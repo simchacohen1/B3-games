@@ -1,0 +1,92 @@
+# Class Pointer classroom pilot
+
+## Dashboard entry
+
+Teachers open **Teacher Tools → Class Pointer — Start a lesson**, choose their class, click **Open teacher classroom**, then **Start class** and **Share teaching screen**. Students already signed in to Fun Torah Tools click **Class Pointer** beside their name. The entry page verifies their existing passcode, reads their account name and active class membership, and waits for that class's lesson. Students join automatically using their account name; the teacher controls pointing/highlighting permissions and can remove students. No passcode is included in a classroom URL or sent to another participant. For other classes, the owner must grant the Class Pointer tool first.
+
+Dashboard lesson discovery stores only temporary room metadata under `b3Games/workspaces/<workspace>/classes/<class>/classPointerSessions/<room>`, using existing authenticated class teacher rules. Disconnect cleanup and End class remove only that room, avoiding interference with another teacher's session. Discovery ignores rooms older than four hours. Screen video, pointers and highlights still travel through PeerJS/WebRTC; no lesson recording is saved. This live-lesson entry is separate from ordinary games' recess schedules; global and class game locks do not block Class Pointer. Active student accounts, class membership, and required Class Pointer grants still apply. Direct join links remain available for manual-name pilot use.
+
+Open `classroom.html` as the teacher. Keep Zoom open for voices and webcams.
+
+1. Click **Start class** and **Copy join link**.
+2. Give the link to one student on another computer. The student enters a name and clicks **Join class**.
+3. The student appears in the teacher roster automatically. Click **Share teaching screen** and choose the teaching window or tab.
+4. Check that the student receives the live picture. Students do not grant camera or microphone access.
+5. Choose **Selected students**, then check **Allow [name] to point**. Moving the student's mouse over the lesson must show their pointer in both views without clicking. Moving out of the picture hides it.
+6. Uncheck the student or choose **Nobody**. The student cannot place a new pointer, and their existing pointer disappears. The teacher can still point.
+7. Add a second student. Allow either one, both, or **Everyone admitted**. Each pointer is independent and labeled.
+8. Choose Target, Arrow, or Star and a color using **Teacher tool / Teacher color** or **My pointer / My color**. Check that the style appears in everyone’s view. Enable **Spotlight the teacher's pointer** to dim the lesson around the teacher’s pointer; the spotlight hides when the teacher leaves the picture.
+9. Choose **Highlighter**, **Underline**, or **Highlight box**, a color, and **Highlight size**, then drag on the lesson. The teacher and permitted students can draw simultaneously. All browsers should show the marks. Underline draws a horizontal line; Highlight box fills the dragged rectangle.
+10. Draw across another person's highlight: the earlier mark stays visible at overlaps. **Undo my highlight** removes only your latest mark; **Clear my highlights** removes only yours. Only the teacher has **Clear all highlights**. Revoking permission prevents new highlights while preserving completed marks. Removing a student clears that student's marks.
+11. Test resizing, Clear teacher pointer, Clear all pointers, Stop sharing, sharing again, Remove student, and End class. Pointer clear buttons do not erase highlights. Stopping sharing clears highlights so they cannot carry over onto different teaching material.
+
+The existing `index.html` practice simulation remains separate.
+
+Teacher and student pages have **Full-screen lesson** above the picture. This expands the entire lesson stage, including pointers, highlights, and spotlight, while hiding the surrounding controls. Click **Exit full screen** in the top-right corner, or press **Escape**, to return. Each person controls their own view. If native browser fullscreen is unavailable, the lesson fills the browser viewport instead. Letterboxing and normalized overlay coordinates update through the existing resize observers. The exit button does not create a pointer or highlight.
+
+While sharing, the teacher also gets **Choose shared area**, **Share full screen**, **Zoom −**, **Zoom +**, and **Move view**. **Choose shared area** opens the original capture and lets the teacher drag a rectangle around the part students should see; the selection keeps the capture's aspect ratio so text is not stretched. The browser renders that selected/zoomed viewport into a new canvas-backed video stream, and that processed stream is what admitted students receive. **Zoom +** moves closer inside the selected area; turn on **Move view** and drag the lesson to pan without placing a teacher pointer or highlight. Changing crop/zoom resets existing pointers and highlights so old marks cannot drift onto different content.
+
+## Connection design
+
+PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. No lesson recording, student camera or student microphone is used. Direct-link names are self-entered; dashboard entry uses the account name. Students with a valid name join automatically while the class is open, up to the 12-student pilot limit. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
+
+The teacher is authoritative: admission and pointing permission are checked on receipt, not only in student controls. Student identities derive from the connection and use a separate namespace from the teacher. Untrusted names render as text. Coordinates are finite values between 0 and 1, relative to the contained video picture. Shapes and colors use fixed allowlists. Only the teacher controls the spotlight. Hover updates are coalesced with a trailing update to retain the final position. Mouse leave, revoking access, disconnecting, stopping capture, or ending class cancels queued updates and removes the appropriate pointer state.
+
+Highlight strokes use the same normalized coordinates and permission policy. Each person's marks are stored independently with connection-derived ownership. SVG masks protect earlier marks from other people's overlapping strokes. Students may undo or clear only their own marks; the teacher may clear the whole lesson. Strokes are limited to 256 points, 40 marks per person, and 240 marks per class to bound browser and network work. Completed marks persist until their owner clears them, the teacher clears all, the student leaves, or screen sharing stops. Highlights stay attached to screen positions; scrolling the captured teaching material does not track document text.
+
+This is a first-device pilot, with a maximum of 12 students per teacher session. Teacher upload bandwidth grows with each student. School filtering, blocked signaling, and restrictive networks can prevent connections. A school-device test is required before classroom use. A managed relay or broadcast service may be needed for dependable connections across school networks or larger classes; that infrastructure is not provisioned by this change.
+
+References: [PeerJS getting started](https://peerjs.com/client/getting-started), [PeerJS API](https://peerjs.com/docs/#api), [PeerJS release 1.5.5](https://github.com/peers/peerjs/releases/tag/v1.5.5).
+
+## Validation
+
+Run `node --test tests/class-pointer.test.cjs tests/class-pointer-viewport.test.cjs`. Tests cover admission, allow-one/several/everyone/nobody policy, malformed coordinates, letterboxing and resize math, connection-bound identity, forged teacher identity, revocation, disconnect cleanup, bounded highlight payloads, and owner-only undo/clear.
+
+Browser verification uses separate teacher and student tabs, the real PeerJS signaling service, real WebRTC media/data connections, and a synthetic animated teaching-screen stream instead of capturing private desktop content. Same-computer tabs do not prove connectivity from a student's school network.
+
+## PDF mode
+
+The teacher page has **Open PDF** beside Share teaching screen. The PDF is read in the teacher's browser with pdf.js (vendor/pdf.min.js, legacy build 3.11.174, Apache-2.0) and sent in 64 KB pieces over the existing PeerJS data connection to each admitted student. Nothing is uploaded or stored online. PDFs up to 25 MB are sent whole to each student. Bigger PDFs (up to 500 MB, for example scanned books) use page-by-page mode: the teacher's browser turns only the pages near the current view (the pages in view, three ahead, one behind) into 2400-px-wide JPEG pictures and sends those; students see the pictures and the first page of a big file may take a moment. Pictures are made with pdf.js print intent so they still work when the teacher tab is hidden. Students who join later receive what they need automatically.
+
+Every browser draws the pages itself (sharp text, right-to-left Hebrew shows as in the file). The teacher's zoom, scroll position and page are copied to students (students follow; they do not scroll). Teacher buttons sit at the bottom of the lesson (so they also work in full screen): Previous, page box + Go, Next, zoom out/in, Fit width, Hide, Close PDF; Ctrl+mouse wheel also zooms.
+
+Pointers and drawings use one document position (x across the page width, y 0..1 down the whole PDF), so they stay on the words at any zoom or screen size. Existing permissions (nobody / selected / everyone, Writing checkbox) are unchanged and still checked by the teacher. Opening a PDF stops screen sharing, and starting screen sharing closes the PDF. Helpers: pdf-core.js (math, tested in tests/class-pointer-pdf.test.cjs), pdf-mode.js (screen). classroom.js exposes a small window.ClassPointerBridge for it.
+
+Limits: pointers/drawings are not text-based (no text selection); overlapping marks from different people are not layered as in screen-share mode; teacher touch-scrolling is not supported (use wheel/buttons); password-protected PDFs are refused.
+
+Two pages side by side: the teacher's **Two pages** button shows pairs like a printed Hebrew book (page 1 alone on the left, then 2 on the right with 3 on the left, and so on). **Page 1 on right/left** swaps sides; **Page 1 alone** turns the lone first page off. The layout is sent to students with every view update. Drawings and pointers are tied to the layout, so switching between one and two pages clears them. The page box + Go button jumps to any page number.
+
+## Pen and whiteboards
+
+**Pen** (toolbar ✒️ Pen, key **D**) draws a solid, thin freehand line on any lesson: shared screen, PDF, webpage, snapshot or whiteboard. It uses the same colors, sizes, Undo/Clear and Writing permission as Highlight. Two dark ink colors (Black, Blue ink) were added for writing on white. Pen lines have their own limit (150 per person, 400 marks per class); highlights keep 40 per person and 240 per class.
+
+**🧾 Whiteboard** opens a blank 16:9 page for everyone, using the webpage lesson mode, so zoom, pointers, all drawing tools and late joiners work as usual. It switches the teacher to Pen with black ink. Close it with **Close whiteboard** at the bottom.
+
+**🧑‍🎨 Student boards** (after Start class) gives every admitted student a private 16:9 board with pen, eraser, six colors, three sizes, Undo, Clear and Full screen. Students need no sharing or permission. The teacher's lesson area becomes a grid with one named tile per student, sized so every board is visible at once and re-laid out as students join, leave, or the window changes size. Tiles update live while a student draws (green border). Click a tile to open that board large: the teacher writes on it (default red) and the student sees it immediately. Students can erase or clear only their own lines; the teacher can undo or clear their own marks or clear a whole board. **Close boards** returns everyone to the lesson; boards are kept (by student name, so a student who refreshes gets his board back) until **Clear all boards** or End class.
+
+Board lines travel as `board-*` messages over the existing PeerJS data connection; nothing is stored online. Both sides apply the same operations, and the author of each change comes from the connection, never from the message. Limits: 400 lines per board, 600 points per line (longer lines are split automatically). Code: `student-boards.js` and `student-boards.css`, with small hooks in `classroom.js` (`window.ClassPointerBoards`) and an optional `opts` argument on `ClassPointerPdf.openSnapshot`.
+
+**Whiteboards or Screens, and pausing a student.** The Student boards bar has a class-wide switch: **📝 Whiteboards** (above) or **🖥 Screens**. In Screens mode each student sees a **Share my screen** button (his browser asks which screen or window), and his live screen appears in his tile; click a tile to watch it large. Screens are view only. The share is a one-way PeerJS media call from the student to the teacher (low frame rate, up to 1600×900), accepted by the teacher only in Screens mode and only for admitted, non-paused students. Switching modes, closing boards, or ending the class stops every student's share; whiteboards are kept. Every tile has **🚫** to pause one student (he sees "Your teacher paused this for you"; his board messages and screen are refused) and **✅** to allow him again. A pause follows the student's name, so it survives a refresh. Screen sharing needs Chrome or Edge on a computer. Each shared screen uses the teacher's download bandwidth, so test with the full class on the school network.
+
+## Send a word or coloring page to all student whiteboards
+
+Teachers can open **Student boards → Whiteboards** to see each boy’s private board in a live grid. The new **Send to all boards** bar lets the teacher enter a Hebrew word or shoresh, optionally add a short instruction, and click **Send word**. Alternatively, click **Coloring page** to upload a JPEG, PNG, WebP or GIF. Uploaded pictures are resized and converted into a bounded JPEG background before being sent over the existing PeerJS connections; animated GIFs display as a still image. All students receive the same fixed word/picture but can draw, mark, underline, or color independently. The word or image is locked beneath the drawing layer; erasers and clear only affect marks.
+
+The teacher sees all students' work updating live in individual named grid tiles. Clicking a tile enlarges that board and allows the teacher to write private feedback visible to that student alone. **Blank boards** removes the activity. Sending another activity clears the prior marks after confirmation if students have drawn. Returning to Screens mode does not delete the teacher's activity; switching back to Whiteboards restores it. Late joiners receive the current activity. Student drawings and backgrounds are transient and disappear at the end of the class. The coloring option is freehand coloring, not a paint-bucket fill tool. The maximum transmitted image payload is 420 KB, so very complex photographs may be refused rather than stall the classroom connection.
+
+## Paste to everyone and individual word editing
+
+In **Student boards → Whiteboards**, the teacher can copy text or an image from another application and press **Ctrl+V** while the teacher grid is open. Text becomes the class word activity; a copied picture/screenshot is converted into the same resized JPEG activity as an uploaded image. Pasting inside the word/instructions field still works normally; click **Send word** afterward. Pasting outside a field sends immediately. Replacing an activity prompts before discarding existing drawings or customized text.
+
+Each boy receives his own editable Hebrew text object when a word is sent. He can type a different word, press **A− / A+** to adjust its size, choose any text color, or select **↔ Move** and drag the word around his board (touch or mouse); his teacher sees those changes live in the named tile. The teacher can edit an individual boy's text from that boy's enlarged board, without affecting classmates. The activity instructions remain shared and not editable by students; the picture background also remains locked. Late joiners start with the original word; a returning student restores his individualized text while the session is open. There is no permanent save across classroom sessions.
+
+## Automatic classroom start
+
+Click **Open teacher classroom** in Teacher Tools → Class Pointer. The classroom page now begins the class session automatically after validating the teacher account and assigned class, connects to PeerJS, publishes the room for student discovery, and enables **Share teaching screen** when ready. There is no second **Start class** click. Browser screen capture still requires the teacher to click **Share teaching screen**, as browsers do not allow a page to start capture automatically. On authorization/connection errors, show a retry button; after intentionally ending the class, show **Start another class**. The existing student automatic-join flow, class isolation, PDF/whiteboard modes, and teacher controls are retained.
+
+## Teacher workspace (design match, Oct 2026)
+
+- Drawing tools appear only after the teacher picks something to teach from. While live, the tabs row shows **Live: <source>**, a **Switch / stop** menu and Full screen.
+- The Students panel is one table: each student's level on the teacher's screen (Nothing, Pointer, + Highlight, + Pen), plus Screen and Board checkboxes. **Everyone** sets the level for the whole class and the default for students who join later (default: Nothing). Levels chosen for students who have not joined yet are remembered by name for this class session.
+- Levels are per student: `publish()` sends each member's own `tools`, and the teacher enforces them on every point and stroke. The full-screen toolbar keeps the original "Tools for selected students" menu.
+- Send screens / Send whiteboards, the join link and Enable student sharing are under **More options** in the panel.

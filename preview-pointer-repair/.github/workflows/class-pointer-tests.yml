@@ -1,0 +1,49 @@
+name: Classroom Pointer checks
+on:
+  push:
+    paths:
+      - 'class-pointer-prototype/**'
+      - 'backend/functions/class-pointer-share-auth.js'
+      - 'backend/functions/index.js'
+      - 'tests/class-pointer*.test.cjs'
+      - 'e2e/class-pointer-activities.spec.ts'
+      - 'e2e/class-pointer-auth-startup.spec.ts'
+      - '.github/workflows/class-pointer-tests.yml'
+  pull_request:
+    paths:
+      - 'class-pointer-prototype/**'
+      - 'backend/functions/class-pointer-share-auth.js'
+      - 'backend/functions/index.js'
+      - 'tests/class-pointer*.test.cjs'
+      - 'e2e/class-pointer-activities.spec.ts'
+      - 'e2e/class-pointer-auth-startup.spec.ts'
+      - '.github/workflows/class-pointer-tests.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check class-pointer-prototype/activity-share.js
+          node --check class-pointer-prototype/activity-screen-teacher.js
+          node --check class-pointer-prototype/classroom.js
+          node --check class-pointer-prototype/student-boards.js
+          node --check class-pointer-prototype/teacher-dashboard.js
+          node --check backend/functions/class-pointer-share-auth.js
+      - name: Classroom Pointer regression tests
+        run: node --test tests/class-pointer*.test.cjs
+      - name: Install browser test dependencies
+        run: npm ci
+      - name: Install browsers
+        run: npx playwright install --with-deps
+      - name: Classroom Pointer browser regression
+        run: npx playwright test e2e/class-pointer-activities.spec.ts e2e/class-pointer-auth-startup.spec.ts --workers=1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pointer-playwright-report
+          path: playwright-report/

@@ -1,0 +1,35 @@
+name: Follow Teacher focused tests
+
+on:
+  pull_request:
+    paths:
+      - 'follow-teacher/**'
+      - 'tests/follow-teacher*.test.cjs'
+      - 'game-gate.js'
+      - 'teacher-home.html'
+      - 'index.html'
+      - '.github/workflows/follow-teacher-tests.yml'
+  push:
+    branches:
+      - 'feat/follow-teacher-foundation-150'
+    paths:
+      - 'follow-teacher/**'
+      - 'tests/follow-teacher*.test.cjs'
+      - 'game-gate.js'
+      - 'teacher-home.html'
+      - 'index.html'
+      - '.github/workflows/follow-teacher-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  navigation-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run focused navigation policy tests
+        run: node --test tests/follow-teacher*.test.cjs

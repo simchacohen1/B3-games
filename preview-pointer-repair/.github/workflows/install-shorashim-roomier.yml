@@ -1,0 +1,493 @@
+name: Make Shorashim Workspace Roomier
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install roomier one-screen layout
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("shorashim/index.html")
+          if not path.exists():
+              raise SystemExit("ERROR: shorashim/index.html was not found.")
+
+          text = path.read_text(encoding="utf-8")
+          marker = 'data-shorashim-roomier-workspace="v3"'
+
+          if marker in text:
+              print("Roomier Shorashim workspace is already installed.")
+              raise SystemExit(0)
+
+          css = r'''
+          <style data-shorashim-roomier-workspace="v3">
+            /*
+              Roomier one-screen learning layout.
+              Keeps the page itself from scrolling on laptop/desktop, but
+              gives the active editing controls enough real space.
+            */
+
+            @media (min-width: 901px) {
+              body.shorashim-learning-active #learnScreen .section-head {
+                grid-template-columns: 145px minmax(0, 1fr) auto !important;
+                gap: 12px !important;
+              }
+
+              .ux-session-actions {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 7px;
+                min-width: 0;
+                white-space: nowrap;
+              }
+
+              .ux-session-count {
+                font-size: .75rem;
+                font-weight: 800;
+                color: #64748b;
+              }
+
+              .ux-end-session {
+                min-height: 32px !important;
+                height: 32px !important;
+                padding: 5px 10px !important;
+                border-radius: 9px !important;
+                font-size: .76rem !important;
+                white-space: nowrap;
+              }
+
+              /* A little less height for cards, more height for tools. */
+              #learnWorkspace #editorContent:not(.hidden) {
+                grid-template-rows:
+                  minmax(205px, 1fr)
+                  42px
+                  196px !important;
+                gap: 7px !important;
+              }
+
+              #learnWorkspace .flashcard.editable {
+                min-height: 205px !important;
+              }
+
+              /* Reset belongs beside Save & Next, not below the viewport. */
+              #learnWorkspace .ux-reset-top {
+                order: 8;
+                min-height: 34px !important;
+                height: 34px !important;
+                padding: 7px 11px !important;
+                margin-left: 2px !important;
+                border-radius: 10px !important;
+                font-size: .78rem !important;
+                white-space: nowrap;
+              }
+
+              #learnWorkspace .editor-actions {
+                display: none !important;
+              }
+
+              #learnWorkspace .session-footer {
+                display: none !important;
+              }
+
+              /*
+                Give the toolbox generous internal spacing. The previous patch
+                made this panel too short and labels began colliding.
+              */
+              #learnWorkspace .tool-columns,
+              #learnWorkspace .tool-columns > .toolbox {
+                min-height: 0 !important;
+                height: 100% !important;
+                overflow: hidden !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox {
+                padding: 10px 12px !important;
+              }
+
+              /* ---------- Text & Card ---------- */
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"].ux-tool-active {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                grid-template-rows: minmax(0, 1fr) auto !important;
+                gap: 8px 12px !important;
+                align-content: stretch !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] > h4 {
+                display: none !important;
+              }
+
+              .ux-settings-group {
+                box-sizing: border-box;
+                min-width: 0;
+                border: 1px solid #e2e8f0;
+                border-radius: 11px;
+                background: #fff;
+                padding: 8px 10px;
+              }
+
+              .ux-settings-group.ux-background-settings {
+                grid-column: 1 / -1;
+                padding-top: 6px;
+                padding-bottom: 6px;
+              }
+
+              .ux-settings-title {
+                font-size: .76rem;
+                font-weight: 900;
+                color: #475569;
+                margin: 0 0 5px;
+                line-height: 1;
+              }
+
+              .ux-settings-fields {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px 12px;
+                align-items: start;
+              }
+
+              .ux-settings-fields > label {
+                min-width: 0;
+                margin: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 4px !important;
+                font-size: .76rem !important;
+                font-weight: 800 !important;
+                line-height: 1.15 !important;
+              }
+
+              .ux-settings-fields > label.ux-color-field {
+                grid-column: 1 / -1;
+              }
+
+              .ux-background-settings .ux-settings-fields {
+                display: block;
+              }
+
+              .ux-background-settings label {
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 9px !important;
+                min-width: 0;
+                font-size: .76rem !important;
+                font-weight: 800 !important;
+                line-height: 1.1 !important;
+              }
+
+              #learnWorkspace .ux-settings-fields input[type="range"] {
+                width: 100% !important;
+                min-width: 90px !important;
+                height: 22px !important;
+                margin: 0 !important;
+              }
+
+              #learnWorkspace .ux-settings-fields select {
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 31px !important;
+                min-height: 31px !important;
+                margin: 0 !important;
+                padding: 3px 9px !important;
+                font-size: .78rem !important;
+              }
+
+              /*
+                Color-palette add-ons use small clickable swatches. Keep them
+                large enough for children, but with enough space that labels
+                no longer sit on top of them.
+              */
+              .ux-settings-group button,
+              .ux-settings-group [role="button"] {
+                flex: 0 0 auto;
+              }
+
+              .ux-settings-group .color-swatch,
+              .ux-settings-group .palette-swatch,
+              .ux-settings-group button[style*="background"] {
+                width: 30px !important;
+                height: 30px !important;
+                min-width: 30px !important;
+                min-height: 30px !important;
+              }
+
+              /* Generic palette rows injected beside the original color inputs. */
+              .ux-settings-group label > div,
+              .ux-settings-group label > span {
+                max-width: 100%;
+              }
+
+              /* ---------- Pictures ---------- */
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"].ux-tool-active {
+                display: grid !important;
+                grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) !important;
+                grid-template-rows: auto 1fr auto !important;
+                gap: 5px 14px !important;
+                align-items: start !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] > h4 {
+                grid-column: 1 / -1 !important;
+                margin: 0 !important;
+              }
+
+              #learnWorkspace #emojiChoices,
+              #learnWorkspace #illustrationChoices {
+                min-height: 48px !important;
+                max-height: 76px !important;
+                overflow-y: auto !important;
+                align-content: flex-start !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-edit-row {
+                grid-column: 1 / -1 !important;
+                margin-top: 2px !important;
+              }
+
+              /* ---------- Draw ---------- */
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"].ux-tool-active {
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr) auto !important;
+                grid-template-rows: auto 1fr !important;
+                gap: 10px 18px !important;
+                align-items: center !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] > h4 {
+                grid-column: 1 / -1 !important;
+                margin: 0 !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .draw-row {
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 18px !important;
+              }
+
+              #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .button-row {
+                margin: 0 !important;
+                justify-content: flex-end !important;
+              }
+            }
+
+            /* Short screens: protect the roomy controls by shrinking cards,
+               never by crushing the controls. */
+            @media (min-width: 901px) and (max-height: 720px) {
+              #learnWorkspace #editorContent:not(.hidden) {
+                grid-template-rows:
+                  minmax(165px, 1fr)
+                  38px
+                  188px !important;
+              }
+
+              #learnWorkspace .flashcard.editable {
+                min-height: 165px !important;
+              }
+
+              .ux-settings-group {
+                padding-top: 6px;
+                padding-bottom: 6px;
+              }
+            }
+          </style>
+          '''
+
+          js = r'''
+          <script data-shorashim-roomier-workspace="v3">
+          (() => {
+            "use strict";
+
+            function byId(id) {
+              return document.getElementById(id);
+            }
+
+            function findLabelFor(input) {
+              return input ? input.closest("label") : null;
+            }
+
+            function makeGroup(className, title, labels) {
+              const group = document.createElement("div");
+              group.className = "ux-settings-group " + className;
+
+              const heading = document.createElement("div");
+              heading.className = "ux-settings-title";
+              heading.textContent = title;
+
+              const fields = document.createElement("div");
+              fields.className = "ux-settings-fields";
+
+              labels.filter(Boolean).forEach(label => fields.appendChild(label));
+
+              group.appendChild(heading);
+              group.appendChild(fields);
+              return group;
+            }
+
+            function organizeTextSettings() {
+              const box = document.querySelector(
+                '#learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"]'
+              );
+              if (!box || box.dataset.roomyOrganized === "1") return;
+
+              const hebrewSize = findLabelFor(byId("hebrewSize"));
+              const hebrewFont = findLabelFor(byId("hebrewFont"));
+              const hebrewColor = findLabelFor(byId("hebrewColor"));
+
+              const englishSize = findLabelFor(byId("englishSize"));
+              const englishFont = findLabelFor(byId("englishFont"));
+              const englishColor = findLabelFor(byId("englishColor"));
+
+              const background = findLabelFor(byId("backgroundColor"));
+
+              if (!hebrewSize || !hebrewFont || !hebrewColor ||
+                  !englishSize || !englishFont || !englishColor || !background) {
+                return;
+              }
+
+              hebrewColor.classList.add("ux-color-field");
+              englishColor.classList.add("ux-color-field");
+              background.classList.add("ux-color-field");
+
+              const hebrewGroup = makeGroup(
+                "ux-hebrew-settings",
+                "Hebrew",
+                [hebrewSize, hebrewFont, hebrewColor]
+              );
+
+              const englishGroup = makeGroup(
+                "ux-english-settings",
+                "English",
+                [englishSize, englishFont, englishColor]
+              );
+
+              const backgroundGroup = makeGroup(
+                "ux-background-settings",
+                "Card",
+                [background]
+              );
+
+              box.appendChild(hebrewGroup);
+              box.appendChild(englishGroup);
+              box.appendChild(backgroundGroup);
+
+              box.dataset.roomyOrganized = "1";
+            }
+
+            function moveResetButton() {
+              const workspace = byId("learnWorkspace");
+              const reset = byId("resetCardBtn");
+              const titleRow = workspace?.querySelector(".editor-panel > .panel-title-row");
+              if (!reset || !titleRow || reset.classList.contains("ux-reset-top")) return;
+
+              reset.classList.add("ux-reset-top");
+              reset.textContent = "Reset Design";
+              titleRow.appendChild(reset);
+            }
+
+            function moveSessionControls() {
+              const sectionHead = document.querySelector("#learnScreen > .section-head");
+              const status = byId("sessionStatus");
+              const end = byId("endSessionBtn");
+              const count = byId("sessionNewCount");
+
+              if (!sectionHead || !status || !end) return;
+              if (sectionHead.querySelector(".ux-session-actions")) return;
+
+              const wrap = document.createElement("div");
+              wrap.className = "ux-session-actions";
+
+              status.parentNode?.removeChild(status);
+              wrap.appendChild(status);
+
+              if (count) {
+                const countWrap = document.createElement("span");
+                countWrap.className = "ux-session-count";
+                count.parentNode?.removeChild(count);
+                countWrap.appendChild(count);
+                wrap.appendChild(countWrap);
+              }
+
+              end.parentNode?.removeChild(end);
+              end.classList.add("ux-end-session");
+              end.textContent = "End Session";
+              wrap.appendChild(end);
+
+              sectionHead.appendChild(wrap);
+            }
+
+            function setup() {
+              organizeTextSettings();
+              moveResetButton();
+              moveSessionControls();
+            }
+
+            function boot() {
+              setup();
+
+              const observer = new MutationObserver(() => {
+                clearTimeout(boot._timer);
+                boot._timer = setTimeout(setup, 40);
+              });
+
+              observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true
+              });
+            }
+
+            if (document.readyState === "loading") {
+              document.addEventListener("DOMContentLoaded", boot, { once: true });
+            } else {
+              boot();
+            }
+          })();
+          </script>
+          '''
+
+          lower = text.lower()
+          head_idx = lower.rfind("</head>")
+          if head_idx == -1:
+              raise SystemExit("ERROR: Could not find </head>.")
+          text = text[:head_idx] + css + "\n" + text[head_idx:]
+
+          lower = text.lower()
+          body_idx = lower.rfind("</body>")
+          if body_idx == -1:
+              raise SystemExit("ERROR: Could not find </body>.")
+          text = text[:body_idx] + js + "\n" + text[body_idx:]
+
+          path.write_text(text, encoding="utf-8")
+          print("Installed roomier Shorashim one-screen workspace.")
+          PY
+
+      - name: Commit roomier workspace
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add shorashim/index.html
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Make Shorashim workspace roomier"
+          git push

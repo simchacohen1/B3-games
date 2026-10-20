@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<script src="text-encoding.js?v=20261013-1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Game Show - Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+<style>
+  /* ===== Theme tokens (gold spotlight is the base; blue overrides) ===== */
+  :root {
+    --bg1: #3a2414; --bg2: #120904;
+    --card: #23150b; --card2: #160d06;
+    --panel: rgba(255, 240, 210, 0.06);
+    --line: rgba(255, 215, 106, 0.28);
+    --accent: #ffd76a; --accent-ink: #2a1708;
+    --glow: rgba(255, 215, 106, 0.55);
+    --hot: #ff7a4d;
+    --good: #4fcf6a; --bad: #e5533d;
+    --text: #fff7e8; --muted: #cdb48e;
+    --radius: 18px;
+    --font: "Rubik", "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
+  }
+  body.theme-blue {
+    --bg1: #123566; --bg2: #040b19;
+    --card: #0d2547; --card2: #06132a;
+    --panel: rgba(200, 228, 255, 0.06);
+    --line: rgba(126, 200, 255, 0.3);
+    --accent: #7ec8ff; --accent-ink: #04101f;
+    --glow: rgba(126, 200, 255, 0.55);
+    --hot: #ffcf4a;
+    --muted: #a7c3e4;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--text);
+    background:
+      radial-gradient(60% 45% at 50% -5%, var(--glow) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 0%, var(--bg1) 0%, var(--bg2) 75%);
+    background-color: var(--bg2);
+    background-attachment: fixed;
+  }
+  button, input, select, textarea { font-family: inherit; }
+  button { cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 15px; font-weight: 700; letter-spacing: .3px;
+    padding: 11px 18px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text);
+    transition: transform .08s, background .15s, border-color .15s, box-shadow .15s;
+  }
+  .btn:hover { border-color: var(--accent); background: rgba(255,255,255,.1); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 18px var(--glow); }
+  .btn-primary:hover { background: var(--accent); filter: brightness(1.08); }
+  .btn-good { background: var(--good); border-color: var(--good); color: #062a0e; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .btn-bad { background: var(--bad); border-color: var(--bad); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .btn-good:hover, .btn-bad:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; }
+  .btn-sm { font-size: 13px; padding: 8px 12px; border-radius: 10px; }
+
+  /* ===== Top bar ===== */
+  .topbar {
+    height: 64px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 22px; gap: 12px;
+  }
+  .logo {
+    font-weight: 900; font-size: 26px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--accent); text-shadow: 0 0 14px var(--glow), 0 2px 0 rgba(0,0,0,.5);
+    white-space: nowrap;
+  }
+  .logo .star { color: var(--hot); text-shadow: none; }
+  .tabs { display: inline-flex; background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+  .tab-btn {
+    border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 15px;
+    padding: 8px 22px; border-radius: 999px;
+  }
+  .tab-btn.active { background: var(--accent); color: var(--accent-ink); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== PLAY: the stage ===== */
+  #tabPlay.active {
+    display: flex; flex-direction: column; gap: 14px;
+    height: calc(100dvh - 64px); padding: 4px 22px 18px;
+    max-width: 1400px; margin: 0 auto;
+  }
+
+  .qcard {
+    position: relative; flex: 3 1 0; min-height: 200px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
+    border: 3px solid var(--accent); border-radius: 26px;
+    box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 0 40px var(--glow), inset 0 0 60px rgba(0,0,0,.45);
+    padding: 34px 40px 22px;
+  }
+  /* Marquee light bulbs along the top and bottom edges */
+  .qcard::before, .qcard::after {
+    content: ""; position: absolute; left: 26px; right: 26px; height: 10px;
+    background: radial-gradient(circle, var(--accent) 0 3px, transparent 4px) 0 50% / 26px 10px repeat-x;
+    filter: drop-shadow(0 0 4px var(--glow));
+    animation: bulbs 1.6s steps(2) infinite;
+  }
+  .qcard::before { top: 9px; }
+  .qcard::after { bottom: 9px; animation-delay: .8s; }
+  @keyframes bulbs { 50% { opacity: .45; } }
+
+  .qnum {
+    position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: var(--accent-ink);
+    font-weight: 900; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 6px 18px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .qnum:empty { display: none; }
+  .qtext {
+    flex: 1 1 auto; min-height: 0; overflow: auto;
+    display: flex; flex-direction: column; justify-content: safe center;
+    text-align: center; white-space: pre-line; overflow-wrap: anywhere;
+    font-weight: 700; line-height: 1.22; font-size: 64px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+    scrollbar-width: thin;
+  }
+  .qtext:focus { outline: none; }
+  .answer {
+    flex-shrink: 0; margin-top: 14px; align-self: center; max-width: 100%;
+    background: rgba(79, 207, 106, .14); border: 2px solid var(--good); color: #b9f5c4;
+    border-radius: 14px; padding: 10px 22px; text-align: center;
+    font-size: clamp(20px, 2.4vw, 32px); font-weight: 700; line-height: 1.3;
+    max-height: 30%; overflow: auto;
+    animation: pop .3s ease;
+  }
+  .answer::before { content: "ANSWER"; display: block; font-size: 12px; letter-spacing: 3px; color: var(--good); margin-bottom: 2px; }
+  .answer:empty { display: none; }
+
+  /* Buzz spotlight + host console share one row */
+  .console {
+    flex-shrink: 0; display: grid; gap: 14px;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    align-items: stretch;
+  }
+  .buzzed {
+    display: flex; align-items: center; gap: 16px; min-width: 0;
+    background: rgba(0,0,0,.35); border: 2px dashed var(--line); border-radius: var(--radius);
+    padding: 10px 20px; transition: all .2s;
+  }
+  .buzzed-label { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+  .buzzed-name { font-size: clamp(22px, 2.6vw, 36px); font-weight: 900; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .buzzed.live { border-style: solid; border-color: var(--hot); background: linear-gradient(90deg, rgba(255,122,77,.25), rgba(0,0,0,.3)); box-shadow: 0 0 30px rgba(255,122,77,.45); }
+  .buzzed.live .buzzed-label { color: var(--hot); }
+  .buzzed.waiting { border-style: solid; border-color: var(--accent); }
+  .buzzed.waiting .buzzed-label, .buzzed.waiting .buzzed-name { color: var(--accent); }
+  .buzzed.waiting .light { background: var(--accent); box-shadow: 0 0 12px var(--glow); }
+  .buzzed.live .buzzed-name { color: #fff; animation: pop .35s ease; }
+  .buzzed .light { width: 18px; height: 18px; border-radius: 50%; background: #444; flex-shrink: 0; box-shadow: inset 0 -2px 4px rgba(0,0,0,.5); }
+  .buzzed.live .light { background: var(--hot); box-shadow: 0 0 16px var(--hot); animation: blink .6s ease-in-out infinite alternate; }
+  @keyframes blink { to { opacity: .45; } }
+  @keyframes pop { 0% { transform: scale(.85); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+  .host {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+    background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px;
+  }
+  .host .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+
+  /* Jump-to-question popover */
+  .jump { position: relative; }
+  .jump summary { list-style: none; }
+  .jump summary::-webkit-details-marker { display: none; }
+  .jump[open] summary { border-color: var(--accent); }
+  .jump-pop {
+    position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 50;
+    width: min(560px, 90vw); max-height: 50vh; overflow: auto;
+    background: var(--card); border: 2px solid var(--accent); border-radius: var(--radius);
+    padding: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.6);
+  }
+  .question-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+  .question-btn {
+    font-size: 15px; font-weight: 700; padding: 9px 0; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  .question-btn:hover { border-color: var(--accent); }
+  .question-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  /* Award strip */
+  .award { display: flex; align-items: center; gap: 10px; }
+  .selected-label { font-size: 14px; color: var(--muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .selected-label b { color: var(--accent); font-size: 17px; }
+  .score-btn { font-size: 20px; min-width: 64px; padding: 9px 14px; }
+
+  /* Contestant podiums */
+  .score-panel { flex: 2 1 0; min-height: 110px; display: flex; flex-direction: column; }
+  .board-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 8px; }
+  .board-head h2 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .board-head span { font-size: 13px; color: var(--muted); }
+  .board {
+    flex: 1; min-height: 0; overflow-y: auto; align-content: start;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px;
+    padding: 4px; scrollbar-width: thin;
+  }
+  .board-empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 24px; border: 2px dashed var(--line); border-radius: var(--radius); }
+  .team {
+    position: relative; cursor: pointer; text-align: center;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.02));
+    border: 2px solid var(--line); border-radius: 16px; padding: 12px 10px 10px;
+    transition: transform .12s, border-color .15s, box-shadow .15s;
+  }
+  .team::after { /* podium base */
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -2px; height: 4px; border-radius: 4px;
+    background: var(--line);
+  }
+  .team:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .team .name { font-weight: 700; font-size: 17px; overflow-wrap: anywhere; margin: 0 14px 2px; }
+  .team .score { font-weight: 900; font-size: 38px; line-height: 1.05; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .team.selected { border-color: var(--accent); background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.04)); box-shadow: 0 0 24px var(--glow); }
+  .team.selected::after { background: var(--accent); }
+  .team.buzzed-in { border-color: var(--hot); box-shadow: 0 0 28px rgba(255,122,77,.6); animation: pop .35s ease; }
+  .team .turn-status { margin-top: 5px; font-size: 12px; font-weight: 800; color: var(--good); }
+  .team .turn-status.has-answered { color: var(--muted); }
+  .team .remove-player {
+    position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; line-height: 20px;
+    background: transparent; border: 0; border-radius: 50%; color: var(--muted); font-size: 18px;
+    opacity: 0; transition: opacity .15s;
+  }
+  .team:hover .remove-player, .team .remove-player:focus-visible { opacity: 1; }
+  .team .remove-player:hover { background: rgba(229,83,61,.25); color: #fff; }
+
+  /* ===== SETUP ===== */
+  #tabSetup { padding: 10px 22px 40px; }
+  .setup-wrap { max-width: 1100px; margin: 0 auto; }
+  .setup-title { margin: 8px 4px 18px; }
+  .setup-title h1 { margin: 0; font-size: 28px; font-weight: 900; }
+  .setup-title p { margin: 4px 0 0; color: var(--muted); }
+  .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .setting .label { flex: 1; min-width: 0; }
+  .card.danger { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .card.danger .hint { margin: 0; }
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  }
+  .card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  .card .hint { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .card.wide { grid-column: 1 / -1; }
+  .card.danger { border-color: rgba(229,83,61,.5); }
+  .card.danger h3 { color: var(--bad); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .row + .row { margin-top: 12px; }
+  .link-box {
+    flex: 1 1 260px; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px;
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .setting {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07);
+  }
+  .setting:first-of-type { border-top: 0; padding-top: 0; }
+  .setting .label b { display: block; font-size: 15px; }
+  .setting .label span { font-size: 13px; color: var(--muted); }
+  .setting .ctrl { display: flex; align-items: center; gap: 10px; flex-shrink: 0; color: var(--muted); font-size: 14px; }
+  /* Switch-style checkbox */
+  .switch { appearance: none; -webkit-appearance: none; width: 46px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.18); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch:checked { background: var(--accent); }
+  .switch:checked::after { transform: translateX(20px); background: var(--accent-ink); }
+  .switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .num, .select {
+    background: rgba(0,0,0,.4); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; font-size: 15px;
+  }
+  .num { width: 64px; text-align: center; }
+  .select { min-width: 200px; }
+  .select option { background: var(--card); }
+  input[type="range"] { accent-color: var(--accent); width: 160px; }
+  .status-line { margin-top: 14px; min-height: 20px; font-size: 14px; color: var(--accent); }
+  .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .theme-opt { position: relative; cursor: pointer; }
+  .theme-opt input { position: absolute; opacity: 0; }
+  .theme-opt .swatch {
+    display: block; height: 70px; border-radius: 12px; border: 2px solid transparent;
+    display: flex; align-items: flex-end; padding: 10px 12px; font-weight: 800; color: #fff;
+  }
+  .theme-opt .gold { background: radial-gradient(120% 120% at 50% 0%, #6a4220, #120904); box-shadow: inset 0 0 0 2px #ffd76a55; }
+  .theme-opt .blue { background: radial-gradient(120% 120% at 50% 0%, #1e5296, #040b19); box-shadow: inset 0 0 0 2px #7ec8ff55; }
+  .theme-opt input:checked + .swatch { border-color: var(--accent); box-shadow: 0 0 18px var(--glow); }
+  .theme-opt input:focus-visible + .swatch { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ===== Lock screen ===== */
+  .lock-overlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; background: inherit; background-color: var(--bg2); }
+  .lock-box { width: 100%; max-width: 380px; text-align: center; background: linear-gradient(180deg, var(--card), var(--card2)); border: 2px solid var(--accent); border-radius: 22px; padding: 32px 28px; box-shadow: 0 0 40px var(--glow); }
+  .lock-box h2 { margin: 6px 0 4px; font-size: 24px; }
+  .lock-box p { margin: 0 0 18px; color: var(--muted); }
+  .lock-box input { width: 100%; font-size: 18px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.4); color: var(--text); margin-bottom: 12px; }
+  .lock-box .btn { width: 100%; margin-top: 4px; }
+  .lock-error { color: #ff9c8a; font-size: 14px; margin-top: 10px; min-height: 18px; }
+
+  /* ===== Question editor ===== */
+  .editor-overlay { display: none; position: fixed; inset: 0; z-index: 1000; overflow-y: auto; padding: 24px 16px; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); }
+  .editor-panel { max-width: 820px; margin: 0 auto; background: linear-gradient(180deg, var(--card), var(--card2)); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .editor-header { position: sticky; top: -24px; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: -22px -22px 18px; padding: 18px 22px; background: var(--card); border-bottom: 1px solid var(--line); border-radius: 22px 22px 0 0; }
+  .editor-header h2 { margin: 0; font-size: 22px; }
+  .editor-header .row { gap: 8px; }
+  .paste-section { background: rgba(0,0,0,.3); border: 1px dashed var(--line); border-radius: 16px; padding: 16px; margin-bottom: 18px; }
+  .paste-section h3 { margin: 0 0 4px; font-size: 16px; }
+  .paste-hint { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .paste-section textarea, .editor-row textarea {
+    width: 100%; font-size: 15px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: rgba(0,0,0,.4); color: var(--text); resize: vertical;
+  }
+  .paste-section textarea { min-height: 110px; }
+  .paste-btn-row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .editor-row { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; counter-increment: qrow; }
+  #editorList { counter-reset: qrow; }
+  .editor-row label { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 6px 0 4px; }
+  .editor-row label:first-child::before { content: "#" counter(qrow) " · "; color: var(--accent); }
+  .editor-row textarea { min-height: 44px; }
+  .editor-del-row { margin-top: 8px; }
+  .editor-add-row { display: flex; margin: 12px auto 0; }
+
+  /* ===== Small screens ===== */
+  @media (max-width: 900px) {
+    .console { grid-template-columns: 1fr; }
+    .host { justify-content: center; }
+  }
+  @media (max-width: 760px) { .setup-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) {
+    .topbar { padding: 0 12px; }
+    .logo { font-size: 18px; letter-spacing: 2px; }
+    .tab-btn { padding: 7px 14px; }
+    #tabPlay.active { padding: 4px 10px 10px; height: auto; min-height: calc(100dvh - 64px); }
+    .qcard { padding: 30px 16px 18px; min-height: 260px; }
+    .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .host .sep { display: none; }
+    #tabSetup { padding: 10px 12px 30px; }
+    .setup-grid { grid-template-columns: 1fr; }
+  }
+</style>
+<style>
+  /* Keep anything marked "hidden" hidden, even buttons with class="btn" */
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body class="play-mode">
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-box">
+    <div class="logo"><span class="star">★</span> GAME SHOW <span class="star">★</span></div>
+    <h2>Host access</h2>
+    <p>Enter the password to run the show.</p>
+    <input type="password" id="lockPassword" placeholder="Password" aria-label="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    <button class="btn btn-primary" onclick="checkPassword()" id="lockUnlock">Unlock</button>
+    <button class="btn btn-primary" id="lockGoogle" style="display:none">Sign in with Google</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="hidden">
+
+<header class="topbar">
+  <div class="logo"><span class="star">★</span> GAME SHOW <span class="star">★</span></div>
+  <nav class="tabs" aria-label="Screens">
+    <button class="tab-btn active" id="tabBtnPlay" onclick="showTab('play')">Play</button>
+    <button class="tab-btn" id="tabBtnSetup" onclick="showTab('setup')">Setup</button>
+  </nav>
+</header>
+
+<main class="tab-panel active" id="tabPlay">
+
+  <section class="qcard" aria-label="Current question">
+    <div class="qnum" id="qnum"></div>
+    <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question" aria-live="polite"></div>
+    <div class="answer" id="answer" aria-live="polite"></div>
+  </section>
+
+  <div class="console">
+    <div class="buzzed" id="buzzedBar" aria-live="assertive">
+      <span class="light" aria-hidden="true"></span>
+      <span class="buzzed-label">Buzzed in</span>
+      <span class="buzzed-name" id="buzzedName">Waiting...</span>
+    </div>
+    <div class="host">
+      <button class="btn" onclick="prevQuestion()" title="Previous question" aria-label="Previous question">◀</button>
+      <button class="btn btn-good" id="startGameShowBtn" onclick="startGameShow()">Start Game Show</button>
+      <button class="btn btn-primary" onclick="reveal()">Show answer</button>
+      <button class="btn" onclick="clearBuzz()">Clear buzzer</button>
+      <button class="btn" onclick="nextQuestion()" title="Next question">Next ▶</button>
+      <details class="jump" id="jumpMenu">
+        <summary class="btn" title="Jump to any question">#</summary>
+        <div class="jump-pop">
+          <div class="question-grid" id="questionGrid" role="navigation" aria-label="Question numbers"></div>
+        </div>
+      </details>
+      <span class="sep" aria-hidden="true"></span>
+      <div class="award">
+        <div class="selected-label" id="selectedLabel">Pick a contestant</div>
+        <button class="btn btn-good score-btn" onclick="adjustSelectedScore(1)" aria-label="Add one point">+1</button>
+        <button class="btn btn-bad score-btn" onclick="adjustSelectedScore(-1)" aria-label="Subtract one point">−1</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="score-panel" aria-label="Contestants">
+    <div class="board-head"><h2>Contestants</h2><span>Click a name to select · × to remove</span></div>
+    <div class="board" id="board"></div>
+  </section>
+
+</main>
+
+<main class="tab-panel" id="tabSetup">
+  <div class="setup-wrap">
+    <div class="setup-title">
+      <h1>Show setup</h1>
+      <p>Everything here saves instantly. Switch back to Play when you're ready.</p>
+    </div>
+
+    <div class="setup-grid">
+
+      <section class="card wide">
+        <h3>Students join here</h3>
+        <p class="hint">Share this link. Students sign in with their Fun Torah Tools name and passcode.</p>
+        <div class="row">
+          <div class="link-box" id="studentLinkText">loading...</div>
+          <button class="btn btn-primary" onclick="copyStudentLink()">Copy link</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Questions</h3>
+        <p class="hint">Type questions, paste six columns for Multiple Choice, or paste the original two-column question and answer format.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="editBtn" onclick="openEditor()">Edit questions</button>
+          <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncQuestionsToDatabase()">Restore built-in questions</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Look</h3>
+        <p class="hint">Changes the Play screen on this computer.</p>
+        <div class="themes">
+          <label class="theme-opt"><input type="radio" name="playTheme" value="gold" onchange="setPlayTheme('gold')"><span class="swatch gold">Gold spotlight</span></label>
+          <label class="theme-opt"><input type="radio" name="playTheme" value="blue" onchange="setPlayTheme('blue')" checked><span class="swatch blue">Blue quiz board</span></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Buzzer rules</h3>
+        <p class="hint">Use either rule, or both together.</p>
+        <div class="setting">
+          <div class="label"><b>Wait before buzzer opens</b><span>Starts each time you go to a question. Students see a countdown.</span></div>
+          <div class="ctrl">
+            <input type="number" class="num" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()" aria-label="Wait seconds"> sec
+            <input type="checkbox" class="switch" id="delayToggle" onchange="saveDelaySettings()" aria-label="Wait before buzzer opens">
+          </div>
+        </div>
+        <div class="setting">
+          <div class="label"><b>Half-second fair buzz</b><span>Default on: if buzzes arrive within half a second, prefer a boy who has not answered. Every boy can buzz every round.</span></div>
+          <div class="ctrl">
+            <input type="number" class="num" id="revealDelaySeconds" value="0.5" min="0.1" max="5" step="0.1" onchange="saveDelaySettings()" aria-label="Window seconds"> sec
+            <input type="checkbox" class="switch" id="revealDelayToggle" checked onchange="saveDelaySettings()" aria-label="Randomize the winner">
+          </div>
+        </div>
+        <div class="setting">
+          <div class="label"><b>Favor boys who haven’t answered yet</b><span>When randomizing, pick from boys waiting for a turn first. If none buzz, choose from those who did.</span></div>
+          <div class="ctrl">
+            <input type="checkbox" class="switch" id="preferUnansweredToggle" checked onchange="saveDelaySettings()" aria-label="Favor boys who have not answered yet">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Sound</h3>
+        <p class="hint">Click a preview once to turn sound on for this screen.</p>
+        <div class="setting">
+          <div class="label"><b>Buzz-in sound</b><span>Student screens use it too.</span></div>
+          <div class="ctrl">
+            <select id="buzzSoundSelect" class="select" onchange="setBuzzSound(this.value)" aria-label="Buzz-in sound">
+              <option value="ding">Bell ding</option>
+                    <option value="chime">Triple chime</option>
+              <option value="zap">Laser zap</option>
+              <option value="bloop">Quiz-board bloop</option>
+              <option value="alarm">Lock-in alarm</option>
+              <option value="random">Surprise me (random)</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="label"><b><label for="buzzerVolume">Volume</label></b></div>
+          <div class="ctrl">
+            <input id="buzzerVolume" type="range" min="0" max="100" value="75" oninput="setBuzzerVolume(this.value)" aria-describedby="buzzerVolumeValue">
+            <output id="buzzerVolumeValue" for="buzzerVolume">75%</output>
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <button class="btn btn-sm" id="enableSoundBtn" onclick="enableSound()">▶ Buzz</button>
+          <button class="btn btn-sm" onclick="playApplauseSound()">▶ Correct</button>
+          <button class="btn btn-sm" onclick="playWrongSound()">▶ Wrong</button>
+        </div>
+        <div class="status-line" id="soundStatus" aria-live="polite"></div>
+      </section>
+
+      <section class="card danger wide">
+        <div><h3>New game</h3>
+        <p class="hint">Clears every contestant and score. Questions are kept.</p></div>
+        <button class="btn btn-bad" id="resetGameBtn" onclick="resetGame()">Reset game</button>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<div class="editor-overlay" id="editorOverlay" role="dialog" aria-modal="true" aria-label="Edit questions">
+  <div class="editor-panel">
+    <div class="editor-header">
+      <h2>Edit questions</h2>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditor()">Save changes</button>
+      </div>
+    </div>
+
+    <div class="paste-section">
+      <h3>Paste from a spreadsheet</h3>
+      <div class="paste-hint">For Multiple Choice paste 6 columns: Question, Red, Blue, Green, Yellow, Correct. Correct can be a color, A–D, 1–4, or the answer text. The first header row is optional. Old 2-column Question / Answer pastes still work. Copy from Sheets, Excel, ChatGPT or Claude.</div>
+      <textarea id="pasteBox" placeholder="Question&#9;Red&#9;Blue&#9;Green&#9;Yellow&#9;Correct&#10;How many malochim came to Avrohom?&#9;Two&#9;Four&#9;Three&#9;Five&#9;Green"></textarea>
+      <div class="paste-btn-row">
+        <button class="btn btn-sm btn-primary" onclick="loadPasted(false)">Add to list</button>
+        <button class="btn btn-sm btn-bad" onclick="loadPasted(true)">Replace whole list</button>
+      </div>
+    </div>
+
+    <div id="editorList"></div>
+    <button class="btn editor-add-row" onclick="addQuestionRow()">+ Add a question</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ---- CHANGE THIS PASSWORD TO WHATEVER YOU WANT ----
+const TEACHER_PASSWORD = "class123";
+// ------------------------------------------------------
+
+// Every teacher opens Game Show from their assigned class. Missing/invalid class
+// context fails closed instead of falling back to a shared ET/WT game.
+const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || 'unassigned').trim();
+const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
+const CLASS_SPACE = true;
+
+function checkPassword() {
+  if (CLASS_SPACE) return;
+  const entered = document.getElementById('lockPassword').value;
+  if (entered === TEACHER_PASSWORD) {
+    document.getElementById('lockOverlay').style.display = 'none';
+    document.getElementById('mainContent').classList.remove('hidden');
+    sessionStorage.setItem('teacherUnlocked', 'yes');
+    if (typeof closeRoundForTeacherSession === 'function') closeRoundForTeacherSession();
+  } else {
+    document.getElementById('lockError').textContent = 'Incorrect password - try again.';
+  }
+}
+
+function showTab(name) {
+  document.getElementById('tabPlay').classList.toggle('active', name === 'play');
+  document.getElementById('tabSetup').classList.toggle('active', name === 'setup');
+  document.getElementById('tabBtnPlay').classList.toggle('active', name === 'play');
+  document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
+  document.body.classList.toggle('play-mode', name === 'play');
+  if (name === 'play') requestAnimationFrame(fitQuestion);
+}
+
+// Shrinks the question text from very large until it fits the card, so short
+// questions fill the screen and long ones still fit without scrolling.
+function fitQuestion() {
+  const el = document.getElementById('qtext');
+  if (!el || !el.clientHeight) return;
+  let size = Math.max(36, Math.min(110, window.innerWidth / 12));
+  el.style.fontSize = size + 'px';
+  while (size > 26 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) {
+    size -= 2;
+    el.style.fontSize = size + 'px';
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitQuestion));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitQuestion);
+
+function setPlayTheme(theme) {
+  document.body.classList.remove('theme-blue');
+  if (theme === 'blue') document.body.classList.add('theme-blue');
+  try { localStorage.setItem('gameShowTheme', theme); } catch (e) {}
+}
+
+function loadSavedTheme() {
+  let theme = 'blue';
+  try { theme = localStorage.getItem('gameShowTheme') || 'blue'; } catch (e) {}
+  setPlayTheme(theme);
+  const radio = document.querySelector('input[name="playTheme"][value="' + theme + '"]');
+  if (radio) radio.checked = true;
+}
+loadSavedTheme();
+
+// Builds the student-facing link automatically from this page's own URL, by
+// swapping "teacher.html" for "player.html", so it's always correct no
+// matter where this file is hosted.
+function getStudentLink() {
+  return window.location.href.replace(/teacher\.html(\?.*)?$/, 'player.html') + (CLASS_SPACE ? '?class=' + encodeURIComponent(GS_CLASS) : '');
+}
+
+function copyStudentLink() {
+  const link = getStudentLink();
+  navigator.clipboard.writeText(link).then(() => {
+    document.getElementById('soundStatus').textContent = 'Student link copied!';
+  }).catch(() => {
+    prompt('Copy this link:', link);
+  });
+}
+
+document.getElementById('studentLinkText').textContent = getStudentLink();
+
+// Skip re-entering the password if already unlocked earlier in this browser tab.
+if (!CLASS_SPACE && sessionStorage.getItem('teacherUnlocked') === 'yes') {
+  document.getElementById('lockOverlay').style.display = 'none';
+  document.getElementById('mainContent').classList.remove('hidden');
+}
+
+// ---- REPLACE WITH YOUR FIREBASE CONFIG ----
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+// --------------------------------------------
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// Every screen measures the wait timer against Firebase's server clock, so a
+// student whose computer clock is a few seconds off still unlocks on time.
+let serverOffset = 0;
+db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
+function serverNow() { return Date.now() + serverOffset; }
+const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
+function closeRoundForTeacherSession() {
+  // Opening or refreshing the host console always puts students in the lobby;
+  // the teacher explicitly starts the show before the first round is opened.
+  gameRef.update({ showStarted: false, roundActive: false, revealed: false, buzzedBy: null, buzzPool: null, buzzOpenAt: null, buzzUnlockAt: 0 }).catch(() => {});
+}
+// While this teacher screen is open and unlocked, tell student screens the game is live.
+// Students who open the Game Show when no teacher screen is open see a waiting message
+// instead of an old, finished game.
+setInterval(() => {
+  if (!document.getElementById('mainContent').classList.contains('hidden')) {
+    gameRef.child('hostSeenAt').set(firebase.database.ServerValue.TIMESTAMP).catch(() => {});
+  }
+}, 20000);
+
+// This is the question set teacher.html knows about locally, used only as a
+// one-time fallback seed if the database is ever empty. The real "master" copy
+// lives in the database from now on - edit it using the on-page editor.
+const ACTIVE_SET_ID = "vayeira18";
+const ACTIVE_SET_TITLE = "Game Show";
+const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' : "questionSets/" + ACTIVE_SET_ID);
+
+// Reuse the verified owner account for the original shared B3 show.
+// Other teachers still use their assigned class and its existing grant checks.
+if (!CLASS_SPACE) {
+  window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => {
+    const owner = !!(user && authorized && access && access.role === 'admin'
+      && !window.B3SiteSettings.getActingStudent());
+    if (owner) {
+      document.getElementById('lockOverlay').style.display = 'none';
+      document.getElementById('mainContent').classList.remove('hidden');
+      window.gameShowOwnerUnlocked = true;
+      closeRoundForTeacherSession();
+    } else if (window.gameShowOwnerUnlocked) {
+      document.getElementById('lockOverlay').style.display = '';
+      document.getElementById('mainContent').classList.add('hidden');
+      window.gameShowOwnerUnlocked = false;
+    }
+  });
+}
+
+if (CLASS_SPACE) {
+  document.getElementById('lockPassword').style.display = 'none';
+  document.getElementById('lockUnlock').style.display = 'none';
+  const lockError = document.getElementById('lockError');
+  lockError.textContent = 'Checking your teacher account…';
+  document.getElementById('lockGoogle').onclick = () => window.B3SiteSettings.signInWithGoogle().catch(err => { lockError.textContent = (err && err.message) || 'Google sign-in did not complete.'; });
+  window.B3SiteSettings.onAuthStateChanged(async (user, authorized, access) => {
+    if (!user || !authorized) {
+      document.getElementById('lockGoogle').style.display = '';
+      lockError.textContent = user ? 'This Google account is not a Fun Torah Tools teacher.' : 'Sign in with your teacher Google account.';
+      return;
+    }
+    const admin = access && access.role === 'admin';
+    if (admin) {
+      try {
+        const classSnap = await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes').once('value');
+        const rows = classSnap.val() || {};
+        window.gameShowLibraryClassIds = Object.keys(rows).filter(id => rows[id] && rows[id].active !== false);
+      } catch (err) {
+        console.warn('Could not load classes for Game Show question sharing:', err.message);
+        window.gameShowLibraryClassIds = [];
+      }
+    } else {
+      window.gameShowLibraryClassIds = (access && access.classIds || []).slice();
+    }
+    if (GS_CLASS === 'unassigned') {
+      const classesSnap = admin ? await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes').once('value') : null;
+      const rows = classesSnap ? (classesSnap.val() || {}) : {};
+      const classIds = admin ? Object.keys(rows).filter(id => rows[id] && rows[id].active !== false) : ((access && access.classIds) || []);
+      const available = classIds.filter(id => /^[A-Za-z0-9_-]{1,100}$/.test(id));
+      if (!available.length) { lockError.textContent = admin ? 'There are no active classes to open Game Show for.' : 'No class is assigned to this teacher account.'; return; }
+      const wrapper = document.createElement('div');
+      wrapper.id = 'gameShowClassChooser';
+      wrapper.style.cssText = 'display:grid;gap:12px;margin-top:14px';
+      const select = document.createElement('select');
+      select.id = 'gameShowClassSelect';
+      select.setAttribute('aria-label', 'Choose a class');
+      select.style.cssText = 'padding:12px;border-radius:10px;font-size:18px;width:100%';
+      available.forEach(id => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = rows[id]?.name || id;
+        select.appendChild(option);
+      });
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'btn btn-primary';
+      openButton.textContent = 'Open Game Show for this class';
+      openButton.onclick = () => {
+        const url = new URL(location.href);
+        url.searchParams.set('class', select.value);
+        location.replace(url.toString());
+      };
+      wrapper.append(select, openButton);
+      document.getElementById('gameShowClassChooser')?.remove();
+      lockError.parentElement.appendChild(wrapper);
+      document.querySelector('#lockOverlay .lock-box > p').textContent = 'Choose which class will host the game.';
+      lockError.textContent = 'Select one of your active classes to continue.';
+      return;
+    }
+    if (!admin && !((access && access.classIds) || []).includes(GS_CLASS)) { lockError.textContent = 'This class is not assigned to your teacher account.'; return; }
+    const cls = (await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes/' + GS_CLASS).once('value')).val();
+    if (!cls || cls.active === false || (!admin && !(cls.toolGrants && cls.toolGrants['game-show'] === true))) { lockError.textContent = 'Game Show is not turned on for this class. Ask the admin.'; return; }
+    document.getElementById('lockGoogle').style.display = 'none';
+    document.getElementById('lockOverlay').style.display = 'none';
+    document.getElementById('mainContent').classList.remove('hidden');
+    closeRoundForTeacherSession();
+  });
+}
+
+const localQuestions = [
+  { q: "וַיֵּרָא אֵלָיו\nThis phrase means...", ans: "Hashem appeared to him (Avrohom)" },
+  { q: "כְּחֹם הַיּוֹם\nThis phrase means... (why was Avrohom outside despite this?)", ans: "In the heat of the day - yet Avrohom still sat at the entrance of his tent hoping for guests" },
+  { q: "שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים\nHow many men (malachim) did Avrohom see standing near him?", ans: "Three" },
+  { q: "וַיָּרׇץ לִקְרָאתָם\nThis phrase means...", ans: "He ran toward them (to greet his guests)" },
+  { q: "אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ\n'Chein' in this posuk means...", ans: "Favor / good will" },
+  { q: "אַל נָא תַעֲבֹר מֵעַל עַבְדֶּךָ\nThis phrase means...", ans: "Please do not pass by your servant" },
+  { q: "יֻקַּח נָא מְעַט מַיִם\nWhat did Avrohom offer to bring first?", ans: "A little water, to wash their feet" },
+  { q: "וְהִשָּׁעֲנוּ תַּחַת הָעֵץ\nThis phrase means...", ans: "Rest yourselves under the tree" },
+  { q: "וְסַעֲדוּ לִבְּכֶם\nThis phrase means...", ans: "Refresh/sustain yourselves" },
+  { q: "פַת לֶחֶם\nEven though Avrohom said he'd bring just 'a piece of bread,' what did he actually serve?", ans: "A whole feast - meat, milk, butter, and freshly baked cakes" },
+  { q: "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה\n'Vayemaher' means...", ans: "He hurried" },
+  { q: "שְׁלֹשׁ סְאִים קֶמַח סֹלֶת\nThis phrase means...", ans: "Three se'ah of fine flour (a very generous amount)" },
+  { q: "בֶּן בָּקָר רַךְ וָטוֹב\nWhat did Avrohom run to get from the herd?", ans: "A tender, good calf" },
+  { q: "וַיִּתֵּן אֶל הַנַּעַר\nThis phrase means...", ans: "He gave it to the youth (his servant) to prepare" },
+  { q: "חֶמְאָה וְחָלָב\nThis phrase means...", ans: "Butter and milk" },
+  { q: "וְהוּא עֹמֵד עֲלֵיהֶם תַּחַת הָעֵץ\nWhat did Avrohom do while his guests ate?", ans: "He personally stood and served them, even though he was wealthy and elderly" },
+  { q: "אַיֵּה שָׂרָה אִשְׁתֶּךָ\nWhat did the malachim ask Avrohom?", ans: "'Where is Sarah your wife?'" },
+  { q: "הִנֵּה בָאֹהֶל\nAvrohom's answer that Sarah was in the tent teaches us that Sarah was...", ans: "Tznius (modest, staying inside rather than mingling with guests)" },
+  { q: "כָּעֵת חַיָּה\nWhat did Hashem promise would happen 'at this time next year'?", ans: "Sarah would have a son" },
+  { q: "וְשָׂרָה שֹׁמַעַת פֶּתַח הָאֹהֶל\nThis phrase means...", ans: "Sarah was listening at the entrance of the tent" },
+  { q: "זְקֵנִים בָּאִים בַּיָּמִים\nThis phrase describes Avrohom and Sarah as...", ans: "Old, advanced in years" },
+  { q: "חָדַל לִהְיוֹת לְשָׂרָה אֹרַח כַּנָּשִׁים\nThis phrase teaches that having a baby naturally was no longer possible for Sarah - so what would it take?", ans: "A miracle from Hashem" },
+  { q: "וַתִּצְחַק שָׂרָה בְּקִרְבָּהּ\n'Vatitzchak' means...", ans: "And she laughed" },
+  { q: "אַחֲרֵי בְלֹתִי הָיְתָה לִּי עֶדְנָה\nThis phrase means...", ans: "'Now that I am old, will I have this joy?'" },
+  { q: "לָמָּה זֶּה צָחֲקָה שָׂרָה\nWhat did Hashem ask Avrohom?", ans: "Why did Sarah laugh?" },
+  { q: "וַאֲנִי זָקַנְתִּי\nHashem left out that Sarah also said Avrohom was old when repeating her words. What lesson does this teach?", ans: "It's permitted to change small details for the sake of peace (shalom bayis)" },
+  { q: "הֲיִפָּלֵא מֵה' דָּבָר\nThis phrase teaches us that...", ans: "Nothing is too wondrous/hard for Hashem" },
+  { q: "לַמּוֹעֵד אָשׁוּב אֵלֶיךָ\nThis phrase means...", ans: "At the appointed time I will return to you" },
+  { q: "וַתְּכַחֵשׁ שָׂרָה\nWhy did Sarah deny that she laughed?", ans: "Because she was afraid" },
+  { q: "לֹא כִּי צָחָקְתְּ\nThis phrase means Hashem told her...", ans: "'No, you did laugh' (teaching us the value of honesty)" },
+  { q: "וַיַּשְׁקִפוּ עַל פְּנֵי סְדֹם\nThis phrase means the malachim...", ans: "Looked out toward Sedom" },
+  { q: "וְאַבְרָהָם הֹלֵךְ עִמָּם לְשַׁלְּחָם\nThis phrase means...", ans: "Avrohom walked with them to escort/see them off" },
+  { q: "הַמְכַסֶּה אֲנִי מֵאַבְרָהָם\nWhat did Hashem say about Avrohom?", ans: "'Should I hide from Avrohom what I am about to do?'" },
+  { q: "אֲשֶׁר אֲנִי עֹשֶׂה\nThis phrase refers to Hashem's plan to...", ans: "Destroy Sedom and Amora" },
+  { q: "לְגוֹי גָּדוֹל וְעָצוּם\nThis phrase means Avrohom would become...", ans: "A great and mighty nation" },
+  { q: "וְנִבְרְכוּ בוֹ כֹּל גּוֹיֵי הָאָרֶץ\nThis phrase means...", ans: "All the nations of the earth will be blessed through him" },
+  { q: "כִּי יְדַעְתִּיו\nWhy did Hashem choose Avrohom, according to this posuk?", ans: "To teach his children to do tzedakah and mishpat" },
+  { q: "וְשָׁמְרוּ דֶּרֶךְ ה׳\nThis phrase means...", ans: "And they will keep the way of Hashem" },
+  { q: "זַעֲקַת סְדֹם וַעֲמֹרָה\nThis phrase means...", ans: "The outcry/complaint against Sedom and Amora" },
+  { q: "וְחַטָּאתָם כִּי כָבְדָה מְאֹד\nThis phrase means...", ans: "Their sin is very heavy/great" },
+  { q: "אֵרְדָה נָּא וְאֶרְאֶה\nThis phrase means...", ans: "I will go down and see" },
+  { q: "וְאִם לֹא אֵדָעָה\nThis phrase teaches an important lesson about judging others - what is it?", ans: "Investigate the facts fairly before punishing, rather than judging right away" },
+  { q: "וְאַבְרָהָם עוֹדֶנּוּ עֹמֵד\nWhat was Avrohom still doing before Hashem?", ans: "Standing (davening/praying)" },
+  { q: "וַיֵּלְכוּ סְדֹמָה\nThis phrase means...", ans: "The malachim went toward Sedom, while Avrohom stayed to daven" },
+  { q: "וַיִּגַּשׁ אַבְרָהָם\n'Vayigash' means...", ans: "He drew near / approached" },
+  { q: "הַאַף תִּסְפֶּה צַדִּיק עִם רָשָׁע\nThis phrase means...", ans: "'Will You also sweep away the righteous with the wicked?'" },
+  { q: "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם\nHow many tzadikim did Avrohom first ask Hashem about?", ans: "Fifty" },
+  { q: "וְלֹא תִשָּׂא לַמָּקוֹם\nThis phrase means...", ans: "And will You not forgive/spare the place" },
+  { q: "חָלִלָה לְּךָ\nThis phrase means...", ans: "It would be unthinkable/a desecration for You" },
+  { q: "הֲשֹׁפֵט כׇּל הָאָרֶץ לֹא יַעֲשֶׂה מִשְׁפָּט\nThis phrase means...", ans: "'Shall the Judge of all the earth not act justly?'" },
+  { q: "אִם אֶמְצָא בִסְדֹם חֲמִשִּׁים צַדִּיקִם\nWhat did Hashem answer if 50 tzadikim were found?", ans: "He would spare the entire place" },
+  { q: "בַּעֲבוּרָם\nThis word teaches us how powerful even a small number of tzadikim can be - what does it mean?", ans: "'For their sake' - Hashem would spare the whole city for their merit" },
+  { q: "אָנֹכִי עָפָר וָאֵפֶר\nThis phrase shows Avrohom's...", ans: "Humility - 'I am but dust and ashes'" },
+  { q: "הוֹאַלְתִּי לְדַבֵּר אֶל אֲדֹנָי\nThis phrase means...", ans: "'I have begun/taken it upon myself to speak to my Lord'" },
+  { q: "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם חֲמִשָּׁה\nAvrohom asks: what if there are 5 fewer than fifty tzadikim?", ans: "Forty-five" },
+  { q: "הֲתַשְׁחִית בַּחֲמִשָּׁה אֶת כׇּל הָעִיר\nThis phrase means...", ans: "'Will You destroy the whole city for a shortage of five?'" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם אַרְבָּעִים\nAvrohom lowers his request to how many?", ans: "Forty" },
+  { q: "וַיֹּסֶף עוֹד לְדַבֵּר אֵלָיו\nThis phrase means...", ans: "And he continued further to speak to Hashem (kept davening even after being answered)" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם שְׁלֹשִׁים\nAvrohom lowers his request to how many?", ans: "Thirty" },
+  { q: "אַל נָא יִחַר לַאדֹנָי\nThis phrase means...", ans: "'Please let it not upset my Lord' (Avrohom's respectful, careful tone)" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם עֶשְׂרִים\nAvrohom lowers his request to how many?", ans: "Twenty" },
+  { q: "הוֹאַלְתִּי לְדַבֵּר\nThis phrase means...", ans: "'I have taken it upon myself to speak' (repeated humbly)" },
+  { q: "בַּעֲבוּר הָעֲשָׂרָה\nWhat is the final, lowest number Avrohom asks about?", ans: "Ten" },
+  { q: "אַךְ הַפַּעַם\nThis phrase means...", ans: "'Just this one more time' (Avrohom's final request)" },
+  { q: "וַיֵּלֶךְ ה' כַּאֲשֶׁר כִּלָּה\nThis phrase means...", ans: "Hashem went, once He finished speaking" },
+  { q: "וְאַבְרָהָם שָׁב לִמְקֹמוֹ\nThis phrase means...", ans: "And Avrohom returned to his place" },
+];
+
+// These get filled in once the active question set is loaded from the database
+// (or, the first time ever, seeded into the database from localQuestions below).
+let questions = [];
+let questionsReady = false;
+
+function buildFromQuestions(data) {
+  const repaired = window.GameShowTextEncoding.repairQuestions(data);
+  questions = repaired.questions;
+  if (repaired.changed) setRef.update({ questions: repaired.questions }).catch(err => console.warn("Could not migrate repaired Game Show question text:", err));
+  buildQuestionGrid();
+  questionsReady = true;
+}
+
+// Flattens the old posuk-grouped format (heb/en/ans per posuk) into the new
+// flat question/answer format, so nothing is lost if this file is loaded
+// against a database that still has the old-style data in it.
+function flattenLegacyPosukData(posukData) {
+  const flat = [];
+  posukData.forEach(p => {
+    p.questions.forEach(q => {
+      const text = (q.heb ? q.heb + "\n" : "") + (q.en || "");
+      flat.push({ q: text, ans: q.ans || "" });
+    });
+  });
+  return flat;
+}
+
+function syncQuestionsToDatabase() {
+  if (CLASS_SPACE) { alert('This class uses its own questions. Add them in the Setup tab.'); return; }
+  const sure = confirm("Are you sure? " + "This will REPLACE your current question list with the original built-in Vayeira Perek 18 list this file shipped with. Any edits you made will be lost.");
+  if (!sure) return;
+  setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
+    document.getElementById('soundStatus').textContent = 'Restored built-in questions';
+  }).catch(err => {
+    document.getElementById('soundStatus').textContent = 'Sync error: ' + err.message;
+  });
+}
+
+// On load: read the active question set from the database. If it doesn't exist
+// yet (first time this game is ever run), seed it from localQuestions automatically.
+// If it exists in the old posuk-grouped format, flatten it automatically.
+setRef.once('value').then(snap => {
+  const existing = snap.val();
+  if (existing && existing.questions) {
+    buildFromQuestions(existing.questions);
+  } else if (existing && existing.posukData) {
+    const flat = flattenLegacyPosukData(existing.posukData);
+    setRef.set({ title: ACTIVE_SET_TITLE, questions: flat }).then(() => {
+      buildFromQuestions(flat);
+      document.getElementById('soundStatus').textContent = 'Converted old question format automatically';
+    });
+  } else if (CLASS_SPACE && ['et', 'wt'].includes(GS_CLASS)) {
+    // Seed each original B3 class with its own copy of the previously shared
+    // question set; later edits stay isolated between the classes.
+    db.ref('questionSets/' + ACTIVE_SET_ID).once('value').then(legacySnap => {
+      const legacyQuestions = legacySnap.val()?.questions;
+      if (Array.isArray(legacyQuestions) && legacyQuestions.length) {
+        setRef.set({ title: ACTIVE_SET_TITLE, questions: legacyQuestions }).then(() => {
+          buildFromQuestions(legacyQuestions);
+          document.getElementById('soundStatus').textContent = 'Copied the existing questions into this class.';
+        });
+      } else {
+        buildFromQuestions([]);
+        document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
+      }
+    }).catch(() => {
+      buildFromQuestions([]);
+      document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
+    });
+  } else if (CLASS_SPACE) {
+    // A new class starts with no questions; its teacher adds their own.
+    buildFromQuestions([]);
+    document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
+  } else {
+    setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
+      buildFromQuestions(localQuestions);
+      document.getElementById('soundStatus').textContent = 'Question set created in database';
+    });
+  }
+  setRef.on('value', liveSnap => {
+    const liveData = liveSnap.val();
+    if (liveData && liveData.questions) {
+      buildFromQuestions(liveData.questions);
+    }
+  });
+});
+
+function loadQuestion(qIndex) {
+  const q = questions[qIndex] || questions[0];
+  if (!q) { document.getElementById('qnum').textContent = ''; document.getElementById('qtext').textContent = 'No questions yet. Add your own in the Setup tab.'; return; }
+  document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
+  document.getElementById('qtext').textContent = q.q;
+  highlightActiveQuestion(qIndex);
+  requestAnimationFrame(fitQuestion);
+}
+
+function buildQuestionGrid() {
+  const grid = document.getElementById('questionGrid');
+  grid.innerHTML = '';
+  questions.forEach((q, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'question-btn';
+    btn.id = 'qBtn' + i;
+    btn.textContent = i + 1;
+    btn.onclick = () => goToQuestion(i);
+    grid.appendChild(btn);
+  });
+}
+
+function highlightActiveQuestion(qIndex) {
+  questions.forEach((q, i) => {
+    const btn = document.getElementById('qBtn' + i);
+    if (btn) btn.classList.toggle('active', i === qIndex);
+  });
+}
+
+function saveDelaySettings() {
+  const on = document.getElementById('delayToggle').checked;
+  const secs = parseInt(document.getElementById('delaySeconds').value) || 10;
+  const revOn = document.getElementById('revealDelayToggle').checked;
+  const revSecs = Math.max(0.1, parseFloat(document.getElementById('revealDelaySeconds').value) || 0.5);
+  gameRef.child('buzzerDelayOn').set(on);
+  gameRef.child('buzzerDelaySeconds').set(secs);
+  gameRef.child('revealDelayOn').set(revOn);
+  gameRef.child('revealDelaySeconds').set(revSecs);
+  gameRef.child('preferUnanswered').set(document.getElementById('preferUnansweredToggle').checked);
+}
+
+function goToQuestion(qIndex, startImmediately = !!lastGameData.showStarted) {
+  ensureAudioAwake();
+  document.getElementById('jumpMenu').open = false;
+  const delayOn = document.getElementById('delayToggle').checked;
+  const delaySecs = parseInt(document.getElementById('delaySeconds').value) || 10;
+  const now = serverNow();
+  const unlockAt = startImmediately ? (delayOn ? now + delaySecs * 1000 : now) : 0;
+  const updates = {
+    qIndex: qIndex,
+    roundActive: startImmediately,
+    revealed: false,
+    buzzedBy: null,
+    selectedPlayer: null,
+    buzzPool: null,
+    buzzUnlockAt: startImmediately ? unlockAt : 0,
+    // The real moment the buzzer becomes live - either right away, or once
+    // the wait timer above finishes. The randomize-winner window (if on)
+    // is measured from this moment.
+    buzzOpenAt: startImmediately ? unlockAt : null
+  };
+  gameRef.update(updates);
+}
+
+// The first question opens only after the teacher starts the show. Later
+// questions open automatically when selected or advanced to.
+function startGameShow() {
+  ensureAudioAwake();
+  const qIndex = Number(lastGameData && lastGameData.qIndex) || 0;
+  if (!questions[qIndex]) {
+    document.getElementById('soundStatus').textContent = 'Add a question before starting the round.';
+    return;
+  }
+  const delayOn = document.getElementById('delayToggle').checked;
+  const now = serverNow();
+  const unlockAt = delayOn ? now + (parseInt(document.getElementById('delaySeconds').value) || 10) * 1000 : now;
+  gameRef.update({
+    showStarted: true,
+    roundActive: true,
+    revealed: false,
+    buzzedBy: null,
+    selectedPlayer: null,
+    buzzPool: null,
+    buzzUnlockAt: unlockAt,
+    buzzOpenAt: unlockAt
+  });
+}
+
+function nextQuestion() {
+  gameRef.child('qIndex').once('value', snap => {
+    const current = snap.val() || 0;
+    goToQuestion((current + 1) % questions.length, !!lastGameData.showStarted);
+  });
+}
+
+function prevQuestion() {
+  gameRef.child('qIndex').once('value', snap => {
+    const current = snap.val() || 0;
+    goToQuestion((current - 1 + questions.length) % questions.length);
+  });
+}
+
+function ensureAudioAwake() {
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+}
+
+// Browsers silently re-suspend (or never fully unlock) an AudioContext that
+// isn't tied to a very recent user gesture on THIS tab. Since buzzes are
+// triggered from the student's tab, not this one, the teacher tab can go
+// quiet for long stretches with no gesture of its own to wake it back up.
+// Resuming on every single click anywhere on this page - not just the
+// dedicated "enable sound" button - keeps it alive far more reliably.
+document.addEventListener('click', () => {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } else if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+});
+
+function reveal() {
+  ensureAudioAwake();
+  gameRef.child('revealed').set(true);
+}
+
+function clearBuzz() {
+  ensureAudioAwake();
+  gameRef.child('buzzedBy').set(null);
+}
+
+// ---- Randomize-winner buzzer mode ----
+// While this is on, players buzzing in don't set "buzzedBy" right away -
+// they get quietly added to "buzzPool" instead. This schedules a single
+// timer (per question) that, once the reveal-delay window ends, picks a
+// winner at random from that pool and only then reveals it.
+let revealPickTimer = null;
+let revealPickScheduledKey = null;
+
+function clearRevealPickTimer() {
+  if (revealPickTimer) { clearTimeout(revealPickTimer); revealPickTimer = null; }
+  revealPickScheduledKey = null;
+}
+
+function maybeScheduleRevealPick(data, qIndex) {
+  if (!data.revealDelayOn || data.buzzedBy) {
+    clearRevealPickTimer();
+    return;
+  }
+  if (!data.buzzOpenAt) {
+    // The window's start time hasn't been stamped yet (e.g. right after a
+    // reset, before any question navigation). Stamp it once here, rather
+    // than falling back to "now" on every single data change - that bug
+    // was pushing the random pick further into the future with every buzz,
+    // so it could effectively never fire.
+    gameRef.child('buzzOpenAt').set(serverNow());
+    return;
+  }
+  const openAt = data.buzzOpenAt;
+  const key = qIndex + '|' + openAt + '|' + Math.min(...Object.values(data.buzzPool || {}).map(Number).filter(Number.isFinite), Infinity);
+  if (revealPickScheduledKey === key) return; // already have a timer set for this exact question
+  clearRevealPickTimer();
+  revealPickScheduledKey = key;
+  const delaySecs = Number(data.revealDelaySeconds) || 0.5;
+  const timestamps = Object.values(data.buzzPool || {}).filter(v => Number.isFinite(Number(v))).map(Number);
+  if (!timestamps.length) { clearRevealPickTimer(); return; }
+  const fireAt = Math.min(...timestamps) + delaySecs * 1000;
+  const wait = Math.max(0, fireAt - serverNow());
+  revealPickTimer = setTimeout(() => pickRandomWinner(qIndex), wait);
+}
+
+function pickRandomWinner(qIndexAtSchedule) {
+  gameRef.once('value').then(snap => {
+    const data = snap.val() || {};
+    if ((data.qIndex || 0) !== qIndexAtSchedule) return; // teacher already moved on
+    if (data.buzzedBy) return; // already decided some other way
+    if (!data.revealDelayOn) return; // toggle got turned off in the meantime
+
+    const names = Object.keys(data.buzzPool || {});
+    if (names.length === 0) {
+      clearRevealPickTimer();
+      return;
+    }
+
+    // Decide against fresh state atomically, with no player lockouts.
+    gameRef.transaction(current => {
+      if (!current || current.buzzedBy || !current.revealDelayOn ||
+          (current.qIndex || 0) !== qIndexAtSchedule || current.buzzOpenAt !== data.buzzOpenAt) return;
+      const arrivals = Object.entries(current.buzzPool || {}).map(([name, time]) => ({name, time: Number(time) || 0})).sort((a,b) => a.time - b.time || a.name.localeCompare(b.name));
+      if (!arrivals.length) return;
+      const cutoff = arrivals[0].time + (Number(current.revealDelaySeconds) || 0.5) * 1000;
+      const competing = arrivals.filter(item => item.time <= cutoff);
+      const unanswered = current.preferUnanswered ? competing.filter(item => !(current.answeredPlayers && current.answeredPlayers[item.name])) : [];
+      const winner = (unanswered.length ? unanswered : competing)[0].name;
+      const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
+      if (current.lastWinnerRound !== round) {
+        current.lastWinnerStreak = current.lastWinner === winner ? (current.lastWinnerStreak || 0) + 1 : 1;
+        current.lastWinner = winner;
+        current.lastWinnerRound = round;
+      }
+      current.buzzedBy = winner;
+      current.selectedPlayer = winner;
+      current.answeredPlayers = current.answeredPlayers || {};
+      current.answeredPlayers[winner] = true;
+      current.buzzPool = null;
+      return current;
+    }, (error, committed) => {
+      if (!error && !committed) {
+        revealPickTimer = setTimeout(() => pickRandomWinner(qIndexAtSchedule), 400);
+      }
+    });
+  });
+}
+
+let currentSelectedPlayer = null;
+
+function selectPlayer(name) {
+  ensureAudioAwake();
+  gameRef.child('selectedPlayer').set(name);
+}
+
+function removePlayer(name) {
+  ensureAudioAwake();
+  if (!confirm('Remove "' + name + '" from the game? Their score will be deleted.')) return;
+
+  const updates = { ['scores/' + name]: null, ['answeredPlayers/' + name]: null };
+
+  gameRef.once('value').then(snap => {
+    const data = snap.val() || {};
+    if (data.selectedPlayer === name) updates.selectedPlayer = null;
+    if (data.buzzedBy === name) updates.buzzedBy = null;
+    if (data.lastWinner === name) { updates.lastWinner = null; updates.lastWinnerStreak = 0; }
+    if (data.buzzPool && data.buzzPool[name] !== undefined) {
+      updates['buzzPool/' + name] = null;
+    }
+    gameRef.update(updates);
+  });
+}
+
+function adjustSelectedScore(delta) {
+  ensureAudioAwake();
+  if (!currentSelectedPlayer) {
+    alert("Click a player's name first to select them.");
+    return;
+  }
+  const scoresRef = gameRef.child('scores').child(currentSelectedPlayer);
+  scoresRef.transaction(current => (current || 0) + delta);
+  if (delta > 0) {
+    gameRef.child('lastCorrectAnswer').set({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      player: currentSelectedPlayer,
+      qIndex: Number(lastGameData && lastGameData.qIndex) || 0,
+      at: firebase.database.ServerValue.TIMESTAMP
+    });
+    celebrate();
+  } else {
+    playWrongSound();
+  }
+}
+
+// ---- Celebration effects: confetti + applause chime for correct answers ----
+function celebrate() {
+  playApplauseSound();
+  launchConfetti();
+}
+
+// Creates the shared audio context on first use if needed. Browsers allow
+// this because it's called from inside a real button click (+1/-1), which
+// counts as a user gesture - so sound works even if "Enable sound" up top
+// was never clicked separately.
+function getAudioCtx() {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+  return sharedAudioCtx;
+}
+
+function playApplauseSound() { return playGameShowSound('correct'); }
+function playWrongSound() { return playGameShowSound('wrong'); }
+
+// Original TV-style cues: metallic lock-in bell, brass victory sting,
+// and a two-tone wrong-answer horn. One engine keeps their volume consistent.
+let activeGameSound = null;
+async function playGameShowSound(kind) {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state !== 'running') await ctx.resume();
+    if (ctx.state !== 'running') {
+      document.getElementById('soundStatus').textContent = 'Click Enable / preview ding to turn on sound';
+      return;
+    }
+    if (activeGameSound) activeGameSound.stop();
+    if (buzzerVolume === 0) {
+      document.getElementById('soundStatus').textContent = 'Sounds muted';
+      return;
+    }
+    const start = ctx.currentTime + 0.01;
+    const bus = ctx.createGain();
+    const volume = ctx.createGain();
+    volume.gain.value = buzzerVolume * 0.8;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -9;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 5;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.1;
+    bus.connect(volume);
+    volume.connect(limiter);
+    limiter.connect(ctx.destination);
+    // Two quiet room reflections add a studio feel without a long echo.
+    const reflections = [0.065, 0.125].map((seconds, i) => {
+      const delay = ctx.createDelay(0.2);
+      const wet = ctx.createGain();
+      delay.delayTime.value = seconds;
+      wet.gain.value = i === 0 ? 0.12 : 0.055;
+      bus.connect(delay); delay.connect(wet); wet.connect(volume);
+      return [delay, wet];
+    });
+    const sources = [];
+    const gains = [];
+    function tone(freq, offset, duration, level, type, release, wave) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      if (wave) osc.setPeriodicWave(wave); else osc.type = type;
+      const at = start + offset;
+      osc.frequency.setValueAtTime(freq, at);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      if (release) {
+        gain.gain.cancelScheduledValues(at + 0.009);
+        gain.gain.setValueAtTime(level, at + 0.009);
+        gain.gain.linearRampToValueAtTime(level * 0.72, at + duration - release);
+        gain.gain.linearRampToValueAtTime(0, at + duration);
+      }
+      osc.connect(gain); gain.connect(bus);
+      osc.start(at); osc.stop(at + duration);
+      sources.push(osc); gains.push(gain);
+    }
+    // Pitch-sweeping voice for zaps and bloops.
+    function sweep(f0, f1, offset, duration, level, type) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      const at = start + offset;
+      osc.frequency.setValueAtTime(f0, at);
+      osc.frequency.exponentialRampToValueAtTime(f1, at + duration);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.006);
+      gain.gain.setValueAtTime(level, at + duration * 0.7);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      osc.connect(gain); gain.connect(bus);
+      osc.start(at); osc.stop(at + duration);
+      sources.push(osc); gains.push(gain);
+    }
+    let duration;
+    if (kind === 'chime') {
+      duration = 0.95;
+      [783.99, 987.77, 1318.51].forEach((freq, i) => {
+        tone(freq, i * 0.12, 0.6, 0.28, 'sine', 0);
+        tone(freq * 2, i * 0.12, 0.3, 0.06, 'sine', 0);
+      });
+    } else if (kind === 'zap') {
+      duration = 0.5;
+      sweep(1900, 160, 0, 0.32, 0.16, 'sawtooth');
+      sweep(1400, 120, 0.02, 0.3, 0.1, 'square');
+      tone(1568, 0.32, 0.18, 0.18, 'sine', 0);
+    } else if (kind === 'bloop') {
+      duration = 0.55;
+      sweep(260, 880, 0, 0.14, 0.3, 'triangle');
+      tone(880, 0.14, 0.4, 0.26, 'triangle', 0);
+      tone(1320, 0.14, 0.25, 0.06, 'sine', 0);
+    } else if (kind === 'alarm') {
+      duration = 0.72;
+      for (let i = 0; i < 6; i++) tone(i % 2 ? 660 : 990, i * 0.11, 0.1, 0.13, 'square', 0.02);
+      tone(1320, 0.66, 0.06, 0.08, 'square', 0.02);
+    } else if (kind === 'correct') {
+      duration = 1.18;
+      const real = new Float32Array(9);
+      const imag = new Float32Array([0, 1, 0.48, 0.24, 0.13, 0.07, 0.035, 0.02, 0.01]);
+      const brass = ctx.createPeriodicWave(real, imag);
+      // A quick pickup leads into a full major chord: ba-ba-BAA!
+      [523.25, 659.25, 783.99].forEach((freq, i) => tone(freq, i * 0.115, 0.16, 0.3, 'sine', 0.04, brass));
+      [523.25, 659.25, 783.99, 1046.5].forEach(freq => tone(freq, 0.36, 0.8, 0.16, 'sine', 0.3, brass));
+      tone(261.63, 0.36, 0.8, 0.18, 'sine', 0.3);
+    } else if (kind === 'wrong') {
+      duration = 0.68;
+      // Band-limited brass harmonics give the familiar low game-show horn.
+      const horn = ctx.createPeriodicWave(new Float32Array(7), new Float32Array([0, 1, 0.3, 0.5, 0.12, 0.2, 0.08]));
+      [0, 0.31].forEach((offset, i) => {
+        tone(i ? 130.81 : 146.83, offset, 0.32, 0.36, 'sine', 0.06, horn);
+        tone(i ? 138.59 : 155.56, offset, 0.32, 0.25, 'sine', 0.06, horn);
+      });
+    } else {
+      duration = 0.72;
+      // Inharmonic bell partials make a bright physical "ding", clearly
+      // distinct from the wrong-answer horn. Low partials give it body.
+      [[880, 0.36], [1760, 0.13], [2398, 0.085], [3520, 0.035]].forEach(([freq, level]) =>
+        tone(freq, 0, freq > 2000 ? 0.28 : 0.68, level, 'sine', 0));
+      tone(440, 0, 0.2, 0.07, 'sine', 0);
+    }
+    const nodes = [bus, volume, limiter, ...gains, ...reflections.flat()];
+    const sound = {
+      stop() {
+        volume.gain.cancelScheduledValues(ctx.currentTime);
+        volume.gain.setTargetAtTime(0, ctx.currentTime, 0.004);
+        sources.forEach(osc => { try { osc.stop(ctx.currentTime + 0.02); } catch (_) {} });
+      }
+    };
+    activeGameSound = sound;
+    let remaining = sources.length;
+    sources.forEach(osc => {
+      osc.onended = () => {
+        osc.disconnect();
+        if (--remaining === 0) {
+          setTimeout(() => nodes.forEach(node => node.disconnect()), 160);
+          if (activeGameSound === sound) activeGameSound = null;
+        }
+      };
+    });
+    document.getElementById('soundStatus').textContent = kind === 'correct' ? 'Correct-answer fanfare' : kind === 'wrong' ? 'Wrong-answer buzzer' : 'Buzz sound: ' + (BUZZ_SOUND_LABELS[kind] || 'Bell ding');
+  } catch (err) {
+    document.getElementById('soundStatus').textContent = 'Sound unavailable - click Enable / preview ding to retry';
+  }
+}
+
+function launchConfetti() {
+  const colors = ['#ffd76a', '#b85042', '#7ed957', '#3a6ea5', '#fdf6ec'];
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.width = '100%';
+  container.style.height = '100%';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '5000';
+  container.style.overflow = 'hidden';
+  document.body.appendChild(container);
+
+  const pieceCount = 140;
+  for (let i = 0; i < pieceCount; i++) {
+    const piece = document.createElement('div');
+    const size = 8 + Math.random() * 10;
+    piece.style.position = 'absolute';
+    piece.style.width = size + 'px';
+    piece.style.height = (size * 0.4) + 'px';
+    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = (Math.random() * 100) + '%';
+    piece.style.top = '-20px';
+    piece.style.opacity = '0.95';
+    piece.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+    piece.style.borderRadius = '2px';
+    const duration = 1.6 + Math.random() * 1.2;
+    const delay = Math.random() * 0.3;
+    const drift = (Math.random() * 160 - 80);
+    piece.style.transition = 'transform ' + duration + 's cubic-bezier(0.25,0.46,0.45,0.94) ' + delay + 's, opacity ' + duration + 's linear ' + delay + 's';
+    container.appendChild(piece);
+    requestAnimationFrame(() => {
+      piece.style.transform = 'translate(' + drift + 'px, ' + (window.innerHeight + 40) + 'px) rotate(' + (Math.random() * 720) + 'deg)';
+      piece.style.opacity = '0';
+    });
+  }
+  setTimeout(() => container.remove(), 3200);
+}
+
+function sanitize(name) {
+  return name.replace(/[.#$\[\]]/g, '_');
+}
+
+function resetGame() {
+  ensureAudioAwake();
+  const sure = confirm("Are you sure? " + "This will erase ALL player names and scores for a fresh start.");
+  if (!sure) return;
+  gameRef.set({
+    qIndex: 0,
+    showStarted: false,
+    roundActive: false,
+    revealed: false,
+    buzzedBy: null,
+    scores: null,
+    selectedPlayer: null,
+    buzzerDelayOn: document.getElementById('delayToggle').checked,
+    buzzerDelaySeconds: parseInt(document.getElementById('delaySeconds').value) || 10,
+    buzzUnlockAt: 0,
+    revealDelayOn: document.getElementById('revealDelayToggle').checked,
+    revealDelaySeconds: parseFloat(document.getElementById('revealDelaySeconds').value) || 0.5,
+    buzzOpenAt: serverNow(),
+    buzzPool: null,
+    lastWinner: null,
+    lastWinnerStreak: 0,
+    lastWinnerRound: null,
+    answeredPlayers: null,
+    preferUnanswered: document.getElementById('preferUnansweredToggle').checked,
+    buzzSound: buzzSoundChoice
+  });
+  document.getElementById('soundStatus').textContent = 'Game reset - names cleared';
+}
+
+let sharedAudioCtx = null;
+
+// Volume stays on this device without changing shared game state.
+let buzzerVolume = 0.75;
+try {
+  const stored = localStorage.getItem('gameShowBuzzerVolume');
+  if (stored !== null && Number.isFinite(Number(stored))) {
+    buzzerVolume = Math.max(0, Math.min(1, Number(stored)));
+  }
+} catch (_) { /* Sound works when storage is unavailable. */ }
+document.getElementById('buzzerVolume').value = Math.round(buzzerVolume * 100);
+document.getElementById('buzzerVolumeValue').textContent = Math.round(buzzerVolume * 100) + '%';
+
+function setBuzzerVolume(value) {
+  buzzerVolume = Math.max(0, Math.min(1, Number(value) / 100));
+  document.getElementById('buzzerVolumeValue').textContent = Math.round(buzzerVolume * 100) + '%';
+  try { localStorage.setItem('gameShowBuzzerVolume', String(buzzerVolume)); } catch (_) {}
+}
+
+function enableSound() {
+  playAlertSound();
+}
+
+// Which sound plays when a student buzzes in. Saved on this device and shared
+// through the live game so student screens play the same buzz.
+const BUZZ_SOUND_LABELS = { ding: 'Bell ding', chime: 'Triple chime', zap: 'Laser zap', bloop: 'Quiz-board bloop', alarm: 'Lock-in alarm' };
+let buzzSoundChoice = 'ding';
+try { buzzSoundChoice = localStorage.getItem('gameShowBuzzSound') || 'ding'; } catch (_) {}
+if (buzzSoundChoice !== 'random' && !BUZZ_SOUND_LABELS[buzzSoundChoice]) buzzSoundChoice = 'ding';
+document.getElementById('buzzSoundSelect').value = buzzSoundChoice;
+gameRef.child('buzzSound').set(buzzSoundChoice).catch(() => {});
+
+function setBuzzSound(value) {
+  buzzSoundChoice = value;
+  try { localStorage.setItem('gameShowBuzzSound', value); } catch (_) {}
+  gameRef.child('buzzSound').set(value).catch(() => {});
+  playAlertSound();
+}
+
+function resolveBuzzSound() {
+  if (buzzSoundChoice !== 'random') return buzzSoundChoice;
+  const kinds = Object.keys(BUZZ_SOUND_LABELS);
+  return kinds[Math.floor(Math.random() * kinds.length)];
+}
+
+function playAlertSound() { return playGameShowSound(resolveBuzzSound()); }
+
+let lastBuzzedBy = null;
+let lastGameData = {};
+let buzzBarTimer = null;
+
+// Shows who buzzed, or - while the wait timer runs - a countdown until buzzers open.
+function updateBuzzBar() {
+  const data = lastGameData || {};
+  const bar = document.getElementById('buzzedBar');
+  const label = bar.querySelector('.buzzed-label');
+  const nameEl = document.getElementById('buzzedName');
+  const left = data.buzzerDelayOn && !data.buzzedBy ? Math.ceil(((data.buzzUnlockAt || 0) - serverNow()) / 1000) : 0;
+  bar.classList.toggle('live', !!data.buzzedBy);
+  bar.classList.toggle('waiting', left > 0);
+  if (data.buzzedBy) {
+    label.textContent = 'Buzzed in';
+    nameEl.textContent = data.buzzedBy;
+  } else if (left > 0) {
+    label.textContent = 'Buzzers locked';
+    nameEl.textContent = 'Open in ' + left + '…';
+  } else {
+    label.textContent = 'Buzzers open';
+    nameEl.textContent = 'Waiting for a buzz…';
+  }
+  clearTimeout(buzzBarTimer);
+  if (left > 0) buzzBarTimer = setTimeout(updateBuzzBar, 250);
+}
+let lastPoolSize = 0;
+
+gameRef.on('value', snapshot => {
+  if (!questionsReady) return; // wait until the question set has loaded from the database
+  const data = snapshot.val() || {};
+  const qIndex = data.qIndex || 0;
+  loadQuestion(qIndex);
+  document.getElementById('startGameShowBtn').hidden = !!data.showStarted;
+  document.getElementById('answer').textContent = data.revealed && questions[qIndex] ? (questions[qIndex].ans || '') : '';
+  requestAnimationFrame(fitQuestion);
+  lastGameData = data;
+  updateBuzzBar();
+
+  document.getElementById('delayToggle').checked = !!data.buzzerDelayOn;
+  if (data.buzzerDelaySeconds) {
+    document.getElementById('delaySeconds').value = data.buzzerDelaySeconds;
+  }
+  document.getElementById('revealDelayToggle').checked = data.revealDelayOn !== false;
+  const preferUnansweredToggle = document.getElementById('preferUnansweredToggle');
+  preferUnansweredToggle.checked = data.preferUnanswered !== false;
+  preferUnansweredToggle.disabled = !data.revealDelayOn;
+  if (data.revealDelaySeconds) {
+    document.getElementById('revealDelaySeconds').value = data.revealDelaySeconds;
+  }
+  maybeScheduleRevealPick(data, qIndex);
+
+  if (data.revealDelayOn && !data.buzzedBy) {
+    const poolSize = Object.keys(data.buzzPool || {}).length;
+    if (poolSize !== lastPoolSize) {
+      document.getElementById('soundStatus').textContent = poolSize > 0
+        ? poolSize + ' student(s) buzzed in - picking a winner soon...'
+        : 'Waiting for buzzes...';
+    }
+    lastPoolSize = poolSize;
+  } else {
+    lastPoolSize = 0;
+  }
+
+  if (data.buzzedBy && data.buzzedBy !== lastBuzzedBy) {
+    document.getElementById('soundStatus').textContent = 'Buzz detected: ' + data.buzzedBy;
+    playAlertSound();
+    // Auto-select whoever just buzzed in, so the teacher can award points immediately.
+    // Update the local variable right away too, instead of waiting for the
+    // database write above to round-trip back through this listener - that
+    // round-trip delay was letting a fast "+1" click land before the
+    // selection had actually registered.
+    gameRef.child('selectedPlayer').set(data.buzzedBy);
+    data.selectedPlayer = data.buzzedBy;
+  }
+  lastBuzzedBy = data.buzzedBy || null;
+
+  currentSelectedPlayer = data.selectedPlayer || null;
+  const selLabel = document.getElementById('selectedLabel');
+  selLabel.replaceChildren();
+  if (currentSelectedPlayer) {
+    const b = document.createElement('b');
+    b.textContent = currentSelectedPlayer;
+    selLabel.append(b);
+  } else {
+    selLabel.textContent = 'Pick a contestant';
+  }
+
+  const scores = data.scores || {};
+  const board = document.getElementById('board');
+  board.replaceChildren();
+  const names = Object.keys(scores).sort();
+  if (!names.length) {
+    const empty = document.createElement('div');
+    empty.className = 'board-empty';
+    empty.textContent = 'No contestants yet. Students appear here when they open the student link.';
+    board.appendChild(empty);
+  }
+  names.forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'team' + (name === currentSelectedPlayer ? ' selected' : '') + (name === data.buzzedBy ? ' buzzed-in' : '');
+    div.setAttribute('role', 'button');
+    div.tabIndex = 0;
+    div.innerHTML = '<button class="remove-player" title="Remove player" aria-label="Remove player">×</button><div class="name"></div><div class="score"></div>';
+    if (data.preferUnanswered) {
+      const answered = !!(data.answeredPlayers && data.answeredPlayers[name]);
+      const status = document.createElement('div');
+      status.className = 'turn-status' + (answered ? ' has-answered' : '');
+      status.textContent = answered ? 'Had a turn' : 'Waiting for a turn';
+      div.appendChild(status);
+    }
+    div.querySelector('.name').textContent = name;
+    div.querySelector('.score').textContent = scores[name];
+    div.onclick = () => selectPlayer(name);
+    div.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPlayer(name); } };
+    div.querySelector('.remove-player').onclick = (e) => {
+      e.stopPropagation();
+      removePlayer(name);
+    };
+    board.appendChild(div);
+  });
+});
+
+// ---------- On-page question editor ----------
+
+function openEditor() {
+  document.getElementById('pasteBox').value = '';
+  renderEditor(questions);
+  document.getElementById('editorOverlay').style.display = 'block';
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').style.display = 'none';
+}
+
+function renderEditor(data) {
+  const list = document.getElementById('editorList');
+  list.innerHTML = '';
+  data.forEach(item => {
+    list.appendChild(createQuestionRow(item.q, item.ans, item.choices, item.correctIndex));
+  });
+}
+
+function createQuestionRow(q, ans, choices, correctIndex) {
+  q = window.GameShowTextEncoding.repairText(q || '');
+  ans = window.GameShowTextEncoding.repairText(ans || '');
+  const div = document.createElement('div');
+  div.className = 'editor-row';
+  const choiceList = Array.isArray(choices) ? choices.map(choice => window.GameShowTextEncoding.repairText(choice)) : [];
+  const choiceText = choiceList.map(choice => escapeHtml(choice)).join('\n');
+  const correctNumber = choiceList.length
+    ? (Number.isInteger(Number(correctIndex)) && Number(correctIndex) >= 0 ? Number(correctIndex) + 1 : 1)
+    : '';
+  div.innerHTML =
+    '<label>Question</label>' +
+    '<textarea class="row-q">' + escapeHtml(q || '') + '</textarea>' +
+    '<label>Answer</label>' +
+    '<textarea class="row-ans">' + escapeHtml(ans || '') + '</textarea>' +
+    '<button class="btn btn-sm btn-ghost editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>' +
+    '<label>Answer choices (one per line)</label>' +
+    '<textarea class="row-choices" placeholder="Choice 1&#10;Choice 2&#10;Choice 3&#10;Choice 4">' + choiceText + '</textarea>' +
+    '<label>Correct choice number</label>' +
+    '<input type="number" min="1" max="8" class="row-correct" value="' + correctNumber + '">';
+  return div;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addQuestionRow() {
+  document.getElementById('editorList').appendChild(createQuestionRow('', ''));
+}
+
+// Parse spreadsheets with the shared, independently tested importer.
+function parsePastedText(text) {
+  return window.GameShowPasteImport.parsePastedText(text).rows;
+}
+function loadPasted(replace) {
+  const box = document.getElementById('pasteBox');
+  const parsed = window.GameShowPasteImport.parsePastedText(box.value);
+  if (parsed.errors.length) {
+    alert("Nothing imported. Fix the spreadsheet first:\n" +
+      parsed.errors.slice(0, 5).join("\n") +
+      (parsed.errors.length > 5 ? "\n…and " + (parsed.errors.length - 5) + " more rows." : ""));
+    return;
+  }
+  if (!parsed.rows.length) {
+    alert("Nothing to import. Paste 6 columns (Question, Red, Blue, Green, Yellow, Correct) or the original 2 columns (Question, Answer).");
+    return;
+  }
+  if (replace && !confirm("Replace every question in the editor with " + parsed.rows.length + " pasted questions?")) return;
+  const list = document.getElementById('editorList');
+  if (replace) list.replaceChildren();
+  parsed.rows.forEach(row => list.appendChild(createQuestionRow(row.q, row.ans, row.choices, row.correctIndex)));
+  box.value = '';
+}
+
+function saveEditor() {
+  const rows = [...document.querySelectorAll('#editorList > .editor-row')];
+  const newQuestions = rows.map(row => ({
+    q: row.querySelector('.row-q').value.trim(),
+    ans: row.querySelector('.row-ans').value.trim(),
+    choices: (row.querySelector('.row-choices')?.value || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+    correctIndex: Math.max(0, (Number(row.querySelector('.row-correct')?.value) || 1) - 1)
+  })).filter(item => item.q || item.ans).map(item => {
+    if (!item.choices.length) { delete item.choices; delete item.correctIndex; }
+    else if (item.correctIndex >= item.choices.length) item.correctIndex = 0;
+    return item;
+  });
+
+  if (newQuestions.length === 0) {
+    alert("There's nothing to save - add at least one question first.");
+    return;
+  }
+  return saveQuestionSet(newQuestions).then(() => {
+    closeEditor();
+  }).catch(err => {
+    document.getElementById('soundStatus').textContent = 'Save error: ' + err.message;
+    throw err;
+  });
+}
+
+function saveQuestionSet(items) {
+  const repaired = window.GameShowTextEncoding.repairQuestions(items).questions;
+  return setRef.set({ title: ACTIVE_SET_TITLE, questions: repaired }).then(() => {
+    document.getElementById('soundStatus').textContent = 'Saved (' + items.length + ' questions)';
+    return items;
+  });
+}
+
+window.getCurrentQuestionSet = () => questions.map(item => ({ ...item }));
+window.saveQuestionSet = saveQuestionSet;
+</script>
+
+<script src="paste-import.js?v=20261016-mc6-r2"></script>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
+<script src="quiz-party-audio.js?v=20261016-announcer-r2"></script>
+<script src="team-modes.js?v=20261016-announcer-r2"></script>
+<script src="question-generator-grade3-v4.js?v=20261016-parsha-r2"></script>
+<script src="question-library.js?v=20261013-share-library2"></script>
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body>
+</html>
+

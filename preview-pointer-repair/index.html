@@ -1,0 +1,2406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>document.documentElement.classList.add("b3-home-auth-pending");</script>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fun Torah Tools</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,sans-serif;background:#f5f7fa;color:#1f2937;text-align:center;margin:0;padding:32px 18px 60px}
+  h1{font-size:46px;margin:8px 0 8px;color:#26364a}
+  .subtitle{color:#64748b;margin-bottom:24px}
+  .hidden{display:none!important}
+  /* Keep the login form hidden until saved student and teacher sessions are checked. */
+  #homeAuthLoading{display:none;max-width:520px;margin:24px auto;padding:30px;color:#475569;background:#fff;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+  html.b3-home-auth-pending #homeAuthLoading{display:block!important}
+  html.b3-home-auth-pending #loginCard{display:none!important}
+  .student-bar{max-width:900px;margin:0 auto 18px;background:white;border-radius:16px;padding:12px 16px;box-shadow:0 3px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
+  .student-bar strong{font-size:16px}.student-bar span{color:#64748b;font-size:13px}.student-bar button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#1f2937}
+  .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
+  .login-card h2,.locked-card h2{margin:0 0 8px;color:#26364a}.login-card p,.locked-card p{color:#64748b;line-height:1.45}
+  .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-card button:disabled{opacity:.6;cursor:wait}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
+  .lock-icon{font-size:54px;text-align:center}.locked-card{text-align:center}
+  .game-container{display:grid;gap:18px;max-width:900px;margin:auto}
+  .game-group{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:18px;box-shadow:0 4px 14px rgba(15,23,42,.06);text-align:left}
+  .game-group-head{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+  .game-group-icon{font-size:27px;line-height:1}
+  .game-group-title{font-size:20px;font-weight:900;color:#26364a}
+  .game-group-subtitle{font-size:12px;color:#64748b;margin-top:2px}
+  .game-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px}
+  .game-group .game-card{box-shadow:0 3px 9px rgba(0,0,0,.08);border:1px solid #edf2f7}
+  .game-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:white;padding:24px 12px;border-radius:16px;box-shadow:0 4px 10px rgba(0,0,0,.1);text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
+  .game-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+  .card-icon{font-size:40px;line-height:1}.yiddish-icon{width:74px;height:74px;object-fit:contain;object-position:center;display:block;border-radius:12px}.rashi-icon{font-family:"Noto Rashi Hebrew",serif;font-size:44px;font-weight:600;line-height:1;direction:rtl}.card-title{font-size:17px;font-weight:bold;color:#333}.disabled-note{margin-top:35px;color:#64748b}
+  .teacher-tools-section{max-width:900px;margin:50px auto 0;padding-top:28px;border-top:2px solid #e5e7eb}
+  .teacher-tools-section h2{font-size:26px;color:#1f2937;margin:0 0 6px}
+  .teacher-tools-subtitle{color:#6b7280;font-size:14px;margin:0 0 22px}
+  .teacher-tools-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;max-width:900px;margin:auto}
+  .teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:22px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
+  .teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+  .teacher-tool-card .card-title{color:#92400e}
+  .admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
+  .admin-panel{position:fixed;top:58px;right:12px;width:min(440px,calc(100vw - 24px));background:white;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.22);padding:18px;text-align:left;z-index:9999;max-height:86vh;overflow-y:auto}
+  .admin-panel h2{margin:0 0 4px}.admin-panel h3{font-size:16px;margin:18px 0 8px}.admin-message{font-size:13px;line-height:1.4;color:#64748b;margin:0 0 12px}.admin-action{width:100%;border:0;border-radius:10px;padding:10px 12px;margin-top:8px;background:#1f2937;color:white;font-weight:bold;cursor:pointer}.admin-action.secondary{background:#e5e7eb;color:#111827}
+  .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
+  .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
+  .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:12px;color:#475569;margin:7px 0 10px;line-height:1.45;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:9px}.schedule-day{border-top:1px solid #e5e7eb;padding:10px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:13px;margin-bottom:6px}.lock-range{display:grid;grid-template-columns:24px 64px minmax(220px,1fr);align-items:center;gap:7px;margin:7px 0;font-size:11px}.lock-range.is-unused .time-span{display:none}.lock-range.is-unused .closed-label{color:#94a3b8}.closed-label{font-weight:800;color:#334155}.time-span{display:flex;align-items:center;gap:6px;min-width:0}.friendly-time{display:flex;align-items:center;gap:3px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:3px 4px;white-space:nowrap}.friendly-time select{border:0;background:transparent;padding:4px 2px;font-size:12px;font-weight:700;color:#1f2937;outline:none;cursor:pointer}.friendly-time select[data-time-hour]{width:40px}.friendly-time select[data-time-minute]{width:45px}.friendly-time select[data-time-ampm]{width:48px}.friendly-time.disabled{background:#f1f5f9;opacity:.6}.friendly-time select:disabled{cursor:not-allowed}.time-colon{font-weight:900;color:#64748b}.lock-range .to{text-align:center;color:#64748b;font-weight:700}.schedule-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.schedule-save,.schedule-reset{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:900;cursor:pointer}.schedule-save{background:#2563eb;color:#fff;border-color:#2563eb}.schedule-save:disabled{opacity:.45;cursor:default}.schedule-reset:hover{background:#f1f5f9}.schedule-save-status{font-size:12px;font-weight:800;color:#64748b}.schedule-save-status.dirty{color:#b45309}.schedule-save-status.saved{color:#15803d}.activity-manager{display:grid;gap:12px}.activity-zone{border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc;padding:10px}.activity-zone.drag-over{border-color:#2563eb;background:#eff6ff}.activity-zone-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.activity-zone-title{font-size:14px;font-weight:900;color:#334155}.activity-zone-count{font-size:11px;font-weight:900;color:#64748b;background:#e2e8f0;border-radius:999px;padding:3px 8px}.activity-list{display:grid;gap:7px;min-height:42px}.activity-manage-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:9px 10px;cursor:grab}.activity-manage-row:active{cursor:grabbing}.activity-manage-row.dragging{opacity:.45}.activity-manage-name{font-size:13px;font-weight:800;color:#1f2937;min-width:0}.activity-manage-hint{font-size:10px;color:#94a3b8;margin-top:2px}.activity-class-controls{display:flex;gap:5px;align-items:center}.activity-class-btn{border:1px solid #cbd5e1;border-radius:8px;padding:6px 7px;background:#fff;color:#475569;font-size:11px;font-weight:900;cursor:pointer;min-width:52px}.activity-class-btn.is-open{background:#dcfce7;border-color:#86efac;color:#166534}.activity-class-btn.is-closed{background:#fee2e2;border-color:#fecaca;color:#991b1b}.activity-inactive-row{grid-template-columns:minmax(0,1fr)}.activity-zone-empty{font-size:12px;color:#94a3b8;text-align:center;padding:10px;border:1px dashed #cbd5e1;border-radius:9px;background:#fff}.activity-manager-help{font-size:12px;color:#64748b;line-height:1.4;margin:0 0 8px}
+  .game-card.activity-closed{opacity:.72;background:#f8fafc;border:1px dashed #94a3b8;cursor:not-allowed;transform:none!important;box-shadow:0 2px 7px rgba(0,0,0,.06)}
+  .game-card.activity-closed:hover{transform:none;box-shadow:0 2px 7px rgba(0,0,0,.06)}
+  .activity-closed-badge{margin-top:2px;border-radius:999px;padding:4px 8px;background:#e2e8f0;color:#475569;font-size:11px;font-weight:900}
+  .tz-note{font-size:11px;color:#64748b;margin-top:7px}
+  .special-access-note{max-width:900px;margin:0 auto 16px;padding:11px 14px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;color:#166534;font-size:14px;font-weight:700;text-align:left}
+  .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
+  .override-box label{font-size:13px;font-weight:800;color:#1e3a8a}.override-student-select{width:100%;margin:7px 0 9px;padding:9px;border:1px solid #93c5fd;border-radius:9px;background:white}
+  .override-game-list{background:white;border:1px solid #dbeafe;border-radius:10px;padding:4px 10px}.override-game-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eff6ff;font-size:13px}.override-game-row:last-child{border-bottom:0}.override-game-row span{min-width:0}.override-off-note{display:block;color:#9a3412;font-size:10px;margin-top:2px}.override-empty{font-size:12px;color:#64748b;padding:7px 0}.override-saving{font-size:11px;color:#64748b;min-height:16px;margin-top:6px}
+  /* When the fixed teacher access panel is open, reserve its space so it never covers tiles. */
+  body.admin-panel-open #gamesArea,
+  body.admin-panel-open #teacherToolsSection{
+    width:calc(100% - 470px);
+    max-width:900px;
+    margin-left:max(18px,calc((100vw - 900px - 470px)/2));
+    margin-right:470px;
+  }
+  body.admin-panel-open .game-container,
+  body.admin-panel-open .teacher-tools-container,
+  body.admin-panel-open .special-access-note{
+    max-width:100%;
+  }
+  @media(max-width:900px){
+    body.admin-panel-open #gamesArea,
+    body.admin-panel-open #teacherToolsSection{
+      width:calc(100% - 470px);
+      margin-left:0;
+      margin-right:470px;
+    }
+  }
+  @media(max-width:700px){
+    body.admin-panel-open #gamesArea,
+    body.admin-panel-open #teacherToolsSection{
+      width:100%;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    body.admin-panel-open .admin-panel{width:min(360px,calc(100vw - 24px))}
+  }
+  /* Friendly student nudges for important daily practice tools. */
+  .game-card{position:relative;overflow:visible}
+  .student-nudge{
+    position:absolute;z-index:20;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);
+    width:max-content;max-width:180px;margin:0;padding:9px 11px;
+    border:2px solid #93c5fd;border-radius:14px;
+    background:#fff;color:#1e3a8a;font-size:13px;font-weight:800;line-height:1.25;
+    text-align:left;box-shadow:0 8px 20px rgba(15,23,42,.16);
+    pointer-events:none;animation:nudgeHello .5s cubic-bezier(.2,.8,.2,1) both,nudgeFloat 2.8s ease-in-out .55s infinite;
+  }
+  .student-nudge::after{
+    content:"";position:absolute;right:26px;bottom:-8px;width:14px;height:14px;
+    background:#fff;border-right:2px solid #93c5fd;border-bottom:2px solid #93c5fd;
+    transform:rotate(45deg);
+  }
+  .student-nudge-wave{display:inline-block;margin-right:3px;animation:nudgeWave 1.4s ease-in-out 2;transform-origin:70% 70%}
+  @keyframes nudgeHello{from{opacity:0;transform:translate(-50%,8px) scale(.88)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+  @keyframes nudgeFloat{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
+  @keyframes nudgeWave{0%,100%{transform:rotate(0)}25%{transform:rotate(18deg)}50%{transform:rotate(-10deg)}75%{transform:rotate(14deg)}}
+  @media(max-width:560px){
+    .student-nudge{max-width:150px;font-size:12px;padding:8px 9px}
+  }
+
+  .version-modal{position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px}
+  .version-modal-card{width:min(390px,100%);background:white;border-radius:20px;padding:22px;box-shadow:0 20px 55px rgba(0,0,0,.28);text-align:center}
+  .version-modal-card h2{margin:0 0 6px;color:#26364a}.version-modal-card p{margin:0 0 16px;color:#64748b}
+  .version-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .version-choice a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:105px;border-radius:14px;text-decoration:none;font-weight:800;padding:14px}
+  .student-version-choice{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+  .teacher-version-choice{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .version-choice-icon{font-size:32px}.version-modal-close{margin-top:14px;border:0;background:#e5e7eb;color:#1f2937;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+
+  .approval-button{position:fixed;top:12px;left:12px;z-index:9998;border:0;border-radius:999px;padding:10px 14px;background:#7c3aed;color:white;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.16);display:flex;align-items:center;gap:7px}
+  .approval-button:hover{background:#6d28d9}.approval-button-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#fff;color:#6d28d9;font-size:12px;font-weight:900}
+  .approval-center-modal{position:fixed;inset:0;background:rgba(15,23,42,.56);z-index:11000;display:flex;align-items:center;justify-content:center;padding:18px}
+  .approval-center-card{width:min(620px,100%);max-height:86vh;overflow:auto;background:#fff;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.32);text-align:left}
+  .approval-center-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.approval-center-head h2{margin:0 0 5px;color:#26364a;font-size:26px}.approval-center-head p{margin:0;color:#64748b;line-height:1.4}
+  .approval-center-x{border:0;background:#eef2f7;color:#334155;border-radius:999px;width:36px;height:36px;font-size:22px;font-weight:900;cursor:pointer;flex:0 0 auto}
+  .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
+  .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
+  .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
+  .home-class-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 6px 5px 14px;box-shadow:0 6px 16px rgba(0,0,0,.16);font-weight:900;color:#1f2937}
+  .home-class-bar.hidden{display:none}
+  body.has-home-class-bar>h1{padding-top:66px!important}
+  .home-class-bar label{font-size:13px}
+  .home-class-bar select{border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:900;background:#f8fafc;color:#1f2937;cursor:pointer;max-width:170px}
+  .home-class-lock{border:0;border-radius:999px;background:#1f2937;color:#fff;font-size:18px;width:38px;height:34px;cursor:pointer}
+  .home-class-lock:hover{background:#334155}
+  .home-access-modal{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+  .home-access-modal.hidden{display:none}
+  .home-access-card{width:min(780px,100%);height:min(92vh,1000px);background:#f1f5f9;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+  .home-access-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#172033;color:#fff;font-weight:900;font-size:18px}
+  .home-access-head button{border:0;border-radius:999px;background:#fff;color:#172033;font-size:20px;font-weight:900;width:38px;height:38px;cursor:pointer}
+  .home-access-card iframe{flex:1;width:100%;border:0;background:#f1f5f9}
+  @media(max-width:560px){.home-class-bar{top:58px;left:auto;right:10px;transform:none}body.has-home-class-bar>h1{padding-top:104px!important}.home-class-bar label{display:none}.home-access-modal{padding:0}.home-access-card{height:100%;border-radius:0}}
+  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
+.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
+/* Keep the student launchers visible together on desktop screens. */
+@media(min-width:760px){
+ body{padding-top:16px}
+ h1{font-size:34px;margin:4px 0}
+ .subtitle{margin-bottom:12px}
+ .student-bar{max-width:1100px;margin-bottom:12px;padding:9px 14px}
+ .game-container{max-width:1100px;grid-template-columns:1fr;gap:8px}
+ .game-group{padding:10px 12px;border-radius:16px}
+ .game-group-head{margin-bottom:6px}
+ .game-group-title{font-size:18px}
+ .game-group-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .game-group[data-game-group="class"] .game-group-grid,.game-group[data-game-group="challenge"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-card{min-height:64px;padding:10px 8px;gap:10px;border-radius:12px;flex-direction:row}
+ .card-icon{font-size:54px}.rashi-icon{font-size:58px}.yiddish-icon{width:68px;height:68px}
+ .card-title{font-size:18px;font-weight:800}
+ .teacher-tools-section{margin-top:24px;padding-top:18px}
+}
+.student-card-shell{position:relative;min-width:0}.student-card-shell>.game-card{height:100%;padding-right:40px}
+/* Each activity group stays on ONE row. On narrow screens the gaps, icons and text shrink instead of wrapping. */
+.game-group-grid,.game-group[data-game-group] .game-group-grid{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:clamp(4px,1.4vw,14px)}
+.game-group-grid>*{min-width:0}
+.game-group-grid .game-card{min-width:0;padding:clamp(8px,2vw,24px) clamp(3px,1vw,12px);gap:clamp(4px,1vw,10px);min-height:clamp(78px,16vw,125px)}
+.game-group-grid .card-title{font-size:clamp(11px,2.4vw,17px);line-height:1.15;text-align:center;overflow-wrap:break-word;min-width:0}
+.game-group-grid .card-icon{font-size:clamp(24px,6.5vw,40px)}
+.game-group-grid .rashi-icon{font-size:clamp(26px,7vw,44px)}
+.game-group-grid .yiddish-icon{width:clamp(36px,10vw,74px);height:clamp(36px,10vw,74px)}
+.game-group-grid .student-card-shell>.game-card{padding-right:clamp(3px,1vw,12px);padding-top:clamp(30px,6vw,24px)}
+.game-group-grid .card-lock{width:clamp(26px,5vw,42px);height:clamp(26px,5vw,42px);font-size:clamp(14px,2.8vw,24px);right:clamp(3px,.8vw,7px);top:clamp(3px,.8vw,7px)}
+@media(min-width:760px){
+ .game-group-grid .game-card{min-height:64px;padding:10px 8px;gap:clamp(6px,.9vw,10px);flex-direction:row}
+ .game-group-grid .card-title{font-size:clamp(14px,1.6vw,18px);text-align:left}
+ .game-group-grid .card-icon{font-size:clamp(34px,4.6vw,54px)}
+ .game-group-grid .rashi-icon{font-size:clamp(36px,5vw,58px)}
+ .game-group-grid .yiddish-icon{width:clamp(44px,5.8vw,68px);height:clamp(44px,5.8vw,68px)}
+ .game-group-grid .student-card-shell>.game-card{padding-right:clamp(30px,4vw,40px);padding-top:10px}
+}
+.card-lock{position:absolute;right:7px;top:7px;width:42px;height:42px;border:0;border-radius:10px;font-size:24px;cursor:pointer;z-index:2;font-weight:900}.card-lock.is-open{background:#dcfce7;color:#166534}.card-lock.is-locked{background:#fee2e2;color:#b91c1c}.card-lock:disabled{opacity:.65;cursor:default}
+.card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
+.card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
+/* Keep both destinations visible while moving activities, even with a long list. */
+.activity-manager{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.activity-zone{height:min(65vh,620px);min-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:12px;min-width:0}
+.activity-zone-head{position:sticky;top:-12px;z-index:1;background:#f8fafc;padding:12px 0;margin-top:-12px;border-bottom:1px solid #e2e8f0}
+.activity-zone-title{font-size:18px;line-height:1.2}
+.activity-zone-count{font-size:13px}
+.activity-manage-row{grid-template-columns:minmax(0,1fr);padding:13px 12px;gap:10px}
+.activity-manage-name{font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.activity-manage-hint{font-size:12px;line-height:1.4;color:#64748b}
+.activity-class-controls{flex-wrap:wrap}
+@media(max-width:480px){.activity-manager{gap:8px}.activity-zone{padding:8px}.activity-zone-head{top:-8px;margin-top:-8px}.activity-zone-title{font-size:16px}.activity-manage-row{padding:10px 8px}.activity-manage-name{font-size:16px}.activity-zone-head{flex-wrap:wrap}}
+
+/* Learning Island: visual homepage only; all original links and class gates remain active. */
+body{background:linear-gradient(180deg,#d9f4ff 0%,#eaf9fd 32%,#f4fbf4 100%);padding-inline:clamp(12px,2vw,30px)}
+#gamesArea{max-width:1190px;margin:auto}
+.island-intro{max-width:1130px;margin:12px auto 22px;padding:18px 22px;display:flex;align-items:center;justify-content:center;gap:20px;background:#fffefa;border:2px solid #bde6d5;border-radius:26px;box-shadow:0 8px 22px #164f3a12}
+.island-intro h2{font-size:clamp(25px,3vw,37px);margin:0;color:#18583e}
+.island-intro p{font-size:18px;margin:6px 0 0;color:#395b60}
+
+.island-map{max-width:1130px;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;padding:24px;background:linear-gradient(155deg,#a8e0c5,#c8edb4 50%,#9ddbc4);border:10px solid #c3ebf7;border-radius:42% 38% 35% 32% / 8% 9% 8% 7%;box-shadow:0 16px 38px #154d6533}
+.island-place{background:#fffdf4ed;border:2px solid #ffffff;border-radius:27px;padding:20px;box-shadow:0 7px 0 #418d6552,0 12px 26px #174c3320;min-width:0}
+.island-place .game-group-head{margin-bottom:16px;align-items:center}
+.island-place .game-group-icon{font-size:clamp(44px,5vw,66px);line-height:1}
+.island-place .game-group-title{font-size:clamp(21px,2.2vw,28px);color:#214b38}
+.island-place .game-group-subtitle{font-size:15px;color:#476053;line-height:1.4;margin-top:5px}
+.island-place .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.island-place .student-card-shell{min-width:0}
+.island-place .game-card{min-height:145px;padding:18px 12px;border:2px solid #cde6dc;border-radius:21px;background:#fff;gap:12px}
+.island-place .card-icon{font-size:48px}
+.island-place .card-title{font-size:clamp(17px,1.7vw,21px);line-height:1.25;text-align:center;overflow-wrap:anywhere}
+.island-main{background:#fffcef;border-color:#f7e6a9}
+.island-main .game-card{min-height:182px;background:#fffefa}
+.island-roots .game-group-grid{grid-template-columns:minmax(0,1fr);max-width:280px;margin:auto}
+.island-roots .game-card{min-height:182px}
+.island-place .game-card:focus-visible{outline:4px solid #1d6cc7;outline-offset:3px}
+@media(min-width:850px){.island-place[data-game-group="skills"]{grid-column:1}.island-place[data-game-group="more-learning"]{grid-column:2}}
+@media(max-width:750px){.island-map{grid-template-columns:1fr;border-radius:34px;padding:14px;gap:16px;border-width:6px}.island-intro{padding:15px}.island-place{padding:16px}.island-place .game-group-grid{gap:10px}.island-place .game-card{min-height:130px}.island-main .game-card{min-height:150px}}
+@media(max-width:380px){.island-place .game-group-grid{grid-template-columns:1fr}.island-place .game-group-icon{font-size:42px}}
+@media(prefers-reduced-motion:reduce){.island-place .game-card{transition:none}}
+/* ===== Fun Torah Tools — Homepage redesign =====
+   1) Add to <head>, before your stylesheet:
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+   2) Paste this whole file at the END of your main CSS.
+*/
+
+body {
+  background: #fffaf0 !important;
+  font-family: 'Nunito', Arial, sans-serif !important;
+  color: #1f2a44;
+  overflow-x: hidden;
+}
+
+/* ---- Sky header with curved bottom ---- */
+body > h1 {
+  margin: -16px calc(50% - 50vw) 0 !important; /* -16px = body top padding */
+  padding: 44px 16px 4px !important;
+  background: linear-gradient(180deg, #38bdf8 0%, #60c8f5 100%);
+  color: #fff !important;
+  font-family: 'Fredoka', sans-serif !important;
+  font-size: 52px !important;
+  font-weight: 700 !important;
+  letter-spacing: .5px;
+  text-shadow: 0 3px 0 rgba(3, 105, 161, .35);
+}
+body > .subtitle {
+  position: relative;
+  margin: 0 calc(50% - 50vw) !important;
+  padding: 0 16px 70px !important;
+  background: linear-gradient(180deg, #60c8f5 0%, #7dd3fc 100%);
+  color: #e0f5ff !important;
+  font-size: 18px !important;
+  font-weight: 700;
+}
+body > .subtitle::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 40px;
+  background: #fffaf0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+/* ---- Name pill ---- */
+#studentBar.student-bar {
+  max-width: 520px !important;
+  margin: -6px auto 8px !important;
+  padding: 10px 22px !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  border: 2px solid #fde68a !important;
+  box-shadow: 0 6px 18px rgba(234, 179, 8, .15) !important;
+  text-align: center;
+  justify-content: center;
+}
+#studentBar strong { font-family: 'Fredoka', sans-serif; font-size: 18px; color: #1f2a44; }
+#studentBar #studentClassLabel { color: #92400e !important; font-weight: 700; }
+
+/* ---- Welcome ---- */
+.island-intro { background: none !important; border: none !important; box-shadow: none !important; padding: 8px 0 0 !important; }
+.island-intro .island-sun { display: inline-block; animation: ftt-spin 18s linear infinite; }
+@keyframes ftt-spin { to { transform: rotate(360deg); } }
+.island-intro h2 { font-family: 'Fredoka', sans-serif !important; font-size: 40px !important; color: #0f3b5f !important; font-weight: 700 !important; }
+.island-intro p { color: #5b6b85 !important; font-size: 18px !important; font-weight: 700; }
+
+/* ---- Island places: each gets its own color ---- */
+.game-container.island-map { background: none !important; box-shadow: none !important; border: none !important; gap: 28px !important; padding: 12px 24px 40px !important; }
+.game-container.island-map::before,
+.game-container.island-map::after { display: none !important; }
+
+.game-group.island-place {
+  --c: #0ea5e9; --soft: #e0f2fe; --deep: #0c4a6e;
+  position: relative;
+  overflow: hidden;
+  background: #fff !important;
+  border: none !important;
+  border-radius: 28px !important;
+  padding: 22px !important;
+  box-shadow: 0 10px 0 var(--soft), 0 18px 34px rgba(15, 23, 42, .08) !important;
+  transition: transform .2s;
+}
+.game-group.island-place::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 8px; background: var(--c); }
+.game-group.island-place:hover { transform: translateY(-3px); }
+
+.island-map > .game-group:nth-of-type(1) { --c: #f59e0b; --soft: #fef3c7; --deep: #78350f; } /* Chumash Cheder */
+.island-map > .game-group:nth-of-type(2) { --c: #22c55e; --soft: #dcfce7; --deep: #14532d; } /* Shorashim Grove */
+.island-map > .game-group:nth-of-type(3) { --c: #ec4899; --soft: #fce7f3; --deep: #831843; } /* Skills Library */
+.island-map > .game-group:nth-of-type(4) { --c: #6366f1; --soft: #e0e7ff; --deep: #312e81; } /* Beis Midrash */
+.island-map > .game-group:nth-of-type(5) { --c: #f97316; --soft: #ffedd5; --deep: #7c2d12; } /* Class Village */
+.island-map > .game-group:nth-of-type(6) { --c: #0ea5e9; --soft: #e0f2fe; --deep: #0c4a6e; } /* Challenge Playground */
+
+.game-group .game-group-head { align-items: center !important; gap: 14px !important; margin-bottom: 16px !important; }
+.game-group .game-group-icon {
+  display: flex !important; align-items: center; justify-content: center;
+  width: 64px !important; height: 64px !important; min-width: 64px;
+  font-size: 38px !important;
+  background: var(--soft);
+  border-radius: 20px;
+}
+.game-group .game-group-title { font-family: 'Fredoka', sans-serif !important; font-size: 26px !important; color: var(--deep) !important; font-weight: 700 !important; line-height: 1.1 !important; }
+.game-group .game-group-subtitle { color: #64748b !important; font-size: 15px !important; font-weight: 700; }
+
+/* ---- Activity buttons ---- */
+.game-group .game-group-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 14px !important; }
+.game-group .game-card {
+  flex-direction: column !important;
+  gap: 10px !important;
+  min-height: 140px;
+  min-width: 0;
+  padding: 20px 12px 18px !important;
+  text-align: center;
+  background: var(--soft) !important;
+  border: 2px solid transparent !important;
+  border-radius: 22px !important;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--c) 35%, transparent) !important;
+  transition: transform .15s, box-shadow .15s, border-color .15s !important;
+}
+.game-group .game-card:hover { transform: translateY(-4px) !important; border-color: var(--c) !important; box-shadow: 0 9px 0 color-mix(in srgb, var(--c) 45%, transparent) !important; }
+.game-group .game-card:active { transform: translateY(2px) !important; box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 45%, transparent) !important; }
+.game-group .card-icon { font-size: 44px !important; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .12)); }
+.game-group .card-title { font-family: 'Fredoka', sans-serif !important; font-size: 19px !important; font-weight: 600 !important; color: var(--deep) !important; line-height: 1.2 !important; overflow-wrap: normal; word-break: normal; }
+.game-group .game-card.activity-closed { background: #f1f5f9 !important; box-shadow: none !important; border: 2px dashed #cbd5e1 !important; }
+
+/* ---- Teacher Tools ---- */
+.teacher-tools-section {
+  max-width: 1100px;
+  margin: 10px auto 40px !important;
+  padding: 28px !important;
+  background: #fff7ed !important;
+  border: 2px dashed #fdba74 !important;
+  border-radius: 28px !important;
+}
+.teacher-tools-section h2 { font-family: 'Fredoka', sans-serif !important; color: #9a3412 !important; }
+.teacher-tool-card { border-radius: 20px !important; background: #fff !important; border: 2px solid #fed7aa !important; box-shadow: 0 4px 0 #fed7aa !important; transition: transform .15s !important; }
+.teacher-tool-card:hover { transform: translateY(-3px) !important; }
+.teacher-tool-card .card-title { font-family: 'Fredoka', sans-serif !important; font-weight: 600 !important; }
+
+@media (max-width: 600px) {
+  body > h1 { font-size: 36px !important; }
+  .island-intro h2 { font-size: 28px !important; }
+  .game-container.island-map { padding: 8px 4px 32px !important; }
+}
+</style>
+<script>
+  window.__b3Errors = [];
+  window.addEventListener("error", function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) {
+      window.__b3Errors.push("Part of the page could not load (" + (t.src || t.href).split("?")[0].split("/")[2] + ").");
+    } else {
+      window.__b3Errors.push("The page hit an error while loading.");
+    }
+  }, true);
+  document.addEventListener("click", function (e) {
+    if (window.__b3Ready) return;
+    var btn = e.target.closest ? e.target.closest("#studentSignInBtn") : null;
+    if (!btn) return;
+    var msg = document.getElementById("loginMsg");
+    var why = window.__b3Errors[0] || "The page did not finish loading.";
+    if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
+  });
+</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="backend/functions/student-tool-policy.js"></script>
+<script src="student-tool-controls.js"></script>
+<script src="follow-teacher/core.js?v=20261020-follow-pointer1"></script>
+<script src="follow-teacher/student.js?v=20261020-follow-pointer1"></script>
+<script src="guest-mode.js?v=20261011-guest"></script>
+<script src="site-settings.js?v=20261020-demo-student"></script>
+<script defer src="audio-mode.js?v=20261011-audio-mode"></script>
+</head>
+<body>
+  <h1>Fun Torah Tools</h1>
+  <div class="subtitle">Learning games and practice tools</div>
+  <div id="homeAuthLoading" role="status" aria-live="polite">⏳ Checking your sign-in…</div>
+
+  <div id="studentBar" class="student-bar hidden">
+    <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
+    <button id="switchStudentBtn" type="button">Switch student</button>
+    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" class="hidden" style="display:none!important" aria-hidden="true" tabindex="-1">👆 Class Pointer</a>
+  </div>
+
+  <div id="loginCard" class="login-card">
+    <h2>Student Sign In</h2>
+    <p id="studentLoginHelp">Use your student name and passcode.</p>
+    <label for="studentNameInput">Your name</label>
+    <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
+    <label for="classPinInput">Passcode</label>
+    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
+    <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+  </div>
+
+  <div id="lockedCard" class="locked-card hidden">
+    <div class="lock-icon">🔒</div>
+    <h2 id="lockedTitle">Fun Torah Tools is locked</h2>
+    <p id="lockedMessage">Your class cannot use Fun Torah Tools right now.</p>
+  </div>
+
+  <div id="gamesArea" class="hidden">
+    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while Fun Torah Tools is locked, only the activity or activities shown below are available to you.</div>
+    <div class="island-intro"><div><h2>Welcome to Learning Island!</h2><p>Choose a place to explore.</p></div></div>
+    <div class="game-container island-map" aria-label="Learning Island destinations">
+            <section class="game-group island-place island-main" data-game-group="learn">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true"><svg viewBox="0 0 64 64" width="52" height="52" role="img" aria-label="Rebbe"><path d="M9 64c0-13 10-20 23-20s23 7 23 20z" fill="#1f2937"/><path d="M26 44l6 13 6-13z" fill="#fff"/><ellipse cx="32" cy="29" rx="11" ry="12" fill="#f3c79d"/><path d="M20.5 28c0 15 5 25 11.5 25s11.5-10 11.5-25c-2 6-6 9-11.5 9s-9.5-3-11.5-9z" fill="#4a3426"/><path d="M27 36.5c2-1.6 3.5-1.6 5-.6 1.5-1 3-1 5 .6-2 .8-3.5 1-5 .4-1.5.6-3 .4-5-.4z" fill="#4a3426"/><circle cx="28" cy="28" r="1.5" fill="#1f2937"/><circle cx="36" cy="28" r="1.5" fill="#1f2937"/><path d="M25.5 24.5q2.5-1.5 5 0M33.5 24.5q2.5-1.5 5 0" stroke="#4a3426" stroke-width="1.3" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="19" rx="18" ry="3.6" fill="#111827"/><path d="M21.5 19c0-8 3-12.5 10.5-12.5S42.5 11 42.5 19z" fill="#111827"/><path d="M21.8 15.5h20.4v3H21.8z" fill="#374151"/><path d="M32 7.5v4" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg></span><div><div class="game-group-title">Chumash Cheder</div><div class="game-group-subtitle">Learn your posuk, then review it</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+<a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a></div>
+      </section>
+            <section class="game-group island-place island-main island-roots" data-game-group="roots">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🌳</span><div><div class="game-group-title">Shorashim Grove</div><div class="game-group-subtitle">Grow your Hebrew word skills</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="skills">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+<a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="more-learning">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🕍</span><div><div class="game-group-title">Learning Beis Midrash</div><div class="game-group-subtitle">Halacha and Sefer HaMitzvos</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
+<a class="game-card" data-game-id="sefer-hamitzvos" href="sefer-hamitzvos/index.html"><span class="card-icon">📖</span><span class="card-title">Sefer HaMitzvos</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="class">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏡</span><div><div class="game-group-title">Class Village</div><div class="game-group-subtitle">Your gallery and rewards</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
+<a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="challenge">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏆</span><div><div class="game-group-title">Challenge Playground</div><div class="game-group-subtitle">Quiz yourself or play a game</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a></div>
+      </section>
+    </div>
+    <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
+  </div>
+
+  <div id="teacherToolsSection" class="teacher-tools-section hidden">
+    <h2>👨‍🏫 Teacher Tools</h2>
+    <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
+    <div class="teacher-tools-container">
+      <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
+      <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
+      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
+      <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
+      <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
+      <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
+      <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="chazara/teacher.html" ><span class="card-icon">🔁</span><span class="card-title">Chazara — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="rashi-letters/teacher.html" ><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="gematria/teacher.html" ><span class="card-icon">🔢</span><span class="card-title">Gematria — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">🏅</span><span class="card-title">Student Rewards — Teacher</span></a>
+      <a class="teacher-tool-card" href="weekly-quiz/teacher.html" ><span class="card-icon">📝</span><span class="card-title">Weekly Quiz — Teacher</span></a>
+      <a class="teacher-tool-card" href="halacha/index.html?teacher=1&v=20261007-teacher-sync" ><span class="card-icon">📔</span><span class="card-title">Halacha — Teacher Lesson</span></a>
+      <a class="teacher-tool-card" href="halacha/teacher.html" ><span class="card-icon">🗂️</span><span class="card-title">Halacha — Student Work</span></a>
+      <a class="teacher-tool-card" href="chavrusa/index.html" ><span class="card-icon">👥</span><span class="card-title">Chavrusa of the Day</span></a>
+      <a class="teacher-tool-card" href="name-picker/index.html" ><span class="card-icon">🎡</span><span class="card-title">Name Picker</span></a>
+      <a class="teacher-tool-card" href="class-dashboard/index.html" ><span class="card-icon">📊</span><span class="card-title">Class Dashboard</span></a>
+      <a class="teacher-tool-card" href="student-report/index.html" ><span class="card-icon">📈</span><span class="card-title">Student Report — All Tools</span></a>
+      <a class="teacher-tool-card" href="sync-to-nigri/index.html" ><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
+      <a class="teacher-tool-card" href="davening_student_app_et/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — ET</span></a>
+      <a class="teacher-tool-card" href="davening_student_app_wt/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — WT</span></a>
+    </div>
+  </div>
+
+  <div id="versionModal" class="version-modal hidden" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle">
+    <div class="version-modal-card">
+      <h2 id="versionModalTitle">Open activity</h2>
+      <p>Which version would you like to open?</p>
+      <div class="version-choice">
+        <a id="versionStudentLink" class="student-version-choice" href="#"><span class="version-choice-icon">🎓</span><span>Student Version</span></a>
+        <a id="versionTeacherLink" class="teacher-version-choice" href="#" ><span class="version-choice-icon">👨‍🏫</span><span>Teacher Version</span></a>
+      </div>
+      <button id="versionModalClose" class="version-modal-close" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <div id="homeClassBar" class="home-class-bar hidden">
+    <label for="homeClassSelect">Class</label>
+    <select id="homeClassSelect" aria-label="Choose class"><option value="et">ET</option><option value="wt">WT</option></select>
+    <button id="homeClassLock" class="home-class-lock" type="button" title="Open Class Access for this class" aria-label="Open Class Access for this class">🔒</button>
+  </div>
+  <div id="homeAccessModal" class="home-access-modal hidden" role="dialog" aria-modal="true" aria-labelledby="homeAccessTitle">
+    <div class="home-access-card">
+      <div class="home-access-head"><span id="homeAccessTitle">🔒 Class Access</span><button id="homeAccessClose" type="button" aria-label="Close Class Access">×</button></div>
+      <iframe id="homeAccessFrame" title="Class Access"></iframe>
+    </div>
+  </div>
+  <button id="approvalCenterButton" class="approval-button hidden" type="button">🔔 Approvals <span id="approvalCenterBadge" class="approval-button-badge">0</span></button>
+  <div id="approvalCenterModal" class="approval-center-modal hidden" role="dialog" aria-modal="true" aria-labelledby="approvalCenterTitle">
+    <div class="approval-center-card">
+      <div class="approval-center-head">
+        <div><h2 id="approvalCenterTitle">🔔 Teacher Approval Center</h2><p id="approvalCenterSummary">Checking what needs your attention…</p></div>
+        <button id="approvalCenterClose" class="approval-center-x" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="approvalCenterList" class="approval-center-list"><div class="approval-center-empty">Checking approvals…</div></div>
+      <div id="approvalCenterWarning" class="approval-center-warning hidden"></div>
+      <div class="approval-center-footer"><button id="approvalCenterRefresh" class="approval-center-refresh" type="button">Refresh</button><button id="approvalCenterDone" class="approval-center-done" type="button">Close</button></div>
+    </div>
+  </div>
+
+  <button id="adminAccessButton" class="admin-button">Teacher Tools</button>
+  <div id="adminPanel" class="admin-panel hidden">
+    <h2>B3 Access Controls</h2>
+    <p id="adminStatus" class="admin-message">Enter the admin password to continue.</p>
+
+    <div id="adminPasswordGate">
+      <label for="adminPasswordInput" style="display:block;font-weight:800;margin:10px 0 6px;">Admin password</label>
+      <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Enter admin password"
+             style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;">
+      <button id="adminPasswordButton" class="admin-action" type="button">Continue</button>
+      <div id="adminPasswordMsg" class="admin-message" style="min-height:18px;margin-top:8px;color:#b91c1c;"></div>
+    </div>
+
+    <button id="signInButton" class="admin-action hidden">Sign in with Google</button>
+    <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
+
+    <div id="adminControls" class="hidden">
+      <div class="master-row"><label for="siteEnabledToggle">Emergency master access</label><input id="siteEnabledToggle" type="checkbox"></div>
+      <p class="admin-message">Turn this off only when you want both ET and WT students locked immediately. Your authorized teacher account will still have access.</p>
+
+      <div id="classControls"></div>
+
+      <section id="classManagementSection">
+      <h3>Class management</h3>
+      <p class="admin-message">Choose a class to see its students. Passcodes and access can be managed right from the list.</p>
+      <p class="admin-message">Each boy chooses his own PIN at his next sign-in. For a forgotten PIN or a later change, save a temporary passcode in the student list to approve a reset. Give it privately to the boy; he will choose a new PIN when he signs in.</p>
+      <div class="override-box" id="classManagementBox">
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
+          <button id="showAddStudentButton" class="admin-action" type="button" style="margin:0">+ Add Student</button>
+
+        </div>
+        <details id="classToolsArea" class="hidden"><summary>Passcode privacy</summary><button id="securePasscodesButton" class="admin-action secondary" type="button">Make all passcodes private</button></details>
+        <div id="addStudentArea" class="hidden" style="margin-top:12px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
+          <strong>Add a student</strong>
+          <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:9px">
+            <input id="managedStudentName" type="text" placeholder="Student name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+            <input id="managedStudentPasscode" type="text" inputmode="numeric" placeholder="Passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+          </div>
+          <button id="createManagedStudentButton" class="admin-action secondary" type="button">Create Student</button>
+          <div style="margin:10px 0;text-align:center;color:#64748b;font-size:12px;font-weight:700">OR ADD AN EXISTING STUDENT</div>
+          <select id="classStudentSelect" class="override-student-select"></select>
+          <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add Existing Student to Class</button>
+        </div>
+        <div style="overflow-x:auto"><div id="studentListHeading" style="min-width:480px;display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span><span></span></div>
+        <div id="classMemberList" style="min-width:480px"></div></div>
+        <div style="display:none"><input id="editManagedStudentPasscode"><button id="saveManagedStudentPasscodeButton" type="button"></button></div>
+        <div id="studentToolChoices"></div>
+        <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
+      </div>
+
+      </section>
+
+      <h3>Student activities</h3>
+      <p class="activity-manager-help">Drag activities between Active and Inactive. Active activities stay on the students' page; use ET/WT to make each one Open or Closed. Inactive activities disappear completely.</p>
+      <div class="activity-manager">
+        <div class="activity-zone" id="activeActivityZone" data-activity-zone="active">
+          <div class="activity-zone-head"><span class="activity-zone-title">Active Activities</span><span class="activity-zone-count" id="activeActivityCount">0</span></div>
+          <div class="activity-list" id="activeActivityList"></div>
+        </div>
+        <div class="activity-zone" id="inactiveActivityZone" data-activity-zone="inactive">
+          <div class="activity-zone-head"><span class="activity-zone-title">Inactive Activities</span><span class="activity-zone-count" id="inactiveActivityCount">0</span></div>
+          <div class="activity-list" id="inactiveActivityList"></div>
+        </div>
+      </div>
+
+      <h3>Student access while locked</h3>
+      <p class="admin-message">Choose one student, then check only the activities that student may use while Fun Torah Tools or that student's class is locked. An activity switched off above always stays off.</p>
+      <div class="override-box">
+        <label for="overrideStudentSelect">Student</label>
+        <select id="overrideStudentSelect" class="override-student-select"><option value="">Loading students…</option></select>
+        <div id="overrideGameToggles" class="override-game-list"><div class="override-empty">Choose a student.</div></div>
+        <div id="overrideSaveStatus" class="override-saving" aria-live="polite"></div>
+      </div>
+      <div class="tz-note">Automatic schedules use America/New_York time.</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  const settingsApi=window.B3SiteSettings;
+  const workspaceId=settingsApi.workspaceId||"b3-2026";
+  const pageParams=new URLSearchParams(window.location.search);
+  const previewStudentId=String(pageParams.get("previewStudent")||"").trim();
+  const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
+  // Keep the whole B3 classroom identity available to every mini-app.
+  // ET/WT are still the student's within-class track, not this workspace ID.
+  try{sessionStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
+  // Initialize Firebase before using Database/Auth. Without this, the script
+  // stops here and the Admin button never receives its click handler.
+  if (!window.firebase.apps.length) {
+    window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  }
+  const db=window.firebase.database();
+  const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
+  const classLabels={et:"ET",wt:"WT"};
+
+  // Student-to-class assignment is data-driven. New memberships live under
+  // the workspace; legacy allowedStudents.classId remains a temporary fallback.
+  // Temporary migration bridge only. These names are used to write the old
+  // B3 roster into Firebase memberships; all normal access uses Firebase data.
+  const LEGACY_MIGRATION_CLASSES={
+    et:new Set(["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"]),
+    wt:new Set(["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"])
+  };
+  function legacyMigrationClass(studentId){
+    if(LEGACY_MIGRATION_CLASSES.et.has(studentId))return "et";
+    if(LEGACY_MIGRATION_CLASSES.wt.has(studentId))return "wt";
+    return "";
+  }
+  async function persistStudentMembership(studentId,classId,data){
+    if(!["et","wt"].includes(classId))return;
+    const name=(data&&data.name)?String(data.name):studentId;
+    const updates={};
+    updates["b3Games/students/"+studentId+"/profile/name"]=name;
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name,active:!data||data.active!==false};
+    try{await db.ref().update(updates);}catch(e){console.warn("Could not persist student membership",e);}
+  }
+  let studentClassChoices=[];
+  // Firebase reads can hang forever on a slow or filtered connection. Sign-in
+  // must never wait silently, so every read on that path gets a time limit.
+  function withTimeout(promise,ms,message){
+    let timer;
+    return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||"The connection is slow. Please try again.")),ms);})]).finally(()=>clearTimeout(timer));
+  }
+  const readOnce=(path,ms=10000)=>withTimeout(db.ref(path).once("value"),ms,"The connection is slow. Please try again.");
+  async function resolvedStudentClass(studentId,data){
+    const memberships=(await readOnce("b3Games/students/"+studentId+"/memberships")).val()||{};
+    const ids=[...new Set(Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId).map(m=>String(m.classId)))];
+    studentClassChoices=(await Promise.all(ids.map(async id=>{
+      const row=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+id)).val();
+      return row&&row.active!==false&&row.members?.[studentId]?.active!==false&&row.members?.[studentId]?{id,name:String(row.name||id)}:null;
+    }))).filter(Boolean);
+    const stored=sessionStorage.getItem("b3Games_studentId")===studentId?sessionStorage.getItem("b3Games_studentClass"):"";
+    if(studentClassChoices.length)return (studentClassChoices.find(c=>c.id===stored)||studentClassChoices[0]).id;
+
+    // Migration repair: an active legacy B3 student should not be locked out
+    // just because the newer membership mirror is missing or half-migrated.
+    // Repair the ET/WT membership on successful sign-in and continue.
+    const legacy=["et","wt"].includes(data?.classId)?data.classId:legacyMigrationClass(studentId);
+    const removedOnPurpose=memberships[workspaceId+"_"+legacy]?.active===false;
+    if(legacy&&data?.active!==false&&!removedOnPurpose){
+      await persistStudentMembership(studentId,legacy,data);
+      studentClassChoices=[{id:legacy,name:legacy.toUpperCase()}];
+      return legacy;
+    }
+    return "";
+  }
+
+  const el=id=>document.getElementById(id);
+  // Hook up student sign-in first. If any later setup code fails, the button
+  // still responds instead of silently doing nothing.
+  el("studentSignInBtn").addEventListener("click",studentSignIn);
+  el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  window.__b3Ready = true;
+  const gameCards=Array.from(document.querySelectorAll(".game-card"));
+  const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
+  gameCards.forEach(card=>card.addEventListener("click",event=>{
+    if(card.classList.contains("activity-closed")){
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }));
+  const teacherVersionByGame={
+    "yiddish":"yiddish/teacher.html",
+    "posuk-practice-scroll":"record_pesukim/teacher.html",
+    "rashi-letters":"rashi-letters/teacher.html",
+    "gematria":"gematria/teacher.html",
+    "shorashim":"shorashim/teacher.html?v=20260917-correct-dashboard",
+    "chazara":"chazara/teacher.html",
+    "game-show":"game-show/teacher.html",
+    "student-rewards":"student-rewards/teacher.html",
+    "weekly-quiz":"weekly-quiz/teacher.html",
+    "sefer-hamitzvos":"sefer-hamitzvos/index.html",
+    "halacha":"halacha/index.html?teacher=1&v=20261007-teacher-sync"
+  };
+  const pairedTeacherHrefs=new Set(Object.values(teacherVersionByGame).map(h=>h.split("?")[0]));
+
+  function slugId(value){
+    return String(value||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
+  }
+  async function loadClassManagement(){
+    if(!isAuthorizedTeacher)return;
+    const isOwner=currentAccess.role==="admin";
+    const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
+    const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
+    const allClasses=classesSnap.val()||{};
+    const classes={};
+    Object.entries(allClasses).forEach(([id,row])=>{
+      // The owner can manage students in every active platform class.
+      // Keep the original ET/WT classes available even if their status changes.
+      // Regular teachers remain limited to their assigned classes.
+      const ownerClass=isOwner&&(["et","wt"].includes(id)||row?.active!==false);
+      if(ownerClass||(!isOwner&&allowedClassIds.has(id)))classes[id]=row||{};
+    });
+
+    const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
+    const prior=classSel.value, priorStudent=studentSel.value;
+    const classIds=Object.keys(classes).sort((a,b)=>{
+      if(isOwner){
+        const priority=id=>id==="et"?0:id==="wt"?1:2;
+        if(priority(a)!==priority(b))return priority(a)-priority(b);
+      }
+      return a.localeCompare(b);
+    });
+    classSel.innerHTML=classIds.map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
+    if(prior&&classes[prior])classSel.value=prior;
+    if(!classSel.value&&classIds.length)classSel.value=classIds[0];
+
+    // Teachers only load students who are members of classes assigned to them.
+    // The owner can still manage the complete B3 student directory.
+    let studentIds=[];
+    if(isOwner){
+      const studentsIndex=await db.ref("b3Games/students").once("value");
+      studentIds=Object.keys(studentsIndex.val()||{});
+    }else{
+      const ids=new Set();
+      Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
+      studentIds=[...ids];
+    }
+    const studentRows=await Promise.all(studentIds.map(async id=>{
+      const snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
+      return [id,snap.val()||{}];
+    }));
+    const students={};
+    studentRows.forEach(([id,profile])=>{students[id]={profile};});
+    // Passcodes are private; teachers see them only through the backend.
+    const passcodeList=await trustedStudentAction("list",isOwner?{all:true}:{});
+    Object.entries(passcodeList?.passcodes||{}).forEach(([id,code])=>{if(students[id])students[id].profile={...students[id].profile,passcode:code};});
+
+    studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
+    if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
+
+    const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
+    el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
+      const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
+      const passcode=String(profile.passcode||"");
+const active=(members[id]?.active!==false&&profile.active!==false);
+      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button><button type="button" data-remove-student="'+id+'" data-student-name="'+name.replace(/"/g,"&quot;")+'" style="border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Remove</button></div>';
+    }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
+
+    const selectedStudent=studentSel.value;
+    if(el("editManagedStudentPasscode"))el("editManagedStudentPasscode").value=String(students[selectedStudent]?.profile?.passcode||"");
+    // Teacher-account administration belongs only in Owner Admin.
+    if(el("teacherList"))el("teacherList").innerHTML="";
+  }
+  async function trustedStudentAction(action,data={}){
+    try{
+      const user=firebase.auth().currentUser;
+      const response=await fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents",{
+        method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json","Authorization":"Bearer "+await user.getIdToken()},
+        body:JSON.stringify({action,classId:el("manageClassSelect").value,...data})
+      });
+      if(response.status===404)throw new Error("Teacher student management is awaiting backend deployment. Your invitation and class assignment are saved.");
+      const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not save the student.");return result;
+    }catch(error){el("classManagementStatus").textContent=error.message;return null;}
+  }
+  async function createManagedStudent(){
+    const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
+    if(!name||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
+    {const result=await trustedStudentAction("create",{name,passcode});if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;}
+  }
+  async function saveManagedStudentPasscode(){
+    const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
+    if(!studentId||!passcode)return;
+    {if(await trustedStudentAction("passcode",{studentId,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
+  }
+  async function addStudentToManagedClass(){
+    const classId=el("manageClassSelect").value, studentId=el("classStudentSelect").value;
+    if(!classId||!studentId)return;
+    if(!isAuthorizedAdmin){if(await trustedStudentAction("add",{studentId}))await loadClassManagement();return;}
+    const s=(await db.ref("b3Games/students/"+studentId+"/profile").once("value")).val()||{};
+    const updates={};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name:s.name||studentId,active:true};
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
+    await db.ref().update(updates); await loadClassManagement();
+  }
+  async function removeStudentFromManagedClass(studentId){
+    const classId=el("manageClassSelect").value;
+    if(!classId||!studentId)throw new Error("Select a class and student first.");
+    const memberPath="b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId;
+    const membershipPath="b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId;
+    if(!isAuthorizedAdmin){
+      if(!await trustedStudentAction("remove",{studentId}))throw new Error("Student removal was not saved.");
+    }else{
+      const updates={};
+      updates[memberPath]=null;
+      updates[membershipPath]={workspaceId,classId,active:false,removedAt:Date.now()};
+      await db.ref().update(updates);
+    }
+    // A missing class member and an inactive membership must both persist.
+    const [member,membership]=await Promise.all([
+      db.ref(memberPath).once("value"),db.ref(membershipPath).once("value")
+    ]);
+    if(member.exists()||membership.val()?.active!==false){
+      throw new Error("The student is still in the saved class roster. Removal was not confirmed.");
+    }
+    await loadClassManagement();
+    if(el("classMemberList").querySelector('[data-remove-student="'+studentId+'"]')){
+      throw new Error("The student remains on the reloaded class roster. Please try again.");
+    }
+    return true;
+  }
+  function setTeacherToolPairVisibility(){
+    document.querySelectorAll(".teacher-tool-card").forEach(card=>{
+      const raw=card.getAttribute("href")||"";
+      const base=raw.split("?")[0];
+      card.classList.toggle("hidden",isAuthorizedTeacher&&pairedTeacherHrefs.has(base));
+    });
+  }
+
+  function openTeacherToolInBackground(url){
+    window.location.assign(url);
+  }
+
+  function closeVersionModal(){el("versionModal")?.classList.add("hidden");}
+  function openVersionModal(game){
+    const teacherHref=teacherVersionByGame[game.id];
+    if(!teacherHref)return false;
+    // Teachers go straight to the Teacher Version — no Student/Teacher chooser.
+    window.location.assign(teacherHref);
+    return true;
+  }
+
+
+  let currentSettings=settingsApi.defaultSettings;
+  let currentUser=null;
+  let isAuthorizedTeacher=false;
+  let isAuthorizedAdmin=false;
+  let teacherToolsAutoOpened=false;
+  let currentAccess={authorized:false,role:"",classIds:[]};
+  let myStudentId="";
+  let myStudentName="";
+  let myClassId="";
+  let myClassRecord=null;
+  let overrideRoster=[];
+  let selectedOverrideStudentId="";
+  let approvalCenterTimer=null;
+  let approvalCenterAutoShown=false;
+  let approvalCenterLoading=false;
+  let approvalCounts={};
+
+  const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
+  const studentNudgeMessages={
+    "posuk-practice-scroll":[
+      "Hi {name}! Ready for today’s pesukim? Come on in!",
+      "Hey {name}! Your Posuk Practice is waiting for you!",
+      "Come on in, {name} — let’s get those pesukim strong!",
+      "Hi {name}! A little Posuk Practice goes a long way!"
+    ],
+    "chazara":[
+      "Hi {name}! Time for a quick Chazara — come on in!",
+      "Hey {name}! Let’s keep yesterday’s learning fresh!",
+      "Come on in, {name}! Your Chazara is waiting!",
+      "Hi {name}! Ready to review and remember?"
+    ],
+    "class-gallery":[
+      "Hi {name}! Come see what’s happening in the Class Gallery!",
+      "Hey {name}! Come on in and see what the class has been sharing!",
+      "The Class Gallery is calling you, {name}!",
+      "Hi {name}! There may be something new to see in the Gallery!"
+    ],
+    "shorashim":[
+      "Hi {name}! Ready to grow your Shorashim?",
+      "Come on in, {name} — let’s make those Shorashim stronger!",
+      "Hey {name}! Your Shorashim practice is waiting!",
+      "Hi {name}! Let’s grow some word-power today!"
+    ]
+  };
+
+  const approvalDefinitions=[
+    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
+    {key:"posukPoints",icon:"⭐",title:"Posuk Practice points",detail:"100% milestone point requests waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"},
+    {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
+    {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
+    {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
+    {key:"prizeStore",icon:"🎁",title:"Prize Store requests",detail:"Student reward purchases waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"}
+  ];
+
+  function approvalValues(v){return v&&typeof v==="object"?Object.values(v):[];}
+  function countPosukDisputes(allAttempts){
+    let count=0;
+    approvalValues(allAttempts).forEach(function(posukMap){
+      approvalValues(posukMap).forEach(function(attemptMap){
+        approvalValues(attemptMap).forEach(function(a){
+          if(!a||typeof a!=="object")return;
+          if(a.hebrewAudioURL&&a.hebrewDisputeStatus==="pending")count++;
+          if(a.comprehensionAudioURL&&a.comprehensionDisputeStatus==="pending")count++;
+          approvalValues(a.questionResults).forEach(function(q){if(q&&q.audioURL&&q.disputeStatus==="pending")count++;});
+          approvalValues(a.translationChunkResults).forEach(function(x){if(x&&x.audioURL&&x.disputeStatus==="pending")count++;});
+        });
+      });
+    });
+    return count;
+  }
+  function countNested(root,predicate){
+    let count=0;
+    approvalValues(root).forEach(function(group){
+      approvalValues(group).forEach(function(item){if(predicate(item||{}))count++;});
+    });
+    return count;
+  }
+  function countPendingShorashimWords(catalog){
+    return approvalValues(catalog).filter(function(item){
+      if(!item||item.hidden===true||item.teacherApproved===true)return false;
+      const raw=item.commonness!==undefined?item.commonness:(item.commonnessScore!==undefined?item.commonnessScore:item.frequency);
+      const n=Number(raw);
+      return Number.isFinite(n)&&n<=5;
+    }).length;
+  }
+  function renderApprovalCenter(){
+    const list=el("approvalCenterList");
+    const active=approvalDefinitions.filter(function(item){return Number(approvalCounts[item.key]||0)>0;});
+    const total=active.reduce(function(n,item){return n+Number(approvalCounts[item.key]||0);},0);
+    el("approvalCenterBadge").textContent=String(total);
+    el("approvalCenterBadge").classList.toggle("hidden",total===0);
+    if(approvalCenterLoading){
+      el("approvalCenterSummary").textContent="Checking what needs your attention…";
+    }else if(total){
+      el("approvalCenterSummary").textContent=String(total)+" item"+(total===1?"":"s")+" waiting for you. Click any section to go straight there.";
+    }else{
+      el("approvalCenterSummary").textContent="Nothing is waiting for approval right now.";
+    }
+    if(approvalCenterLoading&&!active.length){
+      list.innerHTML='<div class="approval-center-empty">Checking approvals…</div>';
+      return total;
+    }
+    if(!active.length){
+      list.innerHTML='<div class="approval-center-empty">✅ All caught up — no approvals are waiting.</div>';
+      return 0;
+    }
+    list.innerHTML=active.map(function(item){
+      const count=Number(approvalCounts[item.key]||0);
+      return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+'</small></span><span class="approval-center-count">'+count+'</span></a>';
+    }).join("");
+    return total;
+  }
+  function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
+  function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
+  async function loadApprovalCenter(autoOpen){
+    if(!isAuthorizedAdmin||approvalCenterLoading)return;
+    approvalCenterLoading=true;
+    renderApprovalCenter();
+    const reads=[
+      ["attempts",db.ref("posukPractice/attempts").once("value")],
+      ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
+      ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
+      ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
+      ["gallery",db.ref("classGallery/posts").once("value")],
+      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")]
+    ];
+    const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
+    const data={};const failed=[];
+    settled.forEach(function(result,i){
+      const key=reads[i][0];
+      if(result.status==="fulfilled")data[key]=result.value.val()||{};
+      else failed.push(key);
+    });
+    // Gallery posts live in one shared list but the gallery page shows one class at a time,
+    // so link straight to the class that has the waiting projects (most pending first).
+    const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
+    const galleryByClass={};
+    galleryPending.forEach(function(x){const c=x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et";galleryByClass[c]=(galleryByClass[c]||0)+1;});
+    const galleryClass=Object.keys(galleryByClass).sort(function(a,b){return galleryByClass[b]-galleryByClass[a];})[0];
+    const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
+    if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
+    const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
+    approvalCounts={
+      posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
+      posukPoints:data.pointRequests?pointRequests.filter(function(x){return ["reading100","translation100","understand100"].includes(String(x.source||""));}).length:0,
+      chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
+      shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
+      shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
+      gallery:galleryPending.length,
+      prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
+    };
+    approvalCenterLoading=false;
+    const total=renderApprovalCenter();
+    const warning=el("approvalCenterWarning");
+    if(failed.length){
+      warning.textContent="Some approval sources could not be checked right now. The counts shown are for the sources that loaded successfully.";
+      warning.classList.remove("hidden");
+    }else{
+      warning.classList.add("hidden");
+    }
+    if(autoOpen&&!approvalCenterAutoShown&&total>0){
+      approvalCenterAutoShown=true;
+      openApprovalCenter();
+    }
+  }
+  function startApprovalCenter(){
+    el("approvalCenterButton").classList.remove("hidden");
+    if(approvalCenterTimer)clearInterval(approvalCenterTimer);
+    // Keep the corner approval badge updated without auto-opening the center modal.
+    loadApprovalCenter(false);
+    approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
+  }
+  function stopApprovalCenter(){
+    if(approvalCenterTimer){clearInterval(approvalCenterTimer);approvalCenterTimer=null;}
+    el("approvalCenterButton").classList.add("hidden");
+    closeApprovalCenter();
+    approvalCounts={};
+    approvalCenterAutoShown=false;
+  }
+
+  // Password gate only keeps students from reaching the Google sign-in screen.
+  // Google/Firebase authentication remains the real administrator security.
+  const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
+  const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
+
+  function adminPasswordUnlocked(){
+    try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
+  }
+
+  async function sha256Hex(value){
+    const bytes=new TextEncoder().encode(String(value||""));
+    const digest=await crypto.subtle.digest("SHA-256",bytes);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function unlockAdminPassword(){
+    const input=el("adminPasswordInput");
+    const msg=el("adminPasswordMsg");
+    const btn=el("adminPasswordButton");
+    if(msg)msg.textContent="";
+    if(btn)btn.disabled=true;
+    try{
+      const hash=await sha256Hex(input?input.value:"");
+      if(hash!==ADMIN_PASSWORD_HASH){
+        if(msg)msg.textContent="Incorrect password.";
+        if(input){input.select();input.focus();}
+        return;
+      }
+      try{sessionStorage.setItem(ADMIN_PASSWORD_SESSION_KEY,"1");}catch(e){}
+      if(input)input.value="";
+      renderAdminPanel();
+      setTimeout(()=>el("signInButton")?.focus(),0);
+    }catch(e){
+      console.error("Admin password check failed:",e);
+      if(msg)msg.textContent="Could not check the password. Please try again.";
+    }finally{
+      if(btn)btn.disabled=false;
+    }
+  }
+
+  function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
+  function setLoginMsg(t){el("loginMsg").textContent=t||"";}
+
+  function showChecking(){if(isAuthorizedTeacher){renderStudentAccess();return;}el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening Fun Torah Tools…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
+  function showLogin(){
+    if(isAuthorizedTeacher){renderStudentAccess();return;}
+    el("loginCard").classList.remove("checking");el("loginCard").querySelector("h2").textContent="Student Sign In";if(el("loginMsg").textContent.startsWith("Checking your sign-in"))setLoginMsg("");
+    document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
+    el("loginCard").classList.remove("hidden");
+    el("studentBar").classList.add("hidden");
+    el("lockedCard").classList.add("hidden");
+    el("gamesArea").classList.add("hidden");
+    el("teacherToolsSection").classList.add("hidden");
+  }
+
+  function studentHasOverride(gameId,studentId=myStudentId){
+    if(!studentId||!gameId)return false;
+    if(typeof settingsApi.studentHasGameOverride==="function")return settingsApi.studentHasGameOverride(currentSettings,studentId,gameId);
+    return Boolean(currentSettings.studentGameOverrides?.[studentId]?.[gameId]===true);
+  }
+
+  function classHasLockedGameOverride(gameId,classId=myClassId){
+    if(!classId||!gameId)return false;
+    if(typeof settingsApi.classHasLockedGameOverride==="function")return settingsApi.classHasLockedGameOverride(currentSettings,classId,gameId);
+    if(!String(currentSettings.classLockedGameOverride?.[classId]||"").split(",").map(v=>v.trim()).includes(String(gameId)))return false;
+    const until=Number(currentSettings.classLockedGameOverrideUntil?.[classId]?.[gameId])||0;
+    return !(until>0&&until<=Date.now());
+  }
+
+  function studentNudgeVisitKey(gameId){
+    return "b3Games_lastVisit_"+myStudentId+"_"+gameId;
+  }
+  function studentNudgeName(){
+    const raw=String(myStudentName||"").trim();
+    if(!raw)return "there";
+    return raw.split(/\s+/)[0];
+  }
+  function studentNudgeMessage(gameId){
+    const messages=studentNudgeMessages[gameId]||[];
+    if(!messages.length)return "";
+    const day=Math.floor(Date.now()/STUDENT_NUDGE_DAY_MS);
+    const seed=String(myStudentId||"student")+"|"+gameId+"|"+day;
+    let hash=0;
+    for(let i=0;i<seed.length;i++)hash=((hash<<5)-hash+seed.charCodeAt(i))|0;
+    const message=messages[Math.abs(hash)%messages.length];
+    return message.replaceAll("{name}",studentNudgeName());
+  }
+  function studentNeedsNudge(gameId){
+    if(!myStudentId||!studentNudgeMessages[gameId])return false;
+    const last=Number(localStorage.getItem(studentNudgeVisitKey(gameId))||0);
+    return !last||(Date.now()-last)>=STUDENT_NUDGE_DAY_MS;
+  }
+  function markStudentToolVisited(gameId){
+    if(!myStudentId||!studentNudgeMessages[gameId])return;
+    try{localStorage.setItem(studentNudgeVisitKey(gameId),String(Date.now()));}catch(e){}
+    const card=gameDefinitions.find(g=>g.id===gameId)?.element;
+    card?.querySelector(".student-nudge")?.remove();
+  }
+  function updateGameGroupVisibility(){
+    document.querySelectorAll(".game-group").forEach(group=>{
+      const hasVisibleCard=Array.from(group.querySelectorAll(".game-card")).some(card=>!card.classList.contains("hidden"));
+      group.classList.toggle("hidden",!hasVisibleCard);
+    });
+  }
+
+  let studentNudgeRotationTimer=null;
+  function renderStudentNudges(){
+    if(studentNudgeRotationTimer){
+      clearTimeout(studentNudgeRotationTimer);
+      studentNudgeRotationTimer=null;
+    }
+    document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
+    if(isAuthorizedTeacher||!myStudentId||!myClassId)return;
+
+    const eligibleGames=gameDefinitions.filter(game=>
+      studentNudgeMessages[game.id] &&
+      !game.element.classList.contains("hidden") &&
+      studentNeedsNudge(game.id)
+    );
+    if(!eligibleGames.length)return;
+
+    let index=0;
+    const showNext=()=>{
+      document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
+      if(isAuthorizedTeacher||!myStudentId||!myClassId)return;
+
+      const stillEligible=eligibleGames.filter(game=>
+        !game.element.classList.contains("hidden") &&
+        studentNeedsNudge(game.id)
+      );
+      if(!stillEligible.length)return;
+      if(index>=stillEligible.length)index=0;
+
+      const game=stillEligible[index++];
+      const bubble=document.createElement("span");
+      bubble.className="student-nudge";
+      bubble.setAttribute("aria-hidden","true");
+      bubble.innerHTML='<span class="student-nudge-wave">👋</span>'+studentNudgeMessage(game.id);
+      game.element.appendChild(bubble);
+
+      studentNudgeRotationTimer=setTimeout(()=>{
+        bubble.remove();
+        studentNudgeRotationTimer=setTimeout(showNext,700);
+      },4500);
+    };
+    showNext();
+  }
+
+  function renderCardLocks(){
+    document.querySelectorAll('#gamesArea .game-card[data-game-id]').forEach(card=>{
+      let shell=card.parentElement;
+      if(!shell.classList.contains('student-card-shell')){
+        shell=document.createElement('div');
+        shell.className='student-card-shell';
+        card.before(shell);
+        shell.appendChild(card);
+      }
+      shell.querySelectorAll('.card-lock,.card-lock-menu').forEach(e=>e.remove());
+      // Games are opened and closed per class in Teacher Center > Control.
+      // The old home-page lock icons changed every class at once, so they are gone.
+      return;
+
+      const id=card.dataset.gameId;
+      const classes=currentAccess.role==='admin'?['et','wt']:(currentAccess.classIds||[]);
+      const globallyActive=currentSettings.games?.[id]!==false;
+      const locked=!globallyActive||classes.some(c=>currentSettings.classGames?.[c]?.[id]===false);
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='card-lock';
+      button.textContent=locked?'🔒':'🔓';
+      button.classList.add(locked?'is-locked':'is-open');
+
+      if(!globallyActive){
+        button.title='This activity is inactive. Use Teacher Tools to enable it.';
+        button.setAttribute('aria-label',card.innerText.trim()+' is inactive. Use Teacher Tools to enable it.');
+        button.addEventListener('click',event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          alert('This activity is inactive. Enable it in Teacher Tools first.');
+        });
+      }else{
+        const nextOpen=locked;
+        button.title=(nextOpen?'Open':'Lock')+' this activity for all of your classes';
+        button.setAttribute('aria-label',(nextOpen?'Open ':'Lock ')+card.innerText.trim()+' for all classes');
+        button.addEventListener('click',async event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          button.disabled=true;
+
+          const oldValues={};
+          currentSettings.classGames=currentSettings.classGames||{};
+          classes.forEach(classId=>{
+            currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+            oldValues[classId]=currentSettings.classGames[classId][id]!==false;
+            currentSettings.classGames[classId][id]=nextOpen;
+          });
+          renderActivityManager();
+          renderStudentAccess();
+
+          try{
+            await settingsApi.updateClassesGameEnabled(classes,id,nextOpen);
+          }catch(e){
+            classes.forEach(classId=>{
+              currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+              currentSettings.classGames[classId][id]=oldValues[classId];
+            });
+            renderActivityManager();
+            renderStudentAccess();
+            alert('Could not save this activity setting.');
+            console.error(e);
+          }
+        });
+      }
+      shell.appendChild(button);
+    });
+  }
+
+  // ---- Guest Mode: a preview of the site, never a login. See guest-mode.js. ----
+  function isGuest(){return Boolean(window.B3Guest&&window.B3Guest.isGuest());}
+  const GUEST_TOOL_INFO={
+    "student-rewards/teacher.html":"Teachers award daily points and rewards to their students here.",
+    "class-pointer-prototype/dashboard.html":"Teachers start a live lesson and point at the screen together with the class.",
+    "game-show/teacher.html":"Teachers host a live trivia game show for the class.",
+    "record_pesukim/teacher.html":"Teachers see who recorded pesukim and approve the recordings.",
+    "shorashim/teacher.html":"Teachers see each student's shorashim progress.",
+    "chazara/teacher.html":"Teachers see each student's chazara chart.",
+    "rashi-letters/teacher.html":"Teachers see each student's Rashi letters progress.",
+    "gematria/teacher.html":"Teachers see each student's gematria practice.",
+    "weekly-quiz/teacher.html":"Teachers build and release the weekly quiz.",
+    "halacha/index.html":"Teachers teach a Halacha lesson together with the class.",
+    "halacha/teacher.html":"Teachers review the Halacha work students handed in.",
+    "chavrusa/index.html":"Teachers pick a chavrusa (learning partner) for each student each day.",
+    "name-picker/index.html":"Teachers spin a wheel to pick a student fairly."
+  };
+  function renderGuest(){
+    el("classPointerStudentLink").classList.add("hidden");
+    el("loginCard").classList.add("hidden");
+    el("lockedCard").classList.add("hidden");
+    el("studentBar").classList.remove("hidden");
+    el("studentNameLabel").textContent="Guest";
+    el("studentClassLabel").textContent="Previewing Fun Torah Tools · nothing is saved";
+    el("switchStudentBtn").classList.add("hidden");
+    el("gamesArea").classList.remove("hidden");
+    el("specialAccessNote")?.classList.add("hidden");
+    el("disabledMessage").classList.add("hidden");
+    gameDefinitions.forEach(game=>{
+      game.element.classList.remove("hidden","activity-closed");
+      game.element.querySelector(".activity-closed-badge")?.remove();
+    });
+    updateGameGroupVisibility();
+    // Tools without a guest preview: show a friendly "Sign in to unlock" instead.
+    const NO_GUEST_PREVIEW={"halacha":"Halacha lessons and the work students hand in are for signed-in students.","weekly-quiz":"The weekly quiz and practice quizzes are for signed-in students.","game-show":"The live Game Show is played by signed-in students during class."};
+    gameDefinitions.forEach(game=>{
+      const why=NO_GUEST_PREVIEW[game.id];
+      if(!why||game.element.dataset.guestWired)return;
+      game.element.dataset.guestWired="1";
+      game.element.addEventListener("click",e=>{
+        if(!isGuest())return;
+        e.preventDefault();e.stopPropagation();
+        window.B3Guest.unlock(game.name,why+" Sign in to try it.");
+      },true);
+    });
+    // Teacher Tools: shown as a preview only. Anything with student data or
+    // student/passcode management is hidden completely.
+    el("teacherToolsSection").classList.remove("hidden");
+    const sub=document.querySelector("#teacherToolsSection .teacher-tools-subtitle");
+    if(sub)sub.textContent="Preview only: these tools are for signed-in teachers.";
+    document.querySelectorAll("#teacherToolsSection .teacher-tool-card").forEach(card=>{
+      const base=(card.getAttribute("href")||"").split("?")[0];
+      const hide=card.id==="actAsStudentCard"||/^(sync-to-nigri|student-report)\//.test(base)||/^(admin|owner-admin|teacher-home)\.html$/.test(base);
+      card.classList.toggle("hidden",hide);
+      if(hide||card.dataset.guestWired)return;
+      card.dataset.guestWired="1";
+      if(base==="class-dashboard/index.html")return; // opens its own demo version
+      card.addEventListener("click",e=>{
+        if(!isGuest())return;
+        e.preventDefault();e.stopPropagation();
+        const title=card.querySelector(".card-title")?.textContent||"This tool";
+        window.B3Guest.unlock(title,(GUEST_TOOL_INFO[base]||"This is a teacher tool.")+" Sign in as a teacher to use it.");
+      },true);
+    });
+    el("approvalCenterButton").classList.add("hidden");
+  }
+  function startGuestTour(){
+    window.B3Guest.tour([
+      {selector:'[data-game-group="learn"]',title:"Learn & Practice",text:"Daily practice: record pesukim, keep a chazara chart, and learn shorashim."},
+      {selector:'[data-game-group="more-learning"]',title:"More Learning",text:"Rashi letters, Yiddish stories and words, Halacha, and Gematria."},
+      {selector:'[data-game-group="class"]',title:"My Class",text:"The Class Gallery shows the class's work, and Student Rewards shows points earned. In Guest Mode these show sample students."},
+      {selector:'[data-game-group="challenge"]',title:"Tests & Challenges",text:"The weekly quiz, practice quizzes, and the live Game Show."},
+      {selector:'#teacherToolsSection',title:"Teacher Tools",text:"What teachers use: a live class pointer, dashboards, a name picker, and more. Guests can look, but these open only for signed-in teachers."}
+    ]);
+  }
+  function enterGuest(){
+    if (!window.B3Guest.start()) return;
+    studentAccessRevoked=false;myStudentId=myStudentName=myClassId="";
+    setLoginMsg("");
+    renderStudentAccess();
+    try{if(!sessionStorage.getItem("b3GuestTourDone"))setTimeout(startGuestTour,400);}catch(e){}
+  }
+
+
+  function renderStudentAccess(){
+    el("classPointerStudentLink").classList.add("hidden"); // Student Pointer is now embedded in their activities.
+    queueMicrotask(renderStudentNudges);
+    queueMicrotask(renderCardLocks);
+    setTeacherToolPairVisibility();
+    // The authorized teacher account is never treated as ET or WT.
+    if(isAuthorizedTeacher){
+      el("loginCard").classList.add("hidden");
+      el("studentBar").classList.remove("hidden");
+      el("studentNameLabel").textContent=currentUser?.displayName||currentUser?.email||"Teacher";
+      el("studentClassLabel").textContent="Teacher access · ET/WT locks do not apply";
+      el("switchStudentBtn").classList.add("hidden");
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.add("hidden");
+      el("teacherToolsSection").classList.remove("hidden");
+      gameDefinitions.forEach(game=>{
+        game.element.classList.remove("hidden","activity-closed");
+        game.element.querySelector(".activity-closed-badge")?.remove();
+      });
+      updateGameGroupVisibility();
+      el("disabledMessage").classList.add("hidden");
+      return;
+    }
+
+    if(isGuest()){renderGuest();return;}
+    el("teacherToolsSection").classList.add("hidden");
+    if(studentAccessRevoked||!myStudentId||!myClassId){showLogin();return;}
+    el("loginCard").classList.add("hidden");
+    el("studentBar").classList.remove("hidden");
+    el("switchStudentBtn").classList.remove("hidden");
+    el("studentNameLabel").textContent=myStudentName||"Student";
+
+    const legacyB3Class=["et","wt"].includes(myClassId);
+    if(!legacyB3Class){
+      if(myClassRecord?.active===false||myClassRecord?.siteEnabled===false||myClassRecord?.access?.mode==="locked"){
+        el("gamesArea").classList.add("hidden");el("lockedCard").classList.remove("hidden");el("lockedTitle").textContent="Your class is locked";el("lockedMessage").textContent="Your teacher can reopen your class.";return;
+      }
+      const grants=myClassRecord?.toolGrants||{};
+      let visible=0;
+      gameDefinitions.forEach(game=>{
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        game.element.classList.toggle("hidden",!show);
+        game.element.classList.remove("activity-closed");
+        game.element.querySelector(".activity-closed-badge")?.remove();
+        if(show)visible++;
+      });
+      updateGameGroupVisibility();
+      const className=String(myClassRecord?.name||myClassId||"Class");
+      el("studentClassLabel").textContent=className;
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.add("hidden");
+      el("disabledMessage").classList.toggle("hidden",visible!==0);
+      return;
+    }
+
+    const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
+    let visible=0;
+    gameDefinitions.forEach(game=>{
+      const globallyActive=currentSettings.games?.[game.id]!==false;
+      const classOpen=currentSettings.classGames?.[myClassId]?.[game.id]!==false;
+      const exceptionAllowed=studentHasOverride(game.id)||classHasLockedGameOverride(game.id,myClassId);
+      const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&globallyActive&&(info.open||exceptionAllowed);
+      const closed=show&&!classOpen;
+
+      game.element.classList.toggle("hidden",!show);
+      game.element.classList.toggle("activity-closed",closed);
+      let badge=game.element.querySelector(".activity-closed-badge");
+      if(closed&&!badge){
+        badge=document.createElement("span");
+        badge.className="activity-closed-badge";
+        badge.textContent="Closed right now";
+        game.element.appendChild(badge);
+      }else if(!closed&&badge){
+        badge.remove();
+      }
+      if(show)visible++;
+    });
+    updateGameGroupVisibility();
+
+    if(info.open){
+      el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.add("hidden");
+      el("disabledMessage").classList.toggle("hidden",visible!==0);
+      return;
+    }
+
+    if(visible>0){
+      el("studentClassLabel").textContent=classLabels[myClassId]+" · special activity access";
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.remove("hidden");
+      el("disabledMessage").classList.add("hidden");
+      return;
+    }
+
+    el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
+    el("gamesArea").classList.add("hidden");
+    el("specialAccessNote")?.classList.add("hidden");
+    el("lockedCard").classList.remove("hidden");
+    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is locked":classLabels[myClassId]+" is locked right now";
+    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use Fun Torah Tools right now. Rabbi Cohen can give you access to a specific activity.";
+  }
+
+  // Student sign-in is checked on the server; passcodes never reach the browser.
+  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  async function studentAuthCall(body){
+    const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Object.assign(new Error(data.error||"Could not check your login. Try again."),{status:response.status});
+    return data;
+  }
+  async function checkStudentAccess(name,pin){
+    const typed=String(name||"").trim(),enteredPin=String(pin||"").trim();
+    if(!typed.replace(/[^a-z0-9]/gi,""))return{ok:false,reason:"Please type your name."};
+    if(!enteredPin)return{ok:false,reason:"Please enter your passcode."};
+    let r;
+    try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
+    catch(e){return{ok:false,reason:e.message,status:e.status}}
+    let classId;
+    if(Array.isArray(r.classChoices)&&r.classChoices.length){
+      studentClassChoices=r.classChoices;
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=(studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0]).id;
+    }else{
+      // Older auth-function deployments return the selected class but not the
+      // full classChoices list. Use that trusted server result so sign-in does
+      // not depend on an unauthenticated Firebase roster read timing out.
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=stored||r.classId||legacyMigrationClass(r.id);
+      studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
+    }
+    if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
+    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
+  }
+
+  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
+  let studentAccessRevoked=false;
+  async function enterStudent(r){
+    if(!isStudentPreview){
+      const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+      if(!pin)throw new Error("Please sign in again so your student access can be secured.");
+      let customToken=r.customToken;
+      // Reuse the token returned by the initial passcode check when it matches
+      // the selected class. This avoids a redundant second function request.
+      if(!customToken){
+        const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
+        customToken=credential.customToken;
+      }
+      if(!customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
+      try{
+        // A real student login must remain in this tab only; teacher tabs
+        // continue to use their own Firebase sessions.
+        await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+        await firebase.auth().signInWithCustomToken(customToken);
+      }catch(e){
+        if(e?.code!=="auth/network-request-failed")throw e;
+        // Firebase can lose the connection while exchanging an otherwise
+        // valid custom token. Retry once after a short pause for transient drops.
+        await new Promise(resolve=>setTimeout(resolve,800));
+        try{await firebase.auth().signInWithCustomToken(customToken);}
+        catch(retryError){
+          if(retryError?.code==="auth/network-request-failed"){
+            throw new Error("Your passcode was accepted, but Firebase sign-in was interrupted. Please try again.");
+          }
+          throw retryError;
+        }
+      }
+    }
+    if(studentClassWatch)studentClassWatch.off();
+    if(studentProfileWatch)studentProfileWatch.off();
+    if(studentMembershipWatch)studentMembershipWatch.off();
+    studentAccessRevoked=false;
+    myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
+    try{
+      const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+      const fields=["name","active","siteEnabled","access","toolGrants"];
+      const snapshots=await Promise.all([...fields.map(field=>readOnce(classPath+"/"+field,8000)),readOnce(classPath+"/members/"+myStudentId,8000)]);
+      myClassRecord=Object.fromEntries(fields.map((field,i)=>[field,snapshots[i].val()]));
+      myClassRecord.members={[myStudentId]:snapshots[fields.length].val()};
+    }catch(e){}
+    if(!isStudentPreview){
+      sessionStorage.setItem("b3Games_studentId",myStudentId);
+      sessionStorage.setItem("b3Games_studentName",myStudentName);
+      sessionStorage.setItem("b3Games_studentClass",myClassId);
+      sessionStorage.setItem("posukPractice_studentId",myStudentId);
+      sessionStorage.setItem("posukPractice_studentName",myStudentName);
+      sessionStorage.setItem("weeklyQuiz_classId",myClassId);
+      // Wake the class-wide Classroom Pointer listener after the first login.
+      window.dispatchEvent(new Event("fttStudentSignedIn"));
+      // Student's verified Firebase token is required for follow navigation.
+      void window.FTTFollowStudent?.start({workspaceId,classId:myClassId,studentId:myStudentId})
+        .catch(error=>console.warn("Follow Teacher unavailable",error));
+    }
+    let chooser=el("activeStudentClass");
+    if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
+    chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
+    chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
+    chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
+    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();
+    const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+    const classRefs=[...(["name","active","siteEnabled","access","toolGrants"].map(field=>({field,ref:db.ref(classPath+"/"+field)}))),{field:"member",ref:db.ref(classPath+"/members/"+myStudentId)}];
+    studentClassWatch={off(){classRefs.forEach(x=>x.ref.off());}};
+    classRefs.forEach(({field,ref})=>ref.on("value",snap=>{
+      if(field==="member")myClassRecord.members={[myStudentId]:snap.val()};else myClassRecord[field]=snap.val();
+      if(myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}
+      renderStudentAccess();
+    }));
+    studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
+    let seenPasscodeUpdate;
+    studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
+      const stamp=v?.passcodeUpdatedAt??null;if(seenPasscodeUpdate===undefined){seenPasscodeUpdate=stamp;return;}if(stamp===seenPasscodeUpdate||isStudentPreview)return;seenPasscodeUpdate=stamp;
+      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});}
+      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;sessionStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
+    studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
+    studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
+    renderStudentAccess();
+  }
+
+  function wrongPasscodeAttemptsKey(name){
+    const normalized=String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"");
+    return normalized?"b3WrongPasscodeAttempts:"+encodeURIComponent(normalized):"";
+  }
+  function recordWrongPasscodeAttempt(name){
+    const key=wrongPasscodeAttemptsKey(name);
+    if(!key)return 0;
+    const cutoff=Date.now()-10*60*1000;
+    try{
+      const previous=JSON.parse(localStorage.getItem(key)||"[]");
+      const attempts=(Array.isArray(previous)?previous:[]).filter(t=>Number.isFinite(t)&&t>=cutoff);
+      attempts.push(Date.now());
+      localStorage.setItem(key,JSON.stringify(attempts));
+      return attempts.length;
+    }catch(e){return 6;}
+  }
+  function clearWrongPasscodeAttempts(name){
+    const key=wrongPasscodeAttemptsKey(name);
+    if(key)try{localStorage.removeItem(key);}catch(e){}
+  }
+
+  async function studentSignIn(){
+    const btn=el("studentSignInBtn");
+    if(btn.disabled)return;
+    btn.disabled=true;setLoginMsg("Checking…");
+    try{
+      const studentName=el("studentNameInput").value;
+      const r=await checkStudentAccess(studentName,el("classPinInput").value);
+      if(!r.ok){
+        let message=r.reason;
+        if(r.status===401){
+          const attempts=recordWrongPasscodeAttempt(studentName);
+          if(attempts>5)message="Please stop guessing and ask your teacher for the passcode. Too many tries can temporarily block sign-in.";
+        }
+        setLoginMsg(message);return;
+      }
+      clearWrongPasscodeAttempts(studentName);
+      sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
+      setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+    }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
+    finally{btn.disabled=false;}
+  }
+
+  let actingStudentRestoreInFlight=false;
+  async function restoreStudent(){
+    if(isAuthorizedTeacher)return;
+    if(isGuest()&&!isStudentPreview){renderStudentAccess();return;}
+    const actingStudent=settingsApi.getActingStudent?.();
+    const id=isStudentPreview?previewStudentId:(actingStudent?.id||sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
+    if(!id){showLogin();return;}
+    // Firebase fires onAuthStateChanged again as the dedicated student tab
+    // signs in. Do not start a second login or overwrite a ready student.
+    if(actingStudent&&(actingStudentRestoreInFlight||
+        (myStudentId===id&&myClassId===actingStudent.classId&&!studentAccessRevoked)))return;
+    showChecking();
+    try{
+      if(actingStudent&&!isStudentPreview){
+        actingStudentRestoreInFlight=true;
+        try {
+        // The separate student tab has no teacher Firebase credentials.
+        // Authenticate its copied, server-verified student passcode before
+        // attempting any Firebase database reads.
+        const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+        if(!pin){showLogin();setLoginMsg("Please reopen student view from your teacher tab.");return;}
+        const identity=await studentAuthCall({action:"login",name:actingStudent.name,pin,classId:actingStudent.classId});
+        if(!identity?.customToken||identity.id!==id||identity.classId!==actingStudent.classId){
+          throw new Error("This student no longer has access to the selected class.");
+        }
+        studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
+        await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        // "Student version" from a teacher page lands on that tool once signed in.
+        const next=sessionStorage.getItem("b3ActAsNext");
+        sessionStorage.removeItem("b3ActAsNext");
+        if(next&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(next)){location.replace(new URL(next,location.href).href);}
+        return;
+        } finally { actingStudentRestoreInFlight=false; }
+      }
+      let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
+      let d=snap.val()||{};
+      if(!snap.exists()){
+        const legacy=await db.ref("posukPractice/allowedStudents/"+id).once("value");
+        if(!legacy.exists()){showLogin();return;}
+        const old=legacy.val()||{};
+        d={id,name:String(old.name||id),active:true};
+        try{await db.ref("b3Games/students/"+id+"/profile").set(d);}catch(e){}
+      }
+      if(isAuthorizedTeacher)return;
+      if(d.active===false){showLogin();return;}
+      if(actingStudent){
+        const classId=actingStudent.classId;
+        const clsSnap=await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+classId);
+        const cls=clsSnap.val();
+        const member=cls?.members?.[id];
+        if(!cls||cls.active===false||!member||member.active===false){showLogin();return;}
+        studentClassChoices=[{id:classId,name:String(cls.name||actingStudent.className||classId)}];
+        await enterStudent({id,name:String(d.name||actingStudent.name),classId});
+        return;
+      }
+      // Every activity reuses the passcode saved at homepage sign-in. If it is
+      // missing or out of date, ask once here instead of inside each activity.
+      if(!isStudentPreview){
+        const saved=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+        let stale=!saved;
+        if(saved){try{const verified=await studentAuthCall({action:"verify",studentId:id,pin:saved});stale=false;}catch(e){stale=e.status===401||e.status===403;}}
+        if(isAuthorizedTeacher)return;
+        if(stale){
+          sessionStorage.removeItem("b3Games_classPin");
+          el("studentNameInput").value=d.name?String(d.name):"";
+          showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
+        }
+      }
+      const identity=await studentAuthCall({action:"login",name:d.name||sessionStorage.getItem("b3Games_studentName")||id,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});
+      studentClassChoices=Array.isArray(identity.classChoices)?identity.classChoices:[];
+      const storedClassId=sessionStorage.getItem("b3Games_studentClass");
+      const restoredClassId=(studentClassChoices.find(c=>c.id===storedClassId)||studentClassChoices.find(c=>c.id===identity.classId)||studentClassChoices[0]||{}).id||await resolvedStudentClass(id,d);
+      if(isAuthorizedTeacher)return;
+      if(!restoredClassId){showLogin();return;}
+      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+    }catch(e){console.warn(e);showLogin();}
+  }
+
+  async function switchStudent(){
+    // Clear the student identity first so auth callbacks cannot restore the
+    // previous student while Firebase finishes signing out.
+    window.FTTFollowStudent?.stop();
+    resetPinForm();
+    studentAccessRevoked=true;
+    if(studentMembershipWatch)studentMembershipWatch.off();
+    if(studentClassWatch)studentClassWatch.off();
+    if(studentProfileWatch)studentProfileWatch.off();
+    studentMembershipWatch=studentClassWatch=studentProfileWatch=null;
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
+    myStudentId=myStudentName=myClassId="";
+    el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
+    // Ends only this student's Firebase session. The teacher's remembered
+    // Google login is untouched and this tab will not adopt it.
+    if(!isAuthorizedTeacher){
+      try { await settingsApi.endStudentSession(); }
+      catch(error){
+        console.warn("Could not sign out student Firebase session:",error);
+        setLoginMsg("Could not fully sign out. Please retry before another student signs in.");
+        return;
+      }
+    }
+    studentAccessRevoked=false;
+  }
+
+  function timeParts(value){
+    const match=/^(\d{2}):(\d{2})$/.exec(String(value||""));
+    let h=match?Number(match[1]):0;
+    const minute=match?Number(match[2]):0;
+    const ampm=h>=12?"PM":"AM";
+    let hour=h%12;if(hour===0)hour=12;
+    return {hour:String(hour),minute:String(minute).padStart(2,"0"),ampm};
+  }
+
+  function timePickerHtml(classId,day,i,which,value,enabled){
+    const p=timeParts(value||"00:00");
+    const key=`${classId}:${day}:${i}`;
+    const hours=Array.from({length:12},(_,n)=>n+1).map(h=>`<option value="${h}" ${String(h)===p.hour?"selected":""}>${h}</option>`).join("");
+    const minutes=Array.from({length:60},(_,n)=>String(n).padStart(2,"0")).map(m=>`<option value="${m}" ${m===p.minute?"selected":""}>${m}</option>`).join("");
+    return `<div class="friendly-time ${enabled?"":"disabled"}" data-time-box="${which}:${key}">
+      <select aria-label="${which} hour" data-time-${which}-hour="${key}" ${enabled?"":"disabled"}>${hours}</select>
+      <span class="time-colon">:</span>
+      <select aria-label="${which} minute" data-time-${which}-minute="${key}" ${enabled?"":"disabled"}>${minutes}</select>
+      <select aria-label="${which} AM or PM" data-time-${which}-ampm="${key}" ${enabled?"":"disabled"}><option value="AM" ${p.ampm==="AM"?"selected":""}>AM</option><option value="PM" ${p.ampm==="PM"?"selected":""}>PM</option></select>
+    </div>`;
+  }
+
+  function lockedGameOverrideOptions(classId){
+    const selected=String(currentSettings.classLockedGameOverride?.[classId]||"");
+    const choices=gameDefinitions.filter(game=>
+      currentSettings.games?.[game.id]!==false &&
+      currentSettings.classGames?.[classId]?.[game.id]!==false
+    );
+    const none='<option value=""'+(selected===""?" selected":"")+'>None — lock everything</option>';
+    return none+choices.map(game=>'<option value="'+game.id.replace(/"/g,"&quot;")+'"'+(selected===game.id?" selected":"")+'>'+game.name.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</option>').join("");
+  }
+
+  function classCardHtml(classId){
+    const access=currentSettings.classAccess[classId];
+    const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
+    const editableDays=["mon","tue","wed","thu","fri"];
+    const rows=editableDays.map(day=>{
+      const ranges=Array.isArray(access.lockWindows[day])?access.lockWindows[day]:[];
+      const rangeRows=[0,1,2,3,4,5].map(i=>{
+        const r=ranges[i]||null;
+        const enabled=Boolean(r);
+        const startValue=r?r.start:"00:00";
+        const endValue=r?r.end:"00:00";
+        return `<div class="lock-range ${enabled?"":"is-unused"}" data-lock-row="${classId}:${day}:${i}">
+          <input type="checkbox" aria-label="Use closed period ${i+1}" data-lock-enabled="${classId}:${day}:${i}" ${enabled?"checked":""}>
+          <span class="closed-label">${enabled?`Closed ${i+1}`:"Add period"}</span>
+          <div class="time-span">
+            ${timePickerHtml(classId,day,i,"start",startValue,enabled)}
+            <span class="to">to</span>
+            ${timePickerHtml(classId,day,i,"end",endValue,enabled)}
+          </div>
+        </div>`;
+      }).join("");
+      return `<div class="schedule-day"><div class="schedule-day-name">${dayLabels[day]}</div>${rangeRows}</div>`;
+    }).join("");
+    const delayNote=classId==="et"?" ET defaults include the 2-minute wait at the start of each 10-minute recess.":" WT defaults open immediately when recess begins.";
+    return `<div class="class-card" data-class-card="${classId}">
+      <div class="class-top"><div><div class="class-title">${classLabels[classId]}</div><div class="status-reason">${info.reason}</div></div><span class="status-pill ${info.open?"status-open":"status-closed"}">${info.open?"OPEN":"LOCKED"}</span></div>
+      <div class="mode-buttons">
+        <button class="mode-btn ${access.mode==="auto"?"active":""}" data-class-mode="${classId}:auto">Automatic</button>
+        <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
+        <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
+      </div>
+      <div style="margin-top:12px;padding:11px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:11px">
+        <label style="display:block;font-size:13px;font-weight:900;color:#1e3a8a;margin-bottom:6px" for="lockedGameOverride-${classId}">🔓 Keep one activity open while locked</label>
+        <select id="lockedGameOverride-${classId}" data-locked-game-override="${classId}" style="width:100%;padding:9px 10px;border:1px solid #93c5fd;border-radius:9px;background:#fff;font-weight:800;color:#1f2937">${lockedGameOverrideOptions(classId)}</select>
+        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When Fun Torah Tools or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
+      </div>
+      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">Fun Torah Tools is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
+    </div>`;
+  }
+
+  function renderStudentOverrideControls(){
+    const select=el("overrideStudentSelect");
+    const list=el("overrideGameToggles");
+    if(!select||!list)return;
+
+    const previous=selectedOverrideStudentId||select.value;
+    select.innerHTML='<option value="">Choose a student…</option>';
+    overrideRoster.forEach(student=>{
+      const option=document.createElement("option");
+      option.value=student.id;
+      option.textContent=student.name+(student.classId?` (${classLabels[student.classId]||student.classId.toUpperCase()})`:"");
+      select.appendChild(option);
+    });
+    if(previous&&overrideRoster.some(s=>s.id===previous)){select.value=previous;selectedOverrideStudentId=previous;}
+    else if(overrideRoster.length){selectedOverrideStudentId=overrideRoster[0].id;select.value=selectedOverrideStudentId;}
+    else selectedOverrideStudentId="";
+
+    select.onchange=()=>{selectedOverrideStudentId=select.value;renderStudentOverrideControls();};
+    list.innerHTML="";
+    if(!selectedOverrideStudentId){list.innerHTML='<div class="override-empty">No student selected.</div>';return;}
+
+    gameDefinitions.forEach(game=>{
+      const row=document.createElement("label");row.className="override-game-row";
+      const text=document.createElement("span");text.textContent=game.name;
+      const selectedStudent=overrideRoster.find(s=>s.id===selectedOverrideStudentId);
+      const selectedClass=selectedStudent?.classId||"";
+      const classGameEnabled=selectedClass&&typeof settingsApi.isGameEnabledForClass==="function"
+        ? settingsApi.isGameEnabledForClass(currentSettings,selectedClass,game.id)
+        : currentSettings.games?.[game.id]!==false;
+      if(!classGameEnabled){
+        const note=document.createElement("small");note.className="override-off-note";note.textContent="Activity switch is OFF for "+(classLabels[selectedClass]||"this class");text.appendChild(note);
+      }
+      const input=document.createElement("input");input.type="checkbox";input.checked=studentHasOverride(game.id,selectedOverrideStudentId);
+      input.addEventListener("change",async()=>{
+        const studentId=selectedOverrideStudentId;
+        const enabled=input.checked;
+        const old=!enabled;
+        const status=el("overrideSaveStatus");
+        if(status)status.textContent="Saving…";
+        currentSettings.studentGameOverrides=currentSettings.studentGameOverrides||{};
+        currentSettings.studentGameOverrides[studentId]=currentSettings.studentGameOverrides[studentId]||{};
+        if(enabled)currentSettings.studentGameOverrides[studentId][game.id]=true;
+        else{delete currentSettings.studentGameOverrides[studentId][game.id];if(!Object.keys(currentSettings.studentGameOverrides[studentId]).length)delete currentSettings.studentGameOverrides[studentId];}
+        renderStudentAccess();
+        try{
+          await settingsApi.updateStudentGameOverride(studentId,game.id,enabled);
+          if(status)status.textContent="Saved";
+        }catch(e){
+          currentSettings.studentGameOverrides=currentSettings.studentGameOverrides||{};
+          currentSettings.studentGameOverrides[studentId]=currentSettings.studentGameOverrides[studentId]||{};
+          if(old)currentSettings.studentGameOverrides[studentId][game.id]=true;
+          else{delete currentSettings.studentGameOverrides[studentId][game.id];if(!Object.keys(currentSettings.studentGameOverrides[studentId]).length)delete currentSettings.studentGameOverrides[studentId];}
+          input.checked=old;
+          if(status)status.textContent="Could not save";
+          alert("Could not save this student's special access.");
+          console.error(e);
+        }
+      });
+      row.append(text,input);list.appendChild(row);
+    });
+  }
+
+  function syncAdminPanelLayout(){
+    document.body.classList.toggle("admin-panel-open",!el("adminPanel").classList.contains("hidden"));
+  }
+
+  function renderAdminPanel(){
+    syncAdminPanelLayout();
+    const signedIn=Boolean(currentUser);
+    const dedicatedAdminPage=new URLSearchParams(window.location.search).get("adminPage")==="1";
+    if(!dedicatedAdminPage)el("adminPanel").classList.add("hidden");
+    else el("adminPanel").classList.remove("hidden");
+    syncAdminPanelLayout();
+    el("adminAccessButton").textContent="Teacher Tools";
+
+    const passwordUnlocked=isAuthorizedTeacher||adminPasswordUnlocked();
+    el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
+    el("signInButton").classList.toggle("hidden",!passwordUnlocked||signedIn);
+    el("signOutButton").classList.toggle("hidden",!passwordUnlocked||!signedIn);
+    el("adminControls").classList.toggle("hidden",!isAuthorizedTeacher);
+
+    if(!passwordUnlocked){
+      el("adminStatus").textContent="Enter the admin password to continue.";
+      return;
+    }
+    if(!signedIn){el("adminStatus").textContent="Password accepted. Now sign in with simcha5770@gmail.com.";return;}
+    if(!isAuthorizedTeacher){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
+    const ownerAccess=currentAccess.role==="admin";
+    el("adminStatus").textContent=ownerAccess
+      ? `Signed in as ${currentUser.email}. Owner access.`
+      : `Signed in as ${currentUser.email}. Managing only your assigned class${currentAccess.classIds.length===1?"":"es"}.`;
+    el("siteEnabledToggle").checked=currentSettings.siteEnabled;
+    const masterRow=el("siteEnabledToggle").closest(".master-row");
+    if(masterRow)masterRow.style.display=ownerAccess?"":"none";
+    const openScheduleEditors=Array.from(el("classControls").querySelectorAll(".class-card details[open]")).map(details=>details.closest(".class-card")?.dataset.classCard).filter(Boolean);
+    const legacyClassIds=ownerAccess?["et","wt"]:(currentAccess.classIds||[]).filter(id=>id==="et"||id==="wt");
+    el("classControls").innerHTML=legacyClassIds.map(classCardHtml).join("") ||
+      '<div class="admin-message" style="padding:14px">This teacher is not assigned to either of the legacy B3 ET/WT groups. Class access for the teacher\'s own class is managed from that class, not from B3 ET/WT.</div>';
+    openScheduleEditors.forEach(classId=>{const details=el("classControls").querySelector(`[data-class-card="${classId}"] details`);if(details)details.open=true;});
+    if(legacyClassIds.length)bindClassControls();
+
+    renderActivityManager();
+    renderStudentOverrideControls();
+  }
+
+  function activityIsActive(gameId){
+    return currentSettings.games?.[gameId]!==false;
+  }
+
+  async function setActivityActive(gameId,active){
+    if(!isAuthorizedAdmin){el("classManagementStatus").textContent="Tool grants are managed by the owner.";return;}
+    currentSettings.games=currentSettings.games||{};
+    const old=currentSettings.games[gameId]!==false;
+    currentSettings.games[gameId]=Boolean(active);
+    renderActivityManager();
+    renderStudentAccess();
+    try{
+      await settingsApi.updateGameEnabled(gameId,active);
+    }catch(e){
+      currentSettings.games[gameId]=old;
+      renderActivityManager();
+      renderStudentAccess();
+      alert("Could not save this activity.");
+      console.error(e);
+    }
+  }
+
+  async function setActivityClassOpen(gameId,classId,isOpen){
+    currentSettings.classGames=currentSettings.classGames||{et:{},wt:{}};
+    currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+    const old=currentSettings.classGames[classId][gameId]!==false;
+    currentSettings.classGames[classId][gameId]=Boolean(isOpen);
+    renderActivityManager();
+    renderStudentAccess();
+    try{
+      await settingsApi.updateClassGameEnabled(classId,gameId,isOpen);
+    }catch(e){
+      currentSettings.classGames[classId][gameId]=old;
+      renderActivityManager();
+      renderStudentAccess();
+      alert("Could not save this activity setting.");
+      console.error(e);
+    }
+  }
+
+  function activityRow(game,active){
+    const ownerAccess=currentAccess.role==="admin";
+    const row=document.createElement("div");
+    row.className="activity-manage-row"+(active?"":" activity-inactive-row");
+    row.draggable=ownerAccess;
+    row.dataset.activityId=game.id;
+
+    const text=document.createElement("div");
+    text.innerHTML='<div class="activity-manage-name"></div><div class="activity-manage-hint">'+(active?"Drag to Inactive to hide from students":"Drag to Active to put back on the student page")+'</div>';
+    text.querySelector(".activity-manage-name").textContent=game.name;
+    row.appendChild(text);
+
+    if(active&&ownerAccess){
+      const controls=document.createElement("div");
+      controls.className="activity-class-controls";
+      ["et","wt"].forEach(classId=>{
+        const isOpen=currentSettings.classGames?.[classId]?.[game.id]!==false;
+        const btn=document.createElement("button");
+        btn.type="button";
+        btn.className="activity-class-btn "+(isOpen?"is-open":"is-closed");
+        btn.textContent=classLabels[classId]+": "+(isOpen?"Open":"Closed");
+        btn.setAttribute("aria-label",game.name+" "+classLabels[classId]+" "+(isOpen?"open":"closed"));
+        btn.addEventListener("click",event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          setActivityClassOpen(game.id,classId,!isOpen);
+        });
+        controls.appendChild(btn);
+      });
+      row.appendChild(controls);
+    }
+
+    row.addEventListener("dragstart",event=>{
+      row.classList.add("dragging");
+      event.dataTransfer.effectAllowed="move";
+      event.dataTransfer.setData("text/plain",game.id);
+    });
+    row.addEventListener("dragend",()=>{
+      row.classList.remove("dragging");
+      document.querySelectorAll(".activity-zone").forEach(z=>z.classList.remove("drag-over"));
+    });
+    return row;
+  }
+
+  let teacherClassToolGrants={};
+  async function loadTeacherToolGrants(){
+    teacherClassToolGrants={};
+    const ownerAccess=currentAccess.role==="admin";
+    if(ownerAccess)return;
+    await Promise.all((currentAccess.classIds||[]).map(async classId=>{
+      const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/toolGrants").once("value");
+      teacherClassToolGrants[classId]=snap.val()||{};
+    }));
+  }
+
+  function renderActivityManager(){
+    const activeList=el("activeActivityList"),inactiveList=el("inactiveActivityList");
+    if(!activeList||!inactiveList)return;
+    activeList.innerHTML="";
+    inactiveList.innerHTML="";
+    let activeCount=0,inactiveCount=0;
+    const ownerAccess=currentAccess.role==="admin";
+    const assignedClassIds=ownerAccess?[]:(currentAccess.classIds||[]);
+    const grantedToolIds=new Set();
+    if(!ownerAccess){
+      assignedClassIds.forEach(classId=>{
+        const grants=teacherClassToolGrants[classId]||{};
+        Object.entries(grants).forEach(([gameId,allowed])=>{if(allowed===true){grantedToolIds.add(gameId);if(gameId==="gallery"||gameId==="tag")grantedToolIds.add("class-gallery");}});
+      });
+    }
+    gameDefinitions.forEach(game=>{
+      if(!ownerAccess&&!grantedToolIds.has(game.id))return;
+      const active=ownerAccess?activityIsActive(game.id):true;
+      (active?activeList:inactiveList).appendChild(activityRow(game,active));
+      if(active)activeCount++;else inactiveCount++;
+    });
+    if(!activeCount)activeList.innerHTML='<div class="activity-zone-empty">No active activities</div>';
+    if(!inactiveCount)inactiveList.innerHTML='<div class="activity-zone-empty">No inactive activities</div>';
+    el("activeActivityCount").textContent=String(activeCount);
+    el("inactiveActivityCount").textContent=String(inactiveCount);
+
+    document.querySelectorAll(".activity-zone").forEach(zone=>{
+      if(!ownerAccess){zone.ondragover=null;zone.ondragleave=null;zone.ondrop=null;return;}
+      zone.ondragover=event=>{event.preventDefault();zone.classList.add("drag-over");event.dataTransfer.dropEffect="move";};
+      zone.ondragleave=()=>zone.classList.remove("drag-over");
+      zone.ondrop=event=>{
+        event.preventDefault();
+        zone.classList.remove("drag-over");
+        const gameId=event.dataTransfer.getData("text/plain");
+        if(!gameId)return;
+        setActivityActive(gameId,zone.dataset.activityZone==="active");
+      };
+    });
+  }
+
+  function bindClassControls(){
+    document.querySelectorAll("[data-class-mode]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const [classId,mode]=btn.dataset.classMode.split(":");
+      try{await settingsApi.updateClassMode(classId,mode);}catch(e){alert("Could not save the class access setting.");console.error(e);}
+    }));
+
+    document.querySelectorAll("[data-locked-game-override]").forEach(select=>select.addEventListener("change",async()=>{
+      const classId=select.dataset.lockedGameOverride;
+      const previous=String(currentSettings.classLockedGameOverride?.[classId]||"");
+      const next=String(select.value||"");
+      select.disabled=true;
+      try{
+        await settingsApi.updateClassLockedGameOverride(classId,next);
+      }catch(e){
+        select.value=previous;
+        alert("Could not save the activity that should stay open while locked.");
+        console.error(e);
+      }finally{
+        select.disabled=false;
+      }
+    }));
+
+    function readFriendlyTime(classId,day,i,which){
+      const key=`${classId}:${day}:${i}`;
+      const hourEl=document.querySelector(`[data-time-${which}-hour="${key}"]`);
+      const minuteEl=document.querySelector(`[data-time-${which}-minute="${key}"]`);
+      const ampmEl=document.querySelector(`[data-time-${which}-ampm="${key}"]`);
+      if(!hourEl||!minuteEl||!ampmEl)return "00:00";
+      let hour=Number(hourEl.value)||12;
+      const minute=String(minuteEl.value||"00").padStart(2,"0");
+      if(ampmEl.value==="AM"){if(hour===12)hour=0;}else if(hour!==12){hour+=12;}
+      return `${String(hour).padStart(2,"0")}:${minute}`;
+    }
+
+    function setRowEnabled(classId,day,i,enabled){
+      const key=`${classId}:${day}:${i}`;
+      const row=document.querySelector(`[data-lock-row="${key}"]`);
+      if(row){
+        row.classList.toggle("is-unused",!enabled);
+        const label=row.querySelector(".closed-label");
+        if(label)label.textContent=enabled?`Closed ${i+1}`:"Add period";
+      }
+      ["start","end"].forEach(which=>{
+        const box=document.querySelector(`[data-time-box="${which}:${key}"]`);
+        if(box)box.classList.toggle("disabled",!enabled);
+        ["hour","minute","ampm"].forEach(part=>{
+          const el=document.querySelector(`[data-time-${which}-${part}="${key}"]`);
+          if(el)el.disabled=!enabled;
+        });
+      });
+    }
+
+    function markScheduleDirty(classId){
+      const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+      const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+      if(save)save.disabled=false;
+      if(status){status.textContent="Unsaved changes";status.className="schedule-save-status dirty";}
+    }
+
+    function markScheduleSaved(classId,text){
+      const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+      const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+      if(save)save.disabled=true;
+      if(status){status.textContent=text||"Saved";status.className="schedule-save-status saved";}
+    }
+
+    function collectLockWindowsFromDom(classId){
+      const lockWindows={};
+      settingsApi.dayKeys.forEach(day=>{
+        lockWindows[day]=[];
+        [0,1,2,3,4,5].forEach(i=>{
+          const enabled=document.querySelector(`[data-lock-enabled="${classId}:${day}:${i}"]`);
+          if(enabled&&enabled.checked){
+            lockWindows[day].push({
+              start:readFriendlyTime(classId,day,i,"start"),
+              end:readFriendlyTime(classId,day,i,"end")
+            });
+          }
+        });
+      });
+      return lockWindows;
+    }
+
+    ["et","wt"].forEach(classId=>{
+      document.querySelectorAll(`[data-lock-enabled^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>{
+        const [,day,iText]=input.dataset.lockEnabled.split(":");
+        setRowEnabled(classId,day,Number(iText),input.checked);
+        markScheduleDirty(classId);
+      }));
+
+      document.querySelectorAll(`[data-time-start-hour^="${classId}:"] , [data-time-start-minute^="${classId}:"] , [data-time-start-ampm^="${classId}:"] , [data-time-end-hour^="${classId}:"] , [data-time-end-minute^="${classId}:"] , [data-time-end-ampm^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>markScheduleDirty(classId)));
+
+      document.querySelector(`[data-save-schedule="${classId}"]`)?.addEventListener("click",async()=>{
+        const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+        const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+        if(save)save.disabled=true;
+        if(status){status.textContent="Saving…";status.className="schedule-save-status";}
+        try{
+          await settingsApi.updateClassLockWindows(classId,collectLockWindowsFromDom(classId));
+          markScheduleSaved(classId,"Saved");
+        }catch(e){
+          if(save)save.disabled=false;
+          if(status){status.textContent="Could not save";status.className="schedule-save-status dirty";}
+          alert("Could not save the locked times.");
+          console.error(e);
+        }
+      });
+
+      document.querySelector(`[data-reset-schedule="${classId}"]`)?.addEventListener("click",async()=>{
+        if(!confirm(`Reset ${classLabels[classId]} to the Master Schedule recess times?`))return;
+        try{
+          const defaults=typeof settingsApi.getDefaultClassLockWindows==="function"
+            ? settingsApi.getDefaultClassLockWindows(classId)
+            : settingsApi.defaultSettings.classAccess[classId].lockWindows;
+          await settingsApi.updateClassLockWindows(classId,defaults);
+        }catch(e){alert("Could not reset the schedule.");console.error(e);}
+      });
+    });
+  }
+
+  gameDefinitions.forEach(game=>game.element.addEventListener("click",e=>{
+    if(!isAuthorizedTeacher)markStudentToolVisited(game.id);
+    if(!isAuthorizedTeacher||!teacherVersionByGame[game.id])return;
+    e.preventDefault();
+    openVersionModal(game);
+  }));
+  el("versionModalClose")?.addEventListener("click",closeVersionModal);
+  el("versionModal")?.addEventListener("click",e=>{if(e.target===el("versionModal"))closeVersionModal();});
+  el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
+  el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
+  el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
+  el("approvalCenterRefresh")?.addEventListener("click",()=>loadApprovalCenter(false));
+  el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
+  function handleTeacherCombinedTile(e){
+    if(!isAuthorizedTeacher)return;
+    const card=e.target.closest(".game-card");
+    if(!card)return;
+    const game=gameDefinitions.find(g=>g.element===card);
+    if(!game||!teacherVersionByGame[game.id])return;
+    e.preventDefault();
+    e.stopPropagation();
+    openVersionModal(game);
+  }
+  document.querySelector(".game-container")?.addEventListener("click",handleTeacherCombinedTile,true);
+  document.querySelectorAll(".teacher-tool-card").forEach(card=>card.addEventListener("click",e=>{
+    if(!isAuthorizedTeacher)return;
+    e.preventDefault();
+    const href=card.getAttribute("href");
+    if(href)openTeacherToolInBackground(href);
+  }));
+
+  el("switchStudentBtn").addEventListener("click",switchStudent);
+  el("adminAccessButton").addEventListener("click",()=>{
+    window.location.href=isAuthorizedTeacher?"admin.html":"teacher-home.html?signin=1";
+  });
+
+  el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
+  el("manageClassSelect").addEventListener("change",loadClassManagement);
+  el("classStudentSelect").addEventListener("change",loadClassManagement);
+  el("createManagedStudentButton").addEventListener("click",createManagedStudent);
+  el("saveManagedStudentPasscodeButton").addEventListener("click",saveManagedStudentPasscode);
+  el("securePasscodesButton").addEventListener("click",async()=>{
+    const status=el("classManagementStatus"),btn=el("securePasscodesButton");
+    const protocol="passcodes-v2-preview-20261015";
+    btn.disabled=true;
+    try{
+      status.textContent="Checking migration safety. No student data will be changed during preview…";
+      // Different action name from the legacy destructive operation.
+      // An old Firebase function rejects this preview instead of erasing data.
+      const preview=await trustedStudentAction("previewPasscodeMigration",{});
+      if(!preview || preview.ok!==true || preview.dryRun!==true || preview.protocol!==protocol){
+        status.textContent="Cleanup unavailable. The verified Firebase migration backend must be deployed before this can run.";
+        return;
+      }
+      if((preview.conflicts||[]).length || (preview.unmatched||[]).length){
+        status.textContent="No changes made. Resolve "+(preview.conflicts||[]).length+" conflicting credentials and "+(preview.unmatched||[]).length+" unlinked class-only student records first.";
+        return;
+      }
+      if(!preview.copied&&!preview.cleared){
+        status.textContent="No public passcodes need to be moved or cleared.";
+        return;
+      }
+      if(!confirm("Preview complete. Copy "+preview.copied+" credentials to private storage and remove "+preview.cleared+" old public copies? Confirm that an independent encrypted Firebase database backup has been verified and tested before proceeding.")){
+        status.textContent="Cancelled. No data changed.";
+        return;
+      }
+      status.textContent="Moving passcodes to protected storage…";
+      const result=await trustedStudentAction("migratePasscodes",{deletePublic:true,migrationProtocol:protocol,backupConfirmed:true});
+      if(result)status.textContent="Completed: "+result.copied+" credentials copied, "+result.cleared+" public copies cleared. Verify student sign-in and inspect Firebase rules.";
+    }finally{btn.disabled=false;}
+  });
+
+  el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
+
+  el("showAddStudentButton").addEventListener("click",()=>el("addStudentArea").classList.toggle("hidden"));
+
+  el("classMemberList").addEventListener("click",async e=>{
+    const save=e.target.closest("[data-save-student]");
+    const toggle=e.target.closest("[data-toggle-student]");
+    const remove=e.target.closest("[data-remove-student]");
+    if(remove){
+      // Takes the student out of this class only. Their account and work stay, and they can be added back.
+      if(!confirm("Remove "+remove.dataset.studentName+" from this class? They will no longer see this class's activities. You can add them back later."))return;
+      const status=el("classManagementStatus");
+      remove.disabled=true;
+      status.textContent="Removing student and verifying saved roster…";
+      try{
+        await removeStudentFromManagedClass(remove.dataset.removeStudent);
+        status.textContent="Student removed from this class. Saved work and account were kept.";
+      }catch(error){
+        console.error("Student removal failed",error);
+        status.textContent="Removal not confirmed: "+(error.message||"Please try again.");
+        alert(status.textContent);
+      }finally{remove.disabled=false;}
+      return;
+    }
+    if(save){
+      const id=save.dataset.saveStudent, input=el("classMemberList").querySelector('[data-student-passcode="'+id+'"]'), passcode=input?input.value.trim():"";
+      if(!passcode){el("classManagementStatus").textContent="Passcode cannot be blank.";return;}
+      {if(await trustedStudentAction("passcode",{studentId:id,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
+    }
+    if(toggle){
+      const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true";
+      if(!isAuthorizedAdmin){if(await trustedStudentAction("active",{studentId:id,active}))await loadClassManagement();return;}
+      await db.ref("b3Games/students/"+id+"/profile/active").set(active);
+      el("classManagementStatus").textContent=active?"Student access enabled.":"Student access blocked."; await loadClassManagement();
+    }
+  });
+  el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
+  el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
+    const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
+    el("adminStatus").textContent="Google sign-in failed: "+detail;
+    alert("Google sign-in failed. The Admin panel now shows the exact error.");
+    console.error(e);
+  }));
+  el("signOutButton").addEventListener("click",()=>{
+    try{sessionStorage.removeItem(ADMIN_PASSWORD_SESSION_KEY);}catch(e){}
+    settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);});
+  });
+  el("siteEnabledToggle").addEventListener("change",async()=>{
+    const old=!el("siteEnabledToggle").checked;
+    try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
+  });
+
+  async function loadSpecialAccessRoster(){
+    if(!isAuthorizedTeacher){overrideRoster=[];renderStudentOverrideControls();return;}
+    const ownerAccess=currentAccess.role==="admin";
+    if(ownerAccess){
+      const snap=await db.ref("posukPractice/allowedStudents").once("value");
+      const data=snap.val()||{};
+      overrideRoster=Object.entries(data).map(([id,info])=>({id,name:(info&&info.name)?String(info.name):id,classId:(info&&info.classId)||""})).sort((a,b)=>a.name.localeCompare(b.name));
+    }else{
+      const rows=[];
+      await Promise.all((currentAccess.classIds||[]).map(async classId=>{
+        const members=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members").once("value");
+        Object.entries(members.val()||{}).forEach(([id,member])=>{
+          if(member&&member.active===false)return;
+          rows.push({id,name:String((member&&member.name)||id),classId});
+        });
+      }));
+      const unique=new Map();
+      rows.forEach(row=>{if(!unique.has(row.id))unique.set(row.id,row);});
+      overrideRoster=[...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
+    }
+    if(selectedOverrideStudentId&&!overrideRoster.some(s=>s.id===selectedOverrideStudentId))selectedOverrideStudentId="";
+    renderStudentOverrideControls();
+  }
+
+  let homepageTeacherChecked=false,homepageStudentChecked=false;
+  function finishHomepageBootstrap(){
+    if(isAuthorizedTeacher||(homepageTeacherChecked&&homepageStudentChecked))
+      document.documentElement.classList.remove("b3-home-auth-pending");
+  }
+  // ---- Owner home bar: class picker + padlock that opens Class Access in place.
+  const homeClassBarAllowed=window.top===window&&pageParams.get("adminPage")!=="1"&&!isStudentPreview;
+  let homeClassUnsub=null,homeClassNames={et:"ET",wt:"WT"};
+  let homeClassId=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
+  function homeClassAccessUrl(){return "admin.html?tab=access&embed=1&class="+encodeURIComponent(homeClassId);}
+  function syncHomeClassAccess(){
+    el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[homeClassId]||homeClassId);
+    const frame=el("homeAccessFrame");
+    if(!el("homeAccessModal").classList.contains("hidden")&&frame.getAttribute("src")!==homeClassAccessUrl())frame.setAttribute("src",homeClassAccessUrl());
+  }
+  function closeHomeClassAccess(){el("homeAccessModal").classList.add("hidden");document.body.style.overflow="";}
+  function openHomeClassAccess(){el("homeAccessModal").classList.remove("hidden");document.body.style.overflow="hidden";syncHomeClassAccess();}
+  function renderHomeClassBar(){
+    const show=homeClassBarAllowed&&isAuthorizedAdmin;
+    el("homeClassBar").classList.toggle("hidden",!show);
+    document.body.classList.toggle("has-home-class-bar",show);
+    if(!show){closeHomeClassAccess();return;}
+    if(homeClassUnsub)return;
+    const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
+    const onValue=snapshot=>{
+      const rows=snapshot.val()||{};
+      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
+      const list=all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+      homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
+      if(!homeClassNames[homeClassId])homeClassId=list[0].id;
+      const select=el("homeClassSelect");select.innerHTML="";
+      list.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=homeClassNames[c.id];select.appendChild(o);});
+      select.value=homeClassId;
+      syncHomeClassAccess();
+    };
+    ref.on("value",onValue,e=>console.warn("Could not load classes for the home class bar",e));
+    homeClassUnsub=()=>ref.off("value",onValue);
+  }
+  el("homeClassSelect").addEventListener("change",e=>{
+    homeClassId=e.target.value;
+    try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}
+    syncHomeClassAccess();
+  });
+  el("homeClassLock").addEventListener("click",openHomeClassAccess);
+  el("homeAccessClose").addEventListener("click",closeHomeClassAccess);
+  el("homeAccessModal").addEventListener("click",e=>{if(e.target===el("homeAccessModal"))closeHomeClassAccess();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!el("homeAccessModal").classList.contains("hidden"))closeHomeClassAccess();});
+
+  // A slow or failed network should not leave the login form hidden forever.
+  setTimeout(()=>document.documentElement.classList.remove("b3-home-auth-pending"),12000);
+  settingsApi.onAuthStateChanged((user,authorized,access)=>{
+    currentUser=user;
+    if(isStudentPreview){
+      homepageTeacherChecked=true;
+      finishHomepageBootstrap();
+      currentAccess={authorized:false,role:"",classIds:[]};
+      isAuthorizedTeacher=false;
+      isAuthorizedAdmin=false;
+      stopApprovalCenter();
+      restoreStudent();
+      return;
+    }
+    currentAccess=access||{authorized:false,role:"",classIds:[]};
+    isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
+    isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
+    renderHomeClassBar();
+    homepageTeacherChecked=true;
+    finishHomepageBootstrap();
+    // A verified teacher always wins over a guest preview.
+    if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
+    try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
+    renderStudentAccess();renderAdminPanel();
+    if(authorized){
+      if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();
+      Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);
+    }else{overrideRoster=[];renderStudentOverrideControls();stopApprovalCenter();}
+  });
+  el("actAsStudentCard").addEventListener("click",()=>settingsApi.openActAsStudentPicker());
+  settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
+  setInterval(()=>{renderStudentAccess();},15000);
+  Promise.resolve().then(restoreStudent).catch(console.warn).finally(()=>{
+    homepageStudentChecked=true;
+    finishHomepageBootstrap();
+  });
+})();
+</script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle2"></script>
+</body>
+</html>
+
+
+

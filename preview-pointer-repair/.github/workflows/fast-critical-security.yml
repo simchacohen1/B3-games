@@ -1,0 +1,44 @@
+name: Fast security and access checks
+
+# Fast, focused checks that can be required before merging. They run for
+# every pull request and main-branch push, even if changes look unrelated.
+# Broad suites still run separately and must not have failures hidden.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'security/**'
+
+permissions:
+  contents: read
+
+jobs:
+  critical-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate security-related backend code
+        run: |
+          node --check backend/functions/student-auth-core.cjs
+          node --check backend/functions/student-management-core.cjs
+          node --check backend/functions/student-passcodes.cjs
+          node --check backend/functions/student-tool-policy.js
+          node --check backend/functions/student-auth.js
+          node --check scripts/security-rule-audit.cjs
+      - name: Audit Firebase rules (no new public grants)
+        run: node scripts/security-rule-audit.cjs --ci
+      - name: Test student login, access, and database rules
+        run: |
+          node --test \
+            tests/firebase-security-audit.test.cjs \
+            tests/firebase-rule-permission-drift.test.cjs \
+            tests/student-auth.test.cjs \
+            tests/student-management.test.cjs \
+            tests/passcode-migration-safety.test.cjs \
+            tests/yiddish-backend.test.cjs \
+            tests/chazara-teacher-scope.test.cjs

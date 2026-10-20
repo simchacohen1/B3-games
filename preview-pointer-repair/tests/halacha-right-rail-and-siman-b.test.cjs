@@ -1,0 +1,76 @@
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const html=fs.readFileSync('halacha/index.html','utf8');
+const editor=fs.readFileSync('halacha/scrapbook-editor.js','utf8');
+const editorCss=fs.readFileSync('halacha/scrapbook-editor.css','utf8');
+const seifA=fs.readFileSync('halacha/seif-a-teacher-led.js','utf8');
+const sourceFile=fs.readFileSync('halacha/siman-b-source.js','utf8');
+const guided=fs.readFileSync('halacha/siman-b-guided.js','utf8');
+const guidedCss=fs.readFileSync('halacha/siman-b-guided.css','utf8');
+
+test('drawing controls occupy a separate right-hand rail, never the canvas',()=>{
+ new vm.Script(editor);
+ assert.match(editor,/function drawingRail\(id\)/);
+ assert.match(editor,/book\.insertAdjacentHTML\('beforeend',drawingRail\(id\)\)/);
+ assert.match(editorCss,/grid-template-columns:minmax\(0,1fr\) 132px/);
+ assert.match(editorCss,/\.page-tools\.studio-tools\{display:none!important\}/);
+ assert.match(editorCss,/\.studio-draw-rail\{box-sizing/);
+ assert.match(editor,/window\.studioRailPage=/);
+ assert.match(editor,/window\.studioRailMode=/);
+ assert.match(editor,/window\.studioRailColor=/);
+ assert.match(editor,/window\.studioRailSize=/);
+ assert.match(html,/scrapbook-editor\.js\?v=20261019-sticker-click2/);
+ assert.match(html,/scrapbook-editor\.css\?v=20261019-all-stickers1/);
+});
+test('drawings still use their original separate page canvases and saving keys',()=>{
+ assert.match(editor,/const pages = id =>/);
+ assert.match(editor,/querySelector\('\.draw-layer'\)/);
+ assert.match(editor,/S\[id\+'_draw'\]=pages\(id\)/);
+ assert.match(editor,/S\[id\+'_scrap_pages'\]/);
+ assert.match(editor,/if\(readonly\(\)\)sec\.querySelectorAll/);
+});
+test('Seif Aleph highlights the original phrases directly in the source',()=>{
+ assert.match(seifA,/const matches = \[/);
+ assert.match(seifA,/const marked = make\('mark'/);
+ assert.match(seifA,/hal-a-source-mark/);
+ assert.match(seifA,/🔎 Find in the seif/);
+ assert.match(seifA,/reading\.open = false/);
+ assert.match(seifA,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
+ assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
+});
+test('teacher transcription contains all nine complete and distinct Siman Beis seifim',()=>{
+ const environment={window:{}};
+ vm.runInNewContext(sourceFile,environment);
+ const text=environment.window.HalachaSimanBSource;
+ assert.equal(text.length,9);
+ assert.ok(text.every(s=>typeof s==='string'&&s.length>110));
+ assert.match(text[0],/^לְפִי שֶׁהָאָדָם/);
+ assert.match(text[1],/^יִלְבַּשׁ/);
+ assert.match(text[2],/^נְטִילַת יָדַיִם שַׁחֲרִית/);
+ assert.match(text[3],/^צָרִיךְ לִטֹּל/);
+ assert.match(text[4],/^לֹא יִגַּע/);
+ assert.match(text[5],/^טוֹב לְהַקְפִּיד/);
+ assert.match(text[6],/^כְּתִיב/);
+ assert.match(text[7],/^אִם הִשְׁכִּים/);
+ assert.match(text[8],/^אֵלּוּ דְבָרִים/);
+ assert.match(text[8],/הַמַּקִּיז דָּם/);
+});
+test('four teaching groups cover all nine consecutive seifim while retaining separate complete source paragraphs',()=>{
+ new vm.Script(guided);
+ assert.match(guided,/s2a:\{[^}]*seifim:\[1,2\]/s);
+ assert.match(guided,/s2b:\{[^}]*seifim:\[3,4,5\]/s);
+ assert.match(guided,/s2c:\{[^}]*seifim:\[6,7,8\]/s);
+ assert.match(guided,/s2d:\{[^}]*seifim:\[9\]/s);
+ assert.match(guided,/source\[seif-1\]/);
+ assert.match(guided,/const details=el\('details','hal-b-seif-source'\)/);
+ assert.match(guided,/const mark=el\('mark','hal-b-source-highlight'/);
+ assert.match(guided,/seif\.open=true/);
+ assert.match(guided,/window\.persist\(id\)/);
+ assert.match(guided,/add\.disabled=readonly\(\)/);
+ assert.match(guidedCss,/hal-b-guide\.hal-b-hidden \.hal-b-inner/);
+ assert.match(html,/siman-b-source\.js\?v=20261019-source1/);
+ assert.match(html,/siman-b-guided\.js\?v=20261019-source1/);
+});

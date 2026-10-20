@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script><meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fun Torah Tools — Owner Admin</title>
+
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
+header{background:#172033;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:24px}.sub{color:#b9c6da;font-size:14px;margin-top:4px}
+.back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:11px 16px;border-radius:10px}
+main{max-width:760px;margin:24px auto 90px;padding:0 16px}
+.notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;padding:14px 16px;margin-bottom:18px;line-height:1.45;font-size:16px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 4px 14px rgba(15,23,42,.06)}
+.card-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.stepnum{flex:none;width:42px;height:42px;border-radius:50%;background:#2563eb;color:#fff;font-weight:900;font-size:21px;display:flex;align-items:center;justify-content:center}
+.card h2{font-size:23px;margin:0}
+.hint{color:#64748b;line-height:1.45;margin:4px 0 14px;font-size:16px}
+.formrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.formrow input,.formrow select{flex:1 1 200px}
+.card input,.card select{padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:17px;background:#fff;width:100%}
+.card button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:800;font-size:17px;cursor:pointer}
+.card button:hover{background:#1d4ed8}.card button:disabled{opacity:.5}
+.formrow button{flex:none}
+.listlabel{margin:16px 0 4px;font-size:14px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+.entry{padding:12px 0;border-bottom:1px solid #e2e8f0}.entry:last-child{border-bottom:0}
+.entry b{font-size:18px}
+.entry small{display:block;color:#64748b;font-size:15px;margin-top:2px}
+.entry.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card button.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;padding:8px 14px;font-size:15px}
+.card button.danger:hover{background:#fef2f2}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;border-radius:999px;padding:5px 6px 5px 14px;font-size:16px}
+.card .chip button{background:transparent;color:#64748b;padding:3px 9px;border-radius:999px;font-size:16px}
+.card .chip button:hover{background:#fee2e2;color:#b91c1c}
+.toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px}
+.tool{display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid #e2e8f0;border-radius:14px;background:#f8fafc;cursor:pointer;user-select:none;font-weight:700;font-size:17px;line-height:1.25}
+.tool input{width:24px;height:24px;margin:0;flex:none;accent-color:#16a34a;cursor:pointer;padding:0}
+.tool:has(input:checked){background:#dcfce7;border-color:#22c55e;color:#14532d}
+.tool .on{margin-left:auto;font-size:13px;font-weight:900;color:#15803d;display:none}
+.tool:has(input:checked) .on{display:inline}
+.tools-title{margin:26px 0 4px;font-size:21px}
+.gate{max-width:520px;margin:70px auto;background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center}
+.gate button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:900;font-size:17px;cursor:pointer}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head><body>
+<header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
+<main>
+<div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
+<div id="ownerArea" class="hidden">
+<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
+
+<section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
+<p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
+<div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
+<div class="listlabel">Your teachers</div><div id="teachers"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
+<p class="hint">Create a class for each group of students.</p>
+<div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
+<div class="listlabel">Your classes</div><div id="classes"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
+<p class="hint">Pick a teacher and a class, then press Assign.</p>
+<div class="formrow"><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button></div>
+<div class="listlabel">Who has what</div><div id="assignments"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">4</div><h2>Tools and content</h2></div>
+<p class="hint">New classes start with no tools. Choose a class, then tap only the tools its teacher should get. Green = on. Changes save instantly.</p>
+<select id="toolClassSelect"><option value="">Choose class</option></select>
+<div id="toolList"></div>
+<h3 class="tools-title">Class Content</h3>
+<p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
+<div id="resourceList"></div></section>
+</div>
+<div id="status" class="toast"></div>
+</main>
+
+<script>
+(function(){
+const OWNER="simcha5770@gmail.com",WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||"b3-2026";
+if(new URLSearchParams(location.search).get('embedded')==='1'){
+ document.querySelector('header').style.display='none';
+ document.querySelector('.notice').textContent='Set up teachers and classes, assign teachers to classes, then choose the tools and content each class may use.';
+}
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
+const PLATFORM_TOOLS=[
+ ["sefer-hamitzvos","Sefer HaMitzvos","dual"],["halacha","Halacha","dual"],["yiddish","Yiddish","dual"],["posuk-practice-scroll","Posuk Practice","dual"],["rashi-letters","Rashi Letters","dual"],["gematria","Gematria","dual"],["shorashim","Shorashim","dual"],["chazara","Chazara","dual"],["game-show","Game Show","dual"],["student-rewards","Student Rewards","dual"],["weekly-quiz","Weekly Quiz","dual"],["gallery","Gallery","dual"],["tag","Tag Game","dual"],
+ ["davening","Davening Player","teacher"],["chavrusa","Chavrusa of the Day","teacher"],["name-picker","Name Picker","teacher"],
+ ["class-pointer","Class Pointer","unsorted"]
+];
+const TOOL_GROUPS=[["dual","Student activities","Students use these. The teacher also gets a control or reports view."],["teacher","Teacher-only tools","Only the teacher sees these. Students never do."],["unsorted","Not sorted yet","Still deciding where these belong."]];
+function key(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
+function safe(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
+async function load(){
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
+ q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
+ Object.entries(teacherData).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><button class="danger" data-delete-teacher="'+id+'">Delete</button></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
+ q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect").innerHTML='<option value="">Choose class</option>';
+ Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
+ const assignmentLines=[];
+ Object.entries(teacherData).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
+ q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
+ await renderToolGrants();
+}
+q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+// ---- Unassign / delete (owner only; this page is gated to the owner account) ----
+const B3_CLASSES=["et","wt"];
+// A signed-in teacher's own record, found by their invitation's claimedUid or by matching email.
+async function teacherUidFor(inviteId){
+ const inv=teacherData[inviteId]||{};if(inv.claimedUid)return inv.claimedUid;
+ const all=(await db.ref("b3Games/workspaces/"+WS+"/teachers").once("value")).val()||{};
+ const email=String(inv.email||"").toLowerCase();
+ return Object.keys(all).find(uid=>String(all[uid]?.email||"").toLowerCase()===email)||"";
+}
+async function unassign(inviteId,classId){
+ const t=teacherData[inviteId]||{},cname=classData[classId]?.name||classId;
+ if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId+"/classIds/"+classId]:null};
+ const hasRemaining=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);
+ if(!hasRemaining)updates[root+"/teacherInvites/"+inviteId+"/active"]=false;
+ if(uid){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;if(!hasRemaining)updates[root+"/teachers/"+uid+"/active"]=false;updates[root+"/classes/"+classId+"/teacherIds/"+uid]=null;}
+ await db.ref().update(updates);q("status").textContent="Unassigned.";await load();
+}
+async function deleteTeacher(inviteId){
+ const t=teacherData[inviteId]||{};
+ if(!confirm("Delete teacher "+(t.name||t.email)+"? They will lose access to all their classes. Their classes and students stay."))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId]:null};
+ if(uid){updates[root+"/teachers/"+uid]=null;Object.keys(classData).forEach(c=>{if(classData[c]?.teacherIds?.[uid])updates[root+"/classes/"+c+"/teacherIds/"+uid]=null;});}
+ await db.ref().update(updates);q("status").textContent="Teacher deleted.";await load();
+}
+async function deleteClass(classId){
+ if(B3_CLASSES.includes(classId))return;
+ const cname=classData[classId]?.name||classId;
+ if(!confirm("Are you sure you want to delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone."))return;
+ const root="b3Games/workspaces/"+WS,updates={[root+"/classes/"+classId]:null,[root+"/contentGrants/"+classId]:null};
+ Object.keys(classData[classId]?.members||{}).forEach(sid=>{updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]=null;});
+ Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId]){updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teacherInvites/"+tid+"/active"]=false;}});
+ const teachers=(await db.ref(root+"/teachers").once("value")).val()||{};
+ Object.entries(teachers).forEach(([uid,t])=>{if(t?.classIds?.[classId]){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teachers/"+uid+"/active"]=false;}});
+ await db.ref().update(updates);q("status").textContent="Class deleted.";await load();
+}
+document.addEventListener("click",e=>{
+ const u=e.target.closest("[data-unassign-teacher]"),dt=e.target.closest("[data-delete-teacher]"),dc=e.target.closest("[data-delete-class]");
+ const run=p=>p.catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+ if(u)run(unassign(u.dataset.unassignTeacher,u.dataset.unassignClass));
+ if(dt)run(deleteTeacher(dt.dataset.deleteTeacher));
+ if(dc)run(deleteClass(dc.dataset.deleteClass));
+});
+async function renderToolGrants(){
+ const classId=q("toolClassSelect").value;
+ if(!classId){q("toolList").innerHTML='<p class="hint" style="margin-top:12px">Choose a class above to see its tools.</p>';q("resourceList").innerHTML="";return}
+ const snap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants").once("value"),grants=snap.val()||{};
+ q("toolList").innerHTML=TOOL_GROUPS.map(([g,title,desc])=>{const items=PLATFORM_TOOLS.filter(t=>t[2]===g);if(!items.length)return"";return '<div class="listlabel">'+title+'</div><p class="hint" style="margin:0 0 4px">'+desc+'</p><div class="toolgrid">'+items.map(([id,name])=>'<label class="tool"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span>'+safe(name)+'</span><span class="on">ON</span></label>').join("")+'</div>'}).join("");
+ q("toolList").querySelectorAll("[data-tool]").forEach(box=>box.onchange=()=>db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants/"+box.dataset.tool).set(box.checked).then(()=>{q("status").textContent="Saved ✓"}).catch(err=>{console.error(err);box.checked=!box.checked;q("status").textContent="Could not save. Please try again."}));
+ await renderResources(classId);
+}
+// Shorashim: B3's own lists live at the base path; every other class has its own copy under classes/<id>.
+const SHORASHIM_ROOT="posukPractice/shorashimLearning";
+function describeLimit(l){return "Perek "+(l.startPerek||1)+", Posuk "+(l.startPosuk||1)+" through Perek "+l.endPerek+", Posuk "+l.endPosuk}
+function countWords(catalog){return ["shorashim","prefix","suffix"].reduce((n,t)=>n+(Array.isArray(catalog?.[t])?catalog[t].length:0),0)}
+async function renderResources(classId){
+ if(!classId||["et","wt"].includes(classId)){q("resourceList").innerHTML=classId?'<small>This is one of your own B3 classes. It already uses your lists.</small>':"";return}
+ const classPath="b3Games/workspaces/"+WS+"/classes/"+classId;
+ const storyPath="b3Games/workspaces/"+WS+"/contentGrants/"+classId+"/yiddishWineMerchant";
+ const [snap,limitSnap,storySnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),db.ref(classPath+"/posukPracticeLimit").once("value"),db.ref(storyPath).once("value")]),count=countWords(snap.val()),limit=limitSnap.val(),hasStory=storySnap.val()===true;
+ q("resourceList").innerHTML='<div class="entry"><b>🌳 Shorashim words</b><small>'+(count?count+" words in this class":"Empty. The teacher has not added any words yet.")+'</small><button id="copyShorashim" style="margin-top:8px">Give this class a copy of my Shorashim words</button><small id="copyShorashimMsg"></small></div>'+
+  '<div class="entry"><b>📜 Posuk Practice pesukim</b><small>'+(limit?describeLimit(limit):"None open yet. The teacher has not chosen any pesukim.")+'</small><button id="copyPesukim" style="margin-top:8px">Open the same pesukim my classes have</button><small id="copyPesukimMsg"></small></div>'+
+  '<div class="entry"><b>ייִדיש Yiddish story “The Wine Merchant”</b><small>'+(hasStory?"This class has the story. Its teacher chooses which steps are open.":"Not given. Students see “Your teacher has not added a Yiddish story yet.”")+'</small><button id="toggleStory" style="margin-top:8px">'+(hasStory?"Take the story away from this class":"Give this class the Wine Merchant story")+'</button><small id="toggleStoryMsg"></small></div>';
+ q("toggleStory").onclick=async()=>{
+  if(hasStory&&!confirm("Take the Yiddish story away from this class? Their students will no longer be able to practice it."))return;
+  q("toggleStory").disabled=true;
+  try{await db.ref(storyPath).set(hasStory?null:true);await renderResources(classId);q("toggleStoryMsg").textContent=hasStory?"Removed ✓":"Given ✓ The teacher can now open steps for their students.";}
+  catch(err){console.error(err);q("toggleStoryMsg").textContent="Could not save. Please try again.";q("toggleStory").disabled=false}
+ };
+ q("copyPesukim").onclick=async()=>{
+  if(limit&&!confirm("This class already has pesukim open. Replace them with the same pesukim your classes have?"))return;
+  q("copyPesukim").disabled=true;q("copyPesukimMsg").textContent="Copying…";
+  try{
+   // B3's window lives in posukPractice/settings; "no limit" there means all of Bereishis.
+   const mine=(await db.ref("posukPractice/settings/practiceLimit").once("value")).val();
+   const next=mine&&(mine.endPerek||mine.perek)?{startPerek:+mine.startPerek||1,startPosuk:+mine.startPosuk||1,endPerek:+(mine.endPerek||mine.perek),endPosuk:+(mine.endPosuk||mine.posuk)}:{startPerek:1,startPosuk:1,endPerek:50,endPosuk:26};
+   await db.ref(classPath+"/posukPracticeLimit").set({...next,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+   await renderResources(classId);q("copyPesukimMsg").textContent="Done ✓ The teacher can change this class's pesukim any time.";
+  }catch(err){console.error(err);q("copyPesukimMsg").textContent="Could not copy. Please try again.";q("copyPesukim").disabled=false}
+ };
+ q("copyShorashim").onclick=async()=>{
+  if(count&&!confirm("This class already has "+count+" words. Replace them with a copy of your words?"))return;
+  q("copyShorashim").disabled=true;q("copyShorashimMsg").textContent="Copying…";
+  try{
+   const [catalog,lists]=await Promise.all([db.ref(SHORASHIM_ROOT+"/catalog").once("value"),db.ref(SHORASHIM_ROOT+"/settings/namedLists").once("value")]);
+   await db.ref().update({[SHORASHIM_ROOT+"/classes/"+classId+"/catalog"]:catalog.val()||null,[SHORASHIM_ROOT+"/classes/"+classId+"/settings/namedLists"]:lists.val()||null});
+   await renderResources(classId);q("copyShorashimMsg").textContent="Copied ✓ The teacher can now change their copy without affecting yours.";
+  }catch(err){console.error(err);q("copyShorashimMsg").textContent="Could not copy. Please try again.";q("copyShorashim").disabled=false}
+ };
+}
+q("toolClassSelect").onchange=renderToolGrants;
+q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
+})();
+</script>
+<script>
+(function(){const t=document.getElementById("status");let timer;new MutationObserver(()=>{if(!t.textContent)return;t.classList.add("show");clearTimeout(timer);timer=setTimeout(()=>{t.classList.remove("show")},3800)}).observe(t,{childList:true,characterData:true,subtree:true})})();
+</script></body></html>

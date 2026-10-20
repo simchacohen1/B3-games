@@ -1,0 +1,931 @@
+// PERSONAL + CLASS REWARDS MODEL - 2026-09-25
+(function(){
+'use strict';
+const C=window.StudentRewardsCommon;
+const {db,auth}=C.ensureFirebase();
+const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
+const OWNER_NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+// Teachers other than the owner award points for their own classes through the
+// studentRewardsTeacher backend; the store, categories and settings stay with the owner.
+const TEACHER_NAV=["Overview","Points Dashboard","Daily Points","Students","Comments","Rewards","Approvals","Reports"];
+let NAV=OWNER_NAV;
+const TEACHER_API="https://us-central1-b3-games.cloudfunctions.net/studentRewardsTeacher";
+async function teacherApi(action,extra={}){
+  const token=await auth.currentUser.getIdToken();
+  const response=await fetch(TEACHER_API,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action,...extra})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+  return data;
+}
+// Classes made in Teacher Center run their own prize store; ET/WT and older
+// classes share the main store.
+function isTeacherStore(classId){const c=state.root?.classes?.[classId];return Boolean(c&&c.b3ClassId&&!["et","wt"].includes(String(c.b3ClassId)))}
+function itemInStore(item,classId=state.classId){return item&&(isTeacherStore(classId)?item.ownerClassId===classId:!item.ownerClassId)}
+function classStoreOpen(classId=state.classId){if(isTeacherStore(classId))return state.root?.settings?.classStoreEnabled?.[classId]===true;const v=state.root?.settings?.rewardStoreEnabled;return v===true||String(v)==="true"}
+// In teacher mode, store edits go to the backend, which checks every change.
+const teacherDb={ref(path){
+  const send=async updates=>{await teacherApi("storeWrite",{classId:state.classId,updates});await loadRoot();render()};
+  return {
+    key:db.ref().push().key,
+    set:v=>send({[path]:v}),
+    remove:()=>send({[path]:null}),
+    update:obj=>send(path?Object.fromEntries(Object.entries(obj).map(([k,v])=>[path+"/"+k,v])):obj),
+    push:()=>({key:db.ref().push().key})
+  };
+}};
+function sdb(){return state.teacherMode?teacherDb:db}
+const REQUESTED_TAB=new URLSearchParams(window.location.search).get("tab");
+// Opened from the teacher home page as ?class=<id> (a site class id); pick the matching rewards class.
+const REQUESTED_CLASS=new URLSearchParams(window.location.search).get("class")||"";
+function requestedClassId(){if(!REQUESTED_CLASS)return "";const list=activeClasses();return (list.find(c=>c.id===REQUESTED_CLASS)||list.find(c=>String(state.root?.classes?.[c.id]?.b3ClassId||"")===REQUESTED_CLASS))?.id||""}
+const ICONS={"Approvals":"✓","Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
+const CLASS_REWARD_PRESETS=[
+  {key:"gimkit",name:"Gimkit",icon:"🎯"},
+  {key:"kahoot",name:"Kahoot",icon:"❓"},
+  {key:"video",name:"Video",icon:"🎬"},
+  {key:"create-new-game",name:"Create a New Game",icon:"🎮"},
+  {key:"extra-class-game-time",name:"Extra Class Time for a Game",icon:"⏰"},
+  {key:"extra-recess",name:"Extra Recess",icon:"🏃"}
+];
+const GIMKIT_MODE_PRESETS=[
+  {id:"fishtopia",name:"Fishtopia"},
+  {id:"tag-domination",name:"Tag: Domination"},
+  {id:"capture-the-flag",name:"Capture the Flag"},
+  {id:"farmchain",name:"Farmchain"},
+  {id:"snowbrawl",name:"Snowbrawl"},
+  {id:"snowy-survival",name:"Snowy Survival"},
+  {id:"one-way-out",name:"One Way Out"},
+  {id:"dont-look-down",name:"Don't Look Down"},
+  {id:"blastball",name:"Blastball"}
+]
+let state={root:null,user:null,tab:NAV.includes(REQUESTED_TAB)?REQUESTED_TAB:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointClassId:"all",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
+const $=s=>document.querySelector(s), esc=C.escapeHtml;
+function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
+function activeClasses(){return C.activeClasses(state.root||{})}
+function roster(){return C.classRoster(state.root||{},state.classId)}
+function pointsRoster(){
+  if(state.pointClassId!=="all")return C.classRoster(state.root||{},state.pointClassId);
+  const byId=new Map();
+  for(const c of activeClasses())for(const s of C.classRoster(state.root||{},c.id))byId.set(s.id,s);
+  return [...byId.values()].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+}
+function pointsClassLabel(){
+  if(state.pointClassId==="all")return "All Classes";
+  return state.root?.classes?.[state.pointClassId]?.name||"All Classes";
+}
+function pointsStudentClassLabel(studentId){
+  const names=activeClasses().filter(c=>C.classRoster(state.root||{},c.id).some(s=>s.id===studentId)).map(c=>c.name);
+  return names.join(" / ");
+}
+function categories(){return C.activeCategories(state.root||{})}
+function cls(){return state.root?.classes?.[state.classId]||null}
+function initials(name){return String(name||"SC").trim().split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase()}
+function toast(msg,type="ok"){C.toast(msg,type)}
+function now(){return new Date().toISOString()}
+const DAY_MS=24*60*60*1000;
+function timeMs(value){
+  if(typeof value==="number"&&Number.isFinite(value))return value;
+  const n=Number(value);if(Number.isFinite(n)&&n>0)return n;
+  const p=Date.parse(String(value||""));return Number.isFinite(p)?p:0;
+}
+function cooldownDaysValue(value){const n=Number(value||0);return Number.isFinite(n)&&n>0?n:0}
+function cooldownText(until){
+  const ms=Math.max(0,timeMs(until)-Date.now()),mins=Math.max(1,Math.ceil(ms/60000)),days=Math.floor(mins/1440),hours=Math.floor((mins%1440)/60);
+  if(days>=7){const weeks=Math.floor(days/7),rem=days%7;return `${weeks} week${weeks===1?"":"s"}${rem?`, ${rem} day${rem===1?"":"s"}`:""}`}
+  if(days>=1)return `${days} day${days===1?"":"s"}${hours?`, ${hours} hour${hours===1?"":"s"}`:""}`;
+  if(hours>=1){const rem=mins%60;return `${hours} hour${hours===1?"":"s"}${rem?`, ${rem} min`:""}`}
+  return `${mins} min`;
+}
+function personalCooldownInfo(item){
+  const days=cooldownDaysValue(item?.cooldownDays),until=timeMs(item?.cooldownUntil),cooling=days>0&&until>Date.now();
+  return {days,until,cooling,label:cooling?`Available again in ${cooldownText(until)}`:(days?`Cooldown: ${days} day${days===1?"":"s"}`:"No cooldown")};
+}
+function isGimkitClassReward(item){const id=String(item?.id||"").toLowerCase(),name=String(item?.name||"").trim().toLowerCase();return item?.modeVotingEnabled===true||id.includes("gimkit")||name==="gimkit"}
+function gimkitModeId(name){return String(name||"mode").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")||"mode"}
+function gimkitModesForItem(item){
+  const raw=item?.modes;let modes=[];
+  if(Array.isArray(raw))modes=raw.map((m,i)=>({id:String(m?.id||gimkitModeId(m?.name||`mode-${i+1}`)),name:String(m?.name||"").trim(),active:m?.active!==false}));
+  else if(raw&&typeof raw==="object")modes=Object.entries(raw).map(([key,m])=>({id:String(m?.id||key),name:String(m?.name||key).trim(),active:m?.active!==false}));
+  modes=modes.filter(m=>m.active!==false&&m.name);
+  if(!modes.length)modes=GIMKIT_MODE_PRESETS.map(m=>({...m,active:true}));
+  const seen=new Set();return modes.filter(m=>{if(seen.has(m.id))return false;seen.add(m.id);return true});
+}
+function modePoints(n){const x=Number(n)||0;return Number.isInteger(x)?String(x):x.toFixed(1).replace(/\.0$/,"")}
+function gimkitTeacherModesHTML(g){
+  if(!g?.modeVoting)return "";
+  return `<div class="gimkit-mode-race"><div class="gimkit-mode-race-head"><b>🎮 Gimkit Mode Race</b><span>First bar to ${g.goal} ★ wins</span></div>${(g.modes||[]).map(m=>`<div class="gimkit-mode-row"><div><strong>${esc(m.name)}</strong><small>${m.voters} voter${m.voters===1?"":"s"}</small></div><div class="gimkit-mode-bar"><i style="width:${m.pct}%"></i></div><b>${modePoints(m.total)} / ${g.goal} ★</b></div>`).join("")}${g.lastWinner?`<p class="gimkit-last-winner">Last winner: <strong>${esc(g.lastWinner.name||g.lastWinner.id||"Gimkit mode")}</strong></p>`:""}</div>`;
+}
+function scoreFor(s){return C.cumulativeProgress(C.allProgressRows(state.root,s.id,state.classId))??100}
+function currentStudent(){const r=roster();return r.find(s=>s.id===state.selectedId)||r[0]||null}
+function getRedemptions(){const out=[];for(const [sid,rows] of Object.entries(state.root?.redemptionsByStudent||{}))for(const [key,item] of Object.entries(rows||{}))out.push({sid,key,item});return out.sort((a,b)=>String(b.item.requestedAt||"").localeCompare(String(a.item.requestedAt||"")))}
+function getActivityPointRequests(){
+  return Object.entries(state.root?.pointRequests||{})
+    .map(([id,item])=>({id,item:item||{}}))
+    .filter(x=>!state.classId || !x.item.classId || x.item.classId===state.classId)
+    .sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
+}
+function pendingActivityPointRequests(){return getActivityPointRequests().filter(x=>x.item.status==="pending")}
+function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length+pendingRefundRequests().length}
+// REFUND REQUESTS - 2026-10-08
+// Students ask for points back on any purchase or class contribution; nothing
+// moves until the owner approves. Stored at refundRequests/<studentId>/<itemKey>.
+function pendingRefundRequests(){
+  if(state.teacherMode)return [];
+  const out=[];
+  for(const [sid,rows] of Object.entries(state.root?.refundRequests||{}))for(const [key,item] of Object.entries(rows||{}))if(item&&(item.status==="pending"||item.status==="processing"))out.push({sid,key,item});
+  return out.sort((a,b)=>timeMs(a.item.requestedAt)-timeMs(b.item.requestedAt));
+}
+function refundItemInfo(sid,key,kind){
+  if(kind==="contribution"){
+    const c=state.root?.classRewardContributionsByStudent?.[sid]?.[key]||null;
+    return {record:c,amount:Math.abs(Number(c?.amount)||0),name:`${c?.rewardName||"Class reward"}${Array.isArray(c?.modeNames)&&c.modeNames.length?" — "+c.modeNames.join(", "):""}`,label:"Class contribution",classId:c?.classId||"",when:timeMs(c?.createdAt)};
+  }
+  const p=state.root?.redemptionsByStudent?.[sid]?.[key]||null;
+  return {record:p,amount:Number(p?.cost)||0,name:state.root?.rewards?.[p?.rewardId]?.name||"Reward",label:`Personal reward · ${String(p?.status||"pending")}`,classId:"",when:timeMs(p?.requestedAt)};
+}
+function refundQueueHTML(){
+  const rows=pendingRefundRequests();if(!rows.length)return "";
+  return `<section class="activity-queue refund-queue"><div class="activity-head"><div><h2>Refund requests</h2><p>Students asking for points back. Approving returns the points and, for class contributions, takes them off the class reward bar if that round is still open.</p></div><div class="activity-head-actions"><b>${rows.length}</b></div></div>${rows.map(x=>{const s=state.root.students?.[x.sid]||{},info=refundItemInfo(x.sid,x.key,x.item.kind),when=timeMs(x.item.requestedAt),busy=x.item.status==="processing";return `<div class="activity-request"><em style="background:${esc(safeColor(s))}">${esc(s.initials||initials(s.name||"?"))}</em><span><strong>${esc(s.name||x.sid)}</strong><small>${esc(info.label)} · ${esc(info.name)}${info.classId?` · ${esc(pointClassName(info.classId))}`:""}${when?` · asked ${esc(new Date(when).toLocaleString())}`:""}</small>${x.item.reason?`<small>“${esc(x.item.reason)}”</small>`:""}${x.item.error?`<small style="color:#b42318">${esc(x.item.error)}</small>`:""}</span><b class="activity-amount">+${info.amount} ★</b>${busy?`<small>Working…</small>`:`<button class="deny" data-refund-decline="${esc(x.sid)}|${esc(x.key)}" title="Decline refund">×</button><button class="approve" data-refund-approve="${esc(x.sid)}|${esc(x.key)}" title="Approve refund">✓</button>`}</div>`}).join("")}</section>`;
+}
+async function removeContributionFromRound(sid,key,item){
+  const amount=Math.abs(Number(item.amount)||0),created=timeMs(item.createdAt);
+  if(!item.classId||!item.rewardId||!amount)return "no-round";
+  const others=Object.entries(state.root?.classRewardContributionsByStudent?.[sid]||{}).filter(([k,c])=>k!==key&&c&&!c.refundedAt&&c.classId===item.classId&&c.rewardId===item.rewardId).map(([,c])=>c);
+  let outcome="not-in-round";
+  await db.ref(`${ROOT}/classRewardRounds/${item.classId}/${item.rewardId}`).transaction(round=>{
+    outcome="not-in-round";
+    if(!round)return null;
+    const started=timeMs(round.startedAt);
+    if(started&&created&&created<started)return; // round was reset after this contribution
+    if(!round.modeVoting&&(String(round.status||"")==="completed"||String(round.status||"")==="cooldown"||Number(round.totalContributed||0)>=Number(round.goalPoints||Infinity)))return; // prize already earned
+    round.byStudent=round.byStudent||{};
+    round.byStudent[sid]=Math.max(0,(Number(round.byStudent[sid])||0)-amount);
+    if(round.modeVoting){
+      const w=round.lastWinner||null,wonAt=timeMs(w?.wonAt||w?.at||w?.completedAt||w?.createdAt);
+      round.modeTotals=round.modeTotals||{};
+      for(const [mode,alloc] of Object.entries(item.modeAllocations||{})){
+        if(w&&String(w.id||"")===mode&&(!wonAt||wonAt>=created))continue; // that bar already won and reset
+        round.modeTotals[mode]=Math.max(0,(Number(round.modeTotals[mode])||0)-Number(alloc||0));
+        const stillVoting=others.some(c=>timeMs(c.createdAt)>=(started||0)&&Number(c.modeAllocations?.[mode]||0)>0);
+        if(!stillVoting&&round.modeVoters?.[mode])round.modeVoters[mode][sid]=null;
+      }
+      round.totalContributed=Math.max(0,...Object.values(round.modeTotals).map(v=>Number(v)||0));
+    }else{
+      round.totalContributed=Math.max(0,(Number(round.totalContributed)||0)-amount);
+    }
+    round.updatedAt=Date.now();outcome="removed";
+    return round;
+  });
+  return outcome;
+}
+async function decideRefund(sid,key,decision){
+  if(state.teacherMode){toast("Only the administrator can approve refunds.","error");return}
+  const reqPath=`${ROOT}/refundRequests/${sid}/${key}`,req=state.root?.refundRequests?.[sid]?.[key];
+  if(!req||req.status!=="pending"){toast("That refund request was already handled or withdrawn.","error");return}
+  const info=refundItemInfo(sid,key,req.kind),s=state.root.students?.[sid]||{};
+  if(decision==="decline"){
+    if(!confirm(`Decline ${s.name||"this student"}’s refund request for ${info.name}? No points will move.`))return;
+    const t=await db.ref(`${reqPath}/status`).transaction(cur=>cur==="pending"?"declined":undefined);
+    if(!t.committed){toast("That refund request was already handled or withdrawn.","error");return}
+    await db.ref(reqPath).update({reviewedAt:now(),reviewedBy:state.user.email,error:null});
+    toast("Refund declined");return;
+  }
+  if(!info.record){toast("Could not find the original purchase or contribution.","error");return}
+  if(!confirm(`Return ${info.amount} ★ to ${s.name||"this student"} for ${info.name}?`))return;
+  const claim=await db.ref(`${reqPath}/status`).transaction(cur=>cur==="pending"?"processing":undefined);
+  if(!claim.committed){toast("That refund request was already handled or withdrawn.","error");return}
+  let marked=false;
+  try{
+    const stamp=now();let amount=info.amount,roundNote="";
+    if(req.kind==="contribution"){
+      const t=await db.ref(`${ROOT}/classRewardContributionsByStudent/${sid}/${key}/refundedAt`).transaction(cur=>cur?undefined:stamp);
+      if(!t.committed)throw new Error("This contribution was already refunded.");
+      marked=true;
+      await db.ref(`${ROOT}/classRewardContributionsByStudent/${sid}/${key}`).update({refundedBy:state.user.email,refundedAmount:amount});
+      const outcome=await removeContributionFromRound(sid,key,info.record);
+      roundNote=outcome==="removed"?" and removed from the class bar":" (class bar left as is — that round already finished)";
+    }else{
+      const t=await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}/status`).transaction(cur=>["declined","canceled","refunded"].includes(String(cur||"pending"))?undefined:"refunded");
+      if(!t.committed)throw new Error("This purchase was already returned.");
+      marked=true;
+      await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}`).update({refundedAt:stamp,refundedBy:state.user.email,statusBeforeRefund:String(info.record.status||"pending")});
+    }
+    let balanceAfter=null;
+    const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const next=Math.max(0,Number(cur||0)+amount);balanceAfter=next;return next});
+    if(!bal.committed)throw new Error("Could not update the balance.");
+    await db.ref(reqPath).update({status:"approved",amount,balanceAfter,reviewedAt:stamp,reviewedBy:state.user.email,error:null});
+    toast(`${amount} ★ returned to ${s.name||"student"}${roundNote}`);
+  }catch(err){
+    console.error(err);
+    // If the original record was never touched, put the request back in the queue.
+    await db.ref(reqPath).update(marked?{error:`Partly done — check balance: ${err.message||err}`}:{status:"pending",error:err.message||String(err)}).catch(()=>{});
+    toast(err.message||String(err),"error");
+  }
+}
+function savedTodayIds(){return new Set(roster().filter(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date]).map(s=>s.id))}
+function classAverage(){const r=roster();return r.length?Math.round(r.reduce((a,s)=>a+scoreFor(s),0)/r.length):0}
+function safeColor(s){return s?.color||"#6849df"}
+function setHeader(){
+  const c=cls(), r=roster(), u=state.user;
+  $("#className").textContent=c?.name||"No class";$("#classCount").textContent=`${r.length} students`;$("#classBadge").textContent=(c?.name||"—").replace("Class ","").slice(0,4);
+  $("#headerClass").textContent=c?.name||"";$("#profileName").textContent=u?.displayName||"Simcha Cohen";
+  const ini=initials(u?.displayName||"Simcha Cohen");$("#profileInitials").textContent=ini;$("#headerInitials").textContent=ini;
+  $("#topDate").value=state.date;$("#dateLabel").textContent=state.date===C.schoolDateString()?"TODAY":"EDITING DATE";
+  $("#datePretty").textContent=new Date(`${state.date}T12:00:00`).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function buildNav(){
+  $("#nav").innerHTML=NAV.map(n=>`<button data-tab="${esc(n)}"><i>${ICONS[n]}</i><span>${esc(n)}</span>${(n==="Rewards"||n==="Approvals")&&pendingCount()?`<mark>${pendingCount()}</mark>`:""}</button>`).join("");
+  $("#nav").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;state.tab=b.dataset.tab;render()};
+}
+function renderClassSelect(){
+  const el=$("#classSelect"), rows=activeClasses();
+  el.innerHTML=rows.map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("");
+  el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
+}
+async function loadRoot(){
+  if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
+  else{
+    const adminRead=path=>db.ref(`${ROOT}/${path}`).once("value").then(s=>s.val());
+    const paths={classes:"classes",students:"students",categories:"categories",rewards:"rewards",classRewardCatalog:"classRewardCatalog",settings:"settings",dailyRatings:"dailyRatings",dailyAwards:"dailyAwards",dailyAttendance:"dailyAttendance",commentsByStudent:"commentsByStudent",redemptionsByStudent:"redemptionsByStudent",enrollments:"enrollments",pointAdjustments:"pointAdjustments",audit:"audit",pointRequests:"pointRequests",classRewardContributionsByStudent:"classRewardContributionsByStudent",refundRequests:"refundRequests",classRewardRounds:"classRewardRounds"};
+    const entries=await Promise.all(Object.entries(paths).map(async([key,path])=>[key,await adminRead(path)]));
+    state.root=Object.fromEntries(entries.map(([key,value])=>[key,value||{}]));
+  }
+  if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";
+  prepareDraft();renderClassSelect();setHeader();buildNav();
+}
+async function ensureRewardModelV2(){
+  if(state.root?.settings?.rewardModelV2Seeded===true)return false;
+  const updates={}, norm=v=>String(v||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const existingRewards=Object.entries(state.root?.rewards||{}), existingClass=Object.entries(state.root?.classRewardCatalog||{});
+  const classNames=new Set(CLASS_REWARD_PRESETS.map(x=>norm(x.name)));
+  for(const preset of CLASS_REWARD_PRESETS){
+    const classMatch=existingClass.find(([,r])=>norm(r?.name)===norm(preset.name));
+    const cid=classMatch?.[0]||`class-incentive-${preset.key}`, oldClass=classMatch?.[1]||{};
+    const oldCost=Number(oldClass.cost||0), perStudent=Number(oldClass.costPerStudent||0)||((oldCost===1000||!oldCost)?100:Math.max(1,Math.round(oldCost/10)));
+    updates[`${ROOT}/classRewardCatalog/${cid}`]={...oldClass,id:cid,name:preset.name,icon:preset.icon,costPerStudent:perStudent,active:true,available:oldClass.available!==false};
+  }
+  for(const [rid,reward] of existingRewards){
+    if(classNames.has(norm(reward?.name))){
+      updates[`${ROOT}/rewards/${rid}/active`]=false;
+      updates[`${ROOT}/rewards/${rid}/rewardType`]="class-migrated";
+    }else if(!reward?.rewardType){
+      updates[`${ROOT}/rewards/${rid}/rewardType`]="personal";
+    }
+  }
+  for(const [cid,item] of existingClass){
+    if(norm(item?.name)==="chat in zoom")updates[`${ROOT}/classRewardCatalog/${cid}/active`]=false;
+  }
+  updates[`${ROOT}/settings/rewardModelV2Seeded`]=true;
+  await db.ref().update(updates);
+  return true;
+}
+function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000);return}clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000)}
+function prepareDraft(){
+  if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
+  for(const s of roster()){
+    const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==="absent")state.absent.add(s.id);
+    const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];
+    const prior=C.latestRatings(state.root,s.id,state.classId,state.date);
+    const source=saved||prior.ratings||{};
+    for(const cat of categories()){const found=vals(source).find(r=>r.category===cat.name);state.draft[`${s.id}|${cat.name}`]=found?.rating||"Good"}
+  }
+}
+function isSavedDay(){return roster().some(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date])}
+function render(){if(!state.root||!state.user)return;setHeader();buildNav();document.querySelectorAll("#nav [data-tab]").forEach(b=>b.classList.toggle("active",b.dataset.tab===state.tab));const p=$("#page");
+  if(state.tab==="Overview")p.innerHTML=overview();
+  if(state.tab==="Points Dashboard")p.innerHTML=pointsDashboard();
+  if(state.tab==="Daily Points")p.innerHTML=daily();
+  if(state.tab==="Students")p.innerHTML=students();
+  if(state.tab==="Categories")p.innerHTML=categoriesPage();
+  if(state.tab==="Comments")p.innerHTML=commentsPage();
+  if(state.tab==="Rewards")p.innerHTML=rewardsPage();
+  if(state.tab==="Approvals")p.innerHTML=approvalsPage();
+  if(state.tab==="Reports")p.innerHTML=reportsPage();
+  if(state.tab==="People & Classes")p.innerHTML=peoplePage();
+  if(state.tab==="Settings")p.innerHTML=settingsPage();
+  bindPage();
+}
+function overview(){
+  const r=roster(), avg=classAverage(), scored=savedTodayIds().size, pending=pendingCount(), enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";
+  return `<div class="welcome"><div><p class="eyebrow">${state.teacherMode?"SIGNED IN AS TEACHER":"SIGNED IN AS ADMIN"}</p><h1>Good afternoon, ${esc(state.user.displayName||"Simcha Cohen")}</h1><p>Here’s how ${esc(cls()?.name||"your class")} is doing today.</p></div><button class="primary" data-go="Daily Points">+ Give today’s points</button></div>
+  <div class="stats">
+    <article class="stat purple"><i>↗</i><div><span>Class average</span><strong>${avg}%</strong><small class="up">Based on saved ratings</small></div><div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div></article>
+    <article class="stat gold"><i>★</i><div><span>Students scored today</span><strong>${scored}</strong><small>of ${r.length} students</small></div><div class="ring" style="background:conic-gradient(#e7ae34 ${r.length?Math.round(scored/r.length*100):0}%,#f1f2f6 0)"><b>${r.length?Math.round(scored/r.length*100):0}%</b></div></article>
+    <article class="stat green click" data-go="${state.teacherMode?"Approvals":"Rewards"}"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
+  </div>
+  <div class="dash">
+    <section class="panel"><div class="panelhead"><div><h2>Student performance</h2><p>Today’s saved score</p></div><button data-go="Students">View all →</button></div><div class="list">${r.slice(0,6).map(s=>`<button class="studentrow" data-student="${esc(s.id)}"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><strong>${esc(s.name)}</strong><small>${Number(s.rewardBalance)||0} reward points</small></span><u><i style="width:${Math.min(100,scoreFor(s))}%;background:${esc(safeColor(s))}"></i></u><b>${scoreFor(s)}%</b></button>`).join("")}</div></section>
+    <section class="panel"><div class="panelhead"><div><h2>Quick actions</h2><p>Common classroom tasks</p></div></div><div class="quick">
+      <button class="access-toggle ${enabled?"enabled":"blocked"}" id="accessToggle"><i>${enabled?"✓":"×"}</i><b>${enabled?"Student Website Enabled":"Student Website Blocked"}</b><small>${enabled?"Click to block student access":"Click to reopen student access"}</small></button>
+      <button data-go="Points Dashboard"><i class="q-gold">★</i><b>Points dashboard</b><small>See every point and reason</small></button>
+      <button data-go="Daily Points"><i class="q-purple">✓</i><b>Daily points</b><small>Score the whole class</small></button>
+      <button data-go="Rewards"><i class="q-green">◇</i><b>Approve rewards</b><small>${pending} requests waiting</small></button>
+      <button data-go="Students"><i class="q-blue">±</i><b>Adjust points</b><small>Does not affect averages</small></button>
+      <button data-go="People & Classes"><i class="q-green">♧</i><b>Manage students</b><small>Classes and enrollment</small></button>
+    </div></section>
+  </div>`;
+}
+
+function pointTime(value){
+  if(typeof value==="number"&&Number.isFinite(value))return value;
+  const n=Number(value);if(Number.isFinite(n)&&n>0)return n;
+  const p=Date.parse(String(value||""));return Number.isFinite(p)?p:0;
+}
+function pointDateFromSchoolDate(date){const p=Date.parse(`${date}T12:00:00`);return Number.isFinite(p)?p:0}
+function pointClassName(classId){return state.root?.classes?.[classId]?.name||classId||""}
+function pointSourceGroup(source){
+  const s=String(source||"");
+  if(["reading100","translation100","understand100"].includes(s))return "posuk";
+  if(["chazara","chazara-recording","chazara-remove","chazara-reject","shorashim-recording","shorashim-no-hints"].includes(s))return "chazara";
+  if(s==="teacher-adjustment")return "teacher";
+  return "activity";
+}
+function pointSourceLabel(source){
+  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'chazara-reject':"Chazara approval reversed",'shorashim-recording':"Shorashim · Recorded Chazara",'shorashim-no-hints':"Shorashim · No Hints Challenge",'teacher-adjustment':"Teacher adjustment"};
+  return labels[source]||String(source||"Activity points");
+}
+function allPointLedger(includeGaps=true){
+  const r=pointsRoster(), rosterMap=new Map(r.map(s=>[s.id,s])), rows=[];
+  const add=row=>{if(!row?.sid||!rosterMap.has(row.sid))return;const s=rosterMap.get(row.sid);rows.push({...row,studentName:row.studentName||s.name||row.sid,studentInitials:s.initials||initials(s.name),studentColor:safeColor(s)})};
+
+  // Daily points. Read every class bucket for each current student so the ledger
+  // can reconcile with the student's current point balance even after class moves.
+  for(const s of r){
+    for(const [cid,dates] of Object.entries(state.root?.dailyAwards?.[s.id]||{})){
+      for(const [date,award] of Object.entries(dates||{})){
+        const when=pointTime(award?.savedAt)||pointDateFromSchoolDate(date);
+        for(const part of C.dailyAwardParts(award)){
+          const label=part.category?`Daily Points · ${part.category}`:"Daily Points";
+          add({id:`daily:${s.id}:${cid}:${date}${part.category?":"+C.categoryKey(part.category):""}`,sid:s.id,amount:part.points,when,source:"daily",sourceGroup:"daily",sourceLabel:label,reason:part.category?`${part.category} — ${part.rating} — ${C.formatDate(date)}`:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+        }
+      }
+    }
+  }
+
+  // Posuk Practice, Chazara, and any other activity point requests.
+  for(const [id,item0] of Object.entries(state.root?.pointRequests||{})){
+    const item=item0||{}, sid=String(item.rewardStudentId||"");if(!rosterMap.has(sid))continue;
+    const rawStatus=String(item.status||"pending"), approved=rawStatus==="approved", amount=Number(approved?(item.actualAmount??item.amount??0):(item.amount??0));
+    const group=pointSourceGroup(item.source), when=pointTime(approved?(item.reviewedAt||item.createdAt):item.createdAt);
+    const status=approved?"posted":rawStatus;
+    add({id:`request:${id}`,sid,amount,when,source:item.source||"activity",sourceGroup:group,sourceLabel:pointSourceLabel(item.source),reason:item.reason||pointSourceLabel(item.source),detail:item.classId?pointClassName(item.classId):"",status,counts:approved,classId:item.classId||"",balanceAfter:approved?item.balanceAfter:null});
+  }
+
+  // Teacher-entered manual adjustments.
+  for(const [id,item0] of Object.entries(state.root?.pointAdjustments||{})){
+    const item=item0||{}, sid=String(item.studentId||"");if(!rosterMap.has(sid))continue;
+    const amount=Number(item.amount||0);if(!amount)continue;
+    add({id:`adjust:${id}`,sid,amount,when:pointTime(item.createdAt),source:"teacher-adjustment",sourceGroup:"teacher",sourceLabel:"Teacher adjustment",reason:item.reason||"Teacher adjustment",detail:item.classId?pointClassName(item.classId):"",status:"posted",counts:true,classId:item.classId||""});
+  }
+
+  // Prize Store purchases: points leave when the request is submitted. A declined
+  // request creates a matching return so the visible ledger mirrors the real balance.
+  for(const s of r){
+    for(const [key,item0] of Object.entries(state.root?.redemptionsByStudent?.[s.id]||{})){
+      const item=item0||{}, cost=Number(item.cost||0);if(!cost)continue;
+      const rewardName=state.root?.rewards?.[item.rewardId]?.name||"Reward";
+      const requested=pointTime(item.requestedAt);
+      if(requested)add({id:`redeem:${s.id}:${key}:request`,sid:s.id,amount:-cost,when:requested,source:"reward-store",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Reward requested — ${rewardName}`,detail:`${String(item.status||"requested")} · ${cost} ★`,status:"posted",counts:true});
+      if(["declined","canceled","refunded"].includes(String(item.status||""))){
+        const reviewed=pointTime(item.status==="refunded"?(item.refundedAt||item.reviewedAt):item.reviewedAt);
+        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:item.status==="canceled"?"Canceled by student":item.status==="refunded"?"Refund approved by teacher":"Request declined",status:"posted",counts:true});
+      }
+    }
+  }
+
+  // Class reward contributions: points are spent immediately into a shared class goal.
+  for(const s of r){
+    for(const [key,item0] of Object.entries(state.root?.classRewardContributionsByStudent?.[s.id]||{})){
+      const item=item0||{}, amount=Math.abs(Number(item.amount||0));if(!amount)continue;
+      add({id:`class-contribution:${s.id}:${key}`,sid:s.id,amount:-amount,when:pointTime(item.createdAt),source:"class-reward-contribution",sourceGroup:"class",sourceLabel:"Class Reward",reason:`Class contribution — ${item.rewardName||"Class Reward"}`,detail:`${item.className||pointClassName(item.classId)} · ${amount} ★ contributed`,status:"posted",counts:true,classId:item.classId||"",balanceAfter:item.balanceAfter});
+      if(item.refundedAt)add({id:`class-contribution:${s.id}:${key}:refund`,sid:s.id,amount:Math.abs(Number(item.refundedAmount??amount)),when:pointTime(item.refundedAt),source:"class-reward-refund",sourceGroup:"class",sourceLabel:"Class Reward",reason:`Points returned — ${item.rewardName||"Class Reward"}`,detail:"Refund approved by teacher",status:"posted",counts:true,classId:item.classId||""});
+    }
+  }
+
+  // Older balances may predate the permanent history records. Show the difference
+  // instead of hiding it so the teacher can immediately see why a balance does not reconcile.
+  if(includeGaps){
+    const sums={};for(const row of rows)if(row.counts)sums[row.sid]=(sums[row.sid]||0)+Number(row.amount||0);
+    for(const s of r){
+      const current=Number(s.rewardBalance||0), accounted=Number(sums[s.id]||0), gap=current-accounted;
+      if(gap)add({id:`gap:${s.id}`,sid:s.id,amount:gap,when:0,source:"history-gap",sourceGroup:"gap",sourceLabel:"History gap",reason:"Balance not linked to a saved history record",detail:`Current balance ${current} ★ · saved ledger ${accounted} ★`,status:"needs-review",counts:true,isGap:true});
+    }
+  }
+  // Calculate a running balance for each student. History gaps are treated as the
+  // older opening balance, so the newest calculated balance lands on the live total.
+  for(const s of r){
+    let running=0;
+    const posted=rows.filter(x=>x.sid===s.id&&x.counts).sort((a,b)=>(a.when||0)-(b.when||0)||String(a.id).localeCompare(String(b.id)));
+    for(const row of posted){running+=Number(row.amount||0);row.runningBalance=running}
+  }
+  return rows.sort((a,b)=>(b.when||0)-(a.when||0)||String(a.studentName).localeCompare(String(b.studentName)));
+}
+function pointRangeStart(){
+  if(state.pointRange==="all")return 0;
+  const days=Math.max(1,Number(state.pointRange)||30), d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));return d.getTime();
+}
+function filteredPointLedger(){
+  const q=String(state.pointSearch||"").trim().toLowerCase(), start=pointRangeStart();
+  return allPointLedger(true).filter(row=>{
+    if(state.pointStudent!=="all"&&row.sid!==state.pointStudent)return false;
+    if(state.pointType!=="all"&&row.sourceGroup!==state.pointType)return false;
+    if(state.pointStatus!=="all"&&row.status!==state.pointStatus)return false;
+    if(start&&row.when&&row.when<start&&!row.isGap)return false;
+    if(q&&!`${row.studentName} ${row.reason} ${row.sourceLabel} ${row.detail||""} ${row.status}`.toLowerCase().includes(q))return false;
+    return true;
+  });
+}
+function formatPointWhen(row){
+  if(row.isGap)return "Older / unknown";
+  if(!row.when)return "Unknown";
+  return new Date(row.when).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+}
+function redeemedPointsForStudent(studentId){
+  let redeemed=0;
+  for(const item0 of Object.values(state.root?.redemptionsByStudent?.[studentId]||{})){
+    const item=item0||{}, cost=Number(item.cost||0), status=String(item.status||"requested").toLowerCase();
+    if(cost>0&&status!=="declined"&&status!=="canceled"&&status!=="refunded")redeemed+=cost;
+  }
+  return redeemed;
+}
+function pointsDashboard(){
+  if(state.pointClassId!=="all"&&!state.root?.classes?.[state.pointClassId]?.active)state.pointClassId="all";
+  const r=pointsRoster(), ledger=allPointLedger(true), visible=filteredPointLedger();
+  const totalBalance=r.reduce((a,s)=>a+Number(s.rewardBalance||0),0), gaps=ledger.filter(x=>x.isGap);
+  const byStudent=r.map(s=>{
+    const rows=ledger.filter(x=>x.sid===s.id), savedNet=rows.filter(x=>x.counts&&!x.isGap).reduce((a,x)=>a+Number(x.amount||0),0), gap=Number(s.rewardBalance||0)-savedNet;
+    const currentBalance=Number(s.rewardBalance||0);
+    const recent=rows.find(x=>!x.isGap&&x.when), classLabel=pointsStudentClassLabel(s.id);
+    return {s,savedNet,gap,currentBalance,recent,classLabel};
+  });
+  const typeOptions=[["all","All sources"],["daily","Daily Points"],["posuk","Posuk Practice"],["chazara","Chazara"],["teacher","Teacher adjustments"],["store","Personal Rewards"],["class","Class Rewards"],["activity","Other activity"],["gap","History gaps"]];
+  const statusOptions=[["all","All statuses"],["posted","Posted to balance"],["pending","Pending"],["rejected","Rejected"],["needs-review","Needs review"]];
+  const classLabel=pointsClassLabel(), allClasses=state.pointClassId==="all";
+
+  const selectedStudent=state.pointStudent==="all"?null:r.find(s=>s.id===state.pointStudent)||null;
+  const selectedRows=selectedStudent?ledger.filter(row=>row.sid===selectedStudent.id&&row.counts):[];
+  const reasonGroups=[
+    {id:"daily",label:"Daily Points",icon:"✓",hint:"Saved daily class points"},
+    {id:"posuk",label:"Posuk Practice",icon:"📖",hint:"Reading, translation & understanding"},
+    {id:"chazara",label:"Chazara",icon:"↻",hint:"Regular and recorded Chazara"},
+    {id:"teacher",label:"Teacher adjustments",icon:"±",hint:"Manual additions or deductions"},
+    {id:"store",label:"Personal Rewards",icon:"🎁",hint:"Points spent or returned on personal rewards"},
+    {id:"class",label:"Class Rewards",icon:"👥",hint:"Points contributed toward class goals"},
+    {id:"activity",label:"Other activity",icon:"★",hint:"Other saved activity points"},
+    {id:"gap",label:"Older points",icon:"…",hint:"Balance from before full history was saved"}
+  ].map(group=>{
+    const rows=selectedRows.filter(row=>row.sourceGroup===group.id);
+    const amount=rows.reduce((sum,row)=>sum+Number(row.amount||0),0);
+    return {...group,rows,amount,count:rows.length};
+  }).filter(group=>group.count||group.amount);
+
+  const reasonOverview=selectedStudent?`
+    <section class="points-section points-reason-overview">
+      <div class="points-reason-head">
+        <div class="points-reason-student">
+          <em style="background:${esc(safeColor(selectedStudent))}">${esc(selectedStudent.initials||initials(selectedStudent.name))}</em>
+          <span><small>STUDENT POINT OVERVIEW</small><h2>${esc(selectedStudent.name)}</h2><p>All-time posted points, grouped by reason. Click a reason to see the individual entries.</p></span>
+        </div>
+        <div class="points-reason-balance"><span>Current balance</span><strong>${Number(selectedStudent.rewardBalance)||0} ★</strong></div>
+      </div>
+      <div class="points-reason-grid">
+        ${reasonGroups.length?reasonGroups.map(group=>`<button class="points-reason-card ${state.pointType===group.id?"selected":""} ${group.amount<0?"negative":group.amount>0?"positive":"zero"}" data-points-source="${esc(group.id)}">
+          <span class="points-reason-icon">${group.icon}</span>
+          <span class="points-reason-copy"><b>${esc(group.label)}</b><small>${esc(group.hint)}</small><i>${group.count} ${group.count===1?"entry":"entries"}</i></span>
+          <strong>${group.amount>0?"+":""}${group.amount} ★</strong>
+          <span class="points-reason-arrow">›</span>
+        </button>`).join(""):`<div class="points-reason-empty">No saved point activity yet for this student.</div>`}
+      </div>
+      <div class="points-reason-actions">
+        <button class="points-all-activity ${state.pointType==="all"?"active":""}" data-points-source="all">View all activity for ${esc(selectedStudent.name)}</button>
+        ${state.pointType!=="all"?`<span>Showing <b>${esc(typeOptions.find(x=>x[0]===state.pointType)?.[1]||"selected reason")}</b> below.</span>`:""}
+      </div>
+    </section>`:"";
+
+  return `<section class="workspace points-dashboard">
+    <div class="workhead points-title"><div><p class="eyebrow">${esc(classLabel.toUpperCase())} · POINTS DASHBOARD</p><h1>All Student Points</h1><p>See each student's current balance and the point activity behind it.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="pointsClass"><option value="all" ${allClasses?"selected":""}>All Classes</option>${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.pointClassId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="reportbuttons"><button id="pointsReset">Reset filters</button><button id="pointsCsv">Export ALL points</button></div></div></div>
+    ${gaps.length?`<div class="points-alert"><b>⚠ ${gaps.length} balance${gaps.length===1?"":"s"} contain older points without a saved reason.</b><span>I am showing those as “History gap” instead of pretending the old reason is known.</span></div>`:""}
+    <div class="points-summary single">
+      <article><span>${allClasses?"Current all-classes balance":"Current class balance"}</span><strong>${totalBalance} ★</strong><small>Total points currently available for ${r.length} student${r.length===1?"":"s"}${allClasses?" across all classes":` in ${esc(classLabel)}`}</small></article>
+    </div>
+
+    <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Click a student to see an overview of where that student's points came from.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
+      <div class="points-student-grid">${byStudent.map(x=>`<button class="points-student-card ${state.pointStudent===x.s.id?"selected":""}" data-points-student="${esc(x.s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(x.s))}">${esc(x.s.initials||initials(x.s.name))}</em><span><b>${esc(x.s.name)}</b><small>${allClasses&&x.classLabel?`${esc(x.classLabel)} · `:""}${x.recent?`Latest: ${esc(x.recent.reason)}`:"No saved activity yet"}</small></span></span><strong>${x.currentBalance} ★</strong></button>`).join("")}</div>
+    </section>
+
+    ${reasonOverview}
+
+    <section class="points-section points-ledger"><div class="points-section-head"><div><h2>${selectedStudent?`${esc(selectedStudent.name)} — individual activity`:"Point activity"}</h2><p>${selectedStudent?"Use the overview above to filter by reason, or use the filters here for a custom view.":"Select a student above for a reason-by-reason overview, or use these filters to browse the full ledger."}</p></div><strong class="points-result-count">${visible.length} row${visible.length===1?"":"s"}</strong></div>
+      <div class="points-filters">
+        <label><span>Student</span><select id="pointsStudent"><option value="all">All students</option>${r.map(s=>`<option value="${esc(s.id)}" ${state.pointStudent===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
+        <label><span>Time</span><select id="pointsRange"><option value="7" ${state.pointRange==="7"?"selected":""}>Last 7 days</option><option value="30" ${state.pointRange==="30"?"selected":""}>Last 30 days</option><option value="90" ${state.pointRange==="90"?"selected":""}>Last 90 days</option><option value="all" ${state.pointRange==="all"?"selected":""}>All time</option></select></label>
+        <label><span>Source</span><select id="pointsType">${typeOptions.map(([v,l])=>`<option value="${v}" ${state.pointType===v?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label><span>Status</span><select id="pointsStatus">${statusOptions.map(([v,l])=>`<option value="${v}" ${state.pointStatus===v?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label class="points-search"><span>Search reason</span><input id="pointsSearch" value="${esc(state.pointSearch)}" placeholder="e.g. Chazara, Reading, Gimkit..."></label>
+      </div>
+      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
+    </section>
+  </section>`;
+}
+function exportPointsCSV(){
+  // Always export the complete ledger for every active student in every active class.
+  // The on-screen student/date/source/status/search filters do not limit this file.
+  const previousClassId=state.pointClassId;
+  state.pointClassId="all";
+  const rows=allPointLedger(true);
+  const rosterById=new Map(pointsRoster().map(s=>[s.id,s]));
+  state.pointClassId=previousClassId;
+
+  const q=v=>`"${String(v??"").replaceAll('"','""')}"`;
+  const header=["Date/Time","Student","Student ID","Amount","Reason","Details","Source","Source Group","Status","Counts in Balance","Class","Balance After","Current Balance"];
+  const body=rows.map(r=>{
+    const student=rosterById.get(r.sid)||{};
+    return [
+      r.isGap?"Older / unknown":r.when?new Date(r.when).toISOString():"",
+      r.studentName,
+      r.sid,
+      Number(r.amount)||0,
+      r.reason,
+      r.detail||"",
+      r.sourceLabel,
+      r.sourceGroup,
+      r.status,
+      r.counts?"Yes":"No",
+      r.classId?pointClassName(r.classId):"",
+      r.counts&&Number.isFinite(Number(r.runningBalance))?Number(r.runningBalance):"",
+      Number(student.rewardBalance)||0
+    ];
+  });
+  const csv="\uFEFF"+[header,...body].map(row=>row.map(q).join(",")).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`brightpath-COMPLETE-points-history-${C.schoolDateString()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  toast(`Exported ${rows.length} point history row${rows.length===1?"":"s"} for all students.`);
+}
+
+function carryDate(s){return C.latestRatings(state.root,s.id,state.classId,state.date).date||""}
+function daily(){
+  const cats=categories(), r=roster(), saved=isSavedDay(), carried=!saved&&r.some(s=>carryDate(s));
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())} · EDITING ${esc(state.date)}</p><h1>Daily Points</h1><p>Entering or reviewing points for <strong>${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</strong>.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="dailyClass">${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="savegroup">${saved?`<span class="savedday">✓ Already saved — changes will replace this day</span>`:`<span class="unsavedday">Draft only — no points awarded yet</span>`}<button id="saveDaily" class="primary">${saved?"Update saved day":"Save whole class"}</button></div></div></div>
+  ${carried?`<div class="carrynotice"><b>↶ Ratings carried forward — not yet saved</b><span>Each student starts with their most recent previously saved ratings in this class. Review or change them, then save to award points for this date.</span></div>`:""}
+  <div class="key"><span>● Excellent</span><span>● Good</span><span>● Fair</span><span>● Needs Improvement</span></div>
+  <div class="table">
+    <div class="row tablehead" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px"><span>Student</span><span>Attendance</span>${cats.map(c=>`<span>${esc(c.name)}</span>`).join("")}<span>${saved?"Saved":"Unsaved Draft"}</span></div>
+    ${r.map(s=>dailyRow(s,cats,saved)).join("")}
+  </div></section>`;
+}
+function dailyRow(s,cats,saved){
+  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:C.dailyAward(ratings), cdate=carryDate(s);
+  return `<div class="row ${absent?"absentrow":""}" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px">
+    <div class="person"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><b>${esc(s.name)}</b>${!saved&&cdate?`<small class="carrysource">Started from ${new Date(`${cdate}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small>`:""}</span></div>
+    <div class="attendance-wrap"><button class="attendance ${absent?"absent":""}" data-att="${esc(s.id)}">${absent?"Absent":"Present"}</button></div>
+    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option value="${x}" ${x===val?"selected":""}>${x} (+${C.ratingPoints[x]})</option>`).join("")}</select></div>`}).join("")}
+    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`${award} points if saved`}</small></div>
+  </div>`;
+}
+function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
+async function saveDaily(){
+  if(state.teacherMode){
+    const cats=categories(), r=roster();
+    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings}});
+    try{await teacherApi("saveDaily",{classId:state.classId,date:state.date,rows});toast(`Saved ${r.length} students`)}catch(err){toast(err.message,"error")}
+    await loadRoot();render();return;
+  }
+  const updates={}, cats=categories(), r=roster(), stamp=now(), balanceDeltas=[];
+  for(const s of r){
+    const absent=state.absent.has(s.id), ratings={};
+    const byCategory={};let newAward=0;
+    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good",key=C.categoryKey(cat.name),pts=C.ratingPoints[rating]??C.ratingPoints.Good;ratings[key]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp};byCategory[key]={category:cat.name,rating,points:pts};newAward+=pts}
+    const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
+    updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
+    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,...(absent?{}:{byCategory}),teacherEmail:state.user.email,savedAt:stamp};
+    updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?"absent":"present",teacherEmail:state.user.email,savedAt:stamp};
+    balanceDeltas.push({id:s.id,delta:newAward-oldAward});
+  }
+  await db.ref().update(updates);
+  // Use a transaction for the balance so Posuk Practice / Chazara points
+  // earned at the same time can never be overwritten by a stale teacher page.
+  await Promise.all(balanceDeltas.filter(x=>x.delta!==0).map(x=>db.ref(`${ROOT}/students/${x.id}/rewardBalance`).transaction(cur=>Math.max(0,Number(cur||0)+x.delta))));
+  toast(`Saved ${r.length} students`);await loadRoot();render();
+}
+function studentHistory(s){const out=[];for(const [date,aw] of Object.entries(state.root.dailyAwards?.[s.id]?.[state.classId]||{})){const at=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date];out.push({date,points:Number(aw?.points||0),status:at?.status||"present"})}return out.sort((a,b)=>b.date.localeCompare(a.date))}
+function students(){
+  const r=roster(), s=currentStudent();if(s&&!state.selectedId)state.selectedId=s.id;
+  if(!s)return `<section class="workspace"><div class="empty"><h3>No students in this class</h3><p>Use People & Classes to add students.</p></div></section>`;
+  const rows=C.allProgressRows(state.root,s.id,state.classId), g={};for(const x of rows){g[x.category]??={e:0,p:0};g[x.category].e+=Number(x.points)||0;g[x.category].p+=100}
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">STUDENT PROGRESS</p><h1>Students</h1><p>Review growth, balances, and daily history.</p></div><select id="studentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>
+    <div class="studenthero"><em class="huge" style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><div><h2>${esc(s.name)}</h2><p>${scoreFor(s)}% overall progress</p></div><button class="balance" id="adjustPoints"><span>CURRENT POINT BALANCE</span><b>${Number(s.rewardBalance)||0} ★</b><small>Click to adjust points</small></button></div>
+    <div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div>
+    <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Daily History</h2><p>Saved points and attendance</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${studentHistory(s).map(x=>`<tr><td>${esc(C.formatDate(x.date))}</td><td>${esc(x.status)}</td><td>${x.points} ★</td></tr>`).join("")||`<tr><td colspan="3">No saved days yet.</td></tr>`}</tbody></table></div></section>
+  </section>`;
+}
+async function adjustPoints(){
+  const s=currentStudent();if(!s)return;const raw=prompt(`Adjust ${s.name}'s points. Use a positive number to add or a negative number to deduct:`,"5");if(raw===null)return;const amount=Number(raw);if(!Number.isInteger(amount)||amount===0)return toast("Enter a whole number","error");
+  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment";
+  if(state.teacherMode){try{await teacherApi("adjust",{classId:state.classId,studentId:s.id,amount,reason});toast("Balance updated")}catch(err){toast(err.message,"error")}await loadRoot();render();return}
+  const key=db.ref(`${ROOT}/pointAdjustments`).push().key;
+  let applied=0;
+  await db.ref(`${ROOT}/students/${s.id}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+  await db.ref(`${ROOT}/pointAdjustments/${key}`).set({id:key,studentId:s.id,classId:state.classId,amount:applied,action:"teacher",reason,teacherEmail:state.user.email,createdAt:now()});
+  toast("Balance updated");
+}
+function categoriesPage(){
+  const cats=categories();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">DAILY SCORING</p><h1>Categories</h1><p>These are the areas scored on the Daily Points page.</p></div><button class="primary" id="addCategory">+ Add category</button></div><div class="category-grid">${cats.map((c,i)=>`<article class="category-card"><div class="catdot">${i+1}</div><h3>${esc(c.name)}</h3><p>Active · order ${Number(c.sortOrder||0)+1}</p><button data-catdelete="${esc(c.id)}">Remove</button></article>`).join("")}</div></section>`;
+}
+async function addCategory(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const name=prompt("Category name:");if(!name)return;const id=`cat-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/categories/${id}`).set({id,teacherEmail:state.user.email,name:name.trim(),points:1,sortOrder:categories().length,active:true});toast("Category added")}
+async function removeCategory(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}if(!confirm("Remove this category from future Daily Points screens? Old history will remain."))return;await db.ref(`${ROOT}/categories/${id}/active`).set(false);toast("Category removed")}
+function commentsPage(){
+  const s=currentStudent(), r=roster();if(s&&!state.selectedId)state.selectedId=s.id;const comments=s?vals(state.root.commentsByStudent?.[s.id]||{}).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))):[];
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">TEACHER NOTES</p><h1>Comments</h1><p>Write a private note or share encouragement with the student.</p></div><select id="commentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${s&&x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>${s?`<div class="admincolumns"><section><h2>${esc(s.name)}’s comments</h2><div class="commentlist">${comments.map(c=>`<article><p>${esc(c.body)}</p><small>${c.visibleToStudent===false?"Private teacher note":"Visible to student"} · ${c.createdAt?new Date(c.createdAt).toLocaleDateString():""}</small></article>`).join("")||`<div class="empty"><h3>No comments yet</h3><p>Add the first note for this student.</p></div>`}</div></section><section><h2>Add a comment</h2><form id="commentForm" class="adminform"><label>Comment<textarea id="commentText" required rows="5"></textarea></label><label class="check"><input id="commentVisible" type="checkbox" checked> Show this comment to the student</label><button class="primary">Save comment</button></form></section></div>`:`<div class="empty">No student selected.</div>`}</section>`;
+}
+async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;if(state.teacherMode){try{await teacherApi("comment",{classId:state.classId,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked});toast("Comment saved")}catch(err){toast(err.message,"error")}await loadRoot();render();return}const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
+function classRewardSnapshot(item,classId=state.classId){
+  const count=Math.max(1,C.classRoster(state.root||{},classId).length),rawLive=state.root?.classRewardRounds?.[classId]?.[item.id]||null,raw=rawLive||{},cooldownDays=cooldownDaysValue(item?.cooldownDays);
+  const perStudent=Math.max(1,Number(raw.perStudentCost)||Number(item.costPerStudent||100)),goal=Math.max(1,Number(raw.goalPoints)||perStudent*count),cap=Number(raw.maxPerStudent)||Math.min(goal,Math.ceil((goal/count)*2));
+  if(isGimkitClassReward(item)){
+    const modes=gimkitModesForItem(item).map(m=>{const total=Math.max(0,Number(raw.modeTotals?.[m.id])||0),voters=Object.values(raw.modeVoters?.[m.id]||{}).filter(Boolean).length;return {...m,total,voters,pct:Math.max(0,Math.min(100,Math.round(total/goal*100)))}}),leader=Math.max(0,...modes.map(m=>m.total)),cooldownUntil=timeMs(raw.cooldownUntil)||(cooldownDays>0&&timeMs(raw.completedAt)?timeMs(raw.completedAt)+cooldownDays*DAY_MS:0),cooling=cooldownDays>0&&cooldownUntil>Date.now(),pct=Math.max(0,Math.min(100,Math.round(leader/goal*100))),contributors=Object.keys(raw.byStudent||{}).filter(k=>Number(raw.byStudent[k])>0).length,status=cooling?"cooldown":(leader>0||raw.startedAt?"active":"not-started");
+    return {count,perStudent,live:rawLive,goal,total:leader,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired:false,modeVoting:true,modes,lastWinner:raw.lastWinner||null};
+  }
+  const rawTotal=Math.max(0,Number(raw.totalContributed)||0),completedAt=timeMs(raw.completedAt),cooldownUntil=cooldownDays>0&&completedAt?completedAt+cooldownDays*DAY_MS:0,cooling=rawTotal>=goal&&cooldownUntil>Date.now(),expired=rawTotal>=goal&&cooldownDays>0&&cooldownUntil>0&&cooldownUntil<=Date.now(),live=expired?null:rawLive,total=expired?0:rawTotal,byStudent=expired?{}:(raw.byStudent||{}),pct=Math.max(0,Math.min(100,Math.round(total/Math.max(1,goal)*100))),contributors=Object.keys(byStudent).filter(k=>Number(byStudent[k])>0).length,status=cooling?"cooldown":expired?"not-started":(total>=goal?"completed":String(raw.status||"not-started"));
+  return {count,perStudent,live,goal,total,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired,modeVoting:false};
+}
+function approvalsPage(){
+  const pointReq=pendingActivityPointRequests();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">APPROVALS</p><h1>Activity points</h1><p>Posuk Practice and Chazara points for your students. Nothing below has been added yet.</p></div></div>
+  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Awaiting approval</h2></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:`<div class="empty"><h3>All caught up</h3><p>No points are waiting for approval.</p></div>`}</section>`;
+}
+function rewardsPage(){
+  const rewards=vals(state.root.rewards||{}).filter(r=>itemInStore(r)&&r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>itemInStore(x)&&x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
+  const storeOpen=classStoreOpen();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS${isTeacherStore(state.classId)?" · "+esc((cls()?.name||"").toUpperCase())+" STORE":""}</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
+  <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can buy personal rewards and contribute to class goals.":"Students can browse rewards and progress, but cannot spend points."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div>
+  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
+  ${refundQueueHTML()}
+  <div class="reward-type-stack">
+    <section class="teacher-reward-section personal-rewards"><div class="teacher-reward-heading"><span>👤</span><div><h2>Personal Rewards</h2><p>One boy spends his points and receives this reward himself. Each reward can also have its own time cooldown.</p></div><button class="primary" id="addReward">+ Add personal reward</button></div><div class="rewardgrid">${rewards.length?rewards.map(r=>{const available=r.available!==false,cd=personalCooldownInfo(r);return `<article class="${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><p><strong>${esc(cd.label)}</strong></p><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-reward="${esc(r.id)}">${available?"Close":"Open"}</button><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No personal rewards</h3></div>`}</div></section>
+    <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. You can set a cooldown (for example 14 days) after the class earns each prize.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x),available=x.available!==false,cdLabel=g.cooling?`Available again in ${cooldownText(g.cooldownUntil)}`:(g.cooldownDays?`Cooldown: ${g.cooldownDays} day${g.cooldownDays===1?"":"s"}`:"No cooldown");return `<article class="teacher-class-goal ${g.status==="completed"||g.status==="cooldown"?"complete":""} ${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p><p><strong>${esc(cdLabel)}</strong></p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div>${gimkitTeacherModesHTML(g)}<div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="cooldown"?`⏳ ${esc(cdLabel)}`:g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-class-reward="${esc(x.id)}">${available?"Close":"Open"}</button><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">${isGimkitClassReward(x)?(g.cooling?"End cooldown":"Reset all mode bars"):(g.cooling?"End cooldown / start new goal":"Reset goal")}</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
+    <section class="teacher-reward-section"><div class="teacher-reward-heading"><span>📬</span><div><h2>Personal reward request queue</h2><p>Pending, ready to collect, and completed history</p></div><b class="queue-count">${getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}</b></div><div class="approvals-inline">${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No personal reward requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</div></section>
+  </div></section>`;
+}
+function activityPointRow(x){
+  const item=x.item||{}, s=state.root.students?.[item.rewardStudentId]||{}, amount=Number(item.amount||0), sign=amount>0?"+":"";
+  const when=item.createdAt?new Date(Number(item.createdAt)).toLocaleString():"";
+  return `<div class="activity-request"><em style="background:${esc(safeColor(s))}">${esc(s.initials||initials(item.studentName||"?"))}</em><span><strong>${esc(item.studentName||s.name||item.rewardStudentId||"Student")}</strong><small>${esc(item.reason||item.source||"Activity points")}${when?` · ${esc(when)}`:""}</small></span><b class="activity-amount ${amount<0?"deduct":""}">${sign}${amount} ★</b><button class="deny" data-point-reject="${esc(x.id)}" title="Reject">×</button><button class="approve" data-point-approve="${esc(x.id)}" title="Approve">✓</button></div>`;
+}
+function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId],status=x.item.status||"pending";return `<div class="request"><em style="background:${esc(safeColor(s))}">${esc(s?.initials||"?")}</em><span><strong>${esc(s?.name||x.sid)}</strong><small>${esc(r?.name||"Reward")} · ${Number(x.item.cost)||0} ★ · ${esc(status)}</small></span>${status==="pending"?`<button class="deny" data-decline="${esc(x.sid)}|${esc(x.key)}">×</button><button class="approve" data-approve="${esc(x.sid)}|${esc(x.key)}">✓</button>`:""}${status==="ready"?`<button class="approve" data-collect="${esc(x.sid)}|${esc(x.key)}">Given</button>`:""}</div>`}
+async function setChazaraPointStatus(item,status){
+  if(!item?.eventId||!item?.practiceStudentId)return;
+  const path=`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}`;
+  const field=Number(item.amount||0)<0?"removalPointRequestStatus":"pointRequestStatus";
+  try{await db.ref(path+'/'+field).set(status)}catch(e){console.warn('Could not mirror Chazara point status',e)}
+}
+async function approveActivityPoint(id,quiet=false){
+  if(state.teacherMode){try{const r=await teacherApi("approve",{requestId:id});if(!quiet)toast(`${r.actualAmount>=0?"+":""}${r.actualAmount} points approved`);if(!quiet){await loadRoot();render()}return true}catch(err){if(!quiet)toast(err.message,"error");return false}}
+  const live=(await db.ref(`${ROOT}/pointRequests/${id}`).once("value")).val();
+  if(!live||live.status!=="pending")return false;
+  const reqRef=db.ref(`${ROOT}/pointRequests/${id}`), stamp=now();
+  const lock=await reqRef.transaction(cur=>cur&&cur.status==="pending"?{...cur,status:"processing",reviewedBy:state.user.email,reviewStartedAt:stamp}:undefined);
+  if(!lock.committed)return false;
+  const item=lock.snapshot.val()||live, sid=item.rewardStudentId, amount=Number(item.amount||0);
+  let applied=0,balanceAfter=0;
+  try{
+    const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+    if(!bal.committed)throw new Error('Balance update did not commit');
+    balanceAfter=Number(bal.snapshot.val()||0);
+    await reqRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy:state.user.email,reviewedAt:now()});
+    await setChazaraPointStatus(item,"approved");
+    if(!quiet)toast(`${item.studentName||"Student"}: ${applied>=0?"+":""}${applied} points approved`);
+    return true;
+  }catch(err){
+    console.error(err);
+    await reqRef.update({status:"pending",lastError:String(err?.message||err),reviewStartedAt:null}).catch(()=>{});
+    if(!quiet)toast("Could not approve points","error");
+    return false;
+  }
+}
+async function rejectActivityPoint(id,quiet=false){
+  if(state.teacherMode){try{await teacherApi("reject",{requestId:id});if(!quiet){toast("Point request rejected");await loadRoot();render()}return true}catch(err){if(!quiet)toast(err.message,"error");return false}}
+  const snap=await db.ref(`${ROOT}/pointRequests/${id}`).once("value"), item=snap.val();
+  if(!item||item.status!=="pending")return false;
+  await db.ref(`${ROOT}/pointRequests/${id}`).update({status:"rejected",reviewedBy:state.user.email,reviewedAt:now()});
+  await setChazaraPointStatus(item,"rejected");
+  if(!quiet)toast("Point request rejected");
+  return true;
+}
+async function approveAllActivityPoints(){
+  const ids=pendingActivityPointRequests().map(x=>x.id);
+  if(!ids.length)return;
+  if(!confirm(`Approve all ${ids.length} pending activity point request${ids.length===1?"":"s"} for ${cls()?.name||"this class"}?`))return;
+  let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
+  toast(`${done} activity point request${done===1?"":"s"} approved`);
+  if(state.teacherMode){await loadRoot();render()}
+}
+function closeRewardEditor(){const overlay=document.querySelector(".reward-editor-backdrop");if(!overlay)return;if(overlay._rewardEditorKeyHandler)document.removeEventListener("keydown",overlay._rewardEditorKeyHandler);overlay.remove()}
+function rewardEditorBackdrop(title,subtitle,bodyHtml){
+  closeRewardEditor();
+  const overlay=document.createElement("div");
+  overlay.className="reward-editor-backdrop";
+  overlay.innerHTML=`<section class="reward-editor-dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="reward-editor-head"><div><p class="eyebrow">REWARD STORE</p><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div><button type="button" class="reward-editor-x" aria-label="Close">×</button></div>${bodyHtml}</section>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".reward-editor-x").onclick=closeRewardEditor;
+  overlay.onclick=e=>{if(e.target===overlay)closeRewardEditor()};
+  const onKey=e=>{if(e.key==="Escape"){document.removeEventListener("keydown",onKey);closeRewardEditor()}};
+  overlay._rewardEditorKeyHandler=onKey;
+  document.addEventListener("keydown",onKey);
+  return overlay;
+}
+function editReward(id=""){
+  const old=id?state.root.rewards?.[id]:null;
+  const quantity=Number(old?.quantity??-1), unlimited=quantity<0, color=/^#[0-9a-f]{6}$/i.test(String(old?.color||""))?old.color:"#ede9fe";
+  const overlay=rewardEditorBackdrop(id?"Edit personal reward":"Add personal reward","Change every reward setting here, then save once.",`
+    <form class="reward-editor-form" id="personalRewardEditor">
+      <label class="wide">Reward name<input id="rewardEditName" required value="${esc(old?.name||"")}" placeholder="Virtual Background"></label>
+      <label>Point cost<input id="rewardEditCost" required type="number" min="0" step="1" value="${Number(old?.cost??25)}"></label>
+      <label>Emoji / icon<input id="rewardEditIcon" value="${esc(old?.icon||"🎁")}" maxlength="12"></label>
+      <label>Cooldown after purchase (days)<input id="rewardEditCooldown" required type="number" min="0" step="0.25" value="${cooldownDaysValue(old?.cooldownDays)}"><small>Use 0 for no cooldown.</small></label>
+      <label>Card color<input id="rewardEditColor" type="color" value="${esc(color)}"></label>
+      <label>Quantity<input id="rewardEditQuantity" type="number" min="0" step="1" value="${unlimited?1:Math.max(0,quantity)}" ${unlimited?"disabled":""}><small>How many are available.</small></label>
+      <label class="reward-editor-check"><input id="rewardEditUnlimited" type="checkbox" ${unlimited?"checked":""}> Unlimited quantity</label>
+      <label class="reward-editor-check"><input id="rewardEditAvailable" type="checkbox" ${old?.available!==false?"checked":""}> Reward is open for students</label>
+      <div class="reward-editor-actions wide"><button type="button" class="reward-editor-cancel">Cancel</button><button class="primary" type="submit">${id?"Save changes":"Add reward"}</button></div>
+      <p class="reward-editor-error wide" aria-live="polite"></p>
+    </form>`);
+  const form=overlay.querySelector("#personalRewardEditor"), unlimitedBox=overlay.querySelector("#rewardEditUnlimited"), quantityInput=overlay.querySelector("#rewardEditQuantity");
+  unlimitedBox.onchange=()=>{quantityInput.disabled=unlimitedBox.checked};
+  overlay.querySelector(".reward-editor-cancel").onclick=closeRewardEditor;
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const error=overlay.querySelector(".reward-editor-error"), save=form.querySelector("button[type=submit]");
+    const name=overlay.querySelector("#rewardEditName").value.trim();
+    const cost=Number(overlay.querySelector("#rewardEditCost").value);
+    const cooldownDays=Number(overlay.querySelector("#rewardEditCooldown").value);
+    const icon=overlay.querySelector("#rewardEditIcon").value.trim()||"🎁";
+    const selectedColor=overlay.querySelector("#rewardEditColor").value||"#ede9fe";
+    const quantityValue=unlimitedBox.checked?-1:Number(quantityInput.value);
+    const available=overlay.querySelector("#rewardEditAvailable").checked;
+    if(!name){error.textContent="Enter a reward name.";return}
+    if(!Number.isFinite(cost)||cost<0){error.textContent="Point cost must be 0 or more.";return}
+    if(!Number.isFinite(cooldownDays)||cooldownDays<0){error.textContent="Cooldown must be 0 or more.";return}
+    if(!unlimitedBox.checked&&(!Number.isFinite(quantityValue)||quantityValue<0)){error.textContent="Quantity must be 0 or more, or choose Unlimited.";return}
+    save.disabled=true;error.textContent="";
+    try{
+      const rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,lastRedeemedAt=timeMs(old?.lastRedeemedAt);
+      const cooldownUntil=cooldownDays>0&&lastRedeemedAt?lastRedeemedAt+cooldownDays*DAY_MS:null;
+      await sdb().ref(`${ROOT}/rewards/${rid}`).set({...(isTeacherStore(state.classId)?{ownerClassId:old?.ownerClassId||state.classId}:{}),id:rid,name,cost:Math.round(cost),icon,color:selectedColor,active:true,available,quantity:unlimitedBox.checked?-1:Math.round(quantityValue),rewardType:"personal",cooldownDays,lastRedeemedAt:lastRedeemedAt||null,cooldownUntil});
+      closeRewardEditor();toast(id?"Personal reward updated":"Personal reward added");
+    }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
+  };
+  requestAnimationFrame(()=>overlay.querySelector("#rewardEditName")?.focus());
+}
+function editClassReward(id=""){
+  const old=id?state.root.classRewardCatalog?.[id]:null,isGimkit=isGimkitClassReward(old)||(!id&&false),startingModes=gimkitModesForItem(old||{id,name:"Gimkit"});
+  const modeSection=isGimkit?`<div class="gimkit-mode-editor wide"><div class="gimkit-mode-editor-head"><div><b>Gimkit mode choices</b><small>Boys can choose one or several modes. Their contribution is split among the modes they check. Losing bars carry over to the next Gimkit.</small></div><button type="button" id="addGimkitMode">+ Add mode</button></div><div id="gimkitModeRows"></div></div>`:"";
+  const overlay=rewardEditorBackdrop(id?"Edit class reward":"Add class reward","Change every class reward setting here, then save once.",`
+    <form class="reward-editor-form" id="classRewardEditor">
+      <label class="wide">Class reward name<input id="classRewardEditName" required value="${esc(old?.name||"")}"></label>
+      <label>Points needed per student<input id="classRewardEditCost" required type="number" min="1" step="1" value="${Number(old?.costPerStudent??100)}"></label>
+      <label>Emoji / icon<input id="classRewardEditIcon" value="${esc(old?.icon||"⭐")}" maxlength="12"></label>
+      <label class="wide">Cooldown after class earns it (days)<input id="classRewardEditCooldown" required type="number" min="0" step="0.25" value="${cooldownDaysValue(old?.cooldownDays)}"><small>Use 0 to keep the manual-reset behavior.</small></label>
+      ${modeSection}
+      <label class="reward-editor-check wide"><input id="classRewardEditAvailable" type="checkbox" ${old?.available!==false?"checked":""}> Reward is open for students</label>
+      <div class="reward-editor-actions wide"><button type="button" class="reward-editor-cancel">Cancel</button><button class="primary" type="submit">${id?"Save changes":"Add reward"}</button></div>
+      <p class="reward-editor-error wide" aria-live="polite"></p>
+    </form>`);
+  const form=overlay.querySelector("#classRewardEditor");
+  const modeRows=overlay.querySelector("#gimkitModeRows");
+  const modeDraft=startingModes.map(m=>({...m}));
+  const drawModes=()=>{if(!modeRows)return;modeRows.innerHTML=modeDraft.map((m,i)=>`<div class="gimkit-mode-edit-row"><input data-gimkit-mode-name="${i}" value="${esc(m.name)}" aria-label="Gimkit mode name"><label><input type="checkbox" data-gimkit-mode-active="${i}" ${m.active!==false?"checked":""}> Active</label><button type="button" data-remove-gimkit-mode="${i}">×</button></div>`).join("");modeRows.querySelectorAll("[data-gimkit-mode-name]").forEach(inp=>inp.oninput=()=>{modeDraft[Number(inp.dataset.gimkitModeName)].name=inp.value});modeRows.querySelectorAll("[data-gimkit-mode-active]").forEach(inp=>inp.onchange=()=>{modeDraft[Number(inp.dataset.gimkitModeActive)].active=inp.checked});modeRows.querySelectorAll("[data-remove-gimkit-mode]").forEach(btn=>btn.onclick=()=>{modeDraft.splice(Number(btn.dataset.removeGimkitMode),1);drawModes()})};
+  drawModes();
+  if(overlay.querySelector("#addGimkitMode"))overlay.querySelector("#addGimkitMode").onclick=()=>{modeDraft.push({id:`mode-${Date.now()}-${modeDraft.length}`,name:"New mode",active:true});drawModes();requestAnimationFrame(()=>modeRows?.querySelector("[data-gimkit-mode-name]:last-of-type")?.focus())};
+  overlay.querySelector(".reward-editor-cancel").onclick=closeRewardEditor;
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const error=overlay.querySelector(".reward-editor-error"),save=form.querySelector("button[type=submit]");
+    const name=overlay.querySelector("#classRewardEditName").value.trim(),cost=Number(overlay.querySelector("#classRewardEditCost").value),cooldownDays=Number(overlay.querySelector("#classRewardEditCooldown").value),icon=overlay.querySelector("#classRewardEditIcon").value.trim()||"⭐",available=overlay.querySelector("#classRewardEditAvailable").checked;
+    if(!name){error.textContent="Enter a reward name.";return}
+    if(!Number.isFinite(cost)||cost<1){error.textContent="Points per student must be at least 1.";return}
+    if(!Number.isFinite(cooldownDays)||cooldownDays<0){error.textContent="Cooldown must be 0 or more.";return}
+    const savingGimkit=isGimkitClassReward({...old,id:id||"",name});
+    const cleanedModes=modeDraft.map(m=>({id:String(m.id||gimkitModeId(m.name)),name:String(m.name||"").trim(),active:m.active!==false})).filter(m=>m.name);
+    if(savingGimkit&&!cleanedModes.some(m=>m.active!==false)){error.textContent="Keep at least one Gimkit mode active.";return}
+    save.disabled=true;error.textContent="";
+    try{
+      const rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;
+      const record={...(isTeacherStore(state.classId)?{ownerClassId:old?.ownerClassId||state.classId}:{}),id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays};
+      if(savingGimkit){record.modeVotingEnabled=true;record.modes=Object.fromEntries(cleanedModes.map(m=>[m.id,m]))}
+      const updates={[`${ROOT}/classRewardCatalog/${rid}`]:record};
+      if(!id)updates[`${ROOT}/settings/classRewardAvailability/${rid}`]=available;
+      await sdb().ref().update(updates);closeRewardEditor();toast(id?"Class reward updated":"Class reward added");
+    }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
+  };
+  requestAnimationFrame(()=>overlay.querySelector("#classRewardEditName")?.focus());
+}
+async function toggleRewardAvailability(id){const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await sdb().ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
+async function toggleClassRewardAvailability(id){const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await sdb().ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
+async function deleteClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await sdb().ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
+async function resetClassReward(id){
+  const r=state.root.classRewardCatalog?.[id];if(!r)return;
+  const round=state.root?.classRewardRounds?.[state.classId]?.[id]||null,g=classRewardSnapshot(r);
+  if(isGimkitClassReward(r)&&round&&g.cooling){
+    if(!confirm(`End the Gimkit cooldown now? The losing mode bars will keep all of their points.`))return;
+    await sdb().ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).update({status:"active",cooldownUntil:null,byStudent:{},updatedAt:Date.now()});toast("Gimkit cooldown ended");return;
+  }
+  const msg=isGimkitClassReward(r)?`Reset every Gimkit mode bar for ${cls()?.name||"this class"}? This clears the carried-over mode totals.`:`Start a fresh “${r.name}” class goal for ${cls()?.name||"this class"}? Previous contributions will stay in point history.`;
+  if(!confirm(msg))return;
+  await sdb().ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast(isGimkitClassReward(r)?"Gimkit mode bars reset":"Class goal reset");
+}
+
+async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await sdb().ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
+async function toggleRewardStore(){const open=classStoreOpen(),next=!open;
+  if(state.teacherMode){try{await teacherApi("setStore",{classId:state.classId,open:next})}catch(err){toast(err.message,"error");return}await loadRoot();render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
+  if(isTeacherStore(state.classId)){await db.ref(`${ROOT}/settings/classStoreEnabled/${state.classId}`).set(next);state.root.settings=state.root.settings||{};(state.root.settings.classStoreEnabled??={})[state.classId]=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
+  await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
+async function review(sid,key,decision){
+  if(state.teacherMode){try{const r=await teacherApi("review",{studentId:sid,key,decision});toast(`Request ${r.status}`)}catch(err){toast(err.message,"error")}await loadRoot();render();return}
+  const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
+  const updates={}, stamp=now(),status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";
+  const expected=decision==="collect"?"ready":"pending";
+  const claim=await sdb().ref(`${ROOT}/redemptionsByStudent/${sid}/${key}/status`).transaction(cur=>String(cur||"pending")===expected?status:undefined);
+  if(!claim.committed){toast("The student already canceled or this request was already handled.","error");return}
+  updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedBy`]=state.user.email;
+  updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;
+  if(decision==="decline"){
+    await sdb().ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>Number(cur||0)+Number(item.cost||0));
+    const r=state.root.rewards?.[item.rewardId],requestMs=timeMs(item.requestedAt),lastMs=timeMs(r?.lastRedeemedAt);
+    if(r&&requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000){
+      updates[`${ROOT}/rewards/${item.rewardId}/lastRedeemedAt`]=null;
+      updates[`${ROOT}/rewards/${item.rewardId}/cooldownUntil`]=null;
+    }
+  }
+  await sdb().ref().update(updates);toast(`Request ${status}`)
+}
+function reportRows(){const out=[];for(const s of roster()){const dates=new Set([...Object.keys(state.root.dailyAwards?.[s.id]?.[state.classId]||{}),...Object.keys(state.root.dailyAttendance?.[s.id]?.[state.classId]||{})]);for(const date of dates){const a=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date],aw=state.root.dailyAwards?.[s.id]?.[state.classId]?.[date];out.push({student:s.name,date,status:a?.status||"present",points:Number(aw?.points||0)})}}return out.sort((a,b)=>b.date.localeCompare(a.date)||a.student.localeCompare(b.student))}
+function reportsPage(){const rows=reportRows();return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REPORTS</p><h1>Daily point history</h1><p>Review or export the saved class history.</p></div><div class="reportbuttons"><button id="csvBtn">Export CSV</button><button id="printBtn">Print / PDF</button></div></div><div class="historytable"><table><thead><tr><th>Student</th><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.student)}</td><td>${esc(C.formatDate(r.date))}</td><td>${esc(r.status)}</td><td>${r.points} ★</td></tr>`).join("")}</tbody></table></div></section>`}
+function exportCSV(){const q=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[["Student","Date","Attendance","Points"],...reportRows().map(r=>[r.student,r.date,r.status,r.points])].map(row=>row.map(q).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`brightpath-${state.classId}-${C.schoolDateString()}.csv`;a.click();URL.revokeObjectURL(a.href)}
+function peoplePage(){
+  const classes=activeClasses(), allStudents=vals(state.root.students||{}).filter(s=>s.active!==false);
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">SCHOOL ROSTER TOOLS</p><h1>People & Classes</h1><p>Manage the active classes and Student Rewards roster.</p></div></div><div class="people-grid">${classes.map(c=>{const count=C.classRoster(state.root,c.id).length;return `<article class="people-card"><h3>${esc(c.name)}</h3><p>${count} active students · ${esc(c.schoolYear||"")}</p><button data-openclass="${esc(c.id)}">Open class</button></article>`}).join("")}</div><div class="admincolumns" style="margin-top:20px"><section><h2>Current class roster</h2><div class="teacherlist">${roster().map(s=>`<div><em>${esc(s.initials)}</em><span><b>${esc(s.name)}</b><small>${Number(s.rewardBalance)||0} reward points</small></span></div>`).join("")}</div></section><section><h2>Add a student to ${esc(cls()?.name||"class")}</h2><form id="addStudentForm" class="adminform"><label>Student full name<input id="newStudentName" required></label><p style="font-size:11px;color:#788398">The student must also be on the main Fun Torah Tools approved-student list to use the shared B3 login.</p><button class="primary">Create student</button></form><h2 style="margin-top:22px">Add a class</h2><form id="addClassForm" class="inlineform"><input id="newClassName" required placeholder="Class name"><button>Add class</button></form></section></div></section>`;
+}
+async function addStudent(e){if(state.teacherMode){toast("Only the administrator can change this.","error");return}e.preventDefault();const name=$("#newStudentName").value.trim();if(!name)return;const id=`student-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,ini=initials(name),colors=["#7c3aed","#2563eb","#0891b2","#059669","#d97706","#dc2626","#9333ea","#4f46e5"],color=colors[Math.floor(Math.random()*colors.length)];await db.ref().update({[`${ROOT}/students/${id}`]:{id,classId:state.classId,name,initials:ini,color,rewardBalance:0,active:true},[`${ROOT}/enrollments/${state.classId}/${id}`]:true});toast("Student added")}
+async function addClass(e){if(state.teacherMode){toast("Only the administrator can change this.","error");return}e.preventDefault();const name=$("#newClassName").value.trim();if(!name)return;const id=`class-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/classes/${id}`).set({id,name,schoolYear:state.root.settings?.schoolYear||"2026–27",active:true});toast("Class added")}
+function settingsPage(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";return `<section class="workspace settings"><div class="workhead"><div><p class="eyebrow">SCHOOL SETUP</p><h1>Settings</h1><p>BrightPath display and access settings.</p></div></div><article><h2>School</h2><label>Display name <input id="displayName" value="${esc(state.root.settings?.displayName||"BrightPath")}"></label><label>Active school year <input id="schoolYear" value="${esc(state.root.settings?.schoolYear||"2026–27")}"></label></article><article><h2>Student website access</h2><label>Current status <b>${enabled?"Enabled":"Blocked"}</b></label><button class="primary" id="settingsAccess">${enabled?"Block student website":"Enable student website"}</button></article><article><h2>Daily rating scale</h2><label>Excellent <b>110%</b></label><label>Good (default) <b>100%</b></label><label>Fair <b>80%</b></label><label>Needs Improvement <b>50%</b></label></article><button class="primary" id="saveSettings">Save settings</button></section>`}
+async function toggleAccess(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).set(enabled?"false":"true");toast(enabled?"Student website blocked":"Student website enabled")}
+async function saveSettings(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}await db.ref(`${ROOT}/settings`).update({displayName:$("#displayName").value.trim()||"BrightPath",schoolYear:$("#schoolYear").value.trim()||"2026–27"});toast("Settings saved")}
+function bindPage(){
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.go;render()});
+  document.querySelectorAll("[data-student]").forEach(b=>b.onclick=()=>{state.selectedId=b.dataset.student;state.tab="Students";render()});
+  if($("#accessToggle"))$("#accessToggle").onclick=toggleAccess;
+  if(state.tab==="Points Dashboard"){
+    const rerender=()=>render();
+    if($("#pointsClass"))$("#pointsClass").onchange=e=>{state.pointClassId=e.target.value;state.pointStudent="all";state.pointType="all";state.pointStatus="all";state.pointSearch="";rerender()};
+    if($("#pointsStudent"))$("#pointsStudent").onchange=e=>{state.pointStudent=e.target.value;state.pointType="all";state.pointStatus="all";state.pointSearch="";rerender()};
+    if($("#pointsRange"))$("#pointsRange").onchange=e=>{state.pointRange=e.target.value;rerender()};
+    if($("#pointsType"))$("#pointsType").onchange=e=>{state.pointType=e.target.value;rerender()};
+    if($("#pointsStatus"))$("#pointsStatus").onchange=e=>{state.pointStatus=e.target.value;rerender()};
+    if($("#pointsSearch")){$("#pointsSearch").oninput=e=>{state.pointSearch=e.target.value;const pos=e.target.selectionStart;render();requestAnimationFrame(()=>{const n=$("#pointsSearch");if(n){n.focus();n.setSelectionRange(pos,pos)}})}}
+    document.querySelectorAll("[data-points-student]").forEach(b=>b.onclick=()=>{state.pointStudent=b.dataset.pointsStudent;state.pointType="all";state.pointStatus="all";state.pointSearch="";render()});
+    document.querySelectorAll("[data-points-source]").forEach(b=>b.onclick=()=>{
+      state.pointType=b.dataset.pointsSource;
+      state.pointRange="all";
+      state.pointStatus=state.pointType==="gap"?"all":"posted";
+      state.pointSearch="";
+      render();
+      requestAnimationFrame(()=>document.querySelector(".points-ledger")?.scrollIntoView({behavior:"smooth",block:"start"}));
+    });
+    if($("#pointsReset"))$("#pointsReset").onclick=()=>{state.pointStudent="all";state.pointRange="30";state.pointType="all";state.pointStatus="all";state.pointSearch="";render()};
+    if($("#pointsCsv"))$("#pointsCsv").onclick=exportPointsCSV;
+  }
+  if(state.tab==="Daily Points"){
+    $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
+    $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
+    document.querySelectorAll("[data-rating]").forEach(s=>s.onchange=()=>{state.draft[`${s.dataset.rating}|${s.dataset.cat}`]=s.value;render()});
+  }
+  if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
+  if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
+  if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
+  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-toggle-reward]").forEach(b=>b.onclick=()=>toggleRewardAvailability(b.dataset.toggleReward));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-toggle-class-reward]").forEach(b=>b.onclick=()=>toggleClassRewardAvailability(b.dataset.toggleClassReward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")});document.querySelectorAll("[data-refund-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundApprove.split("|");decideRefund(s,k,"approve")});document.querySelectorAll("[data-refund-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundDecline.split("|");decideRefund(s,k,"decline")})}
+  if(state.tab==="Approvals"){if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject))}
+  if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
+  if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
+  if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}
+}
+function shiftDate(n){const d=new Date(`${state.date}T12:00:00`);d.setDate(d.getDate()+n);state.date=d.toISOString().slice(0,10);prepareDraft();render()}
+$("#prevDate").onclick=()=>shiftDate(-1);$("#nextDate").onclick=()=>shiftDate(1);$("#topDate").onchange=e=>{state.date=e.target.value;prepareDraft();render()};
+$("#googleBtn").onclick=async()=>{try{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});await auth.signInWithPopup(p)}catch(err){$("#loginError").textContent=err.message||String(err)}};
+$("#signOutBtn").onclick=()=>auth.signOut();
+auth.onAuthStateChanged(async user=>{
+  if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
+  state.teacherMode=!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase();
+  NAV=state.teacherMode?TEACHER_NAV:OWNER_NAV;if(!NAV.includes(state.tab))state.tab="Overview";
+  state.user=user;
+  try{await loadRoot()}catch(err){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");$("#loginError").textContent="Could not open Student Rewards: "+(err.message||String(err))+" Refresh the page to try again.";return}
+  $("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");
+  if(!state.teacherMode){const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();}
+  subscribe();render();
+});
+})();

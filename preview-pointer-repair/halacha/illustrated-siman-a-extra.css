@@ -1,0 +1,26 @@
+/* Five full illustrated scene cards for each later seif of Siman Aleph. */
+.section .hal-extra-illustrations{direction:ltr;background:linear-gradient(135deg,#f5fbff,#fff9ee);border:1px solid #bfdce8;border-radius:13px;padding:14px;margin:4px 0 16px}
+.section .hal-extra-art-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:11px}
+.section .hal-extra-art-heading h3{margin:0;font-size:20px;color:#1c4a6f}
+.section .hal-extra-art-heading p{margin:0;font-size:12px;color:#53718a}
+.section .hal-extra-art-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.section .hal-extra-scene-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.section .hal-extra-scene-card{margin:0;display:flex;flex-direction:column;gap:9px;padding:9px;background:#fff;border:1px solid #cbddea;border-radius:13px;box-shadow:0 4px 13px #2c526315;min-width:0}
+.section .hal-extra-scene-card>.hal-extra-image{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:9px;background:#e7eff9}
+.section .hal-extra-scene-card figcaption{display:flex;flex-direction:column;gap:6px;flex:1}
+.section .hal-extra-scene-card figcaption strong{font-size:17px;color:#234969;line-height:1.25}
+.section .hal-extra-scene-card figcaption span{font-size:13px;color:#4d667c;line-height:1.4}
+.section .hal-extra-art-actions{display:flex;gap:6px;flex-wrap:wrap}
+.section .hal-extra-art-button{flex:1 1 80px;border:1px solid #9dcfc0;background:#ecfff4;color:#235d48;padding:8px 5px;border-radius:8px;font-size:12px;font-weight:850;cursor:pointer}
+.section .hal-extra-art-button:disabled,.section .hal-extra-mini:disabled{opacity:.48;cursor:not-allowed}
+.section .hal-extra-mini-shelf{background:#fff;border:1px solid #cadfea;border-radius:11px;padding:10px}
+.section .hal-extra-mini-shelf>summary{cursor:pointer;font-weight:850;color:#2d5273;font-size:13px}
+.section .hal-extra-mini-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}
+.section .hal-extra-mini{border:1px solid #d5e4ee;background:#f7fbff;border-radius:9px;padding:5px;display:grid;gap:4px;justify-items:center;cursor:pointer}
+.section .hal-extra-mini .hal-extra-image{width:100%;height:94px;object-fit:contain}
+.section .hal-extra-mini span{text-align:center;font-size:11px;font-weight:750;color:#355b73}
+.section .hal-extra-art-status{margin:3px 0 0;font-size:13px;color:#256e50;font-weight:800}
+.section .hal-extra-art-button:focus-visible,.section .hal-extra-mini:focus-visible,.section .hal-extra-mini-shelf>summary:focus-visible{outline:3px solid #f5bd56;outline-offset:2px}
+@media(max-width:690px){.section .hal-extra-scene-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}.section .hal-extra-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:425px){.section .hal-extra-scene-grid{grid-template-columns:1fr}}
+@media print{.section .hal-extra-illustrations{display:none!important}}

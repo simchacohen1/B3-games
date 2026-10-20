@@ -1,0 +1,79 @@
+/* Friendly studio shell; scrapbook DOM remains compatible with saved pieces. */
+.work{gap:18px}.side{background:#fff!important;border:1px solid #dce7f3!important;border-radius:20px!important;padding:16px!important;box-shadow:0 6px 22px #29426412}.side h3{font-size:21px;color:#254774;margin:0 0 12px}.studio-intro{padding:12px;background:linear-gradient(125deg,#edf5ff,#f2edff);border-radius:12px;color:#335583}.studio-intro span{display:block;font-size:12px;margin-top:6px}.studio-actions{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.studio-actions button,.studio-backgrounds button,.studio-reset,.studio-piece-actions button{border:1px solid #cfdef0;border-radius:10px;background:#f1f6ff;color:#254774;padding:9px;font-weight:800;cursor:pointer}.studio-actions button:disabled{opacity:.4;cursor:default}.studio-actions label{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}.studio-actions select,.studio-tools select{border:1px solid #ccdaeb;border-radius:8px;background:white;padding:5px;color:#254774}.studio-backgrounds{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}.studio-backgrounds>b,.studio-stickers>b{grid-column:1/-1;display:block;margin:8px 0;color:#34567d}.studio-stickers>div{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.studio-stickers button{border:1px solid #dce7f3;border-radius:12px;padding:7px;background:#f8fbff;cursor:pointer;color:#34567d}.studio-stickers img{width:57px;height:57px;display:block;margin:auto}.studio-stickers span{font-size:12px;font-weight:800}.studio-stickers button:hover{background:#eaf3ff;border-color:#83a9ed;transform:translateY(-2px)}.book{background:#e0e8f3!important;padding:16px!important;box-shadow:0 8px 30px #29426420!important}.page{height:800px}.studio-page-label{position:absolute;top:9px;right:10px;background:#ffffffdf;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:800;color:#527298;pointer-events:none;z-index:5}.page-tools.studio-tools{left:8px;right:8px;bottom:8px;z-index:50;border:1px solid #dce7f3;border-radius:14px;background:#fff;display:block;padding:8px;max-width:calc(100% - 16px);box-shadow:0 4px 15px #24467420}.studio-tool-row{display:flex;flex-wrap:wrap;gap:5px;margin:3px 0}.page-tools.studio-tools button{width:auto;height:31px;min-width:31px;border:1px solid #d7e2f0;box-shadow:none;border-radius:8px;padding:4px 7px;font-size:12px;font-weight:800;background:#f5f8fc;color:#365879}.page-tools.studio-tools button[aria-pressed=true]{outline:2px solid #3c78d8;outline-offset:1px;background:#e7f0ff}.page-tools.studio-tools .studio-swatch{width:27px;height:27px;min-width:27px;padding:0;border-radius:50%;background:var(--swatch);border:2px solid #dce7f3}.studio-palette{align-items:center;gap:7px;padding-top:5px}.studio-palette label{display:flex;gap:4px;align-items:center;font-size:11px;color:#365879}.scrap .mini{opacity:0;pointer-events:none}.scrap.selected .mini,.scrap:focus-within .mini{opacity:1;pointer-events:auto}.studio-sticker img{height:100%;object-fit:contain}.studio-sticker{padding:0!important;border:0!important;box-shadow:none!important}.scrap img{user-select:none;-webkit-user-drag:none}.page.drawing .draw-layer{z-index:40}.page.drawing .scrap{pointer-events:none}.page[data-studio-bg=paper]{background-color:#fff8e5;background-image:linear-gradient(#0000 31px,#eaddc1 32px);background-size:32px 32px;color:#263746}.page[data-studio-bg=sky]{background-color:#eefaff;background-image:radial-gradient(ellipse at 10% 5%,#fff 0 8%,transparent 9%),radial-gradient(ellipse at 90% 15%,#fff 0 10%,transparent 11%);background-size:100% 100%;color:#263746}.page[data-studio-bg=garden]{background-color:#f3faec;background-image:radial-gradient(#a5ce99 1px,transparent 1.5px);background-size:22px 22px;color:#263746}.page[data-studio-bg=stars]{background-color:#eef0ff;background-image:radial-gradient(#bdb3e4 2px,transparent 2.5px);background-size:38px 38px;color:#263746}.page[data-studio-bg=blank]{background:white;color:#263746}.studio-reset{margin-top:14px;background:#fff1f1;color:#a84545;font-size:12px}.piece-customizer{width:285px!important;max-height:calc(100vh - 115px);overflow:auto;border-radius:18px!important;border:1px solid #cbdcf3!important;box-shadow:0 10px 35px #29426430!important}.piece-customizer textarea{width:100%;min-height:70px;box-sizing:border-box;border:1px solid #cbdcf3;border-radius:8px;padding:8px;margin:8px 0;font:inherit;unicode-bidi:plaintext}.piece-customizer select{max-width:130px}.studio-piece-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.studio-piece-actions button{font-size:11px}.studio-tools button:focus-visible,.side button:focus-visible{outline:3px solid #356bd6;outline-offset:2px}@media(max-width:1000px){.spread{grid-template-columns:1fr}.work{grid-template-columns:220px minmax(0,1fr)}.side{max-height:none!important}.page{height:800px}}@media(max-width:650px){.work{display:block}.side{margin-bottom:14px}.studio-stickers>div{grid-template-columns:repeat(5,1fr)}.studio-stickers img{width:40px;height:40px}.studio-stickers span{font-size:10px}.book{padding:8px!important}.piece-customizer{left:8px!important}}@media print{.studio-page-label,.studio-tools,.studio-piece-actions{display:none!important}}body.exporting .studio-page-label{display:none!important}
+/* Keep the page and primary tools in view while the tray scrolls independently. */
+.side{max-height:calc(100vh - 95px);overflow-y:auto;scrollbar-width:thin}.book{align-self:start}.page{height:700px}.studio-stickers>div{grid-template-columns:repeat(3,1fr)}.studio-stickers img{width:45px;height:45px}.studio-stickers span{font-size:10px}.side .step:has(>.undo-reset-btn[hidden]){display:none}@media(max-width:650px){.side{max-height:460px}.studio-stickers>div{grid-template-columns:repeat(5,1fr)}}
+
+/* Detailed Torah illustrations: larger previews with room to see the artwork. */
+.studio-stickers>div{grid-template-columns:repeat(2,1fr)}.studio-stickers button{padding:8px;background:linear-gradient(150deg,#fff,#f2f6fc);border-radius:15px}.studio-stickers img{width:88px;height:88px}.studio-stickers span{font-size:12px}.studio-sticker img{filter:none}@media(max-width:650px){.studio-stickers>div{grid-template-columns:repeat(3,1fr)}.studio-stickers img{width:76px;height:76px}}
+/* Context bar replaces the floating style popup. */
+.piece-customizer.studio-context{position:sticky!important;top:76px!important;left:auto!important;width:auto!important;max-height:none;overflow:visible;padding:10px!important;margin-bottom:12px;z-index:90;background:#fff}.studio-context-heading{display:flex;align-items:center;gap:10px;color:#254774}.studio-context-heading>span{flex:1;font-size:11px;color:#64748b}.studio-context-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px}.studio-context-row[hidden]{display:none}.studio-context label{display:flex;align-items:center;gap:5px;font-size:12px;color:#34567d}.studio-context button,.studio-context input,.studio-context select{font:inherit;color:#254774;border:1px solid #ccdaea;border-radius:7px;background:#f7faff;padding:6px}.studio-context input{width:60px}.studio-context button{font-size:12px;cursor:pointer}.studio-context button[aria-pressed=true]{background:#dcecff;border-color:#4383dc}.studio-context button.studio-delete{color:#a82c40;background:#fff0f3}.studio-piece-content[contenteditable=true]{cursor:text;user-select:text;outline:none}.studio-context-heading>button{margin-left:auto}@media(max-width:650px){.studio-context-heading>span{display:none}.piece-customizer.studio-context{top:70px!important}}@media print{.studio-context{display:none!important}}body.exporting .studio-context{display:none!important}
+.section[data-studio] .scrap>.mini{display:none!important}
+.page[data-studio-bg=parchment]{background:#fbf0d3;background-image:radial-gradient(#b48b4d20 1px,transparent 1px);background-size:9px 9px;color:#263746}
+.page[data-studio-bg=notebook]{background:#fff;background-image:linear-gradient(#0000 31px,#b7d6ec 32px),linear-gradient(90deg,#0000 38px,#e5a2a2 39px);background-size:100% 32px,40px 100%;color:#263746}
+.page[data-studio-bg=photo]{background:#e8edf4;border:10px solid #fff;box-shadow:inset 0 0 0 2px #c9d1dc,0 0 0 1px #bcc6d3,0 8px 22px #35455c30;color:#263746}
+.page[data-studio-bg=craft]{background:#fff8e5;border:5px dashed #c38e57;box-shadow:inset 0 0 0 7px #f3e7ca;color:#263746}
+.page[data-studio-bg=elegant]{background:#fffdf7;border:7px double #b89b54;box-shadow:inset 0 0 0 5px #f3e8c4;color:#263746}
+.studio-more-stickers{margin-top:10px;padding-top:8px;border-top:1px solid #dce5ef}
+.studio-more-stickers>summary{padding:6px 2px;color:#34567d;font-size:12px;font-weight:800;cursor:pointer}
+.studio-custom-bg{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;border:1px solid #dce7f3;border-radius:10px;background:#fff;color:#34567d;font-size:12px;font-weight:800}
+.studio-custom-bg input{width:42px;height:32px;border:0;padding:0;background:transparent;cursor:pointer}
+
+
+/* Independent, vertical drawing toolbar to the RIGHT of the book, never over student art. */
+.section[data-studio] .book:has(> .studio-draw-rail){display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:start;gap:12px;min-width:0}
+.section[data-studio] .book>.spread{min-width:0}
+.section[data-studio] .page-tools.studio-tools{display:none!important}
+.section[data-studio] .studio-draw-rail{box-sizing:border-box;position:sticky;top:77px;min-width:0;max-height:calc(100vh - 98px);overflow-y:auto;display:flex;flex-direction:column;gap:7px;align-items:stretch;background:#fff;border:1px solid #cbd9eb;border-radius:13px;padding:9px 8px;box-shadow:0 3px 12px #2446741b;z-index:45;scrollbar-width:thin}
+.section[data-studio] .studio-rail-title{text-align:center;color:#214d78;font-size:16px}
+.section[data-studio] .studio-rail-subtitle{text-align:center;color:#516c88;font-size:11px;font-weight:800;margin-top:1px}
+.section[data-studio] .studio-rail-pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.section[data-studio] .studio-draw-rail button{cursor:pointer;border:1px solid #d1dfee;border-radius:7px;background:#f4f8fc;color:#305574;padding:6px 3px;font-size:12px;font-weight:800;min-height:33px}
+.section[data-studio] .studio-draw-rail button[aria-pressed=true]{outline:2px solid #3681ce;outline-offset:0;background:#e7f3ff}
+.section[data-studio] .studio-draw-rail button:focus-visible{outline:3px solid #edba58;outline-offset:2px}
+.section[data-studio] .studio-rail-modes{display:flex;flex-direction:column;gap:4px}
+.section[data-studio] .studio-rail-palette{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;justify-items:center}
+.section[data-studio] .studio-rail-palette .studio-rail-swatch{width:29px;height:29px;min-height:29px;padding:0;border-radius:50%;background:var(--swatch);border:2px solid #bdd0e1}
+.section[data-studio] .studio-rail-size{font-size:11px;font-weight:800;color:#42647f;display:grid;gap:3px}
+.section[data-studio] .studio-rail-size select{width:100%;border:1px solid #bacde1;border-radius:7px;padding:5px 2px;background:#fff;font-size:11px}
+.section[data-studio] .studio-rail-hint{font-size:10px;line-height:1.35;text-align:center;color:#698096;margin:0}
+.section[data-studio] .studio-draw-rail :disabled{opacity:.4;cursor:default}
+@media(max-width:680px){
+ .section[data-studio] .book:has(> .studio-draw-rail){grid-template-columns:minmax(0,1fr) 103px;gap:6px;padding:6px!important}
+ .section[data-studio] .studio-draw-rail{padding:6px 5px;top:70px}
+ .section[data-studio] .studio-draw-rail button{font-size:11px;padding:5px 1px}
+ .section[data-studio] .studio-rail-palette{gap:3px}
+ .section[data-studio] .studio-rail-palette .studio-rail-swatch{width:24px;height:24px;min-height:24px}
+}
+@media print{.section[data-studio] .book:has(> .studio-draw-rail){display:block}.section[data-studio] .studio-draw-rail{display:none!important}}
+body.exporting .studio-draw-rail{display:none!important}
+
+/* Illustrated picture-sticker library is shared by every scrapbook lesson. */
+.section[data-studio] .studio-stickers .studio-sticker-guide{font-size:12px;line-height:1.3;color:#41617d;margin:5px 0 8px}
+.section[data-studio] .studio-stickers .studio-picture-library{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.section[data-studio] .studio-stickers .studio-picture-library button{background:#fff;border:1px solid #cbdde9;border-radius:11px;padding:5px;cursor:pointer;min-width:0}
+.section[data-studio] .studio-stickers .studio-picture-library img{width:100%;height:83px;object-fit:contain;background:#fff;border-radius:8px}
+.section[data-studio] .studio-stickers .studio-picture-library span{font-size:12px;display:block;margin-top:4px;font-weight:750;text-align:center;color:#325770}
+.section[data-studio] .studio-stickers .studio-picture-library button:focus-visible{outline:3px solid #e5ae52;outline-offset:2px}
+.section[data-studio] .studio-sticker-status{color:#24694e;font-size:12px;font-weight:800;min-height:0;margin:4px 0}
+.section[data-studio] .studio-stickers .studio-more-stickers>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media(max-width:650px){.section[data-studio] .studio-stickers .studio-picture-library img{height:65px}}
+
+
+/* Keep the selected-piece toolbar above both full-size scrapbook pages.
+   Without explicit grid placement, prepending the toolbar into .book sends
+   .spread into the narrow drawing-rail column and squeezes saved artwork. */
+.section[data-studio] .book:has(> .studio-draw-rail){
+  grid-template-areas:"pages rail";
+}
+.section[data-studio] .book:has(> .studio-context.show):has(> .studio-draw-rail){
+  grid-template-areas:"context context" "pages rail";
+}
+.section[data-studio] .book > .spread{
+  grid-area:pages;
+  min-width:0;
+}
+.section[data-studio] .book > .studio-draw-rail{grid-area:rail}
+.section[data-studio] .book > .studio-context.show{
+  grid-area:context;
+  min-width:0;
+}

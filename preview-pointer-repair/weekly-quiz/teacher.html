@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<!-- BUILD: 2026-10-07 UI-REDESIGN + NIGRI-SYNC -->
+<!-- BUILD: 2026-09-08 SOURCE-LABEL-OPTIONAL + AUTO-PEREK-18-DETECTION -->
+<!-- BUILD: 2026-09-08 CURRENT-BASE + CHUMASH-SKILLS + SOURCE-REF-FIX -->
+<!-- BUILD: 2026-09-07 FRIENDLY-LAUNCH-UI -->
+<!-- BUILD: 2026-09-07 18:31 ET | LIVE-ANYTIME-MAKEUP-FORCE-CHANGE -->
+<html lang="en">
+<head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>B3 Weekly Quiz - Teacher</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
+<style>
+  /* ===== B3 Weekly Quiz — Teacher (2026-10 redesign) ===== */
+  :root{
+    --ink:#1b2b3a; --muted:#647487; --line:#dde5ee; --line2:#c9d6e3;
+    --bg:#f5f7fa; --card:#ffffff; --soft:#f1f5f9;
+    --blue:#2563a8; --blue2:#1d4f86; --light:#e9f1fb; --gray:#eef2f6;
+    --good:#1f8a52; --good-bg:#e6f5ec; --bad:#c9434b; --bad-bg:#fbe9ea;
+    --gold:#c98a12; --gold-bg:#fff6e0; --purple:#6a4bb0; --purple-bg:#f1ecfb;
+    --radius:14px; --shadow:0 1px 2px rgba(16,40,70,.06),0 4px 14px rgba(16,40,70,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Calibri,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  h1,h2,h3{line-height:1.2;color:var(--ink)}
+  h2{font-size:19px;font-weight:700} h3{font-size:16px;font-weight:700}
+  .hidden{display:none!important}
+  button,input,select,textarea{font:inherit;color:inherit}
+
+  /* ---------- Buttons ---------- */
+  button{border:1px solid transparent;border-radius:10px;padding:9px 15px;cursor:pointer;font-weight:600;line-height:1.2;transition:background .12s,border-color .12s,box-shadow .12s,transform .05s}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid rgba(37,99,168,.3);outline-offset:1px}
+  .primary{background:var(--blue);color:#fff}.primary:hover:not(:disabled){background:var(--blue2)}
+  .good{background:var(--good);color:#fff}.good:hover:not(:disabled){background:#187244}
+  .danger{background:#fff;color:var(--bad);border-color:#efc4c7}.danger:hover:not(:disabled){background:var(--bad-bg)}
+  .secondary{background:#fff;color:var(--ink);border-color:var(--line2)}.secondary:hover:not(:disabled){background:var(--soft)}
+  .gold{background:var(--gold-bg);color:#7a5200;border-color:#f0d491}.gold:hover:not(:disabled){background:#ffeec2}
+  .purple{background:var(--purple);color:#fff}.purple:hover:not(:disabled){background:#573c96}
+  .btn-lg{padding:12px 20px;font-size:16px;border-radius:12px}
+  .link-btn{background:none;border:none;color:var(--blue);padding:4px 0;font-weight:600}
+  .link-btn:hover{text-decoration:underline}
+
+  /* ---------- Inputs ---------- */
+  select,input[type=text],input[type=password],input[type=number],input[type=date],textarea{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;background:#fff;min-height:40px}
+  select:hover,input:hover,textarea:hover{border-color:#aebfd1}
+  textarea{width:100%;min-height:120px;resize:vertical}
+  label{font-size:13px;font-weight:600;color:#3d4f62}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field input,.field select{width:100%}
+
+  /* ---------- App shell ---------- */
+  header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 8px rgba(16,40,70,.04)}
+  .header-inner{max-width:1320px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .home-link{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;white-space:nowrap}
+  .home-link:hover{color:var(--blue);border-color:#aec6df;background:var(--light)}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  h1{margin:0;font-size:19px;font-weight:700}
+  .subtitle{color:var(--muted);font-size:12.5px}
+  .tabs{display:flex;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:4px;flex-wrap:wrap}
+  .tab{background:transparent;color:#435467;border:none;padding:8px 14px;border-radius:9px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .tab:hover{background:#e6edf5}
+  .tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(16,40,70,.12)}
+  .tab-ico{font-size:15px;line-height:1}
+  .wrap{max-width:1320px;margin:20px auto 60px;padding:0 18px}
+  .panel{display:none}.panel.active{display:block;animation:fade .15s ease}
+  @keyframes fade{from{opacity:.4}to{opacity:1}}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 14px}
+  .page-head h2{margin:0;font-size:22px}
+  .page-head p{margin:3px 0 0;color:var(--muted);font-size:14px}
+
+  /* ---------- Cards & layout ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h2,.card-head h3{margin:0}
+  .topline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .small{font-size:13px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .setup-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+  .setup-grid>*,.progress-layout>*{min-width:0}
+  .details-grid{grid-template-columns:2fr 1fr 1fr}
+  .progress-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+  .sticky-side{position:sticky;top:84px}
+  .info-box,.paste-help{background:var(--soft);border:1px solid var(--line);padding:11px 13px;border-radius:10px;color:#4b5d70;font-size:13.5px;margin-bottom:10px}
+  .empty{padding:26px 16px;text-align:center;color:var(--muted);border:1.5px dashed var(--line2);border-radius:12px;background:#fafcfe}
+
+  /* ---------- Live ---------- */
+  .live-head{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+  .quiz-name{font-size:22px;font-weight:700;color:var(--ink)}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--gray);color:#4b5d70;margin-top:8px}
+  .status-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#9aa9b8}
+  .status-pill.live{background:var(--good-bg);color:#17683d}
+  .status-pill.live::before{background:var(--good);box-shadow:0 0 0 3px rgba(31,138,82,.2)}
+  .live-settings{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end}
+  .live-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .live-actions .spacer{flex:1}
+  .question-card{text-align:center;padding:26px 20px}
+  .qnum{color:var(--muted);font-size:13.5px;font-weight:600;letter-spacing:.2px}
+  .qtext{font-size:30px;line-height:1.3;font-weight:700;white-space:pre-line;margin:12px auto 12px;max-width:900px;unicode-bidi:plaintext}
+  .answer-line{display:inline-block;font-size:15px;color:#17683d;background:var(--good-bg);border-radius:999px;padding:5px 14px;font-weight:600;min-height:0}
+  .answer-line:empty{display:none}
+  .q-controls{justify-content:center;margin-top:18px}
+  .qstrip{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+  .qstrip button{width:40px;height:36px;padding:0;background:#fff;border:1px solid var(--line2);color:var(--ink);position:relative;font-weight:600}
+  .qstrip button.open{border-color:#8fd0ac;background:var(--good-bg)}
+  .qstrip button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+  .qstrip button.reveal{box-shadow:0 0 0 2px var(--gold)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:4px 0 12px;align-items:center}
+  .sw{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:5px;border:1px solid rgba(0,0,0,.06)}
+  .summary-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .summary{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:140px;font-size:13px;color:var(--muted)}
+  .summary b{display:block;font-size:22px;color:var(--ink)}
+
+  /* ---------- Tables ---------- */
+  .grid-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh}
+  table{border-collapse:separate;border-spacing:0;min-width:100%;background:#fff;font-size:14px}
+  th,td{border-bottom:1px solid #edf1f5;padding:8px 9px;text-align:center;white-space:nowrap}
+  th{background:#f6f8fb;position:sticky;top:0;z-index:3;font-size:12px;font-weight:700;color:#55687b;text-transform:uppercase;letter-spacing:.3px}
+  th:first-child,td:first-child{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:170px;font-weight:600;border-right:1px solid #edf1f5}
+  th:first-child{z-index:4;background:#f6f8fb}
+  tbody tr:hover td{background:#fafcfe}
+  tbody tr:hover td.correct{background:#d3efdf}tbody tr:hover td.incorrect{background:#f6d6d9}
+  td.cell{min-width:40px;height:36px;cursor:pointer;font-weight:700}
+  td.blank{color:#b3bfcb}
+  td.correct{background:var(--good-bg);color:#17683d}
+  td.incorrect{background:var(--bad-bg);color:#a3333a}
+  td.adjusted{box-shadow:inset 0 0 0 2px var(--gold)}
+  td.locked{color:#c3ccd6}
+  td.locked.correct,td.locked.incorrect{color:inherit}
+  td button{padding:5px 10px;font-size:13px}
+
+  /* ---------- Lists (saved quizzes / history) ---------- */
+  .quiz-list,.launch-list{max-height:62vh;overflow:auto;margin:0 -4px;padding:0 4px}
+  .quiz-item,.launch-item{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .12s,background .12s}
+  .quiz-item:hover,.launch-item:hover{border-color:#aec6df;background:#fafcfe}
+  .quiz-item.active,.launch-item.active{border-color:var(--blue);background:var(--light);box-shadow:inset 3px 0 0 var(--blue)}
+  .quiz-item-title,.launch-item-title{font-weight:600}
+  .launch-item-title button{opacity:.55}
+  .launch-item:hover .launch-item-title button{opacity:1}
+  .quiz-grid .quiz-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;max-height:none}
+  .quiz-grid .quiz-item{margin:0;padding:14px}
+  #quizList.quiz-list{display:block}
+  .quiz-section{border:2px dashed transparent;border-radius:14px;padding:6px;margin:0 -8px 14px;transition:border-color .12s,background .12s}
+  .quiz-dragging .quiz-section{border-color:#c9d6ea}
+  .quiz-section.drop-over{border-color:var(--blue);background:var(--light)}
+  .quiz-section-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:4px 4px 10px}
+  summary.quiz-section-head{cursor:pointer}
+  .quiz-section-title{font-weight:700;font-size:17px;color:#233b70}
+  .quiz-section-count{display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:#e8eef8;font-size:13px;text-align:center}
+  .quiz-section-past .quiz-item{opacity:.8}
+  .quiz-filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px;font-size:13px;color:#465676}
+  .quiz-filters select{margin-left:4px;padding:5px 8px}
+  .quiz-section-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .quiz-drop-empty{grid-column:1/-1;padding:16px;border:1px dashed #c9d6ea;border-radius:11px;color:#6b7a94;text-align:center;font-size:14px}
+  .quiz-item{position:relative}
+  .quiz-item.dragging{opacity:.4}
+  .quiz-item[draggable=true]{cursor:grab}
+  .list-search{width:100%;margin-bottom:10px}
+
+  /* ---------- Quiz Setup stepper ---------- */
+  .stepper{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px;margin-bottom:12px;box-shadow:var(--shadow);flex-wrap:wrap}
+  .step-btn{flex:1 1 180px;background:transparent;border:none;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;color:#56687a;font-weight:600;text-align:left}
+  .step-btn:hover{background:var(--soft)}
+  .step-btn .num{width:26px;height:26px;border-radius:50%;border:2px solid #b8c6d4;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none}
+  .step-btn.active{background:var(--light);color:var(--blue2)}
+  .step-btn.active .num{background:var(--blue);border-color:var(--blue);color:#fff}
+  .step-btn.done .num{background:var(--good-bg);border-color:#8fd0ac;color:var(--good)}
+  .step-sub{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+  .current-quiz-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0 2px 14px}
+  .current-quiz-bar b{color:var(--ink)}
+  .chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--gray);color:#4b5d70}
+  .chip.blue{background:var(--light);color:var(--blue2)}
+  .start-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .start-tile{background:#fff;border:1.5px solid var(--line2);border-radius:14px;padding:18px;text-align:left;display:flex;gap:14px;align-items:flex-start;color:var(--ink)}
+  .start-tile:hover{border-color:var(--blue);background:#fafcff;box-shadow:0 4px 14px rgba(37,99,168,.08)}
+  .tile-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;background:var(--light);color:var(--blue)}
+  .start-tile.ai .tile-ico{background:var(--purple-bg);color:var(--purple)}
+  .tile-title{font-size:16px;font-weight:700;margin-bottom:3px}
+  .tile-desc{font-size:13px;color:var(--muted);font-weight:500;line-height:1.4}
+  .step-footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;position:sticky;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(4px);border-top:1px solid var(--line);margin:18px -20px -20px;padding:12px 20px;border-radius:0 0 var(--radius) var(--radius);z-index:5}
+  .back-link{margin-bottom:10px}
+
+  /* ---------- Generator ---------- */
+  .generator-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin:12px 0}
+  .generator-grid label{display:flex;flex-direction:column;gap:5px}
+  .generator-grid input,.generator-grid select{width:100%}
+  .generator-candidates{display:grid;gap:8px;margin-top:10px}
+  .candidate{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fff;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+  .candidate input[type=checkbox]{width:18px;height:18px;margin-top:2px}
+  .candidate .focus{font-weight:700;color:var(--blue2)}
+  .candidate .reason{font-size:12px;color:var(--muted);margin-top:3px}
+  .candidate .answer{color:var(--good);font-size:13px;margin-top:4px;font-weight:600}
+  .skill-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--light);color:var(--blue2);margin-left:6px;vertical-align:1px}
+  #generatorStatus{font-weight:600}
+
+  /* ---------- Editor ---------- */
+  .editor-row{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;background:#fff}
+  .editor-row:focus-within{border-color:#9dbbdb;box-shadow:0 0 0 3px rgba(37,99,168,.08)}
+  .editor-row input{width:100%;margin-top:6px}
+  .editor-row select{min-height:34px;padding:5px 8px;font-size:13px}
+  .editor-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .editor-head .danger{padding:5px 10px!important;font-size:13px}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  details.paste-panel{border:1px solid var(--line);border-radius:12px;background:var(--soft);margin:12px 0}
+  details.paste-panel summary{cursor:pointer;padding:11px 14px;font-weight:600;color:#3d4f62;list-style:none}
+  details.paste-panel summary::-webkit-details-marker{display:none}
+  details.paste-panel summary::before{content:"▸ ";color:var(--muted)}
+  details.paste-panel[open] summary::before{content:"▾ "}
+  details.paste-panel .paste-body{padding:0 14px 14px}
+  details.paste-panel .paste-help{background:#fff}
+  #setupMsg{font-weight:600;color:var(--good)}
+
+  /* ---------- Give to students ---------- */
+  .launch-card h2{font-size:20px;margin:0 0 4px}
+  .launch-intro{color:var(--muted);margin-bottom:16px}
+  .launch-step{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+  .launch-step:first-of-type{margin-top:0;padding-top:0;border-top:0}
+  .step-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700;margin-bottom:12px}
+  .step-number{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:13px;flex:none}
+  .launch-mode-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .launch-mode-card{border:1.5px solid var(--line2);background:#fff;border-radius:13px;padding:16px;text-align:left;min-height:124px;color:var(--ink)}
+  .launch-mode-card:hover{border-color:#8fb2d6;background:#fafcff}
+  .launch-mode-card.active{border-color:var(--blue);background:var(--light);box-shadow:0 0 0 3px rgba(37,99,168,.12)}
+  .launch-mode-icon{font-size:20px;line-height:1;margin-bottom:8px;color:var(--blue)}
+  .launch-mode-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px}
+  .launch-mode-desc{font-size:13px;color:var(--muted);line-height:1.4;font-weight:500}
+  .choice-pills{display:flex;gap:6px;flex-wrap:wrap;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:4px;width:max-content;max-width:100%}
+  .choice-pill{border:none;background:transparent;color:#435467;border-radius:9px;padding:8px 14px;font-weight:600}
+  .choice-pill.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(16,40,70,.14)}
+  .choice-pill:disabled{opacity:.35}
+  .class-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px}
+  .class-choice{border:1.5px solid var(--line2);background:#fff;border-radius:12px;padding:12px 15px;font-weight:700;color:var(--ink);text-align:center}
+  .class-choice:hover{border-color:#8fb2d6}
+  .class-choice.active{border-color:var(--blue);background:var(--light);color:var(--blue2)}
+  .launch-options-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .launch-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
+  .launch-field input,.launch-field select{width:100%;min-height:42px}
+  .score-toggle{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--soft);border-radius:11px;padding:11px 13px;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
+  .score-toggle input{width:18px;height:18px}
+  .launch-student-select{max-width:520px;width:100%}
+  .student-checklist{border:1px solid var(--line);border-radius:12px;padding:10px;max-height:240px;overflow:auto;background:var(--soft);display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+  .student-checklist label{display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:600;margin:0;padding:8px 10px;border-radius:9px;background:#fff;border:1px solid var(--line);cursor:pointer;color:var(--ink);font-size:14px}
+  .student-checklist label:hover{border-color:#aec6df}
+  .launch-help{margin-top:14px;border-radius:11px;padding:11px 14px;background:var(--light);border:1px solid #cfe0f2;font-size:13.5px;color:#34506c}
+  .launch-type-help{background:var(--gold-bg);border:1px solid #f0d491;border-radius:10px;padding:9px 11px;margin-top:10px;font-size:13px;color:#7a5200}
+  .launch-main-button{width:100%;min-height:52px;margin-top:20px;font-size:17px;border-radius:12px}
+  .launch-source-msg{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--purple-bg);color:var(--purple);font-weight:600}
+  .launch-success{margin-top:10px;font-weight:600;color:var(--good)}
+  .launch-success:empty{display:none}
+
+  /* ---------- Results ---------- */
+  .results-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  details.menu{position:relative}
+  details.menu>summary{list-style:none;cursor:pointer;border:1px solid var(--line2);background:#fff;border-radius:10px;padding:9px 14px;font-weight:600;user-select:none}
+  details.menu>summary::-webkit-details-marker{display:none}
+  details.menu>summary:hover{background:var(--soft)}
+  details.menu[open]>summary{background:var(--soft)}
+  .menu-list{position:absolute;right:0;top:calc(100% + 6px);min-width:240px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(16,40,70,.16);padding:6px;z-index:20;display:flex;flex-direction:column;gap:2px}
+  .menu-list button{background:none;border:none;text-align:left;padding:9px 12px;border-radius:8px;color:var(--ink);font-weight:500;width:100%}
+  .menu-list button:hover{background:var(--soft)}
+  .menu-list button.danger{color:var(--bad)}
+  .menu-list hr{border:none;border-top:1px solid var(--line);margin:4px 0}
+
+  /* ---------- Progress ---------- */
+  .skill-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+  .skill-card{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .skill-card .big{font-size:28px;font-weight:700;color:var(--blue)}
+  .parent-summary{background:#fffdf5;border:1px solid #f0e2b0;border-radius:12px;padding:14px;line-height:1.55}
+  .audit-note{color:#8b6a15;font-size:12px}
+
+  /* ---------- Lock / modals ---------- */
+  .lock-overlay,.modal-overlay{position:fixed;inset:0;background:rgba(20,35,52,.45);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}
+  .lock-overlay{background:linear-gradient(160deg,#e9f1fb,#f5f7fa)}
+  .lock-box,.modal-box{width:min(520px,94vw);background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;text-align:center;box-shadow:0 20px 60px rgba(16,40,70,.22)}
+  .lock-box h2{margin:0 0 4px;font-size:22px}
+  .lock-box input{width:100%;margin:16px 0 10px;font-size:17px;min-height:46px}
+  .lock-box button{width:100%;min-height:46px;font-size:16px}
+  .lock-error{color:var(--bad);min-height:20px;margin-top:8px;font-size:14px}
+  .modal-box{text-align:left}
+  .modal-box h2{margin-top:0}
+  .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+
+  /* ---------- Preview ---------- */
+  .preview-box{width:min(820px,96vw);max-height:92vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 20px 60px rgba(16,40,70,.22)}
+  .preview-banner{background:var(--gold-bg);border:1px solid #f0d491;border-radius:10px;padding:9px 12px;text-align:center;font-weight:600;color:#7a5200;margin:14px 0}
+  .preview-question{font-size:28px;font-weight:700;line-height:1.3;text-align:center;white-space:pre-line;margin:18px 0;unicode-bidi:plaintext}
+  .preview-choices{display:grid;gap:10px}
+  .preview-choice{width:100%;text-align:left;background:#fff;border:1.5px solid var(--line2);color:var(--ink);font-size:19px;padding:14px 16px;border-radius:12px;font-weight:500}
+  .preview-choice:hover:not(:disabled){border-color:var(--blue)}
+  .preview-choice.selected{border-color:var(--blue);background:var(--light)}
+  .preview-choice.correct{border-color:var(--good);background:var(--good-bg)}
+  .preview-choice.wrong{border-color:var(--bad);background:var(--bad-bg)}
+  .preview-status{margin-top:14px;padding:12px;border-radius:10px;text-align:center;font-weight:600;background:var(--soft);min-height:44px}
+  .preview-status.good{background:var(--good-bg);color:#17683d}
+  .preview-status.bad{background:var(--bad-bg);color:#a3333a}
+  .preview-nav{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:15px}
+  .preview-nav button{min-width:38px;padding:7px 9px;background:#fff;border-color:var(--line2);color:var(--ink)}
+  .preview-nav button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+  /* ---------- Hebrew keyboard ---------- */
+  .hebrew-keyboard{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:min(900px,96vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 55px rgba(16,40,70,.22);padding:12px;z-index:140}
+  .hebrew-keyboard-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+  .hebrew-keyboard-title{font-weight:700;color:var(--blue)}
+  .hebrew-keyboard-help{font-size:12px;color:var(--muted)}
+  .hebrew-keyboard-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:6px 0}
+  .hebrew-key{min-width:42px;min-height:40px;padding:6px 10px;background:#fff;color:var(--ink);border:1px solid var(--line2);font-size:22px;line-height:1;border-radius:9px;font-weight:500}
+  .hebrew-key:hover{border-color:var(--blue);background:var(--light)}
+  .hebrew-key.nikud{min-width:38px;font-size:24px;background:#fffaf0}
+  .hebrew-key.utility{font-size:14px;min-width:70px;background:var(--soft)}
+  .hebrew-keyboard-label{width:100%;text-align:center;font-size:11px;color:var(--muted);margin-top:2px}
+  .hebrew-editing-target{outline:3px solid rgba(37,99,168,.22)!important;border-color:var(--blue)!important}
+
+  /* ---------- Read-aloud ---------- */
+  .tts-hebrew{direction:rtl;unicode-bidi:isolate;display:inline-block;border-radius:5px;padding:0 2px;transition:background .15s,box-shadow .15s}
+  .tts-english{direction:ltr;unicode-bidi:isolate;display:inline}
+  .question-type-label{display:table;margin:0 auto 7px;padding:5px 10px;border-radius:999px;background:#eef2ff;font-size:16px;font-weight:700;direction:rtl;unicode-bidi:isolate}
+  .tts-highlight,.tts-hebrew.tts-highlight{background:#ffe66d;box-shadow:0 0 0 2px #ffe66d}
+
+  /* ---------- Responsive ---------- */
+  @media(max-width:1000px){
+    .setup-grid,.progress-layout{grid-template-columns:1fr}
+    .sticky-side{position:static}
+    .generator-grid{grid-template-columns:1fr 1fr}
+    .skill-cards{grid-template-columns:1fr 1fr}
+    .live-head{grid-template-columns:1fr}
+    .live-settings{justify-content:flex-start}
+  }
+  @media(max-width:760px){
+    .header-inner{padding:10px 12px}
+    .tabs{width:100%;display:grid;grid-template-columns:1fr 1fr}.tab{justify-content:center;padding:8px 6px}
+    .details-grid{grid-template-columns:1fr}
+    .step-footer{position:static;flex-direction:column;align-items:stretch}.step-footer .controls{display:grid;grid-template-columns:1fr 1fr}.step-footer .controls button:last-child{grid-column:1/-1}
+    .menu-list{right:auto;left:0}
+    .launch-item-title button{opacity:1}
+    .subtitle{display:none}
+    .wrap{padding:0 12px;margin-top:14px}
+    .card{padding:16px}
+    .step-footer{margin:16px -16px -16px;padding:12px 16px}
+    .start-tiles,.launch-mode-picker,.launch-options-grid,.class-picker,.choice-grid,.skill-cards,.generator-grid{grid-template-columns:1fr}
+    .qtext{font-size:24px}
+    .step-sub{display:none}
+  }
+</style>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
+<link rel="stylesheet" href="teacher-simple.css?v=20261020-1">
+</head>
+<body>
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-box">
+    <div class="brand-mark" style="margin:0 auto 12px;width:48px;height:48px;font-size:18px">B3</div>
+    <h2>Weekly Quiz — Teacher</h2>
+    <div class="small">Sign in with your teacher Google account to continue.</div>
+    <button class="primary" id="lockGoogle">Sign in with Google</button>
+    <div id="lockError" class="lock-error"></div>
+  </div>
+</div>
+
+<div id="answerModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Review answer</h2>
+    <div id="modalAnswerInfo"></div>
+    <label style="display:block;margin-top:12px;font-weight:700">Adjustment note (teacher only)</label>
+    <input id="modalAdjustmentNote" type="text" style="width:100%;margin-top:5px" placeholder="Optional reason">
+    <div class="modal-actions">
+      <button class="good" onclick="adjustCurrentAnswer(true)">Mark Correct</button>
+      <button class="danger" onclick="adjustCurrentAnswer(false)">Mark Incorrect</button>
+      <button class="secondary" onclick="clearCurrentAnswer()">Clear for retry</button>
+      <button class="secondary" onclick="closeAnswerModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="quizPreviewOverlay" class="modal-overlay hidden">
+  <div class="preview-box">
+    <div class="topline">
+      <div>
+        <h2 id="previewTitle" style="margin:0">Quiz Preview</h2>
+        <div id="previewMeta" class="small" style="margin-top:3px"></div>
+      </div>
+      <button class="secondary" onclick="closeQuizPreview()">Close Preview</button>
+    </div>
+    <div class="preview-banner">Teacher Preview — this does not launch the quiz, save answers, or affect student data.</div>
+    <div id="previewQMeta" class="qnum" style="text-align:center"></div>
+    <div id="previewQuestion" class="preview-question" dir="auto"></div>
+    <div id="previewChoices" class="preview-choices"></div>
+    <div id="previewStatus" class="preview-status">Choose an answer, then click Check Answer.</div>
+    <div class="controls" style="justify-content:center;margin-top:14px">
+      <button class="secondary" onclick="previewPrevious()">← Previous</button>
+      <button class="good" id="previewCheckBtn" onclick="checkPreviewAnswer()">Check Answer</button>
+      <button class="primary" onclick="previewNext()">Next →</button>
+    </div>
+    <div id="previewNav" class="preview-nav"></div>
+  </div>
+</div>
+
+<div id="hebrewKeyboard" class="hebrew-keyboard hidden" dir="rtl" aria-label="Hebrew keyboard">
+  <div class="hebrew-keyboard-head" dir="ltr">
+    <div>
+      <div class="hebrew-keyboard-title">Hebrew Keyboard</div>
+      <div class="hebrew-keyboard-help">Click inside the Hebrew word where you want to edit. Nekudos are inserted at the cursor.</div>
+    </div>
+    <button class="secondary" type="button" onclick="closeHebrewKeyboard()">Close</button>
+  </div>
+
+  <div class="hebrew-keyboard-row">
+    <button class="hebrew-key" type="button" data-hkey="ק">ק</button>
+    <button class="hebrew-key" type="button" data-hkey="ר">ר</button>
+    <button class="hebrew-key" type="button" data-hkey="א">א</button>
+    <button class="hebrew-key" type="button" data-hkey="ט">ט</button>
+    <button class="hebrew-key" type="button" data-hkey="ו">ו</button>
+    <button class="hebrew-key" type="button" data-hkey="ן">ן</button>
+    <button class="hebrew-key" type="button" data-hkey="ם">ם</button>
+    <button class="hebrew-key" type="button" data-hkey="פ">פ</button>
+  </div>
+  <div class="hebrew-keyboard-row">
+    <button class="hebrew-key" type="button" data-hkey="ש">ש</button>
+    <button class="hebrew-key" type="button" data-hkey="ד">ד</button>
+    <button class="hebrew-key" type="button" data-hkey="ג">ג</button>
+    <button class="hebrew-key" type="button" data-hkey="כ">כ</button>
+    <button class="hebrew-key" type="button" data-hkey="ע">ע</button>
+    <button class="hebrew-key" type="button" data-hkey="י">י</button>
+    <button class="hebrew-key" type="button" data-hkey="ח">ח</button>
+    <button class="hebrew-key" type="button" data-hkey="ל">ל</button>
+    <button class="hebrew-key" type="button" data-hkey="ך">ך</button>
+    <button class="hebrew-key" type="button" data-hkey="ף">ף</button>
+  </div>
+  <div class="hebrew-keyboard-row">
+    <button class="hebrew-key" type="button" data-hkey="ז">ז</button>
+    <button class="hebrew-key" type="button" data-hkey="ס">ס</button>
+    <button class="hebrew-key" type="button" data-hkey="ב">ב</button>
+    <button class="hebrew-key" type="button" data-hkey="ה">ה</button>
+    <button class="hebrew-key" type="button" data-hkey="נ">נ</button>
+    <button class="hebrew-key" type="button" data-hkey="מ">מ</button>
+    <button class="hebrew-key" type="button" data-hkey="צ">צ</button>
+    <button class="hebrew-key" type="button" data-hkey="ת">ת</button>
+    <button class="hebrew-key" type="button" data-hkey="ץ">ץ</button>
+  </div>
+
+  <div class="hebrew-keyboard-label" dir="ltr">Nekudos</div>
+  <div class="hebrew-keyboard-row">
+    <button class="hebrew-key nikud" type="button" data-hkey="ְ" title="Sheva">בְ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֱ" title="Chataf Segol">בֱ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֲ" title="Chataf Patach">בֲ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֳ" title="Chataf Kamatz">בֳ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ִ" title="Chirik">בִ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֵ" title="Tzeirei">בֵ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֶ" title="Segol">בֶ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ַ" title="Patach">בַ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ָ" title="Kamatz">בָ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ׇ" title="Kamatz Katan">בׇ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֹ" title="Cholam">בֹ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ֻ" title="Kubutz">בֻ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ּ" title="Dagesh / Shuruk">בּ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ׁ" title="Shin dot">שׁ</button>
+    <button class="hebrew-key nikud" type="button" data-hkey="ׂ" title="Sin dot">שׂ</button>
+  </div>
+
+  <div class="hebrew-keyboard-row" dir="ltr">
+    <button class="hebrew-key utility" type="button" data-haction="left">← Cursor</button>
+    <button class="hebrew-key utility" type="button" data-haction="right">Cursor →</button>
+    <button class="hebrew-key utility" type="button" data-haction="backspace">⌫ Backspace</button>
+    <button class="hebrew-key utility" type="button" data-hkey=" ">Space</button>
+    <button class="hebrew-key utility" type="button" data-hkey="־">־ Maqaf</button>
+  </div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <a class="home-link" href="../" title="Back to Fun Torah Tools">← Fun Torah Tools</a>
+    <div class="brand">
+      <div class="brand-mark">B3</div>
+      <div>
+        <h1>Weekly Quiz</h1>
+        <div class="subtitle">Teacher dashboard</div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Main sections">
+      <button id="tabLive" class="tab active" onclick="showTab('live')"><span class="tab-ico">●</span>Live Class</button>
+      <button id="tabSetup" class="tab" onclick="showTab('setup')"><span class="tab-ico">✎</span>Quizzes</button>
+      <button id="tabResults" class="tab" onclick="showTab('results')"><span class="tab-ico">▤</span>Results</button>
+      <button id="tabProgress" class="tab" onclick="showTab('progress')"><span class="tab-ico">↗</span>Student Progress</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap hidden" id="mainContent">
+
+  <!-- ================= LIVE CLASS ================= -->
+  <section id="panelLive" class="panel active">
+    <div class="card">
+      <div class="live-head">
+        <div>
+          <div class="small">Now running</div>
+          <div class="quiz-name" id="liveQuizTitle">No active launch</div>
+          <div class="small" id="liveLaunchMeta"></div>
+          <span id="liveStatus" class="status-pill">Not started</span>
+        </div>
+        <div class="live-settings">
+          <label class="field">Class
+            <select id="liveClassSelect" onchange="changeLiveClass()">
+              <option value="et">East Track</option>
+              <option value="wt">West Track</option>
+            </select>
+          </label>
+          <label class="field">Question style
+            <select id="modeSelect" onchange="changeMode()">
+              <option value="paced">One question at a time</option>
+              <option value="test">Open test / student navigation</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="live-actions">
+        <button class="good btn-lg" onclick="startLaunch()">▶ Start test</button>
+        <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score & review hidden</button>
+        <span class="spacer"></span>
+        <button class="secondary" onclick="copyStudentLink()">Copy student link</button>
+        <button class="danger" onclick="stopLaunch()">End test</button>
+      </div>
+    </div>
+
+    <div class="card question-card">
+      <div class="qnum" id="liveQnum">Question —</div>
+      <div class="qtext" id="liveQtext" dir="auto">No test is running. Go to Quizzes → Give to students to set one up.</div>
+      <div class="answer-line" id="liveAnswer"></div>
+      <div class="controls q-controls">
+        <button class="secondary" onclick="prevQuestion()">← Previous</button>
+        <button class="good" id="openBtn" onclick="setCurrentOpen(true)">Open question</button>
+        <button class="danger" id="lockBtn" onclick="setCurrentOpen(false)">Lock question</button>
+        <button class="gold" id="revealBtn" onclick="toggleReveal()">Reveal answer</button>
+        <button class="primary" onclick="nextQuestion()">Next →</button>
+      </div>
+      <div class="qstrip" id="questionStrip"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Live answers</h2><div class="small">Click any box to review or adjust a student's answer.</div></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:#fff;border-color:#c9d6e3"></span>No answer</span>
+        <span><span class="sw" style="background:#e6f5ec"></span>Correct</span>
+        <span><span class="sw" style="background:#fbe9ea"></span>Incorrect</span>
+        <span><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #c98a12"></span>Adjusted by teacher</span>
+      </div>
+      <div class="grid-wrap"><table id="liveGrid"></table></div>
+      <div class="summary-row" id="liveSummary"></div>
+    </div>
+  </section>
+
+  <!-- ================= QUIZZES (setup) ================= -->
+  <section id="panelSetup" class="panel">
+    <nav class="stepper" id="setupStepper" aria-label="Quiz steps">
+      <button type="button" class="step-btn active" data-step="library" onclick="showSetupStep('library')"><span class="num">1</span><span>Choose a quiz<span class="step-sub">Pick a saved quiz or make a new one</span></span></button>
+      <button type="button" class="step-btn" data-step="edit" onclick="showSetupStep('edit')"><span class="num">2</span><span>Edit questions<span class="step-sub">Check, fix and save</span></span></button>
+      <button type="button" class="step-btn" data-step="assign" onclick="showSetupStep('assign')"><span class="num">3</span><span>Give to students<span class="step-sub">Live, anytime, or make-up</span></span></button>
+    </nav>
+    <div class="current-quiz-bar" id="currentQuizBar">Working on: <b id="currentQuizName">—</b> <span class="chip blue" id="currentQuizType"></span> <span class="chip" id="currentQuizCount"></span></div>
+
+    <!-- Step 1: library -->
+    <div class="setup-step" id="stepLibrary">
+      <div class="card">
+        <div class="card-head"><h2>Make a new quiz</h2></div>
+        <div class="start-tiles">
+          <button type="button" class="start-tile ai" onclick="showSetupStep('generate')">
+            <span class="tile-ico">✨</span>
+            <span><span class="tile-title" style="display:block">Generate from source text</span><span class="tile-desc">Paste a lesson or source text, pick a quiz type, and get draft questions to review.</span></span>
+          </button>
+          <button type="button" class="start-tile" onclick="uiNewQuiz()">
+            <span class="tile-ico">✎</span>
+            <span><span class="tile-title" style="display:block">Write or paste questions</span><span class="tile-desc">Start a blank quiz, type questions, or paste rows from Google Sheets.</span></span>
+          </button>
+        </div>
+      </div>
+      <div class="card quiz-grid">
+        <div class="card-head">
+          <div><h2>Saved quizzes</h2><div class="small">Click a quiz to open it. A saved quiz is just the questions — you choose ET or WT when you give it.</div></div>
+          <input type="text" id="quizSearch" placeholder="Search quizzes…" style="min-width:220px" oninput="filterQuizList()">
+        </div>
+        <div class="quiz-filters">
+          <label>Topic <select id="quizTopicFilter" onchange="filterQuizList()"><option value="all">All topics</option></select></label>
+          <label>Created <select id="quizDateFilter" onchange="filterQuizList()"><option value="all">Any time</option><option value="week">This week</option><option value="month">Last 30 days</option><option value="3months">Last 3 months</option><option value="older">Older than 3 months</option></select></label>
+          <label>Sort <select id="quizSort" onchange="renderQuizList()"><option value="updated">Recently edited</option><option value="newest">Newest created</option><option value="oldest">Oldest created</option><option value="title">Title A–Z</option></select></label>
+          <button type="button" class="link-btn" id="quizFilterReset" onclick="resetQuizFilters()" hidden>Clear filters</button>
+        </div>
+        <div id="quizList" class="quiz-list"></div>
+      </div>
+    </div>
+
+    <!-- Step 1b: generator -->
+    <div class="setup-step hidden" id="stepGenerate">
+      <button type="button" class="link-btn back-link" onclick="showSetupStep('library')">← Back to quizzes</button>
+      <div class="card">
+        <div class="card-head"><div><h2>Generate a quiz from source text</h2><div class="small">Nothing is saved or given to students until you review it.</div></div></div>
+        <div class="generator-grid">
+          <label>Quiz type
+            <select id="generatorType" onchange="generatorTypeChanged()">
+              <option value="general">Any subject</option>
+              <option value="shorashim">Shoroshim</option>
+              <option value="translation">Chumash Translation</option>
+              <option value="comprehension">Chumash Comprehension</option>
+              <option value="mixed">Chumash (mixed)</option>
+            </select>
+          </label>
+          <label>How many questions
+            <input type="number" id="generatorCount" min="1" max="40" value="10">
+          </label>
+          <label>Choices per question
+            <select id="generatorChoices"><option value="3" selected>3 choices</option><option value="4">4 choices</option></select>
+          </label>
+          <label>Source (optional)
+            <input type="text" id="generatorSourceLabel" placeholder="e.g. Vayeira 18:1–5">
+          </label>
+        </div>
+        <div id="mixedCounts" class="generator-grid hidden">
+          <label>Shoroshim questions<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
+          <label>Translation questions<input type="number" id="mixedTranslation" min="0" max="30" value="5"></label>
+          <label>Comprehension questions<input type="number" id="mixedComprehension" min="0" max="30" value="5"></label>
+        </div>
+        <label for="generatorSource">Lesson / source text</label>
+        <textarea id="generatorSource" dir="auto" placeholder="Paste any lesson, notes, or source text here…" style="margin-top:5px"></textarea>
+        <div class="controls" style="margin-top:12px">
+          <button id="generateBtn" class="purple btn-lg" onclick="generateQuizDraft()">✨ Generate draft</button>
+          <span id="generatorStatus" class="small"></span>
+        </div>
+        <div id="generatorReview" class="hidden" style="margin-top:20px;padding-top:18px;border-top:1px solid var(--line)">
+          <div class="card-head" style="margin-bottom:4px">
+            <div><h3>Draft questions</h3><div class="small">Everything is checked. Uncheck anything you don't want.</div></div>
+            <div class="controls"><button class="link-btn" onclick="setAllCandidates(true)">Check all</button><span class="muted">·</span><button class="link-btn" onclick="setAllCandidates(false)">Uncheck all</button></div>
+          </div>
+          <div id="candidateList" class="generator-candidates"></div>
+          <div class="step-footer">
+            <span class="small">Checked questions go into the quiz editor.</span>
+            <div class="controls">
+              <button class="secondary" onclick="addSelectedCandidates(false)">Add to current quiz</button>
+              <button class="primary" onclick="addSelectedCandidates(true)">Use these questions →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: editor -->
+    <div class="setup-step hidden" id="stepEdit">
+      <div class="card">
+        <div class="card-head"><h2>Quiz details</h2><button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button></div>
+        <div class="generator-grid details-grid" style="margin-top:0">
+          <label>Quiz title
+            <input type="text" id="editorTitle" placeholder="e.g. Vayeira 18:1–8 Comprehension">
+          </label>
+          <label>Quiz type (Nigri topic)
+            <select id="editorSkillType" onchange="editorSkillChanged()">
+              <option value="general">Any subject</option>
+              <option value="shorashim">Shoroshim</option>
+              <option value="translation">Chumash Translation</option>
+              <option value="comprehension">Chumash Comprehension</option>
+              <option value="mixed">Chumash</option>
+            </select>
+          </label>
+          <label>Source (optional)
+            <input type="text" id="editorSourceLabel" placeholder="e.g. Vayeira 18:1–5">
+          </label>
+        </div>
+
+        <details class="paste-panel">
+          <summary>Paste questions from Google Sheets / Excel</summary>
+          <div class="paste-body">
+            <div class="paste-help">
+              Copy rows with these columns and paste them below:<br>
+              <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
+              The tabs come in automatically when you copy from a spreadsheet. "Correct" can be A/B/C/D, 1/2/3/4, or the exact answer.
+            </div>
+            <textarea id="pasteBox" placeholder="What did Avrohom see? | Three men | Two men | A camel | A"></textarea>
+            <div class="controls" style="margin-top:8px">
+              <button class="secondary" onclick="loadPasted(false)">Add pasted questions</button>
+              <button class="secondary" onclick="loadPasted(true)">Replace all with pasted</button>
+            </div>
+          </div>
+        </details>
+
+        <div class="card-head" style="margin:18px 0 0"><h3 id="editorCountTitle">Questions</h3><button class="secondary" onclick="addEditorRow()">+ Add question</button></div>
+        <div id="editorRows"></div>
+
+        <div class="step-footer">
+          <span id="setupMsg" class="small"></span>
+          <div class="controls">
+            <button class="secondary" onclick="openQuizPreview()">▶ Try it out</button>
+            <button class="secondary" onclick="saveQuiz()">Save</button>
+            <button class="primary" onclick="uiSaveAndAssign()">Save &amp; give to students →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: give to students -->
+    <div class="setup-step hidden" id="stepAssign">
+      <div class="card launch-card">
+        <h2>Give this quiz to students</h2>
+        <div class="launch-intro">Pick how students take it and who gets it. Only the choices that matter are shown.</div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">1</span> How will they take it?</div>
+          <select id="launchDeliveryType" class="hidden" onchange="updateLaunchTargetUI()">
+            <option value="live">Live Class Test</option>
+            <option value="anytime">Take Anytime</option>
+            <option value="makeup">Make-Up Test</option>
+          </select>
+          <div class="launch-mode-picker">
+            <button type="button" class="launch-mode-card" id="deliveryCardLive" onclick="selectDelivery('live')">
+              <div class="launch-mode-icon">▶</div>
+              <div class="launch-mode-title">Live in class</div>
+              <div class="launch-mode-desc">You run it from the Live Class tab: open, lock and reveal questions as you go.</div>
+            </button>
+            <button type="button" class="launch-mode-card" id="deliveryCardAnytime" onclick="selectDelivery('anytime')">
+              <div class="launch-mode-icon">⏱</div>
+              <div class="launch-mode-title">Take anytime</div>
+              <div class="launch-mode-desc">Students take it on their own. Once finished, it stays finished unless you give a retake.</div>
+            </button>
+            <button type="button" class="launch-mode-card" id="deliveryCardMakeup" onclick="selectDelivery('makeup')">
+              <div class="launch-mode-icon">↻</div>
+              <div class="launch-mode-title">Make-up</div>
+              <div class="launch-mode-desc">Give the original test only to boys who were absent or didn't finish.</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">2</span> Who gets it?</div>
+          <select id="launchTargetType" class="hidden" onchange="updateLaunchTargetUI()">
+            <option value="class">Whole class</option>
+            <option value="student">Individual student</option>
+            <option value="multiple">Several students</option>
+          </select>
+          <div id="launchTargetPills" class="choice-pills">
+            <button type="button" id="targetClassBtn" class="choice-pill" onclick="selectLaunchTarget('class')">Whole class</button>
+            <button type="button" id="targetStudentBtn" class="choice-pill" onclick="selectLaunchTarget('student')">One student</button>
+            <button type="button" id="targetMultipleBtn" class="choice-pill" onclick="selectLaunchTarget('multiple')">Several students</button>
+          </div>
+          <div id="launchClassWrap" style="margin-top:12px">
+            <select id="launchClass" class="hidden" onchange="populateLaunchStudents()">
+              <option value="et">East Track</option>
+              <option value="wt">West Track</option>
+            </select>
+            <div class="class-picker">
+              <button type="button" id="classEtBtn" class="class-choice" onclick="selectLaunchClass('et')">East Track</button>
+              <button type="button" id="classWtBtn" class="class-choice" onclick="selectLaunchClass('wt')">West Track</button>
+            </div>
+          </div>
+          <div id="launchStudentWrap" class="hidden" style="margin-top:12px">
+            <label class="launch-field">Student
+              <select id="launchStudent" class="launch-student-select"></select>
+            </label>
+          </div>
+          <div id="launchMultiWrap" class="hidden" style="margin-top:12px">
+            <div style="font-weight:600;font-size:13px;margin-bottom:7px;color:#3d4f62">Check the students who should get it</div>
+            <div id="launchStudentChecklist" class="student-checklist"></div>
+          </div>
+        </div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">3</span> Options</div>
+          <div class="launch-options-grid">
+            <label id="launchModeWrap" class="launch-field">Question style
+              <select id="launchMode">
+                <option value="paced">One question at a time</option>
+                <option value="test">Open test — students may navigate</option>
+              </select>
+            </label>
+            <label class="launch-field">Note (optional)
+              <input type="text" id="launchNote" placeholder="e.g. Monday make-up">
+            </label>
+          </div>
+          <label class="score-toggle" style="margin-top:12px">
+            <input type="checkbox" id="launchShowScore" checked>
+            <span>Show students their score and right/wrong review when they finish</span>
+          </label>
+          <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
+          <div id="makeupSourceMsg" class="launch-source-msg hidden"></div>
+        </div>
+
+        <button id="friendlyLaunchBtn" class="primary launch-main-button" onclick="launchSelectedQuiz()">Set Up Live Class Test</button>
+        <div id="launchMsg" class="launch-success"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= RESULTS ================= -->
+  <section id="panelResults" class="panel">
+    <div class="setup-grid">
+      <div class="card sticky-side">
+        <div class="card-head">
+          <h2>Quiz history</h2>
+          <select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory()" style="min-width:160px;flex:1"></div>
+        <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
+        <div id="launchHistory" class="launch-list"></div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <div><h2 id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
+            <div class="controls results-actions">
+              <button id="assignMakeupBtn" class="secondary" onclick="openMakeupFromResults()">Assign make-up</button>
+              <details class="menu" id="resultsMenu">
+                <summary>More ▾</summary>
+                <div class="menu-list">
+                  <button id="resultsScoreBtn" onclick="toggleResultsScoreRelease()">Score & review hidden</button>
+                  <button onclick="copyLaunchLink(resultsLaunchId)">Copy direct link to this test</button>
+                  <hr>
+                  <button onclick="downloadCSV()">Download CSV</button>
+                  <button onclick="copyResultsTSV()">Copy for Google Sheets</button>
+                  <hr>
+                  <button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="grid-wrap"><table id="resultsTable"></table></div>
+          <div class="small" style="margin-top:10px">Click a ✓ or × to review or adjust that answer. Parents only see the final adjusted result; the change history stays teacher-only.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PROGRESS ================= -->
+  <section id="panelProgress" class="panel">
+    <div class="progress-layout">
+      <div class="card sticky-side">
+        <h2 style="margin-top:0">Choose a student</h2>
+        <label class="field">Class
+          <select id="progressClass" onchange="populateProgressStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select>
+        </label>
+        <label class="field" style="margin-top:10px">Student
+          <select id="progressStudent" onchange="renderStudentProgress()"></select>
+        </label>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-head"><div><h2 id="progressStudentName">Student Progress</h2><div class="small">Uses final scores. A retake replaces the earlier attempt in the averages.</div></div><button class="secondary" onclick="copyParentSummary()">Copy parent summary</button></div>
+          <div id="skillCards" class="skill-cards"></div>
+          <div id="parentSummary" class="parent-summary"></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-top:0">Assessment history</h2>
+          <div class="grid-wrap"><table id="progressHistory"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
+// (et/wt) keeps its own quizzes, launches and results under b3Quiz/classes/<id>,
+// uses that class's own students, and its teacher signs in with Google.
+const WQ_CLASS=(new URLSearchParams(location.search).get('class')||'').trim();
+const CLASS_SPACE=/^[A-Za-z0-9_-]{1,100}$/.test(WQ_CLASS)&&!['et','wt'].includes(WQ_CLASS);
+const QROOT=CLASS_SPACE?'b3Quiz/classes/'+WQ_CLASS:'b3Quiz';
+const GENERATE_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
+
+// The old page password is gone; clear the "unlocked" flag older versions left in this browser.
+try{localStorage.removeItem('weeklyQuizTeacherUnlocked');}catch(e){}
+
+const firebaseConfig={
+  apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain:"b3-games.firebaseapp.com",
+  databaseURL:"https://b3-games-default-rtdb.firebaseio.com",
+  projectId:"b3-games",
+  storageBucket:"b3-games.firebasestorage.app",
+  messagingSenderId:"568530046190",
+  appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);const db=firebase.database();
+
+const CLASS_ROSTERS={
+  et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
+  wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
+};
+const SKILL_LABELS={general:'Any subject',shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash',mixed:'Chumash'};
+// Quiz types whose questions each keep their own skill (shorashim/translation/comprehension).
+function isMultiSkill(t){return t==='mixed'||t==='integrated';}
+
+let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
+let currentQuizId='',editorQuestions=[],generatorCandidates=[];
+let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
+let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
+let liveLaunchRef=null,liveResponseRef=null;
+let resultsLaunchId='';
+let modalContext=null;
+let makeupSourceLaunchId='';
+let makeupPreselected=new Set();
+
+function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
+function slugTitle(s){return String(s||'quiz').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,35)||'quiz';}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtDate(ts){if(!ts)return'—';try{return new Date(Number(ts)).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return'—';}}
+function classLabel(id){return(CLASS_ROSTERS[id]||{}).label||id||'';}
+function skillLabel(id){return SKILL_LABELS[id]||id||'Comprehension';}
+function showTab(name){['live','setup','results','progress'].forEach(n=>{document.getElementById('panel'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);document.getElementById('tab'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);});if(name==='results')renderResults();if(name==='progress'){populateProgressStudents();renderStudentProgress();}}
+function setupMsg(t){document.getElementById('setupMsg').textContent=t||'';}
+function launchMsg(t){document.getElementById('launchMsg').textContent=t||'';}
+
+// Paid services always use a verified teacher Google account, including ET/WT.
+const paidSignInButton = document.createElement('button');
+paidSignInButton.type = 'button';
+paidSignInButton.textContent = 'Google teacher sign-in';
+paidSignInButton.style.margin = '8px';
+paidSignInButton.onclick = async () => {
+  try { await window.B3SiteSettings.signInWithGoogle(); setupMsg('Google sign-in complete.'); }
+  catch(error) { setupMsg(error.message || 'Google sign-in did not complete.'); }
+};
+document.getElementById('mainContent').prepend(paidSignInButton);
+
+// ---------- Shared data listeners ----------
+// Reuse the verified owner account for the original shared B3 quiz.
+// Other teachers still use their assigned class and its existing grant checks.
+if (!CLASS_SPACE) {
+  const lockErrorB3 = document.getElementById('lockError');
+  lockErrorB3.textContent = 'Checking your sign-in…';
+  document.getElementById('lockGoogle').onclick = () => window.B3SiteSettings.signInWithGoogle()
+    .catch(err => { lockErrorB3.textContent = (err && err.message) || 'Google sign-in did not complete.'; });
+  window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => {
+    const owner = !!(user && authorized && access && access.role === 'admin'
+      && !window.B3SiteSettings.getActingStudent());
+    if (!owner) {
+      lockErrorB3.textContent = !user ? 'Sign in with your teacher Google account.'
+        : 'The original B3 Weekly Quiz is for the owner account. Open Weekly Quiz from your Teacher Home so it opens your own class.';
+    }
+    if (owner) {
+      document.getElementById('lockOverlay').style.display = 'none';
+      document.getElementById('mainContent').classList.remove('hidden');
+      window.weeklyQuizOwnerUnlocked = true;
+    } else if (window.weeklyQuizOwnerUnlocked) {
+      document.getElementById('lockOverlay').style.display = '';
+      document.getElementById('mainContent').classList.add('hidden');
+      window.weeklyQuizOwnerUnlocked = false;
+    }
+  });
+}
+
+if(CLASS_SPACE){
+  // This class's own students replace the B3 East/West lists everywhere on the page.
+  delete CLASS_ROSTERS.et;delete CLASS_ROSTERS.wt;
+  CLASS_ROSTERS[WQ_CLASS]={label:WQ_CLASS,students:[]};
+  const one=(label)=>'<option value="'+esc(WQ_CLASS)+'">'+esc(label)+'</option>';
+  const applyClassLabel=label=>{
+    ['liveClassSelect','launchClass','progressClass'].forEach(id=>{const el=document.getElementById(id);if(el){el.innerHTML=one(label);el.value=WQ_CLASS;}});
+    const filter=document.getElementById('resultsClassFilter');if(filter)filter.innerHTML='<option value="all">'+esc(label)+'</option>';
+    const etBtn=document.getElementById('classEtBtn'),wtBtn=document.getElementById('classWtBtn');
+    if(etBtn){etBtn.textContent=label;etBtn.onclick=()=>selectLaunchClass(WQ_CLASS);}
+    if(wtBtn)wtBtn.style.display='none';
+  };
+  applyClassLabel(WQ_CLASS);
+  db.ref('b3Games/workspaces/b3-2026/classes/'+WQ_CLASS).on('value',snap=>{
+    const cls=snap.val()||{},members=cls.members||{};
+    const ids=Object.keys(members).filter(id=>members[id]&&members[id].active!==false);
+    CLASS_ROSTERS[WQ_CLASS]={label:cls.name||WQ_CLASS,students:ids};
+    roster={};ids.forEach(id=>{roster[id]={name:members[id].name||id};});
+    applyClassLabel(cls.name||WQ_CLASS);
+    renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();
+  });
+  const lockError=document.getElementById('lockError');
+  lockError.textContent='Checking your teacher account…';
+  document.getElementById('lockGoogle').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{lockError.textContent=(err&&err.message)||'Google sign-in did not complete.';});
+  window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+    if(!user||!authorized){document.getElementById('lockGoogle').style.display='';lockError.textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return;}
+    const admin=access&&access.role==='admin';
+    if(!admin&&!((access&&access.classIds)||[]).includes(WQ_CLASS)){lockError.textContent='This class is not assigned to your teacher account.';return;}
+    const cls=(await db.ref('b3Games/workspaces/b3-2026/classes/'+WQ_CLASS).once('value')).val();
+    if(!cls||cls.active===false||(!admin&&!(cls.toolGrants&&cls.toolGrants['weekly-quiz']===true))){lockError.textContent='Weekly Quiz is not turned on for this class. Ask the admin.';return;}
+    document.getElementById('lockGoogle').style.display='none';
+    document.getElementById('lockOverlay').style.display='none';
+    document.getElementById('mainContent').classList.remove('hidden');
+  });
+}else{
+  db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();});
+}
+db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
+db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+
+// ---------- Built-in generator ----------
+function generatorTypeChanged(){
+  const t=document.getElementById('generatorType').value;
+  document.getElementById('mixedCounts').classList.toggle('hidden',t!=='mixed');
+  const help=document.getElementById('integratedModeHelp');
+  if(help)help.classList.toggle('hidden',t!=='integrated');
+  if(t==='integrated')document.getElementById('editorSkillType').value='integrated';
+  else if(t!=='mixed')document.getElementById('editorSkillType').value=t;
+}
+
+/*
+  Build Sefaria-style references for the secure generator.
+  The deployed comprehension generator uses these references to load the
+  trusted Kehot/Metsudah grounding sources.
+
+  Examples accepted:
+    Vayeira 18:1-10
+    Vayeira 18:1–10
+    Genesis 18:1-10
+    Chayei Sarah 24:1-5
+    Toldos 25:19-26
+*/
+function generatorReferences(sourceLabel,sourceText){
+  const refs=[];
+  const seen=new Set();
+
+  function add(ref){
+    ref=String(ref||'').trim();
+    if(ref&&!seen.has(ref)){seen.add(ref);refs.push(ref);}
+  }
+
+  function normalizeHebrew(s){
+    return String(s||'')
+      .normalize('NFD')
+      .replace(/[\u0591-\u05C7]/g,'')       // nekudos + trop
+      .replace(/[״"'׳'’`.,;:!?()[\]{}\-־]/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  // 1) If pasted text already contains explicit Sefaria Ref lines, use them.
+  String(sourceText||'').split(/\r?\n/).forEach(line=>{
+    const m=line.match(/Sefaria\s*Ref\s*:\s*((?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy)\s+\d+\s*:\s*\d+)/i);
+    if(m){
+      const parts=m[1].match(/(Genesis|Exodus|Leviticus|Numbers|Deuteronomy)\s+(\d+)\s*:\s*(\d+)/i);
+      if(parts)add(parts[1][0].toUpperCase()+parts[1].slice(1).toLowerCase()+' '+Number(parts[2])+':'+Number(parts[3]));
+    }
+  });
+  if(refs.length)return refs;
+
+  // 2) AUTOMATIC CURRENT-CURRICULUM DETECTION:
+  //    Match pasted Hebrew directly against Bereishis Perek 18.
+  //    This makes Source Label unnecessary for Vayeira 18.
+  const p18=[
+    [1,"וירא אליו יהוה באלני ממרא והוא ישב פתח האהל כחם היום"],
+    [2,"וישא עיניו וירא והנה שלשה אנשים נצבים עליו וירא וירץ לקראתם מפתח האהל וישתחו ארצה"],
+    [3,"ויאמר אדני אם נא מצאתי חן בעיניך אל נא תעבר מעל עבדך"],
+    [4,"יקח נא מעט מים ורחצו רגליכם והשענו תחת העץ"],
+    [5,"ואקחה פת לחם וסעדו לבכם אחר תעברו כי על כן עברתם על עבדכם ויאמרו כן תעשה כאשר דברת"],
+    [6,"וימהר אברהם האהלה אל שרה ויאמר מהרי שלש סאים קמח סלת לושי ועשי עגות"],
+    [7,"ואל הבקר רץ אברהם ויקח בן בקר רך וטוב ויתן אל הנער וימהר לעשות אתו"],
+    [8,"ויקח חמאה וחלב ובן הבקר אשר עשה ויתן לפניהם והוא עמד עליהם תחת העץ ויאכלו"],
+    [9,"ויאמרו אליו איה שרה אשתך ויאמר הנה באהל"],
+    [10,"ויאמר שוב אשוב אליך כעת חיה והנה בן לשרה אשתך ושרה שמעת פתח האהל והוא אחריו"],
+    [11,"ואברהם ושרה זקנים באים בימים חדל להיות לשרה ארח כנשים"],
+    [12,"ותצחק שרה בקרבה לאמר אחרי בלתי היתה לי עדנה ואדני זקן"],
+    [13,"ויאמר יהוה אל אברהם למה זה צחקה שרה לאמר האף אמנם אלד ואני זקנתי"],
+    [14,"היפלא מיהוה דבר למועד אשוב אליך כעת חיה ולשרה בן"],
+    [15,"ותכחש שרה לאמר לא צחקתי כי יראה ויאמר לא כי צחקת"],
+    [16,"ויקמו משם האנשים וישקפו על פני סדם ואברהם הלך עמם לשלחם"],
+    [17,"ויהוה אמר המכסה אני מאברהם אשר אני עשה"],
+    [18,"ואברהם היו יהיה לגוי גדול ועצום ונברכו בו כל גויי הארץ"],
+    [19,"כי ידעתיו למען אשר יצוה את בניו ואת ביתו אחריו ושמרו דרך יהוה לעשות צדקה ומשפט למען הביא יהוה על אברהם את אשר דבר עליו"],
+    [20,"ויאמר יהוה זעקת סדם ועמרה כי רבה וחטאתם כי כבדה מאד"],
+    [21,"ארדה נא ואראה הכצעקתה הבאה אלי עשו כלה ואם לא אדעה"],
+    [22,"ויפנו משם האנשים וילכו סדמה ואברהם עודנו עמד לפני יהוה"],
+    [23,"ויגש אברהם ויאמר האף תספה צדיק עם רשע"],
+    [24,"אולי יש חמשים צדיקם בתוך העיר האף תספה ולא תשא למקום למען חמשים הצדיקם אשר בקרבה"],
+    [25,"חללה לך מעשת כדבר הזה להמית צדיק עם רשע והיה כצדיק כרשע חללה לך השפט כל הארץ לא יעשה משפט"],
+    [26,"ויאמר יהוה אם אמצא בסדם חמשים צדיקם בתוך העיר ונשאתי לכל המקום בעבורם"],
+    [27,"ויען אברהם ויאמר הנה נא הואלתי לדבר אל אדני ואנכי עפר ואפר"],
+    [28,"אולי יחסרו חמשים הצדיקם חמשה התשחית בחמשה את כל העיר ויאמר לא אשחית אם אמצא שם ארבעים וחמשה"],
+    [29,"ויסף עוד לדבר אליו ויאמר אולי ימצאון שם ארבעים ויאמר לא אעשה בעבור הארבעים"],
+    [30,"ויאמר אל נא יחר לאדני ואדברה אולי ימצאון שם שלשים ויאמר לא אעשה אם אמצא שם שלשים"],
+    [31,"ויאמר הנה נא הואלתי לדבר אל אדני אולי ימצאון שם עשרים ויאמר לא אשחית בעבור העשרים"],
+    [32,"ויאמר אל נא יחר לאדני ואדברה אך הפעם אולי ימצאון שם עשרה ויאמר לא אשחית בעבור העשרה"],
+    [33,"וילך יהוה כאשר כלה לדבר אל אברהם ואברהם שב למקמו"]
+  ];
+
+  const normalizedSource=normalizeHebrew(sourceText);
+  p18.forEach(([verse,text])=>{
+    const n=normalizeHebrew(text);
+    // Exact whole-verse match after removing nekudos/punctuation.
+    // Also accept a strong 7-word opening fingerprint so copied text with
+    // minor punctuation/spelling differences still works.
+    const words=n.split(' ').filter(Boolean);
+    const fingerprint=words.slice(0,Math.min(7,words.length)).join(' ');
+    if((n&&normalizedSource.includes(n)) || (fingerprint&&normalizedSource.includes(fingerprint))){
+      add('Genesis 18:'+verse);
+    }
+  });
+  if(refs.length)return refs;
+
+  // 3) Source Label is OPTIONAL, but if supplied, use it as another way
+  //    to resolve references for other chapters/parshiyos.
+  const label=String(sourceLabel||'').trim().replace(/[–—]/g,'-');
+  if(!label)return refs;
+
+  const lower=label.toLowerCase();
+
+  const parshaBooks={
+    'bereishis':'Genesis','bereshis':'Genesis','bereishit':'Genesis','genesis':'Genesis',
+    'noach':'Genesis','lech lecha':'Genesis','lech-lecha':'Genesis',
+    'vayeira':'Genesis','vayera':'Genesis','chayei sarah':'Genesis','chayei-sarah':'Genesis',
+    'toldos':'Genesis','toledot':'Genesis','vayeitzei':'Genesis','vayetzei':'Genesis',
+    'vayishlach':'Genesis','vayeshev':'Genesis','mikeitz':'Genesis','miketz':'Genesis',
+    'vayigash':'Genesis','vayechi':'Genesis',
+    'shemos':'Exodus','shemot':'Exodus','exodus':'Exodus','vaera':'Exodus',
+    'bo':'Exodus','beshalach':'Exodus','yisro':'Exodus','yitro':'Exodus',
+    'mishpatim':'Exodus','terumah':'Exodus','tetzaveh':'Exodus',
+    'ki sisa':'Exodus','ki tisa':'Exodus','vayakhel':'Exodus','pekudei':'Exodus',
+    'vayikra':'Leviticus','leviticus':'Leviticus','tzav':'Leviticus',
+    'shemini':'Leviticus','tazria':'Leviticus','metzora':'Leviticus',
+    'acharei mos':'Leviticus','acharei mot':'Leviticus','kedoshim':'Leviticus',
+    'emor':'Leviticus','behar':'Leviticus','bechukosai':'Leviticus','bechukotai':'Leviticus',
+    'bamidbar':'Numbers','numbers':'Numbers','naso':'Numbers','behaaloscha':'Numbers',
+    'beha alotcha':'Numbers','shelach':'Numbers','shlach':'Numbers','korach':'Numbers',
+    'chukas':'Numbers','chukat':'Numbers','balak':'Numbers','pinchas':'Numbers',
+    'matos':'Numbers','matot':'Numbers','masei':'Numbers',
+    'devarim':'Deuteronomy','deuteronomy':'Deuteronomy','vaeschanan':'Deuteronomy',
+    'vaetchanan':'Deuteronomy','eikev':'Deuteronomy','reeh':'Deuteronomy',
+    're eh':'Deuteronomy','shoftim':'Deuteronomy','ki seitzei':'Deuteronomy',
+    'ki tetzei':'Deuteronomy','ki savo':'Deuteronomy','ki tavo':'Deuteronomy',
+    'nitzavim':'Deuteronomy','vayeilech':'Deuteronomy','vayelech':'Deuteronomy',
+    'haazinu':'Deuteronomy','vezos habracha':'Deuteronomy','vezot haberakhah':'Deuteronomy'
+  };
+
+  let book='';
+  const explicit=label.match(/\b(Genesis|Exodus|Leviticus|Numbers|Deuteronomy)\b/i);
+  if(explicit){
+    book=explicit[1][0].toUpperCase()+explicit[1].slice(1).toLowerCase();
+  }else{
+    const names=Object.keys(parshaBooks).sort((a,b)=>b.length-a.length);
+    const found=names.find(name=>lower.includes(name));
+    if(found)book=parshaBooks[found];
+  }
+
+  if(!book)return refs;
+
+  const rangeRe=/(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?/g;
+  let m;
+  while((m=rangeRe.exec(label))){
+    const chapter=Number(m[1]);
+    const first=Number(m[2]);
+    const last=m[3]?Number(m[3]):first;
+    if(!chapter||!first||!last)continue;
+    const lo=Math.min(first,last),hi=Math.max(first,last);
+    if(hi-lo>120)continue;
+    for(let v=lo;v<=hi;v++)add(book+' '+chapter+':'+v);
+  }
+
+  return refs;
+}
+
+// Adds the third-grade skills to the generator's directions:
+//   Comprehension also asks מי אמר אל מי / על מי נאמר (they are comprehension).
+//   Shoroshim also asks simple word parts — prefix / shoresh / suffix (dikduk).
+//   Mixed gets both. Translation is unchanged.
+function skillsSource(sourceText,type,count){
+  if(type==='general')return sourceText;
+  const n=Math.max(1,Math.min(40,Number(count)||10));
+  const some=Math.max(1,Math.round(n*0.3));
+  const comp=`COMPREHENSION QUESTIONS — ALSO INCLUDE THESE SKILLS:
+Most comprehension questions stay regular comprehension (what happened). In addition, about ${some} of the comprehension questions should be:
+- "מי אמר אל מי?" — only when the ACTUAL PESUKIM clearly contain speech, and both the speaker and the listener are clear. Never invent a speaker or listener. Begin whySelected with "[מי אמר אל מי]".
+- "על מי נאמר?" — quote a short phrase from the ACTUAL PESUKIM and ask who it is said about, only when that is clear. Begin whySelected with "[על מי נאמר]".
+Return skillType "comprehension" for these. If the pesukim do not clearly support them, use regular comprehension questions instead.`;
+  const shor=`SHOROSHIM QUESTIONS — ALSO INCLUDE SIMPLE WORD PARTS (DIKDUK):
+Most shoroshim questions stay "what is the shoresh". In addition, about ${some} of the shoroshim questions may be simple word-parts questions about an EXACT Hebrew word from the ACTUAL PESUKIM:
+- identify an obvious prefix (e.g. ו, ה, ב, ל, מ), the shoresh, or what an obvious suffix means.
+- Do NOT ask advanced binyan, tense, person, gender, conjugation, or complicated dikduk. Skip any word whose breakdown could be debated.
+Return skillType "shorashim" for these. Begin whySelected with "[Word Parts]".`;
+  const style=`SHORT AND DIRECT — THIS IS THE MOST IMPORTANT RULE:
+- Each question is ONE short, simple question of at most 12 words. No long setup, no quoting a whole pasuk, no two-part questions.
+- Ask plain facts from the pesukim: who, what, where, to whom. Do NOT ask "why" questions that need explaining or reasoning.
+- Each answer choice is at most 6 words.
+- Use easy words an 8-year-old knows.
+Good: "Where was Avraham sitting?" — "At the opening of the tent"
+Good: "Who did Avraham run to greet?" — "Three men"
+Bad: "Hashem asked: Should I hide from Avraham what I am about to do? Why did Hashem feel He should tell Avraham?"`;
+  const rules=(type==='comprehension'?[comp]:type==='shorashim'?[shor]:type==='mixed'?[comp,shor]:[]).concat([style]);
+  return `ACTUAL PESUKIM / SOURCE TEXT BEGIN
+${sourceText}
+ACTUAL PESUKIM / SOURCE TEXT END
+
+TEACHER GENERATOR DIRECTIONS — THESE DIRECTIONS ARE NOT TEST MATERIAL:
+${rules.join('\n\n')}
+
+Keep every question clear, fair, easy-to-moderate, and appropriate for an 8-year-old third grader. The Hebrew itself is authoritative. Do not make any question about these teacher directions. Test only the ACTUAL PESUKIM section.`;
+}
+
+async function generateQuizDraft(){
+  const rawSource=document.getElementById('generatorSource').value.trim();
+  const sourceLabel=document.getElementById('generatorSourceLabel').value.trim();
+  const requestedType=document.getElementById('generatorType').value;
+  const choiceCount=Number(document.getElementById('generatorChoices').value)||3;
+
+  const normalMixedCounts={
+    shorashim:Number(document.getElementById('mixedShoreshim').value)||0,
+    translation:Number(document.getElementById('mixedTranslation').value)||0,
+    comprehension:Number(document.getElementById('mixedComprehension').value)||0
+  };
+
+  const integrated=requestedType==='integrated';
+  const requestedCount=Number(document.getElementById('generatorCount').value)||10;
+  const mixedCounts=normalMixedCounts;
+  const quizType=integrated?'mixed':requestedType;
+  const count=integrated
+    ? requestedCount
+    : (quizType==='mixed'
+        ? (mixedCounts.shorashim+mixedCounts.translation+mixedCounts.comprehension)
+        : requestedCount);
+
+  const sourceText=skillsSource(rawSource,quizType,count);
+  const references=quizType==='general'?[]:generatorReferences(sourceLabel,rawSource);
+
+  if(!rawSource){alert('Paste the lesson/source text first.');return;}
+
+  const btn=document.getElementById('generateBtn');
+  const status=document.getElementById('generatorStatus');
+  btn.disabled=true;
+  status.textContent=integrated?'Generating Chumash Havana skill questions…':'Generating…';
+
+  try{
+    const payload={sourceText,quizType,choiceCount,count,mixedCounts};
+
+    // This is the key fix: comprehension/mixed generation receives the actual
+    // verse references so the deployed secure backend can load its trusted
+    // Kehot/Metsudah grounding sources.
+    if(references.length)payload.references=references;
+
+    const resp=await B3PaidApi.fetch(GENERATE_WEEKLY_QUIZ_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(data.error||'Generator service error');
+
+    generatorCandidates=(data.items||[]).map(x=>({
+      selected:true,
+      skillType:x.skillType||quizType,
+      focus:x.focus||'',
+      q:x.question||'',
+      choices:asArray(x.choices),
+      correctIndex:Number(x.correctIndex)||0,
+      whySelected:x.whySelected||''
+    }));
+
+    if(!generatorCandidates.length)throw new Error('No usable questions were returned.');
+
+    // Short & direct: anything over 12 words (question) or 6 words (a choice) comes back unchecked and tagged.
+    const words=t=>String(t||'').trim().split(/\s+/).filter(Boolean).length;
+    let tooLong=0;
+    generatorCandidates.forEach(x=>{if(words(x.q)>12||x.choices.some(c=>words(c)>6)){x.selected=false;x.tooLong=true;tooLong++;}});
+    // Chumash Havana: only skill questions. Anything else comes back unchecked.
+    let offType=0;
+    if(integrated){
+      const SKILL_TAG=/^\s*\[(Word Parts|מי אמר אל מי|על מי נאמר)\]/;
+      generatorCandidates.forEach(x=>{if(!SKILL_TAG.test(x.whySelected||'')){x.selected=false;offType++;}});
+    }
+
+    document.getElementById('generatorReview').classList.remove('hidden');
+    renderCandidates();
+
+    const warning=data.warning?' '+data.warning:'';
+    status.textContent=(integrated
+      ? 'Generated '+(generatorCandidates.length-offType)+' Chumash Havana skill question(s).'+(offType?' '+offType+' other question(s) were unchecked because they are not skill questions.':'')
+      : 'Generated '+generatorCandidates.length+' question(s).')+(tooLong?' '+tooLong+' long question(s) were unchecked — check them or delete them.':'')+warning;
+
+    if(sourceLabel)document.getElementById('editorSourceLabel').value=sourceLabel;
+    document.getElementById('editorSkillType').value=integrated?'integrated':quizType;
+  }catch(e){
+    console.error(e);
+    const needsRefs=(quizType==='comprehension'||quizType==='mixed')&&!references.length;
+    status.textContent='Generator could not run: '+e.message+
+      (needsRefs
+        ? ' I could not automatically identify the pesukim. You may optionally enter a Source label such as "Vayeira 18:1-10" and try again.'
+        : ' If the Cloud Function is not deployed yet, use the included weekly-quiz-cloud-function.js.');
+  }finally{
+    btn.disabled=false;
+  }
+}
+function renderCandidates(){
+  const box=document.getElementById('candidateList');box.innerHTML='';
+  generatorCandidates.forEach((x,i)=>{
+    const div=document.createElement('div');div.className='candidate';
+    const ans=x.choices[Number(x.correctIndex)]||'';
+    div.innerHTML='<input type="checkbox" '+(x.selected?'checked':'')+' onchange="generatorCandidates['+i+'].selected=this.checked"><div><div class="focus">'+esc(x.focus||x.q)+' <span class="skill-tag">'+esc(skillLabel(x.skillType))+'</span>'+(x.tooLong?'<span class="skill-tag" style="background:#fff6e0;color:#7a5200">Too long</span>':'')+'</div><div>'+esc(x.q)+'</div><div class="answer">Correct: '+esc(ans)+'</div><div class="reason">'+esc(x.whySelected||'')+'</div></div>';
+    box.appendChild(div);
+  });
+}
+function setAllCandidates(v){generatorCandidates.forEach(x=>x.selected=!!v);renderCandidates();}
+function addSelectedCandidates(replace){
+  const chosen=generatorCandidates.filter(x=>x.selected).map(x=>({q:x.q,choices:x.choices.slice(),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType}));
+  if(!chosen.length){alert('Nothing is selected.');return;}
+  if(replace)editorQuestions=[];editorQuestions.push(...chosen);renderEditorRows();setupMsg((replace?'Replaced editor with ':'Added ')+chosen.length+' generated question(s). Review them, then save.');
+}
+
+// ---------- Hebrew keyboard for Quiz Setup ----------
+const HEBREW_TEXT_RE=/[\u0590-\u05FF]/;
+let hebrewKeyboardTarget=null;
+
+function isQuizSetupTextField(el){
+  return !!(el && el.closest && el.closest('#panelSetup') && el.matches('input[type="text"], textarea'));
+}
+function fieldHasHebrew(el){
+  return !!(el && HEBREW_TEXT_RE.test(String(el.value||'')));
+}
+function setHebrewKeyboardTarget(el){
+  if(hebrewKeyboardTarget && hebrewKeyboardTarget!==el)hebrewKeyboardTarget.classList.remove('hebrew-editing-target');
+  hebrewKeyboardTarget=el;
+  if(el)el.classList.add('hebrew-editing-target');
+}
+function showHebrewKeyboard(el){
+  if(!isQuizSetupTextField(el) || !fieldHasHebrew(el))return;
+  setHebrewKeyboardTarget(el);
+  document.getElementById('hebrewKeyboard').classList.remove('hidden');
+}
+function closeHebrewKeyboard(){
+  document.getElementById('hebrewKeyboard').classList.add('hidden');
+  if(hebrewKeyboardTarget)hebrewKeyboardTarget.classList.remove('hebrew-editing-target');
+  hebrewKeyboardTarget=null;
+}
+function fireHebrewKeyboardInput(el){
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function insertHebrewAtCursor(str){
+  const el=hebrewKeyboardTarget;
+  if(!el)return;
+  el.focus();
+  const start=Number.isInteger(el.selectionStart)?el.selectionStart:el.value.length;
+  const end=Number.isInteger(el.selectionEnd)?el.selectionEnd:start;
+  const before=el.value.slice(0,start),after=el.value.slice(end);
+  el.value=before+str+after;
+  const pos=start+str.length;
+  el.setSelectionRange(pos,pos);
+  fireHebrewKeyboardInput(el);
+}
+function hebrewKeyboardBackspace(){
+  const el=hebrewKeyboardTarget;
+  if(!el)return;
+  el.focus();
+  let start=Number.isInteger(el.selectionStart)?el.selectionStart:el.value.length;
+  let end=Number.isInteger(el.selectionEnd)?el.selectionEnd:start;
+  if(start===end && start>0)start--;
+  el.value=el.value.slice(0,start)+el.value.slice(end);
+  el.setSelectionRange(start,start);
+  fireHebrewKeyboardInput(el);
+}
+function moveHebrewCursor(delta){
+  const el=hebrewKeyboardTarget;
+  if(!el)return;
+  el.focus();
+  const pos=Number.isInteger(el.selectionStart)?el.selectionStart:el.value.length;
+  const next=Math.max(0,Math.min(el.value.length,pos+delta));
+  el.setSelectionRange(next,next);
+}
+function handleHebrewKeyboardButton(btn){
+  const key=btn.getAttribute('data-hkey');
+  const action=btn.getAttribute('data-haction');
+  if(key!==null){insertHebrewAtCursor(key);return;}
+  if(action==='backspace'){hebrewKeyboardBackspace();return;}
+  if(action==='left'){moveHebrewCursor(-1);return;}
+  if(action==='right'){moveHebrewCursor(1);return;}
+}
+
+document.getElementById('hebrewKeyboard').addEventListener('mousedown',e=>{
+  // Keep the cursor in the quiz field while clicking on-screen keys.
+  e.preventDefault();
+});
+document.getElementById('hebrewKeyboard').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-hkey],button[data-haction]');
+  if(btn)handleHebrewKeyboardButton(btn);
+});
+
+document.getElementById('panelSetup').addEventListener('mouseup',e=>{
+  const el=e.target.closest('input[type="text"], textarea');
+  if(!el)return;
+  // The keyboard appears automatically only when the clicked field contains Hebrew.
+  // This keeps ordinary English editing uncluttered.
+  if(fieldHasHebrew(el))showHebrewKeyboard(el);
+});
+document.getElementById('panelSetup').addEventListener('focusin',e=>{
+  const el=e.target;
+  if(isQuizSetupTextField(el) && fieldHasHebrew(el))showHebrewKeyboard(el);
+});
+
+// Clicking elsewhere closes it, unless the click is on the keyboard or the active field.
+document.addEventListener('mousedown',e=>{
+  const kb=document.getElementById('hebrewKeyboard');
+  if(kb.classList.contains('hidden'))return;
+  if(kb.contains(e.target))return;
+  if(hebrewKeyboardTarget===e.target)return;
+  if(e.target.closest && e.target.closest('#panelSetup input[type="text"], #panelSetup textarea')){
+    // Let the setup field's own focus/mouseup handler decide whether to switch targets.
+    return;
+  }
+  closeHebrewKeyboard();
+});
+
+// ---------- Teacher preview / try-out ----------
+function openQuizPreview(){
+  const questions=cleanedEditorQuestions();
+  if(!questions.length){alert('Add at least one complete question before previewing.');return;}
+  previewQuestions=questions.map(q=>({q:q.q,choices:asArray(q.choices).slice(),correctIndex:Number(q.correctIndex)||0,skillType:q.skillType||document.getElementById('editorSkillType').value}));
+  previewIndex=0;previewSelected=null;previewChecked=false;
+  document.getElementById('previewTitle').textContent=(document.getElementById('editorTitle').value.trim()||'Quiz Preview');
+  document.getElementById('previewMeta').textContent=skillLabel(document.getElementById('editorSkillType').value)+' • '+previewQuestions.length+' question'+(previewQuestions.length===1?'':'s');
+  document.getElementById('quizPreviewOverlay').classList.remove('hidden');
+  renderQuizPreview();
+}
+function closeQuizPreview(){document.getElementById('quizPreviewOverlay').classList.add('hidden');}
+function choosePreviewAnswer(i){
+  if(previewChecked)return;
+  previewSelected=i;
+  renderQuizPreview();
+}
+// ---------- Audio for Teacher Try-Out Quiz ----------
+const PREVIEW_TTS_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const previewAudioCache=new Map();
+let previewAudio=null;
+function previewSplitAudioSegments(text){
+  const chars=Array.from(String(text||'')),isHeb=ch=>/[\u0590-\u05FF]/.test(ch),isEng=ch=>/[A-Za-z0-9]/.test(ch);
+  const strong=chars.map(ch=>isHeb(ch)?'hebrew':(isEng(ch)?'english':null)),out=[];let buf='',kind=null;
+  for(let i=0;i<chars.length;i++){let k=strong[i];if(!k){let prev=null,next=null;for(let j=i-1;j>=0;j--){if(strong[j]){prev=strong[j];break;}}for(let j=i+1;j<chars.length;j++){if(strong[j]){next=strong[j];break;}}k=(prev==='hebrew'&&next==='hebrew')?'hebrew':'english';}if(kind!==null&&k!==kind){if(buf)out.push({kind,text:buf});buf='';}kind=k;buf+=chars[i];}if(buf)out.push({kind,text:buf});return out;
+}
+function previewExtractQuestionType(text){
+  const raw=String(text||'').trim(),types=[['מי אמר אל מי','מי אמר אל מי'],['על מי נאמר','על מי נאמר']];
+  for(const [needle,label] of types){if(raw.startsWith(needle)){const rest=raw.slice(needle.length).replace(/^\s*[?:：—–-]*\s*/,'').trim();return{label,text:rest||raw};}}
+  return{label:'',text:raw};
+}
+function renderPreviewAudioAwareText(el,text,prefix=''){
+  el.innerHTML='';el.dir='ltr';el.style.unicodeBidi='isolate';if(prefix){const pre=document.createElement('span');pre.className='tts-english';pre.dir='ltr';pre.textContent=prefix;el.appendChild(pre);}let hi=0;
+  previewSplitAudioSegments(text).forEach(seg=>{const span=document.createElement('span');if(seg.kind==='hebrew'){span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);}else{span.className='tts-english';span.dir='ltr';}span.textContent=seg.text;el.appendChild(span);});
+}
+function renderPreviewQuestion(el,text){
+  const parts=previewExtractQuestionType(text),old=document.getElementById('previewQuestionTypeLabel');if(old)old.remove();
+  if(parts.label){const lab=document.createElement('div');lab.id='previewQuestionTypeLabel';lab.className='question-type-label';lab.textContent=parts.label;el.parentNode.insertBefore(lab,el);}
+  renderPreviewAudioAwareText(el,parts.text);return parts;
+}
+function previewWait(ms){return new Promise(r=>setTimeout(r,ms));}
+async function getPreviewAudio(text){
+  const clean=String(text||'').replace(/\s+/g,' ').trim();if(!clean)return null;let src=previewAudioCache.get(clean);if(src)return src;
+  const resp=await B3PaidApi.fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean})});if(!resp.ok)throw new Error('Audio service error');
+  const data=await resp.json();if(data.audioContent)src='data:audio/mp3;base64,'+data.audioContent;else if(data.audioUrl)src=data.audioUrl;else if(data.url)src=data.url;else throw new Error('No audio returned');previewAudioCache.set(clean,src);return src;
+}
+async function playPreviewChunk(text){
+  const src=await getPreviewAudio(text);if(!src)return;if(previewAudio){try{previewAudio.pause();}catch(e){}}
+  previewAudio=new Audio(src);await new Promise((resolve,reject)=>{previewAudio.onended=resolve;previewAudio.onerror=reject;const p=previewAudio.play();if(p&&p.catch)p.catch(reject);});
+}
+async function playPreviewAudio(text,btn,rootEl){
+  text=String(text||'').trim();if(!text)return;const old=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳';}
+  try{
+    if(previewAudio){try{previewAudio.pause();}catch(e){}}
+    const hebrewEls=rootEl?Array.from(rootEl.querySelectorAll('.tts-hebrew')):[];let hi=0;
+    for(const seg of previewSplitAudioSegments(text)){
+      if(seg.kind==='hebrew'){const el=hebrewEls[hi++];if(el)el.classList.add('tts-highlight');await previewWait(Math.max(650,Math.min(1400,seg.text.trim().length*110)));if(el)el.classList.remove('tts-highlight');}
+      else if(/[A-Za-z0-9]/.test(seg.text))await playPreviewChunk(seg.text);
+    }
+  }catch(e){console.error(e);alert('Audio could not play.');}finally{if(btn){btn.disabled=false;btn.textContent=old;}}
+}
+function makePreviewAudioButton(text,label,rootEl){
+  const b=document.createElement('button');b.type='button';b.className='secondary';b.style.margin='6px 0';b.style.padding='7px 11px';b.textContent='🔊 '+label;b.onclick=(e)=>{e.stopPropagation();playPreviewAudio(text,b,rootEl);};return b;
+}
+function renderQuizPreview(){
+  if(!previewQuestions.length)return;
+  previewIndex=Math.max(0,Math.min(previewQuestions.length-1,previewIndex));
+  const q=previewQuestions[previewIndex],choices=asArray(q.choices);
+  document.getElementById('previewQMeta').textContent='Question '+(previewIndex+1)+' of '+previewQuestions.length+(q.skillType?' • '+skillLabel(q.skillType):'');
+  const previewQuestionEl=document.getElementById('previewQuestion'),previewQuestionParts=renderPreviewQuestion(previewQuestionEl,q.q||'');
+  let qAudio=document.getElementById('previewQuestionAudio');
+  if(!qAudio){qAudio=document.createElement('div');qAudio.id='previewQuestionAudio';previewQuestionEl.insertAdjacentElement('afterend',qAudio);}
+  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(previewQuestionParts.text,'Hear question',previewQuestionEl));
+  const box=document.getElementById('previewChoices');box.innerHTML='';
+  choices.forEach((choice,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='preview-choice';
+    renderPreviewAudioAwareText(b,choice,String.fromCharCode(65+i)+'. ');
+    if(previewSelected===i)b.classList.add('selected');
+    if(previewChecked){
+      if(i===Number(q.correctIndex))b.classList.add('correct');
+      else if(i===previewSelected)b.classList.add('wrong');
+    }
+    b.disabled=previewChecked;
+    b.onclick=()=>choosePreviewAnswer(i);
+    const row=document.createElement('div');row.style.display='grid';row.style.gridTemplateColumns='1fr auto';row.style.gap='8px';row.style.alignItems='center';
+    row.appendChild(b);row.appendChild(makePreviewAudioButton(choice,'Hear',b));
+    box.appendChild(row);
+  });
+  const status=document.getElementById('previewStatus');
+  status.className='preview-status';
+  if(!previewChecked){
+    status.textContent=previewSelected===null?'Choose an answer, then click Check Answer.':'Answer selected. Click Check Answer.';
+  }else{
+    const correct=previewSelected===Number(q.correctIndex);
+    status.classList.add(correct?'good':'bad');
+    status.textContent=correct?'Correct!':'Not correct. The correct answer is shown in green.';
+  }
+  document.getElementById('previewCheckBtn').disabled=previewSelected===null||previewChecked;
+  const nav=document.getElementById('previewNav');nav.innerHTML='';
+  previewQuestions.forEach((_,i)=>{
+    const b=document.createElement('button');b.textContent=i+1;
+    if(i===previewIndex)b.classList.add('active');
+    b.onclick=()=>{previewIndex=i;previewSelected=null;previewChecked=false;renderQuizPreview();};
+    nav.appendChild(b);
+  });
+}
+function checkPreviewAnswer(){
+  if(previewSelected===null)return;
+  previewChecked=true;renderQuizPreview();
+}
+function previewNext(){
+  if(!previewQuestions.length)return;
+  if(previewIndex<previewQuestions.length-1)previewIndex++;
+  previewSelected=null;previewChecked=false;renderQuizPreview();
+}
+function previewPrevious(){
+  if(!previewQuestions.length)return;
+  if(previewIndex>0)previewIndex--;
+  previewSelected=null;previewChecked=false;renderQuizPreview();
+}
+
+// ---------- Quiz library / editor ----------
+function renderQuizList(){
+  const box=document.getElementById('quizList');if(!box)return;box.innerHTML='';
+  const sortBy=(document.getElementById('quizSort')||{}).value||'updated',ts=(q,k)=>Number(q[k]||q.createdAt||0);
+  const ids=Object.keys(quizzes).sort((a,b)=>{const A=quizzes[a]||{},B=quizzes[b]||{};if(sortBy==='title')return String(A.title||'').localeCompare(String(B.title||''),undefined,{sensitivity:'base',numeric:true});if(sortBy==='newest')return ts(B,'createdAt')-ts(A,'createdAt');if(sortBy==='oldest')return ts(A,'createdAt')-ts(B,'createdAt');return ts(B,'updatedAt')-ts(A,'updatedAt');});
+  updateQuizTopicOptions();
+  if(!ids.length){box.innerHTML='<div class="small">No quizzes yet. Click + New or use the generator.</div>';return;}
+  // Current vs. past: teachers drag a quiz between the two sections .
+  const groups=[['current','Current quizzes','Drag a quiz down to Past quizzes when you are done with it.'],['past','Past quizzes','Drag a quiz back up to Current to use it again.']];
+  groups.forEach(([key,label,hint])=>{
+    const list=ids.filter(id=>(quizzes[id]&&quizzes[id].archived===true)===(key==='past'));
+    const sec=document.createElement(key==='past'?'details':'section');sec.className='quiz-section quiz-section-'+key;sec.dataset.group=key;
+    if(key==='past'&&quizSectionPastOpen)sec.open=true;
+    if(key==='past')sec.addEventListener('toggle',()=>{quizSectionPastOpen=sec.open;});
+    const head=document.createElement(key==='past'?'summary':'div');head.className='quiz-section-head';head.innerHTML='<span class="quiz-section-title">'+label+' <span class="quiz-section-count">'+list.length+'</span></span><span class="small">'+hint+'</span>';sec.appendChild(head);
+    const grid=document.createElement('div');grid.className='quiz-section-list';
+    if(!list.length)grid.innerHTML='<div class="quiz-drop-empty">'+(key==='past'?'No past quizzes. Drag a quiz here to move it out of the way.':'No current quizzes. Drag one up from Past quizzes, or make a new one.')+'</div>';
+    list.forEach(id=>{const q=quizzes[id]||{},div=document.createElement('div');div.className='quiz-item'+(id===currentQuizId?' active':'');div.draggable=true;div.dataset.quizId=id;div.dataset.skill=q.skillType||'comprehension';div.dataset.created=String(Number(q.createdAt)||0);div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(skillLabel(q.skillType||'comprehension'))+' • '+asArray(q.questions).length+' questions</div>';div.onclick=()=>loadQuizEditor(id);
+      div.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';div.classList.add('dragging');box.classList.add('quiz-dragging');});
+      div.addEventListener('dragend',()=>{div.classList.remove('dragging');box.classList.remove('quiz-dragging');box.querySelectorAll('.drop-over').forEach(x=>x.classList.remove('drop-over'));});
+      grid.appendChild(div);});
+    sec.appendChild(grid);
+    sec.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';sec.classList.add('drop-over');});
+    sec.addEventListener('dragleave',e=>{if(!sec.contains(e.relatedTarget))sec.classList.remove('drop-over');});
+    sec.addEventListener('drop',e=>{e.preventDefault();sec.classList.remove('drop-over');const id=e.dataTransfer.getData('text/plain');if(id&&quizzes[id])setQuizArchived(id,key==='past');});
+    box.appendChild(sec);
+  });
+}
+let quizSectionPastOpen=false;
+function updateQuizTopicOptions(){
+  const sel=document.getElementById('quizTopicFilter');if(!sel)return;const cur=sel.value||'all';
+  const types=[...new Set(Object.values(quizzes).map(q=>(q&&q.skillType)||'comprehension'))].sort((a,b)=>skillLabel(a).localeCompare(skillLabel(b)));
+  sel.innerHTML='<option value="all">All topics</option>'+types.map(t=>'<option value="'+esc(t)+'">'+esc(skillLabel(t))+'</option>').join('');
+  sel.value=types.includes(cur)?cur:'all';
+}
+function quizPassesFilters(el){
+  const q=((document.getElementById('quizSearch')||{}).value||'').trim().toLowerCase(),topic=(document.getElementById('quizTopicFilter')||{}).value||'all',range=(document.getElementById('quizDateFilter')||{}).value||'all';
+  if(q&&!el.textContent.toLowerCase().includes(q))return false;
+  if(topic!=='all'&&el.dataset.skill!==topic)return false;
+  if(range!=='all'){const c=Number(el.dataset.created)||0,now=new Date(),day=86400000,weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime(),cut3=Date.now()-90*day;
+    if(range==='week'&&c<weekStart)return false;if(range==='month'&&c<Date.now()-30*day)return false;if(range==='3months'&&c<cut3)return false;if(range==='older'&&c>=cut3)return false;}
+  return true;
+}
+function applyQuizFilters(){
+  const box=document.getElementById('quizList');if(!box)return;
+  box.querySelectorAll('.quiz-section').forEach(sec=>{let n=0,total=0;sec.querySelectorAll('.quiz-item').forEach(el=>{total++;const ok=quizPassesFilters(el);el.style.display=ok?'':'none';if(ok)n++;});const c=sec.querySelector('.quiz-section-count');if(c)c.textContent=n===total?String(total):n+' of '+total;});
+  const active=['quizTopicFilter','quizDateFilter'].some(id=>{const e=document.getElementById(id);return e&&e.value!=='all';})||!!((document.getElementById('quizSearch')||{}).value||'').trim();
+  const r=document.getElementById('quizFilterReset');if(r)r.hidden=!active;
+}
+function resetQuizFilters(){['quizTopicFilter','quizDateFilter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='all';});const s=document.getElementById('quizSearch');if(s)s.value='';applyQuizFilters();}
+async function setQuizArchived(id,archived){
+  if(!quizzes[id]||(quizzes[id].archived===true)===archived)return;
+  if(archived)quizSectionPastOpen=true;
+  quizzes[id].archived=archived;renderQuizList();
+  try{await db.ref(QROOT+'/quizzes/'+id+'/archived').set(archived);}catch(e){console.warn(e);alert('Could not move the quiz. Please try again.');}
+}
+function newQuizDraft(){
+  currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorSkillType').value='general';document.getElementById('editorSourceLabel').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');renderQuizList();
+}
+function loadQuizEditor(id){
+  currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';document.getElementById('editorSkillType').value=q.skillType||'comprehension';document.getElementById('editorSourceLabel').value=q.sourceLabel||'';
+  editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType||q.skillType||'comprehension'}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg('Loaded saved quiz.');renderQuizList();
+}
+function defaultEditorChoices(){return document.getElementById('generatorChoices').value==='4'?['','','','']:['','',''];}
+function addEditorRow(data){editorQuestions.push(data||{q:'',choices:defaultEditorChoices(),correctIndex:0,skillType:isMultiSkill(document.getElementById('editorSkillType').value)?'comprehension':document.getElementById('editorSkillType').value});renderEditorRows();}
+function editorSkillChanged(){const t=document.getElementById('editorSkillType').value;if(!isMultiSkill(t))editorQuestions.forEach(x=>x.skillType=t);renderEditorRows();}
+function renderEditorRows(){
+  const box=document.getElementById('editorRows');box.innerHTML='';const quizSkill=document.getElementById('editorSkillType').value;
+  editorQuestions.forEach((r,i)=>{
+    if(!Array.isArray(r.choices))r.choices=[];while(r.choices.length<3)r.choices.push('');if(r.choices.length>4)r.choices=r.choices.slice(0,4);
+    const d=document.createElement('div');d.className='editor-row';
+    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(!isMultiSkill(quizSkill)?'disabled':'')+'><option value="general" '+(r.skillType==='general'?'selected':'')+'>Any subject</option><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoroshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Chumash Translation</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Chumash Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
+    box.appendChild(d);
+  });
+}
+function addChoice(i){if(editorQuestions[i].choices.length<4)editorQuestions[i].choices.push('');renderEditorRows();}
+function removeFourthChoice(i){if(editorQuestions[i].choices.length>3){editorQuestions[i].choices=editorQuestions[i].choices.slice(0,3);if(editorQuestions[i].correctIndex>2)editorQuestions[i].correctIndex=0;}renderEditorRows();}
+function removeEditorRow(i){editorQuestions.splice(i,1);renderEditorRows();}
+function parseCorrectToken(token,choices){const t=String(token||'').trim();if(/^[A-Da-d]$/.test(t))return t.toUpperCase().charCodeAt(0)-65;if(/^[1-4]$/.test(t))return Number(t)-1;const idx=choices.findIndex(c=>c.trim().toLowerCase()===t.toLowerCase());return idx>=0?idx:0;}
+function parsePasted(text){
+  return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
+    let cells=line.includes('\t')?line.split('\t'):line.split(',');cells=cells.map(x=>x.trim());const q=(cells.shift()||'').trim(),correct=(cells.pop()||'').trim();const choices=cells.filter(Boolean).slice(0,4);return{q,choices,correctIndex:parseCorrectToken(correct,choices),skillType:isMultiSkill(document.getElementById('editorSkillType').value)?'comprehension':document.getElementById('editorSkillType').value};
+  }).filter(x=>x.q&&x.choices.length>=2);
+}
+function loadPasted(replace){const rows=parsePasted(document.getElementById('pasteBox').value);if(!rows.length){alert('Nothing usable was found. Copy rows from Sheets/Excel, or use comma-separated rows.');return;}if(replace)editorQuestions=[];editorQuestions.push(...rows);document.getElementById('pasteBox').value='';renderEditorRows();setupMsg('Loaded '+rows.length+' question(s) into the editor.');}
+function cleanedEditorQuestions(){
+  const quizSkill=document.getElementById('editorSkillType').value;
+  return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean).slice(0,4);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci,skillType:isMultiSkill(quizSkill)?(r.skillType||'comprehension'):quizSkill};}).filter(r=>r.q&&r.choices.length>=2);
+}
+async function saveQuiz(){
+  const title=document.getElementById('editorTitle').value.trim(),skillType=document.getElementById('editorSkillType').value,sourceLabel=document.getElementById('editorSourceLabel').value.trim(),questions=cleanedEditorQuestions();
+  if(!title){alert('Give the quiz a title.');return null;}if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
+  let id=currentQuizId;if(!id)id=Date.now()+'_'+slugTitle(title);const existing=quizzes[id]||{};
+  await db.ref(QROOT+'/quizzes/'+id).set({title,skillType,sourceLabel,questions,archived:existing.archived===true,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
+}
+async function deleteCurrentQuiz(){
+  if(!currentQuizId)return;const title=(quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'this quiz';if(!confirm('Delete "'+title+'" from the saved quiz library? Historical launches and results will NOT be deleted.'))return;
+  await db.ref(QROOT+'/quizzes/'+currentQuizId).remove();newQuizDraft();
+}
+
+// ---------- Launching: class or individual student ----------
+function makeQuestionStates(questions,mode){const out={};questions.forEach((_,i)=>out[i]={open:mode==='test'||i===0,reveal:false});return out;}
+function classForStudent(studentId){
+  return Object.keys(CLASS_ROSTERS).find(id=>(CLASS_ROSTERS[id].students||[]).includes(studentId))||'';
+}
+
+function selectDelivery(type){
+  document.getElementById('launchDeliveryType').value=type;
+  updateLaunchTargetUI();
+}
+function selectLaunchTarget(type){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  if(delivery==='live')type='class';
+  if(delivery==='makeup'&&type==='class')type='multiple';
+  document.getElementById('launchTargetType').value=type;
+  updateLaunchTargetUI();
+}
+function selectLaunchClass(classId){
+  document.getElementById('launchClass').value=classId;
+  populateLaunchStudents();
+  syncFriendlyLaunchUI();
+}
+function syncFriendlyLaunchUI(){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const target=document.getElementById('launchTargetType').value;
+  const classId=document.getElementById('launchClass').value;
+
+  [['live','deliveryCardLive'],['anytime','deliveryCardAnytime'],['makeup','deliveryCardMakeup']].forEach(([v,id])=>{
+    const el=document.getElementById(id); if(el)el.classList.toggle('active',delivery===v);
+  });
+
+  const targetPills=document.getElementById('launchTargetPills');
+  const classBtn=document.getElementById('targetClassBtn');
+  const oneBtn=document.getElementById('targetStudentBtn');
+  const multiBtn=document.getElementById('targetMultipleBtn');
+
+  if(delivery==='live'){
+    if(targetPills)targetPills.classList.add('hidden');
+  }else{
+    if(targetPills)targetPills.classList.remove('hidden');
+    if(classBtn)classBtn.classList.toggle('hidden',delivery==='makeup');
+  }
+
+  if(classBtn)classBtn.classList.toggle('active',target==='class');
+  if(oneBtn)oneBtn.classList.toggle('active',target==='student');
+  if(multiBtn)multiBtn.classList.toggle('active',target==='multiple');
+
+  const et=document.getElementById('classEtBtn'),wt=document.getElementById('classWtBtn');
+  if(et)et.classList.toggle('active',classId===(CLASS_SPACE?WQ_CLASS:'et'));
+  if(wt)wt.classList.toggle('active',classId==='wt');
+
+  const btn=document.getElementById('friendlyLaunchBtn');
+  if(btn){
+    btn.textContent=delivery==='live'?'Set Up Live Class Test':
+      delivery==='anytime'?'Assign Take Anytime Test':'Assign Make-Up Test';
+    btn.className='primary launch-main-button';
+    if(delivery==='makeup')btn.className='purple launch-main-button';
+    if(delivery==='anytime')btn.className='good launch-main-button';
+  }
+
+  const source=document.getElementById('makeupSourceMsg');
+  if(source)source.classList.toggle('hidden',!source.textContent.trim());
+}
+
+function populateLaunchStudents(){
+  const sel=document.getElementById('launchStudent');if(!sel)return;
+  const old=sel.value;
+  const allIds=[...new Set(Object.values(CLASS_ROSTERS).flatMap(c=>c.students||[]))].filter(id=>id!=='simcha_cohen');
+  const rows=allIds.map(id=>({id,name:(roster[id]&&roster[id].name)||id,classId:classForStudent(id)})).sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML='';
+  rows.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name+' — '+classLabel(x.classId);sel.appendChild(o);});
+  if(rows.some(x=>x.id===old))sel.value=old;
+
+  const checklist=document.getElementById('launchStudentChecklist');
+  if(checklist){
+    const cls=document.getElementById('launchClass').value;
+    const classRows=rows.filter(x=>x.classId===cls);
+    checklist.innerHTML=classRows.map(x=>'<label><input type="checkbox" value="'+esc(x.id)+'" '+(makeupPreselected.has(x.id)?'checked':'')+'> '+esc(x.name)+'</label>').join('');
+  }
+}
+function selectedLaunchStudents(){
+  return [...document.querySelectorAll('#launchStudentChecklist input[type="checkbox"]:checked')].map(x=>x.value);
+}
+function updateLaunchTargetUI(){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const target=document.getElementById('launchTargetType');
+  const classOpt=target.querySelector('option[value="class"]');
+
+  if(delivery==='live'){
+    target.value='class';
+    target.disabled=true;
+    classOpt.disabled=false;
+  }else{
+    target.disabled=false;
+    classOpt.disabled=delivery==='makeup';
+    if(delivery==='makeup'&&target.value==='class')target.value='multiple';
+  }
+
+  const t=target.value;
+  document.getElementById('launchClassWrap').classList.toggle('hidden',t==='student');
+  document.getElementById('launchStudentWrap').classList.toggle('hidden',t!=='student');
+  document.getElementById('launchMultiWrap').classList.toggle('hidden',t!=='multiple');
+  document.getElementById('launchModeWrap').classList.toggle('hidden',delivery!=='live');
+
+  const help=document.getElementById('launchTypeHelp');
+  if(delivery==='live')help.textContent='Live Class Test: you start it and control opening, locking, and revealing questions during class.';
+  else if(delivery==='anytime')help.textContent='Take Anytime: the test is available immediately. Each assigned student may complete it later. After submitting all questions, that attempt is finished unless you assign a retake.';
+  else help.textContent='Make-Up Test: assign the test only to the selected student(s). It does not reopen the test for the rest of the class.';
+
+  populateLaunchStudents();
+  syncFriendlyLaunchUI();
+}
+async function launchSelectedQuiz(){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const targetType=document.getElementById('launchTargetType').value;
+  const note=document.getElementById('launchNote').value.trim();
+  const showScore=document.getElementById('launchShowScore').checked===true;
+
+  let quiz=null,questions=[],quizId=currentQuizId,snapshot=null;
+  if(delivery==='makeup'&&makeupSourceLaunchId&&allLaunches[makeupSourceLaunchId]){
+    const base=allLaunches[makeupSourceLaunchId];
+    snapshot=JSON.parse(JSON.stringify(base.quizSnapshot||{}));
+    quizId=base.quizId||'';
+    questions=asArray(snapshot.questions);
+  }else{
+    if(!currentQuizId||!quizzes[currentQuizId]){alert('Choose and save a quiz first.');return;}
+    quiz=quizzes[currentQuizId];
+    questions=asArray(quiz.questions);
+    snapshot={title:quiz.title||'Untitled',skillType:quiz.skillType||'comprehension',sourceLabel:quiz.sourceLabel||'',questions};
+  }
+  if(!questions.length){alert('This quiz has no questions.');return;}
+
+  let classId='',studentIds=[],targetStudents=null,targetLabel='';
+  if(delivery==='live'){
+    classId=document.getElementById('launchClass').value;
+    targetLabel=classLabel(classId);
+    const old=activeLaunchByClass[classId]||'';
+    if(old&&!confirm(classLabel(classId)+' already has an active class launch. Replace it? The old results will remain saved.'))return;
+  }else if(targetType==='student'){
+    const studentId=document.getElementById('launchStudent').value;
+    if(!studentId){alert('Choose a student.');return;}
+    classId=classForStudent(studentId);
+    if(!classId){alert('That student is not assigned to East Track or West Track yet.');return;}
+    studentIds=[studentId];
+    targetStudents={[studentId]:true};
+    targetLabel=(roster[studentId]&&roster[studentId].name)||studentId;
+  }else if(targetType==='multiple'){
+    classId=document.getElementById('launchClass').value;
+    studentIds=selectedLaunchStudents();
+    if(!studentIds.length){alert('Choose at least one student.');return;}
+    targetStudents=Object.fromEntries(studentIds.map(id=>[id,true]));
+    targetLabel=studentIds.length+' selected student'+(studentIds.length===1?'':'s');
+  }else{
+    classId=document.getElementById('launchClass').value;
+    studentIds=((CLASS_ROSTERS[classId]||{}).students||[]).filter(id=>id!=='simcha_cohen');
+    if(!studentIds.length){alert('No students are assigned to this class.');return;}
+    targetStudents=Object.fromEntries(studentIds.map(id=>[id,true]));
+    targetLabel=classLabel(classId);
+  }
+
+  if(delivery!=='live'){
+    const activeChecks=await Promise.all(studentIds.map(async sid=>{
+      const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');
+      return {sid,old:s.val()||''};
+    }));
+    const conflicts=activeChecks.filter(x=>x.old);
+    if(conflicts.length){
+      const names=conflicts.map(x=>(roster[x.sid]&&roster[x.sid].name)||x.sid).join(', ');
+      if(!confirm('These student(s) already have an individual quiz assigned: '+names+'. Replace their current assignment? Their old results will remain saved.'))return;
+    }
+  }
+
+  const mode=delivery==='live'?document.getElementById('launchMode').value:'test';
+  const autoStart=delivery!=='live';
+  const id=Date.now()+'_'+(delivery==='live'?classId:'assigned')+'_'+slugTitle(snapshot.title||'quiz');
+  const launch={
+    quizId,
+    quizSnapshot:snapshot,
+    classId,
+    targetStudents:delivery==='live'?null:targetStudents,
+    note,
+    deliveryType:delivery,
+    showScore,
+    createdAt:firebase.database.ServerValue.TIMESTAMP,
+    started:autoStart,
+    mode,
+    activeQuestion:0,
+    questionStates:makeQuestionStates(questions,mode),
+    attemptGroupId:id,
+    attemptNumber:1,
+    retakeOf:''
+  };
+  if(autoStart)launch.startedAt=firebase.database.ServerValue.TIMESTAMP;
+  if(makeupSourceLaunchId)launch.makeupOf=makeupSourceLaunchId;
+
+  await db.ref(QROOT+'/launches/'+id).set(launch);
+
+  if(delivery==='live'){
+    await db.ref(QROOT+'/settings/activeLaunchByClass/'+classId).set(id);
+    launchMsg('Live Class Test staged for '+targetLabel+'. Click Start test when the class is ready.');
+    liveClassId=classId;
+    document.getElementById('liveClassSelect').value=classId;
+    showTab('live');
+    attachLiveLaunch(id);
+  }else{
+    const updates={};
+    studentIds.forEach(sid=>updates[QROOT+'/settings/studentActiveLaunch/'+sid]=id);
+    await db.ref().update(updates);
+    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
+    if(delivery==='makeup')makeupSourceLaunchId='';
+    makeupPreselected.clear();
+    document.getElementById('makeupSourceMsg').textContent='';document.getElementById('makeupSourceMsg').classList.add('hidden');
+  }
+}
+// ---------- Live view ----------
+function changeLiveClass(){liveClassId=document.getElementById('liveClassSelect').value;attachLiveLaunch(activeLaunchByClass[liveClassId]||'');}
+function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)liveResponseRef.off();liveLaunchRef=liveResponseRef=null;}
+function attachLiveLaunch(id){
+  if(id===activeLaunchId&&liveLaunchRef)return;detachLive();activeLaunchId=id;liveLaunch=null;liveResponses={};currentQ=0;
+  if(!id){renderLive();renderLiveGrid();return;}
+  liveLaunchRef=db.ref(QROOT+'/launches/'+id);liveResponseRef=db.ref(QROOT+'/responses/'+id);
+  liveLaunchRef.on('value',s=>{liveLaunch=s.val();if(liveLaunch&&liveLaunch.activeQuestion!==undefined)currentQ=Number(liveLaunch.activeQuestion)||0;renderLive();renderLiveGrid();});
+  liveResponseRef.on('value',s=>{liveResponses=s.val()||{};renderLiveGrid();});
+}
+function liveQuestions(){return liveLaunch&&liveLaunch.quizSnapshot?asArray(liveLaunch.quizSnapshot.questions):[];}
+function qState(i,launch=liveLaunch){const qs=(launch&&launch.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
+function responseFor(studentId,i,responses=liveResponses){const r=responses[studentId]||{};return r[i]||r[String(i)]||null;}
+function renderLive(){
+  const qs=liveQuestions(),snap=liveLaunch&&liveLaunch.quizSnapshot||{};
+  document.getElementById('liveQuizTitle').textContent=liveLaunch?(snap.title||'Untitled'):'No active launch for '+classLabel(liveClassId);
+  const targetIds=liveLaunch&&liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const targetText=targetIds.length?((roster[targetIds[0]]&&roster[targetIds[0]].name)||targetIds[0]):classLabel(liveLaunch&&liveLaunch.classId);document.getElementById('liveLaunchMeta').textContent=liveLaunch?(targetText+' • '+skillLabel(snap.skillType)+' • created '+fmtDate(liveLaunch.createdAt)+(liveLaunch.note?' • '+liveLaunch.note:'')):'';
+  document.getElementById('liveStatus').textContent=liveLaunch&&liveLaunch.started?'Live':'Not started';document.getElementById('liveStatus').classList.toggle('live',!!(liveLaunch&&liveLaunch.started));
+  document.getElementById('modeSelect').value=liveLaunch&&liveLaunch.mode||'paced';
+  const scoreBtn=document.getElementById('scoreReleaseBtn');
+  if(scoreBtn){scoreBtn.disabled=!liveLaunch;scoreBtn.textContent=liveLaunch&&liveLaunch.showScore===true?'Score & review shown':'Score & review hidden';}
+  if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='No test is running. Go to Quizzes → Give to students to set one up.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
+  currentQ=Math.max(0,Math.min(qs.length-1,currentQ));const q=qs[currentQ],st=qState(currentQ),choices=asArray(q.choices);
+  document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
+  const strip=document.getElementById('questionStrip');strip.innerHTML='';qs.forEach((_,i)=>{const s=qState(i),b=document.createElement('button');b.textContent=i+1;if(i===currentQ)b.classList.add('active');if(s.open)b.classList.add('open');if(s.reveal)b.classList.add('reveal');b.onclick=()=>goQuestion(i);strip.appendChild(b);});
+}
+function goQuestion(i){currentQ=i;if(activeLaunchId)db.ref(QROOT+'/launches/'+activeLaunchId+'/activeQuestion').set(i);else renderLive();}
+function prevQuestion(){const qs=liveQuestions();if(qs.length)goQuestion(Math.max(0,currentQ-1));}
+async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};/* Opening the next question must never push a student off an unfinished earlier question. Leave previously reached questions available; the student chooses when to move. */updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
+async function setCurrentOpen(open){if(activeLaunchId)await db.ref(QROOT+'/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/open').set(!!open);}
+async function toggleReveal(){if(!activeLaunchId)return;await db.ref(QROOT+'/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
+async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i<=currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}
+async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}
+async function toggleScoreRelease(){
+  if(!activeLaunchId||!liveLaunch)return;
+  await db.ref(QROOT+'/launches/'+activeLaunchId+'/showScore').set(!(liveLaunch.showScore===true));
+}
+async function stopLaunch(){
+  if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
+  await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});
+  if(targets.length){for(const sid of targets){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
+  else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
+}
+function rosterRowsForLaunch(launch=liveLaunch){
+  if(!launch)return[];const targets=launch.targetStudents&&Object.keys(launch.targetStudents).filter(k=>launch.targetStudents[k]);const allowed=targets&&targets.length?targets:(CLASS_ROSTERS[launch.classId]||{}).students||[];
+  return allowed.map(id=>({id,name:(roster[id]&&roster[id].name)||id})).filter(x=>x.id!=='simcha_cohen').sort((a,b)=>a.name.localeCompare(b.name));
+}
+function renderLiveGrid(){
+  const table=document.getElementById('liveGrid');if(!table)return;const qs=liveQuestions(),students=rosterRowsForLaunch();
+  if(!qs.length){table.innerHTML='<tr><td>No active launch.</td></tr>';document.getElementById('liveSummary').innerHTML='';return;}
+  let html='<thead><tr><th>Student</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Score</th></tr></thead><tbody>';
+  students.forEach(st=>{let correct=0,answered=0;html+='<tr><td>'+esc(st.name)+'</td>';qs.forEach((q,i)=>{const r=responseFor(st.id,i),locked=!qState(i).open;let cls='blank',txt='—';if(r){answered++;if(r.correct){correct++;cls='correct';txt='✓';}else{cls='incorrect';txt='×';}if(r.adjusted)cls+=' adjusted';}if(locked)cls+=' locked';html+='<td class="cell '+cls+'" onclick="openAnswerModal(\''+esc(st.id)+'\','+i+',\'live\')">'+txt+'</td>';});html+='<td><b>'+correct+'/'+qs.length+'</b> ('+Math.round(correct/qs.length*100)+'%)</td></tr>';});table.innerHTML=html+'</tbody>';
+  let totalAnswered=0,totalCorrect=0;Object.values(liveResponses).forEach(sr=>Object.values(sr||{}).forEach(r=>{if(r){totalAnswered++;if(r.correct)totalCorrect++;}}));document.getElementById('liveSummary').innerHTML='<div class="summary"><div>Students</div><b>'+students.length+'</b></div><div class="summary"><div>Answers submitted</div><b>'+totalAnswered+'</b></div><div class="summary"><div>Final correct</div><b>'+totalCorrect+'</b></div>';
+}
+
+// ---------- Answer review / adjustment audit ----------
+function launchById(id){return allLaunches[id]||(id===activeLaunchId?liveLaunch:null);}
+function responsesByLaunch(id){return allResponses[id]||(id===activeLaunchId?liveResponses:{});}
+function openAnswerModal(studentId,i,source,launchId){
+  const lid=launchId||(source==='live'?activeLaunchId:resultsLaunchId),launch=launchById(lid),responses=responsesByLaunch(lid),r=responseFor(studentId,i,responses);if(!launch||!r)return;
+  const q=asArray(launch.quizSnapshot&&launch.quizSnapshot.questions)[i],choices=asArray(q&&q.choices),chosen=choices[Number(r.choiceIndex)]||'(unknown)',correct=choices[Number(q.correctIndex)]||'(unknown)',st=roster[studentId]||{};
+  modalContext={launchId:lid,studentId,i,response:r};document.getElementById('modalAdjustmentNote').value='';document.getElementById('modalAnswerInfo').innerHTML='<b>'+esc(st.name||r.name||studentId)+'</b> — Question '+(i+1)+'<br><br><b>Question:</b> '+esc(q.q||'')+'<br><b>Student answer:</b> '+esc(chosen)+'<br><b>Answer key:</b> '+esc(correct)+'<br><b>Current final result:</b> '+(r.correct?'Correct':'Incorrect')+(r.adjusted?' <span class="audit-note">(teacher adjusted)</span>':'');document.getElementById('answerModal').classList.remove('hidden');
+}
+function closeAnswerModal(){document.getElementById('answerModal').classList.add('hidden');modalContext=null;}
+async function writeAudit(type,before,after,note,extra={}){if(!modalContext)return;const ref=db.ref(QROOT+'/audit/'+modalContext.launchId+'/'+modalContext.studentId).push();await ref.set({type,questionIndex:modalContext.i,before,after,note:note||'',at:firebase.database.ServerValue.TIMESTAMP,...extra});}
+async function adjustCurrentAnswer(markCorrect){
+  if(!modalContext)return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response,before=!!r.correct;if(before===!!markCorrect&&!note){closeAnswerModal();return;}
+  await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});closeAnswerModal();
+}
+async function clearCurrentAnswer(){
+  if(!modalContext)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response;await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).remove();closeAnswerModal();
+}
+
+// ---------- Results / history ----------
+function launchResponses(id){return allResponses[id]||{};}
+function launchQuestions(l){return l&&l.quizSnapshot?asArray(l.quizSnapshot.questions):[];}
+function launchStudentRows(l){return rosterRowsForLaunch(l);}
+function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(l),rr=allResponses[lid]||{},sr=rr[studentId]||{};let correct=0,answered=0;qs.forEach((_,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct)correct++;}});return{correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):0};}
+function renderLaunchHistory(){
+  const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',dateFilter=document.getElementById('resultsDateFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();const now=new Date(),todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime();let ids=Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{},ts=Number(l.createdAt)||0;if(filter!=='all'&&l.classId!==filter)return false;if(dateFilter==='today'&&ts<todayStart)return false;if(dateFilter==='week'&&ts<weekStart)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;return true;}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
+  if(!ids.length){box.innerHTML='<div class="small">No quizzes match these filters. Try All Dates or a different search.</div>';return;}
+  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
+  if(!ids.includes(resultsLaunchId)&&ids[0]){resultsLaunchId=ids[0];renderLaunchHistory();renderResults();}
+}
+function renderResults(){
+  const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
+  const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
+  document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');
+  const resultsScoreBtn=document.getElementById('resultsScoreBtn');
+  if(resultsScoreBtn)resultsScoreBtn.textContent=l.showScore===true?'Score & review shown':'Score & review hidden';
+  const endBtn=document.getElementById('endSelectedBtn');endBtn.classList.toggle('hidden',!l.started);
+  if(!qs.length){table.innerHTML='<tr><td>No questions.</td></tr>';return;}
+  let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';
+  students.forEach(st=>{
+    const display=studentDisplayAttempt(resultsLaunchId,st.id),showingOther=display.id!==resultsLaunchId,dqs=showingOther?launchQuestions(allLaunches[display.id]):qs,dr=allResponses[display.id]||{},dsr=dr[st.id]||{},score=launchScore(display.id,st.id),comp=completions[display.id]&&completions[display.id][st.id];
+    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="event.stopPropagation();openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(display.id)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');
+    const nameCell=esc(st.name)+(showingOther?'<div class="small" style="color:var(--blue);cursor:pointer" onclick="event.stopPropagation();resultsLaunchId=\''+esc(display.id)+'\';renderLaunchHistory();renderResults();" title="This score is from a later retake — click to open it directly">showing Retake '+display.attempt+'</div>':'');
+    let retakeCell;
+    if(display.pendingNewer.length){
+      const p=display.pendingNewer[display.pendingNewer.length-1];
+      retakeCell='<div class="small" style="color:var(--gold);font-weight:700;cursor:pointer;margin-bottom:4px" onclick="event.stopPropagation();resultsLaunchId=\''+esc(p.id)+'\';renderLaunchHistory();renderResults();" title="Click to open this retake">Retake '+p.attempt+' assigned — not yet completed</div><button class="secondary" onclick="event.stopPropagation();copyLaunchLink(\''+esc(p.id)+'\')">Copy that retake\'s link</button>';
+    }else if(showingOther){
+      retakeCell='<div class="small" style="color:var(--good);font-weight:700;margin-bottom:4px">Retake '+display.attempt+' completed'+(comp?' '+esc(fmtDate(comp.completedAt)):'')+'</div><button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake again</button>';
+    }else{
+      retakeCell='<button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake</button>';
+    }
+    html+='<tr><td>'+nameCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'<td>'+retakeCell+'</td></tr>';
+  });
+  table.innerHTML=html+'</tbody>';
+}
+async function toggleResultsScoreRelease(){
+  const l=allLaunches[resultsLaunchId];
+  if(!l)return;
+  await db.ref(QROOT+'/launches/'+resultsLaunchId+'/showScore').set(!(l.showScore===true));
+}
+function openMakeupFromResults(){
+  const base=allLaunches[resultsLaunchId];
+  if(!base){alert('Choose a test from Quiz History first.');return;}
+  makeupSourceLaunchId=resultsLaunchId;
+  makeupPreselected=new Set();
+
+  const qs=launchQuestions(base);
+  launchStudentRows(base).forEach(st=>{
+    const score=launchScore(resultsLaunchId,st.id);
+    if(score.answered<qs.length)makeupPreselected.add(st.id);
+  });
+
+  document.getElementById('launchDeliveryType').value='makeup';
+  document.getElementById('launchTargetType').value='multiple';
+  document.getElementById('launchClass').value=base.classId||(CLASS_SPACE?WQ_CLASS:'et');
+  document.getElementById('launchShowScore').checked=base.showScore===true;
+  document.getElementById('launchNote').value='Make-up from '+((base.quizSnapshot&&base.quizSnapshot.title)||'original test');
+  updateLaunchTargetUI();
+  document.getElementById('makeupSourceMsg').textContent='Using the exact original test from Results: '+((base.quizSnapshot&&base.quizSnapshot.title)||'Untitled')+'. Students who did not finish are preselected.'; document.getElementById('makeupSourceMsg').classList.remove('hidden');
+  showTab('setup');
+  document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
+async function launchRetake(studentId){
+  const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
+  const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
+  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref(QROOT+'/settings/studentActiveLaunch/'+studentId).set(id);
+  const name=(roster[studentId]&&roster[studentId].name)||studentId,link=getLaunchLink(id);
+  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
+  catch(e){prompt('Retake '+attempt+' is now active for '+name+'. Copy this direct link to send:',link);}
+}
+async function deleteLaunch(id){
+  const l=allLaunches[id];if(!l){alert('That launch no longer exists.');return;}
+  const snap=l.quizSnapshot||{},retakeLabel=l.retakeOf?(' (Retake '+(l.attemptNumber||2)+')'):'',target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],who=target.length?' for '+((roster[target[0]]&&roster[target[0]].name)||target[0]):'';
+  if(!confirm('Delete "'+(snap.title||'Untitled')+retakeLabel+'"'+who+'? This permanently removes its results, responses, and audit trail. This cannot be undone.'))return;
+  await db.ref(QROOT+'/launches/'+id).remove();
+  await db.ref(QROOT+'/responses/'+id).remove();
+  await db.ref(QROOT+'/completions/'+id).remove();
+  await db.ref(QROOT+'/audit/'+id).remove();
+  // Clean up any dangling pointers so no student/class is left aimed at a deleted launch.
+  if(activeLaunchByClass[l.classId]===id)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();
+  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
+  if(resultsLaunchId===id)resultsLaunchId='';
+  renderLaunchHistory();renderResults();
+}
+// ---------- Retake chain helpers ----------
+// Finds every launch belonging to the same retake chain (attemptGroupId) as
+// baseId that this student is part of, whether they're the base launch or a
+// personal retake targeted at them, sorted from first attempt to latest.
+function studentAttemptChain(baseId,studentId){
+  const base=allLaunches[baseId];if(!base)return[];const group=base.attemptGroupId||baseId,chain=[];
+  Object.keys(allLaunches).forEach(id=>{
+    const l=allLaunches[id];if(!l)return;
+    const belongs=id===baseId||(l.targetStudents&&l.targetStudents[studentId]);
+    if(!belongs)return;
+    if((l.attemptGroupId||id)!==group)return;
+    const comp=completions[id]&&completions[id][studentId];
+    chain.push({id,launch:l,attempt:Number(l.attemptNumber)||1,completed:!!comp,completedAt:comp?comp.completedAt:null});
+  });
+  chain.sort((a,b)=>a.attempt-b.attempt);
+  return chain;
+}
+// Of that chain, picks which attempt's score should be shown for this student
+// on the currently displayed launch: the newest COMPLETED attempt if any exist
+// (so a finished retake replaces a stale 0/10 on the original), otherwise the
+// currently displayed launch itself even if unfinished.
+function studentDisplayAttempt(baseId,studentId){
+  const chain=studentAttemptChain(baseId,studentId);if(!chain.length)return{id:baseId,attempt:1,completed:false,pendingNewer:[]};
+  const completedOnes=chain.filter(a=>a.completed);
+  const display=completedOnes.length?completedOnes[completedOnes.length-1]:(chain.find(a=>a.id===baseId)||chain[chain.length-1]);
+  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed);
+  return{id:display.id,attempt:display.attempt,completed:display.completed,completedAt:display.completedAt,pendingNewer};
+}
+function resultsMatrix(){
+  const l=allLaunches[resultsLaunchId];if(!l)return[];const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},rows=[['Quiz',l.quizSnapshot&&l.quizSnapshot.title||''],['Class',classLabel(l.classId)],['Date',fmtDate(l.createdAt)],['Attempt',l.retakeOf?'Retake '+(l.attemptNumber||2):'First attempt'],[],['Student','Score','Percent',...qs.map((_,i)=>'Q'+(i+1))]];
+  students.forEach(st=>{const score=launchScore(resultsLaunchId,st.id),sr=rr[st.id]||{},answers=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'';const choices=asArray(q.choices);return(r.correct?'Correct: ':'Incorrect: ')+(choices[Number(r.choiceIndex)]||'')+(r.adjusted?' [adjusted]':'');});rows.push([st.name,score.correct+'/'+score.total,score.pct+'%',...answers]);});return rows;
+}
+function csvEscape(v){const s=String(v??'');return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function downloadCSV(){const rows=resultsMatrix(),l=allLaunches[resultsLaunchId];if(!rows.length||!l)return;const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=((l.quizSnapshot&&l.quizSnapshot.title)||'B3_Quiz').replace(/[^a-z0-9]+/gi,'_')+'_'+l.classId+'_'+resultsLaunchId.slice(0,13)+'.csv';a.click();URL.revokeObjectURL(a.href);}
+async function copyResultsTSV(){const rows=resultsMatrix();if(!rows.length)return;const tsv=rows.map(r=>r.join('\t')).join('\n');try{await navigator.clipboard.writeText(tsv);alert('Copied. Paste directly into Google Sheets.');}catch(e){prompt('Copy this and paste into Google Sheets:',tsv);}}
+
+// ---------- Long-term student progress ----------
+function populateProgressStudents(){
+  const cls=document.getElementById('progressClass').value,sel=document.getElementById('progressStudent'),old=sel.value,ids=((CLASS_ROSTERS[cls]||{}).students||[]).filter(id=>id!=='simcha_cohen');sel.innerHTML='';ids.map(id=>({id,name:(roster[id]&&roster[id].name)||id})).sort((a,b)=>a.name.localeCompare(b.name)).forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;sel.appendChild(o);});if(ids.includes(old))sel.value=old;renderStudentProgress();
+}
+function studentLaunchRecords(studentId){
+  const records=[];Object.entries(allLaunches).forEach(([lid,l])=>{const targets=l.targetStudents&&Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]);const belongs=targets&&targets.length?targets.includes(studentId):((CLASS_ROSTERS[l.classId]||{}).students||[]).includes(studentId);if(!belongs)return;const qs=launchQuestions(l),sr=(allResponses[lid]||{})[studentId]||{};if(!Object.keys(sr).length)return;const bySkill={};qs.forEach((q,i)=>{const skill=q.skillType||(l.quizSnapshot&&l.quizSnapshot.skillType)||'comprehension',r=sr[i]||sr[String(i)];if(!bySkill[skill])bySkill[skill]={correct:0,total:0,answered:0};bySkill[skill].total++;if(r){bySkill[skill].answered++;if(r.correct)bySkill[skill].correct++;}});const adjusted=Object.values(sr).filter(r=>r&&r.adjusted).length;records.push({launchId:lid,launch:l,title:l.quizSnapshot&&l.quizSnapshot.title||'Untitled',date:Number(l.createdAt)||0,attemptGroupId:l.attemptGroupId||lid,attemptNumber:Number(l.attemptNumber)||1,retake:!!l.retakeOf,bySkill,adjusted});});return records.sort((a,b)=>a.date-b.date);
+}
+function currentSkillStats(studentId){
+  const records=studentLaunchRecords(studentId),latestByGroup={};records.forEach(r=>{const g=r.attemptGroupId;if(!latestByGroup[g]||r.attemptNumber>=latestByGroup[g].attemptNumber)latestByGroup[g]=r;});const stats={general:{correct:0,total:0,groups:0},shorashim:{correct:0,total:0,groups:0},translation:{correct:0,total:0,groups:0},comprehension:{correct:0,total:0,groups:0}};Object.values(latestByGroup).forEach(r=>Object.entries(r.bySkill).forEach(([skill,v])=>{if(!stats[skill])return;stats[skill].correct+=v.correct;stats[skill].total+=v.total;stats[skill].groups++;}));Object.values(stats).forEach(s=>s.pct=s.total?Math.round(s.correct/s.total*100):null);return{stats,records,latestByGroup};
+}
+function makeParentSummary(name,stats){
+  const available=Object.entries(stats).filter(([,v])=>v.pct!==null).sort((a,b)=>b[1].pct-a[1].pct);if(!available.length)return'No quiz data is available yet for '+name+'.';
+  if(available.length===1){const [k,v]=available[0];return name+' currently has a '+v.pct+'% final average in '+skillLabel(k)+'. More quiz data will give a fuller picture over time.';}
+  const top=available[0],low=available[available.length-1];let lowPhrase=low[1].pct>=90?'is also very strong':low[1].pct>=80?'is also strong':low[1].pct>=70?'is developing well':'currently needs the most support';
+  let text=name+' is currently strongest in '+skillLabel(top[0])+' ('+top[1].pct+'%). '+skillLabel(low[0])+' '+lowPhrase+' ('+low[1].pct+'%).';if(available.length===3){const mid=available[1];text+=' '+skillLabel(mid[0])+' is '+mid[1].pct+'%.';}return text+' These percentages use the student\'s current final results.';
+}
+function renderStudentProgress(){
+  const sel=document.getElementById('progressStudent');if(!sel||!sel.value){document.getElementById('skillCards').innerHTML='';document.getElementById('parentSummary').textContent='Choose a student.';document.getElementById('progressHistory').innerHTML='';return;}const sid=sel.value,name=(roster[sid]&&roster[sid].name)||sel.options[sel.selectedIndex].textContent||sid,{stats,records}=currentSkillStats(sid);document.getElementById('progressStudentName').textContent=name+' — Progress';
+  document.getElementById('skillCards').innerHTML=['general','shorashim','translation','comprehension'].map(k=>'<div class="skill-card"><div>'+skillLabel(k)+'</div><div class="big">'+(stats[k].pct===null?'—':stats[k].pct+'%')+'</div><div class="small">'+stats[k].groups+' assessment'+(stats[k].groups===1?'':'s')+'</div></div>').join('');document.getElementById('parentSummary').textContent=makeParentSummary(name,stats);
+  let html='<thead><tr><th>Date</th><th>Quiz</th><th>Class</th><th>Attempt</th><th>Shoreshim</th><th>Words/Phrases</th><th>Comprehension</th><th>Adjusted</th></tr></thead><tbody>';records.slice().reverse().forEach(r=>{function cell(skill){const v=r.bySkill[skill];return v&&v.total?Math.round(v.correct/v.total*100)+'%':'—';}html+='<tr><td>'+esc(fmtDate(r.date))+'</td><td>'+esc(r.title)+'</td><td>'+esc(classLabel(r.launch.classId))+'</td><td>'+(r.retake?'Retake '+r.attemptNumber:'First')+'</td><td>'+cell('general')+'</td><td>'+cell('shorashim')+'</td><td>'+cell('translation')+'</td><td>'+cell('comprehension')+'</td><td>'+(r.adjusted?r.adjusted:'—')+'</td></tr>';});document.getElementById('progressHistory').innerHTML=html+'</tbody>';
+}
+async function copyParentSummary(){const text=document.getElementById('parentSummary').textContent;if(!text)return;try{await navigator.clipboard.writeText(text);alert('Parent summary copied.');}catch(e){prompt('Copy parent summary:',text);}}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('quizPreviewOverlay').classList.contains('hidden'))closeQuizPreview();});
+
+// ---------- Links ----------
+function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
+async function copyStudentLink(){const link=getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
+// A direct link to one exact launch (the original test or any specific retake).
+// Opening it sends that student straight to that quiz, bypassing whatever
+// launch would otherwise be chosen for them.
+function getLaunchLink(id){return getStudentLink()+'?launch='+encodeURIComponent(id);}
+async function copyLaunchLink(id){
+  if(!id){alert('Choose a test from Quiz History first.');return;}
+  const link=getLaunchLink(id);
+  try{await navigator.clipboard.writeText(link);alert('Direct link to this exact quiz copied. Sending it to a student takes them straight to it.');}
+  catch(e){prompt('Copy this direct link:',link);}
+}
+
+newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTargetUI();
+</script>
+<script>
+// ===== UI navigation for the 2026-10 redesign (layout only; no data changes) =====
+(function(){
+  const $=id=>document.getElementById(id);
+  const STEP_IDS={library:'stepLibrary',generate:'stepGenerate',edit:'stepEdit',assign:'stepAssign'};
+  let setupStep='library';
+
+  window.showSetupStep=function(step){
+    if(!STEP_IDS[step])step='library';
+    setupStep=step;
+    Object.entries(STEP_IDS).forEach(([k,id])=>{const el=$(id);if(el)el.classList.toggle('hidden',k!==step);});
+    const order=['library','edit','assign'],cur=step==='generate'?0:order.indexOf(step);
+    document.querySelectorAll('#setupStepper .step-btn').forEach(b=>{
+      const i=order.indexOf(b.dataset.step);
+      b.classList.toggle('active',b.dataset.step===step||(step==='generate'&&b.dataset.step==='library'));
+      b.classList.toggle('done',i<cur);
+    });
+    updateCurrentQuizBar();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  function updateCurrentQuizBar(){
+    const bar=$('currentQuizBar');if(!bar)return;
+    const title=($('editorTitle')&&$('editorTitle').value.trim())||(currentQuizId&&quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'';
+    const n=(typeof editorQuestions!=='undefined'?editorQuestions.length:0);
+    const makeup=typeof makeupSourceLaunchId!=='undefined'&&makeupSourceLaunchId&&allLaunches[makeupSourceLaunchId];
+    if(setupStep==='assign'&&makeup){
+      $('currentQuizName').textContent=((makeup.quizSnapshot&&makeup.quizSnapshot.title)||'Original test')+' (make-up)';
+      $('currentQuizType').textContent=skillLabel(makeup.quizSnapshot&&makeup.quizSnapshot.skillType);
+      $('currentQuizCount').textContent=asArray(makeup.quizSnapshot&&makeup.quizSnapshot.questions).length+' questions';
+    }else{
+      $('currentQuizName').textContent=title||(currentQuizId?'Untitled quiz':'New quiz (not saved yet)');
+      $('currentQuizType').textContent=skillLabel($('editorSkillType').value);
+      $('currentQuizCount').textContent=n+' question'+(n===1?'':'s');
+    }
+    bar.classList.toggle('hidden',setupStep==='library'||setupStep==='generate');
+    const ct=$('editorCountTitle');if(ct)ct.textContent='Questions ('+n+')';
+  }
+  window.updateCurrentQuizBar=updateCurrentQuizBar;
+
+  window.uiNewQuiz=function(){newQuizDraft();showSetupStep('edit');setTimeout(()=>{const t=$('editorTitle');if(t)t.focus();},250);};
+  window.uiSaveAndAssign=async function(){const id=await saveQuiz();if(id){makeupSourceLaunchId='';const m=$('makeupSourceMsg');if(m){m.textContent='';m.classList.add('hidden');}if($('launchDeliveryType').value==='makeup')selectDelivery('live');showSetupStep('assign');}};
+
+  window.filterQuizList=function(){
+    applyQuizFilters();
+  };
+
+  // --- Hook existing functions so the flow moves to the right step ---
+  const wrap=(name,after)=>{const orig=window[name];if(typeof orig!=='function')return;window[name]=function(){const r=orig.apply(this,arguments);try{after.apply(this,[r].concat([].slice.call(arguments)));}catch(e){console.warn(e);}return r;};};
+  wrap('loadQuizEditor',()=>{const sel=$('editorSkillType');if(sel&&!sel.value){sel.value='mixed';editorSkillChanged();}showSetupStep('edit');});
+  wrap('addSelectedCandidates',()=>{if(editorQuestions.length)showSetupStep('edit');});
+  wrap('renderQuizList',()=>{filterQuizList();updateCurrentQuizBar();if(!Object.keys(quizzes).length)$('quizList').innerHTML='<div class="empty">No saved quizzes yet. Use one of the options above to make your first quiz.</div>';});
+  wrap('renderEditorRows',()=>{updateCurrentQuizBar();if(!editorQuestions.length)$('editorRows').innerHTML='<div class="empty" style="margin-top:12px">No questions yet. Click <b>+ Add question</b>, paste from a spreadsheet, or generate from source text.</div>';});
+  wrap('deleteCurrentQuiz',r=>{if(r&&r.then)r.then(()=>{if(!currentQuizId)showSetupStep('library');});});
+  wrap('openMakeupFromResults',()=>{showSetupStep('assign');});
+  wrap('showTab',(r,name)=>{if(name==='setup')showSetupStep(setupStep);});
+  const t=$('editorTitle');if(t)t.addEventListener('input',updateCurrentQuizBar);
+
+  // --- "More" menus close after a choice or a click elsewhere ---
+  document.addEventListener('click',e=>{
+    document.querySelectorAll('details.menu[open]').forEach(d=>{
+      if(!d.contains(e.target)||e.target.closest('.menu-list button'))d.removeAttribute('open');
+    });
+  });
+
+
+  showSetupStep('library');
+  try{renderQuizList();renderEditorRows();}catch(e){}
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="../sync-to-nigri/nigri-auth.js"></script>
+<script src="nigri-sync.js"></script>
+<script src="teacher-simple.js?v=20261008-1"></script>
+</body>
+</html>
+

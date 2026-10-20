@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="../game-gate.js?v=20261020-follow-pointer1" data-game-id="rashi-letters"></script>
+<title>Rashi Letters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap" rel="stylesheet">
+<style>
+  @font-face{
+    font-family: 'Mekorot Rashi';
+    src: url('./fonts/Mekorot-Rashi.ttf') format('truetype');
+    font-display: swap;
+  }
+  :root{
+    --parchment: #F1E7CE;
+    --parchment-dark: #E4D4AC;
+    --ink: #3B2A1E;
+    --ink-soft: #6B5842;
+    --rimon: #8C2F39;
+    --rimon-dark: #6E1F28;
+    --gold: #C9A227;
+    --gold-light: #E4C662;
+    --shadow: rgba(59,42,30,0.25);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
+    font-family:'Quicksand', sans-serif;
+    color: var(--ink);
+    min-height:100vh;
+  }
+  .wrap{ max-width:520px; margin:0 auto; padding:28px 18px 60px; }
+  header.top{ text-align:center; margin-bottom:22px; }
+  header.top h1{
+    font-family:'Frank Ruhl Libre', serif;
+    font-weight:700; font-size:1.9rem;
+    color: var(--rimon-dark); margin:0 0 4px; letter-spacing:0.5px;
+  }
+  header.top p{ margin:0; color:var(--ink-soft); font-size:0.95rem; }
+  .card{
+    background: var(--parchment);
+    border:2px solid var(--gold);
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 6px 18px var(--shadow);
+    animation: cardIn .25s ease;
+  }
+  @keyframes cardIn{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .name-gate{ text-align:center; }
+  .name-gate input{
+    font-family:'Quicksand', sans-serif; font-size:1.1rem;
+    padding:10px 14px; border-radius:10px; border:2px solid var(--gold);
+    width:70%; max-width:320px; margin:10px 0; display:block; margin-left:auto; margin-right:auto;
+  }
+  .btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:1rem;
+    border:none; border-radius:999px; padding:12px 26px; cursor:pointer;
+    color:#fff; background:var(--rimon); box-shadow:0 4px 0 var(--rimon-dark);
+    transition:transform .08s ease;
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--rimon-dark); }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
+  #gateMsg{ min-height:20px; font-size:0.9rem; color:var(--rimon-dark); font-weight:600; margin-top:4px; }
+  #app{ display:none; }
+  .phase-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .unit-label{ font-size:13px; color:var(--ink-soft); }
+  .phase-pill{
+    font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px;
+    background:var(--parchment-dark); color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px;
+  }
+  .phase-pill.word{ background:var(--gold-light); color:var(--rimon-dark); }
+  .letter-box{
+    background:#FFFDF7; border:0.5px solid var(--gold); border-radius:12px;
+    padding:1.75rem 1rem; display:flex; justify-content:center; margin-bottom:14px;
+    min-height:150px; align-items:center;
+  }
+  #rashiLetter{ font-family:'Mekorot Rashi', serif; font-size:110px; line-height:1; color:var(--ink); transition:transform .15s ease; }
+  #rashiLetter.word-mode{ font-size:58px; }
+  .prompt{ text-align:center; font-size:0.95rem; color:var(--ink-soft); margin-bottom:14px; }
+  .choices{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+  .choice-btn{
+    font-family:'Frank Ruhl Libre', serif; font-size:2.2rem; height:70px;
+    border-radius:12px; border:2px solid var(--gold); background:#FFFDF7; color:var(--ink);
+    cursor:pointer; transition:transform .08s ease;
+  }
+  .choice-btn:active{ transform:scale(0.97); }
+  .choice-btn.word-btn{
+    font-family:'Arial Hebrew','Noto Sans Hebrew','David',Arial,sans-serif; font-size:1.6rem; height:auto; min-height:70px;
+    padding:8px 6px; display:flex; align-items:center; justify-content:center; direction:rtl;
+  }
+  .choice-btn.correct{ background:#DCEFD9; border-color:#4C8C4A; animation: pop .35s ease; }
+  .choice-btn.incorrect{ background:#F4D9D9; border-color:var(--rimon); animation: shake .35s ease; }
+  @keyframes pop{
+    0%{ transform:scale(1); } 40%{ transform:scale(1.12); } 100%{ transform:scale(1); }
+  }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-6px); } 75%{ transform:translateX(6px); }
+  }
+  #feedback{ min-height:22px; text-align:center; font-size:0.95rem; font-weight:600; margin-bottom:10px; }
+  .progress-track{ width:100%; height:8px; background:var(--parchment-dark); border-radius:4px; overflow:hidden; margin-bottom:10px; }
+  #progFill{ height:100%; background:var(--rimon); border-radius:4px; transition:width .3s ease; }
+  .streak-row{ display:flex; justify-content:center; gap:6px; }
+  .streak-star{ font-size:15px; opacity:0.25; transition:opacity .2s ease, transform .2s ease; }
+  .streak-star.lit{ opacity:1; transform:scale(1.15); }
+  #completeScreen, #closedScreen{ display:none; text-align:center; }
+  #completeScreen.show, #closedScreen.show{ display:block; }
+  .confetti-row{ font-size:1.6rem; margin-bottom:6px; letter-spacing:4px; }
+  .mode-gate-section{ margin-bottom:16px; }
+  .mode-gate-section h3{ font-size:0.9rem; margin:0 0 8px; color:var(--ink-soft); font-weight:600; }
+  .continue-btn{ width:100%; margin-bottom:4px; }
+  .letter-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .letter-pick-btn{
+    font-family:'Mekorot Rashi', serif; font-size:1.6rem;
+    border:2px solid var(--gold); border-radius:10px; background:#FFFDF7; color:var(--ink);
+    padding:10px 2px; cursor:pointer; transition:transform .08s ease, background .15s ease;
+  }
+  .letter-pick-btn:active{ transform:scale(0.95); }
+  .letter-pick-btn.selected{ background:var(--gold-light); border-color:var(--rimon); }
+  .mode-type-row{ display:flex; gap:8px; }
+  .mode-type-btn{
+    flex:1; font-family:'Quicksand', sans-serif; font-weight:600; font-size:0.82rem;
+    border:2px solid var(--gold); border-radius:10px; background:#FFFDF7; color:var(--ink-soft);
+    padding:10px 4px; cursor:pointer;
+  }
+  .mode-type-btn.selected{ background:var(--gold-light); color:var(--rimon-dark); border-color:var(--rimon); }
+  .hidden{ display:none !important; }
+  .menu-link{
+    background:none; border:none; color:var(--ink-soft); font-size:0.78rem;
+    text-decoration:underline; cursor:pointer; padding:0; font-family:'Quicksand', sans-serif;
+  }
+
+:root{--parchment:#fff;--parchment-dark:#e5eafa;--ink:#172547;--ink-soft:#475675;--rimon:#6553d6;--rimon-dark:#3f3099;--gold:#b8c4e7;--gold-light:#ede9ff;--shadow:#283f7520}
+body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial-gradient(ellipse at 95% 60%,#ccf5ed,transparent 45%),#f3f6ff;font-family:'Quicksand',Arial,sans-serif}
+.wrap{max-width:1000px;padding:26px 24px 60px}header.top{text-align:left;display:flex;align-items:center;gap:18px;margin-bottom:24px}header.top h1{font:800 34px 'Quicksand',Arial,sans-serif;letter-spacing:-1px;color:var(--ink)}header.top p{font-size:16px;font-weight:600}.brand-icon{display:grid;place-items:center;width:68px;height:68px;background:#6553d6;color:white;border-radius:22px;box-shadow:0 6px 0 #4938ae;font-family:'Mekorot Rashi';font-size:48px}.eyebrow{font-size:12px;letter-spacing:2px;font-weight:700;color:#6553d6;text-transform:uppercase;margin-bottom:10px}.card{border:1px solid #dce3f4;border-radius:28px;padding:30px;box-shadow:0 12px 40px #243e7010}.name-gate{max-width:590px;margin:30px auto;text-align:center}.name-gate h2{font-size:30px;margin:12px 0}.name-gate input{width:100%;max-width:400px;background:#f6f8ff;border:2px solid #d9e0f1;padding:15px;font-size:18px;margin-bottom:18px}.btn{border-radius:16px;background:#6553d6;box-shadow:0 5px 0 #4433a1;padding:16px 26px;font-size:18px}.intro-copy{font-size:17px;line-height:1.7;color:var(--ink-soft)}.mode-gate-section h3{font-size:19px;color:var(--ink);margin:24px 0 14px}.continue-btn{text-align:left;padding:24px;font-size:23px;background:#6553d6}.letter-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.letter-pick-btn{position:relative;background:#f8f9ff;border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:20px;font-size:43px;min-height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.letter-pick-btn small{font:700 12px 'Quicksand',Arial,sans-serif;color:#536180}.letter-pick-btn:nth-child(3n+2){background:#edfaf6}.letter-pick-btn:nth-child(3n){background:#fff7e5}.letter-pick-btn.selected{border-color:#6553d6;background:#ede9ff}.mode-type-btn{font-size:16px;padding:16px}.phase-row{margin-bottom:20px}.unit-label{font-size:17px;font-weight:700}.phase-pill{font-size:13px;padding:8px 12px}.menu-link{font-size:15px;text-decoration:none;border:1px solid #d8dff0;border-radius:10px;padding:10px}.letter-box{position:relative;background:linear-gradient(135deg,#f0edff,#edf6ff);border:0;border-radius:22px;min-height:235px;margin-bottom:20px}.letter-box:before{content:'RASHI SCRIPT';position:absolute;top:18px;left:22px;font:700 11px 'Quicksand',sans-serif;letter-spacing:2px;color:#605592}#rashiLetter{font-size:150px;color:#342773;direction:rtl}#rashiLetter.word-mode{font-size:83px}.prompt{font-size:21px;font-weight:700;color:var(--ink)}.choices{gap:16px}.choice-btn{height:100px;font-size:54px;border:2px solid #dbe2f1;border-bottom:6px solid #c9d3e9;border-radius:19px;background:white}.choice-btn.word-btn{font-size:36px;min-height:100px}.choice-btn:hover:not(:disabled){border-color:#8877e6;background:#f6f3ff;transform:translateY(-2px)}.choice-btn.correct{background:#d9f9e8;border-color:#249665;color:#125e3f}.choice-btn.incorrect{background:#fff0e3;border-color:#d78737}.choice-btn:disabled{color:var(--ink);opacity:1}#feedback{font-size:19px;min-height:30px;line-height:1.5}.progress-track{height:13px;border-radius:20px}#progFill{background:linear-gradient(90deg,#7160e6,#36bda3)}.streak-star{font-size:32px;color:#dfa900;opacity:.22}.streak-star.lit{opacity:1}.hud{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #dce3f4;padding:14px 20px;border-radius:18px;margin-bottom:18px;font-weight:700}.hud button{background:#eef0fc;border:0;padding:10px;border-radius:10px;color:#3f3099;font:inherit;cursor:pointer}.help-row{display:flex;justify-content:center;gap:12px;margin-bottom:18px}.helper{border:0;background:#ece9ff;color:#443694;padding:12px 18px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}.study{background:#f1f7ff;border:2px solid #d5e2fa;border-radius:18px;padding:20px;margin:16px 0;text-align:center}.compare{display:flex;justify-content:center;gap:50px;align-items:center;margin:15px}.compare span{font:80px Arial;direction:rtl}.compare .rashi{font-family:'Mekorot Rashi'}.compare small{display:block;font:700 13px 'Quicksand',sans-serif;color:#536180;margin-top:15px}.star-note{text-align:center;font-size:14px;color:#536180}.finish-icon{font-size:70px}button:focus-visible,input:focus-visible{outline:4px solid #f0b93a;outline-offset:4px}#completeScreen h2{font-size:32px}#completeScreen p{font-size:20px}.pop-banner{animation:pop .4s ease}
+
+/* Adventure layer */
+.quest-scene{
+  position:relative; overflow:hidden; min-height:118px; margin:-4px 0 22px;
+  border-radius:22px; border:2px solid #dfe5f6;
+  background:linear-gradient(#cfeeff 0 58%,#dff5d3 58% 100%);
+  box-shadow:inset 0 -5px 0 rgba(70,113,76,.08);
+}
+.quest-scene:before,.quest-scene:after{
+  content:''; position:absolute; border-radius:999px; background:#fff; opacity:.82;
+  width:72px; height:22px; top:18px; box-shadow:24px 7px 0 4px #fff,-19px 8px 0 0 #fff;
+  animation:cloudDrift 12s linear infinite;
+}
+.quest-scene:before{left:8%;}
+.quest-scene:after{left:68%;top:30px;transform:scale(.72);animation-duration:16s;}
+@keyframes cloudDrift{50%{transform:translateX(20px)}}
+.quest-hills{position:absolute;left:-5%;right:-5%;bottom:25px;height:45px;background:linear-gradient(135deg,#9fd28e,#75bb83);clip-path:polygon(0 70%,14% 30%,28% 70%,43% 18%,57% 70%,73% 36%,100% 72%,100% 100%,0 100%)}
+.quest-path{position:absolute;left:8%;right:8%;bottom:19px;height:12px;border-radius:999px;background:#c89d61;box-shadow:inset 0 2px 0 rgba(255,255,255,.45)}
+.journey-fill{position:absolute;left:0;top:0;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#f2be32,#ffdf66);transition:width .45s ease}
+.explorer{position:absolute;left:7%;bottom:24px;font-size:42px;z-index:4;filter:drop-shadow(0 4px 2px rgba(0,0,0,.16));transition:left .45s cubic-bezier(.2,.8,.2,1)}
+.explorer.hop{animation:explorerHop .55s ease}
+@keyframes explorerHop{0%,100%{transform:translateY(0) rotate(0)}35%{transform:translateY(-24px) rotate(-8deg)}70%{transform:translateY(-6px) rotate(5deg)}}
+.treasure-chest{position:absolute;right:4%;bottom:27px;font-size:46px;z-index:4;filter:drop-shadow(0 4px 2px rgba(0,0,0,.15));transform-origin:bottom center}
+.treasure-chest.rattle{animation:chestRattle .7s ease}
+@keyframes chestRattle{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-9deg) scale(1.08)}40%{transform:rotate(9deg) scale(1.12)}65%{transform:rotate(-5deg) scale(1.09)}80%{transform:rotate(3deg) scale(1.04)}}
+.quest-badge{position:absolute;left:14px;top:10px;z-index:5;background:rgba(255,255,255,.9);border:1px solid #dce3f4;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#3f3099;box-shadow:0 3px 8px rgba(38,53,93,.08)}
+.quest-coins{position:absolute;right:13px;top:10px;z-index:5;background:rgba(255,255,255,.92);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#755400;border:1px solid #ead99b}
+.reward-particle{position:fixed;z-index:9999;pointer-events:none;font-size:22px;animation:rewardFly .85s ease-out forwards}
+@keyframes rewardFly{0%{opacity:1;transform:translate(-50%,-50%) scale(.45)}65%{opacity:1;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.25) rotate(var(--rot))}100%{opacity:0;transform:translate(calc(-50% + var(--dx2)),calc(-50% + var(--dy2))) scale(.8) rotate(var(--rot))}}
+.letter-box.reward-glow{animation:rewardGlow .65s ease}
+@keyframes rewardGlow{0%{box-shadow:0 0 0 0 rgba(91,83,214,0)}45%{box-shadow:0 0 0 9px rgba(91,83,214,.14),0 0 35px rgba(242,190,50,.55)}100%{box-shadow:0 0 0 0 rgba(91,83,214,0)}}
+.quest-toast{position:fixed;z-index:10001;left:50%;top:18%;transform:translate(-50%,-20px) scale(.9);opacity:0;background:#fff;border:3px solid #f2be32;border-radius:18px;padding:14px 22px;box-shadow:0 14px 45px rgba(35,45,84,.25);font-weight:900;font-size:20px;color:#3f3099;pointer-events:none}
+.quest-toast.show{animation:toastPop 1.15s ease forwards}
+@keyframes toastPop{0%{opacity:0;transform:translate(-50%,-20px) scale(.82)}18%,72%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-8px) scale(.94)}}
+.mini-overlay{position:fixed;inset:0;z-index:10000;background:rgba(23,37,71,.72);display:grid;place-items:center;padding:18px;backdrop-filter:blur(4px)}
+.mini-card{width:min(620px,96vw);background:linear-gradient(160deg,#fff,#f5f2ff);border:4px solid #f2be32;border-radius:28px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.32);text-align:center;overflow:hidden;position:relative}
+.mini-kicker{font-weight:900;letter-spacing:2px;color:#d88800;font-size:13px}.mini-card h2{margin:7px 0 4px;font-size:30px;color:#2d266f}.mini-card p{margin:4px 0 14px;color:#536180;font-weight:700}.mini-target{font-family:'Mekorot Rashi';font-size:82px;line-height:1;margin:12px auto;color:#342773;background:#ece9ff;width:118px;height:105px;border-radius:24px;display:grid;place-items:center;box-shadow:inset 0 -5px 0 #d8d1ff}
+.mini-arena{position:relative;height:200px;border-radius:22px;background:linear-gradient(#d9f3ff,#e8fadf);border:2px solid #d8e5f0;overflow:hidden;margin-top:12px}
+.mini-choice{position:absolute;width:76px;height:76px;border-radius:50%;border:3px solid #fff;background:#6553d6;color:#fff;font:700 38px 'Frank Ruhl Libre',serif;box-shadow:0 7px 0 #4433a1,0 9px 20px rgba(42,46,90,.18);cursor:pointer;animation:floatChoice 2.1s ease-in-out infinite;transition:transform .12s ease,background .12s ease}
+.mini-choice:nth-child(2){animation-delay:-.45s}.mini-choice:nth-child(3){animation-delay:-.9s}.mini-choice:nth-child(4){animation-delay:-1.35s}
+@keyframes floatChoice{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-18px) rotate(3deg)}}
+.mini-choice.good{background:#23a66d;box-shadow:0 7px 0 #157b4d}.mini-choice.miss{animation:miniMiss .35s ease}
+@keyframes miniMiss{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}}
+.mini-feedback{min-height:30px;margin-top:12px;font-size:18px;font-weight:900;color:#3f3099}
+.mini-skip{border:0;background:transparent;color:#64708d;text-decoration:underline;font:700 13px 'Quicksand',sans-serif;cursor:pointer;margin-top:4px}
+@media(max-width:600px){.quest-scene{min-height:105px}.explorer{font-size:35px}.treasure-chest{font-size:38px}.quest-badge,.quest-coins{font-size:10px;padding:6px 8px}.mini-card{padding:18px}.mini-target{font-size:68px;width:102px;height:90px}.mini-arena{height:180px}.mini-choice{width:64px;height:64px;font-size:32px}}
+
+
+/* Look-alike letters */
+.letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
+.letter-pick-btn.similar-tile span{font-size:32px;letter-spacing:3px}
+#similarScreen{display:none}
+.sim-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sim-head h2{margin:0;font-size:28px}
+.sim-intro{color:var(--ink-soft);font-weight:600;font-size:16px;line-height:1.6;margin:8px 0 18px}
+.sim-tabs{display:flex;gap:8px;margin-bottom:20px}
+.sim-tab{flex:1;font:700 16px 'Quicksand',sans-serif;border:2px solid #dbe2f1;border-bottom-width:5px;border-radius:14px;background:#f8f9ff;color:var(--ink-soft);padding:14px 6px;cursor:pointer}
+.sim-tab.selected{background:#ede9ff;color:#3f3099;border-color:#6553d6}
+.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:12px}
+.sim-card{border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:18px;background:#fff;padding:12px 6px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:10px;direction:rtl;font:inherit;color:var(--ink)}
+.sim-card:nth-child(3n+2){background:#f3fbf8}.sim-card:nth-child(3n){background:#fffaf0}
+.sim-card:hover{border-color:#8877e6;transform:translateY(-2px)}
+.sim-card .r{font-family:'Mekorot Rashi';font-size:48px;line-height:1;color:#342773}
+.sim-card .p{font-family:'Frank Ruhl Libre',serif;font-size:48px;line-height:1}
+.sim-card .eq{font-size:20px;color:#9aa5c0;font-weight:700}
+.sim-key{display:flex;justify-content:center;gap:22px;font-size:13px;font-weight:700;color:#536180;margin-bottom:12px}
+.sim-key b{color:#342773}
+.morph-box{position:relative;height:230px;border-radius:22px;background:linear-gradient(135deg,#f0edff,#edf6ff);margin:10px 0 14px}
+.morph-box span{position:absolute;inset:0;display:grid;place-items:center;font-size:160px;line-height:1;color:#342773}
+.morph-box .r{font-family:'Mekorot Rashi'}.morph-box .p{font-family:'Frank Ruhl Libre',serif}
+.morph-labels{display:flex;justify-content:space-between;font-weight:800;color:#536180;font-size:15px}
+input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
+.sim-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sim-small-btn{border:0;background:#ece9ff;color:#443694;padding:12px 16px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}
+.sim-small-btn:disabled{opacity:.4;cursor:default}
+.sim-status{text-align:center;font-weight:700;color:#536180;margin-bottom:10px}
+.sim-big{font-family:'Mekorot Rashi';font-size:150px;line-height:1;color:#342773}
+.sim-done{text-align:center;padding:10px 0}
+.sim-done h3{font-size:28px;margin:6px 0}
+.mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;direction:rtl}
+.mem-card{height:105px;border-radius:16px;border:2px solid #4938ae;border-bottom-width:5px;background:#6553d6;color:#fff;font:700 34px 'Quicksand',sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:transform .15s ease,background .15s ease}
+.mem-card.up{background:#fff;color:#342773;border-color:#dbe2f1;transform:rotateY(0)}
+.mem-card .g{font-size:52px;line-height:1}
+.mem-card.rashi .g{font-family:'Mekorot Rashi'}.mem-card.print .g{font-family:'Frank Ruhl Libre',serif}
+.mem-card small{font:700 11px 'Quicksand',sans-serif;color:#536180;letter-spacing:1px;text-transform:uppercase}
+.mem-card.done{background:#d9f9e8;border-color:#249665;animation:pop .35s ease}
+@media(max-width:600px){.mem-grid{grid-template-columns:repeat(3,1fr)}.sim-tab{font-size:13px;padding:12px 4px}.morph-box span{font-size:130px}.sim-card .r,.sim-card .p{font-size:40px}.sim-grid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}}
+
+/* Multiplayer match */
+.mp-choose{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.mp-big{border:2px solid #dbe2f1;border-bottom-width:6px;border-radius:22px;background:#fff;padding:24px 12px;cursor:pointer;font:800 21px 'Quicksand',sans-serif;color:#2d266f;display:flex;flex-direction:column;align-items:center;gap:8px}
+.mp-big .e{font-size:44px}.mp-big small{font:600 14px 'Quicksand',sans-serif;color:#536180}
+.mp-big:hover{border-color:#8877e6;transform:translateY(-2px)}
+.mp-big.friends{background:#f3fbf8}
+.mp-panel{background:#f8f9ff;border:2px solid #e0e5f3;border-radius:20px;padding:20px;text-align:center;margin-bottom:14px}
+.mp-panel h3{margin:0 0 10px;font-size:20px}
+.mp-join{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.mp-join input{font:800 28px 'Quicksand',sans-serif;letter-spacing:8px;text-align:center;width:170px;padding:10px;border:2px solid #d9e0f1;border-radius:14px;background:#fff}
+.mp-msg{min-height:24px;font-weight:700;color:#8a4b12;margin-top:10px}
+.mp-code{font:900 64px 'Quicksand',sans-serif;letter-spacing:12px;color:#3f3099;background:#ede9ff;border-radius:20px;display:inline-block;padding:6px 22px 6px 34px;margin:6px 0}
+.mp-players{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0}
+.mp-chip{background:#fff;border:2px solid #dbe2f1;border-radius:999px;padding:8px 14px;font-weight:800;color:#2d266f}
+.mp-chip.me{border-color:#6553d6;background:#ede9ff}
+.mp-offer{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f3fbf8;border:2px solid #bfe9d8;border-bottom-width:5px;border-radius:18px;padding:14px 16px;margin-bottom:10px;text-align:left}
+.mp-offer-txt{display:flex;flex-direction:column;gap:3px}.mp-offer-txt b{font-size:19px;color:#2d266f}.mp-offer-txt small{font-weight:600;color:#536180}
+.mp-count{font-size:120px;font-weight:900;color:#6553d6;text-align:center;line-height:1.2;animation:pop .5s ease}
+.mp-board{background:#f8f9ff;border:2px solid #e0e5f3;border-radius:18px;padding:10px 12px;margin-bottom:14px}
+.mp-row{display:grid;grid-template-columns:30px minmax(70px,140px) 1fr 54px;align-items:center;gap:8px;padding:4px 0;font-weight:800;font-size:15px}
+.mp-row.me{color:#3f3099}.mp-row.left{opacity:.4}
+.mp-bar{height:12px;background:#e5eafa;border-radius:999px;overflow:hidden}
+.mp-bar i{display:block;height:100%;background:linear-gradient(90deg,#7160e6,#36bda3);border-radius:999px;transition:width .3s ease}
+.mp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-score{text-align:right;color:#755400}
+.mp-results{text-align:left}.mp-results .mp-row{font-size:19px;padding:8px 4px;border-bottom:1px solid #e5eafa}
+@media(max-width:600px){.mp-choose{grid-template-columns:1fr}.mp-code{font-size:48px}.mp-row{grid-template-columns:26px minmax(60px,100px) 1fr 46px;font-size:13px}}
+
+/* Word practice */
+.letter-pick-btn.similar-tile span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.word-levels{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.word-level{border:2px solid #dbe2f1;border-bottom-width:4px;background:#fff;border-radius:12px;padding:10px 16px;font:700 15px 'Quicksand',sans-serif;color:#475675;cursor:pointer}
+.word-level.selected{background:#ede9ff;border-color:#6553d6;color:#3f3099}
+.sim-big.word{font-size:96px}
+.choice-btn.word-choice{font-family:'Frank Ruhl Libre',serif;font-size:40px;direction:rtl}
+@media(max-width:600px){.sim-big.word{font-size:70px}.choice-btn.word-choice{font-size:30px}}
+
+/* Locked path */
+.letter-pick-btn.locked{opacity:.45;filter:grayscale(.6);border-style:solid}
+.letter-pick-btn span.tile-lock,.letter-pick-btn span.tile-done,.letter-pick-btn.similar-tile span.tile-lock,.letter-pick-btn.similar-tile span.tile-done{letter-spacing:0;position:absolute;top:6px;right:8px;font:800 16px 'Quicksand',sans-serif}
+.letter-pick-btn .tile-done{color:#249665}
+.letter-pick-btn.mastered{border-color:#bfe9d8}
+.letter-pick-btn.words-tile span[dir]{font-size:30px}
+.letter-pick-btn span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
+
+@media(min-width:800px){#app{max-width:760px;margin:auto}}
+@media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+</style>
+<script defer src="../gallery-share.js?v=20261011b"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><div class="brand-icon" aria-hidden="true">א</div><div><div class="eyebrow">Discover • Practice • Master</div><h1>Rashi Quest</h1><p>Little letters. Big discoveries. <span lang="he" dir="rtl">אותיות רש״י</span></p></div></header>
+<div class="hud"><span id="welcome">Your letter adventure starts here</span><span id="sessionStars">★ 0 stars this visit</span><button id="soundBtn" aria-pressed="true">Sound on</button></div>
+  <div class="card name-gate" id="nameGate">
+    <div class="finish-icon" aria-hidden="true">🔎</div><h2>Become a Rashi detective!</h2><p class="intro-copy">Discover the letters. Crack the words.<br>One small step at a time!</p><p>Sign in once on Fun Torah Tools, then open Rashi Quest.</p>
+    <div><a class="btn" href="../index.html">Go to Fun Torah Tools</a></div>
+    <div id="gateMsg"></div>
+  </div>
+
+  <div class="card" id="modeGate" style="display:none;">
+    <div class="mode-gate-section">
+      <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
+    </div>
+    <div class="mode-gate-section">
+      <h3>Choose any Rashi activity — all levels are open:</h3>
+      <div class="letter-grid" id="letterGrid"></div>
+    </div>
+    <div class="mode-gate-section hidden" id="modeTypeSection">
+      <h3>What do you want to practice?</h3>
+      <div class="mode-type-row">
+        <button class="mode-type-btn selected" data-mode="mixed">Both</button>
+        <button class="mode-type-btn" data-mode="letter">Letters Only</button>
+        <button class="mode-type-btn" data-mode="word">Words Only</button>
+      </div>
+    </div>
+    <div style="text-align:center;">
+      <button class="btn hidden" id="startPracticeBtn">Start Practicing</button>
+    </div>
+  </div>
+
+  <div class="card" id="app">
+    <div class="phase-row">
+      <div class="unit-label" id="unitLabel"></div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="menu-link" id="menuLinkBtn">⬅ Menu</button>
+        <div class="phase-pill" id="phasePill">Letter</div>
+      </div>
+    </div>
+    <div class="quest-scene" id="questScene" aria-label="Rashi Quest treasure journey">
+      <div class="quest-hills"></div>
+      <div class="quest-badge" id="journeyLabel">Treasure trail</div>
+      <div class="quest-coins" id="coinHud">🪙 0</div>
+      <div class="quest-path"><div class="journey-fill" id="journeyFill"></div></div>
+      <div class="explorer" id="explorer" aria-hidden="true">🕵️</div>
+      <div class="treasure-chest" id="treasureChest" aria-hidden="true">🎁</div>
+    </div>
+    <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
+    <div class="prompt" id="promptText">Which letter is this?</div>
+    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
+    <div id="feedback" role="status" aria-live="polite"></div>
+    <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
+    <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct to complete this step. A mistake does not erase your stars.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
+  </div>
+
+  <div class="card" id="completeScreen">
+    <div class="confetti-row">🎉🎊🎉</div>
+    <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
+    <h2>Quest complete!</h2><p>You finished the whole Rashi path. Keep your Rashi skills strong with more practice!</p><button class="btn" onclick="showModeGate()">Choose a practice mission</button>
+  </div>
+
+  <div class="card" id="practiceCompleteScreen" style="display:none;text-align:center;">
+    <div class="confetti-row">⭐🎉⭐</div>
+    <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
+    <h2 id="practiceCompleteTitle">Practice complete!</h2>
+    <p id="practiceCompleteText">You finished this practice mission.</p>
+    <button class="btn" id="practiceDoneBtn">Choose another mission</button>
+  </div>
+
+  <div class="card" id="similarScreen">
+    <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Try to get 7 of 8 in 🎯 Match it!</b></p>
+    <div class="sim-tabs">
+      <button class="sim-tab" data-sim="explore">👀 Side by side</button>
+      <button class="sim-tab" data-sim="match">🎯 Match it</button>
+      <button class="sim-tab" data-sim="memory">🃏 Memory</button>
+      <button class="sim-tab" data-sim="words">📖 Words</button>
+    </div>
+    <div id="simArea"></div>
+  </div>
+
+  <div class="card" id="closedScreen">
+    <p>Practice is closed right now. Ask your teacher.</p>
+  </div>
+</div>
+
+
+<div class="quest-toast" id="questToast" role="status" aria-live="polite"></div>
+<div class="mini-overlay hidden" id="miniGame" role="dialog" aria-modal="true" aria-labelledby="miniTitle">
+  <div class="mini-card">
+    <div class="mini-kicker">⚡ SURPRISE ROUND ⚡</div>
+    <h2 id="miniTitle">Catch the matching letter!</h2>
+    <p>Tap the regular letter that matches the Rashi letter.</p>
+    <div class="mini-target" id="miniTarget" dir="rtl"></div>
+    <div class="mini-arena" id="miniArena"></div>
+    <div class="mini-feedback" id="miniFeedback"></div>
+    <button class="mini-skip" id="miniSkip">Skip bonus round</button>
+  </div>
+</div>
+
+<script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const UNITS = [
+  { id:'zayin', label:'ז', type:'single', correct:'ז', distractors:['ו','ר','נ'],
+    words:[
+      {w:'זֶה', decoys:['זֶר', 'דֶּה', 'נֶה']},
+      {w:'זָר', decoys:['זָן', 'דָּר', 'נָר']},
+      {w:'זַךְ', decoys:['רַךְ', 'זַד', 'דַּךְ']},
+      {w:'זֵר', decoys:['נֵר', 'זֵן', 'רֵר']},
+      {w:'זָקֵן', decoys:['רָקֵן', 'זָמֵן', 'זָדֵן']},
+      {w:'זָכַר', decoys:['זָכָה', 'נָכַר', 'זָבַר']},
+      {w:'זָמַר', decoys:['זָמַן', 'דָּמַר', 'זָכַר']},
+      {w:'גָּזַל', decoys:['גָּדַל', 'גָּזַר', 'נָּזַל']}
+    ]},
+  { id:'bet', label:'בּ / ב', type:'pair', pair:['בּ','ב'], distractors:['כ','ר'],
+    words:[
+      {w:'בַּיִת', decoys:['כַּיִת', 'בַּיִל', 'בַּיִד']},
+      {w:'בֵּן', decoys:['כֵּן', 'בֵּד', 'רֵּן']},
+      {w:'בֹּקֶר', decoys:['כֹּקֶר', 'בֹּסֶר', 'בֹּקֵר']},
+      {w:'בָּנָה', decoys:['כָּנָה', 'בָּרָה', 'בָּנַע']},
+      {w:'עֶרֶב', decoys:['עֶרֶכ', 'עֶדֶב', 'אֶרֶב']},
+      {w:'זָהָב', decoys:['זָהָר', 'דָּהָב', 'זָכָב']},
+      {w:'לֵב', decoys:['לֵר', 'כֵּב', 'לֵד']},
+      {w:'אֹהֵב', decoys:['אֹהֵר', 'אֹכֵב', 'עֹהֵב']}
+    ]},
+  { id:'tsadi', label:'צ', type:'single', correct:'צ', distractors:['ע','ן','ר'],
+    words:[
+      {w:'צַד', decoys:['עַד', 'צַר', 'נַד']},
+      {w:'צָר', decoys:['עָר', 'צָד', 'נָר']},
+      {w:'צֵל', decoys:['עֵל', 'צֵן', 'נֵל']},
+      {w:'צַדִּיק', decoys:['עַדִּיק', 'צַדִּיל', 'נַדִּיק']},
+      {w:'צֶדֶק', decoys:['עֶדֶק', 'צֶרֶק', 'נֶדֶק']},
+      {w:'צָמַח', decoys:['עָמַח', 'צָמַד', 'נָמַח']},
+      {w:'צַיִד', decoys:['עַיִד', 'צַיִר', 'נַיִד']},
+      {w:'צֶבַע', decoys:['עֶבַע', 'צֶבַד', 'נֶבַע']}
+    ]},
+  { id:'alef', label:'א', type:'single', correct:'א', distractors:['ת','ע','ה'],
+    words:[
+      {w:'אָב', decoys:['עָב', 'אָר', 'תָּב']},
+      {w:'אָח', decoys:['עָח', 'אָה', 'תָּח']},
+      {w:'אֶרֶז', decoys:['עֶרֶז', 'אֶרֶד', 'תֶּרֶז']},
+      {w:'אֹהֶל', decoys:['עֹהֶל', 'אֹהֵל', 'תֹּהֶל']},
+      {w:'אֹכֶל', decoys:['עֹכֶל', 'אֹכֵל', 'תֹּכֶל']},
+      {w:'אֲדָמָה', decoys:['עֲדָמָה', 'אֲדָרָה', 'תַּדָמָה']},
+      {w:'אֱמֶת', decoys:['עֱמֶת', 'אֱמֵן', 'תֱּמֶת']},
+      {w:'אַהֲבָה', decoys:['עַהֲבָה', 'אַהֲרָה', 'תַּהֲבָה']}
+    ]},
+  { id:'tsadisofit', label:'ץ', type:'single', correct:'ץ', distractors:['ן','ף','ך'],
+    words:[
+      {w:'עֵץ', decoys:['עֵן', 'עֵד', 'עֵף']},
+      {w:'רָץ', decoys:['רָן', 'רָד', 'רָף']},
+      {w:'אֶרֶץ', decoys:['אֶרֶן', 'אֶרֶד', 'אֶרֶף']},
+      {w:'קוֹץ', decoys:['קוֹן', 'קוֹד', 'קוֹף']},
+      {w:'חוּץ', decoys:['חוּן', 'חוּד', 'חוּף']},
+      {w:'קָפַץ', decoys:['קָפַן', 'קָפַד', 'קָפַף']},
+      {w:'פָּרַץ', decoys:['פָּרַן', 'פָּרַד', 'פָּרַף']},
+      {w:'רָחַץ', decoys:['רָחַן', 'רָחַד', 'רָחַף']}
+    ]},
+  { id:'memsofit', label:'ם', type:'single', correct:'ם', distractors:['ס','ט','ו'],
+    words:[
+      {w:'יָם', decoys:['יָס', 'יָן', 'יָך']},
+      {w:'חַם', decoys:['חַס', 'חַן', 'חַך']},
+      {w:'דָּם', decoys:['דָּס', 'דָּן', 'דָּך']},
+      {w:'מַיִם', decoys:['מַיִס', 'מַיִן', 'נַיִם']},
+      {w:'יוֹם', decoys:['יוֹס', 'יוֹן', 'יוֹך']},
+      {w:'מָקוֹם', decoys:['מָקוֹס', 'מָקוֹן', 'נָקוֹם']},
+      {w:'פָּנִים', decoys:['פָּנִיס', 'פָּנִין', 'כָּנִים']},
+      {w:'עוֹלָם', decoys:['עוֹלָס', 'עוֹלָן', 'עוֹלָך']}
+    ]},
+  { id:'shin', label:'שׁ / שׂ', type:'pair', pair:['שׁ','שׂ'], distractors:['ס','ע'],
+    words:[
+      {w:'שָׁב', decoys:['סָב', 'שָׁד', 'עָב']},
+      {w:'שׁוֹר', decoys:['סוֹר', 'שׁוֹד', 'עוֹר']},
+      {w:'שַׁבָּת', decoys:['סַבָּת', 'שַׁבָּד', 'עַבָּת']},
+      {w:'שָׁמַר', decoys:['סָמַר', 'שָׁמַד', 'עָמַר']},
+      {w:'שַׂר', decoys:['סַר', 'שַׁר', 'עַר']},
+      {w:'שָׂדֶה', decoys:['סָדֶה', 'שָׁדֶה', 'עָדֶה']},
+      {w:'שָׂרַף', decoys:['סָרַף', 'שָׁרַף', 'עָרַף']},
+      {w:'שִׂיחַ', decoys:['סִיחַ', 'שִׁיחַ', 'עִיחַ']}
+    ]},
+  { id:'samech', label:'ס', type:'single', correct:'ס', distractors:['ם','ה','ו'],
+    words:[
+      {w:'סַף', decoys:['מַף', 'סַר', 'הַף']},
+      {w:'סוּס', decoys:['מוּס', 'סוּר', 'הוּס']},
+      {w:'סוּר', decoys:['מוּר', 'סוּס', 'הוּר']},
+      {w:'סֵפֶר', decoys:['מֵפֶר', 'סֵבֶר', 'הֵפֶר']},
+      {w:'סָגַר', decoys:['מָגַר', 'סָדַר', 'הָגַר']},
+      {w:'סָעַר', decoys:['מָעַר', 'סָעַד', 'הָעַר']},
+      {w:'סָקַל', decoys:['מָקַל', 'סָקַר', 'הָקַל']},
+      {w:'כִּסֵּא', decoys:['כִּמֵּא', 'כִּסֵּד', 'כִּהֵּא']}
+    ]},
+  { id:'finalreview', label:'שׁ / שׂ (review)', type:'pair', pair:['שׁ','שׂ'], distractors:['ב','צ'],
+    words:[
+      {w:'שָׁלוֹם', decoys:['שָׂלוֹם', 'סָלוֹם', 'שָׁרוֹם']},
+      {w:'שָׁמַיִם', decoys:['שָׂמַיִם', 'סָמַיִם', 'שָׁמַיִר']},
+      {w:'שָׁלַח', decoys:['שָׂלַח', 'סָלַח', 'שָׁלַד']},
+      {w:'שַׁחַר', decoys:['שַׂחַר', 'סַחַר', 'שַׁחַד']},
+      {w:'שָׂמֵחַ', decoys:['שָׁמֵחַ', 'סָמֵחַ', 'שָׂמֵחָ']},
+      {w:'שָׂפָה', decoys:['שָׁפָה', 'סָפָה', 'שָׂפָד']},
+      {w:'שָׂכָר', decoys:['שָׁכָר', 'סָכָר', 'שָׂכָד']},
+      {w:'שֶׂה', decoys:['שֶׁה', 'סֶה', 'שֶׂד']}
+    ]}
+];
+const NEEDED_CORRECT = 3;
+const MAX_QUESTIONS_PER_STEP = 5;
+
+let soundOn = true, starsThisVisit = 0, coinsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
+let studentName = null;
+let studentId = null;
+let rashiFollowPending=false;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(rashiFollowPending)e.preventDefault();});
+let unitIndex = 0;
+let phase = 'letter'; // 'letter' | 'word'
+let streak = 0; // correct answers earned in the current step; mistakes do not erase them
+let attemptsThisStep = 0;
+let retryQuestion = null;
+let currentTarget = null;
+let currentWord = null;
+let answering = false;
+let audioCtx = null;
+let mode = 'continue'; // 'continue' | 'practice'
+let practiceUnitId = null;
+let practiceModeType = 'mixed'; // 'letter' | 'word' | 'mixed'
+
+function slugify(name){
+  return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'_').replace(/(^_|_$)/g,'');
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function updateRewardHud(){
+  document.getElementById('sessionStars').textContent = '★ ' + starsThisVisit + '  ·  🪙 ' + coinsThisVisit;
+  const coinHud = document.getElementById('coinHud');
+  if(coinHud) coinHud.textContent = '🪙 ' + coinsThisVisit;
+}
+
+function adventurePercent(){
+  if(mode === 'continue'){
+    const safeIndex = Math.min(unitIndex, UNITS.length);
+    const phasePart = safeIndex >= UNITS.length ? 2 : ((phase === 'word' ? 1 : 0) + Math.min(streak,NEEDED_CORRECT)/NEEDED_CORRECT);
+    return safeIndex >= UNITS.length ? 100 : ((safeIndex*2 + phasePart)/(UNITS.length*2))*100;
+  }
+  const phaseBase = (practiceModeType === 'mixed' && phase === 'word') ? 1 : 0;
+  const denom = practiceModeType === 'mixed' ? 2 : 1;
+  return Math.min(100,((phaseBase + Math.min(streak,NEEDED_CORRECT)/NEEDED_CORRECT)/denom)*100);
+}
+
+function updateAdventure(){
+  const pct = Math.max(0,Math.min(100,adventurePercent()));
+  const fill = document.getElementById('journeyFill');
+  const explorer = document.getElementById('explorer');
+  const label = document.getElementById('journeyLabel');
+  if(fill) fill.style.width = pct + '%';
+  if(explorer) explorer.style.left = (7 + pct*0.78) + '%';
+  if(label){
+    const left = Math.max(0,NEEDED_CORRECT-streak);
+    label.textContent = left === 0 ? 'Treasure reached!' : left + ' treasure star' + (left===1?'':'s') + ' to the next checkpoint';
+  }
+}
+
+function animateExplorer(){
+  const el = document.getElementById('explorer');
+  const box = document.querySelector('.letter-box');
+  if(el){el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop');}
+  if(box){box.classList.remove('reward-glow'); void box.offsetWidth; box.classList.add('reward-glow');}
+}
+
+function rewardBurst(originEl, big=false){
+  const rect = originEl && originEl.getBoundingClientRect ? originEl.getBoundingClientRect() : {left:innerWidth/2,top:innerHeight/2,width:0,height:0};
+  const x = rect.left + rect.width/2, y = rect.top + rect.height/2;
+  const glyphs = big ? ['⭐','✨','🪙','🌟','🪙','✨','⭐','🎉','🪙','🌟','✨','⭐','🪙','🎉'] : ['⭐','✨','🪙','⭐','✨','🪙','🌟','✨'];
+  glyphs.forEach((g,i)=>{
+    const p=document.createElement('span'); p.className='reward-particle'; p.textContent=g;
+    const a=(Math.PI*2*i/glyphs.length)+(Math.random()-.5)*.35, d=(big?95:70)+Math.random()*(big?80:55);
+    p.style.left=x+'px'; p.style.top=y+'px';
+    p.style.setProperty('--dx',(Math.cos(a)*d)+'px'); p.style.setProperty('--dy',(Math.sin(a)*d)+'px');
+    p.style.setProperty('--dx2',(Math.cos(a)*d*1.25)+'px'); p.style.setProperty('--dy2',(Math.sin(a)*d*1.25+24)+'px');
+    p.style.setProperty('--rot',((Math.random()*180)-90)+'deg');
+    document.body.appendChild(p); setTimeout(()=>p.remove(),950);
+  });
+}
+
+function showQuestToast(text){
+  const t=document.getElementById('questToast');
+  if(!t) return;
+  t.textContent=text; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+}
+
+function celebrateCheckpoint(){
+  const chest=document.getElementById('treasureChest');
+  if(chest){chest.classList.remove('rattle'); void chest.offsetWidth; chest.classList.add('rattle'); rewardBurst(chest,true);}
+  showQuestToast('🎁 Checkpoint treasure unlocked!');
+}
+
+let miniGameTarget = null;
+let miniGameUnit = null;
+let miniGameReturn = null;
+function startMiniGame(unit, returnFn){
+  miniGameUnit = unit;
+  miniGameReturn = returnFn || renderQuestion;
+  miniGameTarget = pickTarget(unit);
+  const overlay=document.getElementById('miniGame');
+  const target=document.getElementById('miniTarget');
+  const arena=document.getElementById('miniArena');
+  const fb=document.getElementById('miniFeedback');
+  target.textContent=miniGameTarget; fb.textContent=''; arena.innerHTML='';
+  const opts=choicesFor(unit);
+  const spots=[[8,18],[56,14],[24,57],[68,57]];
+  opts.forEach((letter,i)=>{
+    const b=document.createElement('button'); b.className='mini-choice'; b.textContent=letter;
+    b.style.left=spots[i][0]+'%'; b.style.top=spots[i][1]+'%';
+    b.onclick=()=>handleMiniChoice(letter,b);
+    arena.appendChild(b);
+  });
+  overlay.classList.remove('hidden');
+  setTimeout(()=>{const first=arena.querySelector('button'); if(first) first.focus();},30);
+}
+
+function closeMiniGame(){
+  document.getElementById('miniGame').classList.add('hidden');
+  const fn=miniGameReturn || renderQuestion; miniGameReturn=null; miniGameTarget=null; miniGameUnit=null;
+  setTimeout(fn,180);
+}
+
+function handleMiniChoice(letter,btn){
+  if(letter===miniGameTarget){
+    btn.classList.add('good'); coinsThisVisit += 3; updateRewardHud(); rewardBurst(btn,true); beep('correct');
+    document.getElementById('miniFeedback').textContent='BONUS TREASURE! +3 coins 🪙';
+    document.querySelectorAll('.mini-choice').forEach(x=>x.disabled=true);
+    setTimeout(closeMiniGame,950);
+  }else{
+    btn.classList.remove('miss'); void btn.offsetWidth; btn.classList.add('miss'); beep('wrong');
+    document.getElementById('miniFeedback').textContent='Not that one — keep hunting!';
+  }
+}
+document.getElementById('miniSkip').onclick=closeMiniGame;
+
+function beep(kind){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    if(kind === 'correct'){
+      o.frequency.setValueAtTime(520, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(780, audioCtx.currentTime + 0.15);
+      g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+      o.start(); o.stop(audioCtx.currentTime + 0.22);
+    } else {
+      o.frequency.setValueAtTime(200, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.18);
+      g.gain.setValueAtTime(0.07, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.24);
+      o.start(); o.stop(audioCtx.currentTime + 0.24);
+    }
+  }catch(e){ /* audio not critical */ }
+}
+
+async function checkAccess(name, pin){
+  const slug=slugify(name);if(!slug)return {ok:false,reason:'Please type your name.'};
+  const [lockSnap,profileSnap,siteSettingsSnap]=await Promise.all([
+    db.ref('rashiLetters/settings/accessLocked').once('value'),
+    db.ref('b3Games/students/'+slug+'/profile').once('value'),
+    db.ref('b3Games/siteSettings').once('value')
+  ]);
+  const siteSettings=siteSettingsSnap.val()||{},gamesMap=siteSettings.games||{};
+  if(siteSettings.siteEnabled===false||gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(lockSnap.val()===true)return {ok:false,reason:'Practice is closed right now. Ask your teacher.'};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name)};
+}
+
+if(document.getElementById('startBtn'))document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
+  const val = document.getElementById('studentNameInput').value.trim();
+  const pin = document.getElementById('classPinInput').value.trim();
+  if(!val){ return; }
+  const startBtn = document.getElementById('startBtn');
+  startBtn.disabled = true;
+  const msg = document.getElementById('gateMsg');
+  msg.textContent = 'Checking…';
+  try{
+    const result = await checkAccess(val, pin);
+    if(!result.ok){
+      msg.textContent = result.reason;
+      startBtn.disabled = false;
+      return;
+    }
+    msg.textContent = '';
+    studentName = result.displayName || val;
+    studentId = result.slug;
+    sessionStorage.setItem('b3Games_studentId',studentId);
+    sessionStorage.setItem('b3Games_studentName',studentName);
+    sessionStorage.setItem('b3Games_classPin',pin);
+    await loadProgress();
+    updateRewardHud();
+    document.getElementById('nameGate').style.display = 'none';
+    showModeGate();
+  }catch(e){
+    console.error(e);
+    msg.textContent = 'Something went wrong. Try again.';
+    startBtn.disabled = false;
+  }
+};
+
+// Students sign in only on the Fun Torah Tools homepage. Reuse that login here.
+async function checkSavedAccess(id){
+  const [lockSnap,profileSnap,siteSettingsSnap]=await Promise.all([
+    db.ref('rashiLetters/settings/accessLocked').once('value'),
+    db.ref('b3Games/students/'+id+'/profile').once('value'),
+    db.ref('b3Games/siteSettings').once('value')
+  ]);
+  const siteSettings=siteSettingsSnap.val()||{},gamesMap=siteSettings.games||{};
+  if(siteSettings.siteEnabled===false||gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(lockSnap.val()===true)return {ok:false,reason:'Practice is closed right now. Ask your teacher.'};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Please sign in again on Fun Torah Tools.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name,active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  return {ok:true,slug:id,displayName:String(profile.name||sessionStorage.getItem('b3Games_studentName')||'Student')};
+}
+let teacherPreview = false;
+(async function enterWithHomepageLogin(){
+  const gate=document.getElementById('nameGate'),msg=document.getElementById('gateMsg');
+  ['studentNameInput','classPinInput','startBtn'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';const lab=gate.querySelector('label[for="'+id+'"]');if(lab)lab.style.display='none';}});
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
+  const sendHome=reason=>{msg.innerHTML='';msg.append(document.createTextNode(reason+' '));const a=document.createElement('a');a.href='../index.html';a.textContent='Go to Fun Torah Tools';msg.append(a);};
+  msg.textContent='Checking your account...';
+  const guestPreview = !!(window.B3Guest && window.B3Guest.isGuest());
+  const account = guestPreview ? {authorized:false} : await new Promise(resolve => {
+    const deadline = Date.now() + 10000;
+    const wait = () => {
+      if(window.B3SiteSettings){
+        window.B3SiteSettings.onAuthStateChanged((user,authorized) => resolve({user,authorized}));
+      }else if(Date.now() < deadline){setTimeout(wait,100);}
+      else resolve({authorized:false});
+    };
+    wait();
+    setTimeout(() => resolve({authorized:false}),10000);
+  });
+  if(guestPreview){
+    // Guest Mode: the first 3 steps only, nothing is saved.
+    teacherPreview=true;
+    studentId=''; studentName='Guest';
+    const banner=document.createElement('p');
+    banner.textContent='Guest preview - try the first 3 steps. Nothing is saved. ';
+    document.querySelector('header').append(banner);
+    await new Promise(r=>setTimeout(r,0)); // let the rest of the page script finish defining STEPS
+    msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
+  }
+  if(account.user && account.authorized && !window.B3SiteSettings.getActingStudent()){
+    teacherPreview=true;
+    studentId=''; studentName='Teacher Preview';
+    const banner=document.createElement('p');
+    banner.textContent='Teacher preview - no student progress is saved. ';
+    const home=document.createElement('a');home.href='../index.html';home.textContent='Back to Fun Torah Tools';
+    banner.append(home);document.querySelector('header').append(banner);
+    msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
+  }
+  if(!id)return sendHome('Please sign in on Fun Torah Tools first.');
+  msg.textContent='Signing you in…';
+  try{
+    const result=await checkSavedAccess(id);
+    if(!result.ok)return sendHome(result.reason);
+    msg.textContent='';
+    studentName=result.displayName;studentId=result.slug;
+    sessionStorage.setItem('b3Games_studentName',studentName);
+    await loadProgress();
+    updateRewardHud();
+    gate.style.display='none';
+    showModeGate();
+  }catch(e){console.error(e);sendHome('Something went wrong.');}
+})();
+
+async function loadProgress(){
+  const snap = await db.ref('rashiLetters/progress/' + studentId).once('value');
+  const rec = snap.val() || {};
+  const savedIndex = rec.currentUnitIndex;
+  unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
+  phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
+  streak = 0; attemptsThisStep = 0; retryQuestion = null; guidedIndex = unitIndex; guidedPhase = phase;
+  chainFlags = { alphabetDone:!!rec.alphabetDone, confusionDone:!!rec.confusionDone, similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
+}
+
+function renderLetterGrid(){
+  const grid = document.getElementById('letterGrid');
+  grid.replaceChildren();
+  const cur = currentStep();
+  STEPS.forEach((st, idx) => {
+    const b = document.createElement('button');
+    const unlocked = stepUnlocked(idx), mastered = stepMastered(idx);
+    b.className = 'letter-pick-btn' + (st.k==='similar' ? ' similar-tile' : '') + (st.k==='words' ? ' words-tile' : '') + (unlocked ? '' : ' locked') + (mastered ? ' mastered' : '');
+    let glyph, label;
+    if(st.k==='alphabet'){ glyph='א ב ג'; label='All 27 letters'; }
+    else if(st.k==='confusion'){ glyph='ל צ ס'; label='Tricky pairs'; }
+    else if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
+    else if(st.k==='words'){ glyph={2:'כִּי',3:'טוֹב',4:'תּוֹרָה'}[st.n]; label=st.n+'-letter words'; }
+    else { const u=UNITS[st.i]; glyph = u.id==='finalreview' ? 'שׁ / שׂ' : u.label; label = u.id==='finalreview' ? 'Final review' : 'Mission ' + (st.i+1); }
+    const badge = !unlocked ? '<span class="tile-lock">🔒</span>' : (mastered ? '<span class="tile-done">✓</span>' : (idx===cur ? '<span class="start-here">'+(idx===0?'START HERE':'NEXT')+'</span>' : ''));
+    b.innerHTML = badge + '<span dir="rtl">' + glyph + '</span><small>' + (idx+1) + '. ' + label + '</small>';
+    b.setAttribute('aria-label', 'Step ' + (idx+1) + ': ' + stepName(st) + (unlocked ? (mastered ? ', mastered' : ', ready') : ', locked'));
+    b.onclick = () => {
+      if(!unlocked){ showQuestToast('🔒 First master: ' + stepName(STEPS[firstUnmasteredBefore(idx)])); return; }
+      if(st.k==='unit'){
+        if(mastered) selectPracticeLetter(UNITS[st.i].id, b);
+        else goStep(idx);
+      } else goStep(idx);
+    };
+    grid.appendChild(b);
+  });
+}
+
+/* ---------- Locked path in "Reading Rashi Made Easy Shmeezy" order ---------- */
+const STEPS = [{k:'alphabet'},{k:'confusion'},{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
+  {k:'unit',i:2},{k:'unit',i:3},{k:'unit',i:4},{k:'unit',i:5},{k:'unit',i:6},{k:'unit',i:7},{k:'unit',i:8}];
+const MASTER_MATCH = 7, MASTER_WORDS = 5;
+let chainFlags = {}, pendingWordLevel = null;
+function flagKey(st){ if(st.k==='alphabet') return 'alphabetDone'; if(st.k==='confusion') return 'confusionDone'; return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
+function stepName(st){
+  if(st.k==='alphabet') return 'Full Alef-Beis Lab';
+  if(st.k==='confusion') return 'Tricky letter pairs';
+  if(st.k==='similar') return 'Look-alike letters';
+  if(st.k==='words') return st.n+'-letter words';
+  const u=UNITS[st.i]; return u.id==='finalreview' ? 'Final review' : 'Mission '+(st.i+1)+' ('+u.label+')';
+}
+function stepMastered(idx){
+  const st=STEPS[idx];
+  if(st.k==='unit') return guidedIndex > st.i;
+  return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
+}
+// A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
+function stepUnlocked(idx){ return idx>=0 && idx<STEPS.length; }
+function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
+function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
+function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
+
+const GUEST_STEPS=3;
+function goStep(idx){
+  if(window.B3Guest && window.B3Guest.isGuest() && idx>=GUEST_STEPS){
+    window.B3Guest.unlock('Sign in to unlock','You tried the first '+GUEST_STEPS+' free steps. Sign in to continue the whole Rashi letters quest.');
+    showModeGate(); return;
+  }
+  const st=STEPS[idx];
+  if(st.k==='alphabet' || st.k==='confusion'){ window.openRashiAlphabetLab(st.k); return; }
+  if(st.k==='similar'){ openSimilar(); return; }
+  if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
+  mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
+  document.getElementById('modeGate').style.display='none';
+  document.getElementById('similarScreen').style.display='none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display='none';
+  document.getElementById('app').style.display='block';
+  renderQuestion();
+}
+function goNextStep(){
+  const idx=currentStep();
+  if(idx<0){
+    clearTimeout(questionTimer); viewVersion++;
+    ['app','modeGate','similarScreen','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+    document.getElementById('completeScreen').classList.add('show'); return;
+  }
+  goStep(idx);
+}
+function markMastered(key){
+  if(chainFlags[key]) return false;
+  chainFlags[key]=true;
+  if(studentId) db.ref('rashiLetters/progress/'+studentId).update({[key]:true}).catch(()=>{});
+  const nxt=currentStep();
+  showQuestToast('🔓 Unlocked: '+(nxt<0?'all done!':stepName(STEPS[nxt])));
+  return true;
+}
+function nextStepButton(){
+  const b=el('button','btn','Next step →'); b.style.margin='10px 6px 0'; b.onclick=goNextStep; return b;
+}
+
+function selectPracticeLetter(unitId, btnEl){
+  practiceUnitId = unitId;
+  document.querySelectorAll('.letter-pick-btn').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  document.getElementById('modeTypeSection').classList.remove('hidden');
+  document.getElementById('startPracticeBtn').classList.remove('hidden');
+}
+
+function showModeGate(){
+  clearTimeout(questionTimer); viewVersion++;
+  document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
+  const cur = currentStep();
+  document.getElementById('continueBtn').textContent = cur < 0 ? '★ Quest complete — practice any step below' : '▶ Continue my quest · Step ' + (cur+1) + ' of ' + STEPS.length + ': ' + stepName(STEPS[cur]);
+  document.getElementById('continueBtn').disabled = cur < 0;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('practiceCompleteScreen').style.display = 'none';
+  document.getElementById('similarScreen').style.display = 'none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display = 'none';
+  if(typeof leaveRoom==='function') leaveRoom();
+  document.getElementById('modeGate').style.display = 'block';
+  renderLetterGrid();
+}
+
+document.getElementById('continueBtn').onclick = () => goNextStep();
+
+document.querySelectorAll('.mode-type-btn').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.mode-type-btn').forEach(x => x.classList.remove('selected'));
+    b.classList.add('selected');
+    practiceModeType = b.dataset.mode;
+  };
+});
+
+document.getElementById('startPracticeBtn').onclick = () => {
+  if(!practiceUnitId) return;
+  if(window.B3Guest && window.B3Guest.isGuest() && !window.B3Guest.allowItems('rashi-practice',[String(practiceUnitId)],3,'letters')) return;
+  mode = 'practice';
+  streak = 0; attemptsThisStep = 0; retryQuestion = null;
+  phase = (practiceModeType === 'word') ? 'word' : 'letter';
+  document.getElementById('modeGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderQuestion();
+};
+
+document.getElementById('menuLinkBtn').onclick = () => {
+  showModeGate();
+};
+document.getElementById('practiceDoneBtn').onclick = () => {
+  showModeGate();
+};
+
+function finishPracticeMission(unit){
+  clearTimeout(questionTimer); viewVersion++;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('modeGate').style.display = 'none';
+  document.getElementById('practiceCompleteScreen').style.display = 'block';
+  document.getElementById('practiceCompleteTitle').textContent = '★ Practice complete!';
+  document.getElementById('practiceCompleteText').textContent = 'You finished ' + unit.label + '. Nice work — choose another mission when you’re ready.';
+}
+
+function getActiveUnit(){
+  if(mode === 'practice'){
+    return UNITS.find(u => u.id === practiceUnitId) || UNITS[0];
+  }
+  return UNITS[unitIndex];
+}
+
+function pickTarget(unit){
+  if(unit.type === 'single'){ return unit.correct; }
+  return unit.pair[Math.floor(Math.random()*2)];
+}
+function choicesFor(unit){
+  if(unit.type === 'single'){
+    return shuffle([unit.correct, ...unit.distractors]);
+  }
+  return shuffle([...unit.pair, ...unit.distractors]);
+}
+
+function updateStreakStars(){
+  const row = document.getElementById('streakRow');
+  row.innerHTML = '';
+  for(let i=0;i<NEEDED_CORRECT;i++){
+    const s = document.createElement('span');
+    s.className = 'streak-star' + (i < streak ? ' lit' : '');
+    s.textContent = '★';
+    row.appendChild(s);
+  }
+}
+
+function renderQuestion(){
+  viewVersion++;
+  document.getElementById('studyPanel').classList.add('hidden');
+  document.getElementById('nextBtn').classList.add('hidden');
+  document.getElementById('learnBtn').disabled = false;
+  if(mode === 'continue' && unitIndex >= UNITS.length){
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('completeScreen').classList.add('show');
+    return;
+  }
+  if(mode === 'practice'){
+    if(practiceModeType === 'letter') phase = 'letter';
+    else if(practiceModeType === 'word') phase = 'word';
+    // 'mixed' leaves phase as-is so it can toggle naturally on streak completion
+  }
+  const unit = getActiveUnit();
+  const rashiEl = document.getElementById('rashiLetter');
+  const pill = document.getElementById('phasePill');
+  const promptEl = document.getElementById('promptText');
+
+  if(phase === 'letter'){
+    currentTarget = (retryQuestion && retryQuestion.phase === 'letter') ? retryQuestion.target : pickTarget(unit);
+    currentWord = null;
+    retryQuestion = null;
+    rashiEl.classList.remove('word-mode');
+    rashiEl.textContent = currentTarget;
+    promptEl.textContent = 'Which letter is this?';
+    pill.textContent = 'Letter';
+    pill.classList.remove('word');
+  } else {
+    const wordEntry = (retryQuestion && retryQuestion.phase === 'word') ? retryQuestion.word : unit.words[Math.floor(Math.random()*unit.words.length)];
+    currentWord = wordEntry;
+    currentTarget = wordEntry.w;
+    retryQuestion = null;
+    rashiEl.classList.add('word-mode');
+    rashiEl.textContent = wordEntry.w;
+    promptEl.textContent = 'Which word below matches this word exactly?';
+    pill.textContent = 'Word';
+    pill.classList.add('word');
+  }
+
+  document.getElementById('unitLabel').textContent = (mode === 'continue')
+    ? ('Letter ' + (unitIndex+1) + ' of ' + UNITS.length + ' \u00b7 ' + unit.label)
+    : ('Practicing \u00b7 ' + unit.label);
+  document.getElementById('feedback').textContent = '';
+  const row = document.getElementById('choicesRow');
+  row.innerHTML = '';
+
+  if(phase === 'letter'){
+    const opts = choicesFor(unit);
+    opts.forEach(letter => {
+      const b = document.createElement('button');
+      b.className = 'choice-btn';
+      b.textContent = letter;
+      b.onclick = () => handleAnswer(letter, b);
+      row.appendChild(b);
+    });
+  } else {
+    const opts = shuffle([currentWord.w, ...currentWord.decoys]);
+    opts.forEach(word => {
+      const b = document.createElement('button');
+      b.className = 'choice-btn word-btn';
+      b.textContent = word;
+      b.onclick = () => handleAnswer(word, b);
+      row.appendChild(b);
+    });
+  }
+  let pct;
+  if(mode === 'continue'){
+    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_CORRECT);
+    pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
+  } else if(practiceModeType === 'mixed'){
+    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_CORRECT);
+    pct = Math.round((phaseFrac / 2) * 100);
+  } else {
+    pct = Math.round((streak/NEEDED_CORRECT) * 100);
+  }
+  document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
+  updateStreakStars();
+  updateAdventure();
+  answering = false;
+}
+
+function showComparison(){
+  const panel = document.getElementById('studyPanel');
+  panel.replaceChildren();
+  const title = document.createElement('strong'); title.textContent = 'Look closely: the same ' + (phase === 'word' ? 'word' : 'letter') + ', two styles.';
+  const pair = document.createElement('div'); pair.className = 'compare';
+  ['Rashi','Regular print'].forEach((label,i)=>{ const item=document.createElement('span'); item.className=i===0?'rashi':''; item.textContent=currentTarget; const caption=document.createElement('small');caption.textContent=label;item.appendChild(caption);pair.appendChild(item); });
+  panel.append(title,pair); panel.classList.remove('hidden');
+}
+document.getElementById('learnBtn').onclick=showComparison;
+document.getElementById('soundBtn').onclick=()=>{soundOn=!soundOn;const b=document.getElementById('soundBtn');b.textContent=soundOn?'Sound on':'Sound off';b.setAttribute('aria-pressed',String(soundOn));};
+document.getElementById('nextBtn').onclick=renderQuestion;
+async function handleAnswer(letter, btnEl){
+  if(answering) return;
+  answering = true;
+  const version = viewVersion;
+  const unit = getActiveUnit();
+  const answeredPhase = phase;
+  const isCorrect = letter === currentTarget;
+  const assisted = !document.getElementById('studyPanel').classList.contains('hidden');
+  const fb = document.getElementById('feedback');
+  document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+  document.getElementById('learnBtn').disabled = true;
+  attemptsThisStep++;
+
+  if(isCorrect){
+    btnEl.classList.add('correct');
+    starsThisVisit++; coinsThisVisit++;
+    updateRewardHud();
+    animateExplorer();
+    rewardBurst(btnEl);
+    fb.style.color='#176447';
+    fb.textContent=assisted?'Good learning! Now try the next one on your own.':['You cracked it!','Great detective work!','You found the match!'][Math.floor(Math.random()*3)];
+    if(!assisted) streak++;
+    beep('correct');
+  }else{
+    btnEl.classList.add('incorrect');
+    document.querySelectorAll('.choice-btn').forEach(b=>{if(b.textContent===currentTarget)b.classList.add('correct');});
+    fb.style.color='#865014';
+    fb.textContent='Good try. The green answer is the match — you’ll see this one once more.';
+    // Keep stars already earned. Repeat this exact item once on the next question.
+    retryQuestion = answeredPhase === 'word'
+      ? { phase:'word', word:currentWord }
+      : { phase:'letter', target:currentTarget };
+    showComparison();
+  }
+  updateStreakStars();
+  updateAdventure();
+
+  const writes=[logAttempt(unit.id,answeredPhase,isCorrect)];
+  const stepComplete = streak >= NEEDED_CORRECT || (attemptsThisStep >= MAX_QUESTIONS_PER_STEP && isCorrect) || attemptsThisStep > MAX_QUESTIONS_PER_STEP;
+  let practiceFinished = false, unitAdvanced = false;
+  const miniGamePending = isCorrect && !assisted && starsThisVisit > 0 && starsThisVisit % 4 === 0;
+
+  if(stepComplete){
+    const mastered = streak >= NEEDED_CORRECT;
+    fb.style.color = mastered ? '#176447' : '#5b4a20';
+    fb.textContent = mastered
+      ? '★ Great! You completed this step!'
+      : '★ Step complete! Keep practicing this one again later.';
+    streak = 0;
+    attemptsThisStep = 0;
+    retryQuestion = null;
+    celebrateCheckpoint();
+
+    if(mode==='continue'){
+      if(phase==='letter') phase='word';
+      else { phase='letter'; unitIndex++; unitAdvanced = true; }
+      guidedIndex=unitIndex; guidedPhase=phase;
+      if(!teacherPreview) writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
+    } else if(practiceModeType==='mixed'){
+      if(phase==='letter') phase='word';
+      else practiceFinished = true;
+    } else {
+      practiceFinished = true;
+    }
+  }
+
+  rashiFollowPending=true;
+  try{await Promise.all(writes);rashiFollowPending=false;}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  if(version!==viewVersion) return;
+
+  if(practiceFinished){
+    questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
+  } else if(miniGamePending){
+    const delay = stepComplete ? 1250 : 900;
+    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? goNextStep : renderQuestion),delay);
+  } else if(stepComplete){
+    questionTimer=setTimeout(unitAdvanced ? goNextStep : renderQuestion,1400);
+  } else if(isCorrect){
+    questionTimer=setTimeout(renderQuestion,1050);
+  } else {
+    document.getElementById('nextBtn').classList.remove('hidden');
+  }
+}
+
+/* ---------- Look-alike letters ---------- */
+const ALL_LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
+const TAUGHT_LETTERS = new Set(UNITS.flatMap(u => (u.type==='single' ? [u.correct] : u.pair)).map(ch => ch.normalize('NFD').replace(/[֑-ׇ]/g,'')));
+const SIMILAR = ALL_LETTERS.filter(ch => !TAUGHT_LETTERS.has(ch));
+let simTab = 'explore', simMatch = null, simMem = null, morphTimer = null;
+
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+
+function openSimilar(){
+  clearTimeout(questionTimer); viewVersion++;
+  ['modeGate','app','practiceCompleteScreen','alphabetLabScreen'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('similarScreen').style.display='block';
+  setSimTab('explore');
+}
+function setSimTab(tab){
+  leaveRoom(); simTab = tab; viewVersion++; cancelAnimationFrame(morphTimer);
+  document.querySelectorAll('.sim-tab').forEach(b=>b.classList.toggle('selected', b.dataset.sim===tab));
+  if(tab==='explore') renderSimExplore();
+  else if(tab==='match') renderMatchMenu();
+  else if(tab==='words'){ const c=currentStep(); const lvl = pendingWordLevel || (c>=0 && STEPS[c].k==='words' ? STEPS[c].n : wordLevel); pendingWordLevel=null; startWords(lvl); }
+  else startSimMemory();
+}
+document.querySelectorAll('.sim-tab').forEach(b=>b.onclick=()=>setSimTab(b.dataset.sim));
+document.getElementById('simMenuBtn').onclick=()=>{ cancelAnimationFrame(morphTimer); leaveRoom(); showModeGate(); };
+
+function renderSimExplore(){
+  cancelAnimationFrame(morphTimer);
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const key=el('div','sim-key'); key.innerHTML='<span><b>Rashi</b> on the right</span><span><b>Regular</b> on the left</span>';
+  const grid=el('div','sim-grid');
+  SIMILAR.forEach((ch,i)=>{
+    const c=el('button','sim-card'); c.setAttribute('aria-label','Letter '+ch+': see Rashi and regular side by side');
+    c.append(el('span','r',ch), el('span','eq','='), el('span','p',ch));
+    c.onclick=()=>renderSimMorph(i);
+    grid.appendChild(c);
+  });
+  area.append(el('p','prompt','Tap a letter to watch it change from Rashi to regular!'), key, grid);
+}
+
+function renderSimMorph(i){
+  cancelAnimationFrame(morphTimer);
+  const ch=SIMILAR[i];
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const top=el('div','sim-row');
+  const back=el('button','sim-small-btn','← All letters'); back.onclick=renderSimExplore;
+  top.append(back, el('span','sim-status',(i+1)+' of '+SIMILAR.length));
+  const box=el('div','morph-box'); box.setAttribute('dir','rtl');
+  const r=el('span','r',ch), p=el('span','p',ch); p.style.opacity=0; box.append(r,p);
+  const labels=el('div','morph-labels'); labels.append(el('span',null,'Rashi'), el('span',null,'Regular'));
+  const slider=document.createElement('input'); slider.type='range'; slider.min=0; slider.max=100; slider.value=0; slider.className='morph';
+  slider.setAttribute('aria-label','Slide from Rashi to regular');
+  const setV=v=>{ r.style.opacity=1-v/100; p.style.opacity=v/100; };
+  slider.oninput=()=>{ cancelAnimationFrame(morphTimer); setV(+slider.value); };
+  const play=el('button','helper','▶ Watch it change');
+  play.onclick=()=>{
+    cancelAnimationFrame(morphTimer); const start=performance.now(), dur=3200;
+    const step=t=>{ const k=Math.min(1,(t-start)/dur); const v=Math.round((1-Math.cos(k*Math.PI*2))/2*100); slider.value=v; setV(v); if(k<1) morphTimer=requestAnimationFrame(step); };
+    morphTimer=requestAnimationFrame(step);
+  };
+  const helpRow=el('div','help-row'); helpRow.appendChild(play);
+  const nav=el('div','sim-row');
+  const prev=el('button','sim-small-btn','← Previous'), next=el('button','sim-small-btn','Next →');
+  prev.disabled=i===0; next.disabled=i===SIMILAR.length-1;
+  prev.onclick=()=>renderSimMorph(i-1); next.onclick=()=>renderSimMorph(i+1);
+  nav.append(prev,next);
+  area.append(top, el('p','prompt','Slide or press play — see how little changes!'), box, labels, slider, helpRow, nav);
+}
+
+function startSimMatch(){
+  simMatch={ order:shuffle(SIMILAR).slice(0,8), round:0, correct:0 };
+  renderSimMatch();
+}
+function renderSimMatch(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const m=simMatch;
+  if(m.round>=m.order.length){
+    const passed=m.correct>=MASTER_MATCH; if(passed) markMastered('similarDone');
+    const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'🏆':'💪'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'),
+      el('p','sim-intro', passed ? 'Look-alike letters mastered! See? Rashi and regular letters are almost twins.' : 'Get '+MASTER_MATCH+' of '+m.order.length+' to unlock the next step. Try again!'));
+    const again=el('button','btn','Play again'); again.onclick=startSimMatch; again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && currentStep()>=0) d.appendChild(nextStepButton());
+    area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
+  }
+  const target=m.order[m.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big',target));
+  const opts=shuffle([target, ...shuffle(SIMILAR.filter(c=>c!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.id='simFeedback'; fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const version=viewVersion;
+  const advance=()=>{ if(version!==viewVersion) return; m.round++; renderSimMatch(); };
+  next.onclick=advance;
+  opts.forEach(ch=>{
+    const b=el('button','choice-btn',ch);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=ch===target;
+      if(ok){ b.classList.add('correct'); m.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='Same letter — just a different style!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green one is its twin.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','letter',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Question '+(m.round+1)+' of '+m.order.length+' · ★ '+m.correct), box, el('p','prompt','Which regular letter is the same?'), row, fb, next);
+}
+
+function startSimMemory(){
+  const picks=shuffle(SIMILAR).slice(0,6);
+  simMem={ cards:shuffle(picks.flatMap(ch=>[{ch,kind:'rashi'},{ch,kind:'print'}])), open:[], matched:0, moves:0, lock:false };
+  renderSimMemory();
+}
+function renderSimMemory(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=simMem;
+  const status=el('div','sim-status'); const setStatus=()=>status.textContent='Find each Rashi letter and its regular twin · Pairs: '+g.matched+' of 6 · Tries: '+g.moves;
+  setStatus();
+  const grid=el('div','mem-grid');
+  const version=viewVersion;
+  g.cards.forEach(card=>{
+    const b=el('button','mem-card '+card.kind); b.setAttribute('aria-label','Hidden card');
+    const face=()=>{ b.replaceChildren(el('span','g',card.ch), el('small',null,card.kind==='rashi'?'Rashi':'Regular')); b.classList.add('up'); b.setAttribute('aria-label',(card.kind==='rashi'?'Rashi ':'Regular ')+card.ch); };
+    const hide=()=>{ b.replaceChildren(el('span',null,'?')); b.classList.remove('up'); b.setAttribute('aria-label','Hidden card'); };
+    hide();
+    b.onclick=()=>{
+      if(g.lock || b.classList.contains('up')) return;
+      face(); g.open.push({card,b,hide});
+      if(g.open.length<2) return;
+      g.moves++; const [a,c]=g.open; g.open=[];
+      if(a.card.ch===c.card.ch && a.card.kind!==c.card.kind){
+        [a.b,c.b].forEach(x=>{ x.classList.add('done'); x.disabled=true; });
+        g.matched++; coinsThisVisit++; updateRewardHud(); rewardBurst(c.b); beep('correct'); setStatus();
+        if(g.matched===6){
+          starsThisVisit+=3; updateRewardHud(); showQuestToast('🃏 All pairs found!');
+          const d=el('div','sim-done'); d.append(el('h3',null,'All twins found in '+g.moves+' tries!'));
+          const again=el('button','btn','Play again'); again.onclick=startSimMemory; d.appendChild(again);
+          setTimeout(()=>{ if(version===viewVersion) area.appendChild(d); },500);
+        }
+      } else {
+        g.lock=true; beep('wrong'); setStatus();
+        setTimeout(()=>{ if(version!==viewVersion) return; a.hide(); c.hide(); g.lock=false; },950);
+      }
+    };
+    grid.appendChild(b);
+  });
+  area.append(status, grid);
+}
+
+/* ---------- Match it: solo or live multiplayer ---------- */
+const MP_QUESTIONS = 10;
+const MP_OPEN_MS = 20*60*1000;      // a waiting game stays open for 20 minutes
+const ROOMS_PATH = 'rashiLetters/matchRooms';
+let simRoom = null;                  // the game I'm in
+let mpWatch = null;                  // listener on all games while I'm in multiplayer
+let mpClass = null;                  // my class id ('' if none)
+
+function renderMatchMenu(){
+  leaveRoom();
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const wrap=el('div','mp-choose');
+  const solo=el('button','mp-big'); solo.append(el('span','e','🎯'), el('span',null,'Play alone'), el('small',null,'8 letters, just you'));
+  const fr=el('button','mp-big friends'); fr.append(el('span','e','👥'), el('span',null,'Play with friends'), el('small',null,'Race other boys live'));
+  solo.onclick=()=>{ leaveRoom(); startSimMatch(); }; fr.onclick=()=>enterMultiplayer();
+  wrap.append(solo,fr);
+  area.append(el('p','prompt','How do you want to play?'), wrap);
+}
+
+async function myClassId(){
+  if(mpClass!==null) return mpClass;
+  try{ if(window.FunTorahStudentClass){ const c=await FunTorahStudentClass.resolve(db, studentId); mpClass=String(c.classId||''); } else mpClass=''; }
+  catch(e){ mpClass=''; }
+  return mpClass;
+}
+
+function openGames(all){
+  const now=Date.now();
+  return Object.entries(all||{}).filter(([code,r])=>r && r.state==='lobby' && (r.classId||'')===mpClass &&
+    r.createdAt && now-r.createdAt<MP_OPEN_MS && r.players && r.players[r.host] && !r.players[r.host].left &&
+    !(simRoom && simRoom.code===code) && activePlayers(r).length<8);
+}
+
+async function enterMultiplayer(msgText){
+  leaveRoom(); viewVersion++;
+  const area=document.getElementById('simArea');
+  if(!studentId){ area.replaceChildren(el('p','prompt','Please sign in on Fun Torah Tools to play with friends.')); return; }
+  area.replaceChildren(el('p','prompt','Looking for friends…'));
+  const v=viewVersion;
+  try{
+    await myClassId();
+    const all=(await db.ref(ROOMS_PATH).once('value')).val()||{};
+    if(v!==viewVersion) return;
+    cleanupOldGames(all);
+    if(openGames(all).length===0){ await createRoom(); return; }   // nobody waiting: open my game, others will be offered it
+    watchGames();
+    renderOffers(all, msgText);
+  }catch(e){ console.error(e); area.replaceChildren(el('p','prompt','Could not reach the game server. Ask your teacher.')); }
+}
+
+function cleanupOldGames(all){
+  const now=Date.now();
+  Object.entries(all||{}).forEach(([code,r])=>{ if(!r || !r.createdAt || now-r.createdAt>3*3600*1000) db.ref(ROOMS_PATH+'/'+code).remove().catch(()=>{}); });
+}
+
+function watchGames(){
+  if(mpWatch) return;
+  const ref=db.ref(ROOMS_PATH);
+  const cb=ref.on('value', snap=>onGamesUpdate(snap.val()||{}));
+  mpWatch={ref,cb};
+}
+function stopWatching(){ if(mpWatch){ mpWatch.ref.off('value', mpWatch.cb); mpWatch=null; } }
+
+function onGamesUpdate(all){
+  if(simRoom){ onRoomUpdate(all[simRoom.code]||null, all); return; }
+  if(document.getElementById('mpOffers')) renderOffers(all);
+}
+
+function offerList(all){
+  const list=el('div'); list.id='mpOffers';
+  openGames(all).sort(([,a],[,b])=>a.createdAt-b.createdAt).forEach(([code,r])=>{
+    const others=activePlayers(r).map(([,p])=>p.name);
+    const card=el('div','mp-offer');
+    const txt=el('div','mp-offer-txt'); txt.append(el('b',null,(r.hostName||others[0]||'A friend')+' wants to play!'), el('small',null,others.length+' player'+(others.length===1?'':'s')+' waiting: '+others.join(', ')));
+    const j=el('button','btn','Join'); j.onclick=()=>{ j.disabled=true; joinRoom(code).then(err=>{ if(err) enterMultiplayer(err); }).catch(()=>enterMultiplayer('Could not join. Try again.')); };
+    card.append(txt,j); list.appendChild(card);
+  });
+  return list;
+}
+
+function renderOffers(all, msgText){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const list=offerList(all);
+  if(!list.children.length){ createRoom().catch(()=>{}); return; }
+  const own=el('button','sim-small-btn','Start my own game instead'); own.onclick=()=>{ own.disabled=true; createRoom().catch(()=>{}); };
+  const back=el('button','sim-small-btn','← Back'); back.onclick=renderMatchMenu;
+  const row=el('div','sim-row'); row.append(back,own);
+  area.append(el('p','prompt','Friends are waiting for you!'), list, el('div','mp-msg',msgText||''), row);
+}
+
+function makeQuestions(){
+  return shuffle(SIMILAR).slice(0,MP_QUESTIONS).map(t=>({t, o:shuffle([t, ...shuffle(SIMILAR.filter(c=>c!==t)).slice(0,3)])}));
+}
+
+let mpCreating = false;
+async function createRoom(){
+  if(mpCreating) return; mpCreating=true;
+  try{ await createRoomInner(); } finally { mpCreating=false; }
+}
+async function createRoomInner(){
+  leaveRoom();
+  let code=null;
+  for(let i=0;i<8 && !code;i++){
+    const c=String(1000+Math.floor(Math.random()*9000));
+    const r=(await db.ref(ROOMS_PATH+'/'+c).once('value')).val();
+    if(!r || (r.createdAt && Date.now()-r.createdAt>3*3600*1000)) code=c;
+  }
+  if(!code) throw new Error('no free code');
+  const ref=db.ref(ROOMS_PATH+'/'+code);
+  const players={}; players[studentId]={name:studentName, score:0, q:0};
+  await ref.set({host:studentId, hostName:studentName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
+  ref.onDisconnect().remove();
+  enterRoom(code,true);
+}
+
+async function joinRoom(code){
+  const ref=db.ref(ROOMS_PATH+'/'+code); const r=(await ref.once('value')).val();
+  if(!r) return 'That game closed. Try another one.';
+  if(r.state!=='lobby') return 'That game already started.';
+  if(activePlayers(r).length>=8 && !(r.players||{})[studentId]) return 'That game is full.';
+  leaveRoom();   // if I was waiting in my own empty game, close it
+  const me=ref.child('players/'+studentId);
+  await me.set({name:studentName, score:0, q:0});
+  me.onDisconnect().update({left:true});
+  enterRoom(code,false);
+  return null;
+}
+
+function enterRoom(code,isHost){
+  viewVersion++;
+  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null};
+  watchGames();
+  db.ref(ROOMS_PATH).once('value').then(s=>{ const all=s.val()||{}; if(simRoom && simRoom.code===code) onRoomUpdate(all[code]||null, all); });
+}
+
+function leaveRoom(){
+  stopWatching();
+  const r=simRoom; if(!r) return; simRoom=null;
+  try{
+    const state=r.data && r.data.state;
+    if(r.isHost && (state==='lobby' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); }
+    else if(!r.finished && r.data){ const me=r.ref.child('players/'+studentId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
+  }catch(e){ console.error(e); }
+}
+
+function activePlayers(room){ return Object.entries((room&&room.players)||{}).filter(([,p])=>p && !p.left); }
+function allDone(room){ const a=activePlayers(room); return a.length>0 && a.every(([,p])=>p.finishedAt); }
+
+function onRoomUpdate(room, all){
+  const r=simRoom; if(!r) return;
+  if(!room){ if(r.shown!=='results'){ simRoom=null; enterMultiplayer(r.isHost?'':'That game was closed.'); } return; }
+  r.data=room;
+  if(room.state==='lobby'){ renderLobby(room, all); return; }
+  if(r.shown==='results') return;
+  if(room.state==='ended' || (r.finished && allDone(room))){ renderMpResults(room); return; }
+  if(room.state==='playing' && !r.started){
+    if(!room.players || !room.players[studentId] || room.players[studentId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
+    r.started=true; r.ref.onDisconnect().cancel();
+    r.ref.child('players/'+studentId).onDisconnect().update({left:true});
+    runCountdown(); return;
+  }
+  updateBoard(room);
+}
+
+function renderLobby(room, all){
+  const r=simRoom; r.shown='lobby';
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const panel=el('div','mp-panel');
+  const players=activePlayers(room); const count=players.length;
+  panel.append(el('h3',null, count<2 ? 'Waiting for friends to join…' : 'Your race is ready!'));
+  if(count<2) panel.appendChild(el('p','sim-intro','When another boy taps 👥 Play with friends, he’ll be asked to join you.'));
+  const list=el('div','mp-players');
+  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===studentId?' me':''), (id===room.host?'👑 ':'')+(id===studentId?'You':p.name))));
+  panel.append(el('div','sim-status',count+' player'+(count===1?'':'s')+' here'), list);
+  if(r.isHost){
+    const go=el('button','btn', count<2 ? 'Waiting…' : '▶ Start the race!'); go.disabled=count<2;
+    go.onclick=()=>{ go.disabled=true; r.ref.onDisconnect().cancel(); r.ref.update({state:'playing', startedAt:firebase.database.ServerValue.TIMESTAMP}); };
+    panel.appendChild(go);
+  } else panel.appendChild(el('p','prompt','Waiting for '+(room.hostName||'the host')+' to start…'));
+  area.appendChild(panel);
+  // Someone else is waiting alone too? Offer to join them so nobody waits forever.
+  if(r.isHost && count<2 && all){
+    const offers=offerList(all);
+    if(offers.children.length){ area.append(el('p','prompt','Or join a friend who is waiting:'), offers); }
+  }
+  const leave=el('button','sim-small-btn','← Leave'); leave.onclick=renderMatchMenu;
+  area.appendChild(leave);
+}
+
+function runCountdown(){
+  const r=simRoom; r.shown='countdown'; const v=viewVersion;
+  const area=document.getElementById('simArea');
+  const steps=['3','2','1','Go!']; let i=0;
+  const tick=()=>{
+    if(simRoom!==r || v!==viewVersion) return;
+    if(i>=steps.length){ renderMpQuestion(); return; }
+    area.replaceChildren(el('p','prompt','Get ready…'), el('div','mp-count',steps[i])); beep(i===3?'correct':'wrong'); i++; setTimeout(tick,750);
+  };
+  tick();
+}
+
+function rankPlayers(room){ return Object.entries(room.players||{}).sort(([,a],[,b])=>(b.score||0)-(a.score||0) || ((a.finishedAt||Infinity)-(b.finishedAt||Infinity))); }
+function boardRows(room, results){
+  const total=(room.questions||[]).length||MP_QUESTIONS;
+  const box=el('div','mp-board'+(results?' mp-results':''));
+  rankPlayers(room).forEach(([id,p],i)=>{
+    const row=el('div','mp-row'+(id===studentId?' me':'')+(p.left?' left':''));
+    const medal=results ? (['🥇','🥈','🥉'][i]||(i+1)+'.') : (p.finishedAt?'🏁':(i+1)+'.');
+    const bar=el('div','mp-bar'); const fill=document.createElement('i'); fill.style.width=Math.min(100,(p.q||0)/total*100)+'%'; bar.appendChild(fill);
+    row.append(el('span',null,medal), el('span','mp-name',(id===studentId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
+    box.appendChild(row);
+  });
+  return box;
+}
+function updateBoard(room){ const old=document.getElementById('mpBoard'); if(!old) return; const nb=boardRows(room,false); nb.id='mpBoard'; old.replaceWith(nb); }
+
+function renderMpQuestion(){
+  const r=simRoom; if(!r) return; r.shown='question';
+  const qs=r.data.questions; const q=qs[r.qi];
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const board=boardRows(r.data,false); board.id='mpBoard';
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big',q.t));
+  const row=el('div','choices'); const fb=el('div',null); fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0';
+  const v=viewVersion;
+  q.o.forEach(ch=>{
+    const b=el('button','choice-btn',ch);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=ch===q.t;
+      if(ok){ b.classList.add('correct'); r.score++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='Got it!'; }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===q.t) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='The green one is its twin.'; }
+      r.qi++;
+      const upd={score:r.score, q:r.qi};
+      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+studentId).onDisconnect().cancel(); }
+      r.ref.child('players/'+studentId).update(upd).catch(()=>{});
+      logAttempt('similar','letter',ok).catch(()=>{});
+      setTimeout(()=>{ if(simRoom!==r || v!==viewVersion) return; if(r.qi>=qs.length) renderMpWaiting(); else renderMpQuestion(); }, ok?650:1400);
+    };
+    row.appendChild(b);
+  });
+  area.append(board, el('div','sim-status','Letter '+(r.qi+1)+' of '+qs.length), box, el('p','prompt','Which regular letter is the same?'), row, fb);
+}
+
+function renderMpWaiting(){
+  const r=simRoom; if(!r) return;
+  if(allDone(r.data) || r.data.state==='ended'){ renderMpResults(r.data); return; }
+  r.shown='waiting';
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const board=boardRows(r.data,false); board.id='mpBoard';
+  const d=el('div','sim-done'); d.append(el('div','finish-icon','🏁'), el('p','prompt','You finished with ⭐ '+r.score+'! Waiting for your friends…'), board);
+  if(r.isHost){ const end=el('button','sim-small-btn','End the game now'); end.onclick=()=>r.ref.update({state:'ended'}); d.appendChild(end); }
+  area.appendChild(d);
+}
+
+function renderMpResults(room){
+  const r=simRoom; if(!r || r.shown==='results') return; r.shown='results';
+  r.ref.child('players/'+studentId).onDisconnect().cancel();
+  if(r.isHost) r.ref.onDisconnect().remove();
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const ranked=rankPlayers(room);
+  const iWon=ranked.length && ranked[0][0]===studentId;
+  const icon=el('div','finish-icon',iWon?'🏆':'🎉');
+  const d=el('div','sim-done');
+  const again=el('button','btn','Play again'); again.onclick=()=>enterMultiplayer(); again.style.marginTop='10px';
+  d.append(icon, el('h3',null,iWon?'You won the race!':(ranked[0]?(ranked[0][1].name+' wins!'):'Game over')), boardRows(room,true), again);
+  area.appendChild(d);
+  const myScore=(room.players&&room.players[studentId]&&room.players[studentId].score)||0;
+  if(myScore>=8) markMastered('similarDone');
+  if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); setTimeout(()=>showQuestToast('🏆 Winner! +5 stars'), myScore>=8?1300:0); }
+  else rewardBurst(icon,false);
+}
+
+/* ---------- Word practice with only the letters learned so far ---------- */
+/* ---------- Word practice with only the letters learned so far ---------- */
+const PRACTICE_WORDS = [
+  // 2 letters
+  'כִּי','עַל','כָּל','מִי','מָה','עַד','הֵן','פֹּה','יָד','כֵּן','רַק','חַי','גַּן','הַר','לֹא','נָא','זֶה','לֵב','אָב','אַף','שָׁם','יָם','עֵץ','אִם','גַּם','דָּם',
+  // 3 letters
+  'הוּא','הִיא','טוֹב','נֹחַ','עִיר','הָיָה','יָלַד','הָלַךְ','עָלָה','יָדַע','נָתַן','לָקַח','מֶלֶךְ','נָהָר','דָּגָן','כֹּהֵן','עֵדָה','קָהָל','יוֹם','אוֹר','קָרָא','לֶחֶם','כָּתַב','שָׁנָה','זָכַר','בָּרָא','אֶרֶץ','צֹאן',
+  // 4 letters
+  'תּוֹרָה','פַּרְעֹה','מִנְחָה','הֵיכָל','מִגְדָּל','לְמַעַן','עוֹלָה','מִקְנֶה','גּוֹרָל','חֲנוֹךְ','כִּנּוֹר','תְּהִלָּה','אַהֲרֹן','יַעֲקֹב','מַלְאָךְ','מִצְוָה','מִקְדָּשׁ','יוֹסֵף'
+];
+const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
+let wordLevel = 2, wordGame = null;
+function unlockedLetters(){
+  // Progress, not menu access, determines which letters a student has learned.
+  if(chainFlags.alphabetDone) return new Set(ALL_LETTERS);
+  const known=new Set();
+  if(chainFlags.similarDone) SIMILAR.forEach(ch=>known.add(ch));
+  const completed=Math.min(guidedIndex,UNITS.length);
+  UNITS.slice(0,completed).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>known.add(c))));
+  return known;
+}
+function wordsFor(level){
+  const known=unlockedLetters();
+  const candidates=PRACTICE_WORDS.filter(w=>baseLetters(w).length===level);
+  // Prefer fully learned words; if there are too few for a playable round,
+  // introduce only the minimum number of unfamiliar letters needed.
+  const unfamiliarCount=w=>baseLetters(w).filter(ch=>!known.has(ch)).length;
+  const ranked=candidates.map(w=>({word:w,missing:unfamiliarCount(w)}));
+  ranked.sort((a,b)=>a.missing-b.missing);
+  const maxMissing=ranked[Math.min(5,ranked.length-1)]?.missing ?? 0;
+  return ranked.filter(item=>item.missing<=maxMissing).map(item=>item.word);
+}
+function startWords(level){
+  wordLevel=level;
+  const pool=wordsFor(level);
+  wordGame={level, pool, order:shuffle(pool).slice(0,6), round:0, correct:0};
+  renderWords();
+}
+function renderWords(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=wordGame;
+  const levels=el('div','word-levels');
+  [2,3,4].forEach(n=>{ const open=stepUnlocked(stepIndexOf('words',n)); const b=el('button','word-level'+(n===g.level?' selected':''),(open?'':'🔒 ')+n+'-letter words'); b.onclick=()=>{ viewVersion++; startWords(n); }; levels.appendChild(b); });
+  const top=el('div','sim-row'); top.appendChild(levels); top.style.justifyContent='center';
+  area.appendChild(top);
+  const si=stepIndexOf('words',g.level);
+  if(!stepUnlocked(si)){
+    area.append(el('p','prompt','🔒 '+g.level+'-letter words are locked.'), el('p','sim-intro','First master: '+stepName(STEPS[firstUnmasteredBefore(si)])+'.'));
+    const go=el('button','btn','Go there →'); go.onclick=()=>goStep(firstUnmasteredBefore(si)); area.appendChild(go); return;
+  }
+  if(g.pool.length<4){
+    area.append(el('p','prompt','There are not enough words available for this level.'), el('p','sim-intro','Try another word length.'));
+    return;
+  }
+  if(g.round>=g.order.length){
+    const passed=g.correct>=MASTER_WORDS; if(passed) markMastered('words'+g.level+'Done');
+    const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'📖':'💪'), el('h3',null,'You read '+g.correct+' of '+g.order.length+' words!'),
+      el('p','sim-intro', passed ? g.level+'-letter words mastered!' : 'Get '+MASTER_WORDS+' of '+g.order.length+' to unlock the next step. Try again!'));
+    const again=el('button','btn','More words'); again.onclick=()=>startWords(g.level); again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && currentStep()>=0) d.appendChild(nextStepButton());
+    area.appendChild(d); rewardBurst(d.firstChild, g.correct===g.order.length); return;
+  }
+  const target=g.order[g.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big word',target));
+  const opts=shuffle([target, ...shuffle(g.pool.filter(w=>w!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const v=viewVersion; const advance=()=>{ if(v!==viewVersion) return; g.round++; renderWords(); }; next.onclick=advance;
+  opts.forEach(w=>{
+    const b=el('button','choice-btn word-choice',w);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=w===target;
+      if(ok){ b.classList.add('correct'); g.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='You read it!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green word is the match.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','word',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Word '+(g.round+1)+' of '+g.order.length+' · ★ '+g.correct), box, el('p','prompt','Which word is the same?'), row, fb, next);
+}
+
+async function logAttempt(unitId, ph, correct){
+  if(teacherPreview || !studentId)return;
+  const key = unitId + '_' + ph;
+  const path = 'rashiLetters/progress/' + studentId + '/units/' + key;
+  const snap = await db.ref(path).once('value');
+  const existing = snap.val() || { attempts:0, correct:0 };
+  await db.ref(path).set({
+    attempts: (existing.attempts||0) + 1,
+    correct: (existing.correct||0) + (correct?1:0)
+  });
+  await db.ref('rashiLetters/progress/' + studentId + '/lastActive').set(firebase.database.ServerValue.TIMESTAMP);
+  await db.ref('rashiLetters/progress/' + studentId + '/name').set(studentName);
+}
+</script>
+<script src="alphabet-lab.js?v=20261019-full-alefbet"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle2"></script>
+</body>
+</html>
+

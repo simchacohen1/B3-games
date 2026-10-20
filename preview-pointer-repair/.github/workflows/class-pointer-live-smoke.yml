@@ -1,0 +1,26 @@
+name: Classroom Pointer live release smoke
+on:
+  push:
+    branches: [main, fix/pointer-live-smoke-verification]
+    paths:
+      - 'class-pointer-prototype/**'
+      - 'scripts/class-pointer-live-smoke.cjs'
+      - '.github/workflows/class-pointer-live-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify published assets and anonymous chooser
+        env:
+          POINTER_CANDIDATE_OVERLAY: ${{ github.ref == 'refs/heads/main' && '0' || '1' }}
+        run: node scripts/class-pointer-live-smoke.cjs
