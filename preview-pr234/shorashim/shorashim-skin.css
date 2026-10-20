@@ -1,0 +1,350 @@
+/* ==========================================================================
+   Shorashim "Learning Lab" skin  —  added 2026-10-13
+   Purely visual. Loads AFTER everything else in index.html and only changes
+   how things look. To undo it, delete the three lines that mention
+   "shorashim-skin" in index.html (the page goes back to exactly how it was).
+   ========================================================================== */
+
+:root{
+  --sk-ink:#1c2a5c;
+  --sk-ink2:#44527d;
+  --sk-line:#c9d2f0;
+  --sk-soft:#e8ecfb;
+  --sk-purple:#5b3fe0;
+}
+
+/* ---------- Page + panels ---------- */
+body{
+  font-family:"Nunito","Trebuchet MS",Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(900px 380px at 12% -8%,#dfe6ff 0,transparent 70%),
+    radial-gradient(800px 360px at 100% 0,#e6f6ff 0,transparent 65%),
+    linear-gradient(180deg,#eef1ff 0,#f5f7ff 100%) !important;
+  color:var(--sk-ink);
+}
+button,input,select,textarea{font-family:inherit}
+body .card-panel{
+  border:2px solid #dbe1f7 !important;
+  border-radius:26px !important;
+  box-shadow:0 10px 26px rgba(60,70,160,.10) !important;
+}
+
+/* ---------- Header ---------- */
+.topbar h1{
+  display:flex !important;
+  align-items:center;
+  gap:10px;
+  color:var(--sk-ink);
+  text-transform:uppercase;
+  letter-spacing:.01em;
+  font-weight:900;
+  text-shadow:0 2px 0 #fff;
+}
+.topbar h1 .sk-logo{flex:0 0 auto;width:1.35em;height:1.35em;filter:drop-shadow(0 2px 0 rgba(255,255,255,.9))}
+.topbar h1 .sk-words{display:flex;flex-direction:column}
+.topbar h1 .sk-words span{display:block;font-size:.56em;line-height:1.04;font-weight:900}
+.topbar h1 .sk-words span + span{color:#2d3f8e}
+
+/* The "Back to Fun Torah Tools" button (it's the old "Not you?" button) */
+#switchStudentBtn{
+  background:linear-gradient(180deg,#a8f0d3,#6fdcb2) !important;
+  color:#0f4a3a !important;
+  border:3px solid #2c9e7c !important;
+  border-radius:16px !important;
+  box-shadow:0 4px 0 #1f7a5f !important;
+  font-weight:900 !important;
+  padding:8px 16px !important;
+}
+#switchStudentBtn:hover{filter:brightness(1.04)}
+#switchStudentBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #1f7a5f !important}
+
+.topbar-actions{
+  background:transparent !important;
+  border:0 !important;
+  box-shadow:none !important;
+  align-items:center;
+  gap:10px;
+}
+.signed-in-as{font-weight:800;color:var(--sk-ink2)}
+
+/* Trophy / progress pill (filled in by shorashim-skin.js) */
+.sk-progress{
+  display:flex;align-items:center;gap:10px;
+  background:#fff;border:2px solid #d9def5;border-radius:18px;
+  padding:5px 12px 5px 8px;box-shadow:0 4px 0 #d3daf3;
+}
+.sk-progress .sk-trophy{font-size:1.7rem;line-height:1}
+.sk-progress .sk-count{display:flex;flex-direction:column;align-items:center;min-width:64px;
+  background:#eef1fb;border-radius:10px;padding:3px 8px}
+.sk-progress .sk-count b{font-size:1.02rem;line-height:1.05;color:var(--sk-ink)}
+.sk-progress .sk-count small{font-size:.6rem;font-weight:900;letter-spacing:.08em;color:#6b78a6}
+.sk-progress .sk-bar{width:92px;height:14px;border-radius:99px;background:#eef1fb;border:2px solid #d9def5;overflow:hidden}
+.sk-progress .sk-bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,#ffd54a,#ff9f1c);transition:width .4s ease}
+.sk-progress .sk-pct{font-weight:900;font-size:.9rem;color:#8a5a00;min-width:2.6em;text-align:right}
+
+/* "Home" button on each screen */
+body .backBtn{
+  background:linear-gradient(180deg,#9ae9e0,#5fd2c8) !important;
+  color:#0c4a47 !important;
+  border:3px solid #2a9b93 !important;
+  border-radius:16px !important;
+  box-shadow:0 4px 0 #1d746d !important;
+  font-weight:900 !important;
+}
+body .backBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #1d746d !important}
+
+/* ---------- Left side: "My Study Path" ---------- */
+#pathTitle{font-size:0 !important}
+#pathTitle::before{
+  content:"My Study Path";
+  font-size:1.08rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--sk-ink);
+}
+#learnWorkspace .word-list-panel .mini-note{color:var(--sk-ink2);font-weight:600}
+#availableCount{background:#eef1fb !important;color:var(--sk-ink2) !important}
+
+#learnWorkspace .word-list{padding:6px 8px 10px 4px !important}
+#learnWorkspace .word-row{
+  position:relative;
+  text-align:center !important;
+  border:3px solid #cfd6ee !important;
+  border-radius:20px !important;
+  padding:8px 38px 9px !important;
+  background:linear-gradient(180deg,#ffffff,#f1f4ff) !important;
+  box-shadow:0 4px 0 #c3cbea;
+  opacity:1 !important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+#learnWorkspace .word-row .hebrew{
+  display:block;text-align:center;font-size:28px !important;line-height:1.1;font-weight:800;color:var(--sk-ink);
+}
+#learnWorkspace .word-row .meta{
+  display:block !important;text-align:center;font-size:12.5px;font-weight:800;color:var(--sk-ink2);margin-top:2px;
+}
+#learnWorkspace .word-row .meta > span:last-child{display:none}
+#learnWorkspace .word-row:hover:not(:disabled){transform:translateY(-1px);border-color:#9fb4f2 !important}
+
+/* NEXT (and whichever card is open) */
+#learnWorkspace .word-row.current,
+#learnWorkspace .word-row.active{
+  border-color:#2f6fdd !important;
+  background:#fff !important;
+  box-shadow:0 0 0 4px #bcd6ff,0 4px 0 #2a56b5 !important;
+}
+#learnWorkspace .word-row.current .meta > span:last-child,
+#learnWorkspace .word-row.active .meta > span:last-child{
+  display:inline-block;position:absolute;right:8px;bottom:8px;
+  background:#2f6fdd;color:#fff;border-radius:7px;padding:2px 7px;
+  font-size:10px;font-weight:900;letter-spacing:.06em;
+}
+
+/* Already learned */
+#learnWorkspace .word-row.learned{
+  border-color:#79d3a0 !important;
+  background:linear-gradient(180deg,#f3fff8,#dcf8e8) !important;
+  box-shadow:0 4px 0 #a9e3c2;
+}
+#learnWorkspace .word-row.learned.active{box-shadow:0 0 0 4px #bdeed3,0 4px 0 #3da56f !important}
+#learnWorkspace .word-row.learned .meta > span:last-child{
+  display:inline-block;position:absolute;right:8px;bottom:8px;
+  background:#2ea66a;color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-weight:900;
+}
+
+/* Locked */
+#learnWorkspace .word-row.locked{
+  background:linear-gradient(180deg,#e3e6ee,#d2d6e1) !important;
+  border-color:#b6bccb !important;
+  box-shadow:0 4px 0 #a9afc0;
+  cursor:not-allowed;
+}
+#learnWorkspace .word-row.locked .hebrew{color:#5a6176}
+#learnWorkspace .word-row.locked .meta{color:#6a7186}
+#learnWorkspace .word-row.locked::after{
+  content:"🔒";position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;display:grid;place-items:center;font-size:15px;
+  background:#f6c94c;border:2px solid #b8891a;border-radius:8px;
+}
+
+/* ---------- The two cards ---------- */
+#learnWorkspace .flashcard.editable{border-radius:22px !important}
+#learnWorkspace #frontCard{
+  border:4px solid #4f7fe0 !important;
+  box-shadow:0 0 0 3px #bcd5ff,0 4px 0 3px #3b55b8 !important;
+}
+#learnWorkspace #backCard{
+  border:4px solid #f0b04a !important;
+  box-shadow:0 0 0 3px #ffe2ae,0 4px 0 3px #e0884a !important;
+}
+#learnWorkspace .flashcard .card-label{
+  background:transparent !important;color:#5a6a95 !important;font-size:.72rem !important;font-weight:900;
+  letter-spacing:.1em;padding:0 !important;top:10px !important;left:14px !important;
+}
+/* Ribbons: "Front 👁" and "Back 📖" */
+#learnWorkspace .flashcard.editable::after{
+  position:absolute;top:10px;right:0;z-index:12;pointer-events:none;
+  padding:5px 16px 5px 24px;font-weight:900;font-size:.95rem;
+  clip-path:polygon(0 0,100% 0,100% 100%,0 100%,12px 50%);
+}
+#learnWorkspace #frontCard::after{content:"Front 👁";background:#bfeed6;color:#17503c}
+#learnWorkspace #backCard::after{content:"Back 📖";background:#ffc9a6;color:#7a3414}
+
+/* ---------- "Art Lab" tab strip ---------- */
+#learnWorkspace .ux-tool-tabs{
+  background:transparent !important;border:0 !important;box-shadow:none !important;
+  align-items:flex-end !important;gap:6px !important;padding:0 2px !important;overflow:visible !important;
+}
+#learnWorkspace .ux-tool-tabs::before{
+  content:"ART LAB";align-self:center;margin-right:10px;
+  font-weight:900;font-size:.95rem;letter-spacing:.05em;color:var(--sk-ink);
+}
+#learnWorkspace .ux-tool-tab{
+  background:var(--sk-soft) !important;color:var(--sk-ink2) !important;
+  border:2px solid var(--sk-line) !important;border-bottom:0 !important;
+  border-radius:12px 12px 0 0 !important;font-weight:900 !important;
+}
+#learnWorkspace .ux-tool-tab:hover{background:#f1f4ff !important}
+#learnWorkspace .ux-tool-tab.active{
+  background:#fff !important;color:#2b3a8c !important;border-color:#7b8fe0 !important;box-shadow:none !important;
+}
+#learnWorkspace .sk-reset{
+  margin-left:auto;align-self:center;
+  background:#eef1fb;color:var(--sk-ink);border:2px solid var(--sk-line);border-radius:12px;
+  box-shadow:0 3px 0 #c3cbea;padding:5px 12px;font-weight:900;font-size:.82rem;cursor:pointer;white-space:nowrap;
+}
+#learnWorkspace .sk-reset:active{transform:translateY(2px);box-shadow:0 1px 0 #c3cbea}
+body.sk-has-reset #learnWorkspace #resetCardBtn{display:none !important}
+
+/* Tool panel */
+#learnWorkspace .tool-columns > .toolbox{
+  background:#fff !important;border:2px solid var(--sk-line) !important;border-radius:0 16px 16px 16px !important;
+  padding:10px 14px !important;
+}
+#learnWorkspace .toolbox h4{color:var(--sk-ink)}
+#learnWorkspace .toolbox label{color:var(--sk-ink)}
+
+/* ---------- Pictures & Emojis panel ---------- */
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"].ux-tool-active{
+  display:grid !important;
+  grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  grid-template-areas:"el il" "ec ic" "sz bt" !important;
+  column-gap:0 !important;
+  row-gap:4px !important;
+  align-content:stretch !important;
+}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] > h4{display:none !important}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-section-label{
+  margin:0 !important;font-size:.8rem !important;font-weight:900 !important;color:var(--sk-ink) !important;
+  letter-spacing:.02em;
+}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-section-label:not(.illustration-label){grid-area:el;padding-right:14px}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-section-label.illustration-label{grid-area:il;padding-left:16px;border-left:2px solid #dfe4f6}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] #emojiChoices{grid-area:ec;padding-right:14px}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] #illustrationChoices{grid-area:ic;padding-left:16px;border-left:2px solid #dfe4f6}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-size-control{grid-area:sz;padding-right:14px}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-edit-row{grid-area:bt;padding-left:16px;justify-content:flex-start;align-items:center}
+
+/* One tidy row of picture tiles; scrolls sideways if there are lots */
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-choices{
+  display:flex !important;flex-wrap:nowrap !important;gap:10px !important;
+  overflow-x:auto;overflow-y:hidden;align-items:center;padding-top:4px;padding-bottom:8px;
+  scrollbar-width:thin;
+}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-choice{
+  flex:0 0 auto;
+  width:clamp(46px,7.4vh,64px) !important;height:clamp(46px,7.4vh,64px) !important;
+  min-width:0 !important;min-height:0 !important;
+  font-size:clamp(26px,4.4vh,38px) !important;
+  border-radius:16px !important;border:3px solid #cfd6ee !important;padding:4px !important;
+  background:#fff;box-shadow:0 4px 0 #c3cbea;
+  transition:transform .12s ease;
+}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-choice:hover{transform:translateY(-2px) scale(1.04)}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-choice:active{transform:translateY(2px);box-shadow:0 1px 0 #c3cbea}
+#learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-choice img{max-height:none !important}
+
+/* Colorful emoji tiles */
+#emojiChoices .art-choice:nth-child(6n+1){background:#79cdf7;border-color:#2f84c9 !important;box-shadow:0 4px 0 #2a6aa8}
+#emojiChoices .art-choice:nth-child(6n+2){background:#ffcf4a;border-color:#d9981c !important;box-shadow:0 4px 0 #b97a0e}
+#emojiChoices .art-choice:nth-child(6n+3){background:#86e5ae;border-color:#2f9a67 !important;box-shadow:0 4px 0 #237a50}
+#emojiChoices .art-choice:nth-child(6n+4){background:#ffa9c0;border-color:#d9587f !important;box-shadow:0 4px 0 #b13e63}
+#emojiChoices .art-choice:nth-child(6n+5){background:#c9b0ff;border-color:#7a58d6 !important;box-shadow:0 4px 0 #5c3fb0}
+#emojiChoices .art-choice:nth-child(6n+6){background:#ffbb7a;border-color:#d9822c !important;box-shadow:0 4px 0 #b26418}
+
+/* Pastel illustration tiles */
+#illustrationChoices .art-choice:nth-child(3n+1){background:#fff1c9;border-color:#e3b64d !important}
+#illustrationChoices .art-choice:nth-child(3n+2){background:#d7f5e3;border-color:#7ccf9f !important}
+#illustrationChoices .art-choice:nth-child(3n+3){background:#d8ecff;border-color:#85b9ee !important}
+
+/* Size slider with a star */
+#learnWorkspace .art-size-control{
+  display:flex;align-items:center;gap:10px;font-size:.78rem !important;font-weight:900 !important;margin:0 !important;
+  color:var(--sk-ink);
+}
+#artSize{
+  -webkit-appearance:none;appearance:none;flex:1;min-width:70px;max-width:none !important;
+  height:12px;padding:0;border-radius:99px;border:2px solid #fff !important;
+  background:linear-gradient(90deg,#f26aa7,#9a7bf0 45%,#4cc3f0) !important;
+  box-shadow:0 0 0 2px #d0d7f2;
+}
+#artSize::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:28px;height:28px;border:0;cursor:pointer;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z' fill='%23ffc928' stroke='%23e08a00' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+#artSize::-moz-range-thumb{
+  width:28px;height:28px;border:0;cursor:pointer;background-color:transparent;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z' fill='%23ffc928' stroke='%23e08a00' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size:contain;background-repeat:no-repeat;background-position:center;
+}
+#artSize:disabled{opacity:.5}
+
+/* Small / BIG / Delete / Remove all */
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-edit-row button{
+  min-height:30px !important;padding:5px 12px !important;font-size:.8rem !important;font-weight:900 !important;
+  border-radius:12px !important;border:2px solid var(--sk-line) !important;box-shadow:0 3px 0 #c3cbea;
+  background:#eef1fb !important;color:var(--sk-ink) !important;
+}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] .art-edit-row button:active{transform:translateY(2px);box-shadow:0 1px 0 #c3cbea}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] #removeArtBtn{
+  background:#ffc9bd !important;border-color:#f08a73 !important;color:#a53420 !important;box-shadow:0 3px 0 #d9705a;
+}
+#learnWorkspace .toolbox[data-ux-tool="pictures"] #removeAllArtBtn{
+  background:#e6e0ff !important;border-color:#b7a8f5 !important;color:#5a44b8 !important;box-shadow:0 3px 0 #9a88e0;
+}
+
+/* ---------- Big purple Save button ---------- */
+#learnWorkspace .ux-quick-save{
+  background:linear-gradient(180deg,#8d70f7,#5b3fe0) !important;
+  border:3px solid #4a30c4 !important;border-radius:16px !important;
+  box-shadow:0 4px 0 #3b25a8 !important;
+  color:#fff !important;font-weight:900 !important;text-transform:uppercase;letter-spacing:.02em;
+  font-size:.82rem !important;padding:0 18px !important;height:40px !important;min-height:40px !important;
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+#learnWorkspace .ux-quick-save:hover{filter:brightness(1.06)}
+#learnWorkspace .ux-quick-save:active{transform:translateY(2px);box-shadow:0 2px 0 #3b25a8 !important}
+#learnWorkspace .editor-actions #saveCardBtn{
+  background:linear-gradient(180deg,#8d70f7,#5b3fe0) !important;border:3px solid #4a30c4 !important;
+  border-radius:16px !important;box-shadow:0 4px 0 #3b25a8 !important;font-weight:900 !important;
+  text-transform:uppercase;
+}
+
+/* NEW / LEARNED badge next to the title */
+#newBadge{background:#ffe9a8 !important;color:#7a4b00 !important;border:2px solid #f0c24f}
+
+/* ---------- Small screens: keep the header simple ---------- */
+@media (max-width:900px){
+  .sk-progress .sk-bar,.sk-progress .sk-pct{display:none}
+}
+@media (max-width:650px){
+  .sk-progress{display:none}
+  .topbar h1 .sk-words span{font-size:.7em}
+  #learnWorkspace .toolbox[data-ux-tool="pictures"].ux-tool-active{
+    grid-template-columns:minmax(0,1fr) !important;
+    grid-template-rows:auto auto auto auto auto auto !important;
+    grid-template-areas:"el" "ec" "il" "ic" "sz" "bt" !important;
+  }
+  #learnWorkspace .toolbox[data-ux-tool="pictures"] .art-section-label.illustration-label,
+  #learnWorkspace .toolbox[data-ux-tool="pictures"] #illustrationChoices,
+  #learnWorkspace .toolbox[data-ux-tool="pictures"] .art-edit-row{border-left:0;padding-left:0}
+}

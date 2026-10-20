@@ -1,0 +1,993 @@
+const DEFAULT_CATALOG = {
+  shorashim: [{"id":"1-raah","pasuk":1,"hebrew":"וַיֵּרָא","front":"רָאָה","english":"saw / appeared","art":["👀","✨","☀️"],"hidden":false},{"id":"1-eilon","pasuk":1,"hebrew":"בְּאֵלֹנֵי","front":"אֵלוֹן","english":"grove / plain (of trees)","art":["🌳","🌲","🌿"],"hidden":false},{"id":"1-yashav","pasuk":1,"hebrew":"יֹשֵׁב","front":"יָשַׁב","english":"sat","art":["🪑","🧎","🏕️"],"hidden":false},{"id":"1-petach","pasuk":1,"hebrew":"פֶּתַח","front":"פֶּתַח","english":"entrance","art":["🚪","⛺","🏠"],"hidden":false},{"id":"1-ohel","pasuk":1,"hebrew":"הָאֹהֶל","front":"אֹהֶל","english":"tent","art":["⛺","🏕️","🌵"],"hidden":false},{"id":"1-chom","pasuk":1,"hebrew":"כְּחֹם","front":"חֹם","english":"heat","art":["☀️","🔥","🌡️"],"hidden":false},{"id":"1-yom","pasuk":1,"hebrew":"הַיּוֹם","front":"יוֹם","english":"day","art":["☀️","🌤️","📅"],"hidden":false},{"id":"2-nasa","pasuk":2,"hebrew":"וַיִּשָּׂא","front":"נָשָׂא","english":"lifted / carried","art":["⬆️","🙌","📦"],"hidden":false},{"id":"2-ayin","pasuk":2,"hebrew":"עֵינָיו","front":"עַיִן","english":"eye","art":["👁️","👀","🙂"],"hidden":false},{"id":"2-shalosh","pasuk":2,"hebrew":"שְׁלֹשָׁה","front":"שָׁלוֹשׁ","english":"three","art":["3️⃣","🔺","👨‍👨‍👦"],"hidden":false},{"id":"2-ish","pasuk":2,"hebrew":"אֲנָשִׁים","front":"אִישׁ","english":"man","art":["👨","🧍","👥"],"hidden":false},{"id":"2-nitzav","pasuk":2,"hebrew":"נִצָּבִים","front":"נִצַּב","english":"stood (firm)","art":["🧍","🧍‍♂️","📍"],"hidden":false},{"id":"2-ratz","pasuk":2,"hebrew":"וַיָּרׇץ","front":"רָץ","english":"ran","art":["🏃","💨","👟"],"hidden":false},{"id":"2-kara","pasuk":2,"hebrew":"לִקְרָאתָם","front":"קָרָא","english":"called / met","art":["👋","📣","🤝"],"hidden":false},{"id":"2-hishtachava","pasuk":2,"hebrew":"וַיִּשְׁתַּחוּ","front":"הִשְׁתַּחֲוָה","english":"bowed down","art":["🙇","🙏","🧎"],"hidden":false},{"id":"2-eretz","pasuk":2,"hebrew":"אָרְצָה","front":"אֶרֶץ","english":"land / earth","art":["🌍","🏞️","🌱"],"hidden":false},{"id":"3-amar","pasuk":3,"hebrew":"וַיֹּאמַר","front":"אָמַר","english":"said","art":["💬","🗣️","📣"],"hidden":false},{"id":"3-adon","pasuk":3,"hebrew":"אֲדֹנָי","front":"אָדוֹן","english":"lord / master","art":["👑","⭐","🏛️"],"hidden":false},{"id":"3-matza","pasuk":3,"hebrew":"מָצָאתִי","front":"מָצָא","english":"found","art":["🔎","💡","✅"],"hidden":false},{"id":"3-chen","pasuk":3,"hebrew":"חֵן","front":"חֵן","english":"grace / favor","art":["❤️","✨","🤲"],"hidden":false},{"id":"3-avar","pasuk":3,"hebrew":"תַעֲבֹר","front":"עָבַר","english":"passed / crossed over","art":["➡️","🌉","🚶"],"hidden":false},{"id":"3-avad","pasuk":3,"hebrew":"עַבְדֶּךָ","front":"עָבַד","english":"served / worked","art":["🛠️","🤲","💼"],"hidden":false},{"id":"4-lakach","pasuk":4,"hebrew":"יֻקַּח","front":"לָקַח","english":"took","art":["🤲","📦","✋"],"hidden":false},{"id":"4-meat","pasuk":4,"hebrew":"מְעַט","front":"מְעַט","english":"little / few","art":["🤏","🔹","1️⃣"],"hidden":false},{"id":"4-mayim","pasuk":4,"hebrew":"מַיִם","front":"מַיִם","english":"water","art":["💧","🚰","🌊"],"hidden":false},{"id":"4-rachatz","pasuk":4,"hebrew":"וְרַחֲצוּ","front":"רָחַץ","english":"washed","art":["🧼","💦","🫧"],"hidden":false},{"id":"4-regel","pasuk":4,"hebrew":"רַגְלֵיכֶם","front":"רֶגֶל","english":"foot / leg","art":["🦶","👣","🧦"],"hidden":false},{"id":"4-nishan","pasuk":4,"hebrew":"וְהִשָּׁעֲנוּ","front":"נִשְׁעַן","english":"leaned","art":["🌳","🪑","↘️"],"hidden":false},{"id":"4-etz","pasuk":4,"hebrew":"הָעֵץ","front":"עֵץ","english":"tree","art":["🌳","🌲","🌴"],"hidden":false},{"id":"5-pat","pasuk":5,"hebrew":"פַת","front":"פַּת","english":"piece / morsel","art":["🍞","🥖","🧩"],"hidden":false},{"id":"5-lechem","pasuk":5,"hebrew":"לֶחֶם","front":"לֶחֶם","english":"bread","art":["🍞","🥖","🥯"],"hidden":false},{"id":"5-saad","pasuk":5,"hebrew":"וְסַעֲדוּ","front":"סָעַד","english":"supported / sustained","art":["💪","🍽️","❤️"],"hidden":false},{"id":"5-lev","pasuk":5,"hebrew":"לִבְּכֶם","front":"לֵב","english":"heart","art":["❤️","💗","🫶"],"hidden":false},{"id":"5-asah","pasuk":5,"hebrew":"תַּעֲשֶׂה","front":"עָשָׂה","english":"did / made","art":["🛠️","✅","🧱"],"hidden":false},{"id":"5-diber","pasuk":5,"hebrew":"דִּבַּרְתָּ","front":"דִּבֵּר","english":"spoke","art":["🗣️","💬","📣"],"hidden":false},{"id":"6-miher","pasuk":6,"hebrew":"וַיְמַהֵר","front":"מִהֵר","english":"hurried","art":["🏃","⚡","⏱️"],"hidden":false},{"id":"6-seah","pasuk":6,"hebrew":"סְאִים","front":"סְאָה","english":"measure (se'ah)","art":["🥣","⚖️","🪣"],"hidden":false},{"id":"6-kemach","pasuk":6,"hebrew":"קֶמַח","front":"קֶמַח","english":"flour","art":["🌾","🥣","🍞"],"hidden":false},{"id":"6-solet","pasuk":6,"hebrew":"סֹלֶת","front":"סֹלֶת","english":"fine flour","art":["🌾","🥣","✨"],"hidden":false},{"id":"6-lash","pasuk":6,"hebrew":"לוּשִׁי","front":"לָשׁ","english":"kneaded","art":["🤲","🍞","🥣"],"hidden":false},{"id":"6-ugah","pasuk":6,"hebrew":"עֻגוֹת","front":"עוּגָה","english":"cake","art":["🍰","🧁","🥮"],"hidden":false},{"id":"7-bakar","pasuk":7,"hebrew":"הַבָּקָר","front":"בָּקָר","english":"cattle","art":["🐄","🐂","🐮"],"hidden":false},{"id":"7-ben","pasuk":7,"hebrew":"בֶּן","front":"בֵּן","english":"son","art":["👦","👨‍👦","🧒"],"hidden":false},{"id":"7-rach","pasuk":7,"hebrew":"רַךְ","front":"רַךְ","english":"soft / tender","art":["🧸","☁️","🪶"],"hidden":false},{"id":"7-tov","pasuk":7,"hebrew":"וָטוֹב","front":"טוֹב","english":"good","art":["👍","⭐","😊"],"hidden":false},{"id":"7-natan","pasuk":7,"hebrew":"וַיִּתֵּן","front":"נָתַן","english":"gave","art":["🎁","🤲","➡️"],"hidden":false},{"id":"7-naar","pasuk":7,"hebrew":"הַנַּעַר","front":"נַעַר","english":"youth / lad","art":["👦","🧒","🏃"],"hidden":false},{"id":"8-chemah","pasuk":8,"hebrew":"חֶמְאָה","front":"חֶמְאָה","english":"butter","art":["🧈","🥛","🍞"],"hidden":false},{"id":"8-chalav","pasuk":8,"hebrew":"וְחָלָב","front":"חָלָב","english":"milk","art":["🥛","🐄","🍼"],"hidden":false},{"id":"8-panim","pasuk":8,"hebrew":"לִפְנֵיהֶם","front":"פָּנִים","english":"face","art":["🙂","👤","😊"],"hidden":false},{"id":"8-amad","pasuk":8,"hebrew":"עֹמֵד","front":"עָמַד","english":"stood","art":["🧍","📍","🧍‍♂️"],"hidden":false},{"id":"8-achal","pasuk":8,"hebrew":"וַיֹּאכֵלוּ","front":"אָכַל","english":"ate","art":["🍽️","🥘","😋"],"hidden":false},{"id":"10-shav","pasuk":10,"hebrew":"שׁוֹב","front":"שָׁב","english":"returned","art":["↩️","🏠","🔙"],"hidden":false},{"id":"10-et","pasuk":10,"hebrew":"כָּעֵת","front":"עֵת","english":"time","art":["⏰","⌛","🕰️"],"hidden":false},{"id":"10-chayah","pasuk":10,"hebrew":"חַיָּה","front":"חָיָה","english":"lived","art":["❤️","🌱","🙂"],"hidden":false},{"id":"10-shama","pasuk":10,"hebrew":"שֹׁמַעַת","front":"שָׁמַע","english":"heard","art":["👂","🔊","🎧"],"hidden":false},{"id":"10-achar","pasuk":10,"hebrew":"אַחֲרָיו","front":"אַחַר","english":"after / behind","art":["⬅️","🚶","👣"],"hidden":false}],
+  prefix: [{"id":"p-vav","pasuk":1,"front":"וְ / וַ","english":"and (וַ־ can also be Vav HaHipuch)","art":["➕","🤝","🔗"],"examples":[{"hebrew":"וְאָב","english":"and a father","highlight":"וְ"},{"hebrew":"וּבַת","english":"and a daughter","highlight":"וּ"},{"hebrew":"וַיֹּאמֶר","english":"and he said","highlight":"וַ"}],"hidden":false},{"id":"p-bet","pasuk":1,"front":"בְּ","english":"in / at","art":["🏠","📍","➡️"],"examples":[{"hebrew":"בְּבַיִת","english":"in a house","highlight":"בְּ"},{"hebrew":"בְּכִתָּה","english":"in a classroom","highlight":"בְּ"}],"hidden":false},{"id":"p-heh","pasuk":1,"front":"הַ","english":"the","art":["👉","🏷️","1️⃣"],"examples":[{"hebrew":"הַבַּיִת","english":"the house","highlight":"הַ"},{"hebrew":"הַיֶּלֶד","english":"the boy","highlight":"הַ"}],"hidden":false},{"id":"p-kaf","pasuk":1,"front":"כְּ","english":"like / as","art":["🟰","👑","🦁"],"examples":[{"hebrew":"כְּמֶלֶךְ","english":"like a king","highlight":"כְּ"},{"hebrew":"כְּאַרְיֵה","english":"like a lion","highlight":"כְּ"}],"hidden":false},{"id":"p-lamed","pasuk":2,"front":"לְ / לִ","english":"to / for / toward","art":["➡️","🎁","📍"],"examples":[{"hebrew":"לְבַיִת","english":"to a house","highlight":"לְ"},{"hebrew":"לִשְׁמוּאֵל","english":"to Shmuel","highlight":"לִ"}],"hidden":false},{"id":"p-mem","pasuk":2,"front":"מִ / מֵ","english":"from","art":["⬅️","🏠","📍"],"examples":[{"hebrew":"מִבַּיִת","english":"from a house","highlight":"מִ"},{"hebrew":"מֵעִיר","english":"from a city","highlight":"מֵ"}],"hidden":false}],
+  suffix: [{"id":"s-yav","pasuk":1,"front":"־יו","english":"his / him","art":["👦","👀","👉"],"examples":[{"hebrew":"עֵינָיו","english":"his eyes","highlight":"יו"},{"hebrew":"אֵלָיו","english":"to him","highlight":"יו"}],"hidden":false},{"id":"s-tam","pasuk":2,"front":"־תָם","english":"them","art":["👥","➡️","🤝"],"examples":[{"hebrew":"לִקְרָאתָם","english":"toward them","highlight":"תָם"}],"hidden":false},{"id":"s-directional-heh","pasuk":2,"front":"־ה","english":"to / toward a place","art":["➡️","🏠","🌍"],"examples":[{"hebrew":"אָרְצָה","english":"to the land","highlight":"ה"},{"hebrew":"הַבַּיְתָה","english":"homeward / to the house","highlight":"ה"}],"hidden":false},{"id":"s-cha","pasuk":3,"front":"־ךָ","english":"your (one boy / man)","art":["👉","👦","🏠"],"examples":[{"hebrew":"עֵינֶיךָ","english":"your eyes","highlight":"ךָ"},{"hebrew":"בֵּיתְךָ","english":"your house","highlight":"ךָ"}],"hidden":false},{"id":"s-ti","pasuk":3,"front":"־תִי","english":"I (past tense)","art":["🙋","⏪","💬"],"examples":[{"hebrew":"מָצָאתִי","english":"I found","highlight":"תִי"},{"hebrew":"אָמַרְתִּי","english":"I said","highlight":"תִּי"}],"hidden":false},{"id":"s-chem","pasuk":4,"front":"־כֶם","english":"your (more than one boy / man)","art":["👥","👉","🦶"],"examples":[{"hebrew":"רַגְלֵיכֶם","english":"your feet","highlight":"כֶם"},{"hebrew":"בֵּיתְכֶם","english":"your house","highlight":"כֶם"}],"hidden":false},{"id":"s-ta","pasuk":5,"front":"־תָּ","english":"you (one boy / man, past tense)","art":["👉","🗣️","⏪"],"examples":[{"hebrew":"דִּבַּרְתָּ","english":"you spoke","highlight":"תָּ"},{"hebrew":"אָמַרְתָּ","english":"you said","highlight":"תָּ"}],"hidden":false},{"id":"s-hem","pasuk":8,"front":"־הֶם","english":"them","art":["👥","➡️","👀"],"examples":[{"hebrew":"לִפְנֵיהֶם","english":"before them","highlight":"הֶם"},{"hebrew":"אֲלֵיהֶם","english":"to them","highlight":"הֶם"}],"hidden":false}]
+};
+
+const ILLUSTRATIONS = {"1-raah":[{"src":"assets/illustrations/seeing-binoculars.svg","label":"Looking through binoculars"}],"1-eilon":[{"src":"assets/illustrations/grove.svg","label":"A grove of trees"}],"1-yashav":[{"src":"assets/illustrations/sitting.svg","label":"A person sitting"}],"1-petach":[{"src":"assets/illustrations/entrance.svg","label":"A doorway entrance"}],"1-ohel":[{"src":"assets/illustrations/tent.svg","label":"A tent"}],"1-chom":[{"src":"assets/illustrations/heat.svg","label":"Hot sun and thermometer"}],"1-yom":[{"src":"assets/illustrations/day.svg","label":"A bright daytime scene"}],"2-nasa":[{"src":"assets/illustrations/carrying.svg","label":"A person carrying a box"}],"2-ayin":[{"src":"assets/illustrations/eye.svg","label":"A close-up eye"}],"2-shalosh":[{"src":"assets/illustrations/three-people.svg","label":"Three people"}]};
+
+/* ===== Firebase classroom connection (same b3-games project as Posuk Practice) ===== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+const cloudDb = firebase.database();
+const cloudStorage = firebase.storage();
+const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
+// B3's own classes (et/wt) keep the original shared lists at the base root.
+// Every other class gets its own separate lists, students and leaderboards
+// under classes/<classId>, and starts empty until its teacher adds words.
+let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
+let classSpaceId = '', resolvedStudentClassId='';
+const LEGACY_CLASS_IDS = ['et','wt'];
+function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}
+async function resolveStudentSpace(studentId){
+  let classId='';
+  try{
+    const memberships=(await cloudDb.ref('b3Games/students/'+studentId+'/memberships').once('value')).val()||{};
+    const ws=window.B3_WORKSPACE_ID||'b3-2026';
+    const valid=Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===ws&&m.classId);
+    const stored=sessionStorage.getItem('b3Games_studentClass')||'';
+    const match=valid.find(m=>m.classId===stored)||valid.find(m=>LEGACY_CLASS_IDS.includes(m.classId))||valid[0];
+    classId=match?String(match.classId):'';
+  }catch(err){console.warn('Could not read class membership',err);}
+  resolvedStudentClassId=classId;
+  const isClassSpace=!!classId&&!LEGACY_CLASS_IDS.includes(classId)&&/^[A-Za-z0-9_-]{1,100}$/.test(classId);
+  const nextRoot=isClassSpace?`${SHORASHIM_BASE_ROOT}/classes/${classId}`:SHORASHIM_BASE_ROOT;
+  classSpaceId=isClassSpace?classId:'';
+  if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
+}
+const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+let studentSiteOpen=true;
+function applyStudentSiteOpen(open){
+  studentSiteOpen=teacherPreview||open!==false;
+  const closed=document.getElementById('studentSiteClosed');
+  const login=document.getElementById('loginGate');
+  const app=document.getElementById('appShell');
+  if(!closed)return;
+  closed.classList.toggle('hidden',studentSiteOpen);
+  if(!studentSiteOpen){
+    if(login)login.classList.add('hidden');
+    if(app)app.classList.add('hidden');
+  }else if(cloudEnabled||teacherPreview){
+    if(login)login.classList.add('hidden');
+    if(app)app.classList.remove('hidden');
+  }else{
+    if(login)login.classList.remove('hidden');
+    if(app)app.classList.add('hidden');
+  }
+}
+// This game can be closed from two places: its own setting
+// (shorashimLearning/settings/studentSiteOpen), or the master admin toggle
+// at b3Games/siteSettings (the same node the B3 Games homepage admin panel
+// writes to). Both watchers run independently, but are combined into one
+// "should be open" value before touching the UI, and neither watcher acts
+// until BOTH have reported at least once — otherwise whichever one happens
+// to arrive first would briefly force its own answer, causing a flash of
+// the wrong state on page load.
+let ownSettingOpen=true, masterSettingOpen=true;
+let ownWatcherReady=false, masterWatcherReady=false;
+function recomputeSiteOpen(){
+  if(!(ownWatcherReady && masterWatcherReady)) return;
+  applyStudentSiteOpen(ownSettingOpen && masterSettingOpen);
+}
+let studentSiteWatchRef=null;
+function startStudentSiteWatcher(){
+  if(studentSiteWatchRef)studentSiteWatchRef.off();
+  let path=`${CLOUD_ROOT}/settings/studentSiteOpen`;
+  if(!classSpaceId&&LEGACY_CLASS_IDS.includes(resolvedStudentClassId)){
+    const classPath=`${SHORASHIM_BASE_ROOT}/classes/${resolvedStudentClassId}/settings/studentSiteOpen`;
+    const classRef=cloudDb.ref(classPath),baseRef=cloudDb.ref(`${SHORASHIM_BASE_ROOT}/settings/studentSiteOpen`);
+    let classValue,baseValue,ready=0;
+    const apply=()=>{if(ready<2)return;ownSettingOpen=classValue!==undefined?classValue!==false:baseValue!==false;ownWatcherReady=true;recomputeSiteOpen();};
+    classRef.on('value',snap=>{classValue=snap.exists()?snap.val():undefined;ready++;apply();},()=>{classValue=undefined;ready++;apply();});
+    baseRef.on('value',snap=>{baseValue=snap.val();ready++;apply();},()=>{baseValue=true;ready++;apply();});
+    studentSiteWatchRef={off(){classRef.off();baseRef.off();}};
+    return;
+  }
+  studentSiteWatchRef=cloudDb.ref(path);
+  studentSiteWatchRef.on('value',snap=>{
+    ownSettingOpen = snap.exists()?snap.val():true;
+    ownWatcherReady = true;
+    recomputeSiteOpen();
+  },err=>{
+    console.warn('Could not read Shorashim site availability',err);
+    ownSettingOpen = true;
+    ownWatcherReady = true;
+    recomputeSiteOpen();
+  });
+}
+function startMasterToggleWatcher(){
+  cloudDb.ref('b3Games/siteSettings').on('value',snap=>{
+    const settings = snap.val()||{};
+    const gamesMap = settings.games||{};
+    masterSettingOpen = !(settings.siteEnabled===false || gamesMap['shorashim']===false);
+    masterWatcherReady = true;
+    recomputeSiteOpen();
+  },err=>{
+    console.warn('Could not read master site settings',err);
+    masterSettingOpen = true;
+    masterWatcherReady = true;
+    recomputeSiteOpen();
+  });
+}
+
+let cloudStudentId = null;
+let cloudStudentName = '';
+let cloudEnabled = false;
+let teacherPreview = false;
+let cloudSaveTimer = null;
+let appStarted = false;
+let classMatchLeaderboard = {};
+let cloudListenersStarted = false;
+
+const DB_KEY = 'shorashimLearningLabV2';
+const OLD_DB_KEY = 'shorashimFlashcardsV1';
+const PEREK_19_SHORASHIM = [[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two"], [1, "malach", "מַלְאָךְ", "הַמַּלְאָכִים", "angel / messenger"], [1, "erev", "עֶרֶב", "בָּעֶרֶב", "evening"], [1, "shaar", "שַׁעַר", "שַׁעַר", "gate"], [2, "sur", "סוּר", "סוּרוּ", "turn aside"], [2, "lun", "לוּן", "וְלִינוּ", "stay overnight"], [2, "shechem", "שְׁכֶם", "וְהִשְׁכַּמְתֶּם", "get up early"], [2, "rechov", "רְחוֹב", "בָרְחוֹב", "street / open square"], [3, "patzar", "פָּצַר", "וַיִּפְצַר", "urge strongly"], [3, "mishteh", "מִשְׁתֶּה", "מִשְׁתֶּה", "feast"], [3, "matzah", "מַצָּה", "מַצּוֹת", "matzah"], [3, "afah", "אָפָה", "וַיֹּאפֶה", "bake"], [4, "terem", "טֶרֶם", "טֶרֶם", "before / not yet"], [4, "shachav", "שָׁכַב", "יִשְׁכָּבוּ", "lie down"], [4, "savav", "סָבַב", "נָסַבּוּ", "surround"], [4, "ad", "עַד", "עַד", "until"], [4, "katzeh", "קָצֶה", "מִקָּצֶה", "edge / end"], [5, "lailah", "לַיְלָה", "הַלַּיְלָה", "night"], [5, "yatza", "יָצָא", "הוֹצֵא", "go out / take out"], [6, "delet", "דֶּלֶת", "הַדֶּלֶת", "door"], [6, "sagar", "סָגַר", "סָגָרוּ", "close"], [7, "ach", "אָח", "אַחַי", "brother"], [7, "raa", "רָעַע", "תָּרֵעוּ", "do evil"], [8, "bat", "בַּת", "בָנוֹת", "daughter"], [8, "rak", "רַק", "רַק", "only"], [8, "tzel", "צֵל", "בְּצֵל", "shade"], [8, "korah", "קוֹרָה", "קֹרָתִי", "roof beam / roof"], [9, "echad", "אֶחָד", "הָאֶחָד", "one"], [9, "gur", "גּוּר", "לָגוּר", "dwell as a stranger"], [9, "halah", "הָלְאָה", "הָלְאָה", "farther / onward"], [9, "shavar", "שָׁבַר", "וַיִּשְׁבֹּר", "break"], [10, "yad", "יָד", "יָדְךָ", "hand"], [11, "nakah", "נָכָה", "הִכּוּ", "strike"], [11, "sanverim", "סַנְוֵרִים", "בַּסַּנְוֵרִים", "blindness"], [11, "katan", "קָטֹן", "מִקָּטֹן", "small"], [11, "laah", "לָאָה", "וַיִּלְאוּ", "become weary"], [12, "mi", "מִי", "מִי", "who"], [12, "poh", "פֹּה", "פֹה", "here"], [12, "chatan", "חָתָן", "חָתָן", "son-in-law / bridegroom"], [15, "boker", "בֹּקֶר", "הַבֹּקֶר", "morning"], [15, "shachar", "שַׁחַר", "הַשַּׁחַר", "dawn"], [15, "alah", "עָלָה", "עֲלֵה", "rise / go up"], [15, "utz", "אוּץ", "וַיָּאִיצוּ", "urge / hurry"], [15, "pen", "פֶּן", "פֶּן", "lest"], [15, "avon", "עָוֹן", "בַּעֲוֹן", "sin"], [16, "hitmahmah", "הִתְמַהְמֵהַּ", "וַיִּתְמַהְמָהּ", "linger"], [16, "chazak", "חָזַק", "וַיַּחֲזִקוּ", "hold strongly"], [16, "chamal", "חָמַל", "בְּחֶמְלַת", "have compassion"], [16, "nuach", "נוּחַ", "וַיַּנִּחֻהוּ", "place / set down"], [16, "chutz", "חוּץ", "מִחוּץ", "outside"], [17, "malat", "מָלַט", "הִמָּלֵט", "escape"], [17, "nefesh", "נֶפֶשׁ", "נַפְשֶׁךָ", "life / soul"], [17, "navat", "נָבַט", "תַּבִּיט", "look"], [17, "kikar", "כִּכָּר", "הַכִּכָּר", "plain / district"], [17, "har", "הַר", "הָהָרָה", "mountain"], [19, "chesed", "חֶסֶד", "חַסְדְּךָ", "kindness"], [19, "yachol", "יָכֹל", "אוּכַל", "be able"], [19, "davak", "דָּבַק", "תִּדְבָּקַנִי", "cling / catch up"], [20, "nus", "נוּס", "לָנוּס", "flee"], [20, "tzoar", "צָעִיר", "מִצְעָר", "small / little"], [21, "bilti", "בִּלְתִּי", "לְבִלְתִּי", "not"], [21, "hafach", "הָפַךְ", "הָפְכִּי", "overturn"], [21, "gam", "גַּם", "גַּם", "also"], [23, "shemesh", "שֶׁמֶשׁ", "הַשֶּׁמֶשׁ", "sun"], [24, "matar", "מָטַר", "הִמְטִיר", "rain down"], [24, "gafrit", "גׇּפְרִית", "גׇּפְרִית", "sulfur"], [24, "esh", "אֵשׁ", "וָאֵשׁ", "fire"], [24, "shamayim", "שָׁמַיִם", "הַשָּׁמָיִם", "heavens"], [25, "tzemach", "צֶמַח", "צֶמַח", "plant / growth"], [25, "adamah", "אֲדָמָה", "הָאֲדָמָה", "ground"], [26, "melach", "מֶלַח", "מֶלַח", "salt"], [28, "kitor", "קִיטוֹר", "קִיטֹר", "smoke"], [28, "kivshan", "כִּבְשָׁן", "הַכִּבְשָׁן", "furnace"], [29, "zachar", "זָכַר", "וַיִּזְכֹּר", "remember"], [30, "mearah", "מְעָרָה", "בַּמְּעָרָה", "cave"], [31, "bechor", "בְּכוֹר", "הַבְּכִירָה", "older / firstborn"], [31, "av", "אָב", "אָבִינוּ", "father"], [31, "ayin-none", "אַיִן", "אַיִן", "none / there is no"], [32, "shakah", "שָׁקָה", "וְנַשְׁקֶה", "give to drink"], [32, "yayin", "יַיִן", "יַיִן", "wine"], [32, "zera", "זֶרַע", "זֶרַע", "offspring / seed"], [34, "mochorat", "מָחֳרָת", "מִמָּחֳרָת", "next day"], [34, "emesh", "אֶמֶשׁ", "אֶמֶשׁ", "last night"], [36, "harah", "הָרָה", "וַתַּהֲרֶיןָ", "become pregnant"]].map(([pasuk,slug,front,hebrew,english])=>({
+  id:`19-${pasuk}-${slug}`,
+  perek:19,
+  listName:'Main List',
+  pasuk,
+  front,
+  hebrew,
+  english,
+  art:['✨','📖','⭐'],
+  hidden:false
+}));
+function vocalizedItemKey(item){
+  return String(item?.front||'').normalize('NFC');
+}
+function normalizeCatalogUnits(catalog){
+  // Firebase is the authority for which words exist.  This function may tag
+  // existing records, but it must NEVER recreate a word that the teacher deleted.
+  catalog=catalog||clone(DEFAULT_CATALOG);
+  catalog.shorashim=Array.isArray(catalog.shorashim)?catalog.shorashim:[];
+  catalog.shorashim.forEach(item=>{
+    if(!item.perek)item.perek=String(item.id||'').startsWith('19-')?19:18;
+  });
+  return catalog;
+}
+DEFAULT_CATALOG.shorashim.forEach(item=>{item.perek=18;});
+
+const DEFAULT_STUDENTS = ['Levik Bendet','Menachem Epstein','Binyomin Fischer','Levi Lefkowitz','Ari Leimdorfer','Moshe Marrus','Mendel Wilansky','Leibel Wilansky'];
+
+let db = loadDB();
+let currentStudent = db.currentStudent || Object.keys(db.students)[0];
+let currentTrack = 'shorashim';
+let learningPerek = 18; // A student chooses Perek 18, Perek 19, or the 3rd grade booklet.
+let bookletWeek = 1; // Each of the booklet's 30 weeks has six choices.
+let selectedItemKey = null;
+let selectedArtEl = null;
+let canvas, ctx, drawing = false, erasing = false, drawHistory = [];
+let reviewDeck = [], reviewIndex = 0, reviewFlipped = false, reviewShownAt = 0, reviewSessionSeen = new Set();
+let reviewNoHints = false, reviewPointsMode='regular', shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0, shorashimPausedAt=0, shorashimPausedMs=0;
+let activeScreenId = 'studentHome';
+let lastInteraction = Date.now();
+let ticker = null;
+let matchState = null, shootState = null, whackState = null, raceState = null;
+let gameTimer = null, gameAnimationFrame = null, raceQuestionTimer = null;
+
+function clone(v){return JSON.parse(JSON.stringify(v));}
+function blankStudent(){return {cards:{},sessions:[],activeSession:null,totalActiveSeconds:0,lastActive:null,dailyReview:{date:'',seen:{},completedAt:null},gamesPlayed:0,gameBests:{match:{}}};}
+function normalizeStudent(s){
+  s.cards=s.cards||{};s.sessions=s.sessions||[];s.activeSession=s.activeSession||null;s.totalActiveSeconds=s.totalActiveSeconds||0;s.lastActive=s.lastActive||null;s.dailyReview=s.dailyReview||{date:'',seen:{},completedAt:null};s.gamesPlayed=s.gamesPlayed||0;s.gameBests=s.gameBests||{match:{}};s.gameBests.match=s.gameBests.match||{};
+  if(s.activeSession){s.activeSession.track=s.activeSession.track||'shorashim';s.activeSession.newCardIds=(s.activeSession.newCardIds||[]).map(x=>x.includes(':')?x:`shorashim:${x}`);s.activeSession.activeSeconds=s.activeSession.activeSeconds||0;}
+  const migrated={};
+  Object.entries(s.cards).forEach(([k,c])=>{
+    const key=k.includes(':')?k:`shorashim:${c.itemId||c.wordId||k}`;
+    const [type,id]=splitKey(key);c.itemKey=key;c.itemType=c.itemType||type;c.itemId=c.itemId||c.wordId||id;migrated[key]=c;
+  });s.cards=migrated;
+}
+function loadDB(){
+  const v2=localStorage.getItem(DB_KEY);
+  if(v2){try{const d=JSON.parse(v2);d.catalog=normalizeCatalogUnits(d.catalog||clone(DEFAULT_CATALOG));d.settings=d.settings||{minReviewMs:500,studentSiteOpen:true};d.students=d.students||{};Object.values(d.students).forEach(normalizeStudent);return d;}catch(e){console.warn(e);}}
+  const old=localStorage.getItem(OLD_DB_KEY);
+  if(old){try{const o=JSON.parse(old);o.catalog=normalizeCatalogUnits(clone(DEFAULT_CATALOG));o.settings={minReviewMs:500,studentSiteOpen:true};Object.values(o.students||{}).forEach(normalizeStudent);saveRaw(o);return o;}catch(e){console.warn(e);}}
+  const students={};DEFAULT_STUDENTS.forEach(n=>students[n]=blankStudent());return {students,currentStudent:DEFAULT_STUDENTS[0],catalog:normalizeCatalogUnits(clone(DEFAULT_CATALOG)),settings:{minReviewMs:500,studentSiteOpen:true}};
+}
+function saveRaw(d){if(!teacherPreview)localStorage.setItem(DB_KEY,JSON.stringify(d));}
+function setCloudStatus(text,kind=''){const el=document.getElementById('cloudStatus');if(!el)return;el.textContent=text;el.classList.toggle('syncing',kind==='syncing');el.classList.toggle('error',kind==='error');}
+function scheduleCloudStudentSave(){
+  if(!cloudEnabled||!cloudStudentId||!db.students[currentStudent]) return;
+  clearTimeout(cloudSaveTimer);
+  setCloudStatus('☁️ Saving…','syncing');
+  cloudSaveTimer=setTimeout(async()=>{
+    try{
+      const payload=clone(db.students[currentStudent]);
+      payload.name=cloudStudentName||currentStudent;
+      await cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).set(payload);
+      setCloudStatus('☁️ Saved');
+    }catch(err){
+      console.error('Cloud save failed',err);
+      setCloudStatus('☁️ Save problem','error');
+    }
+  },180);
+}
+function saveDB(){db.currentStudent=currentStudent;saveRaw(db);scheduleCloudStudentSave();}
+async function saveGlobalConfig(){
+  if(!cloudEnabled) return;
+  try{await Promise.all([cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(db.catalog),cloudDb.ref(`${CLOUD_ROOT}/settings`).set(db.settings)]);setCloudStatus('☁️ Saved');}
+  catch(err){console.error('Could not save learning-list settings',err);setCloudStatus('☁️ Save problem','error');}
+}
+function student(){return db.students[currentStudent];}
+function keyFor(track,id){return `${track}:${id}`;}
+function splitKey(key){const i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)];}
+function bookletCatalog(){return Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM:[];}
+function getItem(key){const [track,id]=splitKey(key);return (db.catalog[track]||[]).find(x=>x.id===id)||(track==='shorashim'?bookletCatalog().find(x=>x.id===id):null)||null;}
+function commonnessOf(item){const n=Number(item?.commonness??item?.commonnessScore??item?.frequency);return Number.isFinite(n)?Math.max(1,Math.min(10,Math.round(n))):null;}
+function isTeacherApproved(item){const score=commonnessOf(item);return !score||score>=6||item?.teacherApproved===true||item?.approved===true;}
+function isStudentAvailable(item){return !!item&&!item.hidden&&isTeacherApproved(item);}
+function visibleCatalog(track){return (db.catalog[track]||[]).filter(isStudentAvailable);}
+function learningCatalog(track=currentTrack){const list=visibleCatalog(track);if(track!=='shorashim')return list;if(learningPerek==='booklet')return bookletCatalog().filter(item=>isStudentAvailable(item)&&(bookletWeek==='all'||item.bookletWeek===bookletWeek));return list.filter(item=>itemPerek(item)===learningPerek&&!item.bookletWeek);}
+function nextLearningUncreated(track=currentTrack,s=student()){return learningCatalog(track).find(item=>!s.cards[keyFor(track,item.id)])||null;}
+function labelTrack(track){return track==='shorashim'?'Shorashim':track==='prefix'?'Prefixes':'Suffixes';}
+function singularTrack(track){return track==='shorashim'?'Shoresh':track==='prefix'?'Prefix':'Suffix';}
+function fmtDuration(sec){sec=Math.max(0,Math.round(sec||0));const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);if(h)return `${h}h ${m}m`;if(m)return `${m}m`;return `${sec}s`;}
+function fmtDate(ts){if(!ts)return 'Never';const d=new Date(ts),n=new Date();if(d.toDateString()===n.toDateString())return 'Today';return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
+function todayKey(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
+function escapeHTML(s=''){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function learnedCards(s=student(),track=null,includeHidden=true){return Object.values(s.cards).filter(c=>c.learnedAt&&(!track||c.itemType===track)&&(includeHidden||isStudentAvailable(getItem(c.itemKey)))).sort((a,b)=>a.learnedAt-b.learnedAt);}
+function eligibleLearnedCards(s=student()){return learnedCards(s,null,false).filter(c=>!!getItem(c.itemKey));}
+function nextUncreated(track=currentTrack,s=student()){return visibleCatalog(track).find(item=>!s.cards[keyFor(track,item.id)])||null;}
+function isSessionNew(key,s=student()){return !!s.activeSession?.newCardIds.includes(key);}
+function canEditItem(key,s=student()){const [track]=splitKey(key),item=getItem(key);if(track!==currentTrack||!item)return false;return isStudentAvailable(item)||!!s.cards[key]?.learnedAt;}
+function recentCount(s,days=7){const cut=Date.now()-days*86400000;return Object.values(s.cards).filter(c=>c.learnedAt&&c.learnedAt>=cut&&!getItem(c.itemKey)?.hidden).length;}
+
+const COLOR_SWATCHES=['#1f2937','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#6366f1','#a855f7','#ec4899','#92400e','#ffffff'];
+const BACKGROUND_SWATCHES=['#fff9e8','#ffffff','#fef3c7','#dcfce7','#dbeafe','#e0e7ff','#f3e8ff','#fce7f3','#ffedd5','#e2e8f0'];
+function defaultDesign(){return {hebrewSize:58,hebrewFont:"David, 'Times New Roman', serif",hebrewColor:'#1f2937',englishSize:46,englishFont:'Arial, sans-serif',englishColor:'#1f2937',backgroundColor:'#fff9e8',hebrewPos:{left:50,top:28},englishPos:{left:50,top:42},arts:[],drawing:''};}
+function normalizeHebrewFont(v){if(!v||v.includes('Times New Roman'))return "David, 'Times New Roman', serif";if(v==='Arial, sans-serif')return 'Gisha, Arial, sans-serif';if(v==='Georgia, serif')return "FrankRuehl, 'Frank Ruehl', 'Times New Roman', serif";if(v.includes('Trebuchet'))return "Aharoni, 'Arial Rounded MT Bold', Arial, sans-serif";return v;}
+function normalizeDesign(d){const b=defaultDesign(),n={...b,...(d||{})};n.hebrewFont=normalizeHebrewFont(n.hebrewFont);n.hebrewPos=n.hebrewPos||b.hebrewPos;n.englishPos=n.englishPos||b.englishPos;n.arts=Array.isArray(n.arts)?n.arts.map(x=>({...x})):[];if(!n.arts.length&&d?.art)n.arts=[{kind:'emoji',value:d.art,label:d.art,left:d.artPos?.left??50,top:d.artPos?.top??66,size:88}];return n;}
+
+function slugifyStudent(name){return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+function setLoginMsg(text){const el=document.getElementById('loginMsg');if(el)el.textContent=text||'';}
+async function checkStudentAccess(name,pin){
+  const slug=slugifyStudent(name);if(!slug)return {ok:false,reason:'Please type your name.'};
+  const [siteSnap,profileSnap,masterSnap]=await Promise.all([
+    cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).once('value'),
+    cloudDb.ref('b3Games/students/'+slug+'/profile').once('value'),
+    cloudDb.ref('b3Games/siteSettings').once('value')
+  ]);
+  const masterSettings=masterSnap.val()||{},masterGames=masterSettings.games||{};
+  if(masterSettings.siteEnabled===false||masterGames['shorashim']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(siteSnap.exists()&&siteSnap.val()===false)return {ok:false,reason:'Shorashim practice is closed right now. Ask your teacher.'};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name)};
+}
+
+async function loadClassLeaderboard(){
+  try{const snap=await cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).once('value');classMatchLeaderboard=snap.val()||{};}catch(err){console.warn('Could not load leaderboard',err);classMatchLeaderboard={};}
+}
+function startCloudListeners(){
+  if(cloudListenersStarted)return;cloudListenersStarted=true;
+  cloudDb.ref(`${CLOUD_ROOT}/catalog`).on('value',snap=>{const v=snap.val();if(!v)return;db.catalog=normalizeCatalogUnits(v);saveRaw(db);if(appStarted)renderAll();});
+  cloudDb.ref(`${CLOUD_ROOT}/settings`).on('value',snap=>{const v=snap.val();if(!v)return;db.settings={minReviewMs:500,studentSiteOpen:true,...v};saveRaw(db);const sel=document.getElementById('minReviewTime');if(sel)sel.value=String(db.settings.minReviewMs||500);if(appStarted)renderAll();});
+  cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).on('value',snap=>{classMatchLeaderboard=snap.val()||{};if(matchState&&document.getElementById('matchLeaderboard'))document.getElementById('matchLeaderboard').innerHTML=matchLeaderboardHTML(matchState.pairCount);});
+}
+async function enterCloudStudent(name,studentId){
+  setLoginMsg('Opening your cards…');setCloudStatus('☁️ Connecting…','syncing');
+  await resolveStudentSpace(studentId);
+  // A class with its own lists must never fall back to B3's built-in words or this browser's cached copy.
+  const cachedCatalog=classSpaceId?emptyCatalog():clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(classSpaceId?{}:(db.settings||{}))},cachedStudent=!classSpaceId&&db.students?.[name]?clone(db.students[name]):null;
+  const [catalogSnap,settingsSnap,studentSnap]=await Promise.all([
+    cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
+    cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value'),
+    cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`).once('value')
+  ]);
+  const catalog=normalizeCatalogUnits(catalogSnap.val()||cachedCatalog);const settings={minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||cachedSettings)};if(settings.studentSiteOpen===false){applyStudentSiteOpen(false);throw new Error('STUDENT_SITE_CLOSED');}const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
+  db={students:{[name]:s},currentStudent:name,catalog,settings};currentStudent=name;cloudStudentId=studentId;cloudStudentName=name;cloudEnabled=true;saveRaw(db);
+  if(!catalogSnap.exists()&&!classSpaceId)cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(catalog).catch(console.warn);
+  if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
+  document.getElementById('loginGate').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('signedInStudentName').textContent=name;
+  if(!appStarted){init();appStarted=true;}else{populateStudents();renderAll();goScreen('studentHome');}
+  showMode('student');setCloudStatus('☁️ Saved');scheduleCloudStudentSave();startCloudListeners();await loadClassLeaderboard();renderGamesLock();
+}
+async function trySavedStudent(){
+  const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  if(!savedId)return false;
+  const profile=await cloudDb.ref('b3Games/students/'+savedId+'/profile').once('value');
+  let record=profile.val();
+  if(!profile.exists()){
+    record=(await cloudDb.ref('posukPractice/allowedStudents/'+savedId).once('value')).val();
+  }
+  if(!record||record.active===false)return false;
+  const name=record.name||sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'Student';
+  await enterCloudStudent(name,savedId);
+  return true;
+}
+
+// Teachers opening the student version use their existing verified B3 account.
+// Preview activity stays in memory and never writes a student's cloud record.
+async function enterTeacherPreview(user,access){
+  const selected=new URLSearchParams(location.search).get('class')||sessionStorage.getItem('b3Games_studentClass')||'';
+  if(access.role!=='admin'&&!(access.classIds||[]).includes(selected))throw new Error('Open Shorashim from your assigned class on the homepage.');
+  if(selected){
+    const workspace=window.B3_WORKSPACE_ID||'b3-2026';
+    const cls=(await cloudDb.ref(`b3Games/workspaces/${workspace}/classes/${selected}`).once('value')).val();
+    if(!cls||cls.active===false||(access.role!=='admin'&&cls.toolGrants?.shorashim!==true))throw new Error('Shorashim is not enabled for this class.');
+  }
+  classSpaceId=selected&&!LEGACY_CLASS_IDS.includes(selected)?selected:'';
+  CLOUD_ROOT=classSpaceId?`${SHORASHIM_BASE_ROOT}/classes/${classSpaceId}`:SHORASHIM_BASE_ROOT;
+  const [catalogSnap,settingsSnap]=await Promise.all([
+    cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
+    cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value')
+  ]);
+  teacherPreview=true;
+  currentStudent='Teacher Preview';
+  db={students:{[currentStudent]:blankStudent()},currentStudent,
+    catalog:normalizeCatalogUnits(catalogSnap.val()||(classSpaceId?emptyCatalog():clone(DEFAULT_CATALOG))),
+    settings:{minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||{})}};
+  document.getElementById('signedInStudentName').textContent='Teacher Preview';
+  document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
+  setCloudStatus('Preview — no student points');
+  applyStudentSiteOpen(true);
+  if(!appStarted){init();appStarted=true;}
+  showMode('student');
+}
+
+// Guest Mode: a few sample cards, held in memory only (nothing is saved anywhere).
+const isGuestPreview=()=>!!(window.B3Guest&&window.B3Guest.isGuest());
+function enterGuestPreview(){
+  const cat=clone(DEFAULT_CATALOG);
+  const sample={shorashim:cat.shorashim.slice(0,4),prefix:cat.prefix.slice(0,2),suffix:cat.suffix.slice(0,2)};
+  teacherPreview=true;
+  currentStudent='Guest';
+  db={students:{[currentStudent]:blankStudent()},currentStudent,catalog:normalizeCatalogUnits(sample),settings:{minReviewMs:500,studentSiteOpen:true}};
+  document.getElementById('signedInStudentName').textContent='Guest';
+  document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
+  setCloudStatus('Guest preview — nothing is saved');
+  applyStudentSiteOpen(true);
+  if(!appStarted){init();appStarted=true;}
+  showMode('student');
+}
+function bindCloudLogin(){
+  document.getElementById('loginBtn').onclick=()=>{location.href='../index.html';};
+  document.getElementById('switchStudentBtn').onclick=()=>{location.href='../index.html';};
+  setLoginMsg('Opening your Fun Torah Tools account…');
+  if(isGuestPreview()){enterGuestPreview();return;}
+  const waitForAccount=()=>{
+    if(!window.B3SiteSettings){setTimeout(waitForAccount,100);return;}
+    let restoring=false;
+    window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+      if(restoring||appStarted)return;
+      restoring=true;
+      try{
+        if(user&&authorized){await enterTeacherPreview(user,access);return;}
+        if(await trySavedStudent())return;
+        setLoginMsg('Open Shorashim from Fun Torah Tools to use your signed-in account.');
+        document.getElementById('loginBtn').classList.remove('hidden');
+      }catch(err){
+        if(err?.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);return;}
+        console.warn('Could not open saved account',err);
+        setLoginMsg(err?.message||'Could not connect. Please try again.');
+        document.getElementById('loginBtn').classList.remove('hidden');
+      }finally{restoring=false;}
+    });
+  };
+  waitForAccount();
+}
+
+// Follow destinations use the existing screens and never replace student records.
+const FOLLOW_SHORASHIM_SECTIONS=Object.freeze({review:'reviewScreen',learn:'shorashimPerekScreen',games:'gamesScreen',gallery:'galleryScreen',affixes:'affixHomeScreen'});
+function followAllowsScreen(id,track=currentTrack){
+  const section=window.FTTFollowStudent?.activityPolicy('shorashim')?.subdestination;
+  if(!section)return true;
+  if(section==='learn')return id==='shorashimPerekScreen'||id==='learnScreen'&&track==='shorashim';
+  if(section==='affixes')return id==='affixHomeScreen'||id==='learnScreen'&&['prefix','suffix'].includes(track);
+  return id===FOLLOW_SHORASHIM_SECTIONS[section];
+}
+function currentFollowSection(){
+  if(activeScreenId==='learnScreen')return currentTrack==='shorashim'?'learn':'affixes';
+  return Object.keys(FOLLOW_SHORASHIM_SECTIONS).find(key=>FOLLOW_SHORASHIM_SECTIONS[key]===activeScreenId)||'';
+}
+function applyFollowSection(section){
+  if(!Object.prototype.hasOwnProperty.call(FOLLOW_SHORASHIM_SECTIONS,section))return false;
+  const screen=FOLLOW_SHORASHIM_SECTIONS[section];
+  if(!screen||!followAllowsScreen(screen,section==='learn'?'shorashim':currentTrack))return false;
+  if(section==='learn')currentTrack='shorashim';
+  if(section==='review')currentTrack='shorashim';
+  goScreen(screen);
+  const url=new URL(location.href);url.searchParams.set('section',section);history.replaceState(null,'',url);
+  return true;
+}
+function initializeFollowDestination(){
+  window.FTTFollowActivities=window.FTTFollowActivities||{};
+  window.FTTFollowActivities.shorashim={currentSection:currentFollowSection,applySection:applyFollowSection};
+  applyFollowSection(new URL(location.href).searchParams.get('section'));
+}
+window.addEventListener('ftt:before-follow-navigation',event=>{
+  const cloudStatus=document.getElementById('cloudStatus');
+  if((activeScreenId==='learnScreen'&&window.__shorashimEditorDirty) || shorashimRecorder ||
+      document.getElementById('saveCardBtn')?.disabled ||
+      (cloudEnabled&&cloudStatus?.matches('.syncing,.error')))event.preventDefault();
+});
+function init(){
+  populateStudents();bindNavigation();bindModes();bindStudentDialog();bindSession();bindEditor();bindReview();bindGames();bindTeacher();initCanvas();bindActivityTracking();renderAll();startTicker();initializeFollowDestination();
+}
+function populateStudents(){const sel=document.getElementById('studentSelect');sel.innerHTML='';Object.keys(db.students).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});if(!db.students[currentStudent])currentStudent=Object.keys(db.students)[0];sel.value=currentStudent;sel.onchange=()=>{currentStudent=sel.value;selectedItemKey=null;reviewDeck=[];saveDB();renderAll();goScreen('studentHome');};}
+function bindNavigation(){
+  document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!followAllowsScreen(btn.dataset.go,btn.dataset.track||currentTrack))return;
+    const requested=btn.dataset.track;if(requested&&requested!==currentTrack){currentTrack=requested;selectedItemKey=null;}
+    goScreen(btn.dataset.go);
+  }));
+  document.querySelectorAll('.backBtn').forEach(b=>b.onclick=()=>goScreen('studentHome'));
+  document.querySelectorAll('[data-learning-perek]').forEach(btn=>btn.onclick=()=>chooseLearningPerek(btn.dataset.learningPerek));
+  const changePerek=document.getElementById('changeLearningPerekBtn');
+  if(changePerek)changePerek.onclick=()=>goScreen('shorashimPerekScreen');
+  const weekSelect=document.getElementById('bookletWeekSelect');
+  if(weekSelect)weekSelect.onchange=()=>{bookletWeek=weekSelect.value==='all'?'all':Number(weekSelect.value);selectedItemKey=null;renderLearningScreen();};
+}
+function goScreen(id){if(!followAllowsScreen(id))return;if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
+function bindModes(){document.getElementById('studentModeBtn').onclick=()=>showMode('student');document.getElementById('teacherModeBtn').onclick=()=>showMode('teacher');}
+function showMode(mode){const studentMode=mode==='student';document.getElementById('studentView').classList.toggle('hidden',!studentMode);document.getElementById('teacherView').classList.toggle('hidden',studentMode);document.getElementById('studentModeBtn').classList.toggle('active',studentMode);document.getElementById('teacherModeBtn').classList.toggle('active',!studentMode);if(!studentMode)renderTeacher();}
+function bindStudentDialog(){const dlg=document.getElementById('addStudentDialog');document.getElementById('addStudentBtn').onclick=()=>dlg.showModal();document.getElementById('confirmAddStudent').onclick=e=>{e.preventDefault();const inp=document.getElementById('newStudentName'),name=inp.value.trim();if(!name)return;if(!db.students[name])db.students[name]=blankStudent();currentStudent=name;inp.value='';dlg.close();saveDB();populateStudents();renderAll();};}
+
+function bindSession(){}
+function renderPerekChoices(){const s=student(),list=visibleCatalog('shorashim');document.querySelectorAll('[data-learning-perek]').forEach(btn=>{const value=btn.dataset.learningPerek,words=value==='booklet'?bookletCatalog():list.filter(item=>itemPerek(item)===Number(value)),learned=words.filter(item=>s.cards[keyFor('shorashim',item.id)]?.learnedAt).length,count=btn.querySelector('.perek-progress');if(count)count.textContent=words.length?`${learned} of ${words.length} learned`:'No words assigned yet';});}
+function chooseLearningPerek(value){if(!followAllowsScreen('learnScreen','shorashim'))return;const choice=value==='booklet'?'booklet':Number(value);if(choice!=='booklet'&&choice!==18&&choice!==19)return;currentTrack='shorashim';learningPerek=choice;selectedItemKey=null;goScreen('learnScreen');}
+function renderLearningScreen(){const isShorashim=currentTrack==='shorashim',isBooklet=isShorashim&&learningPerek==='booklet',label=isBooklet?`3rd Grade Booklet • ${bookletWeek==='all'?'All Weeks':`Week ${bookletWeek}`}`:isShorashim?`Perek ${learningPerek===19?'י״ט':'י״ח'} Shorashim`:labelTrack(currentTrack);document.getElementById('learnHeading').textContent=`Learn & Edit ${label}`;document.getElementById('pathTitle').textContent=`Your ${label}`;document.getElementById('changeLearningPerekBtn')?.classList.toggle('hidden',!isShorashim);document.getElementById('bookletWeekWrap')?.classList.toggle('hidden',!isBooklet);const weekSelect=document.getElementById('bookletWeekSelect');if(weekSelect&&isBooklet)weekSelect.value=String(bookletWeek);const list=learningCatalog(currentTrack);if(selectedItemKey&&!list.some(item=>keyFor(currentTrack,item.id)===selectedItemKey))selectedItemKey=null;renderSession();renderWordList();if(!selectedItemKey){const next=nextLearningUncreated(currentTrack);if(next)loadEditorItem(keyFor(currentTrack,next.id));else{const learned=list.filter(item=>student().cards[keyFor(currentTrack,item.id)]?.learnedAt);if(learned.length)loadEditorItem(keyFor(currentTrack,learned[learned.length-1].id));else showNoMoreItems();}}}
+function renderSession(){document.getElementById('startSessionPanel')?.classList.add('hidden');document.getElementById('learnWorkspace')?.classList.remove('hidden');const status=document.getElementById('sessionStatus');if(status)status.textContent='Cards save as you go';const footer=document.querySelector('#learnWorkspace .session-footer');if(footer)footer.classList.add('hidden');}
+function renderWordList(){const box=document.getElementById('wordList'),s=student(),list=learningCatalog(currentTrack),created=list.filter(i=>s.cards[keyFor(currentTrack,i.id)]?.learnedAt).length;document.getElementById('availableCount').textContent=`${created} / ${list.length} learned`;box.innerHTML='';list.forEach(item=>{const key=keyFor(currentTrack,item.id),c=s.cards[key],b=document.createElement('button');b.type='button';let cls='word-row',status='Choose • Learn';if(c?.learnedAt){cls+=' learned';status='Learned • Edit';}else{cls+=' available';}if(selectedItemKey===key)cls+=' active';b.className=cls;b.innerHTML=`<div class="hebrew">${escapeHTML(item.front)}</div><div class="meta"><span>${escapeHTML(item.english)}${currentTrack==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span><span>${status}</span></div>`;b.onclick=()=>loadEditorItem(key);box.appendChild(b);});}
+
+function markShorashimEditorDirty(){window.__shorashimEditorDirty=true;}
+function bindEditor(){
+const editor=document.getElementById('editorContent');
+editor.addEventListener('input',markShorashimEditorDirty,true);
+editor.addEventListener('change',markShorashimEditorDirty,true);
+editor.addEventListener('click',e=>{if(e.target.closest('#emojiChoices button,#illustrationChoices button,#artSmallerBtn,#artBiggerBtn,#removeArtBtn,#removeAllArtBtn,#undoBtn,#clearDrawingBtn,#resetCardBtn'))markShorashimEditorDirty();},true);
+let editorDragActive=false;
+editor.addEventListener('pointerdown',e=>{if(e.target.closest('.movable,.art-item,#drawCanvas'))editorDragActive=true;if(e.target.closest('#drawCanvas'))markShorashimEditorDirty();},true);
+document.addEventListener('pointermove',e=>{if(editorDragActive&&e.buttons)markShorashimEditorDirty();},true);
+document.addEventListener('pointerup',()=>{editorDragActive=false;},true);
+  ['hebrewSize','hebrewFont','englishSize','englishFont'].forEach(id=>document.getElementById(id).addEventListener('input',applyEditorControls));
+  bindColorSwatches();
+  document.getElementById('saveCardBtn').onclick=saveCurrentCard;document.getElementById('resetCardBtn').onclick=resetCurrentDesign;document.getElementById('artSize').oninput=e=>setSelectedArtSize(e.target.value);document.getElementById('artSmallerBtn').onclick=()=>resizeSelectedArt(-24);document.getElementById('artBiggerBtn').onclick=()=>resizeSelectedArt(24);document.getElementById('removeArtBtn').onclick=removeSelectedArt;document.getElementById('removeAllArtBtn').onclick=()=>{document.getElementById('approvedArtLayer').innerHTML='';selectArt(null);};
+  makeDraggable(document.getElementById('hebrewText'),document.getElementById('frontCard'));makeDraggable(document.getElementById('englishText'),document.getElementById('backCard'));
+  document.getElementById('frontCard').addEventListener('pointerdown',e=>{if(!e.target.closest('.art-item')&&!e.target.closest('#hebrewText'))selectArt(null);});
+  // The flip-card wrapper is sized after the editor initializes. Keep the
+  // regular word size synchronized with its *actual* width after that resize.
+  if(typeof ResizeObserver!=='undefined'){
+    new ResizeObserver(()=>{if(!editor.classList.contains('hidden'))scaleEditorCardContents();})
+      .observe(document.getElementById('frontCard'));
+  }
+  document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&selectedArtEl&&activeScreenId==='learnScreen'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){e.preventDefault();removeSelectedArt();}});
+}
+function bindColorSwatches(){document.querySelectorAll('.color-swatches').forEach(box=>{const id=box.dataset.colorTarget,palette=id==='backgroundColor'?BACKGROUND_SWATCHES:COLOR_SWATCHES;box.innerHTML='';palette.forEach(color=>{const b=document.createElement('button');b.type='button';b.className='color-swatch';b.style.background=color;b.title=color;b.setAttribute('aria-label',`Choose ${color}`);b.onclick=()=>{document.getElementById(id).value=color;renderColorSwatches();applyEditorControls();};box.appendChild(b);});});renderColorSwatches();}
+function renderColorSwatches(){document.querySelectorAll('.color-swatches').forEach(box=>{const id=box.dataset.colorTarget,current=document.getElementById(id)?.value;box.querySelectorAll('.color-swatch').forEach(b=>b.classList.toggle('active',rgbToHex(b.style.backgroundColor)===String(current).toLowerCase()));});}
+function rgbToHex(c){if(!c)return c;if(c.startsWith('#'))return c.toLowerCase();const m=c.match(/\d+/g);if(!m)return c;return '#'+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,'0')).join('');}
+const CARD_DESIGN_WIDTH=620;
+const CARD_DESIGN_HEIGHT=360;
+
+function cardDisplayScale(card){
+  const width=card?.clientWidth||CARD_DESIGN_WIDTH;
+  // A large monitor must never magnify the chosen text size. New Hebrew
+  // words use the normal 58px design size; smaller cards scale down to fit.
+  return Math.min(1,width/CARD_DESIGN_WIDTH);
+}
+
+function hebrewFontVisualStyle(fontFamily){
+  const v=String(fontFamily||'');
+  if(v.includes('Gisha')) return {weight:'500',letterSpacing:'0.2px'};
+  if(v.includes('FrankRuehl')||v.includes('Frank Ruehl')) return {weight:'900',letterSpacing:'-0.4px'};
+  if(v.includes('Aharoni')||v.includes('Arial Rounded')) return {weight:'800',letterSpacing:'1.2px'};
+  return {weight:'700',letterSpacing:'0'};
+}
+
+function scaleEditorCardContents(){
+  const front=document.getElementById('frontCard');
+  if(!front)return;
+  const scale=cardDisplayScale(front);
+  const h=document.getElementById('hebrewText');
+  const e=document.getElementById('englishText');
+  const hs=Number(document.getElementById('hebrewSize')?.value||58);
+  const es=Number(document.getElementById('englishSize')?.value||46);
+  if(h)h.style.fontSize=(hs*scale)+'px';
+  if(e)e.style.fontSize=(es*scale)+'px';
+  document.querySelectorAll('#frontExamples .heb-example').forEach(x=>x.style.fontSize=(22*scale)+'px');
+  const backExamples=document.getElementById('backExamples');
+  if(backExamples)backExamples.style.fontSize=(14*scale)+'px';
+  document.querySelectorAll('#approvedArtLayer .art-item').forEach(applyArtSize);
+}
+function applyEditorControls(){const h=document.getElementById('hebrewText'),e=document.getElementById('englishText'),font=document.getElementById('hebrewFont'),bg=document.getElementById('backgroundColor').value;h.style.fontFamily=font.value;h.style.fontWeight=['700','500','900','800'][font.selectedIndex]||'700';h.style.letterSpacing=['0','0.2px','-0.4px','1.2px'][font.selectedIndex]||'0';h.style.color=document.getElementById('hebrewColor').value;e.style.fontFamily=document.getElementById('englishFont').value;e.style.fontWeight='800';e.style.color=document.getElementById('englishColor').value;document.getElementById('frontCard').style.background=bg;document.getElementById('backCard').style.background=bg;scaleEditorCardContents();renderColorSwatches();}
+function loadEditorItem(key){const s=student(),item=getItem(key);if(!item||!canEditItem(key,s))return;selectedItemKey=key;window.__shorashimRedesignKey=window.__shorashimRedesignMode?key:null;const existing=s.cards[key],d=normalizeDesign(existing?.design);document.getElementById('emptyEditor').classList.add('hidden');document.getElementById('editorContent').classList.remove('hidden');document.getElementById('editorTitle').textContent=`${item.front} — ${item.english}`;document.getElementById('hebrewText').textContent=item.front;document.getElementById('englishText').textContent=item.english;setExamples(item);Object.entries({hebrewSize:d.hebrewSize,hebrewFont:d.hebrewFont,hebrewColor:d.hebrewColor,englishSize:d.englishSize,englishFont:d.englishFont,englishColor:d.englishColor,backgroundColor:d.backgroundColor}).forEach(([id,v])=>document.getElementById(id).value=v);const h=document.getElementById('hebrewText'),e=document.getElementById('englishText');h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';renderArtChoices(item);renderEditorArts(d.arts);applyEditorControls();clearCanvas(false);drawHistory=[];if(d.drawing)loadDrawing(d.drawing);const badge=document.getElementById('newBadge'),learned=!!existing?.learnedAt;badge.textContent=learned?'LEARNED':(existing?'NEW':'NEXT');badge.classList.remove('hidden');document.getElementById('saveCardBtn').textContent=learned?'Save Redesign':(existing?'Save Changes & Continue':'Save Card & Go to Next');window.__shorashimEditorDirty=false;renderWordList();}
+function setExamples(item){const teach=document.getElementById('exampleTeachingBox'),front=document.getElementById('frontExamples'),back=document.getElementById('backExamples');const ex=item.examples||[];teach.classList.toggle('hidden',!ex.length);front.innerHTML='';back.innerHTML='';if(!ex.length){teach.innerHTML='';return;}teach.innerHTML=`<h4>Examples</h4><div class="example-grid">${ex.map(x=>`<div class="example-pair"><div class="heb">${highlightExample(x)}</div><div class="eng">${escapeHTML(x.english)}</div></div>`).join('')}</div>`;front.innerHTML=ex.slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');back.innerHTML=ex.slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');}
+function highlightExample(x){let h=escapeHTML(x.hebrew);if(!x.highlight)return h;const mark=escapeHTML(x.highlight);const idx=h.indexOf(mark);if(idx<0)return h;return h.slice(0,idx)+`<span class="affix-mark">${mark}</span>`+h.slice(idx+mark.length);}
+function pictureSvg(kind,label){const drawings={cane:'<path d="M62 18c22 0 22 27 3 27H50v49"/><path d="M50 94h-9"/>',door:'<path d="M28 92V18h48v74M38 92V29h28v63"/><circle cx="60" cy="60" r="2"/>',eye:'<path d="M12 55s15-25 38-25 38 25 38 25-15 25-38 25S12 55 12 55Z"/><circle cx="50" cy="55" r="11"/>',tree:'<path d="M50 88V57"/><path d="M50 62c-21 8-33-12-19-23-5-20 23-29 31-12 21-5 29 22 12 33-7 5-16 5-24 2Z"/>',water:'<path d="M50 12C38 31 25 45 25 62a25 25 0 0 0 50 0c0-17-13-31-25-50Z"/>',sun:'<circle cx="50" cy="50" r="19"/><path d="M50 8v13M50 79v13M8 50h13M79 50h13M20 20l9 9M71 71l9 9M80 20l-9 9M29 71l-9 9"/>',book:'<path d="M12 22c18-5 30 1 38 9v55c-8-8-20-14-38-9ZM88 22c-18-5-30 1-38 9v55c8-8 20-14 38-9Z"/>',arrow:'<path d="M13 50h68M62 31l19 19-19 19"/>',clock:'<circle cx="50" cy="50" r="36"/><path d="M50 28v23l16 10"/>',home:'<path d="M12 49 50 17l38 32M24 44v43h52V44M42 87V63h16v24"/>',speech:'<path d="M14 18h72v52H48L28 86V70H14Z"/><path d="M29 39h42M29 51h30"/>',default:'<circle cx="50" cy="50" r="34"/><path d="m31 52 12 12 27-31"/>'};const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#fff8dc"/><g fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${drawings[kind]||drawings.default}</g></svg>`;return{src:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg),label};}
+function semanticIllustrations(item){const text=`${item?.english||''} ${item?.front||''}`.toLowerCase(),out=[];const add=(kind,label)=>{if(!out.some(x=>x.label===label))out.push(pictureSvg(kind,label));};if(/old|aged|זק/.test(text))add('cane','Walking stick');if(/door|gate|entrance|פתח|דלת/.test(text))add('door','Doorway');if(/see|look|eye|ראה|עין/.test(text))add('eye','Eye');if(/tree|grove|wood|עץ|אלון/.test(text))add('tree','Tree');if(/water|wash|rain|מים|רחץ/.test(text))add('water','Water drop');if(/sun|day|heat|שמש|יום|חם/.test(text))add('sun','Sun');if(/book|learn|read|ספר/.test(text))add('book','Open book');if(/go|come|pass|return|toward|הלך|בא|עבר|שב/.test(text))add('arrow','Direction arrow');if(/time|hour|עת/.test(text))add('clock','Clock');if(/house|home|tent|בית|אהל/.test(text))add('home','Home');if(/say|speak|call|אמר|דבר|קרא/.test(text))add('speech','Speech bubble');if(!out.length)add('default','Simple symbol');return out;}
+function isTeacherScreenshotArt(value){try{const url=new URL(String(value||''));return url.protocol==='https:'&&url.hostname==='firebasestorage.googleapis.com'&&url.pathname.startsWith('/v0/b/b3-games.firebasestorage.app/o/shorashim-teacher-pictures%2F');}catch(_){return false;}}
+function renderArtChoices(item){const emojis=document.getElementById('emojiChoices'),ills=document.getElementById('illustrationChoices');emojis.innerHTML='';ills.innerHTML='';(item.art||[]).forEach(value=>{const b=document.createElement('button');b.type='button';b.className='art-choice';if(isTeacherScreenshotArt(value)){b.title='Teacher screenshot';const img=document.createElement('img');img.src=value;img.alt='Teacher screenshot';b.appendChild(img);b.onclick=()=>addArtToEditor({kind:'illustration',value,label:'Teacher screenshot'});ills.appendChild(b);}else{b.textContent=value;b.title='Emoji picture';b.onclick=()=>addArtToEditor({kind:'emoji',value,label:value});emojis.appendChild(b);}});const choices=[...(item.id?ILLUSTRATIONS[item.id]||[]:[]),...semanticIllustrations(item)];choices.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='art-choice';b.title=a.label;b.innerHTML=`<img src="${a.src}" alt="${escapeHTML(a.label)}">`;b.onclick=()=>addArtToEditor({kind:'illustration',value:a.src,label:a.label});ills.appendChild(b);});}
+function renderEditorArts(arts){const layer=document.getElementById('approvedArtLayer');layer.innerHTML='';selectedArtEl=null;(arts||[]).forEach(a=>addArtToEditor(a,true));}
+function addArtToEditor(spec,fromSaved=false){const layer=document.getElementById('approvedArtLayer'),count=layer.children.length,presets=[[50,70],[28,68],[72,68],[38,80],[62,80]],p=presets[count%presets.length];const a={kind:spec.kind||'emoji',value:spec.value||'',label:spec.label||'',left:spec.left??p[0],top:spec.top??p[1],size:spec.size??(spec.kind==='illustration'?180:126)};const el=document.createElement('div');el.className='art-item '+a.kind;el.dataset.kind=a.kind;el.dataset.value=a.value;el.dataset.label=a.label;el.dataset.size=a.size;el.style.left=a.left+'%';el.style.top=a.top+'%';if(a.kind==='illustration'){const img=document.createElement('img');img.src=a.value;img.alt=a.label;img.draggable=false;img.style.pointerEvents='none';el.appendChild(img);}else el.textContent=a.value;applyArtSize(el);el.style.touchAction='none';el.style.cursor='grab';makeDraggable(el,document.getElementById('frontCard'),()=>selectArt(el));el.onclick=e=>{selectArt(el);e.stopPropagation();};layer.appendChild(el);if(!fromSaved)selectArt(el);}
+function selectArt(el){document.querySelectorAll('#approvedArtLayer .art-item').forEach(x=>x.classList.remove('selected'));selectedArtEl=el;const control=document.getElementById('artSize');if(control){control.disabled=!el;if(el)control.value=String(el.dataset.size||84);}if(el)el.classList.add('selected');}
+function applyArtSize(el){const baseSize=Number(el.dataset.size||84),scale=cardDisplayScale(document.getElementById('frontCard')),size=baseSize*scale;if(el.dataset.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';}else el.style.fontSize=size+'px';}
+function setSelectedArtSize(size){if(!selectedArtEl)return;selectedArtEl.dataset.size=Math.max(30,Math.min(380,Number(size)||84));applyArtSize(selectedArtEl);constrainElement(selectedArtEl,document.getElementById('frontCard'));selectArt(selectedArtEl);}
+function resizeSelectedArt(delta){if(!selectedArtEl)return;setSelectedArtSize(Number(selectedArtEl.dataset.size||84)+delta);}
+function removeSelectedArt(){if(!selectedArtEl)return;selectedArtEl.remove();selectArt(null);}
+function stylePos(el,parent){const pr=parent.getBoundingClientRect(),er=el.getBoundingClientRect();return {left:(er.left-pr.left+er.width/2)/pr.width*100,top:(er.top-pr.top+er.height/2)/pr.height*100};}
+function serializeArts(){const p=document.getElementById('frontCard');return [...document.querySelectorAll('#approvedArtLayer .art-item')].map(el=>{const pos=stylePos(el,p);return {kind:el.dataset.kind,value:el.dataset.value,label:el.dataset.label,left:pos.left,top:pos.top,size:Number(el.dataset.size||84)};});}
+function makeDraggable(el,parent,onStart){let dragging=false,dx=0,dy=0;el.style.touchAction='none';el.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;dragging=true;el.setPointerCapture?.(e.pointerId);const r=el.getBoundingClientRect();dx=e.clientX-(r.left+r.width/2);dy=e.clientY-(r.top+r.height/2);onStart?.();e.preventDefault();e.stopPropagation();});el.addEventListener('pointermove',e=>{if(!dragging)return;const p=parent.getBoundingClientRect();let x=e.clientX-dx-p.left,y=e.clientY-dy-p.top;const er=el.getBoundingClientRect(),hw=er.width/2,hh=er.height/2;x=Math.max(hw,Math.min(p.width-hw,x));y=Math.max(hh,Math.min(p.height-hh,y));el.style.left=x/p.width*100+'%';el.style.top=y/p.height*100+'%';e.preventDefault();});const stop=()=>{dragging=false;};el.addEventListener('pointerup',stop);el.addEventListener('pointercancel',stop);el.addEventListener('lostpointercapture',stop);}
+function constrainElement(el,parent){const p=parent.getBoundingClientRect(),r=el.getBoundingClientRect(),cx=r.left-p.left+r.width/2,cy=r.top-p.top+r.height/2;const x=Math.max(r.width/2,Math.min(p.width-r.width/2,cx)),y=Math.max(r.height/2,Math.min(p.height-r.height/2,cy));el.style.left=x/p.width*100+'%';el.style.top=y/p.height*100+'%';}
+function canvasHasInk(){
+  try{const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;for(let i=3;i<data.length;i+=32){if(data[i]>8)return true;}}catch(e){}
+  return false;
+}
+function dataURLToBlob(dataURL){const parts=dataURL.split(',');const mime=(parts[0].match(/:(.*?);/)||[])[1]||'image/png';const bin=atob(parts[1]||'');const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
+async function saveDrawingToCloud(itemKey,dataURL){
+  if(!cloudEnabled||!cloudStudentId||!dataURL)return dataURL||'';
+  try{
+    const safe=itemKey.replace(/[^a-zA-Z0-9_-]/g,'_');
+    // Keep drawings with the same student record used by the realtime database.
+    // The previous path omitted `students`, which made the files land outside
+    // the student's data hierarchy and could be rejected by storage rules.
+    const path=`${CLOUD_ROOT}/students/${cloudStudentId}/drawings/${safe}.png`;
+    const ref=cloudStorage.ref(path);
+    await ref.put(dataURLToBlob(dataURL));
+    return await ref.getDownloadURL();
+  }catch(err){console.warn('Could not upload card drawing; keeping a local copy.',err);return dataURL;}
+}
+async function saveCurrentCard(){
+const s=student(),item=getItem(selectedItemKey),existing=s.cards[selectedItemKey],redesigning=!!existing?.learnedAt;
+if(!item||!canEditItem(selectedItemKey,s))return;
+const wasNew=!existing;
+if(!window.__shorashimEditorDirty){
+  const happy=confirm('You have not changed this card. Are you happy with this card as it is?');
+  if(!happy)return;
+}
+const btn=document.getElementById('saveCardBtn'),oldLabel=btn.textContent;btn.disabled=true;btn.textContent='Saving…';
+try{
+const drawingData=canvasHasInk()?canvas.toDataURL('image/png'):'';
+const drawing=await saveDrawingToCloud(selectedItemKey,drawingData);
+const d={hebrewSize:+document.getElementById('hebrewSize').value,hebrewFont:document.getElementById('hebrewFont').value,hebrewColor:document.getElementById('hebrewColor').value,englishSize:+document.getElementById('englishSize').value,englishFont:document.getElementById('englishFont').value,englishColor:document.getElementById('englishColor').value,backgroundColor:document.getElementById('backgroundColor').value,hebrewPos:stylePos(document.getElementById('hebrewText'),document.getElementById('frontCard')),englishPos:stylePos(document.getElementById('englishText'),document.getElementById('backCard')),arts:serializeArts(),drawing};
+s.cards[selectedItemKey]={itemKey:selectedItemKey,itemType:existing?.itemType||currentTrack,itemId:item.id,createdAt:existing?.createdAt||Date.now(),learnedAt:existing?.learnedAt||Date.now(),sessionId:existing?.sessionId||null,design:d};
+s.lastActive=Date.now();saveDB();renderWordList();renderStudentStats();window.__shorashimEditorDirty=false;
+if(isGuestPreview()&&!nextUncreated('shorashim')&&!nextUncreated('prefix')&&!nextUncreated('suffix'))setTimeout(()=>window.B3Guest.unlock('Sign in to unlock','You tried all the free sample cards. Sign in to learn the full list of shorashim.'),700);
+if(redesigning){document.getElementById('sessionStatus').textContent='Changes saved ✓';renderGallery();return;}
+const list=learningCatalog(currentTrack),index=list.findIndex(x=>x.id===item.id),following=[...list.slice(index+1),...list.slice(0,index+1)];const next=following.find(x=>!s.cards[keyFor(currentTrack,x.id)]);if(next)loadEditorItem(keyFor(currentTrack,next.id));else showNoMoreItems();
+}finally{btn.disabled=false;btn.textContent=oldLabel;}
+}
+function resetCurrentDesign(){if(!selectedItemKey)return;const item=getItem(selectedItemKey),d=defaultDesign();document.getElementById('hebrewSize').value=d.hebrewSize;document.getElementById('hebrewFont').value=d.hebrewFont;document.getElementById('hebrewColor').value=d.hebrewColor;document.getElementById('englishSize').value=d.englishSize;document.getElementById('englishFont').value=d.englishFont;document.getElementById('englishColor').value=d.englishColor;document.getElementById('backgroundColor').value=d.backgroundColor;document.getElementById('hebrewText').style.left=d.hebrewPos.left+'%';document.getElementById('hebrewText').style.top=d.hebrewPos.top+'%';document.getElementById('englishText').style.left=d.englishPos.left+'%';document.getElementById('englishText').style.top=d.englishPos.top+'%';renderEditorArts([]);clearCanvas(false);applyEditorControls();setExamples(item);}
+function showNoMoreItems(){selectedItemKey=null;document.getElementById('editorContent').classList.add('hidden');document.getElementById('emptyEditor').classList.remove('hidden');document.getElementById('emptyEditor').innerHTML='<b>Great work!</b><br>You have reached the end of this learning list. You can click any learned card on the left to edit it.';renderWordList();}
+
+function initCanvas(){canvas=document.getElementById('drawCanvas');ctx=canvas.getContext('2d');canvas.addEventListener('pointerdown',startDraw);canvas.addEventListener('pointermove',drawMove);canvas.addEventListener('pointerup',endDraw);canvas.addEventListener('pointercancel',endDraw);document.getElementById('eraserBtn').onclick=()=>{erasing=!erasing;document.getElementById('eraserBtn').textContent=erasing?'Eraser ✓':'Eraser';};document.getElementById('clearDrawingBtn').onclick=()=>clearCanvas(true);document.getElementById('undoBtn').onclick=undoDrawing;}
+function pointerCanvas(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};}
+function startDraw(e){drawing=true;drawHistory.push(canvas.toDataURL());if(drawHistory.length>20)drawHistory.shift();const p=pointerCanvas(e);ctx.beginPath();ctx.moveTo(p.x,p.y);canvas.setPointerCapture?.(e.pointerId);}
+function drawMove(e){if(!drawing)return;const p=pointerCanvas(e);ctx.lineWidth=+document.getElementById('brushSize').value;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=erasing?'rgba(0,0,0,1)':document.getElementById('drawColor').value;ctx.globalCompositeOperation=erasing?'destination-out':'source-over';ctx.lineTo(p.x,p.y);ctx.stroke();}
+function endDraw(){drawing=false;ctx.closePath();ctx.globalCompositeOperation='source-over';}
+function clearCanvas(push=true){if(push)drawHistory.push(canvas.toDataURL());ctx.clearRect(0,0,canvas.width,canvas.height);}
+function undoDrawing(){const src=drawHistory.pop();if(src===undefined)return;ctx.clearRect(0,0,canvas.width,canvas.height);loadDrawing(src);}
+function loadDrawing(src){if(!src)return;const img=new Image();img.crossOrigin='anonymous';img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);img.src=src;}
+
+let reviewPerekFilter='all';
+function itemPerek(item){return item?.bookletWeek?0:Number(item?.perek)||18;}
+function reviewFilterLabel(item){return item?.bookletWeek?`Week ${item.bookletWeek}`:itemPerek(item)===19?'Perek י״ט':'Perek י״ח';}
+function ensureDailyReview(s=student()){const t=todayKey();if(s.dailyReview?.date!==t)s.dailyReview={date:t,seen:{},completedAt:null};else if(!s.dailyReview.seen)s.dailyReview.seen={};return s.dailyReview;}
+function dailyProgress(s=student()){const dr=ensureDailyReview(s),keys=eligibleLearnedCards(s).map(c=>c.itemKey),seen=keys.filter(k=>dr.seen[k]).length,complete=keys.length>0&&seen===keys.length;if(complete&&!dr.completedAt)dr.completedAt=Date.now();return {seen,total:keys.length,complete};}
+function gamesUnlocked(s=student()){return true;}
+function bindReview(){
+  document.querySelectorAll('[data-review-perek]').forEach(btn=>btn.onclick=()=>{
+    reviewPerekFilter=btn.dataset.reviewPerek;
+    document.querySelectorAll('[data-review-perek]').forEach(x=>x.classList.toggle('active',x===btn));
+    renderReviewPicker();
+  });
+  document.getElementById('startReviewBtn').onclick=startReview;
+  const noHints=document.getElementById('reviewNoHints'); if(noHints) noHints.onchange=()=>{reviewNoHints=!!noHints.checked;};
+  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Press Show My Cards and say each shorash and its meaning. No recording needed.':mode==='no-hints'?'Press Show My Cards. Then press Start Recording and say each shorash and its meaning without pictures or drawings.':'Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.';};
+  document.getElementById('regularChazaraChoice')?.addEventListener('click',()=>setMode('regular'));
+  document.getElementById('noHintsChazaraChoice')?.addEventListener('click',()=>setMode('no-hints'));
+  document.getElementById('practiceOnlyChoice')?.addEventListener('click',()=>setMode('practice'));
+  const rec=document.getElementById('shorashimRecordBtn'); if(rec) rec.onclick=toggleShorashimRecording;
+  const pause=document.getElementById('shorashimPauseBtn'); if(pause) pause.onclick=toggleShorashimPause;
+  setMode('regular');
+  document.getElementById('chooseReviewCardsBtn').onclick=chooseDifferentReviewCards;document.getElementById('flipReviewBtn').onclick=flipReview;document.getElementById('reviewFlipCard').onclick=flipReview;document.getElementById('prevReviewBtn').onclick=()=>moveReview(-1);document.getElementById('nextReviewBtn').onclick=()=>moveReview(1);document.getElementById('editReviewBtn').onclick=()=>{const c=reviewDeck[reviewIndex];if(c)openRedesignCard(c.itemKey);};
+  document.getElementById('reviewSort').onchange=renderReviewPicker;document.getElementById('selectAllReview').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=true);updateReviewSelectionCount();};document.getElementById('clearReviewSelection').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=false);updateReviewSelectionCount();};
+  document.addEventListener('keydown',e=>{if(activeScreenId!=='reviewScreen'||document.getElementById('reviewArea').classList.contains('hidden')||!reviewDeck.length)return;if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();moveReview(1);}else if(e.key==='ArrowLeft'){e.preventDefault();moveReview(-1);}else if(e.key==='ArrowUp'){e.preventDefault();flipReview();}});
+}
+function reviewSortedCards(){let arr=eligibleLearnedCards().slice();if(reviewPerekFilter!=='all')arr=arr.filter(c=>c.itemType==='shorashim'&&(reviewPerekFilter==='booklet'?!!getItem(c.itemKey)?.bookletWeek:itemPerek(getItem(c.itemKey))===Number(reviewPerekFilter)));let mode=document.getElementById('reviewSort')?.value||'newest';if(mode==='alpha')arr.sort((a,b)=>(getItem(a.itemKey)?.front||'').localeCompare(getItem(b.itemKey)?.front||'','he'));else if(mode==='manual')arr.sort((a,b)=>(a.reviewOrder??a.learnedAt)-(b.reviewOrder??b.learnedAt));else if(mode==='newest')arr.sort((a,b)=>b.learnedAt-a.learnedAt);else arr.sort((a,b)=>a.learnedAt-b.learnedAt);return arr;}
+function renderReviewPicker(){const box=document.getElementById('reviewPicker'),arr=reviewSortedCards(),manual=document.getElementById('reviewSort').value==='manual';box.innerHTML='';arr.forEach(c=>{const item=getItem(c.itemKey),row=document.createElement('div');row.className='review-pick-row'+(manual?' manual-draggable':'');row.dataset.key=c.itemKey;row.draggable=manual;row.innerHTML=`<label><input class="review-pick-check" type="checkbox" data-key="${escapeHTML(c.itemKey)}" checked> <b class="hebrew">${escapeHTML(item.front)}</b><span>${escapeHTML(item.english)}${c.itemType==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span>${manual?'<span class="review-drag-hint">↕ Drag to reorder</span>':''}</label>`;box.appendChild(row);});box.querySelectorAll('.review-pick-check').forEach(x=>x.onchange=updateReviewSelectionCount);if(manual)bindReviewDragDrop(box);updateReviewSelectionCount();}
+function bindReviewDragDrop(box){let dragged=null;box.querySelectorAll('.review-pick-row').forEach(row=>{row.addEventListener('dragstart',e=>{if(e.target.closest('input')){e.preventDefault();return}dragged=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.key)});row.addEventListener('dragend',()=>{row.classList.remove('dragging');box.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));dragged=null});row.addEventListener('dragover',e=>{if(!dragged||dragged===row)return;e.preventDefault();row.classList.add('drag-over')});row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-over');if(!dragged||dragged===row)return;const rows=[...box.querySelectorAll('.review-pick-row')],from=rows.indexOf(dragged),to=rows.indexOf(row);if(from<to)row.after(dragged);else row.before(dragged);saveManualReviewOrderFromGrid(box)});});}
+function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pick-row')].forEach((row,n)=>{const c=student().cards[row.dataset.key];if(c)c.reviewOrder=n});saveDB();}
+function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findIndex(c=>c.itemKey===key),j=i+dir;if(i<0||j<0||j>=arr.length)return;arr.forEach((c,n)=>c.reviewOrder=n);[arr[i].reviewOrder,arr[j].reviewOrder]=[arr[j].reviewOrder,arr[i].reviewOrder];saveDB();renderReviewPicker();}
+function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Start Review (${n} cards)`:'Start Review';}
+function renderReviewAvailability(){const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
+function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;reviewSessionSeen=new Set();document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');const activeRec=document.getElementById('activeReviewRecording');if(activeRec)activeRec.classList.toggle('hidden',reviewPointsMode==='practice');renderReviewCard();}
+
+
+function chooseDifferentReviewCards(){
+  document.body.classList.remove('shorashim-review-active');
+  reviewDeck=[];
+  reviewIndex=0;
+  reviewFlipped=false;
+  document.getElementById('reviewArea').classList.add('hidden');
+  document.getElementById('reviewEmpty').classList.add('hidden');
+  document.getElementById('reviewSetup').classList.remove('hidden');
+  renderReviewPicker();
+  window.scrollTo(0,0);
+}
+
+
+
+function toggleShorashimPause(){
+  const pause=document.getElementById('shorashimPauseBtn'),status=document.getElementById('shorashimRecordStatus');
+  if(!shorashimRecorder)return;
+  if(shorashimRecorder.state==='recording'){shorashimRecorder.pause();shorashimPausedAt=Date.now();if(pause)pause.textContent='▶ Resume';if(status)status.textContent='Recording paused — press Resume when you are ready.';}
+  else if(shorashimRecorder.state==='paused'){shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.resume();if(pause)pause.textContent='⏸ Pause';if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — 3 points after approval.':'Recording with pictures — 2 points after approval.';}
+}
+
+async function toggleShorashimRecording(){
+  const btn=document.getElementById('shorashimRecordBtn'), status=document.getElementById('shorashimRecordStatus');
+  if(isGuestPreview()){window.B3Guest.unlock('Sign in to unlock','Recording your review and earning points are for signed-in students.');return;}
+  if(!cloudEnabled||!cloudStudentId){if(status)status.textContent='Please sign in first.';return;}
+  if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){
+    if(!qualifyCurrentCard())return;
+    const missing=reviewDeck.filter(c=>!reviewSessionSeen.has(c.itemKey)).length;
+    if(missing>0){
+      if(status)status.textContent=`Keep going! ${missing} card${missing===1?'':'s'} left before you can submit.`;
+      return;
+    }
+    if(shorashimRecorder.state==='paused')shorashimPausedMs+=Date.now()-shorashimPausedAt;
+    shorashimRecorder.stop();return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    shorashimRecordingChunks=[];
+    const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(x=>MediaRecorder.isTypeSupported?.(x))||'';
+    shorashimRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+    shorashimRecordingStartedAt=Date.now(); shorashimPausedAt=0; shorashimPausedMs=0;
+    shorashimRecorder.ondataavailable=e=>{if(e.data?.size)shorashimRecordingChunks.push(e.data)};
+    shorashimRecorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const durationMs=Math.max(0,Date.now()-shorashimRecordingStartedAt-shorashimPausedMs);
+      if(btn){btn.disabled=true;btn.textContent='Uploading…';}
+      if(status)status.textContent='Saving your recording…';
+      try{
+        if(durationMs<5000)throw new Error('Please record at least 5 seconds.');
+        const blob=new Blob(shorashimRecordingChunks,{type:shorashimRecorder.mimeType||'audio/webm'});
+        if(blob.size<1000)throw new Error('The recording was too short. Please try again.');
+        const date=todayKey(), mode=reviewNoHints?'no-hints':'pictures', points=reviewNoHints?3:2;
+        const existingRef=cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`);
+        const existing=await existingRef.once('value');
+        if(existing.exists()){
+          const oldDaily=existing.val()||{};
+          const oldEventId=oldDaily.eventId||'';
+          const oldEvent=oldEventId?await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${oldEventId}`).once('value'):null;
+          const oldData=oldEvent?.val?.()||{};
+          // Never destroy an already uploaded recording because its separate
+          // points request failed. The teacher can safely repair that request.
+          if(oldData.audioURL&&oldData.storagePath)
+            throw new Error(oldData.pointRequestId?'You already sent today’s Shorashim recording.':'Your recording is saved. Ask your teacher to press Connect Points Request.');
+          // Only a dangling date marker without a usable recording can be replaced.
+          await existingRef.remove();
+        }
+        const eventId=cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`).push().key;
+        const storagePath=`shorashim-recordings/${cloudStudentId}/${date}/${eventId}.webm`;
+        const ref=cloudStorage.ref(storagePath); await ref.put(blob,{contentType:blob.type||'audio/webm'}); const audioURL=await ref.getDownloadURL();
+        const record={id:eventId,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
+        await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).set(record);
+        // Mark the day as submitted immediately. A temporary Rewards API failure
+        // must not allow duplicates or make the pupil's recording disappear.
+        await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
+
+        const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
+        const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
+        if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');
+        const idToken=await user.getIdToken();
+        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
+        const awardData=await awardResp.json().catch(()=>({}));
+        if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
+        await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
+        await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
+        if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;
+      }catch(err){console.error(err);if(status)status.textContent=err?.message||'Could not save the recording.';}
+      finally{if(btn){btn.disabled=false;btn.textContent=reviewNoHints?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
+    };
+    shorashimRecorder.start(500); if(btn){btn.textContent='⏹ Finish & Submit';btn.classList.remove('record-pulse');}const pause=document.getElementById('shorashimPauseBtn');if(pause)pause.classList.remove('hidden'); if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — worth 3 points after approval.':'Recording with pictures — worth 2 points after approval.';
+  }catch(err){console.error(err);if(status)status.textContent='Microphone permission is needed to record.';}
+}
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;renderReviewCard(false);}
+function qualifyCurrentCard(){
+  if(!reviewDeck.length)return true;
+  const c=reviewDeck[reviewIndex],dr=ensureDailyReview(),already=!!dr.seen[c.itemKey];
+  if(!already){
+    const elapsed=performance.now()-reviewShownAt,min=db.settings.minReviewMs||500;
+    if(elapsed<min){
+      const msg=document.getElementById('tooFastMessage');
+      msg.textContent='Say the Shoresh and meaning first!';
+      msg.classList.remove('hidden');
+      setTimeout(()=>msg.classList.add('hidden'),1400);
+      return false;
+    }
+    dr.seen[c.itemKey]=Date.now();
+    saveDB();renderDailyStatus();
+  }
+  reviewSessionSeen.add(c.itemKey);
+  return true;
+}
+function moveReview(dir){if(!reviewDeck.length||!qualifyCurrentCard())return;reviewIndex=(reviewIndex+dir+reviewDeck.length)%reviewDeck.length;reviewFlipped=false;renderReviewCard();}
+function renderReviewCard(resetTimer=true){const c=reviewDeck[reviewIndex],item=getItem(c.itemKey);if(!item)return;const d=normalizeDesign(c.design),card=document.getElementById('reviewFlipCard'),h=document.getElementById('reviewHebrew'),e=document.getElementById('reviewEnglish'),ex=document.getElementById('reviewExamples'),bex=document.getElementById('reviewBackExamples'),layer=document.getElementById('reviewArtLayer'),img=document.getElementById('reviewDrawing');document.getElementById('reviewCounter').textContent=`${reviewIndex+1} of ${reviewDeck.length}`;document.getElementById('reviewPasuk').textContent=`${singularTrack(c.itemType)}${c.itemType==='shorashim'?` • ${reviewFilterLabel(item)}`:''}${item.pasuk?` • Pasuk ${item.pasuk}`:''} • learned ${fmtDate(c.learnedAt)}`;card.style.background=d.backgroundColor;const scale=cardDisplayScale(card),fontStyle=hebrewFontVisualStyle(d.hebrewFont);h.textContent=item.front;h.style.fontSize=(d.hebrewSize*scale)+'px';h.style.fontFamily=d.hebrewFont;h.style.fontWeight=fontStyle.weight;h.style.letterSpacing=fontStyle.letterSpacing;h.style.color=d.hebrewColor;h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.textContent=item.english;e.style.fontSize=(d.englishSize*scale)+'px';e.style.fontFamily=d.englishFont;e.style.fontWeight='800';e.style.color=d.englishColor;e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';ex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');ex.querySelectorAll('.heb-example').forEach(x=>x.style.fontSize=(22*scale)+'px');bex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');bex.style.fontSize=(14*scale)+'px';renderReadOnlyArts(layer,d.arts,scale);img.src=d.drawing||'';layer.classList.toggle('hidden',reviewFlipped||reviewNoHints);img.classList.toggle('hidden',!d.drawing||reviewFlipped||reviewNoHints);h.classList.toggle('hidden',reviewFlipped);ex.classList.toggle('hidden',reviewFlipped||!(item.examples||[]).length);e.classList.toggle('hidden',!reviewFlipped);bex.classList.toggle('hidden',!reviewFlipped||!(item.examples||[]).length);document.getElementById('reviewSideLabel').textContent=reviewFlipped?'BACK':'FRONT';if(resetTimer)reviewShownAt=performance.now();renderDailyStatus();}
+function renderReadOnlyArts(layer,arts,scale=1){layer.innerHTML='';(arts||[]).forEach(a=>{const el=document.createElement('div');el.className='art-item '+(a.kind||'emoji');el.style.left=(a.left??50)+'%';el.style.top=(a.top??66)+'%';const size=(a.size||84)*scale;if(a.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';const im=document.createElement('img');im.src=a.value;im.alt=a.label||'illustration';el.appendChild(im);}else{el.style.fontSize=size+'px';el.textContent=a.value||'';}layer.appendChild(el);});}
+function renderDailyStatus(){const p=dailyProgress();document.getElementById('dailyReviewBadge').textContent=p.total?`${p.seen} / ${p.total} reviewed today${p.complete?' ✓':''}`:'No learned cards yet';document.getElementById('reviewProgressToday').textContent=p.total?`Today: ${p.seen} / ${p.total}`:'Today: 0';renderHomeGameState();}
+
+function bindGames(){document.querySelectorAll('.game-choice').forEach(b=>b.onclick=()=>{const g=b.dataset.game;if(g==='match')startMatchGame();else if(g==='shoot')startShootGame();else if(g==='whack')startWhackGame();else if(g==='race')startRaceGame();});}
+function renderGamesLock(){const unlocked=gamesUnlocked();document.getElementById('gamesLockedPanel').classList.toggle('hidden',unlocked);document.getElementById('gamesUnlockedPanel').classList.toggle('hidden',!unlocked);if(!unlocked){cleanupGameRuntime();document.getElementById('gameStage').classList.add('hidden');}}
+function focusGameStage(){requestAnimationFrame(()=>document.getElementById('gameStage')?.scrollIntoView({block:'start'}));}
+function renderHomeGameState(){const card=document.getElementById('gamesHomeCard'),msg=document.getElementById('gamesHomeMessage');if(card)card.classList.remove('locked');if(msg)msg.textContent='Choose a practice game.';}
+function cleanupGameRuntime(){if(gameTimer){clearInterval(gameTimer);gameTimer=null;}if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}if(whackState?.moleTimer){clearTimeout(whackState.moleTimer);whackState.moleTimer=null;}if(gameAnimationFrame){cancelAnimationFrame(gameAnimationFrame);gameAnimationFrame=null;}const stage=document.getElementById('gameStage');if(stage){stage.onpointermove=null;stage.onpointerdown=null;}}
+function formatGameTime(ms){const sec=Math.max(0,ms)/1000;return sec<60?`${sec.toFixed(1)}s`:`${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}.${Math.floor((sec%1)*10)}`;}
+function finishGame(){student().gamesPlayed++;student().lastActive=Date.now();saveDB();renderStudentStats();}
+
+const MATCH_PAIR_COUNT=8;
+function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};renderMatchGame();focusGameStage();startMatchClock();}
+function startMatchClock(){if(gameTimer)clearInterval(gameTimer);gameTimer=setInterval(()=>{const el=document.getElementById('matchTimer');if(el&&matchState&&!matchState.finished)el.textContent=formatGameTime(performance.now()-matchState.startedAt);},100);}
+function matchLeaderboardHTML(pairCount){const rows=classMatchLeaderboard[String(pairCount)]||{};const entries=Object.entries(rows).map(([id,x])=>({id,name:x.name||id,time:Number(x.time)})).filter(x=>Number.isFinite(x.time)).sort((a,b)=>a.time-b.time).slice(0,8);if(!entries.length)return '<div class="mini-note">No leaderboard times yet. Finish a round to set the first time!</div>';return `<div class="leaderboard"><div class="leaderboard-title">🏆 ${pairCount}-pair class leaderboard</div>${entries.map((x,i)=>`<div class="leaderboard-row${x.id===cloudStudentId?' current':''}"><span>${i+1}. ${escapeHTML(x.name)}</span><b>${formatGameTime(x.time)}</b></div>`).join('')}</div>`;}
+function saveMatchBest(pairCount,time){const s=student(),k=String(pairCount),old=s.gameBests.match[k],improved=!Number.isFinite(old)||time<old;if(improved)s.gameBests.match[k]=time;if(improved&&cloudEnabled&&cloudStudentId){classMatchLeaderboard[k]=classMatchLeaderboard[k]||{};classMatchLeaderboard[k][cloudStudentId]={name:cloudStudentName||currentStudent,time,updatedAt:Date.now()};cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${k}/${cloudStudentId}`).set(classMatchLeaderboard[k][cloudStudentId]).catch(err=>console.warn('Leaderboard save failed',err));}}
+function renderMatchGame(){const stage=document.getElementById('gameStage');stage.classList.remove('hidden');const elapsed=matchState.finished?matchState.elapsedMs:performance.now()-matchState.startedAt;stage.innerHTML=`<div class="game-head"><div><h3>🧩 Match</h3><span class="muted">${matchState.pairCount} pairs • Match Hebrew to English as fast as you can.</span></div><div class="game-scorebox"><b id="matchTimer">${formatGameTime(elapsed)}</b><button id="newMatchRound" class="ghost">New Round</button></div></div><div class="match-layout"><div class="match-grid" id="matchGrid"></div><aside id="matchLeaderboard">${matchLeaderboardHTML(matchState.pairCount)}</aside></div>`;document.getElementById('newMatchRound').onclick=startMatchGame;const grid=document.getElementById('matchGrid');matchState.tiles.forEach((t,i)=>{const b=document.createElement('button');b.className='match-tile '+(t.type==='front'?'hebrew':'');if(matchState.matched.has(t.key))b.classList.add('matched');if(matchState.selected===i)b.classList.add('selected');b.textContent=t.label;b.disabled=matchState.finished;b.onclick=()=>pickMatch(i);grid.appendChild(b);});if(matchState.finished){stage.insertAdjacentHTML('beforeend',`<div class="game-result-banner"><h3>🎉 ${formatGameTime(matchState.elapsedMs)}</h3><p>${matchState.moves} tries. Your best time is ${formatGameTime(student().gameBests.match[String(matchState.pairCount)])}.</p><button id="againMatch" class="primary">Play Again</button></div>`);document.getElementById('againMatch').onclick=startMatchGame;}}
+function pickMatch(i){if(matchState.finished||matchState.matched.has(matchState.tiles[i].key))return;if(matchState.selected===null){matchState.selected=i;renderMatchGame();startMatchClock();return;}if(matchState.selected===i){matchState.selected=null;renderMatchGame();startMatchClock();return;}const a=matchState.tiles[matchState.selected],b=matchState.tiles[i];matchState.moves++;if(a.key===b.key&&a.type!==b.type)matchState.matched.add(a.key);matchState.selected=null;if(matchState.matched.size===matchState.pairCount){matchState.finished=true;matchState.elapsedMs=performance.now()-matchState.startedAt;cleanupGameRuntime();saveMatchBest(matchState.pairCount,matchState.elapsedMs);finishGame();}renderMatchGame();if(!matchState.finished)startMatchClock();}
+
+function gameAnswerSet(correctCard,count=3){const others=shuffle(eligibleLearnedCards().filter(x=>x.itemKey!==correctCard.itemKey)).slice(0,count-1);return shuffle([correctCard,...others]);}
+function startShootGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();if(learned.length<3){alert('Learn at least three cards before playing Target Shoot.');return;}const pool=[];while(pool.length<10)pool.push(...shuffle([...learned]));shootState={pool:pool.slice(0,10),index:0,score:0,shots:0,hits:0,locked:false,startedAt:performance.now(),targets:[]};renderShootRound();focusGameStage();}
+function renderShootRound(){cleanupGameRuntime();const stage=document.getElementById('gameStage');stage.classList.remove('hidden');if(shootState.index>=shootState.pool.length){const elapsed=performance.now()-shootState.startedAt,accuracy=shootState.shots?Math.round(shootState.hits/shootState.shots*100):0;stage.innerHTML=`<div class="game-finish"><div class="finish-icon">🎯</div><h3>Target round complete!</h3><p><b>${shootState.score} points</b> • ${accuracy}% accuracy • ${formatGameTime(elapsed)}</p><button id="shootAgain" class="primary">Play Again</button></div>`;document.getElementById('shootAgain').onclick=startShootGame;finishGame();return;}const c=shootState.pool[shootState.index],item=getItem(c.itemKey),answers=gameAnswerSet(c,3);stage.innerHTML=`<div class="game-head"><div><h3>🎯 Target Shoot</h3><span class="muted">Aim the crosshair and fire at the correct moving target.</span></div><div class="game-scorebox"><b>${shootState.score} pts</b><span>Hit ${shootState.index+1}/10</span><button id="restartShoot" class="ghost">Restart</button></div></div><div class="shoot-prompt">${escapeHTML(item.front)}</div><div id="shootArena" class="shoot-arena"><div id="crosshair" class="crosshair">＋</div><div class="shooter-base">🏹</div></div><div id="shootMessage" class="game-message">Move your mouse and click to fire.</div>`;document.getElementById('restartShoot').onclick=startShootGame;const arena=document.getElementById('shootArena'),rect=arena.getBoundingClientRect();shootState.targets=answers.map((a,i)=>{const ai=getItem(a.itemKey),el=document.createElement('div');el.className='moving-target';el.textContent=ai.english;arena.appendChild(el);return {card:a,el,x:120+i*210,y:85+(i%2)*130,vx:(i%2?1:-1)*(0.8+Math.random()*.6),vy:(i===1?-1:1)*(0.55+Math.random()*.4),w:150,h:76};});const cross=document.getElementById('crosshair');arena.onpointermove=e=>{const r=arena.getBoundingClientRect();cross.style.left=(e.clientX-r.left)+'px';cross.style.top=(e.clientY-r.top)+'px';cross.classList.add('visible');};arena.onpointerleave=()=>cross.classList.remove('visible');arena.onpointerdown=e=>fireAtTarget(e,c);animateTargets();}
+function animateTargets(){const arena=document.getElementById('shootArena');if(!arena||!shootState||shootState.locked)return;const r=arena.getBoundingClientRect();shootState.targets.forEach(t=>{t.x+=t.vx;t.y+=t.vy;if(t.x<10||t.x+t.w>r.width-10)t.vx*=-1;if(t.y<12||t.y+t.h>r.height-18)t.vy*=-1;t.x=Math.max(10,Math.min(r.width-t.w-10,t.x));t.y=Math.max(12,Math.min(r.height-t.h-18,t.y));t.el.style.transform=`translate(${t.x}px,${t.y}px)`;});gameAnimationFrame=requestAnimationFrame(animateTargets);}
+function fireAtTarget(e,correctCard){if(shootState.locked)return;const arena=document.getElementById('shootArena'),r=arena.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;shootState.shots++;spawnDart(arena,x,y);const hit=shootState.targets.find(t=>x>=t.x&&x<=t.x+t.w&&y>=t.y&&y<=t.y+t.h),msg=document.getElementById('shootMessage');if(!hit){shootState.score=Math.max(0,shootState.score-1);msg.textContent='Miss! Aim for a moving target.';msg.className='game-message miss';return;}if(hit.card.itemKey===correctCard.itemKey){shootState.locked=true;shootState.hits++;shootState.score+=10;hit.el.classList.add('bullseye');msg.textContent='Bullseye! +10';msg.className='game-message correct';setTimeout(()=>{shootState.index++;shootState.locked=false;renderShootRound();},600);}else{shootState.score=Math.max(0,shootState.score-2);hit.el.classList.add('wrong-hit');msg.textContent='Wrong target — try again!';msg.className='game-message wrong';setTimeout(()=>hit.el?.classList.remove('wrong-hit'),450);}}
+function spawnDart(arena,x,y){const dart=document.createElement('div'),r=arena.getBoundingClientRect(),sx=r.width/2,sy=r.height-25,dx=x-sx,dy=y-sy,angle=Math.atan2(dy,dx)*180/Math.PI;dart.className='dart-shot';dart.textContent='➤';dart.style.left=sx+'px';dart.style.top=sy+'px';dart.style.transform=`rotate(${angle}deg)`;arena.appendChild(dart);requestAnimationFrame(()=>{dart.style.transform=`translate(${dx}px,${dy}px) rotate(${angle}deg)`;dart.style.opacity='0';});setTimeout(()=>dart.remove(),420);}
+
+function startWhackGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();if(learned.length<3){alert('Learn at least three cards before playing Whack-a-Word.');return;}whackState={score:0,startedAt:performance.now(),endAt:performance.now()+30000,correct:null,locked:false,optionCount:Math.min(6,learned.length)};renderWhackGame();focusGameStage();newWhackPrompt();gameTimer=setInterval(updateWhackClock,100);}
+function renderWhackGame(){const stage=document.getElementById('gameStage');stage.classList.remove('hidden');stage.innerHTML=`<div class="game-head"><div><h3>🔨 Whack-a-Word</h3><span class="muted">30 seconds. Whack the correct meaning before it ducks down.</span></div><div class="game-scorebox"><b id="whackScore">0 pts</b><span id="whackClock">30.0s</span><button id="restartWhack" class="ghost">Restart</button></div></div><div id="whackPrompt" class="whack-prompt"></div><div id="whackBoard" class="whack-board">${Array.from({length:6},(_,i)=>`<div class="whack-hole"><button class="mole" data-hole="${i}"></button></div>`).join('')}</div><div id="whackMessage" class="game-message">Ready...</div>`;document.getElementById('restartWhack').onclick=startWhackGame;}
+function newWhackPrompt(){if(!whackState||performance.now()>=whackState.endAt)return finishWhackGame();const pool=eligibleLearnedCards(),correct=pool[Math.floor(Math.random()*pool.length)],item=getItem(correct.itemKey),answers=gameAnswerSet(correct,whackState.optionCount);whackState.correct=correct;whackState.locked=false;whackState.moleOrder=shuffle(answers.map((_,i)=>i));whackState.moleIndex=0;document.getElementById('whackPrompt').textContent=item.front;document.querySelectorAll('.mole').forEach((b,i)=>{const a=answers[i];b.closest('.whack-hole').classList.toggle('hidden',!a);if(!a)return;const ai=getItem(a.itemKey);b.textContent=ai.english;b.dataset.key=a.itemKey;b.classList.remove('hit','wrong','up');b.onclick=()=>whackMole(b);});document.getElementById('whackMessage').textContent='Watch for the right meaning!';showNextWhackMole();}
+function showNextWhackMole(){if(!whackState||whackState.locked||performance.now()>=whackState.endAt)return;const moles=[...document.querySelectorAll('.mole')];moles.forEach(b=>b.classList.remove('up'));const index=whackState.moleOrder[whackState.moleIndex++%whackState.moleOrder.length],mole=moles[index];if(mole)mole.classList.add('up');whackState.moleTimer=setTimeout(showNextWhackMole,900);}
+function whackMole(b){if(whackState.locked||!b.classList.contains('up'))return;if(b.dataset.key===whackState.correct.itemKey){whackState.locked=true;clearTimeout(whackState.moleTimer);whackState.score+=10;b.classList.add('hit');document.getElementById('whackScore').textContent=whackState.score+' pts';document.getElementById('whackMessage').textContent='Nice whack! +10';document.querySelectorAll('.mole').forEach(x=>x.classList.remove('up'));whackState.moleTimer=setTimeout(newWhackPrompt,420);}else{whackState.score=Math.max(0,whackState.score-2);b.classList.add('wrong');document.getElementById('whackScore').textContent=whackState.score+' pts';document.getElementById('whackMessage').textContent='Not that one!';setTimeout(()=>b.classList.remove('wrong'),300);}}
+function updateWhackClock(){if(!whackState)return;const left=Math.max(0,whackState.endAt-performance.now()),el=document.getElementById('whackClock');if(el)el.textContent=(left/1000).toFixed(1)+'s';if(left<=0)finishWhackGame();}
+function finishWhackGame(){if(!whackState||whackState.finished)return;whackState.finished=true;cleanupGameRuntime();const stage=document.getElementById('gameStage'),score=whackState.score;stage.innerHTML=`<div class="game-finish"><div class="finish-icon">🔨</div><h3>Time!</h3><p>You scored <b>${score} points</b>.</p><button id="whackAgain" class="primary">Play Again</button></div>`;document.getElementById('whackAgain').onclick=startWhackGame;finishGame();}
+
+function startRaceGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();if(learned.length<3){alert('Learn at least three cards before playing Word Race.');return;}raceState={studentPos:0,computerPos:0,question:0,score:0,locked:false,questionEnds:0,correct:null,finished:false};renderRaceShell();focusGameStage();newRaceQuestion();}
+function renderRaceShell(){const stage=document.getElementById('gameStage');stage.classList.remove('hidden');stage.innerHTML=`<div class="game-head"><div><h3>🏎️ Word Race</h3><span class="muted">Choose quickly. Correct answers move your car; mistakes and timeouts help the computer.</span></div><div class="game-scorebox"><span id="raceQuestionCount">Question 1</span><span id="raceClock">5.0s</span><button id="restartRace" class="ghost">Restart</button></div></div><div class="race-track"><div class="race-lane"><span class="lane-name">You</span><div class="race-road"><div id="studentCar" class="race-car">🏎️</div><div class="finish-line">🏁</div></div></div><div class="race-lane"><span class="lane-name">Computer</span><div class="race-road"><div id="computerCar" class="race-car computer">🚙</div><div class="finish-line">🏁</div></div></div></div><div id="racePrompt" class="race-prompt"></div><div id="raceAnswers" class="race-answers"></div><div id="raceMessage" class="game-message">Go!</div>`;document.getElementById('restartRace').onclick=startRaceGame;updateRaceCars();}
+function updateRaceCars(){const s=document.getElementById('studentCar'),c=document.getElementById('computerCar');if(s)s.style.left=`calc(${Math.min(100,raceState.studentPos)}% - 28px)`;if(c)c.style.left=`calc(${Math.min(100,raceState.computerPos)}% - 28px)`;}
+function newRaceQuestion(){if(raceState.finished)return;if(raceState.studentPos>=100||raceState.computerPos>=100||raceState.question>=12)return finishRaceGame();raceState.locked=false;raceState.question++;raceState.questionEnds=performance.now()+5000;const pool=eligibleLearnedCards(),correct=pool[Math.floor(Math.random()*pool.length)],item=getItem(correct.itemKey),answers=gameAnswerSet(correct,3);raceState.correct=correct;document.getElementById('raceQuestionCount').textContent=`Question ${raceState.question}/12`;document.getElementById('racePrompt').textContent=item.front;const box=document.getElementById('raceAnswers');box.innerHTML='';answers.forEach(a=>{const ai=getItem(a.itemKey),b=document.createElement('button');b.className='race-answer';b.textContent=ai.english;b.onclick=()=>answerRace(a,b);box.appendChild(b);});document.getElementById('raceMessage').textContent='Pick the meaning before the timer runs out!';if(raceQuestionTimer)clearInterval(raceQuestionTimer);raceQuestionTimer=setInterval(updateRaceClock,80);}
+function updateRaceClock(){if(!raceState||raceState.locked)return;const left=Math.max(0,raceState.questionEnds-performance.now()),el=document.getElementById('raceClock');if(el)el.textContent=(left/1000).toFixed(1)+'s';if(left<=0){raceState.locked=true;clearInterval(raceQuestionTimer);raceQuestionTimer=null;raceState.computerPos+=14;document.getElementById('raceMessage').textContent='Time! The computer moves ahead.';updateRaceCars();setTimeout(newRaceQuestion,650);}}
+function answerRace(card,b){if(raceState.locked)return;raceState.locked=true;if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}const quick=Math.max(0,raceState.questionEnds-performance.now());if(card.itemKey===raceState.correct.itemKey){const boost=10+(quick>3000?3:quick>1500?1:0);raceState.studentPos+=boost;raceState.computerPos+=3;b.classList.add('correct');document.getElementById('raceMessage').textContent=`Correct! Your car moves ${boost}%!`;}else{raceState.computerPos+=14;b.classList.add('wrong');[...document.querySelectorAll('.race-answer')].forEach(x=>{if(x.textContent===getItem(raceState.correct.itemKey).english)x.classList.add('correct');});document.getElementById('raceMessage').textContent='Oops — the computer speeds ahead!';}updateRaceCars();setTimeout(newRaceQuestion,700);}
+function finishRaceGame(){if(raceState.finished)return;raceState.finished=true;cleanupGameRuntime();const won=raceState.studentPos>=100||raceState.studentPos>raceState.computerPos,stage=document.getElementById('gameStage');stage.innerHTML=`<div class="game-finish"><div class="finish-icon">${won?'🏆':'🏁'}</div><h3>${won?'You won the race!':'Race finished!'}</h3><p>You: <b>${Math.round(raceState.studentPos)}%</b> • Computer: <b>${Math.round(raceState.computerPos)}%</b></p><button id="raceAgain" class="primary">Race Again</button></div>`;document.getElementById('raceAgain').onclick=startRaceGame;finishGame();}
+
+function renderStudentStats(){const s=student(),p=dailyProgress(s),sh=learnedCards(s,'shorashim',false).length,aff=learnedCards(s,'prefix',false).length+learnedCards(s,'suffix',false).length;document.getElementById('studentStats').innerHTML=[[`Shorashim learned`,sh],[`Prefixes & suffixes`,aff],[`Reviewed today`,p.total?`${p.seen}/${p.total}`:'0'],[`Games`,'Available']].map(([l,v])=>`<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');renderHomeGameState();}
+function openRedesignCard(itemKey){const s=student(),card=s.cards[itemKey];if(!card?.learnedAt||!followAllowsScreen('learnScreen',card.itemType))return;currentTrack=card.itemType;if(currentTrack==='shorashim'){const item=getItem(itemKey);learningPerek=item?.bookletWeek?'booklet':itemPerek(item);if(item?.bookletWeek)bookletWeek=item.bookletWeek;}window.__shorashimRedesignMode=true;window.__shorashimRedesignKey=itemKey;selectedItemKey=itemKey;goScreen('learnScreen');}
+function renderGallery(target='galleryGrid',s=student()){const box=document.getElementById(target);if(!box)return;const cards=Object.values(s.cards).sort((a,b)=>b.createdAt-a.createdAt);if(!cards.length){box.innerHTML='<div class="card-panel empty-state">No cards created yet.</div>';return;}const studentGallery=target==='galleryGrid';box.innerHTML=cards.map(c=>galleryHTML(c,studentGallery)).join('');if(studentGallery)box.querySelectorAll('[data-redesign-key]').forEach(btn=>btn.onclick=()=>openRedesignCard(btn.dataset.redesignKey));}
+function galleryHTML(c,allowRedesign=false){const item=getItem(c.itemKey);if(!item)return '';const d=normalizeDesign(c.design),ex=(item.examples||[]).slice(0,2).map(x=>escapeHTML(x.hebrew)).join('<br>'),edit=allowRedesign&&c.learnedAt?`<button type="button" class="ghost small" data-redesign-key="${escapeHTML(c.itemKey)}">✏️ Redesign</button>`:'';return `<div class="gallery-item"><div class="gallery-card" style="background:${d.backgroundColor}"><div class="g-hebrew" style="font-family:${d.hebrewFont};color:${d.hebrewColor};left:${d.hebrewPos.left}%;top:${d.hebrewPos.top}%">${escapeHTML(item.front)}</div><div class="g-examples">${ex}</div><div class="gallery-art-layer">${galleryArtsHTML(d.arts)}</div>${d.drawing?`<img class="g-drawing" src="${d.drawing}" alt="drawing">`:''}</div><div class="g-meta"><span>${singularTrack(c.itemType)}${c.itemType==='shorashim'?` • ${reviewFilterLabel(item)}`:''}${item.pasuk?` • Pasuk ${item.pasuk}`:''}</span><span>${c.learnedAt?'Learned '+fmtDate(c.learnedAt):'New'}</span></div>${edit}</div>`;}
+function galleryArtsHTML(arts){return (arts||[]).map(a=>{const size=(a.size||84)*.52,common=`left:${a.left??50}%;top:${a.top??66}%;`;if(a.kind==='illustration')return `<div class="art-item illustration" style="${common}width:${size}px;height:${size*.68}px"><img src="${escapeHTML(a.value)}" alt="${escapeHTML(a.label||'illustration')}"></div>`;return `<div class="art-item emoji" style="${common}font-size:${size}px">${a.value||''}</div>`;}).join('');}
+
+function bindTeacher(){document.getElementById('seedDemoBtn').onclick=seedDemo;document.getElementById('closeStudentDetail').onclick=()=>document.getElementById('teacherStudentDetail').classList.add('hidden');document.getElementById('manageListBtn').onclick=()=>{document.getElementById('manageListPanel').classList.remove('hidden');document.getElementById('teacherStudentDetail').classList.add('hidden');renderCatalogManager();document.getElementById('manageListPanel').scrollIntoView({behavior:'smooth'});};document.getElementById('closeManageList').onclick=()=>document.getElementById('manageListPanel').classList.add('hidden');document.getElementById('manageTrack').onchange=renderCatalogManager;document.getElementById('addCatalogItemBtn').onclick=()=>openCatalogDialog();document.getElementById('minReviewTime').value=String(db.settings.minReviewMs||500);document.getElementById('minReviewTime').onchange=e=>{db.settings.minReviewMs=+e.target.value;saveDB();saveGlobalConfig();};document.getElementById('saveCatalogItemBtn').onclick=saveCatalogDialog;}
+function renderTeacher(){const names=Object.keys(db.students),all=names.map(n=>db.students[n]),totalLearned=all.reduce((a,s)=>a+eligibleLearnedCards(s).length,0),totalTime=all.reduce((a,s)=>a+s.totalActiveSeconds,0),doneToday=all.filter(s=>dailyProgress(s).complete).length;document.getElementById('teacherSummary').innerHTML=[['Students',names.length],['Active learned cards',totalLearned],['Class study time',fmtDuration(totalTime)],['Review complete today',`${doneToday}/${names.length}`]].map(([l,v])=>`<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');const body=document.getElementById('teacherTableBody');body.innerHTML='';names.forEach(n=>{const s=db.students[n],p=dailyProgress(s),sh=learnedCards(s,'shorashim',false).length,aff=learnedCards(s,'prefix',false).length+learnedCards(s,'suffix',false).length,tr=document.createElement('tr');tr.className='clickable';tr.innerHTML=`<td><b>${n}</b></td><td>${sh}</td><td>${aff}</td><td>${fmtDuration(s.totalActiveSeconds)}</td><td>${Object.keys(s.cards||{}).length}</td><td>${p.total?`${p.seen}/${p.total}${p.complete?' ✓':''}`:'—'}</td><td>${fmtDate(s.lastActive)}</td>`;tr.onclick=()=>openTeacherStudent(n);body.appendChild(tr);});saveDB();}
+function openTeacherStudent(name){const s=db.students[name],p=dailyProgress(s);document.getElementById('teacherStudentDetail').classList.remove('hidden');document.getElementById('manageListPanel').classList.add('hidden');document.getElementById('detailStudentName').textContent=name;document.getElementById('detailStats').innerHTML=[['Shorashim',learnedCards(s,'shorashim',false).length],['Affixes',learnedCards(s,'prefix',false).length+learnedCards(s,'suffix',false).length],['Study time',fmtDuration(s.totalActiveSeconds)],['Today’s review',p.total?`${p.seen}/${p.total}`:'—']].map(([l,v])=>`<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');const hist=learnedCards(s).slice().reverse();document.getElementById('detailHistory').innerHTML=hist.length?hist.map(c=>{const i=getItem(c.itemKey);return i?`<div class="history-row"><b>${escapeHTML(i.front)}</b><span>${singularTrack(c.itemType)}</span><span>${escapeHTML(i.english)}</span><span>${new Date(c.learnedAt).toLocaleString()}</span></div>`:'';}).join(''):'<div class="empty-state">No learned cards yet.</div>';renderGallery('teacherCardGallery',s);document.getElementById('teacherStudentDetail').scrollIntoView({behavior:'smooth'});}
+function renderCatalogManager(){const track=document.getElementById('manageTrack').value,list=db.catalog[track]||[],box=document.getElementById('catalogList');box.innerHTML='';list.forEach((item,idx)=>{const row=document.createElement('div');row.className='catalog-row'+(item.hidden?' hidden-item':'');row.innerHTML=`<div class="order-buttons"><button data-act="up" ${idx===0?'disabled':''}>▲</button><button data-act="down" ${idx===list.length-1?'disabled':''}>▼</button></div><div class="catalog-term">${escapeHTML(item.front)}</div><div><b>${escapeHTML(item.english)}</b><div class="mini-note">${item.pasuk?`Pasuk ${escapeHTML(item.pasuk)} • `:''}${item.hidden?'Removed from future learning/review':'Active'}</div></div><div class="catalog-actions"><button class="ghost small" data-act="edit">Edit</button><button class="${item.hidden?'primary':'danger'} small" data-act="remove">${item.hidden?'Restore':'Remove'}</button></div>`;row.querySelector('[data-act="up"]').onclick=()=>moveCatalog(track,idx,-1);row.querySelector('[data-act="down"]').onclick=()=>moveCatalog(track,idx,1);row.querySelector('[data-act="edit"]').onclick=()=>openCatalogDialog(item);row.querySelector('[data-act="remove"]').onclick=()=>removeCatalogItem(track,item.id);box.appendChild(row);});}
+function moveCatalog(track,idx,dir){const list=db.catalog[track],j=idx+dir;if(j<0||j>=list.length)return;[list[idx],list[j]]=[list[j],list[idx]];saveDB();saveGlobalConfig();renderCatalogManager();}
+function removeCatalogItem(track,id){const list=db.catalog[track],idx=list.findIndex(x=>x.id===id);if(idx<0)return;const key=keyFor(track,id),used=Object.values(db.students).some(s=>s.cards[key]?.learnedAt),item=list[idx];if(item.hidden){item.hidden=false;saveDB();saveGlobalConfig();renderCatalogManager();renderAll();return;}if(used){if(!confirm('At least one student has already learned this item. Remove it from future learning and daily review while keeping the old card in teacher history?'))return;item.hidden=true;}else{if(!confirm(`Remove “${item.front}” from the learning list?`))return;list.splice(idx,1);}saveDB();saveGlobalConfig();renderCatalogManager();renderAll();}
+function openCatalogDialog(item=null){const track=document.getElementById('manageTrack').value,dlg=document.getElementById('catalogDialog');document.getElementById('catalogDialogTitle').textContent=item?`Edit ${singularTrack(track)}`:`Add ${singularTrack(track)}`;document.getElementById('catalogEditId').value=item?.id||'';document.getElementById('catalogFront').value=item?.front||'';document.getElementById('catalogEnglish').value=item?.english||'';document.getElementById('catalogPasuk').value=item?.pasuk||'';document.getElementById('catalogWord').value=item?.hebrew||'';document.getElementById('catalogExamples').value=(item?.examples||[]).map(x=>`${x.hebrew} | ${x.english}`).join('\n');document.getElementById('catalogWordWrap').classList.toggle('hidden',track!=='shorashim');document.getElementById('catalogExamplesWrap').classList.toggle('hidden',track==='shorashim');dlg.showModal();}
+function saveCatalogDialog(e){e.preventDefault();const track=document.getElementById('manageTrack').value,id=document.getElementById('catalogEditId').value.trim(),front=document.getElementById('catalogFront').value.trim(),english=document.getElementById('catalogEnglish').value.trim();if(!front||!english)return;const list=db.catalog[track];let item=id?list.find(x=>x.id===id):null;if(!item){item={id:`custom-${track}-${Date.now()}`,art:track==='shorashim'?['✨','🖍️','⭐']:['🧩','✨','➡️'],hidden:false};list.push(item);}item.front=front;item.english=english;item.pasuk=document.getElementById('catalogPasuk').value.trim();if(track==='shorashim')item.hebrew=document.getElementById('catalogWord').value.trim();else item.examples=document.getElementById('catalogExamples').value.split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{const [hebrew,...rest]=line.split('|');return {hebrew:hebrew.trim(),english:rest.join('|').trim()};});saveDB();saveGlobalConfig();document.getElementById('catalogDialog').close();renderCatalogManager();renderAll();}
+function seedDemo(){
+  const names=Object.keys(db.students);
+  names.slice(0,5).forEach((n,idx)=>{
+    const s=db.students[n];
+    const items=[...visibleCatalog('shorashim').slice(0,5+idx*2),...visibleCatalog('prefix').slice(0,Math.min(2,idx+1))];
+    items.forEach((item,i)=>{
+      const track=db.catalog.shorashim.includes(item)?'shorashim':'prefix';
+      const key=keyFor(track,item.id);
+      if(!s.cards[key]){
+        s.cards[key]={
+          itemKey:key,itemType:track,itemId:item.id,
+          createdAt:Date.now()-(items.length-i)*86400000,
+          learnedAt:Date.now()-(items.length-i)*86400000,
+          sessionId:'demo',
+          design:{...defaultDesign(),arts:[{kind:'emoji',value:(item.art||['✨'])[0],left:50,top:68,size:84}]}
+        };
+      }
+    });
+    s.totalActiveSeconds+=900+idx*330;
+    s.sessions.push({id:'demo'+Date.now()+idx,track:'shorashim',startedAt:Date.now()-3600000,endedAt:Date.now()-3000000,activeSeconds:600,newCardIds:[]});
+    s.lastActive=Date.now()-idx*86400000;
+  });
+  saveDB();renderAll();renderTeacher();
+}
+
+function bindActivityTracking(){['pointerdown','keydown','mousemove','touchstart'].forEach(ev=>document.addEventListener(ev,()=>lastInteraction=Date.now(),{passive:true}));}
+// Activity ticks update only the two counters, never the full card history.
+function saveActivityCounters(){
+  const s=student();saveRaw(db);
+  if(!cloudEnabled||!cloudStudentId)return;
+  cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).update({totalActiveSeconds:s.totalActiveSeconds,lastActive:s.lastActive}).catch(err=>console.warn('Could not save activity time',err));
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&appStarted)saveActivityCounters();});
+function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveRaw(db);if(s.totalActiveSeconds%60===0)saveActivityCounters();}},1000);}
+function updateReviewGameCopy(){
+  const reviewHome=document.querySelector('.feature-card.review span:last-child');
+  if(reviewHome)reviewHome.textContent='Review what you learned — and record your Chazara for points!';
+  const reviewRule=document.querySelector('#reviewScreen .review-rule');
+  if(reviewRule)reviewRule.remove();
+  const gamesEyebrow=document.querySelector('#gamesScreen .section-head .eyebrow');
+  if(gamesEyebrow)gamesEyebrow.textContent='Practice with your learned cards';
+}
+
+function installFloatingReviewControls(){
+  if(!document.getElementById('shorashim-floating-review-controls-v1')){
+    const style=document.createElement('style');
+    style.id='shorashim-floating-review-controls-v1';
+    style.textContent=`
+      #reviewSetup .review-start-row{
+        display:flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:14px !important;
+        flex-wrap:wrap !important;
+        margin:12px 0 10px !important;
+        padding:10px 12px !important;
+        background:#f8fafc !important;
+        border:1px solid #e2e8f0 !important;
+        border-radius:14px !important;
+      }
+      #reviewSetup #startReviewBtn{
+        position:fixed !important;
+        right:28px !important;
+        bottom:24px !important;
+        z-index:1200 !important;
+        min-width:200px !important;
+        min-height:54px !important;
+        padding:14px 22px !important;
+        border-radius:16px !important;
+        font-size:16px !important;
+        box-shadow:0 14px 34px rgba(79,70,229,.34) !important;
+      }
+      #reviewSetup #startReviewBtn:disabled{
+        opacity:.55 !important;
+        box-shadow:0 8px 20px rgba(15,23,42,.14) !important;
+      }
+      @media(max-width:650px){
+        #reviewSetup #startReviewBtn{
+          left:14px !important;
+          right:14px !important;
+          bottom:14px !important;
+          width:calc(100% - 28px) !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const setup=document.getElementById('reviewSetup');
+  const picker=document.getElementById('reviewPicker');
+  const startRow=setup?.querySelector('.review-start-row');
+  if(setup&&picker&&startRow&&startRow.nextElementSibling!==picker){
+    setup.insertBefore(startRow,picker);
+  }
+}
+
+function installExactCardPreviewFix(){
+  if(document.getElementById('shorashim-exact-card-preview-v2'))return;
+  const style=document.createElement('style');
+  style.id='shorashim-exact-card-preview-v2';
+  style.textContent=`
+    #learnWorkspace #editorContent:not(.hidden){
+      grid-template-rows:auto 42px minmax(118px,1fr) !important;
+    }
+    #learnWorkspace .flip-stage{
+      height:auto !important;
+      min-height:0 !important;
+      align-items:start !important;
+    }
+    #learnWorkspace .flashcard.editable{
+      width:100% !important;
+      aspect-ratio:620 / 360 !important;
+      height:auto !important;
+      min-height:0 !important;
+      max-height:none !important;
+      align-self:start !important;
+    }
+    .review-card,
+    body.shorashim-review-active #reviewScreen .review-card{
+      aspect-ratio:620 / 360 !important;
+      height:auto !important;
+      min-height:0 !important;
+      max-height:none !important;
+    }
+    .review-examples{top:45% !important;}
+    .review-examples.back{top:62% !important;}
+  `;
+  document.head.appendChild(style);
+}
+installExactCardPreviewFix();
+
+let cardPreviewResizeFrame=0;
+window.addEventListener('resize',()=>{
+  cancelAnimationFrame(cardPreviewResizeFrame);
+  cardPreviewResizeFrame=requestAnimationFrame(()=>{
+    if(activeScreenId==='learnScreen'&&!document.getElementById('editorContent')?.classList.contains('hidden')){
+      applyEditorControls();
+    }
+    if(activeScreenId==='reviewScreen'&&reviewDeck.length){
+      renderReviewCard(false);
+    }
+  });
+});
+
+function renderAll(){updateReviewGameCopy();installFloatingReviewControls();renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
+window.addEventListener('beforeunload',saveDB);
+startStudentSiteWatcher();
+startMasterToggleWatcher();
+bindCloudLogin();
+
+
+/* Shared: pick the best-sounding available system voice for spoken instructions,
+   so the fallback "computer voice" is as natural as the browser/OS allows. */
+(function(){
+  let voiceCache=[];
+  function refreshVoices(){ try{ voiceCache=speechSynthesis.getVoices()||[]; }catch(e){} }
+  refreshVoices();
+  try{ if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged=refreshVoices; }catch(e){}
+
+  // Known higher-quality / natural-sounding voices across common browsers & OSes.
+  const PREFERRED=[
+    'Google US English',
+    'Microsoft Aria Online (Natural) - English (United States)',
+    'Microsoft Jenny Online (Natural) - English (United States)',
+    'Microsoft Ana Online (Natural) - English (United States)',
+    'Microsoft Guy Online (Natural) - English (United States)',
+    'Samantha',
+    'Karen',
+    'Moira'
+  ];
+
+  function pickBestVoice(){
+    if(!voiceCache.length) refreshVoices();
+    for(const name of PREFERRED){
+      const v=voiceCache.find(v=>v.name===name);
+      if(v) return v;
+    }
+    const enVoices=voiceCache.filter(v=>/^en/i.test(v.lang));
+    const natural=enVoices.find(v=>/natural|neural|enhanced|premium/i.test(v.name));
+    if(natural) return natural;
+    const nonCompact=enVoices.find(v=>!/compact/i.test(v.name));
+    return nonCompact||enVoices[0]||voiceCache[0]||null;
+  }
+
+  window.__speakNatural=function(text,opts){
+    opts=opts||{};
+    const rate=typeof opts.rate==='number'?opts.rate:.92;
+    const pitch=typeof opts.pitch==='number'?opts.pitch:1.0;
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      const v=pickBestVoice();
+      if(v) u.voice=v;
+      u.rate=rate; u.pitch=pitch;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  };
+})();
+
+
+/* Third-grade quick review controls */
+(function(){
+  function quickStart(){
+    const checks=[...document.querySelectorAll('.review-pick-check')];
+    if(!checks.some(x=>x.checked)){
+      checks.forEach(x=>x.checked=true);
+      if(typeof updateReviewSelectionCount==='function')updateReviewSelectionCount();
+    }
+    if(typeof startReview==='function')startReview();
+  }
+  window.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById('quickStartReviewBtn')?.addEventListener('click',quickStart);
+    document.getElementById('reviewHelpAudioBtn')?.addEventListener('click',speakReviewHelp);
+  });
+})();

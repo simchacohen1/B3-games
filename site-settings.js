@@ -1033,6 +1033,23 @@
       if (index===1) target.searchParams.set('demo','1');
       link.href=target.href; link.textContent=index===0?'Teacher version':'Student version';
       link.style.cssText='padding:8px 14px;border-radius:8px;background:white;color:#163c49;text-decoration:none;border:1px solid #cbd8d5';
+      if (index===1 && classId) {
+        // Student version = the teacher's own demo student, in a new tab,
+        // landing on this tool. Falls back to the old preview if that fails.
+        const studentPage = new URL(path,SITE_BASE); studentPage.searchParams.set('class',classId);
+        const nextPath = studentPage.pathname.slice(base.pathname.length) + studentPage.search;
+        link.title = 'Opens your demo student in a new tab';
+        link.onclick = function (event) {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+          event.preventDefault();
+          const studentTab = window.open('about:blank','_blank');
+          if (!studentTab) { alert('Please allow pop-ups for Fun Torah Tools, then try again.'); return; }
+          openMyDemoStudent(classId, studentTab, nextPath).catch(function (error) {
+            console.warn('Demo student unavailable; opening preview instead', error);
+            try { studentTab.location.replace(link.href); } catch (e) { location.href = link.href; }
+          });
+        };
+      }
       bar.appendChild(link);
     });
     document.body.insertBefore(bar,document.body.firstChild);
@@ -1145,16 +1162,18 @@
           const m = cls.members[sid];
           return ACTING_ID.test(sid) && m && m.active !== false;
         }).map(function (sid) {
-          return { id:sid, name:String(cls.members[sid].name || sid) };
-        }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+          return { id:sid, name:String(cls.members[sid].name || sid), demo:cls.members[sid].demo === true };
+        }).filter(function (s) { return !s.demo; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
         return { classId:id, className:String(cls.name || id.toUpperCase()), students:students };
       });
     }));
-    return rows.filter(function (r) { return r && r.students.length; })
+    return rows.filter(function (r) { return r; })
       .sort(function (a, b) { return a.className.localeCompare(b.className); });
   }
 
-  async function startActingAsStudent(classId, studentId, studentTab) {
+  // Only same-site tool pages may be used as the landing page after sign-in.
+  const NEXT_PATH = /^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/;
+  async function startActingAsStudent(classId, studentId, studentTab, nextPath) {
     classId = String(classId || ""); studentId = String(studentId || "");
     if (!ACTING_ID.test(classId) || !ACTING_ID.test(studentId)) throw new Error("Choose a student.");
     const services = ensureFirebase();
@@ -1196,6 +1215,7 @@
     studentSession.setItem("weeklyQuiz_classId", classId);
     studentSession.setItem("b3Games_workspaceId", WORKSPACE_ID);
     studentSession.removeItem("b3TeacherBypass");
+    if (nextPath && NEXT_PATH.test(nextPath)) studentSession.setItem("b3ActAsNext", nextPath);
     studentSession.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
     if (studentTab) {
       studentSession.setItem("b3ActAsSeparateTab", "1");
@@ -1205,6 +1225,24 @@
     } else {
       location.href = SITE_BASE + "index.html?v=20261019-student-tab";
     }
+  }
+
+  // The teacher's own demo student: created (or re-added to this class) by
+  // the server, then opened exactly like "Sign in as a student".
+  async function openMyDemoStudent(classId, studentTab, nextPath) {
+    classId = String(classId || "");
+    if (!ACTING_ID.test(classId)) throw new Error("Choose a class.");
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) throw new Error("Sign in with your teacher Google account first.");
+    const response = await fetch(MANAGE_STUDENTS_URL, {
+      method:"POST", signal:AbortSignal.timeout(15000),
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + await user.getIdToken() },
+      body:JSON.stringify({ action:"demoStudent", classId:classId })
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok || !ACTING_ID.test(String(result.studentId || ""))) throw new Error(result.error || "Could not open your demo student.");
+    return startActingAsStudent(classId, result.studentId, studentTab, nextPath);
   }
 
   function stopActingAsStudent() {
@@ -1233,10 +1271,10 @@
     bar.id = "b3ActingBanner";
     bar.setAttribute("role", "status");
     bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
-      "padding:10px 12px 10px 16px;border-radius:999px;background:#7c2d12;color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
-      "box-shadow:0 8px 24px rgba(0,0,0,.28)";
+      "padding:10px 12px 10px 16px;border-radius:999px;background:rgba(124,45,18,.45);color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
+      "text-shadow:0 1px 2px rgba(0,0,0,.6);opacity:.8;pointer-events:none";
     bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
-      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap">Exit student view</button>';
+      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap;pointer-events:auto;text-shadow:none">Exit student view</button>';
     bar.querySelector("button").onclick = stopActingAsStudent;
     document.body.appendChild(bar);
   }
@@ -1252,11 +1290,12 @@
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
       '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">A new student tab opens while this teacher tab stays signed in. Anything you do in the student tab counts as work by that student. Press <strong>Exit student view</strong> to close the student tab.</p>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">A new student tab opens while this teacher tab stays signed in. Anything you do in the student tab counts as work by that student. <strong>My demo student</strong> opens your own student account instead, which saves progress like a real student. Press <strong>Exit student view</strong> to close the student tab.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">' +
+      '<button type="button" id="b3ActAsDemo" style="margin-right:auto;border:0;background:#7c3aed;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">\uD83E\uDDEA My demo student</button>' +
       '<button type="button" id="b3ActAsCancel" style="border:1px solid #cbd5e1;background:#fff;color:#1f2937;border-radius:10px;padding:10px 14px;font:700 14px Arial,sans-serif;cursor:pointer">Cancel</button>' +
       '<button type="button" id="b3ActAsGo" disabled style="border:0;background:#15803d;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">Open as student</button>' +
       '</div></div>';
@@ -1272,6 +1311,17 @@
         return '<option value="' + actingEsc(s.id) + '">' + actingEsc(s.name) + '</option>';
       }).join("");
       q("b3ActAsGo").disabled = !cls || !cls.students.length;
+      q("b3ActAsDemo").disabled = !cls;
+    };
+    q("b3ActAsDemo").onclick = function () {
+      const studentTab = window.open("about:blank", "_blank");
+      if (!studentTab) { q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again."; return; }
+      q("b3ActAsDemo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening your demo student\u2026";
+      openMyDemoStudent(q("b3ActAsClass").value, studentTab).catch(function (e) {
+        try { studentTab.close(); } catch (_error) {}
+        q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open your demo student.";
+        q("b3ActAsDemo").disabled = false;
+      });
     };
     q("b3ActAsClass").onchange = fillStudents;
     q("b3ActAsGo").onclick = function () {
@@ -1290,7 +1340,7 @@
     };
     listStudentsForActing().then(function (rows) {
       classes = rows;
-      if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No students in your classes</option>'; fillStudents(); return; }
+      if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No classes assigned</option>'; fillStudents(); return; }
       q("b3ActAsClass").innerHTML = rows.map(function (c) { return '<option value="' + actingEsc(c.classId) + '">' + actingEsc(c.className) + '</option>'; }).join("");
       fillStudents();
     }).catch(function (e) {
@@ -1383,7 +1433,8 @@
     listStudentsForActing: listStudentsForActing,
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,
-    openActAsStudentPicker: openActAsStudentPicker
+    openActAsStudentPicker: openActAsStudentPicker,
+    openMyDemoStudent: openMyDemoStudent
   };
   // Pages that never ask about sign-in still need their sign-in screens shown.
   if (authChecking) {

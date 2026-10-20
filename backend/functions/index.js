@@ -91,6 +91,7 @@
  *   graders replaying short feedback sentences will ever use.
  */
 
+const { resolveAnswerWordSets } = require("./question-answer-spans.cjs");
 const { onRequest } = require("firebase-functions/v2/https");
 const { paidHandler, ALLOWED_ORIGINS: PAID_ORIGINS } = require("./paid-api");
 const { defineSecret } = require("firebase-functions/params");
@@ -1851,14 +1852,14 @@ QUESTION RULES:
 ANSWER-FIRST DESIGN (REQUIRED): Build each question from its answer evidence, never the other way around.
 1. Read the Hebrew verse as tokens split on whitespace. Choose a short, meaningful, contiguous phrase of exact Hebrew tokens that is directly supported by the accepted English translation (and classroom-reference translation when present). This phrase is the answer evidence. Do not begin by trying to fit a prewritten question.
 2. Write a short child-friendly English question whose answer is clearly and fully expressed by that exact Hebrew phrase. A person who knows the translation should be able to see why the selected phrase answers the question. The phrase must not merely share a topic with the question.
-3. Set expectedAnswer to a concise English meaning of that selected phrase, consistent with the accepted translation. Set answerWordSets to the zero-based token indexes of the exact phrase, split on whitespace. Keep the phrase contiguous; punctuation-attached words count as one token. Include a second set only if a different contiguous phrase also clearly answers the same question.
+3. Set expectedAnswer to a concise English meaning of that selected phrase, consistent with the accepted translation. Set answerHebrewPhrases to an array containing the exact Hebrew answer phrase copied from the supplied verse. Do NOT count tokens or return word indexes: application code locates the phrase. Keep the phrase contiguous and preserve whole whitespace-delimited tokens, including maqaf-attached words. Include a second phrase only if it also clearly answers the same question.
 4. Number questions require special care: ask about a number only when the selected answer phrase itself clearly states that quantity or an unmistakable equivalent. When a quantity is not explicit, ask a question the selected words do answer instead. Never borrow a nearby number that answers a different fact.
 5. Omit any answer phrase/question pair that a reasonable independent reader could not verify from the supplied translation and verse. Prefer fewer clear questions over exhaustive but arguable ones.
 
 OUTPUT: Return ONLY JSON, no markdown or commentary:
-{"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerWordSets":[[0],[1,2]]}]}
+{"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerHebrewPhrases":["exact Hebrew answer phrase copied from the verse"]}]}
 
-QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens named by answerWordSets first. Confirm they form a contiguous phrase, confirm expectedAnswer translates that phrase, and confirm the question is plainly answered by that phrase. If any link in this chain is uncertain, omit the item. Remove duplicates; never invent a reason or identity.`;
+QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew phrases in answerHebrewPhrases first. Confirm they form a contiguous phrase, confirm expectedAnswer translates that phrase, and confirm the question is plainly answered by that phrase. If any link in this chain is uncertain, omit the item. Remove duplicates; never invent a reason or identity.`;
 
     const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${classroomReferenceTranslation.trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}\nGenerate up to ${questionLimit} clear question-and-answer pairs.`;
 
@@ -1893,13 +1894,12 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
                           sourceFact: { type: "string" },
                           question: { type: "string" },
                           expectedAnswer: { type: "string" },
-                          answerWordSets: {
-                            type: "array",
-                            minItems: 1,
-                            items: { type: "array", minItems: 1, items: { type: "integer" } }
+                          answerHebrewPhrases: {
+                            type: "array", minItems: 1,
+                            items: { type: "string" }
                           }
                         },
-                        required: ["sourceFact", "question", "expectedAnswer", "answerWordSets"],
+                        required: ["sourceFact", "question", "expectedAnswer", "answerHebrewPhrases"],
                         additionalProperties: false
                       }
                     }
@@ -1940,7 +1940,9 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
       // Independently audit the question/evidence/key chain. The generator's
       // own confidence is not evidence that its selected Hebrew words answer
       // its question. A separate model pass must approve each exact span.
-      const candidates = Array.isArray(parsed.items) ? parsed.items : [];
+      const candidates = (Array.isArray(parsed.items) ? parsed.items : [])
+        .map(item => ({ ...item, answerWordSets: resolveAnswerWordSets(posukText, item?.answerHebrewPhrases) }))
+        .filter(item => item.answerWordSets.length);
       let approvedIndices = [];
       if (candidates.length) {
         const reviewResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1963,6 +1965,8 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
                 question: String(item?.question || ""),
                 expectedAnswer: String(item?.expectedAnswer || ""),
                 sourceFact: String(item?.sourceFact || ""),
+                answerHebrewPhrases: item?.answerHebrewPhrases,
+                resolvedHebrewAnswers: item.answerWordSets.map(set => set.map(i => String(posukText).trim().split(/\s+/)[i]).join(' ')),
                 answerWordSets: item?.answerWordSets,
               })),
             }) }],
@@ -2003,6 +2007,7 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
           sourceFact: String(item?.sourceFact || "").trim(),
           question: applyFrumBiblicalNames(String(item?.question || "").trim()),
           expectedAnswer: applyFrumBiblicalNames(String(item?.expectedAnswer || "").trim()),
+          answerHebrewPhrases: item.answerHebrewPhrases,
           answerWordSets: Array.isArray(item?.answerWordSets)
             ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))].sort((a, b) => a - b) : []).filter((set) => set.length).slice(0, 3)
             : [],
@@ -2019,6 +2024,10 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
         })
         .slice(0, questionLimit);
 
+      if(!items.length){
+        res.status(422).json({ error: "No verified questions were produced. Please retry." });
+        return;
+      }
       res.status(200).json({ items });
     } catch (err) {
       console.error("generateComprehensionQuestions error:", err);

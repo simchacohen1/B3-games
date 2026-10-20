@@ -71,22 +71,40 @@ function paidHandler(name, category, handler) {
       // Hebrew answer spans are produced. Bump its cache namespace whenever
       // that contract changes, so identical requests cannot keep returning a
       // stale set generated under the previous prompt.
-      const cacheVersion = name === 'generateComprehensionQuestions' ? 'answerfirst_v6' : 'v1';
-      const cacheKey = hash(name + ':' + cacheVersion + ':' + JSON.stringify(stable(req.body || {})));
+      const cacheVersion = name === 'generateComprehensionQuestions' ? 'phrases_v7' : 'v1';
+      // The verse key locates the student-readable mirror; it is metadata,
+      // so adding it must not invalidate previously generated private results.
+      const cacheBody = { ...(req.body || {}) };
+      if (name === 'generateTranslationChunks') delete cacheBody.translationCacheKey;
+      const mirrorTranslation = async value => {
+        const key = req.body?.translationCacheKey;
+        if (name !== 'generateTranslationChunks' || typeof key !== 'string' ||
+            !/^[A-Za-z0-9_-]{1,120}$/.test(key) || !Array.isArray(value?.levels) || !value.levels.length) return;
+        await db.ref('posukPractice/translationChunks/' + key)
+          .transaction(existing => existing?.levels?.length ? undefined : {
+            levels: value.levels, generatedAt: Date.now()
+          });
+      };
+      const reusableResult = value => !!value &&
+        (name !== 'generateComprehensionQuestions' || (Array.isArray(value.items) && value.items.length > 0));
+      const cacheKey = hash(name + ':' + cacheVersion + ':' + JSON.stringify(stable(cacheBody)));
       if (category === 'speech' && speechCache.has(cacheKey))
         return res.status(200).json(speechCache.get(cacheKey).value);
       if (category === 'generation') {
         cacheRef = db.ref('b3Private/paidApiCache/' + name + '/' + cacheKey);
         const cached = (await cacheRef.get()).val();
-        if (cached?.value) return res.status(200).json(cached.value);
+        if (reusableResult(cached?.value)) {
+          await mirrorTranslation(cached.value);
+          return res.status(200).json(cached.value);
+        }
         lease = crypto.randomUUID();
         const lock = await cacheRef.transaction(c => {
-          if (c?.value || (c?.lease && c.until > Date.now())) return undefined;
+          if (reusableResult(c?.value) || (c?.lease && c.until > Date.now())) return undefined;
           return { lease, until: Date.now() + 180000 };
         });
         if (!lock.committed) {
           const value = lock.snapshot.val()?.value;
-          return value ? res.status(200).json(value) : res.status(409).json({ error: 'This content is already being prepared. Please try again shortly.' });
+          return reusableResult(value) ? res.status(200).json(value) : res.status(409).json({ error: 'This content is already being prepared. Please try again shortly.' });
         }
       }
       if (category === 'speech' && inflight.has(cacheKey))
@@ -100,7 +118,8 @@ function paidHandler(name, category, handler) {
       await handler(req, res);
       res.json = originalJson;
       if (res.statusCode === 200 && captured) {
-        if (cacheRef) await cacheRef.set({ value: captured, generatedAt: Date.now() });
+        if (cacheRef && reusableResult(captured)) await cacheRef.set({ value: captured, generatedAt: Date.now() });
+        await mirrorTranslation(captured);
         if (category === 'speech') cacheSpeech(cacheKey, captured);
       }
       if (captured !== undefined) return res.json(captured);

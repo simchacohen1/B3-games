@@ -241,3 +241,17 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 })();
+
+
+// Independent teacher toolbar: share this loader with pages that import
+// Firebase configuration, while keeping the student Gallery code unchanged.
+(function () {
+  if (typeof document === 'undefined' || window.__fttTeacherToolbarLoading) return;
+  window.__fttTeacherToolbarLoading = true;
+  const current = document.currentScript;
+  if (!current || !current.src) return;
+  const script = document.createElement('script');
+  script.src = new URL('teacher-global-controls.js?v=20261020-quickbar', current.src).href;
+  script.async = true;
+  (document.head || document.documentElement).appendChild(script);
+})();

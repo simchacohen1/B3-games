@@ -337,13 +337,13 @@ function pointHistoryRows(){
   for(const item of state.activityPointHistory||[]){
     const amount=Number(item.actualAmount??item.amount??0);
     if(!amount)continue;
-    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
+    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','chazara-reject':'Chazara approval reversed','shorashim-recording':'Shorashim · Recorded Chazara','shorashim-no-hints':'Shorashim · No Hints Challenge','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
     rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:historyTime(item.reviewedAt||item.createdAt)});
   }
   for(const [cid,dates] of Object.entries(state.root.awards||{})){
     for(const [date,award] of Object.entries(dates||{})){
-      const amount=Number(award?.points||0);if(!amount)continue;
-      rows.push({amount,title:'Daily class points',detail:'Saved school day',when:new Date(`${date}T12:00:00`).getTime()});
+      const when=new Date(`${date}T12:00:00`).getTime();
+      for(const part of C.dailyAwardParts(award))rows.push({amount:part.points,title:part.category?`Daily Points · ${part.category}`:'Daily class points',detail:part.category?`${part.rating} · Saved school day`:'Saved school day',when});
     }
   }
   for(const p of Object.values(state.root.redemptions||{})){

@@ -152,6 +152,20 @@
   .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
   .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
+  .home-class-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 6px 5px 14px;box-shadow:0 6px 16px rgba(0,0,0,.16);font-weight:900;color:#1f2937}
+  .home-class-bar.hidden{display:none}
+  body.has-home-class-bar>h1{padding-top:66px!important}
+  .home-class-bar label{font-size:13px}
+  .home-class-bar select{border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:900;background:#f8fafc;color:#1f2937;cursor:pointer;max-width:170px}
+  .home-class-lock{border:0;border-radius:999px;background:#1f2937;color:#fff;font-size:18px;width:38px;height:34px;cursor:pointer}
+  .home-class-lock:hover{background:#334155}
+  .home-access-modal{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+  .home-access-modal.hidden{display:none}
+  .home-access-card{width:min(780px,100%);height:min(92vh,1000px);background:#f1f5f9;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+  .home-access-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#172033;color:#fff;font-weight:900;font-size:18px}
+  .home-access-head button{border:0;border-radius:999px;background:#fff;color:#172033;font-size:20px;font-weight:900;width:38px;height:38px;cursor:pointer}
+  .home-access-card iframe{flex:1;width:100%;border:0;background:#f1f5f9}
+  @media(max-width:560px){.home-class-bar{top:58px;left:auto;right:10px;transform:none}body.has-home-class-bar>h1{padding-top:104px!important}.home-class-bar label{display:none}.home-access-modal{padding:0}.home-access-card{height:100%;border-radius:0}}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
 .login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
 /* Keep the student launchers visible together on desktop screens. */
@@ -403,7 +417,7 @@ body > .subtitle::after {
 <script src="follow-teacher/core.js?v=20261020-follow-pointer1"></script>
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
-<script src="site-settings.js?v=20261019-restore-fix"></script>
+<script src="site-settings.js?v=20261020-demo-student"></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -513,6 +527,17 @@ body > .subtitle::after {
     </div>
   </div>
 
+  <div id="homeClassBar" class="home-class-bar hidden">
+    <label for="homeClassSelect">Class</label>
+    <select id="homeClassSelect" aria-label="Choose class"><option value="et">ET</option><option value="wt">WT</option></select>
+    <button id="homeClassLock" class="home-class-lock" type="button" title="Open Class Access for this class" aria-label="Open Class Access for this class">🔒</button>
+  </div>
+  <div id="homeAccessModal" class="home-access-modal hidden" role="dialog" aria-modal="true" aria-labelledby="homeAccessTitle">
+    <div class="home-access-card">
+      <div class="home-access-head"><span id="homeAccessTitle">🔒 Class Access</span><button id="homeAccessClose" type="button" aria-label="Close Class Access">×</button></div>
+      <iframe id="homeAccessFrame" title="Class Access"></iframe>
+    </div>
+  </div>
   <button id="approvalCenterButton" class="approval-button hidden" type="button">🔔 Approvals <span id="approvalCenterBadge" class="approval-button-badge">0</span></button>
   <div id="approvalCenterModal" class="approval-center-modal hidden" role="dialog" aria-modal="true" aria-labelledby="approvalCenterTitle">
     <div class="approval-center-card">
@@ -988,6 +1013,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(result.status==="fulfilled")data[key]=result.value.val()||{};
       else failed.push(key);
     });
+    // Gallery posts live in one shared list but the gallery page shows one class at a time,
+    // so link straight to the class that has the waiting projects (most pending first).
+    const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
+    const galleryByClass={};
+    galleryPending.forEach(function(x){const c=x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et";galleryByClass[c]=(galleryByClass[c]||0)+1;});
+    const galleryClass=Object.keys(galleryByClass).sort(function(a,b){return galleryByClass[b]-galleryByClass[a];})[0];
+    const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
+    if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
     const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
@@ -995,7 +1028,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
-      gallery:data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}).length:0,
+      gallery:galleryPending.length,
       prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
     };
     approvalCenterLoading=false;
@@ -1196,7 +1229,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const button=document.createElement('button');
       button.type='button';
       button.className='card-lock';
-      button.textContent=locked?'\uD83D\uDD12':'\uD83D\uDD13';
+      button.textContent=locked?'🔒':'🔓';
       button.classList.add(locked?'is-locked':'is-open');
 
       if(!globallyActive){
@@ -1620,6 +1653,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         }
         studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
         await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        // "Student version" from a teacher page lands on that tool once signed in.
+        const next=sessionStorage.getItem("b3ActAsNext");
+        sessionStorage.removeItem("b3ActAsNext");
+        if(next&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(next)){location.replace(new URL(next,location.href).href);}
         return;
         } finally { actingStudentRestoreInFlight=false; }
       }
@@ -2279,6 +2316,50 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(isAuthorizedTeacher||(homepageTeacherChecked&&homepageStudentChecked))
       document.documentElement.classList.remove("b3-home-auth-pending");
   }
+  // ---- Owner home bar: class picker + padlock that opens Class Access in place.
+  const homeClassBarAllowed=window.top===window&&pageParams.get("adminPage")!=="1"&&!isStudentPreview;
+  let homeClassUnsub=null,homeClassNames={et:"ET",wt:"WT"};
+  let homeClassId=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
+  function homeClassAccessUrl(){return "admin.html?tab=access&embed=1&class="+encodeURIComponent(homeClassId);}
+  function syncHomeClassAccess(){
+    el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[homeClassId]||homeClassId);
+    const frame=el("homeAccessFrame");
+    if(!el("homeAccessModal").classList.contains("hidden")&&frame.getAttribute("src")!==homeClassAccessUrl())frame.setAttribute("src",homeClassAccessUrl());
+  }
+  function closeHomeClassAccess(){el("homeAccessModal").classList.add("hidden");document.body.style.overflow="";}
+  function openHomeClassAccess(){el("homeAccessModal").classList.remove("hidden");document.body.style.overflow="hidden";syncHomeClassAccess();}
+  function renderHomeClassBar(){
+    const show=homeClassBarAllowed&&isAuthorizedAdmin;
+    el("homeClassBar").classList.toggle("hidden",!show);
+    document.body.classList.toggle("has-home-class-bar",show);
+    if(!show){closeHomeClassAccess();return;}
+    if(homeClassUnsub)return;
+    const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
+    const onValue=snapshot=>{
+      const rows=snapshot.val()||{};
+      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
+      const list=all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+      homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
+      if(!homeClassNames[homeClassId])homeClassId=list[0].id;
+      const select=el("homeClassSelect");select.innerHTML="";
+      list.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=homeClassNames[c.id];select.appendChild(o);});
+      select.value=homeClassId;
+      syncHomeClassAccess();
+    };
+    ref.on("value",onValue,e=>console.warn("Could not load classes for the home class bar",e));
+    homeClassUnsub=()=>ref.off("value",onValue);
+  }
+  el("homeClassSelect").addEventListener("change",e=>{
+    homeClassId=e.target.value;
+    try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}
+    syncHomeClassAccess();
+  });
+  el("homeClassLock").addEventListener("click",openHomeClassAccess);
+  el("homeAccessClose").addEventListener("click",closeHomeClassAccess);
+  el("homeAccessModal").addEventListener("click",e=>{if(e.target===el("homeAccessModal"))closeHomeClassAccess();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!el("homeAccessModal").classList.contains("hidden"))closeHomeClassAccess();});
+
   // A slow or failed network should not leave the login form hidden forever.
   setTimeout(()=>document.documentElement.classList.remove("b3-home-auth-pending"),12000);
   settingsApi.onAuthStateChanged((user,authorized,access)=>{
@@ -2296,6 +2377,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     currentAccess=access||{authorized:false,role:"",classIds:[]};
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
+    renderHomeClassBar();
     homepageTeacherChecked=true;
     finishHomepageBootstrap();
     // A verified teacher always wins over a guest preview.

@@ -7,6 +7,8 @@
 const crypto=require('node:crypto');
 const SR='studentRewards',WS='b3-2026',ADMIN_EMAIL='simcha5770@gmail.com';
 const PROGRESS={Excellent:110,Good:100,Fair:80,'Needs Improvement':50,Average:80,Poor:50};
+// Daily Points earned per category from its rating (matches student-rewards/common.js).
+const RATING_POINTS={Excellent:4,Good:3,Fair:2,'Needs Improvement':1,Average:2,Poor:1};
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const key=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,120}$/.test(s);
 const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -227,16 +229,16 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   const updates={},deltas=[];
   for(const row of rows){
    const sid=String(row?.studentId||'');requireStudent(scope,classId,sid);
-   const absent=row.absent===true,ratings={};
+   const absent=row.absent===true,ratings={},byCategory={};let award=0;
    if(!absent)for(const [category,rating] of Object.entries(row.ratings||{})){
     if(typeof category!=='string'||!category||category.length>60||!(rating in PROGRESS))fail(400,'Invalid rating.');
-    ratings[categoryKey(category)]={category,rating,points:PROGRESS[rating],teacherEmail:email,savedAt:now};
+    const key=categoryKey(category),pts=RATING_POINTS[rating];
+    ratings[key]={category,rating,points:PROGRESS[rating],teacherEmail:email,savedAt:now};
+    byCategory[key]={category,rating,points:pts};award+=pts;
    }
-   const award=absent?0:Math.round(Number(row.award??10));
-   if(!Number.isFinite(award)||award<0||award>1000)fail(400,'Daily points must be between 0 and 1000.');
    const old=Number((await store.get(SR+'/dailyAwards/'+sid+'/'+classId+'/'+date))?.points||0);
    updates[SR+'/dailyRatings/'+sid+'/'+classId+'/'+date]=absent?null:ratings;
-   updates[SR+'/dailyAwards/'+sid+'/'+classId+'/'+date]={points:award,teacherEmail:email,savedAt:now};
+   updates[SR+'/dailyAwards/'+sid+'/'+classId+'/'+date]={points:award,...(absent?{}:{byCategory}),teacherEmail:email,savedAt:now};
    updates[SR+'/dailyAttendance/'+sid+'/'+classId+'/'+date]={status:absent?'absent':'present',teacherEmail:email,savedAt:now};
    if(award!==old)deltas.push([sid,award-old]);
   }
@@ -266,4 +268,4 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
  if(action==='review')return reviewRedemption(store,scope,email,String(body.studentId||''),String(body.key||''),String(body.decision||''),now);
  fail(400,'Unknown action.');
 }
-module.exports={rewardsTeacher,PROGRESS};
+module.exports={rewardsTeacher,PROGRESS,RATING_POINTS};
