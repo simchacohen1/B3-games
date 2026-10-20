@@ -278,7 +278,7 @@
     margin: 14px 0 22px;
     min-height: 100px;
     box-shadow: 0 8px 24px var(--shadow), inset 0 0 40px rgba(140,47,57,0.05);
-    display:flex; align-items:center; justify-content:center;
+    display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center;
     text-align:center;
   }
   .scroll .placeholder{ color: var(--ink-soft); font-style: italic; font-size:1rem; }
@@ -588,74 +588,26 @@
   }
 
   .save-row{ text-align:center; margin: 20px 0; }
-  /* Arrows are pulled out of normal flow (see .nav-arrow), so this row
-     no longer needs to reserve space for them. */
-  .posuk-nav-row{ margin:0; }
-
-  /* Prev/next posuk arrows live in the empty side margins that flank the
-     780px .wrap column on wide screens, vertically centered on the
-     viewport. On narrow screens (where there's no real margin to sit in)
-     they shrink into small translucent overlay buttons near the edge of
-     the screen instead of crowding the content. */
+  .posuk-nav-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    width:100%;
+    margin:0;
+    direction:ltr;
+  }
   .nav-arrow{
-    position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
-    width: auto; height: 56px;
-    padding: 0 16px;
-    border-radius: 999px;
-    display: flex; align-items:center; justify-content:center;
-    gap: 6px;
-    font-size: 1rem;
-    white-space: nowrap;
-    z-index: 20;
-    transition: opacity 0.2s ease, background-color 0.2s ease;
+    min-height:44px;
+    padding:8px 14px;
+    font-size:.85rem;
+    white-space:nowrap;
   }
-  /* Anchored by their FAR edge (not the edge nearest the card) so that
-     growing wider to fit the "Prev Posuk"/"Next Posuk" text expands away
-     from the card instead of into it — with a fixed left/right value the
-     wider pill buttons were overlapping onto the learning area. */
-  #prevPosukBtn{ right: calc(50vw + 410px); left: auto; }
-  #nextPosukBtn{ left: calc(50vw + 410px); right: auto; }
-  @media (max-width: 959px){
-    /* On mobile, the sticky posuk box (z-index 30) scrolls up over
-       anything vertically centered, so the arrows are pinned to the top
-       corners instead — above the posuk box, out of its way entirely —
-       rather than floating mid-screen where it can cover them. */
-    .nav-arrow{
-      top: 10px;
-      transform: none;
-      width: auto; height: 40px;
-      padding: 0 10px;
-      font-size: 0.72rem;
-      opacity: 0.75;
-      background: rgba(201,162,39,0.55) !important;
-      box-shadow: none;
-      z-index: 40;
-    }
-    .nav-arrow:hover, .nav-arrow:focus, .nav-arrow:active{ opacity: 1; }
-    #prevPosukBtn{ left: 8px; right:auto; }
-    #nextPosukBtn{ right: 8px; left:auto; }
+  .nav-arrow:disabled{ opacity:.4; box-shadow:none; cursor:default; }
+  @media (max-width: 480px){
+    .nav-arrow{ padding:8px 10px; font-size:.75rem; }
   }
-  .nav-arrow:disabled{
-    opacity: 0.4;
-    box-shadow: none;
-    cursor: default;
-  }
-  /* .btn:active normally presses the button down with translateY(3px),
-     but these arrows are also centered with translateY(-50%) via fixed
-     positioning — the two transforms can't combine (the second overwrites
-     the first), so a click was making the arrow visibly jump instead of
-     just looking pressed. This keeps the vertical centering intact while
-     still giving a pressed feel via the box-shadow only. */
-  .nav-arrow:active{
-    transform: translateY(-50%);
-  }
-  @media (max-width: 959px){
-    /* Mobile arrows are top-pinned rather than vertically centered, so the
-       desktop active transform must not pull them half a button upward. */
-    .nav-arrow:active{ transform:none; }
-  }
+
 
   .history{
     margin-top: 30px;
@@ -1278,6 +1230,10 @@
     </div>
 
     <div class="scroll" id="scrollBox">
+      <div class="posuk-nav-row hidden" id="posukNavigation">
+        <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous posuk">◀️ Prev Posuk</button>
+        <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next posuk">Next Posuk ▶️</button>
+      </div>
       <div class="placeholder" id="scrollPlaceholder">Choose a פרק and פסוק to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
@@ -1441,10 +1397,6 @@
         </div>
       </div>
 
-      <div class="save-row posuk-nav-row">
-        <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous posuk">◀️ Prev Posuk</button>
-        <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next posuk">Next Posuk ▶️</button>
-      </div>
 
       <div class="history">
         <button class="history-toggle" id="historyToggleBtn" type="button" aria-expanded="false" aria-controls="historyBody">
@@ -3366,6 +3318,7 @@ function applyManualCorrections(text, perekNum, posukNum){
 function resetScroll(){
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
+  document.getElementById('posukNavigation').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
   document.getElementById('scrollBox').classList.remove('range-selection');
   expandSelectionPicker();
@@ -3389,6 +3342,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   text = stripMeteg(text);
   const isRange = Number(endPosukNum) > Number(posukNum);
   const posukPart = isRange ? (posukNum + '-' + endPosukNum) : String(posukNum);
+  document.getElementById('posukNavigation').classList.remove('hidden');
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukPart;
   currentPosukNum = posukNum;
   currentPosukEndNum = endPosukNum;
