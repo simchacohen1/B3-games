@@ -297,6 +297,7 @@
       if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
       if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       await waitForFirebaseAuthState(window.firebase.auth());
       markAuthReady();
