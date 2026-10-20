@@ -988,6 +988,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(result.status==="fulfilled")data[key]=result.value.val()||{};
       else failed.push(key);
     });
+    // Gallery posts live in one shared list but the gallery page shows one class at a time,
+    // so link straight to the class that has the waiting projects (most pending first).
+    const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
+    const galleryByClass={};
+    galleryPending.forEach(function(x){const c=x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et";galleryByClass[c]=(galleryByClass[c]||0)+1;});
+    const galleryClass=Object.keys(galleryByClass).sort(function(a,b){return galleryByClass[b]-galleryByClass[a];})[0];
+    const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
+    if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
     const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
@@ -995,7 +1003,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
-      gallery:data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}).length:0,
+      gallery:galleryPending.length,
       prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
     };
     approvalCenterLoading=false;
