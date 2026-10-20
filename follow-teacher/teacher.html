@@ -23,8 +23,8 @@ a{color:#1e40af}.hidden{display:none!important}
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js"></script>
-<script src="core.js"></script>
-<script src="teacher.js" defer></script>
+<script src="core.js?v=20261020-follow-pointer1"></script>
+<script src="teacher.js?v=20261020-follow-pointer1" defer></script>
 </head><body><main>
 <p><a href="../index.html">← Fun Torah Tools</a></p>
 <h1>👣 Follow the Teacher</h1>
@@ -32,19 +32,20 @@ a{color:#1e40af}.hidden{display:none!important}
 <div id="gate" class="card">Checking your teacher account…</div>
 <div id="app" class="hidden">
 <div class="card"><label for="classSelect">Teaching class</label><select id="classSelect"></select>
-<p id="state" role="status">Independent — students can choose their activities.</p></div>
+<p id="state" role="status">Students are free to choose their activities.</p></div>
 <div class="card"><h2>1. Choose a mode</h2>
-<label class="mode"><input type="radio" name="mode" value="independent" checked><div><strong>Independent</strong><span>Students choose their own permitted tools.</span></div></label>
-<label class="mode"><input type="radio" name="mode" value="free"><div><strong>Follow once — Free afterward</strong><span>Send students to the selected activity once. They may leave afterward.</span></div></label>
-<label class="mode"><input type="radio" name="mode" value="locked"><div><strong>Follow Teacher — Locked</strong><span>Keep them on the selected activity until you unlock, change the mode or close this tab and the session expires.</span></div></label>
+<label class="mode"><input type="radio" name="mode" value="free" checked><div><strong>Follow once — Free afterward</strong><span>Send students to the selected activity once. They may leave afterward.</span></div></label>
+<label class="mode"><input type="radio" name="mode" value="locked"><div><strong>Follow Teacher — Locked</strong><span>Keep them on the selected activity until you unlock or close this tab and the session expires.</span></div></label>
 <label for="destination">Destination</label><select id="destination"></select>
+<div id="subdestinationRow" class="hidden"><label for="subdestination">Where in this activity?</label><select id="subdestination"></select></div>
 </div>
+<div id="pointerWorkspaceRow" class="card hidden"><h2>Class Pointer teaching workspace</h2><p>Your whiteboard opens below. Use Send students when ready; then change teaching surfaces in this workspace. Keep this page open to maintain Follow Locked.</p><iframe id="pointerWorkspace" name="followTeachingWorkspace" title="Class Pointer teacher workspace" style="width:100%;height:85vh;border:1px solid #dbe6f3;border-radius:12px" allow="display-capture"></iframe><p><a id="openClassPointer" target="followTeachingWorkspace" href="../class-pointer-prototype/classroom.html?dashboard=teacher&amp;followTeacherWhiteboard=1">Reopen Class Pointer whiteboard</a></p></div>
 <div class="card"><h2>2. Who follows</h2>
 <p><strong>Entire class</strong> — only students who are permitted to open the selected activity will move.</p>
 <p>Individual student targeting will be added after its private access rules are verified.</p>
 </div>
 <div class="card"><div class="actions">
-<button id="apply" type="button">Apply mode</button>
+<button id="apply" type="button">Send students</button>
 <button id="unlock" type="button" class="stop">Unlock everyone</button>
 </div>
 <p id="status" role="status" aria-live="polite"></p>

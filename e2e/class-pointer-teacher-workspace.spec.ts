@@ -420,3 +420,29 @@ test('My Screen whiteboard supplies live frames with published pictures and pen 
   await page.evaluate(()=>{(window as any).__testBoardStream=(window as any).ClassPointerPdf.presentationStream();(window as any).ClassPointerPdf.close(true)});
   expect(await page.evaluate(()=>(window as any).__testBoardStream.getVideoTracks()[0].readyState)).toBe('ended');expect(errors).toEqual([]);await context.close();
 });
+
+test('Follow Teacher launch opens the shared whiteboard automatically without capture or another window', async ({browser})=>{
+  const context=await browser.newContext();await wire(context);
+  await context.addInitScript(()=>{
+    (window as any).__captureCalls=0;
+    navigator.mediaDevices.getDisplayMedia=async()=>{(window as any).__captureCalls++;throw Error('Capture requires a teacher click')};
+  });
+  const page=await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(BASE+'/class-pointer-prototype/classroom.html?dashboard=teacher&class=pointer_test&followTeacherWhiteboard=1');
+  await expect(page.locator('#pdfView')).toBeVisible({timeout:20000});
+  await expect(page.getByRole('button',{name:/Close whiteboard/})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__captureCalls)).toBe(0);
+  expect(context.pages()).toHaveLength(1);expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('embedded Follow Teacher workspace keeps the parent-selected class authoritative',async({browser})=>{
+  const context=await browser.newContext();await wire(context,{realSession:true});
+  await context.route(BASE+'/follow-frame-test.html',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset="utf-8"><iframe id="followFrame" title="Teacher workspace" allow="display-capture" style="width:100%;height:900px" src="/class-pointer-prototype/classroom.html?dashboard=teacher&class=pointer_test&followTeacherWhiteboard=1"></iframe>'}));
+  const page=await context.newPage();await page.goto(BASE+'/follow-frame-test.html');
+  const frame=page.frameLocator('#followFrame');
+  await expect(frame.locator('#pointerClassChoice')).toBeDisabled();
+  await expect(frame.locator('#pointerClassChoice')).toHaveValue('pointer_test');
+  await expect(frame.locator('#pdfView')).toBeVisible({timeout:20000});
+  expect(context.pages()).toHaveLength(1);await context.close();
+});

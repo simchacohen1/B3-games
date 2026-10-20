@@ -11,6 +11,7 @@
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
   const persistentShareWindow=new URL(location.href).searchParams.get('pointerShare')==='1';
+  const presentationView=/\/class-pointer-prototype\/student-view\.html$/.test(location.pathname);
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
   const studentAuth='https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth';
   const ws='b3-2026';
@@ -54,6 +55,8 @@
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     const classId=scope.classId;
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
+    function sameStudent(){return sessionStorage.getItem('b3Games_studentId')===id &&
+      (sessionStorage.getItem('b3Games_studentClass')||classId)===classId}
     // Mount the existing student whiteboard on real browser pages. Synthetic
     // auth-only tests use deliberately minimal DOM mocks without append().
     if(typeof document.body?.append==='function'){
@@ -70,7 +73,7 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261018-embedded1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261020-follow-pointer1',root).href);
     }
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -97,6 +100,15 @@
     // The teacher's page admits him only with a fresh server-issued ticket for this class and lesson,
     // gives him no lesson data here, and a deliberate removal by the teacher stops it.
     let presencePeer=null,presenceConn=null,presenceTimer=null,presenceDelay=0,presenceTarget='',presenceFailures=0;
+    // The ordinary activity gate stays locked. Only server-admitted teaching
+    // surfaces and explicitly permitted share controls can receive interaction.
+    window.B3PointerAssignedUI={allowsEvent(target){
+      if(!sameStudent())return false;
+      if(holder.contains?.(target) && active && permissionReady && permission.screenSharingDenied!==true)return true;
+      return admitted && ((lessonActive && lessonOverlay.contains?.(target)) ||
+        document.getElementById('fttEmbeddedPointerStage')?.contains?.(target) ||
+        document.getElementById('fttReturnPointerBoard')?.contains?.(target) || reopen.contains?.(target));
+    }};
     const later=(fn,ms)=>typeof setTimeout==='function'?setTimeout(fn,ms):0,cancelLater=t=>{if(t&&typeof clearTimeout==='function')clearTimeout(t)};
     const removedRoom=()=>{try{return sessionStorage.getItem('classPointerRemovedRoom')||''}catch{return''}};
     function activityName(){
@@ -112,7 +124,8 @@
     lessonOverlay.style.cssText='position:fixed;inset:0;z-index:2147483638;background:#071426;display:none;flex-direction:column;font:700 16px system-ui,sans-serif;color:white';
     const lessonToolbar=document.createElement('div');lessonToolbar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#102748';
     const lessonStatus=document.createElement('span');lessonStatus.setAttribute('role','status');lessonStatus.textContent='Connecting to your teacher…';
-    const back=document.createElement('button');back.type='button';back.textContent='Back to Activity';
+    const back=document.createElement(presentationView?'a':'button');back.type='button';back.textContent='Back to Activity';
+    if(presentationView)back.href=new URL('index.html',root).href;
     back.style.cssText='padding:10px 16px;border:0;border-radius:9px;background:white;color:#102748;font:inherit;cursor:pointer';
     const lessonVideo=document.createElement('video');lessonVideo.autoplay=true;lessonVideo.muted=true;lessonVideo.playsInline=true;
     lessonVideo.style.cssText='display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#071426';
@@ -209,7 +222,19 @@
     lessonStage.append(lessonVideo,markLayer,pointerLayer,hitLayer);
     lessonOverlay.append(lessonToolbar,lessonStage);document.body.appendChild(lessonOverlay);document.body.appendChild(reopen);
     redrawToolbar();
-    back.addEventListener('click',()=>{lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none'});
+    function followingPresentation(){return presentationView && !!window.FTTFollowStudent?.activityPolicy('class-pointer');}
+    function refreshPresentationLock(){
+      back.hidden=followingPresentation();
+      back.textContent=presentationView?'Back to Fun Torah Tools':'Back to Activity';
+      if(followingPresentation() && lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none'}
+    }
+    window.addEventListener('ftt:follow-activity-changed',refreshPresentationLock);
+    window.addEventListener('ftt:follow-policy-changed',refreshPresentationLock);
+    back.addEventListener('click',event=>{
+      if(followingPresentation()){event.preventDefault();return}
+      if(presentationView)return;
+      lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
+    });
     reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null}
     function clearLesson(){
@@ -236,13 +261,14 @@
       try{incoming.answer();if(!lessonVideo.srcObject)lessonReceiveTimer=later(()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}},15000)}catch{lost()}
     }
     function incomingLesson(incoming){
-      if(incoming.peer!==presenceTarget||incoming.metadata?.kind!=='activity-lesson'||typeof incoming.metadata?.presentationId!=='string'||incoming.metadata.presentationId.length>120){try{incoming.close()}catch{}return}
+      if(!sameStudent()||incoming.peer!==presenceTarget||incoming.metadata?.kind!=='activity-lesson'||typeof incoming.metadata?.presentationId!=='string'||incoming.metadata.presentationId.length>120){try{incoming.close()}catch{}return}
       if(admitted&&lessonActive&&incoming.metadata.presentationId===lessonId){acceptLesson(incoming);return}
       // Signalling may beat the reliable announcement. Never answer before admission.
       try{pendingLessonCall?.close()}catch{}pendingLessonCall=incoming;cancelLater(pendingLessonTimer);
       pendingLessonTimer=later(()=>{if(pendingLessonCall===incoming){pendingLessonCall=null;try{incoming.close()}catch{}}},5000);
     }
     function announceLesson(message){
+      refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
       if(!message.active){if(message.id===lessonId){lessonActive=false;cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
       if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';reopen.style.display='none'}
@@ -265,7 +291,7 @@
     async function connectPresence(){
       presenceTimer=null;
       const session=latestSession;
-      if(!session||sessionStorage.getItem('b3Games_studentId')!==id){stopPresence();return}
+      if(!session||!sameStudent()){stopPresence();return}
       const room=session.roomId;
       if(removedRoom()===room||(presenceConn&&presenceConn.peer===room))return;
       stopPresence();
@@ -289,7 +315,7 @@
         const conn=own.connect(room,{reliable:true});presenceConn=conn;
         conn.on('open',()=>{if(presenceConn===conn)conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName})});
         conn.on('data',message=>{
-          if(presenceConn!==conn||!message||typeof message!=='object')return;
+          if(presenceConn!==conn||!sameStudent()||!message||typeof message!=='object')return;
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
@@ -312,7 +338,7 @@
       if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
-    const identityTimer=typeof setInterval==='function'?setInterval(()=>{if(sessionStorage.getItem('b3Games_studentId')!==id){stopPresence();stop();clearInterval(identityTimer)}},1000):null;
+    const identityTimer=typeof setInterval==='function'?setInterval(()=>{if(!sameStudent()){stopPresence();stop();clearInterval(identityTimer)}},1000):null;
     identityTimer?.unref?.();
     window.addEventListener('pagehide',()=>{if(identityTimer)clearInterval(identityTimer)},{once:true});
 
@@ -384,7 +410,7 @@
     },()=>{stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
     async function beginShare(){
       if(stream){stop();return}
-      if(busy||!active)return;
+      if(busy||!active||!sameStudent())return;
       const lesson=active;
       busy=true;btn.disabled=true;
       let captured=null;
@@ -398,7 +424,7 @@
         captured=await capturePromise;
         const displaySurface=captured.getVideoTracks()[0]?.getSettings?.().displaySurface;
         if(displaySurface&&displaySurface!=='monitor')throw Error('Please choose Entire Screen in the browser picker.');
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        if(!sameStudent()||active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         status('Connecting to teacher…');
         // A missing, blocked or unavailable Cloud Function can surface as a
         // generic "Failed to fetch" after the student approves screen capture.

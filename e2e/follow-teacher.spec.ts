@@ -11,7 +11,7 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   const raw=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.html'),'utf8');
   const body=raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1]||'';
   await page.route('http://localhost:8099/**',route=>route.fulfill({
-    status:200,contentType:'text/html',body:'<!doctype html><html><body>'+body+'</body></html>'
+    status:200,contentType:'text/html',body:'<!doctype html><html><head><style>.hidden{display:none!important}</style></head><body>'+body+'</body></html>'
   }));
   await page.goto('http://localhost:8099/follow-teacher/teacher.html');
   await page.evaluate(()=>{
@@ -38,13 +38,24 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   await page.addScriptTag({content:core});
   await page.addScriptTag({content:teacher});
   await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('input[name="mode"][value="independent"]')).toHaveCount(0);
+  await expect(page.locator('input[name="mode"][value="free"]')).toBeChecked();
+  await page.locator('#subdestination').selectOption('review');
   await page.locator('input[name="mode"][value="locked"]').check();
   await page.locator('#apply').click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__followState?.mode)).toBe('locked');
-  await expect(page.locator('#state')).toContainText('Locked');
+  await expect(page.locator('#state')).toContainText('Review Shorashim');
+  expect(await page.evaluate(()=>(window as any).__followState.subdestination)).toBe('review');
   await page.locator('#unlock').click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__followState?.mode)).toBe('independent');
-  await expect(page.locator('#state')).toContainText('Independent');
+  await expect(page.locator('#state')).toContainText('free to choose');
+  await page.locator('#destination').selectOption('class-pointer');
+  await expect(page.locator('#pointerWorkspace')).toHaveAttribute('src',/class=et/);
+  await expect(page.locator('#pointerWorkspace')).toHaveAttribute('src',/followTeacherWhiteboard=1/);
+  await expect(page.locator('#subdestinationRow')).toBeHidden();
+  expect(page.context().pages()).toHaveLength(1);
+  await page.locator('#apply').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__followState?.destination)).toBe('class-pointer');
 });
 
 test('verified student follows Locked teacher to Shorashim without screen capture',async({page})=>{
@@ -145,7 +156,7 @@ test('unsaved work defers navigation; latest Unlock cancels it',async({page})=>{
   await expect(page.locator('#fttFollowTeacherNotice')).toHaveCount(0);
 });
 
-for(const classId of ['et','wt']) test(`${classId}: actual shared gate opens only selected activity while locked, then closes on Unlock`,async({page})=>{
+for(const classId of ['et','wt']) for(const destination of ['halacha','class-pointer']) test(`${classId}: actual shared gate opens only selected ${destination} while locked, then closes on Unlock`,async({page})=>{
   const gate=fs.readFileSync(path.join(ROOT,'game-gate.js'),'utf8');
   const policy=fs.readFileSync(path.join(ROOT,'backend/functions/student-tool-policy.js'),'utf8');
   const ws='b3Games/workspaces/b3-2026/classes/'+classId;
@@ -165,12 +176,12 @@ for(const classId of ['et','wt']) test(`${classId}: actual shared gate opens onl
     const pathname=new URL(route.request().url()).pathname;
     const scripts:Record<string,string>={'/game-gate.js':gate,'/follow-teacher/core.js':core,'/follow-teacher/student.js':student};
     if(pathname.endsWith('.js'))return route.fulfill({status:200,contentType:'text/javascript',body:scripts[pathname]||''});
-    const tool=pathname.startsWith('/halacha')?'halacha':'gematria';
+    const tool=pathname.startsWith('/class-pointer-prototype/')?'class-pointer':pathname.startsWith('/halacha')?'halacha':'gematria';
     return route.fulfill({status:200,contentType:'text/html',body:`<!doctype html><html><head><script src="/game-gate.js" data-game-id="${tool}"></script></head><body><h1>Learning</h1></body></html>`});
   });
-  await page.addInitScript(({classId,data,ws,policy})=>{
+  await page.addInitScript(({classId,data,ws,policy,destination})=>{
     sessionStorage.setItem('b3Games_studentId','testBoy');sessionStorage.setItem('b3Games_studentClass',classId);
-    const state={workspaceId:'b3-2026',classId,teacherUid:'teacher1',mode:'locked',destination:'halacha',revision:'gate',targets:'all',issuedAt:Date.now()-5000,heartbeatAt:Date.now()-1000,expiresAt:Date.now()+60000};
+    const state={workspaceId:'b3-2026',classId,teacherUid:'teacher1',mode:'locked',destination,revision:'gate',targets:'all',issuedAt:Date.now()-5000,heartbeatAt:Date.now()-1000,expiresAt:Date.now()+60000};
     let callback:Function=()=>{};
     const snap=(v:any)=>({val:()=>v,exists:()=>v!=null,child:(p:string)=>snap(p.split('/').reduce((o:any,k:string)=>o?.[k],v))});
     const user={uid:'testBoy',getIdToken:async()=>'synthetic-test-token',getIdTokenResult:async()=>({claims:{b3StudentRole:'student',b3StudentId:'testBoy',b3ClassId:classId}})};
@@ -183,9 +194,9 @@ for(const classId of ['et','wt']) test(`${classId}: actual shared gate opens onl
     (window as any).__unlock=()=>callback(snap({...state,mode:'independent'}));
     // Install the actual student tool permission policy before the gate runs.
     new Function(policy)();
-  },{classId,data,ws,policy});
-  await page.goto('http://localhost:8099/halacha/');
-  await expect.poll(()=>page.evaluate(()=>(window as any).FTTFollowStudent?.allowsLockedActivity('halacha'))).toBe(true);
+  },{classId,data,ws,policy,destination});
+  await page.goto('http://localhost:8099'+(destination==='class-pointer'?'/class-pointer-prototype/student-view.html':'/halacha/'));
+  await expect.poll(()=>page.evaluate(tool=>(window as any).FTTFollowStudent?.allowsLockedActivity(tool),destination)).toBe(true);
   await expect(page.locator('#b3-gate-overlay')).toHaveCount(0);
   await page.evaluate(()=>(window as any).__unlock());
   await expect(page.locator('#b3-gate-overlay')).toBeVisible();

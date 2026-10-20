@@ -295,8 +295,9 @@
       const returnBoard=button('📝 Show My Whiteboard','Return to your whiteboard',()=>{
         if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw()}
       });
+      returnBoard.id='fttReturnPointerBoard';
       returnBoard.hidden=true;
-      returnBoard.style.cssText='position:fixed;bottom:16px;left:16px;z-index:2147483635;background:#245ce4;color:white;border:2px solid white;border-radius:12px;padding:12px 18px;font:700 15px system-ui;box-shadow:0 6px 22px #0004';
+      returnBoard.style.cssText='position:fixed;bottom:16px;left:16px;z-index:2147483640;background:#245ce4;color:white;border:2px solid white;border-radius:12px;padding:12px 18px;font:700 15px system-ui;box-shadow:0 6px 22px #0004';
       document.body.append(returnBoard);bar.append(back);
       stage.addEventListener('classpointer:board-state',()=>{returnBoard.hidden=true});
     }
