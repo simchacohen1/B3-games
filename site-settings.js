@@ -1271,10 +1271,10 @@
     bar.id = "b3ActingBanner";
     bar.setAttribute("role", "status");
     bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
-      "padding:10px 12px 10px 16px;border-radius:999px;background:#7c2d12;color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
-      "box-shadow:0 8px 24px rgba(0,0,0,.28)";
+      "padding:10px 12px 10px 16px;border-radius:999px;background:rgba(124,45,18,.45);color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
+      "text-shadow:0 1px 2px rgba(0,0,0,.6);opacity:.8;pointer-events:none";
     bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
-      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap">Exit student view</button>';
+      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap;pointer-events:auto;text-shadow:none">Exit student view</button>';
     bar.querySelector("button").onclick = stopActingAsStudent;
     document.body.appendChild(bar);
   }
