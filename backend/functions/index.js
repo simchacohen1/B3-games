@@ -2075,6 +2075,28 @@ exports.gradeQuestionAnswer = onRequest(
       return;
     }
 
+    // JSON selections use semantic grading; legacy multipart recordings remain supported.
+    if (req.is('application/json')) {
+      try {
+        const { gradePosukAnswer } = require('./posuk-answer-grading.cjs');
+        const result = await gradePosukAnswer(req.body || {}, async body => {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY.value(), 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify(body)
+          });
+          if (!response.ok) throw new Error('AI grading unavailable');
+          const data = await response.json();
+          const text = (data.content || []).find(b => b.type === 'text')?.text || '';
+          return JSON.parse(text.replace(/```json|```/g, '').trim());
+        });
+        return res.status(200).json(result);
+      } catch (err) {
+        console.error('Semantic Posuk grading failed', err);
+        return res.status(502).json({ error: 'Could not check your answer. Please retry.' });
+      }
+    }
+
     let fields, audioBuffer, audioFilename;
     try {
       ({ fields, audioBuffer, audioFilename } = await parseMultipart(req));

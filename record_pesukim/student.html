@@ -1700,10 +1700,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v6_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_phrases_v7_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v6';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_phrases_v7';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {
@@ -1714,6 +1714,7 @@ function normalizeGeneratedItems(items, posukNum){
       question: normalizeDivineNames(item.question || ''),
       expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
       sourceFact: normalizeDivineNames(item.sourceFact || ''),
+      answerHebrewPhrases: Array.isArray(item.answerHebrewPhrases) ? item.answerHebrewPhrases.filter(p => typeof p === 'string' && p.trim()) : [],
       answerWordSets: sets
         .filter(Array.isArray)
         .map(set => [...new Set(set.map(Number).filter(Number.isInteger))].sort((a,b)=>a-b))
@@ -1721,7 +1722,7 @@ function normalizeGeneratedItems(items, posukNum){
       posukNum,
       generated: true
     };
-  }).filter(item => item.question && item.answerWordSets.length);
+  }).filter(item => item.question && item.answerHebrewPhrases.length && item.answerWordSets.length);
 }
 
 function readLocalGeneratedQuestions(cacheKey, posukNum){
@@ -1816,6 +1817,7 @@ async function getGeneratedQuestionsForPart(part){
 
     // The server stores the shared AI cache; students cannot overwrite it.
     const items = normalizeGeneratedItems(rawItems, part.posukNum);
+    if(!items.length) throw new Error('Question service must return verified Hebrew answer phrases');
     generatedQuestionMemoryCache.set(cacheKey, items);
     saveLocalGeneratedQuestions(cacheKey, rawItems);
     return items;
@@ -4627,13 +4629,33 @@ async function gradeCurrentQuestionAnswer(){
   const selected=(questionSelectionDrafts[idx]||[]).map(Number).sort((a,b)=>a-b);
   if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
   const words=getQuestionPosukWords(current);
-  const correct=matchesAnyAnswerWordSet(selected,current);
+  const part=(currentSelectionParts||[]).find(p=>Number(p.posukNum)===Number(current.posukNum));
+  const gradingMsg=document.getElementById('comprehensionGradingMsg');
+  const check=document.getElementById('checkWordSelectionBtn');
+  if(check.disabled)return;
+  check.disabled=true;gradingMsg.textContent='Checking your answer…';
+  let grade;
+  try{
+    const response=await B3PaidApi.fetch(GRADE_QUESTION_ANSWER_URL,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:current.question,expectedAnswer:current.expectedAnswer||'',
+        posukText:words.join(' '),posukTranslation:(part&&part.translation)||currentPosukTranslation||'',selectionIndices:selected})
+    });
+    if(!response.ok)throw new Error('Grading unavailable');
+    grade=await response.json();
+    if(!['correct','incorrect'].includes(grade.verdict)||grade.gradingVersion!=='semantic-v1')throw new Error('Grading version unavailable');
+    if(comprehensionQIndex!==idx||comprehensionQuestions[idx]!==current)return;
+  }catch(err){
+    gradingMsg.textContent='Could not check your answer. Please try again.';
+    return;
+  }finally{check.disabled=false;}
+  const correct=grade.verdict==='correct';
   const picked=selected.map(i=>words[i]).join(' ');
   const previous=comprehensionQResults[idx];
   questionTryCounts[idx]=Math.max(questionTryCounts[idx]||0,Number(previous&&previous.tries)||0)+1;
   document.getElementById('comprehensionGradingMsg').textContent='';
   if(!correct){
-    const feedback='Not quite. Change your choices and check again.';
+    const feedback=grade.feedback||'Not quite. Change your choices and check again.';
     renderQuestionResult(idx,'incorrect',feedback,picked,null,null,false);
     document.getElementById('comprehensionStatus').textContent='Try again. Change your choices and check again.';
     document.getElementById('questionsDoneBlock').classList.add('hidden');
@@ -4641,7 +4663,7 @@ async function gradeCurrentQuestionAnswer(){
     return;
   }
   void speakText('Great job! You found the right words!');
-  comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
+  comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:grade.feedback||'You found the right words!',transcript:picked,selectionIndices:selected,answerWordSets:grade.answerWordSets,gradingVersion:grade.gradingVersion,saving:true};
   renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
   document.getElementById('comprehensionStatus').textContent='Correct!';
   const allAnswered=comprehensionQuestions.every((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct');
@@ -4796,6 +4818,8 @@ async function autosaveComprehensionQuestions(){
       questionResultsData[i] = {
         question: comprehensionQuestions[i].question,
         selectionIndices: Array.isArray(r.selectionIndices) ? r.selectionIndices : [],
+        gradingVersion: r.gradingVersion || null,
+        answerWordSets: r.answerWordSets || [],
         questionIndex: i,
         posukNum: comprehensionQuestions[i].posukNum,
         verdict: r.verdict,
