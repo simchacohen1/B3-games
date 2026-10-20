@@ -159,6 +159,7 @@ html = f'''<!doctype html>
       }});
     }});
   </script>
+  <script async src="teacher-global-bootstrap.js?v=20261020"></script>
 </body>
 </html>
 '''
