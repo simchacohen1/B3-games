@@ -175,6 +175,22 @@
   .launch-item:hover .launch-item-title button{opacity:1}
   .quiz-grid .quiz-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;max-height:none}
   .quiz-grid .quiz-item{margin:0;padding:14px}
+  #quizList.quiz-list{display:block}
+  .quiz-section{border:2px dashed transparent;border-radius:14px;padding:6px;margin:0 -8px 14px;transition:border-color .12s,background .12s}
+  .quiz-dragging .quiz-section{border-color:#c9d6ea}
+  .quiz-section.drop-over{border-color:var(--blue);background:var(--light)}
+  .quiz-section-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:4px 4px 10px}
+  summary.quiz-section-head{cursor:pointer}
+  .quiz-section-title{font-weight:700;font-size:17px;color:#233b70}
+  .quiz-section-count{display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:#e8eef8;font-size:13px;text-align:center}
+  .quiz-section-past .quiz-item{opacity:.8}
+  .quiz-filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px;font-size:13px;color:#465676}
+  .quiz-filters select{margin-left:4px;padding:5px 8px}
+  .quiz-section-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .quiz-drop-empty{grid-column:1/-1;padding:16px;border:1px dashed #c9d6ea;border-radius:11px;color:#6b7a94;text-align:center;font-size:14px}
+  .quiz-item{position:relative}
+  .quiz-item.dragging{opacity:.4}
+  .quiz-item[draggable=true]{cursor:grab}
   .list-search{width:100%;margin-bottom:10px}
 
   /* ---------- Quiz Setup stepper ---------- */
@@ -362,7 +378,7 @@
   }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
-<link rel="stylesheet" href="teacher-simple.css?v=20261008-1">
+<link rel="stylesheet" href="teacher-simple.css?v=20261020-1">
 </head>
 <body>
 <div class="lock-overlay" id="lockOverlay">
@@ -596,6 +612,12 @@
         <div class="card-head">
           <div><h2>Saved quizzes</h2><div class="small">Click a quiz to open it. A saved quiz is just the questions — you choose ET or WT when you give it.</div></div>
           <input type="text" id="quizSearch" placeholder="Search quizzes…" style="min-width:220px" oninput="filterQuizList()">
+        </div>
+        <div class="quiz-filters">
+          <label>Topic <select id="quizTopicFilter" onchange="filterQuizList()"><option value="all">All topics</option></select></label>
+          <label>Created <select id="quizDateFilter" onchange="filterQuizList()"><option value="all">Any time</option><option value="week">This week</option><option value="month">Last 30 days</option><option value="3months">Last 3 months</option><option value="older">Older than 3 months</option></select></label>
+          <label>Sort <select id="quizSort" onchange="renderQuizList()"><option value="updated">Recently edited</option><option value="newest">Newest created</option><option value="oldest">Oldest created</option><option value="title">Title A–Z</option></select></label>
+          <button type="button" class="link-btn" id="quizFilterReset" onclick="resetQuizFilters()" hidden>Clear filters</button>
         </div>
         <div id="quizList" class="quiz-list"></div>
       </div>
@@ -1534,9 +1556,58 @@ function previewPrevious(){
 // ---------- Quiz library / editor ----------
 function renderQuizList(){
   const box=document.getElementById('quizList');if(!box)return;box.innerHTML='';
-  const ids=Object.keys(quizzes).sort((a,b)=>((quizzes[b].updatedAt||quizzes[b].createdAt||0)-(quizzes[a].updatedAt||quizzes[a].createdAt||0)));
+  const sortBy=(document.getElementById('quizSort')||{}).value||'updated',ts=(q,k)=>Number(q[k]||q.createdAt||0);
+  const ids=Object.keys(quizzes).sort((a,b)=>{const A=quizzes[a]||{},B=quizzes[b]||{};if(sortBy==='title')return String(A.title||'').localeCompare(String(B.title||''),undefined,{sensitivity:'base',numeric:true});if(sortBy==='newest')return ts(B,'createdAt')-ts(A,'createdAt');if(sortBy==='oldest')return ts(A,'createdAt')-ts(B,'createdAt');return ts(B,'updatedAt')-ts(A,'updatedAt');});
+  updateQuizTopicOptions();
   if(!ids.length){box.innerHTML='<div class="small">No quizzes yet. Click + New or use the generator.</div>';return;}
-  ids.forEach(id=>{const q=quizzes[id]||{},div=document.createElement('div');div.className='quiz-item'+(id===currentQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(skillLabel(q.skillType||'comprehension'))+' • '+asArray(q.questions).length+' questions</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
+  // Current vs. past: teachers drag a quiz between the two sections .
+  const groups=[['current','Current quizzes','Drag a quiz down to Past quizzes when you are done with it.'],['past','Past quizzes','Drag a quiz back up to Current to use it again.']];
+  groups.forEach(([key,label,hint])=>{
+    const list=ids.filter(id=>(quizzes[id]&&quizzes[id].archived===true)===(key==='past'));
+    const sec=document.createElement(key==='past'?'details':'section');sec.className='quiz-section quiz-section-'+key;sec.dataset.group=key;
+    if(key==='past'&&quizSectionPastOpen)sec.open=true;
+    if(key==='past')sec.addEventListener('toggle',()=>{quizSectionPastOpen=sec.open;});
+    const head=document.createElement(key==='past'?'summary':'div');head.className='quiz-section-head';head.innerHTML='<span class="quiz-section-title">'+label+' <span class="quiz-section-count">'+list.length+'</span></span><span class="small">'+hint+'</span>';sec.appendChild(head);
+    const grid=document.createElement('div');grid.className='quiz-section-list';
+    if(!list.length)grid.innerHTML='<div class="quiz-drop-empty">'+(key==='past'?'No past quizzes. Drag a quiz here to move it out of the way.':'No current quizzes. Drag one up from Past quizzes, or make a new one.')+'</div>';
+    list.forEach(id=>{const q=quizzes[id]||{},div=document.createElement('div');div.className='quiz-item'+(id===currentQuizId?' active':'');div.draggable=true;div.dataset.quizId=id;div.dataset.skill=q.skillType||'comprehension';div.dataset.created=String(Number(q.createdAt)||0);div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(skillLabel(q.skillType||'comprehension'))+' • '+asArray(q.questions).length+' questions</div>';div.onclick=()=>loadQuizEditor(id);
+      div.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';div.classList.add('dragging');box.classList.add('quiz-dragging');});
+      div.addEventListener('dragend',()=>{div.classList.remove('dragging');box.classList.remove('quiz-dragging');box.querySelectorAll('.drop-over').forEach(x=>x.classList.remove('drop-over'));});
+      grid.appendChild(div);});
+    sec.appendChild(grid);
+    sec.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';sec.classList.add('drop-over');});
+    sec.addEventListener('dragleave',e=>{if(!sec.contains(e.relatedTarget))sec.classList.remove('drop-over');});
+    sec.addEventListener('drop',e=>{e.preventDefault();sec.classList.remove('drop-over');const id=e.dataTransfer.getData('text/plain');if(id&&quizzes[id])setQuizArchived(id,key==='past');});
+    box.appendChild(sec);
+  });
+}
+let quizSectionPastOpen=false;
+function updateQuizTopicOptions(){
+  const sel=document.getElementById('quizTopicFilter');if(!sel)return;const cur=sel.value||'all';
+  const types=[...new Set(Object.values(quizzes).map(q=>(q&&q.skillType)||'comprehension'))].sort((a,b)=>skillLabel(a).localeCompare(skillLabel(b)));
+  sel.innerHTML='<option value="all">All topics</option>'+types.map(t=>'<option value="'+esc(t)+'">'+esc(skillLabel(t))+'</option>').join('');
+  sel.value=types.includes(cur)?cur:'all';
+}
+function quizPassesFilters(el){
+  const q=((document.getElementById('quizSearch')||{}).value||'').trim().toLowerCase(),topic=(document.getElementById('quizTopicFilter')||{}).value||'all',range=(document.getElementById('quizDateFilter')||{}).value||'all';
+  if(q&&!el.textContent.toLowerCase().includes(q))return false;
+  if(topic!=='all'&&el.dataset.skill!==topic)return false;
+  if(range!=='all'){const c=Number(el.dataset.created)||0,now=new Date(),day=86400000,weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime(),cut3=Date.now()-90*day;
+    if(range==='week'&&c<weekStart)return false;if(range==='month'&&c<Date.now()-30*day)return false;if(range==='3months'&&c<cut3)return false;if(range==='older'&&c>=cut3)return false;}
+  return true;
+}
+function applyQuizFilters(){
+  const box=document.getElementById('quizList');if(!box)return;
+  box.querySelectorAll('.quiz-section').forEach(sec=>{let n=0,total=0;sec.querySelectorAll('.quiz-item').forEach(el=>{total++;const ok=quizPassesFilters(el);el.style.display=ok?'':'none';if(ok)n++;});const c=sec.querySelector('.quiz-section-count');if(c)c.textContent=n===total?String(total):n+' of '+total;});
+  const active=['quizTopicFilter','quizDateFilter'].some(id=>{const e=document.getElementById(id);return e&&e.value!=='all';})||!!((document.getElementById('quizSearch')||{}).value||'').trim();
+  const r=document.getElementById('quizFilterReset');if(r)r.hidden=!active;
+}
+function resetQuizFilters(){['quizTopicFilter','quizDateFilter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='all';});const s=document.getElementById('quizSearch');if(s)s.value='';applyQuizFilters();}
+async function setQuizArchived(id,archived){
+  if(!quizzes[id]||(quizzes[id].archived===true)===archived)return;
+  if(archived)quizSectionPastOpen=true;
+  quizzes[id].archived=archived;renderQuizList();
+  try{await db.ref(QROOT+'/quizzes/'+id+'/archived').set(archived);}catch(e){console.warn(e);alert('Could not move the quiz. Please try again.');}
 }
 function newQuizDraft(){
   currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorSkillType').value='general';document.getElementById('editorSourceLabel').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');renderQuizList();
@@ -1575,7 +1646,7 @@ async function saveQuiz(){
   const title=document.getElementById('editorTitle').value.trim(),skillType=document.getElementById('editorSkillType').value,sourceLabel=document.getElementById('editorSourceLabel').value.trim(),questions=cleanedEditorQuestions();
   if(!title){alert('Give the quiz a title.');return null;}if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
   let id=currentQuizId;if(!id)id=Date.now()+'_'+slugTitle(title);const existing=quizzes[id]||{};
-  await db.ref(QROOT+'/quizzes/'+id).set({title,skillType,sourceLabel,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
+  await db.ref(QROOT+'/quizzes/'+id).set({title,skillType,sourceLabel,questions,archived:existing.archived===true,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
 }
 async function deleteCurrentQuiz(){
   if(!currentQuizId)return;const title=(quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'this quiz';if(!confirm('Delete "'+title+'" from the saved quiz library? Historical launches and results will NOT be deleted.'))return;
@@ -2077,8 +2148,7 @@ newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTar
   window.uiSaveAndAssign=async function(){const id=await saveQuiz();if(id){makeupSourceLaunchId='';const m=$('makeupSourceMsg');if(m){m.textContent='';m.classList.add('hidden');}if($('launchDeliveryType').value==='makeup')selectDelivery('live');showSetupStep('assign');}};
 
   window.filterQuizList=function(){
-    const q=(($('quizSearch')&&$('quizSearch').value)||'').trim().toLowerCase();
-    document.querySelectorAll('#quizList .quiz-item').forEach(el=>{el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none';});
+    applyQuizFilters();
   };
 
   // --- Hook existing functions so the flow moves to the right step ---
