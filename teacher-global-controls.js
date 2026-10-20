@@ -86,11 +86,12 @@
     if (bar) return;
     var style = el('style');
     style.textContent = [
-      '#fttTeacherQuickBar{position:fixed;top:12px;right:12px;z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #cbd5e1;padding:6px 8px;border-radius:18px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
+      '#fttTeacherQuickBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:0;padding:5px 6px 5px 14px;border-radius:999px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
       '#fttTeacherQuickBar[hidden],#fttTeacherQuickModal[hidden]{display:none!important}',
       '#fttTeacherQuickBar label{font-size:13px;font-weight:800}',
-      '#fttTeacherQuickBar select{max-width:130px;min-width:70px;border:1px solid #cbd5e1;border-radius:10px;padding:9px 5px;color:#1e293b;background:#fff;font:700 14px Arial}',
-      '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:11px;padding:9px 11px;background:#edf2ff;color:#1d4ed8;font:800 14px Arial;cursor:pointer;white-space:nowrap}',
+      '#fttTeacherQuickBar select{max-width:170px;min-width:130px;border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;color:#1e293b;background:#fff;font:700 14px Arial}',
+      '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:999px;width:34px;height:34px;padding:0;background:#f0ebff;color:#5c4592;font:800 18px Arial;cursor:pointer;white-space:nowrap;display:inline-grid;place-items:center}',
+      '#fttTeacherQuickBar #fttTeacherQuickLock{background:#1f2937;color:white}',
       '#fttTeacherQuickBar button:focus-visible,.ftt-home-follow:focus-visible{outline:3px solid #2563eb;outline-offset:2px}',
       '#fttTeacherQuickBar button[aria-expanded=true],.ftt-home-follow[aria-expanded=true]{background:#dbeafe}',
       '.ftt-home-follow{font-size:18px!important;padding:5px 9px!important;border-radius:999px!important}',
@@ -101,7 +102,7 @@
       '#fttTeacherQuickModal .ftt-quick-close,#fttTeacherQuickModal .ftt-quick-popout{padding:8px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font:700 13px Arial;color:#1e293b;cursor:pointer}',
       '#fttTeacherQuickModal iframe{width:100%;flex:1;min-height:0;border:0;background:#fff}',
       '#fttTeacherQuickModal iframe[hidden]{display:none!important}',
-      '@media(max-width:620px){#fttTeacherQuickBar{top:auto;bottom:8px;right:8px}#fttTeacherQuickBar label{display:none}#fttTeacherQuickBar button{padding:9px 7px;font-size:12px}#fttTeacherQuickModal{padding:0}#fttTeacherQuickModal .ftt-quick-card{width:100%;height:100%;border-radius:0}}'
+      '@media(max-width:620px){#fttTeacherQuickBar{top:8px;bottom:auto;right:auto;left:50%;transform:translateX(-50%)}#fttTeacherQuickBar label{display:block}#fttTeacherQuickBar select{min-width:100px}#fttTeacherQuickBar button{padding:0;font-size:18px}#fttTeacherQuickModal{padding:0}#fttTeacherQuickModal .ftt-quick-card{width:100%;height:100%;border-radius:0}}'
     ].join('\n');
     document.head.appendChild(style);
 
@@ -109,8 +110,8 @@
     bar.setAttribute('aria-label', 'Teacher class and Follow controls');
     var label = el('label', '', 'Class'); label.htmlFor = 'fttTeacherQuickClass';
     select = el('select'); select.id = 'fttTeacherQuickClass'; select.setAttribute('aria-label','Teaching class');
-    lock = el('button', '', '🔒 Lock'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
-    follow = el('button', '', '👣 Follow'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
+    lock = el('button', '', '🔒'); lock.id='fttTeacherQuickLock'; lock.setAttribute('aria-label','Open Class Access'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
+    follow = el('button', '', '👣'); follow.setAttribute('aria-label','Open or close Follow the Teacher'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
     bar.append(label, select, lock, follow);
     document.body.appendChild(bar);
     select.addEventListener('change', function () { if (classes.some(function(c){return c.id===select.value;})) { remember(select.value); if (!modal.hidden && activePanel) { closePanel(); } } });
