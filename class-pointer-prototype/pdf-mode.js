@@ -67,6 +67,37 @@
     }
     ctx.globalAlpha=1;
   }
+  // The normal Fun Torah Tools student pages watch a teacher-owned lesson video.
+  // PDF mode must publish that video too, not only the separate Pointer join-page PDF protocol.
+  function paintPdfPresentation(canvas){
+    if(!isTeacher||!doc||webMode||scroller.hidden||!lay||!W||!H)return;
+    const vw=Math.max(1,Math.round(scroller.clientWidth)),vh=Math.max(1,Math.round(scroller.clientHeight));
+    const scale=Math.min(1,1920/vw,1080/vh);
+    const cw=Math.max(1,Math.round(vw*scale)),ch=Math.max(1,Math.round(vh*scale));
+    if(canvas.width!==cw)canvas.width=cw;
+    if(canvas.height!==ch)canvas.height=ch;
+    const ctx=canvas.getContext('2d');if(!ctx)return;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cw,ch);
+    ctx.save();ctx.scale(scale,scale);ctx.translate(-scroller.scrollLeft,-scroller.scrollTop);
+    for(let i=0;i<pageEls.length;i++){
+      const page=pageEls[i],picture=page?.querySelector('canvas,img');
+      if(!picture||!(picture.width||picture.naturalWidth))continue;
+      const left=lay.lefts[i]*W,top=lay.tops[i]*W,width=lay.widths[i]*W,height=lay.heights[i]*W;
+      if(top+height<scroller.scrollTop||top>scroller.scrollTop+vh)continue;
+      try{ctx.drawImage(picture,left,top,width,height)}catch{}
+    }
+    ctx.restore();
+  }
+  function startPdfPresentation(){
+    stopBoardPresentation();
+    if(!isTeacher||!doc||webMode)return;
+    const canvas=document.createElement('canvas');
+    if(typeof canvas.captureStream!=='function')return;
+    paintPdfPresentation(canvas);
+    try{boardPresentation=canvas.captureStream(8)}catch{return}
+    boardPresentationTimer=setInterval(()=>paintPdfPresentation(canvas),125);
+    document.dispatchEvent(new CustomEvent('class-pointer-document-presentation',{detail:{stream:boardPresentation}}));
+  }
   function startBoardPresentation(dataUrl){
     stopBoardPresentation();
     if(!isTeacher||!isBoardOpen())return;
@@ -410,6 +441,7 @@
       showNote('');B.resetMarks();B.setPdf(true);
       B.status(big?'Large PDF open. Students receive the pages you teach on, so the first page may take a moment.':'PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
+      startPdfPresentation();
       if(big)scheduleViewSend(true);
       window.PointerPdfLibrary?.onOpened(file);
       return true;
@@ -424,7 +456,7 @@
     opening++;
     const had=!!doc;
     if(had)for(const member of B.members().values())B.send(member.connection,{type:'pdf-close'});
-    dropBoardPictures();docId=null;bytes=null;unload(true);strokes=[];
+    stopBoardPresentation();dropBoardPictures();docId=null;bytes=null;unload(true);strokes=[];
     window.PointerPdfLibrary?.onClosed();
     if(had||!quiet)B.setPdf(false);
     if(had)$('placeholder').hidden=B.sharing();
