@@ -1,1 +1,0 @@
-import { test, expect } from '@playwright/test'; test('verify logged in dashboard', async ({ page }) => { await page.goto('https://funtorahtools.com/index.html'); await expect(page.getByText('Simcha Cohen')).toBeVisible(); });
