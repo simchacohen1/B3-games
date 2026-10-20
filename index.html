@@ -1628,6 +1628,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         }
         studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
         await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        // "Student version" from a teacher page lands on that tool once signed in.
+        const next=sessionStorage.getItem("b3ActAsNext");
+        sessionStorage.removeItem("b3ActAsNext");
+        if(next&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(next)){location.replace(new URL(next,location.href).href);}
         return;
         } finally { actingStudentRestoreInFlight=false; }
       }

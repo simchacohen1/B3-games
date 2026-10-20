@@ -1033,6 +1033,23 @@
       if (index===1) target.searchParams.set('demo','1');
       link.href=target.href; link.textContent=index===0?'Teacher version':'Student version';
       link.style.cssText='padding:8px 14px;border-radius:8px;background:white;color:#163c49;text-decoration:none;border:1px solid #cbd8d5';
+      if (index===1 && classId) {
+        // Student version = the teacher's own demo student, in a new tab,
+        // landing on this tool. Falls back to the old preview if that fails.
+        const studentPage = new URL(path,SITE_BASE); studentPage.searchParams.set('class',classId);
+        const nextPath = studentPage.pathname.slice(base.pathname.length) + studentPage.search;
+        link.title = 'Opens your demo student in a new tab';
+        link.onclick = function (event) {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+          event.preventDefault();
+          const studentTab = window.open('about:blank','_blank');
+          if (!studentTab) { alert('Please allow pop-ups for Fun Torah Tools, then try again.'); return; }
+          openMyDemoStudent(classId, studentTab, nextPath).catch(function (error) {
+            console.warn('Demo student unavailable; opening preview instead', error);
+            try { studentTab.location.replace(link.href); } catch (e) { location.href = link.href; }
+          });
+        };
+      }
       bar.appendChild(link);
     });
     document.body.insertBefore(bar,document.body.firstChild);
@@ -1154,7 +1171,9 @@
       .sort(function (a, b) { return a.className.localeCompare(b.className); });
   }
 
-  async function startActingAsStudent(classId, studentId, studentTab) {
+  // Only same-site tool pages may be used as the landing page after sign-in.
+  const NEXT_PATH = /^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/;
+  async function startActingAsStudent(classId, studentId, studentTab, nextPath) {
     classId = String(classId || ""); studentId = String(studentId || "");
     if (!ACTING_ID.test(classId) || !ACTING_ID.test(studentId)) throw new Error("Choose a student.");
     const services = ensureFirebase();
@@ -1196,6 +1215,7 @@
     studentSession.setItem("weeklyQuiz_classId", classId);
     studentSession.setItem("b3Games_workspaceId", WORKSPACE_ID);
     studentSession.removeItem("b3TeacherBypass");
+    if (nextPath && NEXT_PATH.test(nextPath)) studentSession.setItem("b3ActAsNext", nextPath);
     studentSession.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
     if (studentTab) {
       studentSession.setItem("b3ActAsSeparateTab", "1");
@@ -1209,7 +1229,7 @@
 
   // The teacher's own demo student: created (or re-added to this class) by
   // the server, then opened exactly like "Sign in as a student".
-  async function openMyDemoStudent(classId, studentTab) {
+  async function openMyDemoStudent(classId, studentTab, nextPath) {
     classId = String(classId || "");
     if (!ACTING_ID.test(classId)) throw new Error("Choose a class.");
     const services = ensureFirebase();
@@ -1222,7 +1242,7 @@
     });
     const result = await response.json().catch(function () { return {}; });
     if (!response.ok || !ACTING_ID.test(String(result.studentId || ""))) throw new Error(result.error || "Could not open your demo student.");
-    return startActingAsStudent(classId, result.studentId, studentTab);
+    return startActingAsStudent(classId, result.studentId, studentTab, nextPath);
   }
 
   function stopActingAsStudent() {
