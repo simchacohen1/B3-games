@@ -2,27 +2,7 @@
 <!-- BUILD: 2026-10-08 UI-REDESIGN -->
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -33,7 +13,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>B3 Weekly Quiz</title>
+<title>My Quiz Center</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -124,13 +104,6 @@
   .nav button:disabled{opacity:.35}
   .progress{text-align:center;color:var(--muted);font-size:14px;margin-top:10px}
 
-  /* practice link */
-  .practice-link-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(135deg,#fff6c9,#f1e4ff);border:1.5px solid #e6d27a;border-radius:20px;padding:16px 20px;margin-bottom:16px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);transition:transform .12s}
-  .practice-link-card:hover{transform:translateY(-2px)}
-  .practice-link-title{font-size:19px;font-weight:800;color:#5a44b7}
-  .practice-link-sub{font-size:14px;color:var(--muted);margin-top:2px}
-  .practice-link-go{font-size:26px;color:#5a44b7}
-
   /* past quizzes + review */
   .history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
   .past-list{display:grid;gap:10px}
@@ -187,8 +160,8 @@
     <div class="brand">
       <div class="brand-mark">B3</div>
       <div>
-        <h1>Weekly Quiz</h1>
-        <div class="subtitle">Shoroshim • Translation • Comprehension</div>
+        <h1>My Quiz Center</h1>
+        <div class="subtitle">Your assigned quizzes and saved results</div>
       </div>
     </div>
     <div class="header-spacer"></div>
@@ -214,10 +187,12 @@
 
     <div id="previewBar" class="card preview-bar hidden"></div>
 
-    <div id="assignedCard" class="card assigned-card hidden">
-      <div class="assigned-head"><span class="assigned-badge">📝 Teacher Assigned Quiz</span></div>
+    <div id="assignedCard" class="card assigned-card">
+      <div class="assigned-head"><h2 class="assigned-badge">📝 Current Quiz</h2></div>
       <div id="assignedList" class="assigned-list"></div>
     </div>
+
+    <button id="backToCenter" class="secondary hidden" style="margin-bottom:16px" onclick="backToQuizCenter()">← My Quiz Center</button>
 
     <div id="loadingQuizCard" class="card waiting hidden" role="status" aria-live="polite">
       <div class="state-ico">⏳</div>
@@ -278,13 +253,8 @@
       <div id="reviewQuestions"></div>
     </div>
 
-    <a class="practice-link-card" href="practice.html">
-      <div><div class="practice-link-title">🌈 Make a practice quiz</div><div class="practice-link-sub">Pick your own pesukim and practice before the real quiz.</div></div>
-      <div class="practice-link-go">➜</div>
-    </a>
-
     <div id="pastQuizzesCard" class="card">
-      <div class="history-head"><h2>📚 My past quizzes</h2></div>
+      <div class="history-head"><h2>📚 My Previous Quizzes</h2></div>
       <div id="pastQuizList" class="past-list"><div class="past-meta">Loading your quizzes…</div></div>
     </div>
   </div>
@@ -342,7 +312,7 @@ function waitForStudentAuth(){
 // same assignment rules: the launch's classId must be the student's class and,
 // when the launch targets specific students, this student must be one of them.
 let quizBackendMode=''; // '' (unknown) | 'function' | 'direct'
-const HISTORY_LAUNCH_LIMIT=60;
+
 const quizError=(status,message)=>Object.assign(new Error(message),{status});
 async function callStudentQuizFunction(action,payload){
   const user=await waitForStudentAuth();
@@ -380,13 +350,13 @@ async function directStudentQuiz(action,payload={}){
   if(action==='history'){
     if(teacherPreview)return {launches:{},completions:{}};
     // Keep this light: list launch IDs only (shallow REST read), check this
-    // student's own completion for the most recent launches, and download full
+    // student's own completion for all launches, and download full
     // launch data only for quizzes this student actually finished.
     const user=firebase.auth().currentUser,token=user?await user.getIdToken().catch(()=>''):'';
     const res=await fetch(firebaseConfig.databaseURL+'/'+root+'/launches.json?shallow=true'+(token?'&auth='+encodeURIComponent(token):''),{cache:'no-store'});
     if(!res.ok)throw quizError(res.status,'Could not load your past quizzes.');
     const ids=Object.keys(await res.json()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id))
-      .sort((a,b)=>(Number(String(b).split('_')[0])||0)-(Number(String(a).split('_')[0])||0)).slice(0,HISTORY_LAUNCH_LIMIT);
+      .sort((a,b)=>(Number(String(b).split('_')[0])||0)-(Number(String(a).split('_')[0])||0));
     const comps=await Promise.all(ids.map(id=>dbGet(root+'/completions/'+id+'/'+sid).catch(()=>null)));
     const done=ids.filter((_,i)=>comps[i]);
     const launches=await Promise.all(done.map(id=>dbGet(root+'/launches/'+id).catch(()=>null)));
@@ -674,6 +644,7 @@ async function listenForHistory(){
 // link, an individual assignment (Take Anytime / Make-Up / retake), and the
 // class's live test. All of them are listed; none hides another.
 let assignedInfo={},userPickedLaunchId='',assignmentsLoaded=false;
+let quizOpened=!!forcedLaunchId;
 function assignedIds(){
   return [...new Set([forcedLaunchId,personalLaunchId,classLaunchId].filter(Boolean))];
 }
@@ -682,7 +653,7 @@ function isLaunchCompleted(id){return !!(allCompletions[id]&&allCompletions[id][
 async function loadAssignments(){
   const ids=assignedIds(),seq=(loadAssignments.seq=(loadAssignments.seq||0)+1);
   await Promise.all(ids.map(async id=>{
-    try{const r=await callStudentQuiz('launch',{launchId:id});assignedInfo[id]={launch:r.launch||null,error:''};if(r.completion)allCompletions[id]={[myStudentId]:r.completion};}
+    try{const r=await callStudentQuiz('launch',{launchId:id});assignedInfo[id]={launch:r.launch||null,responses:r.responses||{},error:''};if(r.completion)allCompletions[id]={[myStudentId]:r.completion};}
     catch(e){assignedInfo[id]={launch:null,error:e.message||'Could not open this quiz.',status:e.status||0};}
   }));
   if(seq!==loadAssignments.seq)return;
@@ -690,38 +661,41 @@ async function loadAssignments(){
   pickActiveLaunch();renderAssigned();
 }
 function pickActiveLaunch(){
-  const ids=assignedIds();let id='';
-  if(forcedLaunchId)id=forcedLaunchId;
-  else if(userPickedLaunchId&&ids.includes(userPickedLaunchId))id=userPickedLaunchId;
-  else{
-    const usable=ids.filter(x=>assignedInfo[x]&&assignedInfo[x].launch);
-    const open=usable.filter(x=>!isLaunchCompleted(x)).sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]));
-    // A stale pointer to another class's quiz (403/404) is skipped rather than shown as an error;
-    // a temporary failure is still shown so the student can retry.
-    id=open[0]||usable.sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]))[0]
-      ||ids.find(x=>assignedInfo[x]&&![400,403,404].includes(assignedInfo[x].status))||'';
-  }
+  const ids=assignedIds();
+  // The center opens first; exact teacher links still open their own launch.
+  const id=forcedLaunchId||(quizOpened&&ids.includes(userPickedLaunchId)?userPickedLaunchId:'');
   chooseActiveLaunch(id);
+  render();
+}
+function backToQuizCenter(){
+  quizOpened=false;userPickedLaunchId='';chooseActiveLaunch('');
+  document.getElementById('reviewCard').classList.add('hidden');render();
 }
 function openAssignedQuiz(id){
-  userPickedLaunchId=id;chooseActiveLaunch(id);renderAssigned();
+  quizOpened=true;userPickedLaunchId=id;chooseActiveLaunch(id);renderAssigned();
   const target=document.getElementById('assignedCard');if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function retryAssignedQuiz(){quizLoadError='';assignmentsLoaded=false;render();loadAssignments();listenForHistory();}
 function renderAssigned(){
   const card=document.getElementById('assignedCard'),list=document.getElementById('assignedList');if(!card||!list)return;
-  const rows=assignedIds().map(id=>({id,info:assignedInfo[id]})).filter(r=>r.info&&r.info.launch);
-  if(!rows.length){card.classList.add('hidden');return;}
+  const rows=assignedIds().map(id=>({id,info:assignedInfo[id]}))
+    .filter(r=>r.info&&r.info.launch&&!isLaunchCompleted(r.id)&&!r.info.launch.endedAt);
   card.classList.remove('hidden');
-  list.innerHTML=rows.map(({id,info})=>{
-    const l=info.launch,snap=l.quizSnapshot||{},n=asArray(snap.questions).length,done=isLaunchCompleted(id);
-    const status=done?'✅ Finished':(l.started?'Ready to take':'Waiting for your teacher to start');
-    const kind=l.retakeOf?'Retake':(l.deliveryType==='live'?'Class test':(l.deliveryType==='makeup'?'Make-up test':'Assigned quiz'));
-    const current=id===activeLaunchId;
-    const label=current?(done?'Showing':'Open now'):(done?'Review':'Open quiz');
-    return '<div class="assigned-row'+(current?' current':'')+'"><div><div class="assigned-title">'+esc(snap.title||'Weekly Quiz')+'</div><div class="assigned-meta">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+n+' question'+(n===1?'':'s')+' • '+esc(status)+'</div></div><button class="'+(current?'secondary':'primary')+'" '+(current?'disabled':'')+' onclick="openAssignedQuiz(\''+esc(id)+'\')">'+esc(label)+'</button></div>';
+  if(!rows.length){
+    const failed=assignedIds().some(id=>assignedInfo[id]&&assignedInfo[id].error&&![400,403,404].includes(assignedInfo[id].status));
+    list.innerHTML=!assignmentsLoaded?'<p role="status">Loading your quizzes…</p>':failed?'<p role="alert">Could not load your assigned quizzes. <button class="secondary" onclick="retryAssignedQuiz()">Try again</button></p>':'<p>No quiz right now.</p>';
+    return;
+  }
+  list.innerHTML=rows.map(({id,info},index)=>{
+    const l=info.launch,snap=l.quizSnapshot||{},n=asArray(snap.questions).length;
+    const responses=id===activeLaunchId?myResponses:info.responses||{};
+    const started=Object.keys(responses).length>0;
+    const kind=l.retakeOf?'Retake '+(l.attemptNumber||2):(l.deliveryType==='makeup'?'Make-up test':(l.deliveryType==='live'?'Live class quiz':'Assigned quiz'));
+    const label=started?'Continue Quiz':'Start Quiz';
+    return '<div class="assigned-row"><div><div class="assigned-title">'+esc(snap.title||'Weekly Quiz')+'</div><div class="assigned-meta">'+n+' question'+(n===1?'':'s')+' • '+esc(kind)+(rows.length>1?' • Assignment '+(index+1):'')+(!l.started?' • Waiting for your teacher':'')+'</div></div><button class="primary" onclick="openAssignedQuiz(\''+esc(id)+'\')">'+label+'</button></div>';
   }).join('');
 }
+
 function renderPreviewBar(){
   const bar=document.getElementById('previewBar');if(!bar||!teacherPreview)return;
   const link=c=>{const p=new URLSearchParams(location.search);p.set('class',c);p.delete('launch');return '?'+p.toString();};
@@ -741,12 +715,12 @@ function attachDirectLaunchListeners(id){
   launchRef.on('value',snap=>{
     if(activeLaunchId!==id)return;const value=snap.val();
     if(!value){launchData=null;quizLoadError='This quiz could not be found. Ask your teacher for a new link.';render();return;}
-    quizLoadError='';launchData={id,...value};assignedInfo[id]={launch:launchData,error:''};render();renderAssigned();
+    quizLoadError='';launchData={id,...value};assignedInfo[id]={launch:launchData,responses:myResponses,error:''};render();renderAssigned();
   },onError);
   activeLaunchListeners.push(launchRef);
   if(teacherPreview)return;
   const responseRef=db.ref(QROOT+'/responses/'+id+'/'+myStudentId);
-  responseRef.on('value',snap=>{if(activeLaunchId!==id)return;myResponses=snap.val()||{};render();},onError);
+  responseRef.on('value',snap=>{if(activeLaunchId!==id)return;myResponses=snap.val()||{};if(assignedInfo[id])assignedInfo[id].responses=myResponses;render();renderAssigned();},onError);
   const completionRef=db.ref(QROOT+'/completions/'+id+'/'+myStudentId);
   completionRef.on('value',snap=>{if(activeLaunchId!==id)return;const value=snap.val();if(value){allCompletions[id]={[myStudentId]:value};render();renderAssigned();}},onError);
   activeLaunchListeners.push(responseRef,completionRef);
@@ -759,7 +733,7 @@ function chooseActiveLaunch(id){
   if(!id){render();return;}
   const cached=assignedInfo[id];
   if(cached&&cached.error&&!cached.launch){quizLoadError=cached.error;render();}
-  else if(cached&&cached.launch){launchData=cached.launch;render();}
+  else if(cached&&cached.launch){launchData=cached.launch;myResponses=cached.responses||{};render();}
   else render();
   let refreshCount=0,failures=0;
   const refresh=async()=>{
@@ -767,7 +741,7 @@ function chooseActiveLaunch(id){
       const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;
       failures=0;quizLoadError='';launchData=result.launch||null;
       if(!teacherPreview)myResponses=result.responses||{};
-      assignedInfo[id]={launch:launchData,error:''};
+      assignedInfo[id]={launch:launchData,responses:myResponses,error:''};
       if(result.completion)allCompletions[id]={[myStudentId]:result.completion};
       if(allLaunches[id])allLaunches[id]=launchData;
       render();renderAssigned();
@@ -821,6 +795,8 @@ function showQuizError(title,text){
 }
 function render(){
   if(!myStudentId)return;hideAll();
+  document.getElementById('backToCenter').classList.toggle('hidden',!quizOpened);
+  if(!quizOpened){renderAssigned();renderPastQuizzes();return;}
   if(!assignmentsLoaded&&!activeLaunchId){document.getElementById('loadingQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   if(activeLaunchId&&!launchData&&quizLoadError){
     const wrongClass=/not assigned/i.test(quizLoadError);
@@ -838,6 +814,7 @@ function render(){
   if(allCompletions?.[activeLaunchId]?.[myStudentId]){
     renderCompletionCard(questions);
     renderPastQuizzes();
+    renderAssigned();
     return;
   }
   if(!launchData.started){
@@ -899,7 +876,7 @@ function renderCompletionCard(questions){
   const score=scoreFromResponses(questions,myResponses);
   if(launchData&&launchData.showScore===true){
     scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');
-    msg.textContent='Great job! Tap below to see your answers. You can also find this quiz later in My past quizzes.';
+    msg.textContent='Great job! Tap below to see your answers. You can also find this quiz later in My Previous Quizzes.';
     btn.classList.remove('hidden');
   }else{
     scoreEl.textContent='';scoreEl.classList.add('hidden');
@@ -961,7 +938,7 @@ async function markCompletion(){
 
 function completedLaunchRows(){
   if(!myStudentId)return[];
-  return Object.entries(allLaunches||{}).map(([id,launch])=>{
+  return Object.entries({...Object.fromEntries(Object.entries(assignedInfo).filter(([,info])=>info.launch).map(([id,info])=>[id,info.launch])),...allLaunches}).map(([id,launch])=>{
     const comp=allCompletions&&allCompletions[id]&&allCompletions[id][myStudentId];
     return comp?{id,launch,comp}:null;
   }).filter(Boolean).sort((a,b)=>Number((b.comp&&b.comp.completedAt)||b.launch.endedAt||b.launch.createdAt||0)-Number((a.comp&&a.comp.completedAt)||a.launch.endedAt||a.launch.createdAt||0));
@@ -1016,4 +993,5 @@ restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
 </body>
 </html>
+
 
