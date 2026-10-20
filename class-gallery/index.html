@@ -398,10 +398,12 @@ function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reje
 // service again for every post whenever one gallery entry is edited.
 const galleryMediaUrlCache=new Map();
 async function galleryPrivateMediaUrl(path){
-  const cached=galleryMediaUrlCache.get(path);
-  if(cached && Date.now()-cached.savedAt<3*60*1000)return cached.url;
   const user=firebase.auth().currentUser;
   if(!user)throw new Error('Sign in to open this media.');
+  // Signed links must not carry over if a different account uses this tab.
+  const cacheKey=user.uid+':'+path;
+  const cached=galleryMediaUrlCache.get(cacheKey);
+  if(cached && Date.now()-cached.savedAt<3*60*1000)return cached.url;
   const token=await user.getIdToken();
   const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
@@ -409,7 +411,7 @@ async function galleryPrivateMediaUrl(path){
   });
   const j=await r.json().catch(()=>({}));
   if(!r.ok||!j.url)throw new Error(j.error||'Media is not available.');
-  galleryMediaUrlCache.set(path,{url:j.url,savedAt:Date.now()});
+  galleryMediaUrlCache.set(cacheKey,{url:j.url,savedAt:Date.now()});
   return j.url;
 }
 async function resolveGalleryMedia(rows){await Promise.all(rows.map(async p=>{for(const [field,pathField] of [['audioUrl','audioStoragePath'],['videoUrl','videoStoragePath']])if(p[pathField]){try{p[field]=await galleryPrivateMediaUrl(p[pathField])}catch(error){console.warn('Gallery media unavailable:',error.message);p[field]=''}}}));return rows;}
