@@ -15,7 +15,7 @@ if(window.firebase?.storage?.Reference){const proto=firebase.storage.Reference.p
 const originalFetch=window.fetch.bind(window);window.fetch=function(input,options){const url=String(input?.url||input);if(url.includes('cloudfunctions.net/')&&options?.method?.toUpperCase()==='POST'){
  const body=JSON.parse(options.body||'{}');
  if(url.includes('/classPointerShareAuth')){if(!['pointer_test','testing'].includes(body.classId))return Promise.reject(Error('Preview: Class Pointer is limited to existing test classes.'));}
- else if(!(url.includes('/funTorahStudentAuth')&&body.action==='login') && !(url.includes('/funTorahManageStudents')&&body.action==='list'))return Promise.reject(Error('Preview: this data-changing service is disabled.'));
+ else if(!(url.includes('/funTorahStudentAuth')&&['login','verify'].includes(body.action)) && !(url.includes('/funTorahManageStudents')&&body.action==='list'))return Promise.reject(Error('Preview: this data-changing service is disabled.'));
  }return originalFetch(input,options);};
 document.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('div');notice.textContent='PR #234 TEST PREVIEW · student saves disabled';notice.style.cssText='position:fixed;bottom:0;left:0;z-index:2147483647;background:#fff2af;color:#171717;font:700 12px system-ui;padding:5px 9px;pointer-events:none';document.body.append(notice);});
 })();
