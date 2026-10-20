@@ -2,7 +2,8 @@
 (function(){
 'use strict';
 window.FTT_PR234_PREVIEW=true;
-const permitted=p=>/^b3Games\/workspaces\/b3-2026\/classes\/(et|wt|pointer_test|testing)\/access\/previewPr234(?:\/|$)/.test(p)||/^b3Games\/workspaces\/b3-2026\/classes\/(pointer_test|testing)\/classPointerSessions\//.test(p)||/^b3Private\/classPointerSharePermissions\/b3-2026\/(pointer_test|testing)\//.test(p);
+const temporaryStudents=["student_56848fe7d1544f5b81bd25b130615c79","student_eea1b121b2ec4e81aff9df7e7b633b6f"];
+const permitted=p=>temporaryStudents.some(id=>p==='posukPractice/shorashimLearning/students/'+id||p.startsWith('posukPractice/shorashimLearning/students/'+id+'/'))||/^b3Games\/workspaces\/b3-2026\/classes\/(et|wt|pointer_test|testing)\/access\/previewPr234(?:\/|$)/.test(p)||/^b3Games\/workspaces\/b3-2026\/classes\/(pointer_test|testing)\/classPointerSessions\//.test(p)||/^b3Private\/classPointerSharePermissions\/b3-2026\/(pointer_test|testing)\//.test(p);
 const pathOf=ref=>decodeURIComponent(new URL(ref.toString()).pathname).replace(/^\//,'');
 const deny=()=>{throw Error('Preview safety: student-data writes and production class controls are disabled.');};
 if(window.firebase?.database?.Reference){
@@ -17,7 +18,7 @@ const originalFetch=window.fetch.bind(window);window.fetch=function(input,option
  if(url.includes('/classPointerShareAuth')){if(!['pointer_test','testing'].includes(body.classId))return Promise.reject(Error('Preview: Class Pointer is limited to existing test classes.'));}
  else if(!(url.includes('/funTorahStudentAuth')&&['login','verify'].includes(body.action)) && !(url.includes('/funTorahManageStudents')&&body.action==='list'))return Promise.reject(Error('Preview: this data-changing service is disabled.'));
  }return originalFetch(input,options);};
-document.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('div');notice.textContent='PR #234 TEST PREVIEW · student saves disabled';notice.style.cssText='position:fixed;bottom:0;left:0;z-index:2147483647;background:#fff2af;color:#171717;font:700 12px system-ui;padding:5px 9px;pointer-events:none';document.body.append(notice);});
+document.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('div');notice.textContent='PR #234 TEST PREVIEW · only named temporary test saves allowed';notice.style.cssText='position:fixed;bottom:0;left:0;z-index:2147483647;background:#fff2af;color:#171717;font:700 12px system-ui;padding:5px 9px;pointer-events:none';document.body.append(notice);});
 })();
 
 window.B3_FIREBASE_CONFIG = {
