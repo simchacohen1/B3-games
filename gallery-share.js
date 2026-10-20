@@ -251,7 +251,7 @@
   const current = document.currentScript;
   if (!current || !current.src) return;
   const script = document.createElement('script');
-  script.src = new URL('teacher-global-controls.js?v=20261020-quickbar', current.src).href;
+  script.src = new URL('teacher-global-controls.js?v=20261020-uniform2', current.src).href;
   script.async = true;
   (document.head || document.documentElement).appendChild(script);
 })();
