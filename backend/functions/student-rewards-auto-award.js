@@ -1272,7 +1272,10 @@ async function readStudentRewardsData(classId="all"){
     for(const [cid,dates] of Object.entries(root.dailyAwards?.[studentId]||{})){
       for(const [date,a0] of Object.entries(dates||{})){
         const a=a0||{}, amount=Number(a.points||0); if(!amount) continue;
-        events.push({id:`daily:${studentId}:${cid}:${date}`,source:'daily',amount,reason:'Daily Points',classId:cid,date,createdAt:a.savedAt||null,status:'posted'});
+        const parts=a.byCategory&&typeof a.byCategory==='object'?Object.values(a.byCategory).filter(x=>x&&x.category&&Number(x.points)):[];
+        if(parts.length&&parts.reduce((t,x)=>t+Number(x.points),0)===amount){
+          for(const x of parts)events.push({id:`daily:${studentId}:${cid}:${date}:${String(x.category).replace(/[^A-Za-z0-9_-]+/g,'_')}`,source:'daily',category:x.category,rating:x.rating||null,amount:Number(x.points),reason:`Daily Points · ${x.category}`,classId:cid,date,createdAt:a.savedAt||null,status:'posted'});
+        }else events.push({id:`daily:${studentId}:${cid}:${date}`,source:'daily',amount,reason:'Daily Points',classId:cid,date,createdAt:a.savedAt||null,status:'posted'});
       }
     }
     for(const [id,i0] of Object.entries(root.pointRequests||{})){
