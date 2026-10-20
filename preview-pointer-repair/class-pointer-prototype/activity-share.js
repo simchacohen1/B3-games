@@ -43,6 +43,9 @@
       pin=sessionStorage.getItem('b3Games_classPin');
     }
     if(!id||!pin||!(/^[A-Za-z0-9_-]{1,100}$/).test(id))return;
+    // game-gate owns Firebase startup on activity/presentation pages. Waiting
+    // here prevents two app SDK loads from replacing each other's services.
+    if(window.B3GameGateAuthReady)await window.B3GameGateAuthReady;
     if(!window.firebase?.database){
       if(!window.firebase)await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
       await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js');

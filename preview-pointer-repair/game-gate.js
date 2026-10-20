@@ -30,6 +30,8 @@
   var FIRST_LOAD_FAILSAFE_MS = 5500;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
+  // Other student clients share this initialization instead of loading a second SDK.
+  window.B3GameGateAuthReady = authReadyPromise;
   function markAuthReady() {
     if (!authReadyResolve) return;
     authReadyResolve();
