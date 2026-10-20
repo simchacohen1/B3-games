@@ -71,7 +71,7 @@ function paidHandler(name, category, handler) {
       // Hebrew answer spans are produced. Bump its cache namespace whenever
       // that contract changes, so identical requests cannot keep returning a
       // stale set generated under the previous prompt.
-      const cacheVersion = name === 'generateComprehensionQuestions' ? 'answerfirst_v6' : 'v1';
+      const cacheVersion = name === 'generateComprehensionQuestions' ? 'phrases_v7' : 'v1';
       // The verse key locates the student-readable mirror; it is metadata,
       // so adding it must not invalidate previously generated private results.
       const cacheBody = { ...(req.body || {}) };
