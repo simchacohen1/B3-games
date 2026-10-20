@@ -965,6 +965,29 @@ function recordingModeLabel(r){
   return (r.noHints===true||r.mode==="no-hints") ? "🏆 No Hints Challenge" : "🎙️ Record Chazara";
 }
 function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==="no-hints")?3:2));}
+function recordingDurationLabel(seconds){
+  if(!Number.isFinite(seconds)||seconds<=0)return "Duration unavailable";
+  const total=Math.round(seconds);
+  return "Length: "+Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
+}
+function updateShorashimAudioDurations(){
+  document.querySelectorAll('#shorashimRecordingsList audio[data-recording-audio]').forEach(audio=>{
+    const label=audio.parentElement.querySelector('[data-recording-duration]');
+    if(!label)return;
+    const update=()=>{
+      let seconds=audio.duration;
+      if(!Number.isFinite(seconds)||seconds<=0){
+        const ranges=audio.seekable;
+        if(ranges&&ranges.length)seconds=ranges.end(ranges.length-1);
+      }
+      if(Number.isFinite(seconds)&&seconds>0)label.textContent=recordingDurationLabel(seconds);
+    };
+    for(const event of ['loadedmetadata','durationchange','loadeddata','progress','seeked'])audio.addEventListener(event,update);
+    audio.addEventListener('error',()=>{if(label.textContent==='Checking length…')label.textContent='Duration unavailable';});
+    update();
+  });
+}
+
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
@@ -999,13 +1022,14 @@ function renderShorashimRecordings(){
         <div class="mini-note">${recordingModeLabel(r)} • <b>${recordingPoints(r)} points</b> • ${esc(recordingTime(r.createdAt))}</div></div>
         <b>${statusLabel}</b>
       </div>
-      ${r.audioURL?`<audio controls preload="none" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0"></audio>`:'<p class="mini-note">Audio file unavailable.</p>'}
+      ${r.audioURL?`<div><audio controls preload="metadata" data-recording-audio src="${esc(r.audioURL)}" style="width:100%;margin:12px 0 4px"></audio><div class="mini-note" data-recording-duration aria-live="polite">Checking length…</div></div>`:'<p class="mini-note">Audio file unavailable.</p>'}
       ${pendingReady?`<div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="primary" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','approve')">✓ Approve ${recordingPoints(r)} Points</button>
         <button class="ghost" style="border-color:#dc2626;color:#b91c1c" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','reject')">✕ Reject</button>
       </div>`:''}
     </div>`;
   }).join('');
+  updateShorashimAudioDurations();
 }
 async function teacherRewardsToken(){
   let user=firebase.auth().currentUser;
