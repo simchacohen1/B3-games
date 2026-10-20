@@ -42,3 +42,45 @@ test('a new class without the admin story grant sees nothing open and cannot pra
 test('teacher of a class without the story grant cannot save lesson settings',async()=>{const x=setup('alpha',{storyGranted:false});x.data['b3Games/workspaces/b3-2026/teachers/teacher']={active:true,classIds:{alpha:true}};const r=await x.service({action:'teacherLoad',idToken:'t',classId:'alpha'});assert.equal(r.storyGranted,false);await assert.rejects(x.service({action:'teacherSave',idToken:'t',classId:'alpha',config:r.config}),/has not given this class/)});
 test('admin story grant opens Yiddish for a new class',async()=>{const x=setup('alpha'),{token}=await login(x);const st=await x.service({action:'status',token});assert.equal(st.noStory,undefined);assert.ok((await x.service({action:'start',token,group:0})).round)});
 test('B3 classes keep the story without any grant',async()=>{const x=setup('et',{storyGranted:false}),{token}=await login(x,'et');const st=await x.service({action:'status',token});assert.equal(st.noStory,undefined)});
+
+// All persistence checks below use the in-memory store and synthetic identities.
+function unlockSetup(){const x=setup('et');const c=x.data['yiddishPrivate/config'];c.sections.forEach(s=>s.verified=true);c.unlocked={et:1,wt:1};c.unlockedSteps={et:2,wt:2};return x}
+const setUnlock=(x,track,steps,expectedSteps)=>x.service({action:'teacherSetUnlock',idToken:'owner',classId:track,track,steps,expectedSteps});
+test('WT levels 4 and 5 survive fresh teacher sessions and leave ET and progress unchanged',async()=>{
+ const x=unlockSetup();x.data['yiddishPrivate/students/test_wt']={words:{saved:{credits:2}}};
+ const progress=structuredClone(x.data['yiddishPrivate/students/test_wt']);
+ for(const [steps,previous] of [[4,2],[5,4]]){
+  await setUnlock(x,'wt',steps,previous);
+  const reopened=makeService(x.store,async()=>({email:'simcha5770@gmail.com',email_verified:true}));
+  for(const classId of ['et','wt','et','wt']){
+   const loaded=await reopened({action:'teacherLoad',idToken:'new-session',classId});
+   assert.equal(loaded.config.unlockedSteps.wt,steps);assert.equal(loaded.config.unlockedSteps.et,2);
+  }
+  assert.deepEqual(x.data['yiddishPrivate/students/test_wt'],progress);
+ }
+});
+test('independent ET/WT edits preserve each other; stale same-class edits fail',async()=>{
+ const x=unlockSetup();await setUnlock(x,'wt',5,2);await setUnlock(x,'et',4,2);
+ assert.deepEqual(x.data['yiddishPrivate/config'].unlockedSteps,{et:4,wt:5});
+ await assert.rejects(setUnlock(x,'wt',2,2),/changed elsewhere/);
+ assert.equal(x.data['yiddishPrivate/config'].unlockedSteps.wt,5);
+});
+test('stale whole-form saves cannot undo an immediate unlock save',async()=>{
+ const x=unlockSetup(),old=structuredClone(x.data['yiddishPrivate/config']);await setUnlock(x,'wt',5,2);
+ await assert.rejects(x.service({action:'teacherSave',idToken:'owner',classId:'et',config:old}),/changed elsewhere/);
+ assert.equal(x.data['yiddishPrivate/config'].unlockedSteps.wt,5);
+});
+test('invalid and unauthorized unlock writes do not change settings',async()=>{
+ const x=unlockSetup(),old=structuredClone(x.data['yiddishPrivate/config']);
+ for(const steps of [-1,9,4.5])await assert.rejects(setUnlock(x,'wt',steps,2),/valid number/);
+ await assert.rejects(x.service({action:'teacherSetUnlock',idToken:'owner',classId:'et',track:'alpha',steps:4,expectedSteps:0}),/selected class/);
+ await assert.rejects(x.service({action:'teacherSetUnlock',idToken:'teacher',classId:'et',track:'wt',steps:5,expectedSteps:2}),/not assigned/);
+ assert.deepEqual(x.data['yiddishPrivate/config'],old);
+});
+test('student status and server practice gates use exact saved steps after a new login',async()=>{
+ const x=unlockSetup();await setUnlock(x,'et',5,2);
+ const {token}=await login(x,'et');const st=await x.service({action:'status',token});
+ assert.equal(st.config.unlockedSteps.et,5);
+ await x.service({action:'start',token,group:2,part:0});
+ await assert.rejects(x.service({action:'start',token,group:2,part:1}),/not open yet/);
+});

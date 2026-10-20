@@ -99,6 +99,29 @@ return async function handle(b,ip='unknown'){
    await store.set(TIMES_PATH,{...v,updatedAt:now()});
    return {ok:true,storyTimes:await storyTimes()};
   }
+  // Unlock changes update only the chosen class, never a stale whole-form copy.
+  if(b.action==='teacherSetUnlock'){
+   const target=b.track;
+   if(!validKey(target)||(legacy(classId)?!legacy(target):target!==classId))fail(400,'Choose the selected class.');
+   if(!await storyGranted(target))fail(403,'The admin has not given this class a Yiddish story yet.');
+   let conflict=false;
+   await store.tx(configPath(classId),old=>{
+    conflict=false;
+    const c=structuredClone(old||defaults());
+    const count=s=>Math.max(1,Math.ceil(s.words.length/4));
+    const previous=Number.isInteger(c.unlockedSteps?.[target])?c.unlockedSteps[target]:c.sections.slice(0,c.unlocked[target]||0).reduce((n,s)=>n+count(s),0);
+    if(previous!==b.expectedSteps){conflict=true;return undefined}
+    const n=b.steps,total=c.sections.reduce((n,s)=>n+count(s),0);
+    if(!Number.isInteger(n)||n<0||n>total)fail(400,'Choose a valid number of open steps.');
+    let sections=0,steps=0;while(sections<c.sections.length&&steps<n)steps+=count(c.sections[sections++]);
+    c.unlocked={...c.unlocked,[target]:sections};
+    c.unlockedSteps={...c.unlockedSteps,[target]:n};
+    validateConfig(c);
+    return {...c,version:c.version+1};
+   });
+   if(conflict)fail(409,'This class changed elsewhere. Refresh progress before changing its level.');
+   return {config:await cfg(classId)};
+  }
   if(b.action==='teacherSave'){
    if(!await storyGranted(classId))fail(403,'The admin has not given this class a Yiddish story yet.');
    const c=validateConfig(b.config);
