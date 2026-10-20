@@ -36,3 +36,29 @@ test('owner can restrict existing ET tools while assigned teachers still need ad
  await manageStudents(f.store,{...f.identity,email:'simcha5770@gmail.com'},body);
  assert.equal(f.writes[0][root+'classes/et/members/child/toolAccess/yiddish'],false);
 });
+
+test('demo student is a real, teacher-owned account that is stable across classes',async()=>{
+ const f=fixture(),root='b3Games/workspaces/b3-2026/';
+ f.data[root+'teachers/teacher'].classIds.second=true;f.data[root+'classes/second']={active:true,members:{}};
+ const ident={...f.identity,name:'Rabbi Test'};
+ const a=await manageStudents(f.store,ident,{action:'demoStudent',classId:'mine'});
+ assert.match(a.studentId,/^demo_[a-f0-9]{32}$/);assert.equal(a.name,'Rabbi Test (demo)');
+ const w=f.writes[0];
+ assert.equal(w['b3Games/students/'+a.studentId+'/profile'].demoOwner,'teacher');
+ assert.ok(w['b3Private/passcodes/'+a.studentId].passcode.length>=12);
+ assert.equal(w[root+'classes/mine/members/'+a.studentId].active,true);
+ assert.equal(w['b3Games/students/'+a.studentId+'/memberships/b3-2026_mine'].active,true);
+ for(const [p,v] of Object.entries(w))if(p.startsWith('b3Games/'))f.data[p]=v;
+ const b=await manageStudents(f.store,ident,{action:'demoStudent',classId:'second'});
+ assert.equal(b.studentId,a.studentId);
+ assert.equal(f.writes[1]['b3Private/passcodes/'+a.studentId],undefined,'passcode is not replaced');
+ assert.equal(f.writes[1][root+'classes/second/members/'+a.studentId].demo,true);
+});
+test('demo student cannot be created in another teacher class or hijack a foreign profile',async()=>{
+ const f=fixture();
+ await assert.rejects(manageStudents(f.store,f.identity,{action:'demoStudent',classId:'other'}),/not assigned/);
+ const id='demo_'+require('node:crypto').createHash('sha256').update('b3-demo-student:teacher').digest('hex').slice(0,32);
+ f.data['b3Games/students/'+id+'/profile']={name:'x',demoOwner:'someone_else'};
+ await assert.rejects(manageStudents(f.store,f.identity,{action:'demoStudent',classId:'mine'}),/could not be created/);
+ assert.equal(f.writes.length,0);
+});
