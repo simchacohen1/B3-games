@@ -681,7 +681,10 @@ function pickActiveLaunch(){
   else{
     const usable=ids.filter(x=>assignedInfo[x]&&assignedInfo[x].launch);
     const open=usable.filter(x=>!isLaunchCompleted(x)).sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]));
-    id=open[0]||usable.sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]))[0]||ids[0]||'';
+    // A stale pointer to another class's quiz (403/404) is skipped rather than shown as an error;
+    // a temporary failure is still shown so the student can retry.
+    id=open[0]||usable.sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]))[0]
+      ||ids.find(x=>assignedInfo[x]&&![400,403,404].includes(assignedInfo[x].status))||'';
   }
   chooseActiveLaunch(id);
 }
