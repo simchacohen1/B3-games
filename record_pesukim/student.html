@@ -4644,7 +4644,6 @@ async function gradeCurrentQuestionAnswer(){
     renderQuestionWordChoices(current,null);
     return;
   }
-  void speakText('Great job! You found the right words!');
   comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
   renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
   document.getElementById('comprehensionStatus').textContent='Correct!';
