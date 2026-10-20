@@ -35,3 +35,12 @@ test('Pointer waits for the access gate to initialize Firebase before verificati
  f.events.get('fttStudentSignedIn')();await Promise.resolve();await Promise.resolve();
  assert.equal(f.verified(),0);release();await f.task;assert.equal(f.verified(),1);
 });
+
+test('access gate creates the default Firebase app before asking Auth to restore',async()=>{
+ const gate=fs.readFileSync('game-gate.js','utf8');
+ const code=gate.slice(gate.indexOf('  async function watchTeacherAccess()'),gate.indexOf('  function getStoredStudentId()'));
+ const order=[],firebase={apps:[],initializeApp(){order.push('initialize');this.apps.push({})},auth(){assert.equal(this.apps.length,1);order.push('auth');return{}},database(){}};
+ const context=vm.createContext({window:{firebase,B3_FIREBASE_CONFIG:{},B3SiteSettings:{onAuthStateChanged(){}}},document:{readyState:'complete'},
+ loadAuthScript:async()=>{},waitForFirebaseAuthState:async()=>{},markAuthReady:()=>order.push('ready'),console,checkNow(){}});
+ vm.runInContext(code,context);await context.watchTeacherAccess();assert.deepEqual(order,['initialize','auth','ready']);
+});
