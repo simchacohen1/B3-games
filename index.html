@@ -1622,6 +1622,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       clearWrongPasscodeAttempts(studentName);
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+      // A student who opened a direct activity link (e.g. a teacher-assigned
+      // Weekly Quiz) before signing in goes straight back to it.
+      let returnTo="";try{returnTo=sessionStorage.getItem("b3StudentReturnTo")||"";sessionStorage.removeItem("b3StudentReturnTo");}catch(e){}
+      if(returnTo&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(returnTo)){location.replace(new URL(returnTo,location.href).href);return;}
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
     finally{btn.disabled=false;}
   }
