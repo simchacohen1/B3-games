@@ -41,12 +41,12 @@
   // Until the private student-targeting path is hardened, never broadcast
   // individual student identifiers under the publicly readable class path.
   function selected() {return 'all';}
-  function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.INDEPENDENT;}
+  function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.FREE;}
   function renderState(state) {
     currentState = state;
     const validState = state && C.fresh(state, clock());
     const msg = !validState || state.mode === C.MODES.INDEPENDENT
-      ? 'Independent — students can choose their activities.'
+      ? 'Students are free to choose their activities.'
       : state.mode === C.MODES.LOCKED
         ? '🔒 Follow Teacher — Locked · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity')
         : '↪ Follow once · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity') + ' (free afterward)';
@@ -79,7 +79,7 @@
     };
     stateRef.on('value', listener, e => error('Could not load class navigation: ' + e.message));
     unlisten = () => stateRef.off('value', listener);
-    status('Ready. Choose a mode, then Apply.');
+    status('Ready. Choose where students should go, then send them.');
   }
 
   async function publish(forceMode) {
