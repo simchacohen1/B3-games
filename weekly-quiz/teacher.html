@@ -2090,7 +2090,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElemen
 
 // ---------- Links ----------
 function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
-async function copyStudentLink(){const link=getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
+// From the Live panel, copy a link to the exact test that is running so the
+// student lands on this quiz (and keeps it through sign-in), not a generic page.
+async function copyStudentLink(){const link=activeLaunchId?getLaunchLink(activeLaunchId):getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
 // A direct link to one exact launch (the original test or any specific retake).
 // Opening it sends that student straight to that quiz, bypassing whatever
 // launch would otherwise be chosen for them.
