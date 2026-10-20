@@ -90,11 +90,14 @@ it must not be run with Node's unit-test runner or treated as an offline test.
 
 ## Environment access needed
 
-The observed failure was a connection refusal to the injected HTTP proxy at
-`proxy:8080`, not an HTTP destination-policy denial. Restart/recreate the managed
-B3-games environment to restore that proxy; if it persists, the environment
-service needs repair. Do not remove proxy settings or disable TLS validation.
-Changing an allowed-host list alone does not repair an unreachable proxy.
+The initial proxy connection failure was observed inside the default process
+sandbox. A subsequent approved check outside that sandbox reached GitHub through
+the existing proxy, and a normal Git push succeeded. A restart is not currently
+needed to reach GitHub. Access to `https://funtorahtools.com/` returned a proxy
+CONNECT 403: the restricted environment network allowlist must be expanded.
+Current policy is enforced and contains only the package-manager preset, with
+no custom allowed hosts. Keep proxy settings and TLS validation enabled. Apply
+the updated configuration; restart only if the environment UI requires it.
 
 In the cloud environment configuration, expand the restricted network policy
 from its current package-manager hosts to allow the test/deployment services:
@@ -133,4 +136,10 @@ into chat. Frontend deployment authorization has already been granted.
   traversal, or live production deployment was verified.
 - No production student data, Firebase Functions, database rules or storage
   rules were changed. PRs #232 and #233 were inspected through the GitHub
-  connector and remain unmerged; this candidate has not been pushed/published.
+  connector and remain unmerged. Commit `8a41cda71e1ece35bd58ae9a354149e68549fca2`
+  was subsequently pushed and verified on GitHub branch
+  `feat/follow-teacher-pointer-destinations`; it has not been merged or deployed.
+  An independently verified recovery bundle is on branch
+  `backup/follow-teacher-8a41cda` at
+  `recovery/follow-teacher-8a41cda.bundle.b64`. Its decoded SHA-256 is
+  `58501f9d82b5ed3743b4307bd7db0853242bef0db2a7f3441a1e78df9fe81dea`.
