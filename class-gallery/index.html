@@ -394,7 +394,24 @@ let hallDoorPositions = {};
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
 function resizeImage(file,maxWidth){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>maxWidth){h=Math.round(h*(maxWidth/w));w=maxWidth;} const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.72));}; img.onerror=reject; img.src=e.target.result;};r.onerror=reject;r.readAsDataURL(file);}); }
 function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream'}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
-async function galleryPrivateMediaUrl(path){const user=firebase.auth().currentUser;if(!user)throw new Error('Sign in to open this media.');const token=await user.getIdToken(),r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({path}),cache:'no-store'}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Media is not available.');return j.url;}
+// Reuse recently signed media links instead of calling the private-media
+// service again for every post whenever one gallery entry is edited.
+const galleryMediaUrlCache=new Map();
+async function galleryPrivateMediaUrl(path){
+  const cached=galleryMediaUrlCache.get(path);
+  if(cached && Date.now()-cached.savedAt<3*60*1000)return cached.url;
+  const user=firebase.auth().currentUser;
+  if(!user)throw new Error('Sign in to open this media.');
+  const token=await user.getIdToken();
+  const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({path}),cache:'no-store'
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.url)throw new Error(j.error||'Media is not available.');
+  galleryMediaUrlCache.set(path,{url:j.url,savedAt:Date.now()});
+  return j.url;
+}
 async function resolveGalleryMedia(rows){await Promise.all(rows.map(async p=>{for(const [field,pathField] of [['audioUrl','audioStoragePath'],['videoUrl','videoStoragePath']])if(p[pathField]){try{p[field]=await galleryPrivateMediaUrl(p[pathField])}catch(error){console.warn('Gallery media unavailable:',error.message);p[field]=''}}}));return rows;}
 function wrapCanvasText(ctx,text,x,y,maxWidth,lineHeight,maxLines){ const words=String(text||'').split(/\s+/); let line='',lines=[]; for(const word of words){ const test=line?line+' '+word:word; if(ctx.measureText(test).width>maxWidth && line){lines.push(line);line=word;if(lines.length>=maxLines-1) break;}else line=test;} if(line&&lines.length<maxLines)lines.push(line); lines.forEach((ln,i)=>ctx.fillText(ln,x,y+i*lineHeight)); return lines.length; }
 function roundedRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -2033,17 +2050,20 @@ function applyGalleryPosts(data){
   lastGalleryPostsSnapshot=snapshot;
   const revision=++galleryApplyRevision;
   const rows=Object.keys(data||{}).map(id=>({id,...data[id]}));
-  resolveGalleryMedia(rows).then(ready=>{
-    if(revision!==galleryApplyRevision)return; // A newer response won the race.
-    posts=ready;updatePending();
-    if(scene)buildScene();
-    refreshRemoteAvatars();
+  // Pictures are already in the post data. Show the gallery immediately;
+  // private audio/video URLs can finish loading without blocking 3D posts.
+  posts=rows;updatePending();
+  if(scene)buildScene();
+  refreshRemoteAvatars();
+  const renderOpenPanels=()=>{
     if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();
     if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview();
-  }).catch(err=>{
-    if(revision===galleryApplyRevision)lastGalleryPostsSnapshot=null;
-    console.error('Gallery media load failed:',err);
-  });
+  };
+  renderOpenPanels();
+  resolveGalleryMedia(rows).then(()=>{
+    if(revision!==galleryApplyRevision)return; // A newer response won the race.
+    renderOpenPanels(); // Show audio/video indicators once links are ready.
+  }).catch(err=>console.error('Gallery media load failed:',err));
 }
 if(dbRef){
   if(isGuestGallery)dbRef.on('value',snapshot=>applyGalleryPosts(snapshot.val()||{}),err=>console.error('Gallery demo read failed:',err));
