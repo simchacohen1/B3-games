@@ -177,7 +177,12 @@
   }
 
   function showClosed(title, message) {
-    document.querySelectorAll("audio,video").forEach(function(media){try{media.pause();}catch(error){}});
+    // The independently authenticated Pointer lesson remains usable above a
+    // locked activity. Closing that activity must not freeze the teacher video.
+    document.querySelectorAll("audio,video").forEach(function(media){
+      if(media.closest('#fttTeacherLessonOverlay'))return;
+      try{media.pause();}catch(error){}
+    });
     markFirstDecision();
     reveal();
     if (!overlay) {
