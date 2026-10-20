@@ -472,7 +472,7 @@ window.FTT_MITZVAH_TITLES = {
   "P102": "Tzaraat on Garments",
   "P103": "Tzaraat on Houses",
   "P104": "Ritual Impurity of a Zav",
-  "P105": "Ritual Impurity of Semen\\<br>Impurity caused by Discharge",
+  "P105": "Ritual Impurity of a Seminal Discharge",
   "P106": "Ritual Impurity of a Zavah",
   "P107": "Ritual Impurity Contracted through Contact with a Corpse",
   "P108": "The Purifying Waters of the Red Heifer",

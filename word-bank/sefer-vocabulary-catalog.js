@@ -1,846 +1,624 @@
-/* Sefer HaMitzvos direct-reference vocabulary.
- * IMPORTANT: Every displayed Hebrew term must be directly anchored to the
- * numbered mitzvah's verified title/subject. Never pad with broad topic words.
- * A title with no approved word has an empty matching activity, not guesses.
- * To add vocabulary, add an explicit title-anchored match or a reviewed
- * numbered-ref override. This is a safety constraint, not a target count.
+/* Explicit, individually reviewed Sefer HaMitzvos vocabulary; no title matching.
+ * Sources: ../sefer-hamitzvos/CONTENT-SOURCES.md. Existing word-bank IDs are preserved.
  */
 (function(root){
  'use strict';
- const rules=[[/city of refuge/i,"עִיר מִקְלָט","city of refuge"],
-  [/exil|banish/i,"גָּלוּת","exile"],
-  [/inadvertent|unintentional|accidental/i,"שׁוֹגֵג","unintentional"],
-  [/murder|killer/i,"רוֹצֵחַ","killer"],
-  [/covet|plotting to acquire/i,"לֹא תַחְמֹד","do not covet"],
-  [/desir(e|ing) another|desire.*belong/i,"לֹא תִתְאַוֶּה","do not desire another's possession"],
-  [/property|possessions|owner|thief|steal|robbery/i,"רְכוּשׁ","property"],
-  [/idol|idolat|false god|foreign theolog|worship.*other/i,"עֲבוֹדָה זָרָה","idol worship"],
-  [/false prophet|prophec/i,"נְבִיא שֶׁקֶר","false prophet"],
-  [/prophet/i,"נָבִיא","prophet"],
-  [/sorc(er|ery)|witchcraft|divination|omen|astrolog|incantation|soothsaying|magic/i,"כִּשּׁוּף","sorcery"],
-  [/inciter|inciting/i,"מֵסִית","inciter"],
-  [/temple|sanctuary|beis hamikdash/i,"בֵּית הַמִּקְדָּשׁ","Beis Hamikdash"],
-  [/\bark\b/i,"אֲרוֹן הַבְּרִית","holy ark"],
-  [/menorah/i,"מְנוֹרָה","menorah"],
-  [/altar/i,"מִזְבֵּחַ","altar"],
-  [/incense/i,"קְטֹרֶת","incense"],
-  [/showbread/i,"לֶחֶם הַפָּנִים","showbread"],
-  [/anoint/i,"שֶׁמֶן הַמִּשְׁחָה","anointing oil"],
-  [/bless(ing|ings)|grace after meals/i,"בְּרָכָה","blessing"],
-  [/prayer|pray/i,"תְּפִלָּה","prayer"],
-  [/shema\b/i,"שְׁמַע יִשְׂרָאֵל","Shema"],
-  [/tefillin|phylacter/i,"תְּפִלִּין","tefillin"],
-  [/mezuzah/i,"מְזוּזָה","mezuzah"],
-  [/tzitzit|fringes/i,"צִיצִית","tzitzis"],
-  [/shofar/i,"שׁוֹפָר","shofar"],
-  [/trumpet/i,"חֲצוֹצְרוֹת","trumpets"],
-  [/torah|scripture/i,"תּוֹרָה","Torah"],
-  [/scroll|book/i,"סֵפֶר","scroll/book"],
-  [/stud(y|ying)|teach(ing)?|learning/i,"לִמּוּד","learning"],
-  [/shabbat|sabbath/i,"שַׁבָּת","Shabbos"],
-  [/work|labor/i,"מְלָאכָה","work"],
-  [/\brest(ing)?\b/i,"מְנוּחָה","rest"],
-  [/kiddush/i,"קִדּוּשׁ","Kiddush"],
-  [/havdalah/i,"הַבְדָּלָה","Havdalah"],
-  [/passover|pesach|paschal/i,"פֶּסַח","Pesach"],
-  [/matza(h)?/i,"מַצָּה","matzah"],
-  [/chametz|leaven/i,"חָמֵץ","chametz"],
-  [/sukkah|sukkot/i,"סֻכָּה","sukkah"],
-  [/shavuot/i,"שָׁבוּעוֹת","Shavuos"],
-  [/rosh hashanah/i,"רֹאשׁ הַשָּׁנָה","Rosh Hashanah"],
-  [/yom kippur/i,"יוֹם כִּפּוּר","Yom Kippur"],
-  [/shemini atzeret/i,"שְׁמִינִי עֲצֶרֶת","Shemini Atzeres"],
-  [/festival|holiday/i,"יוֹם טוֹב","Yom Tov"],
-  [/omer/i,"עֹמֶר","Omer"],
-  [/count(ing)?/i,"סְפִירָה","counting"],
-  [/month|new moon|rosh chodesh/i,"חֹדֶשׁ","month"],
-  [/year/i,"שָׁנָה","year"],
-  [/fast(ing)?/i,"צוֹם","fast"],
-  [/rejoic(ing|e)|joy/i,"שִׂמְחָה","joy"],
-  [/offering|sacrifice|sacrificial/i,"קָרְבָּן","offering"],
-  [/sin offering/i,"קָרְבַּן חַטָּאת","sin offering"],
-  [/guilt offering/i,"קָרְבַּן אָשָׁם","guilt offering"],
-  [/burnt offering/i,"קָרְבַּן עוֹלָה","burnt offering"],
-  [/meal offering/i,"מִנְחָה","meal offering"],
-  [/priest|kohen|high priest/i,"כֹּהֵן","Kohen"],
-  [/high priest/i,"כֹּהֵן גָּדוֹל","Kohen Gadol"],
-  [/levite/i,"לֵוִי","Levi"],
-  [/priestly garment|priest.s robe|breastplate|apron/i,"בִּגְדֵי כְּהֻנָּה","priestly garments"],
-  [/purif|ritual purity/i,"טָהֳרָה","ritual purity"],
-  [/impur|unclean|defil/i,"טֻמְאָה","ritual impurity"],
-  [/mikvah|immersi|ritual pool/i,"מִקְוֶה","mikvah"],
-  [/tzaraat|metzora|leper/i,"צָרַעַת","tzaraas"],
-  [/red heifer/i,"פָּרָה אֲדֻמָּה","red heifer"],
-  [/corpse|dead|bury|burial|funeral/i,"מֵת","deceased person"],
-  [/vow|pledge/i,"נֶדֶר","vow"],
-  [/oath|swear|swearing/i,"שְׁבוּעָה","oath"],
-  [/confess(ing|ion)?/i,"וִדּוּי","confession"],
-  [/repent|teshuva/i,"תְּשׁוּבָה","repentance"],
-  [/\bsins?\b/i,"חֵטְא","sin"],
-  [/theft|steal|thief/i,"גְּנֵבָה","theft"],
-  [/return(ing)? .*lost|lost (article|item|object)/i,"הֲשָׁבַת אֲבֵדָה","returning lost property"],
-  [/restitution/i,"תַּשְׁלוּמִין","compensation"],
-  [/damage|injury|goring|attacker/i,"נֶזֶק","damage"],
-  [/fire|arson/i,"אֵשׁ","fire"],
-  [/grazing animal|herd/i,"בְּהֵמָה","domestic animal"],
-  [/ox|bull/i,"שׁוֹר","ox"],
-  [/animal|beast|cattle/i,"בְּהֵמָה","animal"],
-  [/bird|fowl/i,"עוֹף","bird"],
-  [/fish/i,"דָּג","fish"],
-  [/insect|locust|grasshopper/i,"חָגָב","locust"],
-  [/blood/i,"דָּם","blood"],
-  [/meat|flesh/i,"בָּשָׂר","meat"],
-  [/slaughter/i,"שְׁחִיטָה","shechitah"],
-  [/kosher/i,"כָּשֵׁר","kosher"],
-  [/fat(s)?\b/i,"חֵלֶב","fat"],
-  [/cooking|boil/i,"בִּשּׁוּל","cooking"],
-  [/eating|consum(ing|ption)|food/i,"אֲכִילָה","eating"],
-  [/firstborn/i,"בְּכוֹר","firstborn"],
-  [/redeem|redemption/i,"פִּדְיוֹן","redemption"],
-  [/dough|challah/i,"חַלָּה","challah"],
-  [/tithe/i,"מַעֲשֵׂר","tithe"],
-  [/terumah|priestly portion/i,"תְּרוּמָה","terumah"],
-  [/first fruit/i,"בִּכּוּרִים","first fruits"],
-  [/field|crop|harvest|grain|wheat/i,"שָׂדֶה","field"],
-  [/vineyard|grape/i,"כֶּרֶם","vineyard"],
-  [/fruit|tree/i,"פְּרִי","fruit"],
-  [/sheave/i,"עֹמֶר","sheaf"],
-  [/forgotten sheaves/i,"שִׁכְחָה","forgotten sheaves"],
-  [/fallen stalk/i,"לֶקֶט","fallen stalks"],
-  [/field.s (corner|edge)|edges of the fields/i,"פֵּאָה","field corner"],
-  [/sabbatical|shemitta|shemitah/i,"שְׁמִטָּה","Shemitah"],
-  [/jubilee/i,"יוֹבֵל","Yovel"],
-  [/land of israel|eretz yisrael/i,"אֶרֶץ יִשְׂרָאֵל","Eretz Yisrael"],
-  [/jerusalem/i,"יְרוּשָׁלַיִם","Yerushalayim"],
-  [/inheritance|hereditary/i,"נַחֲלָה","inheritance"],
-  [/\bcit(?:y|ies)\b|walled cit/i,"עִיר","city"],
-  [/home|house|houses|dwelling/i,"בַּיִת","house"],
-  [/boundary|border/i,"גְּבוּל","boundary"],
-  [/judge|judgment|judicial|court|trial/i,"בֵּית דִּין","court"],
-  [/witness|testimony|evidence/i,"עֵד","witness"],
-  [/verdict|decision/i,"פְּסַק דִּין","ruling"],
-  [/execution|punish|death penalty|capital offense/i,"עֹנֶשׁ","punishment"],
-  [/flogg(ing)?/i,"מַלְקוֹת","lashes"],
-  [/bribe/i,"שֹׁחַד","bribe"],
-  [/ransom/i,"כֹּפֶר","ransom"],
-  [/fine\b/i,"קְנָס","fine"],
-  [/loan|lend|borrower|lending/i,"הַלְוָאָה","loan"],
-  [/interest/i,"רִבִּית","interest"],
-  [/debt/i,"חוֹב","debt"],
-  [/poor|charity|tzedakah/i,"צְדָקָה","tzedakah"],
-  [/measure|weight|scale/i,"מִדָּה","measure"],
-  [/business|transaction|buy|sell|selling|sale/i,"מִקָּח וּמִמְכָּר","buying and selling"],
-  [/lost|deposit|watchman|guard(ian|ing)?|custody/i,"שְׁמִירָה","guarding"],
-  [/servant|slave|bondsman|maidservant/i,"עֶבֶד","servant"],
-  [/wage|employee|worker|laborer/i,"שָׂכָר","wages"],
-  [/\bking\b|\bmonarch\b/i,"מֶלֶךְ","king"],
-  [/army|battle|\bwar\b|siege/i,"מִלְחָמָה","war"],
-  [/amalek/i,"עֲמָלֵק","Amalek"],
-  [/egypt/i,"מִצְרַיִם","Egypt"],
-  [/canaanite|seven nations/i,"שֶׁבַע עֲמָמִים","seven nations"],
-  [/marry|married|marriage|husband|wife|widow/i,"נִשּׂוּאִין","marriage"],
-  [/divorce/i,"גֵּט","get (divorce document)"],
-  [/circumcision/i,"בְּרִית מִילָה","bris milah"],
-  [/brother|sister|father|mother|parent|daughter|\bson\b/i,"מִשְׁפָּחָה","family"],
-  [/levirate|yibbum/i,"יִבּוּם","yibbum"],
-  [/beautiful captive/i,"יְפַת תֹּאַר","beautiful captive"],
-  [/sotah|suspected adulteress/i,"סוֹטָה","sotah"],
-  [/kindness/i,"חֶסֶד","kindness"],
-  [/love|loving/i,"אַהֲבָה","love"],
-  [/hatred|hate/i,"שִׂנְאָה","hatred"],
-  [/revenge|vengeance/i,"נְקָמָה","revenge"],
-  [/grudge/i,"נְטִירָה","holding a grudge"],
-  [/respect|honor|honoring/i,"כָּבוֹד","honor"],
-  [/reprov|rebuk/i,"תּוֹכֵחָה","rebuke"],
-  [/slander|gossip/i,"לָשׁוֹן הָרָע","slander"],
-  [/curse|cursing/i,"קְלָלָה","curse"],
-  [/truth|false testimony|deceit|dishonest/i,"שֶׁקֶר","falsehood"],
-  [/hol(y|iness)|sanctif|sacred/i,"קֹדֶשׁ","holiness"],
-  [/g-d|hashem|divine/i,"הַשֵּׁם","Hashem"],
-  [/belief|believ/i,"אֱמוּנָה","faith"],
-  [/\bunity\b|one g-d/i,"אֶחָד","one"],
-  [/fear|reverence/i,"יִרְאָה","fear/reverence"],
-  [/nazirite/i,"נָזִיר","nazir"],
-  [/hair|shav(e|ing)|sideburn/i,"שֵׂעָר","hair"],
-  [/cloth|garment|clothes|robe|wearing/i,"בֶּגֶד","garment"],
-  [/wool/i,"צֶמֶר","wool"],
-  [/linen/i,"פִּשְׁתִּים","linen"],
-  [/tattoo/i,"כְּתוֹבֶת קַעֲקַע","tattoo"],
-  [/\boil\b/i,"שֶׁמֶן","oil"],
-  [/salt/i,"מֶלַח","salt"],
-  [/honey/i,"דְּבַשׁ","honey"],
-  [/wine|inebriat|drunk/i,"יַיִן","wine"],
-  [/bread/i,"לֶחֶם","bread"],
-  [/water/i,"מַיִם","water"],
-  [/circumvent|avoid|neglect/i,"בִּטּוּל","neglect"]];
- const overrides={
-  "P225": [
-    [
-      "עִיר מִקְלָט",
-      "city of refuge"
-    ],
-    [
-      "גָּלוּת",
-      "exile"
-    ],
-    [
-      "בֵּית דִּין",
-      "Jewish court"
-    ]
-  ],
-  "N265": [
-    [
-      "לֹא תַחְמֹד",
-      "do not covet"
-    ],
-    [
-      "חֶמְדָּה",
-      "coveting"
-    ],
-    [
-      "רְכוּשׁ הַזּוּלָת",
-      "another person's possessions"
-    ]
-  ],
-  "N266": [
-    [
-      "לֹא תִתְאַוֶּה",
-      "do not desire another's possessions"
-    ],
-    [
-      "תַּאֲוָה",
-      "desire"
-    ],
-    [
-      "רְכוּשׁ הַזּוּלָת",
-      "another person's possessions"
-    ]
-  ],
-  "N4": [
-    [
-      "פֶּסֶל",
-      "statue"
-    ]
-  ],
-  "N7": [
-    [
-      "מֹלֶךְ",
-      "Molech"
-    ]
-  ],
-  "N8": [
-    [
-      "אוֹב",
-      "Ov"
-    ]
-  ],
-  "N9": [
-    [
-      "יִדְּעֹנִי",
-      "Yidoni"
-    ]
-  ],
-  "N11": [
-    [
-      "בֵּית עֲבוֹדָה זָרָה",
-      "place of idol worship"
-    ]
-  ],
-  "N12": [
-    [
-      "אֶבֶן מַשְׂכִּית",
-      "kneeling stone"
-    ],
-    [
-      "הִשְׁתַּחֲוָאָה",
-      "bowing"
-    ]
-  ],
-  "N23": [
-    [
-      "עִיר הַנִּדַּחַת",
-      "apostate city"
-    ],
-    [
-      "עֲבוֹדָה זָרָה",
-      "idol worship"
-    ]
-  ],
-  "N24": [
-    [
-      "עִיר הַנִּדַּחַת",
-      "apostate city"
-    ],
-    [
-      "עֲבוֹדָה זָרָה",
-      "idol worship"
-    ]
-  ],
-  "N30": [
-    [
-      "חֻקּוֹת הַגּוֹיִם",
-      "practices of other nations"
-    ]
-  ],
-  "N36": [
-    [
-      "שְׁאֵלַת אוֹב",
-      "consulting an Ov"
-    ]
-  ],
-  "N37": [
-    [
-      "שְׁאֵלַת יִדְּעֹנִי",
-      "consulting a Yidoni"
-    ]
-  ],
-  "N40": [
-    [
-      "לֹא יִלְבַּשׁ",
-      "do not cross-dress"
-    ],
-    [
-      "בְּגָדִים",
-      "clothing"
-    ]
-  ],
-  "N45": [
-    [
-      "שְׂרִיטָה",
-      "scarring"
-    ]
-  ],
-  "N54": [
-    [
-      "אֲדוֹמִי",
-      "Edomite"
-    ]
-  ],
-  "N57": [
-    [
-      "בַּל תַּשְׁחִית",
-      "do not destroy needlessly"
-    ],
-    [
-      "הַשְׁחָתָה",
-      "destruction"
-    ]
-  ],
-  "N63": [
-    [
-      "חִלּוּל הַשֵּׁם",
-      "desecrating Hashem's Name"
-    ]
-  ],
-  "N64": [
-    [
-      "לֹא תְנַסּוּ",
-      "do not test Hashem"
-    ]
-  ],
-  "N65": [
-    [
-      "בֵּית הַמִּקְדָּשׁ",
-      "Beis Hamikdash"
-    ],
-    [
-      "אִסּוּר הַשְׁחָתָה",
-      "prohibition against destroying"
-    ]
-  ],
-  "N157": [
-    [
-      "מוֹצָא שְׂפָתֶיךָ",
-      "what you promise"
-    ],
-    [
-      "הֲפָרַת הַבְטָחָה",
-      "breaking a promise"
-    ]
-  ],
-  "N176": [
-    [
-      "שְׁרָצִים",
-      "creeping creatures"
-    ]
-  ],
-  "N183": [
-    [
-      "גִּיד הַנָּשֶׁה",
-      "sciatic nerve"
-    ]
-  ],
-  "N215": [
-    [
-      "כִּלְאַיִם",
-      "forbidden mixtures"
-    ],
-    [
-      "זְרָעִים",
-      "seeds"
-    ]
-  ],
-  "N243": [
-    [
-      "גְּנֵבַת נֶפֶשׁ",
-      "kidnapping"
-    ]
-  ],
-  "N247": [
-    [
-      "עֹשֶׁק",
-      "withholding money owed"
-    ],
-    [
-      "שָׂכָר",
-      "wages"
-    ]
-  ],
-  "N250": [
-    [
-      "יֹשֶׁר",
-      "honesty"
-    ],
-    [
-      "מִשָּׂא וּמַתָּן",
-      "commerce"
-    ]
-  ],
-  "N251": [
-    [
-      "אוֹנָאַת דְּבָרִים",
-      "hurtful words"
-    ]
-  ],
-  "N252": [
-    [
-      "אוֹנָאַת דְּבָרִים",
-      "hurtful words"
-    ],
-    [
-      "גֵּר",
-      "convert"
-    ]
-  ],
-  "N273": [
-    [
-      "מִשְׁפַּט צֶדֶק",
-      "just judgment"
-    ],
-    [
-      "בֵּית דִּין",
-      "court"
-    ]
-  ],
-  "N275": [
-    [
-      "בַּעַל דִּין",
-      "litigant"
-    ],
-    [
-      "מַשּׂוֹא פָּנִים",
-      "favoritism"
-    ]
-  ],
-  "N277": [
-    [
-      "בַּעַל דִּין",
-      "litigant"
-    ],
-    [
-      "דַּל",
-      "poor person"
-    ]
-  ],
-  "N278": [
-    [
-      "בַּעַל דִּין",
-      "litigant"
-    ],
-    [
-      "דַּיָּן",
-      "judge"
-    ]
-  ],
-  "N280": [
-    [
-      "גֵּר",
-      "convert"
-    ],
-    [
-      "יָתוֹם",
-      "orphan"
-    ],
-    [
-      "מִשְׁפַּט צֶדֶק",
-      "just judgment"
-    ]
-  ],
-  "N281": [
-    [
-      "בַּעַל דִּין",
-      "litigant"
-    ],
-    [
-      "דַּיָּן",
-      "judge"
-    ]
-  ],
-  "N298": [
-    [
-      "מִכְשׁוֹל",
-      "hazard"
-    ],
-    [
-      "מַעֲקֶה",
-      "safety railing"
-    ]
-  ],
-  "N299": [
-    [
-      "עֵצָה רָעָה",
-      "bad advice"
-    ],
-    [
-      "לִפְנֵי עִוֵּר",
-      "do not mislead another"
-    ]
-  ],
-  "N303": [
-    [
-      "הַלְבָּנַת פָּנִים",
-      "public shaming"
-    ]
-  ],
-  "N340": [
-    [
-      "אִסּוּר עֲרָיוֹת",
-      "prohibited relationships"
-    ],
-    [
-      "דּוֹדָה",
-      "aunt"
-    ]
-  ],
-  "N341": [
-    [
-      "אִסּוּר עֲרָיוֹת",
-      "prohibited relationships"
-    ],
-    [
-      "דּוֹדָה",
-      "aunt"
-    ]
-  ],
-  "N346": [
-    [
-      "נִדָּה",
-      "niddah"
-    ],
-    [
-      "אִסּוּר עֲרָיוֹת",
-      "prohibited relationships"
-    ]
-  ],
-  "N347": [
-    [
-      "נִאוּף",
-      "adultery"
-    ]
-  ],
-  "N348": [
-    [
-      "רְבִיעָה",
-      "forbidden relations with an animal"
-    ],
-    [
-      "בְּהֵמָה",
-      "animal"
-    ]
-  ],
-  "N349": [
-    [
-      "רְבִיעָה",
-      "forbidden relations with an animal"
-    ],
-    [
-      "בְּהֵמָה",
-      "animal"
-    ]
-  ],
-  "N350": [
-    [
-      "מִשְׁכַּב זָכָר",
-      "prohibited male relations"
-    ]
-  ],
-  "N352": [
-    [
-      "אִסּוּר עֲרָיוֹת",
-      "prohibited relationships"
-    ],
-    [
-      "מִשְׁפָּחָה",
-      "family"
-    ]
-  ],
-  "N353": [
-    [
-      "פְּרִיצוּת",
-      "immodest behavior"
-    ]
-  ],
-  "N355": [
-    [
-      "אִסּוּר זְנוּת",
-      "prohibited relations outside marriage"
-    ]
-  ],
-  "N358": [
-    [
-      "גֵּט",
-      "divorce document"
-    ],
-    [
-      "אֹנֶס",
-      "coercion"
-    ]
-  ],
-  "N359": [
-    [
-      "מוֹצִיא שֵׁם רָע",
-      "one who defames"
-    ],
-    [
-      "גֵּט",
-      "divorce document"
-    ]
-  ],
-  "N360": [
-    [
-      "סְרִיס",
-      "castrated man"
-    ]
-  ],
-  "N361": [
-    [
-      "סֵרוּס",
-      "castration"
-    ]
-  ],
-  "P6": [
-    [
-      "חֲכָמִים",
-      "sages"
-    ],
-    [
-      "דְּבֵקוּת",
-      "clinging to"
-    ]
-  ],
-  "P8": [
-    [
-      "לָלֶכֶת בִּדְרָכָיו",
-      "to follow Hashem's ways"
-    ]
-  ],
-  "P16": [
-    [
-      "הַקְהֵל",
-      "gathering the Jewish people"
-    ],
-    [
-      "קָהָל",
-      "assembly"
-    ]
-  ],
-  "P94": [
-    [
-      "דִּבּוּר",
-      "speech"
-    ],
-    [
-      "קִיּוּם הַבְטָחָה",
-      "keeping a promise"
-    ]
-  ],
-  "P171": [
-    [
-      "מַחֲצִית הַשֶּׁקֶל",
-      "half-shekel"
-    ]
-  ],
-  "P177": [
-    [
-      "בַּעַל דִּין",
-      "litigant"
-    ],
-    [
-      "מִשְׁפַּט צֶדֶק",
-      "fair judgment"
-    ]
-  ],
-  "P181": [
-    [
-      "עֶגְלָה עֲרוּפָה",
-      "decapitated calf"
-    ]
-  ],
-  "P182": [
-    [
-      "עָרֵי מִקְלָט",
-      "cities of refuge"
-    ]
-  ],
-  "P193": [
-    [
-      "מַחֲנֶה",
-      "camp"
-    ],
-    [
-      "יָתֵד",
-      "camp latrine peg"
-    ]
-  ],
-  "P194": [
-    [
-      "הֲשָׁבַת גְּזֵלָה",
-      "returning stolen property"
-    ]
-  ],
-  "P212": [
-    [
-      "פְּרוּ וּרְבוּ",
-      "be fruitful and multiply"
-    ]
-  ],
-  "P218": [
-    [
-      "אֹנֶס",
-      "coercion"
-    ],
-    [
-      "בֵּית דִּין",
-      "Jewish court"
-    ]
-  ],
-  "P220": [
-    [
-      "מְפַתֶּה",
-      "seducer"
-    ],
-    [
-      "בֵּית דִּין",
-      "Jewish court"
-    ]
-  ],
-  "P230": [
-    [
-      "תְּלִיָּה",
-      "hanging"
-    ]
-  ],
-  "P246": [
-    [
-      "טַעֲנוֹת",
-      "legal claims"
-    ],
-    [
-      "בֵּית דִּין",
-      "Jewish court"
-    ]
-  ],
-  "N232": [
-    [
-      "עָנִי",
-      "person in need"
-    ],
-    [
-      "צְדָקָה",
-      "tzedakah"
-    ]
-  ],
-  "N239": [
-    [
-      "מַשְׁכּוֹן",
-      "collateral"
-    ],
-    [
-      "בַּעַל חוֹב",
-      "debtor"
-    ]
-  ],
-  "N270": [
-    [
-      "עֶזְרָה",
-      "help"
-    ],
-    [
-      "נִזְקָק",
-      "person in need"
-    ]
-  ],
-  "N297": [
-    [
-      "פִּקּוּחַ נֶפֶשׁ",
-      "saving a life"
-    ],
-    [
-      "הַצָּלָה",
-      "rescue"
-    ]
-  ],
-  "P114": [
-    [
-      "עֲרָכִין",
-      "vowed valuation"
-    ],
-    [
-      "עֵרֶךְ",
-      "value"
-    ]
-  ],
-  "P169": [
-    [
-      "אַרְבַּעַת הַמִּינִים",
-      "the four species"
-    ],
-    [
-      "אֶתְרוֹג",
-      "esrog"
-    ],
-    [
-      "לוּלָב",
-      "lulav"
-    ]
-  ],
-  "P196": [
-    [
-      "הַעֲנָקָה",
-      "gifts at release"
-    ],
-    [
-      "עֶבֶד עִבְרִי",
-      "Jewish bondsman"
-    ]
-  ]
+ const entries={
+  "P1": [["אֱמוּנָה", "belief"]],
+  "P2": [["אֶחָד", "one"]],
+  "P3": [["אהבת ה׳", "love of Hashem"]],
+  "P4": [["יראת ה׳", "awe of Hashem"]],
+  "P5": [["תפילה", "prayer"]],
+  "P6": [["תלמיד חכם", "Torah scholar"]],
+  "P7": [["שְׁבוּעָה", "oath"]],
+  "P8": [["רחמים", "mercy"]],
+  "P9": [["קידוש השם", "sanctifying Hashem's Name"]],
+  "P10": [["קריאת שמע", "reciting Shema"]],
+  "P11": [["תלמוד תורה", "Torah study"]],
+  "P12": [["תפילין של ראש", "head tefillin"]],
+  "P13": [["תפילין של יד", "arm tefillin"]],
+  "P14": [["צִיצִית", "tzitzis"]],
+  "P15": [["מְזוּזָה", "mezuzah"]],
+  "P16": [["הַקְהֵל", "Hakhel gathering"]],
+  "P17": [["מֶלֶךְ", "king"], ["ספר תורה", "Torah scroll"]],
+  "P18": [["ספר תורה", "Torah scroll"]],
+  "P19": [["ברכת המזון", "blessing after a bread meal"]],
+  "P20": [["בֵּית הַמִּקְדָּשׁ", "Beis Hamikdash"]],
+  "P21": [["מורא מקדש", "awe of the Beis Hamikdash"]],
+  "P22": [["שְׁמִירָה", "guarding"]],
+  "P23": [["לויים", "Leviim"]],
+  "P24": [["קידוש ידיים ורגליים", "washing hands and feet for service"]],
+  "P25": [["מְנוֹרָה", "Menorah"]],
+  "P26": [["ברכת כהנים", "the kohanim's blessing"]],
+  "P27": [["לֶחֶם הַפָּנִים", "showbread"]],
+  "P28": [["קטורת", "incense"]],
+  "P29": [["אש תמיד", "constant fire"]],
+  "P30": [["תרומת הדשן", "removing altar ashes"]],
+  "P31": [["טומאה", "ritual impurity"]],
+  "P32": [["כֹּהֵן", "kohen"]],
+  "P33": [["בגדי כהונה", "priestly garments"]],
+  "P34": [["אֲרוֹן הַבְּרִית", "Aron of the covenant"]],
+  "P35": [["שֶׁמֶן הַמִּשְׁחָה", "anointing oil"]],
+  "P36": [["משמרות", "service shifts"]],
+  "P37": [["קרובים", "close relatives"]],
+  "P38": [["כֹּהֵן גָּדוֹל", "Kohen Gadol"]],
+  "P39": [["קרבן תמיד", "daily offering"]],
+  "P40": [["מנחת חביתין", "the Kohen Gadol's flour offering"]],
+  "P41": [["מוסף שבת", "additional Shabbos offering"]],
+  "P42": [["מוסף ראש חודש", "additional Rosh Chodesh offering"]],
+  "P43": [["מוסף פסח", "additional Pesach offering"]],
+  "P44": [["עומר", "Omer offering"]],
+  "P45": [["מוסף שבועות", "additional Shavuos offering"]],
+  "P46": [["שתי הלחם", "two loaves"]],
+  "P47": [["מוסף ראש השנה", "additional Rosh Hashanah offering"]],
+  "P48": [["מוסף יום הכיפורים", "additional Yom Kippur offering"]],
+  "P49": [["עבודת יום הכיפורים", "Yom Kippur service"]],
+  "P50": [["מוסף סוכות", "additional Sukkos offering"]],
+  "P51": [["מוסף שמיני עצרת", "additional Shemini Atzeres offering"]],
+  "P52": [["קרבן חגיגה", "festival offering"]],
+  "P53": [["עלייה לרגל", "festival pilgrimage"]],
+  "P54": [["שמחת יום טוב", "Yom Tov joy"]],
+  "P55": [["קרבן פסח", "Pesach offering"]],
+  "P56": [["מצה ומרור", "matzah and maror"]],
+  "P57": [["פסח שני", "second Pesach"]],
+  "P58": [["פסח שני", "second Pesach"]],
+  "P59": [["חֲצוֹצְרוֹת", "trumpets"]],
+  "P60": [["שמונה ימים", "eight days"]],
+  "P61": [["תמים", "without a blemish"]],
+  "P62": [["מֶלַח", "salt"]],
+  "P63": [["עולה", "burnt offering"]],
+  "P64": [["חטאת", "sin offering"]],
+  "P65": [["אשם", "guilt offering"]],
+  "P66": [["שלמים", "peace offering"]],
+  "P67": [["מִנְחָה", "flour offering"]],
+  "P68": [["העלם דבר", "a mistaken ruling"]],
+  "P69": [["שׁוֹגֵג", "unintentional sinner"], ["חטאת", "sin offering"]],
+  "P70": [["אשם תלוי", "offering for a doubtful sin"]],
+  "P71": [["אשם ודאי", "definite guilt offering"]],
+  "P72": [["קרבן עולה ויורד", "offering adjusted to one's means"]],
+  "P73": [["וידוי", "confession"]],
+  "P74": [["זב", "man with a particular bodily discharge"]],
+  "P75": [["זבה", "woman with a particular bodily discharge"]],
+  "P76": [["יולדת", "woman who has given birth"]],
+  "P77": [["מצורע", "person with tzaraas"]],
+  "P78": [["מעשר בהמה", "animal tithe"]],
+  "P79": [["בְּכוֹר", "firstborn"]],
+  "P80": [["פדיון הבן", "redeeming a firstborn son"]],
+  "P81": [["פטר חמור", "firstborn donkey"]],
+  "P82": [["עריפה", "breaking the neck"]],
+  "P83": [["רגל", "pilgrimage festival"]],
+  "P84": [["בית הבחירה", "the chosen sanctuary"]],
+  "P85": [["חוץ לארץ", "outside Eretz Yisrael"]],
+  "P86": [["פִּדְיוֹן", "redemption"]],
+  "P87": [["תמורה", "substituted offering"]],
+  "P88": [["שיירי מנחות", "remainders of flour offerings"]],
+  "P89": [["בשר קודש", "holy sacrificial meat"]],
+  "P90": [["קודשים", "holy offerings"]],
+  "P91": [["נותר", "sacrificial meat left too long"]],
+  "P92": [["נָזִיר", "nazir"]],
+  "P93": [["נזירות", "nezirus"]],
+  "P94": [["נֶדֶר", "vow"]],
+  "P95": [["התרת נדרים", "release from vows"]],
+  "P96": [["נבלה", "animal carcass"]],
+  "P97": [["שרץ", "small creature specified in the tumah laws"]],
+  "P98": [["אוכל ומשקה", "food and drink"]],
+  "P99": [["נידה", "niddah"]],
+  "P100": [["יולדת", "woman who has given birth"]],
+  "P101": [["צָרַעַת", "tzaraas"]],
+  "P102": [["בֶּגֶד", "garment"], ["צָרַעַת", "tzaraas"]],
+  "P103": [["בַּיִת", "house"], ["צָרַעַת", "tzaraas"]],
+  "P104": [["זב", "man with a particular bodily discharge"]],
+  "P105": [["שכבת זרע", "seminal discharge"]],
+  "P106": [["זבה", "woman with a particular bodily discharge"]],
+  "P107": [["טומאת מת", "tumah from a dead body"]],
+  "P108": [["מי חטאת", "water mixed with red-heifer ashes"]],
+  "P109": [["מקווה", "mikveh"]],
+  "P110": [["טָהֳרָה", "purification"], ["צָרַעַת", "tzaraas"]],
+  "P111": [["תגלחת", "shaving"]],
+  "P112": [["טמא", "ritually impure"]],
+  "P113": [["פרה אדומה", "red heifer"]],
+  "P114": [["עֲרָכִין", "vowed valuations"]],
+  "P115": [["ערך בהמה", "valuation of an animal"]],
+  "P116": [["ערך בית", "valuation of a house"]],
+  "P117": [["ערך שדה", "valuation of a field"]],
+  "P118": [["מעילה", "misuse of holy property"]],
+  "P119": [["נטע רבעי", "fourth-year fruit"]],
+  "P120": [["פֵּאָה", "harvest corner left for the poor"]],
+  "P121": [["לֶקֶט", "fallen stalks left for the poor"]],
+  "P122": [["שִׁכְחָה", "forgotten produce left for the poor"]],
+  "P123": [["עוללות", "incomplete grape clusters"]],
+  "P124": [["פרט", "fallen grapes"]],
+  "P125": [["ביכורים", "first fruits"]],
+  "P126": [["תְּרוּמָה", "produce gift to a kohen"]],
+  "P127": [["מעשר ראשון", "first tithe"]],
+  "P128": [["מעשר שני", "second tithe"]],
+  "P129": [["תרומת מעשר", "a tenth of the Levi's tithe"]],
+  "P130": [["מעשר עני", "tithe for the poor"]],
+  "P131": [["וידוי מעשר", "declaration about tithes"]],
+  "P132": [["מקרא ביכורים", "first-fruits declaration"]],
+  "P133": [["הפרשת חלה", "separating challah"]],
+  "P134": [["הפקר", "ownerless produce"]],
+  "P135": [["שמיטה", "Shemittah year"]],
+  "P136": [["יוֹבֵל", "Jubilee year"]],
+  "P137": [["דרור", "freedom"], ["שׁוֹפָר", "shofar"]],
+  "P138": [["נַחֲלָה", "ancestral property"]],
+  "P139": [["בתי ערי חומה", "houses in walled cities"]],
+  "P140": [["ספירת היובל", "counting toward Yovel"]],
+  "P141": [["שמיטת כספים", "cancellation of debts"]],
+  "P142": [["נוכרי", "non-Jew"], ["חוֹב", "debt"]],
+  "P143": [["זרוע לחיים וקיבה", "foreleg, cheeks, and stomach"]],
+  "P144": [["ראשית הגז", "first shearing"]],
+  "P145": [["חרם", "property dedicated as cherem"]],
+  "P146": [["שְׁחִיטָה", "kosher slaughter"]],
+  "P147": [["כיסוי הדם", "covering the blood"]],
+  "P148": [["שילוח הקן", "sending away the mother bird"]],
+  "P149": [["סימני טהרה", "kosher signs"]],
+  "P150": [["עוֹף", "bird"]],
+  "P151": [["חָגָב", "locust"]],
+  "P152": [["סנפיר וקשקשת", "fins and scales"]],
+  "P153": [["קידוש החודש", "sanctifying the new month"]],
+  "P154": [["שַׁבָּת", "Shabbos"]],
+  "P155": [["קידוש", "Kiddush"], ["הבדלה", "Havdalah"]],
+  "P156": [["ביעור חמץ", "removing chametz"]],
+  "P157": [["יציאת מצרים", "the Exodus from Egypt"]],
+  "P158": [["מַצָּה", "matzah"]],
+  "P159": [["פֶּסַח", "Pesach"]],
+  "P160": [["שביעי של פסח", "seventh day of Pesach"]],
+  "P161": [["ספירת העומר", "counting the Omer"]],
+  "P162": [["שָׁבוּעוֹת", "Shavuos"]],
+  "P163": [["רֹאשׁ הַשָּׁנָה", "Rosh Hashanah"]],
+  "P164": [["צוֹם", "fast"]],
+  "P165": [["יום הכיפורים", "Yom Kippur"]],
+  "P166": [["סוכות", "Sukkos"]],
+  "P167": [["שְׁמִינִי עֲצֶרֶת", "Shemini Atzeres"]],
+  "P168": [["סוכה", "sukkah"]],
+  "P169": [["אַרְבַּעַת הַמִּינִים", "the four species"], ["אֶתְרוֹג", "esrog"], ["לוּלָב", "lulav"]],
+  "P170": [["שׁוֹפָר", "shofar"]],
+  "P171": [["מַחֲצִית הַשֶּׁקֶל", "half-shekel"]],
+  "P172": [["נָבִיא", "prophet"]],
+  "P173": [["מֶלֶךְ", "king"]],
+  "P174": [["בית דין הגדול", "Great Beis Din"]],
+  "P175": [["רוב", "majority"]],
+  "P176": [["שופטים ושוטרים", "judges and officers"]],
+  "P177": [["בעלי דין", "parties to a court case"]],
+  "P178": [["עדות", "testimony"]],
+  "P179": [["דרישה וחקירה", "careful questioning"]],
+  "P180": [["עדים זוממים", "plotting witnesses"]],
+  "P181": [["עֶגְלָה עֲרוּפָה", "calf of the unsolved-murder procedure"]],
+  "P182": [["עָרֵי מִקְלָט", "cities of refuge"]],
+  "P183": [["ערי לויים", "cities of the Leviim"]],
+  "P184": [["מַעֲקֶה", "roof railing"]],
+  "P185": [["עֲבוֹדָה זָרָה", "idol worship"]],
+  "P186": [["עיר הנידחת", "city condemned for communal idol worship"]],
+  "P187": [["שבעה עממים", "seven Canaanite nations"]],
+  "P188": [["עֲמָלֵק", "Amalek"]],
+  "P189": [["זכור", "remember"], ["עֲמָלֵק", "Amalek"]],
+  "P190": [["שלום", "peace"]],
+  "P191": [["משוח מלחמה", "kohen appointed for war"]],
+  "P192": [["מַחֲנֶה", "camp"]],
+  "P193": [["יָתֵד", "digging tool"]],
+  "P194": [["הֲשָׁבַת גְּזֵלָה", "returning stolen property"]],
+  "P195": [["צְדָקָה", "tzedakah"]],
+  "P196": [["הַעֲנָקָה", "gifts at release"], ["עֶבֶד עִבְרִי", "Jewish bondsman"]],
+  "P197": [["הלוואה", "loan"]],
+  "P198": [["ריבית", "interest"], ["נוכרי", "non-Jew"]],
+  "P199": [["מַשְׁכּוֹן", "collateral"]],
+  "P200": [["שכר שכיר", "a worker's wages"]],
+  "P201": [["שכיר", "worker"]],
+  "P202": [["פריקה", "unloading"]],
+  "P203": [["טעינה", "loading"]],
+  "P204": [["הֲשָׁבַת אֲבֵדָה", "returning a lost item"]],
+  "P205": [["תּוֹכֵחָה", "correction"]],
+  "P206": [["אהבת ישראל", "love of fellow Jews"]],
+  "P207": [["גר צדק", "convert to Judaism"]],
+  "P208": [["מידות ומשקלות", "measures and weights"]],
+  "P209": [["תלמיד חכם", "Torah scholar"]],
+  "P210": [["כיבוד אב ואם", "honoring parents"]],
+  "P211": [["מורא אב ואם", "respect for parents"]],
+  "P212": [["פרייה ורבייה", "having children"]],
+  "P213": [["קידושין", "kiddushin"]],
+  "P214": [["חתן", "groom"]],
+  "P215": [["בְּרִית מִילָה", "bris milah"]],
+  "P216": [["ייבום", "levirate marriage"]],
+  "P217": [["חליצה", "chalitzah"]],
+  "P218": [["אונס", "one who used force"]],
+  "P219": [["מוֹצִיא שֵׁם רָע", "husband who falsely accuses his bride"]],
+  "P220": [["מְפַתֶּה", "one who entices"]],
+  "P221": [["יפת תואר", "woman subject to the captive-marriage laws"]],
+  "P222": [["גֵּט", "Jewish divorce document"]],
+  "P223": [["סוֹטָה", "woman subject to the sotah procedure"]],
+  "P224": [["מַלְקוֹת", "lashes imposed by Beis Din"]],
+  "P225": [["עִיר מִקְלָט", "city of refuge"], ["גָּלוּת", "exile"], ["בֵּית דִּין", "Jewish court"]],
+  "P226": [["סייף", "court penalty by sword"]],
+  "P227": [["חנק", "court penalty by strangulation"]],
+  "P228": [["שריפה", "court penalty by burning"]],
+  "P229": [["סקילה", "court penalty by stoning"]],
+  "P230": [["תלייה", "hanging"]],
+  "P231": [["קבורה", "burial"]],
+  "P232": [["עֶבֶד עִבְרִי", "Jewish bondsman"]],
+  "P233": [["ייעוד", "the prescribed maidservant marriage"]],
+  "P234": [["פִּדְיוֹן", "redemption"], ["אמה עברייה", "Jewish maidservant"]],
+  "P235": [["עבד כנעני", "Canaanite bondservant"]],
+  "P236": [["חובל", "one who injures another"]],
+  "P237": [["שׁוֹר", "ox"], ["נֶזֶק", "damage"]],
+  "P238": [["בור", "pit"]],
+  "P239": [["גנב", "thief"]],
+  "P240": [["שן ורגל", "damage through eating or trampling"]],
+  "P241": [["אֵשׁ", "fire"]],
+  "P242": [["שומר חינם", "unpaid guardian"]],
+  "P243": [["שומר שכר", "paid guardian"], ["שוכר", "renter"]],
+  "P244": [["שואל", "borrower"]],
+  "P245": [["מִקָּח וּמִמְכָּר", "buying and selling"]],
+  "P246": [["טוען ונטען", "claimant and respondent"]],
+  "P247": [["רודף", "attacker"], ["נרדף", "person being pursued"]],
+  "P248": [["ירושה", "inheritance"]],
+  "N1": [["אלהים אחרים", "false gods"]],
+  "N2": [["פֶּסֶל", "idol"]],
+  "N3": [["עֲבוֹדָה זָרָה", "idol worship"]],
+  "N4": [["צורה", "figure"]],
+  "N5": [["השתחוויה", "bowing"]],
+  "N6": [["עֲבוֹדָה זָרָה", "idol worship"]],
+  "N7": [["מולך", "Molech"]],
+  "N8": [["אוֹב", "ov ritual"]],
+  "N9": [["ידעוני", "yidoni ritual"]],
+  "N10": [["עֲבוֹדָה זָרָה", "idol worship"]],
+  "N11": [["מצבה", "worship pillar"]],
+  "N12": [["אֶבֶן מַשְׂכִּית", "stone for prostration"]],
+  "N13": [["מִזְבֵּחַ", "altar"]],
+  "N14": [["שְׁבוּעָה", "oath"]],
+  "N15": [["מדיח", "one who leads a community to idolatry"]],
+  "N16": [["מֵסִית", "one who urges another to worship idols"]],
+  "N17": [["מֵסִית", "one who urges another to worship idols"]],
+  "N18": [["מֵסִית", "one who urges another to worship idols"]],
+  "N19": [["מֵסִית", "one who urges another to worship idols"]],
+  "N20": [["זכות", "argument for acquittal"]],
+  "N21": [["עדות", "testimony"]],
+  "N22": [["תכשיט", "ornament"]],
+  "N23": [["עיר הנידחת", "city condemned for communal idol worship"]],
+  "N24": [["עיר הנידחת", "city condemned for communal idol worship"]],
+  "N25": [["עֲבוֹדָה זָרָה", "idol worship"]],
+  "N26": [["נבואה", "prophecy"]],
+  "N27": [["נְבִיא שֶׁקֶר", "false prophet"]],
+  "N28": [["נבואה", "prophecy"]],
+  "N29": [["נְבִיא שֶׁקֶר", "false prophet"]],
+  "N30": [["חוקות הגויים", "forbidden idolatrous customs"]],
+  "N31": [["קוסם", "diviner"]],
+  "N32": [["מעונן", "one who chooses times by astrology"]],
+  "N33": [["ניחוש", "relying on omens"]],
+  "N34": [["כישוף", "sorcery"]],
+  "N35": [["חובר חבר", "one who recites magic charms"]],
+  "N36": [["אוֹב", "ov ritual"]],
+  "N37": [["ידעוני", "yidoni ritual"]],
+  "N38": [["דורש אל המתים", "one who consults the dead"]],
+  "N39": [["שמלת גבר", "man's clothing"]],
+  "N40": [["שמלת אישה", "woman's clothing"]],
+  "N41": [["כְּתוֹבֶת קַעֲקַע", "tattoo"]],
+  "N42": [["שעטנז", "forbidden wool-and-linen mixture"]],
+  "N43": [["פאות הראש", "corners of the head's hair"]],
+  "N44": [["זקן", "beard"]],
+  "N45": [["שְׂרִיטָה", "cut in the skin"]],
+  "N46": [["מִצְרַיִם", "Egypt"]],
+  "N47": [["לב ועיניים", "heart and eyes"]],
+  "N48": [["ברית", "covenant"]],
+  "N49": [["שבעה עממים", "seven Canaanite nations"]],
+  "N50": [["לא תחנם", "the prohibition of granting specified favors"]],
+  "N51": [["אֶרֶץ יִשְׂרָאֵל", "Eretz Yisrael"]],
+  "N52": [["נישואין", "marriage"]],
+  "N53": [["עמוני ומואבי", "Ammonite and Moabite"]],
+  "N54": [["אֲדוֹמִי", "Edomite"]],
+  "N55": [["מצרי", "Egyptian"]],
+  "N56": [["עמון ומואב", "Ammon and Moav"]],
+  "N57": [["בַּל תַּשְׁחִית", "do not destroy wastefully"]],
+  "N58": [["מִלְחָמָה", "war"]],
+  "N59": [["עֲמָלֵק", "Amalek"]],
+  "N60": [["ברכת השם", "the term used for the prohibition of cursing Hashem"]],
+  "N61": [["שבועת ביטוי", "oath about an action"]],
+  "N62": [["שבועת שווא", "vain oath"]],
+  "N63": [["חילול השם", "desecrating Hashem's Name"]],
+  "N64": [["ניסיון", "test"]],
+  "N65": [["שם קודש", "holy Name"]],
+  "N66": [["תלייה", "hanging"]],
+  "N67": [["שמירת המקדש", "guarding the Beis Hamikdash"]],
+  "N68": [["קודש הקודשים", "Holy of Holies"]],
+  "N69": [["בעל מום", "person with a disqualifying blemish"]],
+  "N70": [["מום קבוע", "permanent blemish"]],
+  "N71": [["מום עובר", "temporary blemish"]],
+  "N72": [["עבודה", "Temple service"]],
+  "N73": [["שתוי יין", "one affected by wine"]],
+  "N74": [["זר", "non-kohen"]],
+  "N75": [["כהן טמא", "kohen with tumah"]],
+  "N76": [["טבול יום", "one awaiting nightfall after immersion"]],
+  "N77": [["עֶזְרָה", "Temple courtyard"]],
+  "N78": [["הר הבית", "Temple Mount"]],
+  "N79": [["אבני מזבח", "altar stones"]],
+  "N80": [["מעלות", "stairs"]],
+  "N81": [["אש המזבח", "altar fire"]],
+  "N82": [["מזבח הזהב", "golden altar"]],
+  "N83": [["שֶׁמֶן הַמִּשְׁחָה", "anointing oil"]],
+  "N84": [["שֶׁמֶן הַמִּשְׁחָה", "anointing oil"]],
+  "N85": [["קטורת", "incense"]],
+  "N86": [["בדי הארון", "Aron poles"]],
+  "N87": [["חושן", "choshen"], ["אפוד", "ephod"]],
+  "N88": [["מעיל", "Kohen Gadol's robe"]],
+  "N89": [["העלאה בחוץ", "offering a korban outside"]],
+  "N90": [["שחוטי חוץ", "offerings slaughtered outside"]],
+  "N91": [["בעל מום", "animal with a disqualifying blemish"]],
+  "N92": [["מום", "blemish"]],
+  "N93": [["דָּם", "blood"]],
+  "N94": [["אימורים", "portions burned on the altar"]],
+  "N95": [["מום עובר", "temporary blemish"]],
+  "N96": [["בעל מום", "animal with a disqualifying blemish"]],
+  "N97": [["הטלת מום", "causing a blemish"]],
+  "N98": [["שאור ודבש", "leaven and honey"]],
+  "N99": [["מֶלַח", "salt"]],
+  "N100": [["אתנן ומחיר", "forbidden payment and exchange"]],
+  "N101": [["אותו ואת בנו", "an animal and its offspring"]],
+  "N102": [["מנחת חוטא", "sinner's flour offering"]],
+  "N103": [["לבונה", "frankincense"]],
+  "N104": [["מנחת סוטה", "sotah's flour offering"]],
+  "N105": [["לבונה", "frankincense"]],
+  "N106": [["תמורה", "substitution of an offering"]],
+  "N107": [["קודשים", "holy offerings"]],
+  "N108": [["בְּכוֹר", "firstborn"]],
+  "N109": [["מעשר בהמה", "animal tithe"]],
+  "N110": [["שדה חרם", "field dedicated as cherem"]],
+  "N111": [["חרם", "property dedicated as cherem"]],
+  "N112": [["מליקה", "the kohen's bird-offering procedure"]],
+  "N113": [["קודשים", "consecrated animals"]],
+  "N114": [["גיזה", "shearing"]],
+  "N115": [["חָמֵץ", "chametz"]],
+  "N116": [["אימורים", "portions burned on the altar"]],
+  "N117": [["נותר", "sacrificial meat left too long"]],
+  "N118": [["חגיגה", "festival offering"]],
+  "N119": [["פסח שני", "second Pesach"]],
+  "N120": [["תודה", "thanksgiving offering"]],
+  "N121": [["עצם", "bone"]],
+  "N122": [["עצם", "bone"]],
+  "N123": [["חבורה", "Pesach-offering group"]],
+  "N124": [["שיירי מנחות", "remainders of flour offerings"]],
+  "N125": [["צלי אש", "roasted over fire"]],
+  "N126": [["גר תושב", "resident non-Jew with a defined Torah status"]],
+  "N127": [["ערל", "uncircumcised male"]],
+  "N128": [["בן נכר", "one estranged from the faith in this law"]],
+  "N129": [["טמא", "ritually impure"]],
+  "N130": [["טומאה", "ritual impurity"]],
+  "N131": [["נותר", "sacrificial meat left too long"]],
+  "N132": [["פיגול", "offering invalidated by a forbidden time intention"]],
+  "N133": [["תְּרוּמָה", "produce gift to a kohen"]],
+  "N134": [["שכיר", "hired worker"]],
+  "N135": [["ערל", "uncircumcised male"]],
+  "N136": [["תְּרוּמָה", "produce gift to a kohen"]],
+  "N137": [["חללה", "woman disqualified from kehunah"]],
+  "N138": [["מנחת כהן", "kohen's flour offering"]],
+  "N139": [["חטאות פנימיות", "inner sin offerings"]],
+  "N140": [["פסולי המוקדשים", "disqualified consecrated animals"]],
+  "N141": [["דגן", "grain"], ["מעשר שני", "second tithe"]],
+  "N142": [["תירוש", "wine"], ["מעשר שני", "second tithe"]],
+  "N143": [["יצהר", "olive oil"], ["מעשר שני", "second tithe"]],
+  "N144": [["בְּכוֹר", "firstborn"]],
+  "N145": [["חטאת ואשם", "sin and guilt offerings"]],
+  "N146": [["עולה", "burnt offering"]],
+  "N147": [["קודשים קלים", "offerings of lesser holiness"]],
+  "N148": [["קודשי קודשים", "most holy offerings"]],
+  "N149": [["ביכורים", "first fruits"]],
+  "N150": [["מעשר שני", "second tithe"]],
+  "N151": [["אנינות", "first stage of mourning"]],
+  "N152": [["דמי מעשר", "money of the second tithe"]],
+  "N153": [["טבל", "produce with gifts not yet separated"]],
+  "N154": [["תרומות ומעשרות", "produce gifts and tithes"]],
+  "N155": [["בל תאחר", "do not delay a pledge"]],
+  "N156": [["עולת ראייה", "pilgrimage burnt offering"]],
+  "N157": [["נֶדֶר", "vow"]],
+  "N158": [["זונה", "woman with the status of zonah"]],
+  "N159": [["חללה", "woman disqualified from kehunah"]],
+  "N160": [["גרושה", "divorced woman"]],
+  "N161": [["אלמנה", "widow"]],
+  "N162": [["כֹּהֵן גָּדוֹל", "Kohen Gadol"], ["אלמנה", "widow"]],
+  "N163": [["פרוע ראש", "one with overgrown hair"]],
+  "N164": [["קרוע בגדים", "one wearing torn clothing"]],
+  "N165": [["עבודה", "Temple service"]],
+  "N166": [["טומאת מת", "tumah from a dead body"]],
+  "N167": [["אוהל המת", "roofed space containing a dead body"]],
+  "N168": [["טומאת מת", "tumah from a dead body"]],
+  "N169": [["נַחֲלָה", "land inheritance"]],
+  "N170": [["ביזה", "spoils of war"]],
+  "N171": [["קורחה", "bald patch made in mourning"]],
+  "N172": [["בהמה טמאה", "non-kosher animal"]],
+  "N173": [["דג טמא", "non-kosher fish"]],
+  "N174": [["עוף טמא", "non-kosher bird"]],
+  "N175": [["שרץ העוף", "flying insect"]],
+  "N176": [["שרץ הארץ", "ground-crawling creature"]],
+  "N177": [["רמש", "creeping creature"]],
+  "N178": [["תולעת", "worm"]],
+  "N179": [["שרץ", "forbidden small creature"]],
+  "N180": [["נבלה", "animal that died without shechitah"]],
+  "N181": [["טריפה", "animal with a disqualifying injury"]],
+  "N182": [["אבר מן החי", "limb from a living animal"]],
+  "N183": [["גִּיד הַנָּשֶׁה", "sciatic sinew"]],
+  "N184": [["דָּם", "blood"]],
+  "N185": [["חֵלֶב", "forbidden animal fat"]],
+  "N186": [["בשר בחלב", "meat with milk"]],
+  "N187": [["בשר בחלב", "meat with milk"]],
+  "N188": [["שור הנסקל", "ox sentenced to stoning"]],
+  "N189": [["חֹדֶשׁ", "new grain"]],
+  "N190": [["קלי", "roasted grain"]],
+  "N191": [["כרמל", "fresh grain kernels"]],
+  "N192": [["ערלה", "fruit of a tree's first three years"]],
+  "N193": [["כלאי הכרם", "forbidden vineyard mixture"]],
+  "N194": [["יין נסך", "wine used for idolatry"]],
+  "N195": [["בן סורר ומורה", "rebellious son described by the Torah"]],
+  "N196": [["יום הכיפורים", "Yom Kippur"]],
+  "N197": [["חָמֵץ", "chametz"]],
+  "N198": [["תערובת חמץ", "chametz mixture"]],
+  "N199": [["ערב פסח", "day before Pesach"]],
+  "N200": [["בל ייראה", "chametz may not be seen in one's possession"]],
+  "N201": [["בל יימצא", "chametz may not be found in one's possession"]],
+  "N202": [["יַיִן", "wine"], ["נָזִיר", "nazir"]],
+  "N203": [["ענבים", "grapes"]],
+  "N204": [["צימוקים", "raisins"]],
+  "N205": [["חרצנים", "grape seeds"]],
+  "N206": [["זגים", "grape skins"]],
+  "N207": [["טומאת מת", "tumah from a dead body"]],
+  "N208": [["אוהל המת", "roofed space containing a dead body"]],
+  "N209": [["נזירות", "nezirus"]],
+  "N210": [["פֵּאָה", "harvest corner left for the poor"]],
+  "N211": [["לֶקֶט", "fallen stalks left for the poor"]],
+  "N212": [["עוללות", "incomplete grape clusters"]],
+  "N213": [["פרט", "fallen grapes"]],
+  "N214": [["שִׁכְחָה", "forgotten produce left for the poor"]],
+  "N215": [["כלאי זרעים", "forbidden seed mixture"]],
+  "N216": [["כלאי הכרם", "forbidden vineyard mixture"]],
+  "N217": [["כלאי בהמה", "animal crossbreeding"]],
+  "N218": [["שור וחמור", "ox and donkey"]],
+  "N219": [["חסימה", "muzzling"]],
+  "N220": [["שמיטה", "Shemittah year"]],
+  "N221": [["זמירה", "pruning"]],
+  "N222": [["ספיחים", "self-grown crops"]],
+  "N223": [["פירות שביעית", "Shemittah fruit"]],
+  "N224": [["יוֹבֵל", "Jubilee year"]],
+  "N225": [["ספיחים", "self-grown crops"]],
+  "N226": [["יוֹבֵל", "Jubilee year"]],
+  "N227": [["לצמיתות", "permanently"]],
+  "N228": [["מגרש", "open land around a city"]],
+  "N229": [["לֵוִי", "Levi"]],
+  "N230": [["שמיטת כספים", "cancellation of debts"]],
+  "N231": [["הלוואה", "loan"]],
+  "N232": [["צְדָקָה", "tzedakah"]],
+  "N233": [["הַעֲנָקָה", "gifts at release"]],
+  "N234": [["נושה", "creditor"]],
+  "N235": [["ריבית", "interest"]],
+  "N236": [["ריבית", "interest"]],
+  "N237": [["ערב", "guarantor"]],
+  "N238": [["שכר שכיר", "a worker's wages"]],
+  "N239": [["מַשְׁכּוֹן", "collateral"]],
+  "N240": [["מַשְׁכּוֹן", "collateral"]],
+  "N241": [["אלמנה", "widow"]],
+  "N242": [["ריחיים ורכב", "millstones"]],
+  "N243": [["גונב נפש", "kidnapper"]],
+  "N244": [["גְּנֵבָה", "theft"]],
+  "N245": [["גזלה", "robbery"]],
+  "N246": [["השגת גבול", "moving a land boundary"]],
+  "N247": [["עושק", "withholding what is owed"]],
+  "N248": [["כפירה", "false denial"]],
+  "N249": [["שבועת הפיקדון", "oath denying an entrusted item"]],
+  "N250": [["אונאת ממון", "dishonesty in a sale"]],
+  "N251": [["אוֹנָאַת דְּבָרִים", "hurtful speech"]],
+  "N252": [["גר צדק", "convert to Judaism"]],
+  "N253": [["אונאת ממון", "dishonesty in a sale"]],
+  "N254": [["עבד בורח", "escaped bondservant"]],
+  "N255": [["עבד בורח", "escaped bondservant"]],
+  "N256": [["יתום ואלמנה", "orphan and widow"]],
+  "N257": [["עֶבֶד עִבְרִי", "Jewish bondsman"]],
+  "N258": [["ממכרת עבד", "slave-market sale"]],
+  "N259": [["עבודת פרך", "crushing labor"]],
+  "N260": [["עבודת פרך", "crushing labor"]],
+  "N261": [["אמה עברייה", "Jewish maidservant"]],
+  "N262": [["שאר כסות ועונה", "food, clothing, and marital rights"]],
+  "N263": [["יפת תואר", "woman subject to the captive-marriage laws"]],
+  "N264": [["יפת תואר", "woman subject to the captive-marriage laws"]],
+  "N265": [["לֹא תַחְמֹד", "do not covet"]],
+  "N266": [["לֹא תִתְאַוֶּה", "do not desire another's possession"]],
+  "N267": [["שכיר", "worker"]],
+  "N268": [["כלי", "container"]],
+  "N269": [["אבדה", "lost item"]],
+  "N270": [["פריקה", "unloading"]],
+  "N271": [["מידות ומשקלות", "measures and weights"]],
+  "N272": [["אבן ואבן", "unequal weights"]],
+  "N273": [["משפט", "judgment"]],
+  "N274": [["שוחד", "bribe"]],
+  "N275": [["הכרת פנים", "favoritism"]],
+  "N276": [["דיין", "judge"]],
+  "N277": [["דַּל", "poor person"]],
+  "N278": [["רשע", "wrongdoer"]],
+  "N279": [["עונש", "penalty"]],
+  "N280": [["גר ויתום", "convert and orphan"]],
+  "N281": [["בעלי דין", "parties to a court case"]],
+  "N282": [["רוב", "majority"]],
+  "N283": [["דיין", "judge"]],
+  "N284": [["דיין", "judge"]],
+  "N285": [["עדות שקר", "false testimony"]],
+  "N286": [["עד פסול", "disqualified witness"]],
+  "N287": [["קרובים", "relatives"]],
+  "N288": [["עד אחד", "one witness"]],
+  "N289": [["לא תרצח", "do not murder"]],
+  "N290": [["אומד", "inference"]],
+  "N291": [["עד ודיין", "witness and judge"]],
+  "N292": [["בֵּית דִּין", "Jewish court"]],
+  "N293": [["רודף", "attacker"]],
+  "N294": [["אונס", "coercion"]],
+  "N295": [["כופר", "ransom"], ["מזיד", "intentional wrongdoer"]],
+  "N296": [["עִיר מִקְלָט", "city of refuge"], ["כופר", "ransom"], ["גָּלוּת", "exile"]],
+  "N297": [["הַצָּלָה", "rescue"], ["פיקוח נפש", "saving a life"]],
+  "N298": [["מִכְשׁוֹל", "hazard"]],
+  "N299": [["לפני עיוור", "before a blind person"]],
+  "N300": [["מַלְקוֹת", "lashes imposed by Beis Din"]],
+  "N301": [["רכילות", "gossip"]],
+  "N302": [["שִׂנְאָה", "hatred"]],
+  "N303": [["הַלְבָּנַת פָּנִים", "shaming someone"]],
+  "N304": [["נְקָמָה", "revenge"]],
+  "N305": [["נְטִירָה", "bearing a grudge"]],
+  "N306": [["אם על הבנים", "mother bird with her young"]],
+  "N307": [["נתק", "tzaraas mark of the scalp or beard"]],
+  "N308": [["צָרַעַת", "tzaraas"]],
+  "N309": [["נחל איתן", "site of the eglah arufah procedure"]],
+  "N310": [["מכשף", "sorcerer"]],
+  "N311": [["חתן", "groom"]],
+  "N312": [["בית דין הגדול", "Great Beis Din"]],
+  "N313": [["בל תוסיף", "do not add"]],
+  "N314": [["בל תגרע", "do not subtract"]],
+  "N315": [["דיין", "judge"]],
+  "N316": [["נשיא", "ruler"]],
+  "N317": [["קְלָלָה", "curse"]],
+  "N318": [["אב ואם", "father and mother"]],
+  "N319": [["אב ואם", "father and mother"]],
+  "N320": [["מְלָאכָה", "melachah"]],
+  "N321": [["תחום שבת", "Shabbos boundary"]],
+  "N322": [["בֵּית דִּין", "Jewish court"]],
+  "N323": [["פֶּסַח", "Pesach"]],
+  "N324": [["שביעי של פסח", "seventh day of Pesach"]],
+  "N325": [["שָׁבוּעוֹת", "Shavuos"]],
+  "N326": [["רֹאשׁ הַשָּׁנָה", "Rosh Hashanah"]],
+  "N327": [["סוכות", "Sukkos"]],
+  "N328": [["שְׁמִינִי עֲצֶרֶת", "Shemini Atzeres"]],
+  "N329": [["יום הכיפורים", "Yom Kippur"]],
+  "N330": [["אם", "mother"]],
+  "N331": [["אשת אב", "father's wife"]],
+  "N332": [["אחות", "sister"]],
+  "N333": [["אחות מן האב", "paternal half-sister"]],
+  "N334": [["בת הבן", "son's daughter"]],
+  "N335": [["בת הבת", "daughter's daughter"]],
+  "N336": [["בת", "daughter"]],
+  "N337": [["אישה ובתה", "a woman and her daughter"]],
+  "N338": [["בת בנה", "her son's daughter"]],
+  "N339": [["בת בתה", "her daughter's daughter"]],
+  "N340": [["אחות האב", "father's sister"]],
+  "N341": [["אחות האם", "mother's sister"]],
+  "N342": [["אשת אחי האב", "paternal uncle's wife"]],
+  "N343": [["כלתו", "his daughter-in-law"]],
+  "N344": [["אשת אח", "brother's wife"]],
+  "N345": [["אחות אישה", "wife's sister"]],
+  "N346": [["נידה", "niddah"]],
+  "N347": [["אשת איש", "married woman"]],
+  "N348": [["בְּהֵמָה", "animal"]],
+  "N349": [["בְּהֵמָה", "animal"]],
+  "N350": [["מִשְׁכַּב זָכָר", "the prohibited male relationship"]],
+  "N351": [["אב", "father"]],
+  "N352": [["אחי האב", "father's brother"]],
+  "N353": [["עריות", "relationships forbidden by the Torah"]],
+  "N354": [["ממזר", "person with the status of mamzer"]],
+  "N355": [["קידושין", "kiddushin"]],
+  "N356": [["גרושה", "divorced woman"]],
+  "N357": [["יבמה", "widow awaiting yibum or chalitzah"]],
+  "N358": [["אונס", "one who used force"]],
+  "N359": [["מוֹצִיא שֵׁם רָע", "husband who falsely accuses his bride"]],
+  "N360": [["פצוע דכא", "man with a specified reproductive injury"]],
+  "N361": [["סירוס", "castration"]],
+  "N362": [["מֶלֶךְ", "king"]],
+  "N363": [["סוסים", "horses"]],
+  "N364": [["מֶלֶךְ", "king"]],
+  "N365": [["כסף וזהב", "silver and gold"]]
 };
  const idOf=he=>'word:'+he.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he');
- function topic(title){return title?'direct':'unreviewed';}
- function forRef(ref){
-   const title=String(root.FTT_MITZVAH_TITLES&&root.FTT_MITZVAH_TITLES[ref]||'');
-   if(!title)return [];
-   const direct=overrides[ref];
-   const pairs=direct||rules.filter(row=>row[0].test(title)).map(row=>row.slice(1));
-   const seen=new Set(),result=[];
-   for(const pair of pairs){
-     const id=idOf(pair[0]);
-     if(seen.has(id))continue;
-     seen.add(id);
-     result.push({id,hebrew:pair[0],english:pair[1],source:'sefer-hamitzvos',topic:'direct'});
-     if(result.length===3)break;
-   }
-   return result;
- }
- root.FTTSeferVocabulary={topic,forRef,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
+ function forRef(ref){return (entries[ref]||[]).map(([hebrew,english])=>({id:idOf(hebrew),hebrew,english,source:'sefer-hamitzvos',topic:'direct'}));}
+ root.FTTSeferVocabulary={topic:()=> 'direct',forRef,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
 })(typeof window==='object'?window:globalThis);
