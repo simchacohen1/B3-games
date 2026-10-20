@@ -285,8 +285,6 @@ function prepareDraft(){
   for(const s of roster()){
     const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==="absent")state.absent.add(s.id);
     const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];
-    const savedAward=state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date];
-    state.awardDraft[s.id]=savedAward&&Number.isFinite(Number(savedAward.points))?Number(savedAward.points):10;
     const prior=C.latestRatings(state.root,s.id,state.classId,state.date);
     const source=saved||prior.ratings||{};
     for(const cat of categories()){const found=vals(source).find(r=>r.category===cat.name);state.draft[`${s.id}|${cat.name}`]=found?.rating||"Good"}
@@ -338,12 +336,12 @@ function pointClassName(classId){return state.root?.classes?.[classId]?.name||cl
 function pointSourceGroup(source){
   const s=String(source||"");
   if(["reading100","translation100","understand100"].includes(s))return "posuk";
-  if(["chazara","chazara-recording","chazara-remove"].includes(s))return "chazara";
+  if(["chazara","chazara-recording","chazara-remove","chazara-reject","shorashim-recording","shorashim-no-hints"].includes(s))return "chazara";
   if(s==="teacher-adjustment")return "teacher";
   return "activity";
 }
 function pointSourceLabel(source){
-  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'teacher-adjustment':"Teacher adjustment"};
+  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'chazara-reject':"Chazara approval reversed",'shorashim-recording':"Shorashim · Recorded Chazara",'shorashim-no-hints':"Shorashim · No Hints Challenge",'teacher-adjustment':"Teacher adjustment"};
   return labels[source]||String(source||"Activity points");
 }
 function allPointLedger(includeGaps=true){
@@ -355,8 +353,11 @@ function allPointLedger(includeGaps=true){
   for(const s of r){
     for(const [cid,dates] of Object.entries(state.root?.dailyAwards?.[s.id]||{})){
       for(const [date,award] of Object.entries(dates||{})){
-        const amount=Number(award?.points||0);if(!amount)continue;
-        add({id:`daily:${s.id}:${cid}:${date}`,sid:s.id,amount,when:pointTime(award?.savedAt)||pointDateFromSchoolDate(date),source:"daily",sourceGroup:"daily",sourceLabel:"Daily Points",reason:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+        const when=pointTime(award?.savedAt)||pointDateFromSchoolDate(date);
+        for(const part of C.dailyAwardParts(award)){
+          const label=part.category?`Daily Points · ${part.category}`:"Daily Points";
+          add({id:`daily:${s.id}:${cid}:${date}${part.category?":"+C.categoryKey(part.category):""}`,sid:s.id,amount:part.points,when,source:"daily",sourceGroup:"daily",sourceLabel:label,reason:part.category?`${part.category} — ${part.rating} — ${C.formatDate(date)}`:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+        }
       }
     }
   }
@@ -578,30 +579,30 @@ function daily(){
   </div></section>`;
 }
 function dailyRow(s,cats,saved){
-  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:Number(state.awardDraft[s.id]??10), cdate=carryDate(s);
+  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:C.dailyAward(ratings), cdate=carryDate(s);
   return `<div class="row ${absent?"absentrow":""}" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px">
     <div class="person"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><b>${esc(s.name)}</b>${!saved&&cdate?`<small class="carrysource">Started from ${new Date(`${cdate}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small>`:""}</span></div>
     <div class="attendance-wrap"><button class="attendance ${absent?"absent":""}" data-att="${esc(s.id)}">${absent?"Absent":"Present"}</button></div>
-    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option ${x===val?"selected":""}>${x}</option>`).join("")}</select></div>`}).join("")}
-    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`<input class="daily-award-input" data-award="${esc(s.id)}" type="number" min="0" step="1" value="${award}" aria-label="Reward points for ${esc(s.name)}"> points if saved`}</small></div>
+    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option value="${x}" ${x===val?"selected":""}>${x} (+${C.ratingPoints[x]})</option>`).join("")}</select></div>`}).join("")}
+    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`${award} points if saved`}</small></div>
   </div>`;
 }
 function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
 async function saveDaily(){
   if(state.teacherMode){
     const cats=categories(), r=roster();
-    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings,award:absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0))}});
+    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings}});
     try{await teacherApi("saveDaily",{classId:state.classId,date:state.date,rows});toast(`Saved ${r.length} students`)}catch(err){toast(err.message,"error")}
     await loadRoot();render();return;
   }
   const updates={}, cats=categories(), r=roster(), stamp=now(), balanceDeltas=[];
   for(const s of r){
     const absent=state.absent.has(s.id), ratings={};
-    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good";ratings[C.categoryKey(cat.name)]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp}}
-    const newAward=absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0));
+    const byCategory={};let newAward=0;
+    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good",key=C.categoryKey(cat.name),pts=C.ratingPoints[rating]??C.ratingPoints.Good;ratings[key]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp};byCategory[key]={category:cat.name,rating,points:pts};newAward+=pts}
     const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
     updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
-    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:stamp};
+    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,...(absent?{}:{byCategory}),teacherEmail:state.user.email,savedAt:stamp};
     updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?"absent":"present",teacherEmail:state.user.email,savedAt:stamp};
     balanceDeltas.push({id:s.id,delta:newAward-oldAward});
   }
@@ -903,7 +904,6 @@ function bindPage(){
     $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
     $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
     document.querySelectorAll("[data-rating]").forEach(s=>s.onchange=()=>{state.draft[`${s.dataset.rating}|${s.dataset.cat}`]=s.value;render()});
-    document.querySelectorAll("[data-award]").forEach(inp=>inp.onchange=()=>{state.awardDraft[inp.dataset.award]=Math.max(0,Math.round(Number(inp.value)||0));inp.value=state.awardDraft[inp.dataset.award]});
   }
   if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
