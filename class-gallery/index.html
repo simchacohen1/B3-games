@@ -394,7 +394,26 @@ let hallDoorPositions = {};
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
 function resizeImage(file,maxWidth){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>maxWidth){h=Math.round(h*(maxWidth/w));w=maxWidth;} const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.72));}; img.onerror=reject; img.src=e.target.result;};r.onerror=reject;r.readAsDataURL(file);}); }
 function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream'}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
-async function galleryPrivateMediaUrl(path){const user=firebase.auth().currentUser;if(!user)throw new Error('Sign in to open this media.');const token=await user.getIdToken(),r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({path}),cache:'no-store'}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Media is not available.');return j.url;}
+// Reuse recently signed media links instead of calling the private-media
+// service again for every post whenever one gallery entry is edited.
+const galleryMediaUrlCache=new Map();
+async function galleryPrivateMediaUrl(path){
+  const user=firebase.auth().currentUser;
+  if(!user)throw new Error('Sign in to open this media.');
+  // Signed links must not carry over if a different account uses this tab.
+  const cacheKey=user.uid+':'+path;
+  const cached=galleryMediaUrlCache.get(cacheKey);
+  if(cached && Date.now()-cached.savedAt<3*60*1000)return cached.url;
+  const token=await user.getIdToken();
+  const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({path}),cache:'no-store'
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.url)throw new Error(j.error||'Media is not available.');
+  galleryMediaUrlCache.set(cacheKey,{url:j.url,savedAt:Date.now()});
+  return j.url;
+}
 async function resolveGalleryMedia(rows){await Promise.all(rows.map(async p=>{for(const [field,pathField] of [['audioUrl','audioStoragePath'],['videoUrl','videoStoragePath']])if(p[pathField]){try{p[field]=await galleryPrivateMediaUrl(p[pathField])}catch(error){console.warn('Gallery media unavailable:',error.message);p[field]=''}}}));return rows;}
 function wrapCanvasText(ctx,text,x,y,maxWidth,lineHeight,maxLines){ const words=String(text||'').split(/\s+/); let line='',lines=[]; for(const word of words){ const test=line?line+' '+word:word; if(ctx.measureText(test).width>maxWidth && line){lines.push(line);line=word;if(lines.length>=maxLines-1) break;}else line=test;} if(line&&lines.length<maxLines)lines.push(line); lines.forEach((ln,i)=>ctx.fillText(ln,x,y+i*lineHeight)); return lines.length; }
 function roundedRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -648,6 +667,8 @@ function hallCameraSafeT(startX,startZ,endX,endZ){
 }
 
 
+// Automatically reduce GPU work on school Chromebooks and lower-powered devices.
+const galleryLowGraphics=(Number(navigator.deviceMemory)>0&&navigator.deviceMemory<=4)||(Number(navigator.hardwareConcurrency)>0&&navigator.hardwareConcurrency<=4);
 function createHallwayRenderer(){
   // A high-performance GPU request can be rejected even when ordinary WebGL works.
   // Retry with fewer demands before reporting that the browser cannot start 3D.
@@ -670,10 +691,10 @@ function init3D(){
   const host=document.getElementById('threeHost');
   scene=new THREE.Scene();scene.background=new THREE.Color(0xe9dfd0);scene.fog=new THREE.Fog(0xe9dfd0,46,155);
   camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,.05,220);
-  renderer=createHallwayRenderer();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
+  renderer=createHallwayRenderer();renderer.setPixelRatio(Math.min(devicePixelRatio, galleryLowGraphics?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=!galleryLowGraphics;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
   clock=new THREE.Clock();
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
-  const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
+  const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(galleryLowGraphics?512:1024,galleryLowGraphics?512:1024);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
   buildScene();
   avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
   remoteAvatarsGroup=new THREE.Group();scene.add(remoteAvatarsGroup);
@@ -760,10 +781,15 @@ function buildHallway(){
   const leftFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);leftFork.position.set(-2.15,2.25,forkLength/2+.55);leftFork.rotation.y=Math.PI/2;worldGroup.add(leftFork);
   const rightFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);rightFork.position.set(2.15,2.25,forkLength/2+.55);rightFork.rotation.y=-Math.PI/2;worldGroup.add(rightFork);
 
+  let hallLightIndex=0;
   for(let z=hallMinZ+6;z<hallMaxZ-4;z+=8.5){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.45,roughness:.35});
     addBox(worldGroup,1.8,.05,.52,panelMat,0,4.72,z,false,false);
-    const light=new THREE.PointLight(0xffe7b2,.46,12,2);light.position.set(0,4.45,z);worldGroup.add(light);
+    // The illuminated ceiling panels remain; fewer dynamic point lights
+    // markedly reduce the shader work on lower-powered computers.
+    if(hallLightIndex++%(galleryLowGraphics?3:2)===0){
+      const light=new THREE.PointLight(0xffe7b2,.46,12,2);light.position.set(0,4.45,z);worldGroup.add(light);
+    }
   }
 
   addEndWall(hallMinZ,false,wallMat,trimMat);addEndWall(hallMaxZ,true,wallMat,trimMat);
@@ -970,9 +996,13 @@ function buildGalleryClassroom({title,subtitle,roomPosts,exitKind,exitId}){
   addBox(worldGroup,.1,.25,roomLength,trimMat,-roomWidth/2+.12,.25,0,false,true);addBox(worldGroup,.1,.25,roomLength,trimMat,roomWidth/2-.12,.25,0,false,true);
   addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMinZ+.12,false,true);addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMaxZ-.12,false,true);
 
+  let roomLightIndex=0;
   for(let z=hallMinZ+3.3;z<hallMaxZ-2.5;z+=4.4){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.35,roughness:.35});
-    addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);
+    addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);
+    if(roomLightIndex++%(galleryLowGraphics?3:2)===0){
+      const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);
+    }
   }
 
   const chalkMat=new THREE.MeshStandardMaterial({color:0x274f44,roughness:.88});
@@ -2012,7 +2042,31 @@ document.querySelectorAll('.touch-btn').forEach(btn=>{const key=btn.dataset.move
 setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 
 /* ---------- data render ---------- */
-function applyGalleryPosts(data){const rows=Object.keys(data||{}).map(id=>({id,...data[id]}));resolveGalleryMedia(rows).then(ready=>{posts=ready;updatePending();buildScene();refreshRemoteAvatars();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview()}).catch(err=>console.error('Gallery media load failed:',err));}
+// Server polling must not recreate hundreds of meshes, textures, and lights
+// when the underlying posts have not changed. Only a changed post snapshot
+// can trigger a full rebuild; media URL renewal is handled separately.
+let lastGalleryPostsSnapshot=null,galleryApplyRevision=0;
+function applyGalleryPosts(data){
+  const snapshot=JSON.stringify(data||{});
+  if(snapshot===lastGalleryPostsSnapshot)return;
+  lastGalleryPostsSnapshot=snapshot;
+  const revision=++galleryApplyRevision;
+  const rows=Object.keys(data||{}).map(id=>({id,...data[id]}));
+  // Pictures are already in the post data. Show the gallery immediately;
+  // private audio/video URLs can finish loading without blocking 3D posts.
+  posts=rows;updatePending();
+  if(scene)buildScene();
+  refreshRemoteAvatars();
+  const renderOpenPanels=()=>{
+    if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();
+    if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview();
+  };
+  renderOpenPanels();
+  resolveGalleryMedia(rows).then(()=>{
+    if(revision!==galleryApplyRevision)return; // A newer response won the race.
+    renderOpenPanels(); // Show audio/video indicators once links are ready.
+  }).catch(err=>console.error('Gallery media load failed:',err));
+}
 if(dbRef){
   if(isGuestGallery)dbRef.on('value',snapshot=>applyGalleryPosts(snapshot.val()||{}),err=>console.error('Gallery demo read failed:',err));
   else{
@@ -2027,7 +2081,10 @@ if(dbRef){
       }
       notice.textContent='Class Gallery could not load saved posts. Your work may still be saved; do not resubmit yet. '+message;
     };
+    let galleryFetchInFlight=false;
     const loadScopedPosts=async()=>{
+      if(galleryFetchInFlight)return;
+      galleryFetchInFlight=true;
       try{
         const user=firebase.auth().currentUser;
         if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
@@ -2038,10 +2095,15 @@ if(dbRef){
         document.getElementById('galleryReadError')?.remove();
         applyGalleryPosts(j.posts||{});
       }catch(err){console.error('Gallery read failed:',err);showGalleryReadError(err?.message||'Please tell your teacher.');}
+      finally{galleryFetchInFlight=false;}
     };
-    B3SiteSettings.onAuthStateChanged(loadScopedPosts);setInterval(loadScopedPosts,10000);
+    B3SiteSettings.onAuthStateChanged(loadScopedPosts);
+    // Skip hidden tabs, and immediately catch up when a student comes back.
+    setInterval(()=>{if(!document.hidden)loadScopedPosts()},20000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadScopedPosts()});
   }
-  setInterval(()=>{if(!document.hidden)applyGalleryPosts(Object.fromEntries(posts.map(({id,...row})=>[id,row])))},4*60*1000);
+  // Renew short-lived private audio/video links without rebuilding the 3D room.
+  setInterval(()=>{if(!document.hidden&&posts.length)resolveGalleryMedia(posts).catch(err=>console.warn('Gallery media renewal failed:',err))},4*60*1000);
 }
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
 
