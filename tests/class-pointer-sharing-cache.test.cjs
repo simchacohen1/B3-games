@@ -28,13 +28,13 @@ test('all student tools load the corrected activity screen-sharing script withou
     const html = fs.readFileSync(path.join(root, page), 'utf8');
     const refs = html.match(/activity-share[.]js[?]v=[^"']+/g) || [];
     assert.equal(refs.length, 1, page + ' must include exactly one activity-share script');
-    assert.equal(refs[0], 'activity-share.js?v=20261020-follow-pointer1', page + ' must use the release version');
+    assert.equal(refs[0], 'activity-share.js?v=20261020-pointer-lifecycle2', page + ' must use the release version');
   }
 });
 
 test('the classroom loads the updated PeerJS reconnection handling', () => {
   const html = fs.readFileSync(path.join(root, 'class-pointer-prototype/classroom.html'), 'utf8');
-  assert.match(html, /classroom[.]js[?]v=20261020-follow-pointer1/);
+  assert.match(html, /classroom[.]js[?]v=20261020-pointer-lifecycle2/);
   assert.match(html, /activity-screen-teacher[.]js[?]v=20261018-embedded1/);
 });
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{

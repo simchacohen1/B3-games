@@ -29,13 +29,15 @@
       // Listen for the homepage event and for same-tab session initialization;
       // never copy student credentials into persistent cross-tab storage.
       await new Promise(resolve=>{
-        let checks=0;
         const timer=setInterval(()=>{
           if(sessionStorage.getItem('b3Games_studentId')&&sessionStorage.getItem('b3Games_classPin'))finish();
-          else if(++checks>=120)finish();
         },500);
-        function finish(){clearInterval(timer);window.removeEventListener('fttStudentSignedIn',finish);resolve()}
+        // Stay subscribed for the lifetime of this page: pupils often leave
+        // the sign-in screen open before class. A timeout loses the only
+        // listener that can start their classroom connection after signing in.
+        function finish(){clearInterval(timer);window.removeEventListener('fttStudentSignedIn',finish);window.removeEventListener('pagehide',finish);resolve()}
         window.addEventListener('fttStudentSignedIn',finish,{once:true});
+        window.addEventListener('pagehide',finish,{once:true});
       });
       id=sessionStorage.getItem('b3Games_studentId');
       pin=sessionStorage.getItem('b3Games_classPin');
@@ -141,6 +143,7 @@
     const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
     markLayer.style.cssText='position:absolute;pointer-events:none;overflow:visible';
     markLayer.setAttribute('viewBox','0 0 1000 1000');
+    markLayer.setAttribute('preserveAspectRatio','none');
     const pointerLayer=document.createElement('div');
     pointerLayer.style.cssText='position:absolute;pointer-events:none';
     const hitLayer=document.createElement('div');
