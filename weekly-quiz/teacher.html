@@ -369,10 +369,8 @@
   <div class="lock-box">
     <div class="brand-mark" style="margin:0 auto 12px;width:48px;height:48px;font-size:18px">B3</div>
     <h2>Weekly Quiz — Teacher</h2>
-    <div class="small">Enter the teacher password to continue.</div>
-    <input type="password" id="lockPassword" onkeydown="if(event.key==='Enter')checkPassword()" placeholder="Password">
-    <button class="primary" onclick="checkPassword()" id="lockUnlock">Unlock</button>
-    <button class="primary" id="lockGoogle" style="display:none">Sign in with Google</button>
+    <div class="small">Sign in with your teacher Google account to continue.</div>
+    <button class="primary" id="lockGoogle">Sign in with Google</button>
     <div id="lockError" class="lock-error"></div>
   </div>
 </div>
@@ -867,7 +865,6 @@
 </div>
 
 <script>
-const TEACHER_PASSWORD='class123';
 // Opened from a teacher's home page as ?class=<id>: any class other than B3's own
 // (et/wt) keeps its own quizzes, launches and results under b3Quiz/classes/<id>,
 // uses that class's own students, and its teacher signs in with Google.
@@ -876,12 +873,8 @@ const CLASS_SPACE=/^[A-Za-z0-9_-]{1,100}$/.test(WQ_CLASS)&&!['et','wt'].includes
 const QROOT=CLASS_SPACE?'b3Quiz/classes/'+WQ_CLASS:'b3Quiz';
 const GENERATE_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
 
-function checkPassword(){
-  if(CLASS_SPACE)return;
-  if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');localStorage.setItem('weeklyQuizTeacherUnlocked','yes');}
-  else document.getElementById('lockError').textContent='Incorrect password.';
-}
-if(!CLASS_SPACE&&localStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
+// The old page password is gone; clear the "unlocked" flag older versions left in this browser.
+try{localStorage.removeItem('weeklyQuizTeacherUnlocked');}catch(e){}
 
 const firebaseConfig={
   apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -937,9 +930,17 @@ document.getElementById('mainContent').prepend(paidSignInButton);
 // Reuse the verified owner account for the original shared B3 quiz.
 // Other teachers still use their assigned class and its existing grant checks.
 if (!CLASS_SPACE) {
+  const lockErrorB3 = document.getElementById('lockError');
+  lockErrorB3.textContent = 'Checking your sign-in…';
+  document.getElementById('lockGoogle').onclick = () => window.B3SiteSettings.signInWithGoogle()
+    .catch(err => { lockErrorB3.textContent = (err && err.message) || 'Google sign-in did not complete.'; });
   window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => {
     const owner = !!(user && authorized && access && access.role === 'admin'
       && !window.B3SiteSettings.getActingStudent());
+    if (!owner) {
+      lockErrorB3.textContent = !user ? 'Sign in with your teacher Google account.'
+        : 'The original B3 Weekly Quiz is for the owner account. Open Weekly Quiz from your Teacher Home so it opens your own class.';
+    }
     if (owner) {
       document.getElementById('lockOverlay').style.display = 'none';
       document.getElementById('mainContent').classList.remove('hidden');
@@ -973,8 +974,6 @@ if(CLASS_SPACE){
     applyClassLabel(cls.name||WQ_CLASS);
     renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();
   });
-  document.getElementById('lockPassword').style.display='none';
-  document.getElementById('lockUnlock').style.display='none';
   const lockError=document.getElementById('lockError');
   lockError.textContent='Checking your teacher account…';
   document.getElementById('lockGoogle').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{lockError.textContent=(err&&err.message)||'Google sign-in did not complete.';});
