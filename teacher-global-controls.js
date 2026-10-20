@@ -216,7 +216,7 @@
     }
   }
   function connect() {
-    if (!document.body) {document.addEventListener('DOMContentLoaded',connect,{once:true});return;}
+    if (document.readyState === 'loading' || !document.body) {document.addEventListener('DOMContentLoaded',connect,{once:true});return;}
     var tries = 0;
     function ready() {
       API = window.B3SiteSettings;
