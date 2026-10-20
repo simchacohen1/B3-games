@@ -622,8 +622,14 @@ if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
     const workspaceId=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
     const memberships=await db.ref('b3Games/students/'+id+'/memberships').once('value');
     const rows=memberships.val()||{};
-    const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
-    const classId=membership?String(membership.classId).trim():String(sessionStorage.getItem('b3Games_studentClass')||d.classId||sessionStorage.getItem('weeklyQuiz_classId')||studentClass(id)||'').trim();
+    // A student enrolled in more than one class uses the class they signed in
+    // to (the same class their secure sign-in token carries), not simply the
+    // first membership on file.
+    const activeClasses=Object.values(rows).filter(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim()).map(m=>String(m.classId).trim());
+    const signedInClass=String(sessionStorage.getItem('b3Games_studentClass')||'').trim();
+    let tokenClass='';
+    try{const user=await waitForStudentAuth();if(user&&user.getIdTokenResult)tokenClass=String(((await user.getIdTokenResult()).claims||{}).b3ClassId||'');}catch(e){}
+    const classId=activeClasses.includes(signedInClass)?signedInClass:(activeClasses.includes(tokenClass)?tokenClass:(activeClasses[0]||String(signedInClass||d.classId||sessionStorage.getItem('weeklyQuiz_classId')||studentClass(id)||'').trim()));
     if(!classId)return switchStudent(false);
     enterStudent(d&&d.name?String(d.name):name,id,classId);
   }catch(e){console.warn(e);}
