@@ -276,3 +276,46 @@ test('new follow command is rechecked after an earlier permission check is in fl
   await runTimers(h);
   assert.deepEqual(h.navigations,['https://funtorahtools.com/shorashim/']);
 });
+
+test('subsection policy is available only after permission, to the selected class and student',async()=>{
+  const h=harness();
+  await fire(h,{...h.state,subdestination:'review'});
+  assert.equal(h.ctx.FTTFollowStudent.activityPolicy('shorashim').subdestination,'review');
+  assert.equal(h.ctx.FTTFollowStudent.activityPolicy('chazara'),null);
+  for(const change of [{classId:'wt'},{workspaceId:'other'},{targets:['boy2']},{mode:'free'},{subdestination:'constructor'}]) {
+    await fire(h,{...h.state,subdestination:'review',...change});
+    assert.equal(h.ctx.FTTFollowStudent.activityPolicy('shorashim'),null);
+  }
+});
+test('same-page subsection navigation uses the activity adapter after save protection',async()=>{
+  const h=harness();let section='games',moves=[];
+  h.ctx.location.href='https://funtorahtools.com/shorashim/?section=review';
+  h.ctx.FTTFollowActivities={shorashim:{currentSection:()=>section,applySection:s=>{moves.push(s);section=s;return true}}};
+  await fire(h,{...h.state,subdestination:'review'});await runTimers(h);
+  assert.deepEqual(moves,['review']);assert.equal(h.navigations.length,0);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  section='games';assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+});
+test('subsection change still respects unfinished student work',async()=>{
+  const h=harness({busy:true});let moves=0;
+  h.ctx.location.href='https://funtorahtools.com/shorashim/';
+  h.ctx.FTTFollowActivities={shorashim:{currentSection:()=>'',applySection:()=>{moves++;return true}}};
+  await fire(h,{...h.state,subdestination:'review'});await runTimers(h);
+  assert.equal(moves,0);assert.equal(h.navigations.length,0);
+});
+test('unlock and identity changes immediately remove subsection enforcement',async()=>{
+  const h=harness();await fire(h,{...h.state,subdestination:'review'});
+  h.stored.set('b3Games_studentId','boy2');
+  assert.equal(h.ctx.FTTFollowStudent.activityPolicy('shorashim'),null);
+  h.stored.set('b3Games_studentId','boy1');
+  await fire(h,{...h.state,mode:'independent'});
+  assert.equal(h.ctx.FTTFollowStudent.activityPolicy('shorashim'),null);
+});
+test('permission revocation clears a previously validated subsection policy',async()=>{
+  const values={'b3Games/workspaces/b3-2026/classes/et/members/boy1':{active:true}};
+  const h=harness({values});await fire(h,{...h.state,subdestination:'review'});
+  assert.ok(h.ctx.FTTFollowStudent.activityPolicy('shorashim'));
+  values['b3Games/workspaces/b3-2026/classes/et/members/boy1'].toolAccess={shorashim:false};
+  await fire(h,{...h.state,subdestination:'review'});
+  assert.equal(h.ctx.FTTFollowStudent.activityPolicy('shorashim'),null);
+});

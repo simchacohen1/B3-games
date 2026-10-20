@@ -12,10 +12,24 @@
   function policyChanged(run) {
     const state=run?.state;
     const signature=state && C.fresh(state, Date.now() + (run.serverOffset || 0))
-      ? [state.revision,state.mode,state.destination].join(':') : '';
+      ? [state.revision,state.mode,state.destination,state.subdestination || ''].join(':') : '';
     if (signature !== policySignature) { policySignature=signature;
       window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed')); }
   }
+  function activityPolicy(tool) {
+    const run=active, state=run?.state;
+    if (!run || run.permittedState !== state || state?.destination !== tool ||
+        state.mode !== C.MODES.LOCKED || !C.fresh(state, Date.now() + (run.serverOffset || 0)) ||
+        root.firebase?.auth?.().currentUser?.uid !== run.uid ||
+        sessionStorage.getItem('b3Games_studentId') !== run.studentId ||
+        sessionStorage.getItem('b3Games_studentClass') !== run.classId) return null;
+    const decision=C.decide(state,{studentAuthorized:true,workspaceId:run.workspaceId,
+      classId:run.classId,studentId:run.studentId,allowedTools:{[tool]:true},
+      currentUrl:location.href,now:Date.now() + (run.serverOffset || 0)});
+    if(decision.reason !== 'teacher-locked')return null;
+    return {destination:tool, subdestination:state.subdestination || '', revision:state.revision};
+  }
+  function currentSection(tool) {return root.FTTFollowActivities?.[tool]?.currentSection?.();}
   async function allowsLockedActivity(tool) {
     const run = active, state = run?.state;
     if (!run || !state || state.destination !== tool || !Object.prototype.hasOwnProperty.call(C.DESTINATIONS, tool) ||
@@ -25,7 +39,7 @@
         !C.fresh(state, Date.now() + (run.serverOffset || 0))) return false;
     const decision = C.decide(state, {studentAuthorized:true,workspaceId:run.workspaceId,
       classId:run.classId,studentId:run.studentId,allowedTools:{[tool]:true},
-      currentUrl:location.href,now:Date.now() + (run.serverOffset || 0)});
+      currentUrl:location.href,currentSection:currentSection(tool),now:Date.now() + (run.serverOffset || 0)});
     if (decision.action !== 'stay') return false;
     // The current selected activity remains available through reloads until
     // Unlock, a new destination, revoked permission, or session expiry.
@@ -103,13 +117,21 @@
         clearTimeout(run.redirectTimer);
         return;
       }
-      if (!(await permitted(run, state.destination))) { notice(''); clearTimeout(run.redirectTimer); return; }
+      if (!(await permitted(run, state.destination))) {
+        run.permittedState=null;
+        window.dispatchEvent(new CustomEvent('ftt:follow-activity-changed'));
+        notice(''); clearTimeout(run.redirectTimer); return;
+      }
       if (active !== run || run.state !== state) return;
+      if (run.permittedState !== state) {
+        run.permittedState=state;
+        window.dispatchEvent(new CustomEvent('ftt:follow-activity-changed'));
+      }
       const lastAppliedKey = sessionStorage.getItem(appliedKey) || '';
       const decision = C.decide(state, {
         studentAuthorized: true, workspaceId: run.workspaceId,
         classId: run.classId, studentId: run.studentId,
-        currentUrl: location.href, allowedTools: {[state.destination]: true},
+        currentUrl: location.href, currentSection:currentSection(state.destination), allowedTools: {[state.destination]: true},
         lastAppliedKey, now: Date.now() + (run.serverOffset || 0)
       });
       if (decision.action === 'none') { notice(''); clearTimeout(run.redirectTimer); return; }
@@ -150,12 +172,19 @@
           if (decision.mode === C.MODES.FREE) {
             sessionStorage.setItem(appliedKey, decision.applyKey);
           }
+          const adapter=root.FTTFollowActivities?.[state.destination];
+          if (state.subdestination && C.canonicalPath(location.href) === C.canonicalPath(decision.destination) &&
+              adapter?.applySection?.(state.subdestination)) {
+            window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'));
+            return;
+          }
           location.assign(new URL(decision.destination, location.origin).href);
         }, 3500);
       }
     } catch (e) {
       // A lost Firebase/auth connection never grants permission or a redirect.
       console.warn('Follow Teacher could not check student access', e);
+      if (run) run.permittedState=null;
       notice('');
       if (run) clearTimeout(run.redirectTimer);
     } finally {
@@ -210,6 +239,6 @@
     }, 15000);
   }
 
-  root.FTTFollowStudent = Object.freeze({start,stop,allowsLockedActivity});
+  root.FTTFollowStudent = Object.freeze({start,stop,allowsLockedActivity,activityPolicy});
   window.addEventListener('pagehide', stop);
 })(window);

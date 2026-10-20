@@ -28,8 +28,25 @@
     'weekly-quiz': Object.freeze({label: 'Weekly Quiz', path: '/weekly-quiz/'}),
     'game-show': Object.freeze({label: 'Game Show', path: '/game-show/player.html'}),
     'student-rewards': Object.freeze({label: 'Student Rewards', path: '/student-rewards/student.html'}),
-    'class-gallery': Object.freeze({label: 'Class Gallery', path: '/class-gallery/'})
+    'class-gallery': Object.freeze({label: 'Class Gallery', path: '/class-gallery/'}),
+    'class-pointer': Object.freeze({label: 'Class Pointer', path: '/class-pointer-prototype/student-view.html'})
   });
+  // Each activity opts in with an adapter; never accept arbitrary teacher URLs.
+  const SUBDESTINATIONS = Object.freeze({shorashim: Object.freeze({
+    review: 'Review Shorashim', learn: 'Learn New Shorashim', games: 'Games',
+    gallery: 'My Card Gallery', affixes: 'Learn Prefixes and Suffixes'
+  })});
+  function validSubdestination(tool, section) {
+    return section == null || section === '' ||
+      (typeof section === 'string' && Object.prototype.hasOwnProperty.call(SUBDESTINATIONS, tool) &&
+       Object.prototype.hasOwnProperty.call(SUBDESTINATIONS[tool], section));
+  }
+  function destinationPath(state) {
+    if (!Object.prototype.hasOwnProperty.call(DESTINATIONS, state?.destination) ||
+        !validSubdestination(state.destination, state.subdestination)) return null;
+    return DESTINATIONS[state.destination].path + (state.subdestination
+      ? '?section=' + encodeURIComponent(state.subdestination) : '');
+  }
   const MAX_HEARTBEAT_AGE_MS = 90 * 1000;
   const MAX_LEASE_MS = 10 * 60 * 1000;
   const KEY = /^[A-Za-z0-9_-]{1,100}$/;
@@ -84,16 +101,20 @@
     if (!fresh(state, c.now)) return none('expired');
     if (!targetApplies(state.targets, c.studentId)) return none('not-selected');
     const destination = Object.prototype.hasOwnProperty.call(DESTINATIONS, state.destination) ? DESTINATIONS[state.destination] : null;
-    if (!destination || c.allowedTools?.[state.destination] !== true) return none('not-permitted');
+    const path = destinationPath(state);
+    if (!destination || !path || c.allowedTools?.[state.destination] !== true) return none('not-permitted');
     const applyKey = [state.workspaceId, state.classId, state.revision, c.studentId].join(':');
-    const alreadyThere = canonicalPath(c.currentUrl) === canonicalPath(destination.path);
+    const section = c.currentSection !== undefined ? c.currentSection :
+      new URL(c.currentUrl || '/', 'https://funtorahtools.com').searchParams.get('section');
+    const alreadyThere = canonicalPath(c.currentUrl) === canonicalPath(destination.path) &&
+      (!state.subdestination || section === state.subdestination);
     if (state.mode === MODES.FREE) {
       if (c.lastAppliedKey === applyKey) return none('already-sent');
       return {action: alreadyThere ? 'stay' : 'navigate', reason: 'one-time',
-        destination: destination.path, applyKey, mode: state.mode};
+        destination: path, applyKey, mode: state.mode};
     }
     return {action: alreadyThere ? 'stay' : 'navigate',
-      reason: 'teacher-locked', destination: destination.path, applyKey, mode: state.mode};
+      reason: 'teacher-locked', destination: path, applyKey, mode: state.mode};
   }
 
   /**
@@ -102,10 +123,11 @@
    * destination tool grant, targets, and revision before storing it.
    */
   function propose({workspaceId, classId, teacherUid, mode, destination,
-                    revision, targets = 'all', issuedAt, heartbeatAt, expiresAt}) {
+                    subdestination, revision, targets = 'all', issuedAt, heartbeatAt, expiresAt}) {
     if (![MODES.INDEPENDENT, MODES.FREE, MODES.LOCKED].includes(mode)) throw Error('Invalid mode');
     if (![workspaceId, classId, teacherUid, revision].every(validId)) throw Error('Invalid session identifier');
     if (mode !== MODES.INDEPENDENT && !Object.prototype.hasOwnProperty.call(DESTINATIONS, destination)) throw Error('Destination is not allowed');
+    if (mode !== MODES.INDEPENDENT && !validSubdestination(destination, subdestination)) throw Error('Subdestination is not allowed');
     if (targets !== 'all' && (!Array.isArray(targets) || !targets.length ||
         targets.length > 60 || targets.some(id => !validId(id)) ||
         new Set(targets).size !== targets.length)) throw Error('Invalid student selection');
@@ -114,9 +136,10 @@
         expiresAt > issuedAt + MAX_LEASE_MS) throw Error('Invalid lease');
     return {version: 1, workspaceId, classId, teacherUid, mode,
       destination: mode === MODES.INDEPENDENT ? null : destination,
+      ...(mode !== MODES.INDEPENDENT && subdestination ? {subdestination} : {}),
       revision, targets, issuedAt, heartbeatAt, expiresAt};
   }
 
-  return Object.freeze({MODES, DESTINATIONS, MAX_HEARTBEAT_AGE_MS,
+  return Object.freeze({MODES, DESTINATIONS, SUBDESTINATIONS, validSubdestination, destinationPath, MAX_HEARTBEAT_AGE_MS,
     MAX_LEASE_MS, validId, canonicalPath, targetApplies, fresh, decide, propose});
 });

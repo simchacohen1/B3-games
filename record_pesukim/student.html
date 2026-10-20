@@ -30,7 +30,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261019-follow-all" data-game-id="posuk-practice-scroll"></script>
+<script src="../game-gate.js?v=20261020-follow-pointer1" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -278,7 +278,7 @@
     margin: 14px 0 22px;
     min-height: 100px;
     box-shadow: 0 8px 24px var(--shadow), inset 0 0 40px rgba(140,47,57,0.05);
-    display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center;
+    display:flex; align-items:center; justify-content:center;
     text-align:center;
   }
   .scroll .placeholder{ color: var(--ink-soft); font-style: italic; font-size:1rem; }
@@ -588,26 +588,74 @@
   }
 
   .save-row{ text-align:center; margin: 20px 0; }
-  .posuk-nav-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    width:100%;
-    margin:0;
-    direction:ltr;
-  }
-  .nav-arrow{
-    min-height:44px;
-    padding:8px 14px;
-    font-size:.85rem;
-    white-space:nowrap;
-  }
-  .nav-arrow:disabled{ opacity:.4; box-shadow:none; cursor:default; }
-  @media (max-width: 480px){
-    .nav-arrow{ padding:8px 10px; font-size:.75rem; }
-  }
+  /* Arrows are pulled out of normal flow (see .nav-arrow), so this row
+     no longer needs to reserve space for them. */
+  .posuk-nav-row{ margin:0; }
 
+  /* Prev/next posuk arrows live in the empty side margins that flank the
+     780px .wrap column on wide screens, vertically centered on the
+     viewport. On narrow screens (where there's no real margin to sit in)
+     they shrink into small translucent overlay buttons near the edge of
+     the screen instead of crowding the content. */
+  .nav-arrow{
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto; height: 56px;
+    padding: 0 16px;
+    border-radius: 999px;
+    display: flex; align-items:center; justify-content:center;
+    gap: 6px;
+    font-size: 1rem;
+    white-space: nowrap;
+    z-index: 20;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+  }
+  /* Anchored by their FAR edge (not the edge nearest the card) so that
+     growing wider to fit the "Prev Posuk"/"Next Posuk" text expands away
+     from the card instead of into it — with a fixed left/right value the
+     wider pill buttons were overlapping onto the learning area. */
+  #prevPosukBtn{ right: calc(50vw + 410px); left: auto; }
+  #nextPosukBtn{ left: calc(50vw + 410px); right: auto; }
+  @media (max-width: 959px){
+    /* On mobile, the sticky posuk box (z-index 30) scrolls up over
+       anything vertically centered, so the arrows are pinned to the top
+       corners instead — above the posuk box, out of its way entirely —
+       rather than floating mid-screen where it can cover them. */
+    .nav-arrow{
+      top: 10px;
+      transform: none;
+      width: auto; height: 40px;
+      padding: 0 10px;
+      font-size: 0.72rem;
+      opacity: 0.75;
+      background: rgba(201,162,39,0.55) !important;
+      box-shadow: none;
+      z-index: 40;
+    }
+    .nav-arrow:hover, .nav-arrow:focus, .nav-arrow:active{ opacity: 1; }
+    #prevPosukBtn{ left: 8px; right:auto; }
+    #nextPosukBtn{ right: 8px; left:auto; }
+  }
+  .nav-arrow:disabled{
+    opacity: 0.4;
+    box-shadow: none;
+    cursor: default;
+  }
+  /* .btn:active normally presses the button down with translateY(3px),
+     but these arrows are also centered with translateY(-50%) via fixed
+     positioning — the two transforms can't combine (the second overwrites
+     the first), so a click was making the arrow visibly jump instead of
+     just looking pressed. This keeps the vertical centering intact while
+     still giving a pressed feel via the box-shadow only. */
+  .nav-arrow:active{
+    transform: translateY(-50%);
+  }
+  @media (max-width: 959px){
+    /* Mobile arrows are top-pinned rather than vertically centered, so the
+       desktop active transform must not pull them half a button upward. */
+    .nav-arrow:active{ transform:none; }
+  }
 
   .history{
     margin-top: 30px;
@@ -1230,10 +1278,6 @@
     </div>
 
     <div class="scroll" id="scrollBox">
-      <div class="posuk-nav-row hidden" id="posukNavigation">
-        <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous posuk">◀️ Prev Posuk</button>
-        <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next posuk">Next Posuk ▶️</button>
-      </div>
       <div class="placeholder" id="scrollPlaceholder">Choose a פרק and פסוק to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
@@ -1397,6 +1441,10 @@
         </div>
       </div>
 
+      <div class="save-row posuk-nav-row">
+        <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous posuk">◀️ Prev Posuk</button>
+        <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next posuk">Next Posuk ▶️</button>
+      </div>
 
       <div class="history">
         <button class="history-toggle" id="historyToggleBtn" type="button" aria-expanded="false" aria-controls="historyBody">
@@ -1652,10 +1700,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_phrases_v7_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v6_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_phrases_v7';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v6';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {
@@ -1666,7 +1714,6 @@ function normalizeGeneratedItems(items, posukNum){
       question: normalizeDivineNames(item.question || ''),
       expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
       sourceFact: normalizeDivineNames(item.sourceFact || ''),
-      answerHebrewPhrases: Array.isArray(item.answerHebrewPhrases) ? item.answerHebrewPhrases.filter(p => typeof p === 'string' && p.trim()) : [],
       answerWordSets: sets
         .filter(Array.isArray)
         .map(set => [...new Set(set.map(Number).filter(Number.isInteger))].sort((a,b)=>a-b))
@@ -1674,7 +1721,7 @@ function normalizeGeneratedItems(items, posukNum){
       posukNum,
       generated: true
     };
-  }).filter(item => item.question && item.answerHebrewPhrases.length && item.answerWordSets.length);
+  }).filter(item => item.question && item.answerWordSets.length);
 }
 
 function readLocalGeneratedQuestions(cacheKey, posukNum){
@@ -1769,7 +1816,6 @@ async function getGeneratedQuestionsForPart(part){
 
     // The server stores the shared AI cache; students cannot overwrite it.
     const items = normalizeGeneratedItems(rawItems, part.posukNum);
-    if(!items.length) throw new Error('Question service must be updated to return verified Hebrew answer phrases');
     generatedQuestionMemoryCache.set(cacheKey, items);
     saveLocalGeneratedQuestions(cacheKey, rawItems);
     return items;
@@ -3318,7 +3364,6 @@ function applyManualCorrections(text, perekNum, posukNum){
 function resetScroll(){
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
-  document.getElementById('posukNavigation').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
   document.getElementById('scrollBox').classList.remove('range-selection');
   expandSelectionPicker();
@@ -3342,7 +3387,6 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   text = stripMeteg(text);
   const isRange = Number(endPosukNum) > Number(posukNum);
   const posukPart = isRange ? (posukNum + '-' + endPosukNum) : String(posukNum);
-  document.getElementById('posukNavigation').classList.remove('hidden');
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukPart;
   currentPosukNum = posukNum;
   currentPosukEndNum = endPosukNum;
@@ -3478,8 +3522,6 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     await restoreSavedQuestionResults();
     }else{
     comprehensionQuestionLoadFailed = true;
-    document.getElementById('questionProgress').textContent = 'Questions unavailable';
-    document.getElementById('questionText').textContent = 'Could not load questions for this pasuk.';
     const msg = document.getElementById('comprehensionGradingMsg');
       msg.textContent = hadFailure ? 'Could not prepare reliable questions. Tap retry.' : 'No clear questions could be made from this pasuk. Please use the bonus explanation.';
     const retry = document.getElementById('comprehensionRetryBtn');
@@ -3764,7 +3806,7 @@ function renderComprehensionQuestionUI(){
   const total = comprehensionQuestions.length;
   const current = comprehensionQuestions[comprehensionQIndex];
   document.getElementById('questionProgress').textContent =
-    total ? 'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots() : 'Preparing questions…';
+    'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
   document.getElementById('questionText').textContent = current ? current.question : '';
   renderQuestionWordChoices(current, comprehensionQResults[comprehensionQIndex]);
   caption.textContent = 'Tap all the Hebrew words that answer the question.';
@@ -4598,6 +4640,7 @@ async function gradeCurrentQuestionAnswer(){
     renderQuestionWordChoices(current,null);
     return;
   }
+  void speakText('Great job! You found the right words!');
   comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
   renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
   document.getElementById('comprehensionStatus').textContent='Correct!';
@@ -4825,7 +4868,7 @@ document.getElementById('checkWordSelectionBtn').onclick = gradeCurrentQuestionA
 function buildQuestionHint(question){
   const q=String(question&&question.question||'').trim().toLowerCase();
   let clue='Think about what the question is asking, then look for those words in the pasuk.';
-  if(/^who\b/.test(q)) clue='Look for the words that tell who the question is about.';
+  if(/^who\b/.test(q)) clue='The answer is a person’s name. Listen for a name in the pasuk.';
   else if(/^where\b/.test(q)) clue='The answer tells where. Listen for a place in the pasuk.';
   else if(/^when\b/.test(q)) clue='The answer tells when. Listen for a time word in the pasuk.';
   else if(/^how many\b/.test(q)) clue='The answer is a number. Listen for the number in the pasuk.';
@@ -4912,47 +4955,17 @@ function promiseWithTimeout(promise, ms, label){
 }
 
 const translationPieceCache = new Map();
-const translationPieceRequests = new Map();
-function translationPieceKey(part){
-  return JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
-}
-function cachedTranslationPieces(part){
-  const key = translationPieceKey(part);
-  if(translationPieceCache.has(key)) return translationPieceCache.get(key);
-  try{
-    const levels = JSON.parse(localStorage.getItem('posukPractice_translationPieces_v1_' + key));
-    if(Array.isArray(levels) && levels.length){
-      translationPieceCache.set(key, levels);
-      return levels;
-    }
-  }catch(err){ /* Storage may be unavailable. */ }
-  return null;
-}
-function rememberTranslationPieces(key, levels){
-  translationPieceCache.set(key, levels);
-  try{
-    localStorage.setItem('posukPractice_translationPieces_v1_' + key, JSON.stringify(levels));
-  }catch(err){ /* Retain the memory cache if storage is full or disabled. */ }
-}
-function fetchOrGenerateTranslationLevelsForPart(part){
-  const cached = cachedTranslationPieces(part);
-  if(cached) return Promise.resolve(cached);
-  const key = translationPieceKey(part);
-  if(translationPieceRequests.has(key)) return translationPieceRequests.get(key);
-  const request = fetchTranslationLevelsForPart(part, key)
-    .finally(() => translationPieceRequests.delete(key));
-  translationPieceRequests.set(key, request);
-  return request;
-}
-async function fetchTranslationLevelsForPart(part, cacheKey){
-  const perekNum = currentPerekNum;
+async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
+  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
+    if(myToken !== translationLoadToken) return null;
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      rememberTranslationPieces(cacheKey, snap.val().levels);
+      translationPieceCache.set(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -4961,8 +4974,7 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
 
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
-    const refs = await fetchClassroomReferenceChapter(perekNum);
-    const classroomReferenceTranslation = refs[part.posukNum - 1] || '';
+    const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     let res;
@@ -4972,21 +4984,21 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          translationCacheKey: part.key,
           posukText: part.text,
           posukTranslation: part.translation || '',
           classroomReferenceTranslation,
-          perekNum,
+          perekNum: currentPerekNum,
           posukNum: part.posukNum
         })
       });
     }finally{ clearTimeout(timeout); }
+    if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     // Keep successful pieces for this visit too, including when returning
     // to a posuk. Failed requests remain retryable.
-    rememberTranslationPieces(cacheKey, data.levels);
+    translationPieceCache.set(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
@@ -5019,6 +5031,12 @@ function combineTranslationLevelsForRange(partLevels){
 
 async function loadOrGenerateTranslationChunks(){
   const myToken = ++translationLoadToken;
+  translationLevels = null;
+  translationLevelIndex = 0;
+  translationChunkIndex = 0;
+  if(document.getElementById('translationPanel').classList.contains('hidden') === false){
+    renderCurrentChunk();
+  }
   if(!currentPosukKey || !currentPosukText) return;
 
   const parts = currentSelectionParts.length ? currentSelectionParts : [{
@@ -5027,15 +5045,6 @@ async function loadOrGenerateTranslationChunks(){
     translation: currentPosukTranslation,
     key: currentPosukKey
   }];
-
-  const cached = parts.map(part => ({ part, levels: cachedTranslationPieces(part) }));
-  translationLevels = currentIsRange
-    ? combineTranslationLevelsForRange(cached)
-    : cached[0].levels;
-  translationLevelIndex = translationLevels ? defaultTranslationLevelIndex(translationLevels) : 0;
-  translationChunkIndex = 0;
-  renderCurrentChunk();
-  if(translationLevels) return;
 
   const loaded = await Promise.all(parts.map(async part => {
     try{
@@ -6575,7 +6584,7 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261018-directshare2"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-follow-pointer1"></script>
 </body>
 </html>
 

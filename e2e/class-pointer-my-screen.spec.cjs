@@ -3,7 +3,7 @@ const {test,expect}=require('@playwright/test');
 const fs=require('node:fs');
 const path=require('node:path');
 async function setup(page,{activity='/shorashim/',classId='et',joinAuthorized=true,expired=false}={}){
-  await page.route('https://lesson.test/**',route=>route.fulfill({contentType:route.request().url().endsWith('.js')?'text/javascript':'text/html',body:route.request().url().endsWith('.js')?fs.readFileSync(path.join(__dirname,'../class-pointer-prototype/activity-share.js'),'utf8'):'<!doctype html><title>Shorashim</title><input id="answer" value="unfinished answer"><main>My activity</main>'}));
+  await page.route('https://lesson.test/**',route=>route.fulfill({contentType:route.request().url().endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8',body:route.request().url().endsWith('.js')?fs.readFileSync(path.join(__dirname,'../class-pointer-prototype/activity-share.js'),'utf8'):'<!doctype html><meta charset="utf-8"><title>Shorashim</title><input id="answer" value="unfinished answer"><main>My activity</main>'}));
   await page.goto('https://lesson.test'+activity);
   await page.evaluate(({classId,joinAuthorized})=>{
     window.room=classId==='et'?'class-pointer-12345678-1234-1234-1234-123456789abc':'class-pointer-12345678-1234-1234-1234-123456789abd';
@@ -120,4 +120,47 @@ test('lost authenticated connection reconnects and requires fresh admission befo
   await announce(page,'after');await page.evaluate(()=>window.deliver('after'));expect(await page.evaluate(()=>!!window.calls.at(-1).answered)).toBe(false);
   await page.evaluate(()=>window.connection.emit('data',{type:'present'}));await announce(page,'after');
   await expect.poll(()=>page.locator('#fttTeacherLessonOverlay video').evaluate(v=>v.videoWidth)).toBe(320);
+});
+
+test('dedicated presentation view follows surface changes, hides exit only while locked and gates tools',async({page,context,browserName})=>{
+  test.skip(browserName!=='chromium');
+  await setup(page,{activity:'/class-pointer-prototype/student-view.html'});
+  await page.evaluate(()=>{
+    sessionStorage.setItem('b3Games_studentClass','et');
+    window.__locked=true;window.FTTFollowStudent={activityPolicy:()=>window.__locked?{destination:'class-pointer'}:null};
+    window.connection.emit('data',{type:'present'});
+  });
+  const overlay=page.locator('#fttTeacherLessonOverlay');
+  for(const id of ['whiteboard','screen','pdf','webpage']) {
+    await announce(page,id);await page.evaluate(id=>window.deliver(id),id);
+    await expect(overlay).toBeVisible();await expect.poll(()=>overlay.locator('video').evaluate(v=>v.videoWidth)).toBe(320);
+    await expect(overlay.locator('a')).toBeHidden();
+    expect(page.url()).toContain('/class-pointer-prototype/student-view.html');
+  }
+  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(0);
+  await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
+  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(3);
+  // Run the actual shared gate's capture handlers while ordinary activity UI is locked.
+  const gate=fs.readFileSync(path.join(__dirname,'../game-gate.js'),'utf8');
+  const handlers=gate.slice(gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach'),gate.indexOf('  if (!isGuestPreview()) watchTeacherAccess();'));
+  expect(handlers).toContain('B3PointerAssignedUI');
+  await page.evaluate(()=>{
+    const lock=document.createElement('div');lock.id='testOrdinaryToolsLocked';
+    lock.style.cssText='position:fixed;inset:0;z-index:2147483635;background:white';document.body.append(lock);
+    window.__ordinaryClicks=0;document.querySelector('#answer').addEventListener('click',()=>window.__ordinaryClicks++);
+  });
+  await page.addScriptTag({content:'(()=>{const overlay=document.getElementById("testOrdinaryToolsLocked");'+handlers+'})();'});
+  await page.locator('#answer').dispatchEvent('click');
+  expect(await page.evaluate(()=>window.__ordinaryClicks)).toBe(0);
+  await page.getByRole('button',{name:'✎ Pen',exact:true}).click();
+  await expect(page.getByRole('button',{name:'✎ Pen',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(4);
+  expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(true);
+  expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#answer')))).toBe(false);
+  await page.evaluate(()=>{window.__locked=false;window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'))});
+  await expect(overlay.getByRole('link',{name:'Back to Fun Torah Tools'})).toBeVisible();
+  await page.evaluate(()=>{sessionStorage.setItem('b3Games_studentClass','wt')});
+  expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(false);
+  expect(await page.evaluate(()=>window.captureCount)).toBe(0);
+  expect(context.pages()).toHaveLength(1);
 });

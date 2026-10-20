@@ -182,7 +182,7 @@
       overlay = document.createElement("div");
       overlay.id = "b3-gate-overlay";
       overlay.style.cssText =
-        "position:fixed;inset:0;z-index:2147483647;background:#f5f7fa;" +
+        "position:fixed;inset:0;z-index:2147483635;background:#f5f7fa;" +
         "display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;" +
         "text-align:center;padding:24px;color:#1f2937;";
       overlay.innerHTML =
@@ -378,8 +378,8 @@
   async function startFollowTeacherListener(classId,studentId) {
     if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
     if (!followLoader) {
-      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow-fix2",rootBase).href)
-        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow-fix2",rootBase).href))
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261020-follow-pointer1",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261020-follow-pointer1",rootBase).href))
         .catch(error=>{followLoader=null;throw error;});
     }
     return followLoader.then(()=>{
@@ -685,6 +685,7 @@
   ["click","pointerdown","keydown","submit"].forEach(function(type){
     document.addEventListener(type,function(event){
       if(!overlay||overlay.contains(event.target))return;
+      if(window.B3PointerAssignedUI?.allowsEvent(event.target))return;
       event.preventDefault();event.stopImmediatePropagation();
     },true);
   });

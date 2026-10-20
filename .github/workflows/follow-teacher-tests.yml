@@ -32,4 +32,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run focused navigation policy tests
-        run: node --test tests/follow-teacher.test.cjs tests/follow-teacher-integration.test.cjs
+        run: node --test tests/follow-teacher*.test.cjs

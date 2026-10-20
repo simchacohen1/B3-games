@@ -11,6 +11,16 @@ const removedKey='classPointerRemoved:'+(new URL(location.href).searchParams.get
 const removedStudents=new Set((()=>{try{return JSON.parse(sessionStorage.getItem(removedKey)||'[]').filter(id=>typeof id==='string')}catch{return[]}})());
 function saveRemoved(){try{sessionStorage.setItem(removedKey,JSON.stringify(Array.from(removedStudents)))}catch{}}
 const autoJoin=!isTeacher&&entry==='student';
+let followWhiteboardRoom=null;
+function openFollowWhiteboard(){
+  if(!isTeacher||!started||!window.ClassPointerPdf||followWhiteboardRoom===peer?.id||
+      new URL(location.href).searchParams.get('followTeacherWhiteboard')!=='1')return;
+  const whiteboard=$('openWhiteboard');
+  if(whiteboard){whiteboard.disabled=false;whiteboard.click();followWhiteboardRoom=peer.id}
+}
+// Deferred document controls may load after the peer opens. Try once the page
+// is ready as well as when the authorized classroom connection opens.
+document.addEventListener('DOMContentLoaded',openFollowWhiteboard,{once:true});
 let reconnectTimer=null,reconnectAttempts=0,stopReconnecting=false,replacedHere=false;
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
 let closingClass=false,endPromise=Promise.resolve();
@@ -318,6 +328,9 @@ async function startClass(){
     $('startClass').hidden=true;
     const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
+    // An explicit Follow Teacher launch starts with the teacher's shared whiteboard.
+    // This uses the existing classroom document viewer, not the student-board broadcast.
+    if(new URL(location.href).searchParams.get('followTeacherWhiteboard')==='1')openFollowWhiteboard();
     if(new URL(location.href).searchParams.get('sendEveryoneShare')==='1')void requestEveryoneToShare();
     if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
   });

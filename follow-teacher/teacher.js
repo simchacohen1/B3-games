@@ -41,16 +41,30 @@
   // Until the private student-targeting path is hardened, never broadcast
   // individual student identifiers under the publicly readable class path.
   function selected() {return 'all';}
-  function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.INDEPENDENT;}
+  function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.FREE;}
+  function renderSubdestinations() {
+    const sections = C.SUBDESTINATIONS[q('destination').value];
+    q('subdestinationRow').classList.toggle('hidden', !sections);
+    q('subdestination').replaceChildren(...Object.entries({'': 'Activity home', ...sections}).map(([value,label]) => {
+      const option=document.createElement('option');option.value=value;option.textContent=label;return option;
+    }));
+    const pointer = q('destination').value === 'class-pointer';
+    q('pointerWorkspaceRow').classList.toggle('hidden', !pointer);
+    const frame=q('pointerWorkspace'), link=q('openClassPointer');
+    if (pointer && frame.getAttribute('src') !== link.getAttribute('href')) frame.src=link.getAttribute('href');
+    if (!pointer) frame.removeAttribute('src');
+  }
   function renderState(state) {
     currentState = state;
     const validState = state && C.fresh(state, clock());
     const msg = !validState || state.mode === C.MODES.INDEPENDENT
-      ? 'Independent — students can choose their activities.'
+      ? 'Students are free to choose their activities.'
       : state.mode === C.MODES.LOCKED
         ? '🔒 Follow Teacher — Locked · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity')
         : '↪ Follow once · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity') + ' (free afterward)';
     q('state').textContent = msg;
+    if (validState && state.subdestination && C.SUBDESTINATIONS[state.destination]?.[state.subdestination])
+      q('state').textContent += ' · ' + C.SUBDESTINATIONS[state.destination][state.subdestination];
     q('state').style.background = validState && state.mode === C.MODES.LOCKED ? '#fff2cf' : '#ebf4ff';
   }
   async function loadClass(id) {
@@ -64,11 +78,14 @@
     if (myGeneration !== generation) return;
     if (!row || row.active === false) throw Error('This class is disabled.');
     classRow = row; current = id;
+    const pointerLink = q('openClassPointer');
+    if (pointerLink) pointerLink.href = '../class-pointer-prototype/classroom.html?dashboard=teacher&followTeacherWhiteboard=1&class=' + encodeURIComponent(id);
     q('destination').replaceChildren(...Object.entries(C.DESTINATIONS).filter(([tool]) =>
       (['et','wt'].includes(id) || row.toolGrants?.[tool] === true) &&
       settings.games?.[tool] !== false && settings.classGames?.[id]?.[tool] !== false).map(([tool,entry]) => {
         const option=document.createElement('option'); option.value=tool; option.textContent=entry.label; return option;
       })); q('classSelect').value = id;
+    renderSubdestinations();
     stateRef = db.ref('b3Games/workspaces/' + WS + '/classes/' + id + '/access/followTeacher');
     const listener = snapshot => {
       if (myGeneration !== generation) return;
@@ -79,13 +96,16 @@
     };
     stateRef.on('value', listener, e => error('Could not load class navigation: ' + e.message));
     unlisten = () => stateRef.off('value', listener);
-    status('Ready. Choose a mode, then Apply.');
+    status('Ready. Choose where students should go, then send them.');
   }
 
   async function publish(forceMode) {
     try {
       safeTeacher();
+      const serial=generation, classId=current, uid=teacher.user.uid;
+      q('apply').disabled=q('unlock').disabled=q('classSelect').disabled=true;
       const m = forceMode || mode(), destination = q('destination').value;
+      const subdestination = q('subdestination').value;
       if (m !== C.MODES.INDEPENDENT) {
         if (!Object.prototype.hasOwnProperty.call(C.DESTINATIONS, destination)) throw Error('This destination is not supported.');
         if (!['et','wt'].includes(current) && classRow?.toolGrants?.[destination] !== true)
@@ -107,11 +127,15 @@
       q('apply').disabled = q('unlock').disabled = true;
       const now = clock(), revision = crypto.randomUUID();
       const row = C.propose({workspaceId:WS,classId:current,teacherUid:teacher.publicKey,
-        mode:m,destination,targets,revision,issuedAt:now,heartbeatAt:now,
+        mode:m,destination,subdestination,targets,revision,issuedAt:now,heartbeatAt:now,
         expiresAt:now + C.MAX_HEARTBEAT_AGE_MS});
       // RTDB security rules permit class access writes only to an assigned,
       // active teacher or administrator. Do not bypass those rules.
+      safeTeacher();
+      if(serial!==generation || current!==classId || teacher.user.uid!==uid)
+        throw Error('Your class or sign-in changed. Please send again.');
       await stateRef.set(row);
+      if(serial!==generation)return;
       clearInterval(heartbeat); heartbeat = null;
       ownRevision = m === C.MODES.INDEPENDENT ? null : revision;
       if (ownRevision) {
@@ -137,10 +161,11 @@
         m === C.MODES.LOCKED ? 'Follow Locked sent. Keep this page open while teaching.' :
           'Sent once. Students are free to navigate afterward.');
     } catch (e) { error(e.message || 'Could not change the class mode.'); }
-    finally {q('apply').disabled = q('unlock').disabled = false;}
+    finally {q('apply').disabled = q('unlock').disabled = q('classSelect').disabled = false;}
   }
 
   q('apply').addEventListener('click', () => void publish());
+  q('destination').addEventListener('change', renderSubdestinations);
   q('unlock').addEventListener('click', () => void publish(C.MODES.INDEPENDENT));
   q('classSelect').addEventListener('change', () => {
     // Set current only inside loadClass once the class has been verified.
@@ -151,6 +176,7 @@
     try {
       if (!user || !authorized || !['admin','teacher'].includes(access?.role)) {
         ++generation;endWatching();teacher=null;
+        q('pointerWorkspace').removeAttribute('src');
         q('app').classList.add('hidden');
         q('gate').textContent = 'Sign in with your authorized teacher Google account from Fun Torah Tools.';
         return;

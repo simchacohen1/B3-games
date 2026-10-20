@@ -380,12 +380,47 @@ function bindCloudLogin(){
   waitForAccount();
 }
 
+// Follow destinations use the existing screens and never replace student records.
+const FOLLOW_SHORASHIM_SECTIONS=Object.freeze({review:'reviewScreen',learn:'shorashimPerekScreen',games:'gamesScreen',gallery:'galleryScreen',affixes:'affixHomeScreen'});
+function followAllowsScreen(id,track=currentTrack){
+  const section=window.FTTFollowStudent?.activityPolicy('shorashim')?.subdestination;
+  if(!section)return true;
+  if(section==='learn')return id==='shorashimPerekScreen'||id==='learnScreen'&&track==='shorashim';
+  if(section==='affixes')return id==='affixHomeScreen'||id==='learnScreen'&&['prefix','suffix'].includes(track);
+  return id===FOLLOW_SHORASHIM_SECTIONS[section];
+}
+function currentFollowSection(){
+  if(activeScreenId==='learnScreen')return currentTrack==='shorashim'?'learn':'affixes';
+  return Object.keys(FOLLOW_SHORASHIM_SECTIONS).find(key=>FOLLOW_SHORASHIM_SECTIONS[key]===activeScreenId)||'';
+}
+function applyFollowSection(section){
+  if(!Object.prototype.hasOwnProperty.call(FOLLOW_SHORASHIM_SECTIONS,section))return false;
+  const screen=FOLLOW_SHORASHIM_SECTIONS[section];
+  if(!screen||!followAllowsScreen(screen,section==='learn'?'shorashim':currentTrack))return false;
+  if(section==='learn')currentTrack='shorashim';
+  if(section==='review')currentTrack='shorashim';
+  goScreen(screen);
+  const url=new URL(location.href);url.searchParams.set('section',section);history.replaceState(null,'',url);
+  return true;
+}
+function initializeFollowDestination(){
+  window.FTTFollowActivities=window.FTTFollowActivities||{};
+  window.FTTFollowActivities.shorashim={currentSection:currentFollowSection,applySection:applyFollowSection};
+  applyFollowSection(new URL(location.href).searchParams.get('section'));
+}
+window.addEventListener('ftt:before-follow-navigation',event=>{
+  const cloudStatus=document.getElementById('cloudStatus');
+  if((activeScreenId==='learnScreen'&&window.__shorashimEditorDirty) || shorashimRecorder ||
+      document.getElementById('saveCardBtn')?.disabled ||
+      (cloudEnabled&&cloudStatus?.matches('.syncing,.error')))event.preventDefault();
+});
 function init(){
-  populateStudents();bindNavigation();bindModes();bindStudentDialog();bindSession();bindEditor();bindReview();bindGames();bindTeacher();initCanvas();bindActivityTracking();renderAll();startTicker();
+  populateStudents();bindNavigation();bindModes();bindStudentDialog();bindSession();bindEditor();bindReview();bindGames();bindTeacher();initCanvas();bindActivityTracking();renderAll();startTicker();initializeFollowDestination();
 }
 function populateStudents(){const sel=document.getElementById('studentSelect');sel.innerHTML='';Object.keys(db.students).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});if(!db.students[currentStudent])currentStudent=Object.keys(db.students)[0];sel.value=currentStudent;sel.onchange=()=>{currentStudent=sel.value;selectedItemKey=null;reviewDeck=[];saveDB();renderAll();goScreen('studentHome');};}
 function bindNavigation(){
   document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!followAllowsScreen(btn.dataset.go,btn.dataset.track||currentTrack))return;
     const requested=btn.dataset.track;if(requested&&requested!==currentTrack){currentTrack=requested;selectedItemKey=null;}
     goScreen(btn.dataset.go);
   }));
@@ -396,14 +431,14 @@ function bindNavigation(){
   const weekSelect=document.getElementById('bookletWeekSelect');
   if(weekSelect)weekSelect.onchange=()=>{bookletWeek=weekSelect.value==='all'?'all':Number(weekSelect.value);selectedItemKey=null;renderLearningScreen();};
 }
-function goScreen(id){if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
+function goScreen(id){if(!followAllowsScreen(id))return;if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
 function bindModes(){document.getElementById('studentModeBtn').onclick=()=>showMode('student');document.getElementById('teacherModeBtn').onclick=()=>showMode('teacher');}
 function showMode(mode){const studentMode=mode==='student';document.getElementById('studentView').classList.toggle('hidden',!studentMode);document.getElementById('teacherView').classList.toggle('hidden',studentMode);document.getElementById('studentModeBtn').classList.toggle('active',studentMode);document.getElementById('teacherModeBtn').classList.toggle('active',!studentMode);if(!studentMode)renderTeacher();}
 function bindStudentDialog(){const dlg=document.getElementById('addStudentDialog');document.getElementById('addStudentBtn').onclick=()=>dlg.showModal();document.getElementById('confirmAddStudent').onclick=e=>{e.preventDefault();const inp=document.getElementById('newStudentName'),name=inp.value.trim();if(!name)return;if(!db.students[name])db.students[name]=blankStudent();currentStudent=name;inp.value='';dlg.close();saveDB();populateStudents();renderAll();};}
 
 function bindSession(){}
 function renderPerekChoices(){const s=student(),list=visibleCatalog('shorashim');document.querySelectorAll('[data-learning-perek]').forEach(btn=>{const value=btn.dataset.learningPerek,words=value==='booklet'?bookletCatalog():list.filter(item=>itemPerek(item)===Number(value)),learned=words.filter(item=>s.cards[keyFor('shorashim',item.id)]?.learnedAt).length,count=btn.querySelector('.perek-progress');if(count)count.textContent=words.length?`${learned} of ${words.length} learned`:'No words assigned yet';});}
-function chooseLearningPerek(value){const choice=value==='booklet'?'booklet':Number(value);if(choice!=='booklet'&&choice!==18&&choice!==19)return;currentTrack='shorashim';learningPerek=choice;selectedItemKey=null;goScreen('learnScreen');}
+function chooseLearningPerek(value){if(!followAllowsScreen('learnScreen','shorashim'))return;const choice=value==='booklet'?'booklet':Number(value);if(choice!=='booklet'&&choice!==18&&choice!==19)return;currentTrack='shorashim';learningPerek=choice;selectedItemKey=null;goScreen('learnScreen');}
 function renderLearningScreen(){const isShorashim=currentTrack==='shorashim',isBooklet=isShorashim&&learningPerek==='booklet',label=isBooklet?`3rd Grade Booklet • ${bookletWeek==='all'?'All Weeks':`Week ${bookletWeek}`}`:isShorashim?`Perek ${learningPerek===19?'י״ט':'י״ח'} Shorashim`:labelTrack(currentTrack);document.getElementById('learnHeading').textContent=`Learn & Edit ${label}`;document.getElementById('pathTitle').textContent=`Your ${label}`;document.getElementById('changeLearningPerekBtn')?.classList.toggle('hidden',!isShorashim);document.getElementById('bookletWeekWrap')?.classList.toggle('hidden',!isBooklet);const weekSelect=document.getElementById('bookletWeekSelect');if(weekSelect&&isBooklet)weekSelect.value=String(bookletWeek);const list=learningCatalog(currentTrack);if(selectedItemKey&&!list.some(item=>keyFor(currentTrack,item.id)===selectedItemKey))selectedItemKey=null;renderSession();renderWordList();if(!selectedItemKey){const next=nextLearningUncreated(currentTrack);if(next)loadEditorItem(keyFor(currentTrack,next.id));else{const learned=list.filter(item=>student().cards[keyFor(currentTrack,item.id)]?.learnedAt);if(learned.length)loadEditorItem(keyFor(currentTrack,learned[learned.length-1].id));else showNoMoreItems();}}}
 function renderSession(){document.getElementById('startSessionPanel')?.classList.add('hidden');document.getElementById('learnWorkspace')?.classList.remove('hidden');const status=document.getElementById('sessionStatus');if(status)status.textContent='Cards save as you go';const footer=document.querySelector('#learnWorkspace .session-footer');if(footer)footer.classList.add('hidden');}
 function renderWordList(){const box=document.getElementById('wordList'),s=student(),list=learningCatalog(currentTrack),created=list.filter(i=>s.cards[keyFor(currentTrack,i.id)]?.learnedAt).length;document.getElementById('availableCount').textContent=`${created} / ${list.length} learned`;box.innerHTML='';list.forEach(item=>{const key=keyFor(currentTrack,item.id),c=s.cards[key],b=document.createElement('button');b.type='button';let cls='word-row',status='Choose • Learn';if(c?.learnedAt){cls+=' learned';status='Learned • Edit';}else{cls+=' available';}if(selectedItemKey===key)cls+=' active';b.className=cls;b.innerHTML=`<div class="hebrew">${escapeHTML(item.front)}</div><div class="meta"><span>${escapeHTML(item.english)}${currentTrack==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span><span>${status}</span></div>`;b.onclick=()=>loadEditorItem(key);box.appendChild(b);});}
@@ -728,7 +763,7 @@ function answerRace(card,b){if(raceState.locked)return;raceState.locked=true;if(
 function finishRaceGame(){if(raceState.finished)return;raceState.finished=true;cleanupGameRuntime();const won=raceState.studentPos>=100||raceState.studentPos>raceState.computerPos,stage=document.getElementById('gameStage');stage.innerHTML=`<div class="game-finish"><div class="finish-icon">${won?'🏆':'🏁'}</div><h3>${won?'You won the race!':'Race finished!'}</h3><p>You: <b>${Math.round(raceState.studentPos)}%</b> • Computer: <b>${Math.round(raceState.computerPos)}%</b></p><button id="raceAgain" class="primary">Race Again</button></div>`;document.getElementById('raceAgain').onclick=startRaceGame;finishGame();}
 
 function renderStudentStats(){const s=student(),p=dailyProgress(s),sh=learnedCards(s,'shorashim',false).length,aff=learnedCards(s,'prefix',false).length+learnedCards(s,'suffix',false).length;document.getElementById('studentStats').innerHTML=[[`Shorashim learned`,sh],[`Prefixes & suffixes`,aff],[`Reviewed today`,p.total?`${p.seen}/${p.total}`:'0'],[`Games`,'Available']].map(([l,v])=>`<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');renderHomeGameState();}
-function openRedesignCard(itemKey){const s=student(),card=s.cards[itemKey];if(!card?.learnedAt)return;currentTrack=card.itemType;if(currentTrack==='shorashim'){const item=getItem(itemKey);learningPerek=item?.bookletWeek?'booklet':itemPerek(item);if(item?.bookletWeek)bookletWeek=item.bookletWeek;}window.__shorashimRedesignMode=true;window.__shorashimRedesignKey=itemKey;selectedItemKey=itemKey;goScreen('learnScreen');}
+function openRedesignCard(itemKey){const s=student(),card=s.cards[itemKey];if(!card?.learnedAt||!followAllowsScreen('learnScreen',card.itemType))return;currentTrack=card.itemType;if(currentTrack==='shorashim'){const item=getItem(itemKey);learningPerek=item?.bookletWeek?'booklet':itemPerek(item);if(item?.bookletWeek)bookletWeek=item.bookletWeek;}window.__shorashimRedesignMode=true;window.__shorashimRedesignKey=itemKey;selectedItemKey=itemKey;goScreen('learnScreen');}
 function renderGallery(target='galleryGrid',s=student()){const box=document.getElementById(target);if(!box)return;const cards=Object.values(s.cards).sort((a,b)=>b.createdAt-a.createdAt);if(!cards.length){box.innerHTML='<div class="card-panel empty-state">No cards created yet.</div>';return;}const studentGallery=target==='galleryGrid';box.innerHTML=cards.map(c=>galleryHTML(c,studentGallery)).join('');if(studentGallery)box.querySelectorAll('[data-redesign-key]').forEach(btn=>btn.onclick=()=>openRedesignCard(btn.dataset.redesignKey));}
 function galleryHTML(c,allowRedesign=false){const item=getItem(c.itemKey);if(!item)return '';const d=normalizeDesign(c.design),ex=(item.examples||[]).slice(0,2).map(x=>escapeHTML(x.hebrew)).join('<br>'),edit=allowRedesign&&c.learnedAt?`<button type="button" class="ghost small" data-redesign-key="${escapeHTML(c.itemKey)}">✏️ Redesign</button>`:'';return `<div class="gallery-item"><div class="gallery-card" style="background:${d.backgroundColor}"><div class="g-hebrew" style="font-family:${d.hebrewFont};color:${d.hebrewColor};left:${d.hebrewPos.left}%;top:${d.hebrewPos.top}%">${escapeHTML(item.front)}</div><div class="g-examples">${ex}</div><div class="gallery-art-layer">${galleryArtsHTML(d.arts)}</div>${d.drawing?`<img class="g-drawing" src="${d.drawing}" alt="drawing">`:''}</div><div class="g-meta"><span>${singularTrack(c.itemType)}${c.itemType==='shorashim'?` • ${reviewFilterLabel(item)}`:''}${item.pasuk?` • Pasuk ${item.pasuk}`:''}</span><span>${c.learnedAt?'Learned '+fmtDate(c.learnedAt):'New'}</span></div>${edit}</div>`;}
 function galleryArtsHTML(arts){return (arts||[]).map(a=>{const size=(a.size||84)*.52,common=`left:${a.left??50}%;top:${a.top??66}%;`;if(a.kind==='illustration')return `<div class="art-item illustration" style="${common}width:${size}px;height:${size*.68}px"><img src="${escapeHTML(a.value)}" alt="${escapeHTML(a.label||'illustration')}"></div>`;return `<div class="art-item emoji" style="${common}font-size:${size}px">${a.value||''}</div>`;}).join('');}

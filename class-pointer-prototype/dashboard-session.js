@@ -73,6 +73,10 @@
             if(C.permitted(access,id,classRow)){const opt=document.createElement('option');opt.value=id;opt.textContent=classRow.name||id;picker.appendChild(opt)}
           }
           picker.value=classId;
+          if(window.self!==window.top && query.get('followTeacherWhiteboard')==='1'){
+            picker.disabled=true;
+            picker.title='Choose the teaching class in Follow the Teacher.';
+          }
           picker.addEventListener('change',()=>{
             if(!picker.value||picker.value===classId)return;
             if(!document.getElementById('endClass').disabled&&!confirm('End this classroom and switch classes?')){picker.value=classId;return}
