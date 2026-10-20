@@ -1,0 +1,237 @@
+/*
+ * Shared teacher-only quick controls for Fun Torah Tools.
+ * Loaded by firebase-config.js on existing activity pages. UI is authorized
+ * via B3SiteSettings; students and student impersonation never see the tools.
+ */
+(function () {
+  'use strict';
+  if (window.__fttGlobalTeacherControls || window.self !== window.top) return;
+  if (/\/preview-pr\d+\//.test(location.pathname)) return;
+  window.__fttGlobalTeacherControls = true;
+
+  var loader = document.currentScript;
+  var base = new URL('./', loader && loader.src || location.href);
+  var API = null, bar = null, select = null, lock = null, follow = null;
+  var homeFollow = null, modal = null, modalTitle = null;
+  var accessFrame = null, followFrame = null, activePanel = '';
+  var classes = [], selected = '', identity = 0, authorized = false;
+  var lastFollowClass = '';
+  var ID = /^[A-Za-z0-9_-]{1,100}$/;
+  var workspace = 'b3-2026';
+
+  function el(tag, className, content) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (content !== undefined) node.textContent = content;
+    return node;
+  }
+  function currentClass() {
+    var homeSelect = document.getElementById('homeClassSelect');
+    if (homeFollow && homeSelect && ID.test(homeSelect.value)) return homeSelect.value;
+    return selected;
+  }
+  function getPreferred() {
+    try { return localStorage.getItem('b3ControlClass') || ''; } catch (_) { return ''; }
+  }
+  function remember(id) {
+    selected = id;
+    try { localStorage.setItem('b3ControlClass', id); } catch (_) {}
+  }
+  function chosenLabel() {
+    var row = classes.find(function(c) { return c.id === currentClass(); });
+    return row ? row.name : currentClass().toUpperCase();
+  }
+  function classUrl(path, classId, options) {
+    var url = new URL(path, base);
+    url.searchParams.set('class', classId);
+    Object.keys(options || {}).forEach(function(key) { url.searchParams.set(key, options[key]); });
+    return url.href;
+  }
+  function applySource(frame, src) {
+    if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+  }
+  function closePanel() {
+    if (!modal) return;
+    modal.hidden = true;
+    activePanel = '';
+    if (follow) follow.setAttribute('aria-expanded', 'false');
+    if (homeFollow) homeFollow.setAttribute('aria-expanded', 'false');
+    if (lock) lock.setAttribute('aria-expanded', 'false');
+  }
+  function openPanel(which) {
+    var id = currentClass();
+    if (!authorized || !ID.test(id) || !classes.some(function(row) { return row.id === id; })) return;
+    if (!modal) return;
+    if (!modal.hidden && activePanel === which) { closePanel(); return; }
+    activePanel = which;
+    modal.hidden = false;
+    modalTitle.textContent = (which === 'access' ? '🔒 Class Access · ' : '👣 Follow the Teacher · ') + chosenLabel();
+    accessFrame.hidden = which !== 'access';
+    followFrame.hidden = which !== 'follow';
+    if (which === 'access') {
+      applySource(accessFrame, classUrl('admin.html', id, {tab:'access',embed:'1'}));
+    } else {
+      // Keep an already-running Follow session alive while its panel is closed.
+      // Changing class is intentional: its original controller stops on unload.
+      if (lastFollowClass !== id) {
+        applySource(followFrame, classUrl('follow-teacher/teacher.html', id, {embed:'1'}));
+        lastFollowClass = id;
+      }
+    }
+    if (follow) follow.setAttribute('aria-expanded', String(which === 'follow'));
+    if (homeFollow) homeFollow.setAttribute('aria-expanded', String(which === 'follow'));
+    if (lock) lock.setAttribute('aria-expanded', String(which === 'access'));
+  }
+  function setupUi() {
+    if (bar) return;
+    var style = el('style');
+    style.textContent = [
+      '#fttTeacherQuickBar{position:fixed;top:12px;right:12px;z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #cbd5e1;padding:6px 8px;border-radius:18px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
+      '#fttTeacherQuickBar[hidden],#fttTeacherQuickModal[hidden]{display:none!important}',
+      '#fttTeacherQuickBar label{font-size:13px;font-weight:800}',
+      '#fttTeacherQuickBar select{max-width:130px;min-width:70px;border:1px solid #cbd5e1;border-radius:10px;padding:9px 5px;color:#1e293b;background:#fff;font:700 14px Arial}',
+      '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:11px;padding:9px 11px;background:#edf2ff;color:#1d4ed8;font:800 14px Arial;cursor:pointer;white-space:nowrap}',
+      '#fttTeacherQuickBar button:focus-visible,.ftt-home-follow:focus-visible{outline:3px solid #2563eb;outline-offset:2px}',
+      '#fttTeacherQuickBar button[aria-expanded=true],.ftt-home-follow[aria-expanded=true]{background:#dbeafe}',
+      '.ftt-home-follow{font-size:18px!important;padding:5px 9px!important;border-radius:999px!important}',
+      '#fttTeacherQuickModal{position:fixed;inset:0;z-index:100500;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:12px;font-family:Arial,sans-serif}',
+      '#fttTeacherQuickModal .ftt-quick-card{background:#fff;color:#1e293b;border-radius:18px;width:min(980px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 65px #0005}',
+      '#fttTeacherQuickModal .ftt-quick-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #cbd5e1;font-weight:900}',
+      '#fttTeacherQuickModal .ftt-quick-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}',
+      '#fttTeacherQuickModal .ftt-quick-close,#fttTeacherQuickModal .ftt-quick-popout{padding:8px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font:700 13px Arial;color:#1e293b;cursor:pointer}',
+      '#fttTeacherQuickModal iframe{width:100%;flex:1;min-height:0;border:0;background:#fff}',
+      '#fttTeacherQuickModal iframe[hidden]{display:none!important}',
+      '@media(max-width:620px){#fttTeacherQuickBar{top:auto;bottom:8px;right:8px}#fttTeacherQuickBar label{display:none}#fttTeacherQuickBar button{padding:9px 7px;font-size:12px}#fttTeacherQuickModal{padding:0}#fttTeacherQuickModal .ftt-quick-card{width:100%;height:100%;border-radius:0}}'
+    ].join('\n');
+    document.head.appendChild(style);
+
+    bar = el('nav'); bar.id = 'fttTeacherQuickBar'; bar.hidden = true;
+    bar.setAttribute('aria-label', 'Teacher class and Follow controls');
+    var label = el('label', '', 'Class'); label.htmlFor = 'fttTeacherQuickClass';
+    select = el('select'); select.id = 'fttTeacherQuickClass'; select.setAttribute('aria-label','Teaching class');
+    lock = el('button', '', '🔒 Lock'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
+    follow = el('button', '', '👣 Follow'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
+    bar.append(label, select, lock, follow);
+    document.body.appendChild(bar);
+    select.addEventListener('change', function () { if (classes.some(function(c){return c.id===select.value;})) { remember(select.value); if (!modal.hidden && activePanel) { closePanel(); } } });
+    lock.addEventListener('click', function(){ openPanel('access'); });
+    follow.addEventListener('click', function(){ openPanel('follow'); });
+
+    modal = el('div'); modal.id = 'fttTeacherQuickModal'; modal.hidden = true;
+    modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-label','Teacher quick controls');
+    var card = el('div','ftt-quick-card'), head = el('div','ftt-quick-head');
+    modalTitle = el('span', '', 'Teacher controls');
+    var actions = el('div','ftt-quick-actions');
+    var popout = el('button','ftt-quick-popout','↗ Separate window'); popout.type = 'button';
+    popout.title = 'Keep Follow running in its own window while you visit other teacher pages';
+    var dismiss = el('button','ftt-quick-close','✕ Close'); dismiss.type = 'button';
+    actions.append(popout,dismiss);head.append(modalTitle,actions);
+    accessFrame = el('iframe');accessFrame.title = 'Class Access';accessFrame.hidden = true;
+    followFrame = el('iframe');followFrame.title = 'Follow the Teacher controls';followFrame.hidden = true;
+    card.append(head,accessFrame,followFrame);modal.appendChild(card);document.body.appendChild(modal);
+    dismiss.addEventListener('click',closePanel);
+    modal.addEventListener('click',function(e){if(e.target===modal)closePanel();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)closePanel();});
+    popout.addEventListener('click',function(){
+      var url=activePanel==='follow'?classUrl('follow-teacher/teacher.html',currentClass()):classUrl('admin.html',currentClass(),{tab:'access'});
+      window.open(url,'_blank','noopener');
+    });
+  }
+  function syncClassPicker() {
+    if (!select) return;
+    select.replaceChildren();
+    classes.forEach(function(row){
+      var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
+    });
+    select.value = selected;
+  }
+  function syncHomeButton(access) {
+    var homeBar = document.getElementById('homeClassBar');
+    // Use the existing owner home bar, not a second duplicate toolbar.
+    var useHome = Boolean(homeBar && access.role === 'admin' &&
+      new URLSearchParams(location.search).get('adminPage') !== '1' &&
+      new URLSearchParams(location.search).get('preview') !== '1');
+    if (!useHome) {
+      if (homeFollow) homeFollow.remove();
+      homeFollow = null;
+      bar.hidden = false;
+      return;
+    }
+    bar.hidden = true;
+    if (!homeFollow || !homeBar.contains(homeFollow)) {
+      homeFollow = el('button','ftt-home-follow','👣');
+      homeFollow.type = 'button';homeFollow.title = 'Open or close Follow the Teacher';
+      homeFollow.setAttribute('aria-label','Open or close Follow the Teacher tools');
+      homeFollow.setAttribute('aria-expanded','false');
+      homeFollow.addEventListener('click',function(){openPanel('follow');});
+      homeBar.appendChild(homeFollow);
+    }
+  }
+  function reset() {
+    authorized = false; identity++; classes = []; selected = '';
+    if (bar) bar.hidden = true;
+    if (homeFollow) {homeFollow.remove();homeFollow=null;}
+    if (accessFrame) accessFrame.removeAttribute('src');
+    if (followFrame) followFrame.removeAttribute('src');
+    lastFollowClass = '';
+    closePanel();
+  }
+  async function onAuth(user, ok, access) {
+    var serial = ++identity;
+    if (!user || !ok || !access || !access.authorized ||
+      (access.role !== 'admin' && access.role !== 'teacher') ||
+      (API.getActingStudent && API.getActingStudent())) {reset();return;}
+    try {
+      workspace = API.workspaceId || 'b3-2026';
+      var db = firebase.database();
+      var rows = [];
+      if (access.role === 'admin') {
+        var all = (await db.ref('b3Games/workspaces/'+workspace+'/classes').once('value')).val() || {};
+        rows = Object.keys(all).filter(function(id){return ID.test(id) && all[id] && all[id].active !== false;}).map(function(id){
+          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():String(all[id].name||id)};
+        });
+      } else {
+        rows = (access.classIds||[]).filter(function(id){return ID.test(id);}).map(function(id){
+          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():id};
+        });
+      }
+      if (serial !== identity) return;
+      rows.sort(function(a,b) {
+        var rank=function(id){return id==='et'?0:id==='wt'?1:2;};
+        return rank(a.id)-rank(b.id)||a.name.localeCompare(b.name);
+      });
+      if (!rows.length) {reset();return;}
+      classes=rows;
+      var requested = new URLSearchParams(location.search).get('class');
+      var preferred = getPreferred();
+      var ids=rows.map(function(row){return row.id;});
+      remember(ids.includes(requested)?requested:ids.includes(preferred)?preferred:ids[0]);
+      authorized=true;
+      setupUi();
+      syncClassPicker();
+      syncHomeButton(access);
+    } catch(e) {
+      if (serial===identity) reset();
+      console.warn('Teacher quick controls unavailable:',e);
+    }
+  }
+  function connect() {
+    if (!document.body) {document.addEventListener('DOMContentLoaded',connect,{once:true});return;}
+    var tries = 0;
+    function ready() {
+      API = window.B3SiteSettings;
+      if (API && typeof API.onAuthStateChanged === 'function' && window.firebase) {
+        clearInterval(ticker);
+        API.onAuthStateChanged(onAuth);
+      } else if (++tries >= 150) clearInterval(ticker);
+    }
+    // Most tools already import site-settings.js. Load it only where missing.
+    if (!window.B3SiteSettings && !Array.from(document.scripts).some(function(s){return /(?:^|\/)site-settings\.js(?:\?|$)/.test(s.src||'');})) {
+      var script=el('script');script.src=new URL('site-settings.js?v=20261020-quickbar',base).href;
+      document.head.appendChild(script);
+    }
+    var ticker=setInterval(ready,100);
+    ready();
+  }
+  connect();
+})();
