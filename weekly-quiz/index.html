@@ -535,7 +535,7 @@ function chooseActiveLaunch(){
   let refreshCount=0;
   const refresh=async()=>{
     try{const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;launchData=result.launch||null;myResponses=result.responses||{};if(result.completion)allCompletions[id]={[myStudentId]:result.completion};if(allLaunches[id])allLaunches[id]=launchData;render();if(++refreshCount%12===0)await listenForHistory();}
-    catch(error){console.warn('Could not refresh quiz:',error);}
+    catch(error){console.warn('Could not refresh quiz:',error);if(activeLaunchId!==id)return;const card=document.getElementById('noQuizCard');if(card){card.classList.remove('hidden');let msg=document.getElementById('quizLoadError');if(!msg){msg=document.createElement('p');msg.id='quizLoadError';msg.setAttribute('role','alert');card.prepend(msg);}msg.textContent='Your assigned quiz could not load: '+(error.message||'Connection error')+'. Please tell your teacher.';}}
   };
   refreshActiveLaunch=refresh;refresh();launchPollTimer=setInterval(refresh,2500);
 }
