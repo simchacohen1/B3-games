@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chazara Chart</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#1f2937;font-family:Arial,sans-serif}.wrap{max-width:1050px;margin:auto;padding:20px}h1{font-size:38px;margin:5px 0}.sub,.note{color:#64748b}.top,.controls{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.top a{color:#475569;text-decoration:none;font-weight:bold}.student-banner{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:8px 13px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:900}.student-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}.student-row .student-banner{margin-top:0}.switch-student{border:0;border-radius:999px;padding:8px 13px;background:#334155;color:white;font-weight:800;cursor:pointer;box-shadow:0 2px 0 #1e293b}.switch-student:active{transform:translateY(1px);box-shadow:0 1px 0 #1e293b}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.stat,.panel{background:white;border-radius:18px;padding:16px;box-shadow:0 4px 16px #0001}.stat b{display:block;font-size:27px}.stat span,.note{font-size:12px}.panel{margin:14px 0}.panel h2{margin:0 0 8px}.grid{display:block}.perek-group{margin:8px 0 22px}.perek-title{direction:rtl;text-align:right;font-size:25px;font-weight:900;margin:10px 4px 9px}.perek-grid{direction:rtl;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:11px}.pasuk-wrap{min-width:0;position:relative}.pasuk{width:100%;min-height:94px;border:0;border-radius:16px 16px 8px 8px;cursor:pointer;padding:8px;box-shadow:0 3px 8px #0002}.pasuk:disabled{cursor:not-allowed;opacity:.8}.pasuk.locked-gap{background:#e5e7eb!important;color:#64748b!important;box-shadow:none;border:2px dashed #cbd5e1;opacity:1}.pasuk.locked-gap .count{font-size:24px}.gap-bar{width:100%;border:0;border-radius:0 0 12px 12px;padding:8px 5px;background:#cbd5e1;color:#64748b;font-weight:900;font-size:11px;text-align:center}.ref{font-size:19px;font-weight:900;direction:rtl;unicode-bidi:isolate;text-align:center;white-space:nowrap}.count{font-size:30px;font-weight:900}.last{font-size:10px;opacity:.78}.undo-btn{position:absolute;z-index:4;top:39px;left:-8px;width:24px;height:24px;border-radius:999px;border:2px solid #fff;background:#334155;color:#fff;font-size:18px;font-weight:900;line-height:17px;cursor:pointer;box-shadow:0 2px 6px #0004}.undo-btn:hover{background:#b91c1c}.record-bar{width:100%;border:0;border-radius:0 0 12px 12px;padding:8px 5px;background:#1d4ed8;color:#fff;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 2px 6px #0002}.record-bar.recording{background:#b91c1c}.record-bar:disabled{background:#94a3b8;cursor:not-allowed}.rec-panel{background:#fff;border:1px solid #cbd5e1;border-top:0;border-radius:0 0 12px 12px;padding:7px}.rec-panel canvas{display:block;width:100%;height:45px;background:#f1f5f9;border-radius:8px}.rec-status{font-size:10px;color:#475569;margin-top:5px;text-align:center;line-height:1.3}.due{direction:rtl;display:flex;gap:8px;flex-wrap:wrap}.due button{direction:rtl;unicode-bidi:isolate;border:0;border-radius:12px;padding:10px;background:#fff1f2;color:#9f1239;font-weight:bold;cursor:pointer}.due button:disabled{opacity:.6;cursor:not-allowed}.hidden{display:none!important}.empty{padding:25px;color:#64748b}.locked-note{font-size:10px;color:#9f1239;font-weight:800;margin-top:4px;text-align:center}.practice-link{display:block;margin-top:5px;color:#1d4ed8;font-size:10px;font-weight:bold;text-align:center;text-decoration:none}.reward-toast{position:fixed;right:18px;bottom:18px;z-index:99999;background:#1e293b;color:#fff;border:3px solid #fbbf24;border-radius:15px;padding:12px 16px;font-weight:900;box-shadow:0 8px 24px #0004;transition:opacity .25s}.record-help{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 12px;margin:10px 0;color:#1e3a8a;font-size:13px}.recordings-list{display:grid;gap:14px}.recording-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.recording-column{border-radius:16px;padding:12px;min-width:0}.recording-column.approved{background:#f0fdf4;border:2px solid #bbf7d0}.recording-column.rejected{background:#fff1f2;border:2px solid #fecdd3}.recording-column h3{margin:0 0 10px;font-size:16px}.recording-column.approved h3{color:#166534}.recording-column.rejected h3{color:#9f1239}.recording-stack{display:grid;gap:10px}.recording-pending-wrap{background:#fffbeb;border:2px solid #fde68a;border-radius:16px;padding:12px}.recording-pending-wrap h3{margin:0 0 10px;color:#92400e;font-size:16px}.recording-item{border:1px solid #dbe4f0;border-radius:14px;padding:12px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}.recording-item.approved{border-color:#86efac}.recording-item.rejected{border-color:#fda4af}.recording-item.pending{border-color:#fcd34d}.recording-title{font-weight:900;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.recording-meta{font-size:11px;color:#64748b;margin-top:3px}.recording-item audio{width:100%;grid-column:1/-1}.recording-delete{border:0;border-radius:10px;padding:8px 11px;background:#fee2e2;color:#991b1b;font-weight:900;cursor:pointer}.recording-delete:disabled{opacity:.6;cursor:wait}.recording-empty{color:#64748b;padding:8px 0}.recording-status{display:inline-block;font-size:11px;font-weight:900;border-radius:999px;padding:4px 8px}.recording-status.approved{color:#166534;background:#dcfce7}.recording-status.rejected{color:#991b1b;background:#fee2e2}.recording-status.pending{color:#92400e;background:#fef3c7}.recording-points{display:inline-block;font-size:11px;font-weight:900;color:#166534;background:#dcfce7;border-radius:999px;padding:4px 8px}.error{color:#b91c1c;font-weight:800}.confirm-backdrop{position:fixed;inset:0;background:#0f172a99;z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px}.confirm-card{width:min(430px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 24px 70px #0005;text-align:center}.confirm-card h3{font-size:22px;margin:0 0 8px}.confirm-card p{color:#475569;line-height:1.45;margin:0 0 18px}.confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.confirm-actions button{border:0;border-radius:13px;padding:12px 10px;font-size:15px;font-weight:900;cursor:pointer}.confirm-yes{background:#16a34a;color:#fff}.confirm-no{background:#e2e8f0;color:#334155}.signin-box{max-width:470px;margin-top:12px;display:grid;gap:10px}.signin-box label{font-size:12px;font-weight:800;color:#475569}.signin-box input{width:100%;border:2px solid #cbd5e1;border-radius:12px;padding:11px 12px;font-size:16px;background:#fff}.signin-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.signin-btn{border:0;border-radius:12px;padding:11px 16px;background:#1d4ed8;color:#fff;font-weight:900;cursor:pointer}.signin-btn:disabled{opacity:.55;cursor:wait}.signin-msg{min-height:18px;font-size:12px;font-weight:800;color:#b91c1c}.cheer-banner{margin:0;position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;max-width:min(520px,92vw);text-align:center;font-size:26px;font-weight:900;color:#155431;background:#e2f3e8;border-radius:16px;padding:12px 18px;box-shadow:0 8px 24px #0003;transition:opacity .5s;pointer-events:none}@media(max-width:650px){.cheer-banner{font-size:20px}.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:30px}.perek-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.recording-columns{grid-template-columns:1fr}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="recording-save.js?v=20261002-fast-save"></script>
+<script src="../firebase-config.js"></script>
+<script src="../private-media.js?v=20261015-private"></script>
+<script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="../game-gate.js?v=20261020-follow-pointer1" data-game-id="chazara" data-back-href="../index.html"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>🔁 Chazara Chart</h1><div class="sub">Tap the Posuk after you <b>read and translate</b> it. Record it for double points.</div><div class="student-row"><div class="student-banner">👤 <span id="studentNameTop">Student</span></div><button type="button" class="switch-student" id="switchStudentBtn">🔄 Switch Student</button></div></div><a href="../index.html">← Fun Torah Tools</a></div>
+  <div id="noStudent" class="panel hidden"><h2>Sign in on Fun Torah Tools</h2><p class="note">Students sign in once on the homepage, then open Chazara.</p><div class="signin-actions"><a href="../index.html" style="font-weight:800;color:#475569;text-decoration:none;">← Fun Torah Tools</a></div></div>
+  <div id="app" class="hidden">
+    <div class="stats"><div class="stat"><b id="total">0</b><span>Total Chazaras</span></div><div class="stat"><b id="learned">0</b><span>Pesukim Unlocked</span></div><div class="stat"><b id="goalDone">0</b><span>At 10+ Chazaras</span></div><div class="stat"><b id="streak">0</b><span>Day Streak 🔥</span></div></div>
+    <div class="record-help"><b>🎙️ Recorded Chazara = 2 points.</b> A normal Chazara = 1 point. Points are sent to Rabbi Cohen for approval before they are added.</div>
+    <div class="panel"><h2>⏰ Time for Chazara</h2><p class="note">An unlocked Posuk appears here if it has never been reviewed or has not been reviewed for 14 days.</p><div id="due" class="due"></div></div>
+    <div class="panel"><div class="controls"><h2>My Chazara Grid</h2><span class="note">100% Reading + 100% Translation unlocks a Posuk automatically.</span></div><p class="note">You may do each open Posuk once, then a second time only after doing all the other open pesukim. Maximum 2 per Posuk per day. The square gets brighter as you approach 10 Chazaras. At 10, you need 100% Understand before continuing beyond 10.</p><div id="grid" class="grid"></div></div>
+    <div class="panel"><div class="controls"><h2>🎧 My Chazara Recordings</h2><span class="note">Approved and rejected recordings are separated clearly below.</span></div><p class="note">A green <b>2 points</b> badge means the recording was approved. Rejected recordings stay in your history, but do not count as a Chazara and may be recorded again.</p><div id="recordingsList" class="recordings-list"><div class="recording-empty">Loading recordings…</div></div></div>
+  </div>
+</div>
+<div id="confirmBox" class="confirm-backdrop hidden" role="dialog" aria-modal="true">
+  <div class="confirm-card">
+    <h3>Did you do the Chazara?</h3>
+    <p id="confirmQuestion">Did you read and translate this Posuk correctly?</p>
+    <div class="confirm-actions"><button id="confirmNo" class="confirm-no">No — try again</button><button id="confirmYes" class="confirm-yes">Yes ✓</button></div>
+  </div>
+</div>
+<script src="teacher-preview.js"></script>
+<script>
+const fallbackConfig={apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",authDomain:"b3-games.firebaseapp.com",databaseURL:"https://b3-games-default-rtdb.firebaseio.com",projectId:"b3-games",storageBucket:"b3-games.firebasestorage.app",messagingSenderId:"568530046190",appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"};
+if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG||fallbackConfig);
+let db=firebase.database(),storage=firebase.storage();
+let teacherPreview=false;
+let sid=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
+let sname=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'Student';
+const ROOT='posukPractice/chazara/students/', EVENTS='posukPractice/chazara/events/', POINT_REQUEST_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+const GOAL=10,MAX_DAILY_CHazaras=2;
+let d={goal:10,reviews:{},reviewDays:{}},attemptsRoot={},practiceProgress={},unlocked={},recorderState=null,chazaraEvents={},reviewSubmitting=false;
+const $=x=>document.getElementById(x),K=(p,v)=>p+'_'+v;
+function hebNum(n){const ones=['','א','ב','ג','ד','ה','ו','ז','ח','ט'],tens=['','י','כ','ל','מ','נ','ס','ע','פ','צ'];n=Number(n);let s='';if(n===15)s='טו';else if(n===16)s='טז';else{s=(tens[Math.floor(n/10)]||'')+(ones[n%10]||'');}return s.length===1?s+'׳':s.slice(0,-1)+'״'+s.slice(-1)}
+const R=k=>{const [p,v]=k.split('_');return 'פרק '+hebNum(p)+' · פסוק '+hebNum(v)};
+function norm(v){return{goal:GOAL,reviews:v?.reviews||{},reviewDays:v?.reviewDays||{}}}
+function resultEntries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');if(v&&typeof v==='object')return Object.keys(v).filter(k=>/^\d+$/.test(k)).map(k=>[Number(k),v[k]]).filter(([,x])=>x&&typeof x==='object');return[]}
+function readingScore(a){return a&&typeof a.hebrewFinalScore==='number'?a.hebrewFinalScore:(a&&typeof a.hebrewScore==='number'?a.hebrewScore:null)}
+function translationScore(a){if(!a)return null;const e=resultEntries(a.translationChunkResults);if(!e.length)return null;const max=Math.max(...e.map(([i,c])=>Number.isInteger(c.chunkIndex)?c.chunkIndex:i))+1,total=Math.max(Number(a.translationTotal)||0,max,e.length),correct=e.filter(([,c])=>(c.finalVerdict||c.verdict)==='correct').length;return total?Math.round(correct/total*100):null}
+function understandScore(a){if(!a)return null;const e=resultEntries(a.questionResults);if(e.length){const max=Math.max(...e.map(([i,q])=>Number.isInteger(q.questionIndex)?q.questionIndex:i))+1,total=Math.max(Number(a.questionTotal)||0,max,e.length),correct=e.filter(([,q])=>(q.finalVerdict||q.verdict)==='correct').length;return total?Math.round(correct/total*100):null}if(typeof a.comprehensionScore==='number')return a.comprehensionScore;const n=parseFloat(String(a.questionScore||'').replace('%',''));return Number.isFinite(n)?n:null}
+function maxScore(attempts,reader){let b=null;attempts.forEach(a=>{const v=reader(a);if(typeof v==='number'&&(b===null||v>b))b=v});return b}
+function parsePracticeKey(key){const parts=String(key).split('_');if(parts.length<3)return null;const part=parts.pop(),perek=Number(parts.pop()),prefix=parts.join('_');const m=/^(\d+)(?:-(\d+))?$/.exec(part);if(!perek||!m)return null;return{prefix,perek,start:Number(m[1]),end:Number(m[2]||m[1])}}
+function rebuildUnlocked(){const next={};Object.entries(attemptsRoot||{}).forEach(([evidenceKey,attemptMap])=>{const parsed=parsePracticeKey(evidenceKey);if(!parsed)return;const attempts=Object.values(attemptMap||{});const read=maxScore(attempts,readingScore),trans=maxScore(attempts,translationScore),under=maxScore(attempts,understandScore);for(let posuk=parsed.start;posuk<=parsed.end;posuk++){const key=K(parsed.perek,posuk);const x=next[key]||(next[key]={perek:parsed.perek,posuk,reading:0,translation:0,understand:0,practiceKey:parsed.prefix+'_'+parsed.perek+'_'+posuk});x.reading=Math.max(x.reading,Number(read)||0);x.translation=Math.max(x.translation,Number(trans)||0);x.understand=Math.max(x.understand,Number(under)||0)}});practiceProgress=next;unlocked={};Object.entries(next).forEach(([k,x])=>{if(x.reading>=100&&x.translation>=100)unlocked[k]=x});render()}
+function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}
+function col(c,g){const x=Math.min(1,c/g);return `hsl(${52+68*x} ${95-10*x}% ${88-30*x}%)`}
+function dayKey(t=Date.now()){const x=new Date(Number(t)||Date.now()),y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),day=String(x.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+function streak(){const s=new Set(Object.keys(d.reviewDays||{})),x=new Date();x.setHours(0,0,0,0);if(!s.has(dayKey(x.getTime())))x.setDate(x.getDate()-1);let n=0;while(s.has(dayKey(x.getTime()))){n++;x.setDate(x.getDate()-1)}return n}
+function showNotice(message){let e=document.getElementById('rewardToast');if(!e){e=document.createElement('div');e.id='rewardToast';e.className='reward-toast';document.body.appendChild(e)}e.textContent=message;e.style.opacity='1';clearTimeout(showNotice.t);showNotice.t=setTimeout(()=>e.style.opacity='0',3000)}
+function showCheer(){let e=document.getElementById('cheerBanner');if(!e){e=document.createElement('p');e.id='cheerBanner';e.className='cheer-banner';e.setAttribute('role','status');e.textContent='🎉 Great job, you finished! 🎉';document.body.appendChild(e)}e.style.opacity='1';clearTimeout(showCheer.t);showCheer.t=setTimeout(()=>{e.style.opacity='0'},4000)}
+function baseCanReview(key){if(!unlocked[key])return false;const c=Number(d.reviews[key]?.count)||0;return c<GOAL||Number(unlocked[key]?.understand)>=100}
+function activeChazaraKeys(){return Object.keys(unlocked).sort((a,b)=>{const A=a.split('_').map(Number),B=b.split('_').map(Number);return A[0]-B[0]||A[1]-B[1]})}
+function eventDay(e){return String(e?.chazaraDate||'').trim()||dayKey(Number(e?.createdAt)||Date.now())}
+function isRejectedEvent(e){return !!(e&&(e.teacherRejected===true||e.pointRequestStatus==='rejected'))}
+function todayCounts(){const today=dayKey(),counts={};Object.values(chazaraEvents||{}).forEach(e=>{if(!e||e.reviewApplied!==true||e.removed===true||isRejectedEvent(e)||eventDay(e)!==today)return;const key=K(Number(e.perek),Number(e.posuk));counts[key]=(counts[key]||0)+1});return counts}
+function dailyRotationPool(){return activeChazaraKeys().filter(baseCanReview)}
+function dailyLimitReached(key){return Number(todayCounts()[key]||0)>=MAX_DAILY_CHazaras}
+function rotationAllows(key){const pool=dailyRotationPool();if(pool.length<=1)return true;if(!pool.includes(key))return false;const counts=todayCounts(),min=Math.min(...pool.map(k=>Number(counts[k]||0)));return Number(counts[key]||0)===min}
+function canReview(key){return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
+function reviewLockReason(key){if(!baseCanReview(key))return '100% Understand needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
+async function askNormalReview(key){return new Promise(resolve=>{const box=$('confirmBox');$('confirmQuestion').textContent='Did you read and translate '+R(key)+' correctly?';box.classList.remove('hidden');let done=false;const finish=v=>{if(done)return;done=true;box.classList.add('hidden');$('confirmYes').onclick=null;$('confirmNo').onclick=null;resolve(v)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false)})}
+async function requestPoints(source,eventId){if(teacherPreview)return null;try{const user=firebase.auth().currentUser;if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');const idToken=await user.getIdToken();const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:sid,source,eventId}),signal:AbortSignal.timeout(15000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
+async function requestRemovalPoints(eventId){if(teacherPreview)return null;try{const user=firebase.auth().currentUser;if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');const idToken=await user.getIdToken();const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:sid,source:'chazara-remove',eventId})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));await db.ref(EVENTS+sid+'/'+eventId).update({removalPointSynced:true,removalPointRequestId:data.requestId||null,removalPointRequestStatus:data.status||data.action||'none',removalPointSyncedAt:firebase.database.ServerValue.TIMESTAMP});return data}catch(e){console.warn('Point removal will be retried later',e);return null}}
+async function retryPendingPointSyncs(){try{const snap=await db.ref(EVENTS+sid).once('value');const events=snap.val()||{};for(const [id,e] of Object.entries(events)){if(!e||e.reviewApplied!==true)continue;if(e.removed===true){if(!isRejectedEvent(e)&&e.removalPointSynced!==true)await requestRemovalPoints(id)}else if(isRejectedEvent(e)){continue}else if(!e.pointRequestId){await requestPoints(e.recorded?'chazara-recording':'chazara',id)}}}catch(e){console.warn(e)}}
+async function incrementReview(key){const ref=db.ref(ROOT+sid+'/reviews/'+key),now=Date.now();let out=null;await ref.transaction(cur=>{const c=(cur&&Number(cur.count))||0;out={count:c+1,lastAt:now};return out});d.reviews[key]=out;d.reviewDays[dayKey(now)]=true;await db.ref(ROOT+sid).update({goal:GOAL,name:sname,updatedAt:firebase.database.ServerValue.TIMESTAMP,['reviewDays/'+dayKey(now)]:true});render();return out.count}
+async function normalReview(key){if(recorderState||reviewSubmitting||!canReview(key))return;const yes=await askNormalReview(key);if(!yes)return;if(!canReview(key)){showNotice(reviewLockReason(key)||'That Posuk is not available for another Chazara right now.');render();return}reviewSubmitting=true;try{const eventRef=db.ref(EVENTS+sid).push();const nextCount=(Number(d.reviews[key]?.count)||0)+1;const [perek,posuk]=key.split('_').map(Number);await eventRef.set({id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:false,removed:false,chazaraDate:dayKey(),createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:nextCount});await incrementReview(key);await eventRef.update({reviewApplied:true});chazaraEvents[eventRef.key]={id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:true,removed:false,chazaraDate:dayKey(),createdAt:Date.now(),reviewNumber:nextCount};showCheer();await requestPoints('chazara',eventRef.key)}catch(e){console.error(e);alert('Could not save this Chazara. Please try again.')}finally{reviewSubmitting=false;render()}}
+async function activeEventsForStudent(){const snap=await db.ref(EVENTS+sid).once('value');chazaraEvents=snap.val()||{};return Object.entries(chazaraEvents).map(([id,e])=>({id,...e})).filter(e=>e&&e.reviewApplied===true&&e.removed!==true&&!isRejectedEvent(e))}
+async function recomputeReviewDays(events){const days={};for(const e of events){const k=eventDay(e);if(k)days[k]=true}d.reviewDays=days;await db.ref(ROOT+sid+'/reviewDays').set(days)}
+function eventKey(e){return K(Number(e.perek),Number(e.posuk))}
+async function removeChazaraEvent(eventId,{confirmFirst=true}={}){
+  if(recorderState)return false;
+  const snap=await db.ref(EVENTS+sid+'/'+eventId).once('value');
+  if(!snap.exists())throw new Error('That Chazara could not be found.');
+  const e=snap.val()||{};
+  if(e.removed===true)return true;
+  const key=eventKey(e),wasRejected=isRejectedEvent(e);
+  if(confirmFirst&&!confirm('Delete this '+(e.recorded?'recorded ':'')+'Chazara for '+R(key)+'?\n\n'+(wasRejected?'This rejected attempt will simply be removed from your history.':'This will also remove any points earned from it.')))return false;
+  const active=await activeEventsForStudent();
+  await db.ref(EVENTS+sid+'/'+eventId).update({removed:true,removedAt:firebase.database.ServerValue.TIMESTAMP,removedByStudent:true});
+  let pointResult=null;
+  if(!wasRejected){
+    const remaining=active.filter(x=>x.id!==eventId);
+    const remainingForPosuk=remaining.filter(x=>Number(x.perek)===Number(e.perek)&&Number(x.posuk)===Number(e.posuk)).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+    const newCount=remainingForPosuk.length,lastAt=Number(remainingForPosuk[0]?.createdAt)||null;
+    if(newCount){await db.ref(ROOT+sid+'/reviews/'+key).set(lastAt?{count:newCount,lastAt}:{count:newCount});d.reviews[key]=lastAt?{count:newCount,lastAt}:{count:newCount}}
+    else{await db.ref(ROOT+sid+'/reviews/'+key).remove();delete d.reviews[key]}
+    await recomputeReviewDays(remaining);
+    await db.ref(ROOT+sid).update({name:sname,goal:GOAL,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+    pointResult=await requestRemovalPoints(eventId);
+  }
+  if(e.recorded&&e.storagePath){try{await storage.ref(String(e.storagePath)).delete()}catch(err){console.warn('Recording file delete failed',err)}}
+  chazaraEvents[eventId]={...e,removed:true};
+  render();renderRecordings();
+  if(pointResult?.action==='reversed')showNotice('Chazara deleted. Its points were removed automatically.');
+  else if(pointResult?.action==='cancelled')showNotice('Chazara deleted. Its pending points were cancelled.');
+  else showNotice('Chazara deleted.');
+  return true;
+}
+function recordingStatusText(e){
+  if(isRejectedEvent(e))return 'Rejected';
+  if(e.pointRequestStatus==='approved')return 'Approved';
+  return 'Awaiting approval';
+}
+function recordingCard(e,status){
+  const row=document.createElement('div');row.className='recording-item '+status;
+  const left=document.createElement('div');
+  const badge=status==='approved'?'<span class="recording-status approved">✓ Approved</span><span class="recording-points">2 points</span>':status==='rejected'?'<span class="recording-status rejected">✕ Rejected</span>':'<span class="recording-status pending">⏳ Awaiting approval</span>';
+  left.innerHTML=`<div class="recording-title">${R(eventKey(e))}${badge}</div><div class="recording-meta">${e.createdAt?new Date(Number(e.createdAt)).toLocaleString():''}${e.durationMs?' · '+(Number(e.durationMs)/1000).toFixed(1)+' sec':''}</div>`;
+  const del=document.createElement('button');del.type='button';del.className='recording-delete';del.textContent='Delete';del.onclick=async()=>{del.disabled=true;del.textContent='Deleting…';try{await removeChazaraEvent(e.id)}catch(err){console.error(err);alert('Could not delete that recording. Please try again.')}finally{del.disabled=false;del.textContent='Delete'}};
+  row.append(left,del);
+  const audioSrc=e.audioDataURL||e.audioURL;
+  if(e.storagePath||audioSrc){const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';if(audioSrc)audio.src=audioSrc;if(e.storagePath)B3PrivateMedia.setSource(audio,e.storagePath).catch(err=>console.warn('Recording access failed:',err.message));audio.addEventListener('play',()=>document.querySelectorAll('#recordingsList audio').forEach(a=>{if(a!==audio)a.pause()}));row.appendChild(audio)}
+  return row;
+}
+function renderRecordingGroup(target,rows,status){
+  rows.forEach(e=>target.appendChild(recordingCard(e,status)));
+  if(!rows.length){const empty=document.createElement('div');empty.className='recording-empty';empty.textContent=status==='approved'?'No approved recordings yet.':'No rejected recordings.';target.appendChild(empty)}
+}
+function renderRecordings(){
+  const box=$('recordingsList');if(!box||!sid)return;
+  const rows=Object.entries(chazaraEvents||{}).map(([id,e])=>({id,...(e||{})})).filter(e=>e.recorded===true&&e.reviewApplied===true&&e.removed!==true).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+  if(!rows.length){box.innerHTML='<div class="recording-empty">No Chazara recordings yet.</div>';return}
+  const approved=rows.filter(e=>!isRejectedEvent(e)&&e.pointRequestStatus==='approved');
+  const rejected=rows.filter(e=>isRejectedEvent(e)||e.pointRequestStatus==='cancelled');
+  const pending=rows.filter(e=>!isRejectedEvent(e)&&e.pointRequestStatus!=='approved'&&e.pointRequestStatus!=='cancelled');
+  box.innerHTML='';
+  if(pending.length){
+    const wrap=document.createElement('section');wrap.className='recording-pending-wrap';wrap.innerHTML='<h3>⏳ Awaiting Approval</h3><div class="recording-stack"></div>';
+    const stack=wrap.querySelector('.recording-stack');pending.forEach(e=>stack.appendChild(recordingCard(e,'pending')));box.appendChild(wrap);
+  }
+  const columns=document.createElement('div');columns.className='recording-columns';
+  const approvedCol=document.createElement('section');approvedCol.className='recording-column approved';approvedCol.innerHTML='<h3>✓ Approved</h3><div class="recording-stack"></div>';
+  const rejectedCol=document.createElement('section');rejectedCol.className='recording-column rejected';rejectedCol.innerHTML='<h3>✕ Rejected</h3><div class="recording-stack"></div>';
+  renderRecordingGroup(approvedCol.querySelector('.recording-stack'),approved,'approved');
+  renderRecordingGroup(rejectedCol.querySelector('.recording-stack'),rejected,'rejected');
+  columns.append(approvedCol,rejectedCol);box.appendChild(columns);
+}
+async function removeLatestReview(key){if(recorderState)return;const count=Number(d.reviews[key]?.count)||0;if(!count)return;if(!confirm('Remove the most recent Chazara for '+R(key)+'?\n\nAny points earned from it will also be removed.'))return;try{const [perek,posuk]=key.split('_').map(Number);const active=await activeEventsForStudent();const matching=active.filter(e=>Number(e.perek)===perek&&Number(e.posuk)===posuk).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));const latest=matching[0];if(!latest){
+  // Older Chazaras existed before per-review event records were introduced.
+  // In that case there is no event to remove, so simply lower the saved count
+  // by one. Those older Chazaras never created Student Rewards point requests,
+  // so there is no point deduction to submit.
+  const newCount=Math.max(0,count-1),oldLast=Number(d.reviews[key]?.lastAt)||null;
+  if(newCount>0){const row=oldLast?{count:newCount,lastAt:oldLast}:{count:newCount};await db.ref(ROOT+sid+'/reviews/'+key).set(row);d.reviews[key]=row}
+  else{await db.ref(ROOT+sid+'/reviews/'+key).remove();delete d.reviews[key]}
+  await db.ref(ROOT+sid).update({name:sname,goal:GOAL,updatedAt:firebase.database.ServerValue.TIMESTAMP});render();showNotice('Chazara removed.');return;
+}await removeChazaraEvent(latest.id,{confirmFirst:false})}catch(e){console.error(e);alert('Could not remove that Chazara. Please try again.')}}
+
+function displayPlan(){
+  const perakim={};
+  const remember=(key)=>{
+    const m=/^(\d+)_(\d+)$/.exec(String(key));
+    if(!m)return;
+    const p=Number(m[1]),v=Number(m[2]);
+    if(!perakim[p])perakim[p]={min:v,max:v};
+    else{perakim[p].min=Math.min(perakim[p].min,v);perakim[p].max=Math.max(perakim[p].max,v)}
+  };
+  Object.keys(practiceProgress||{}).forEach(remember);
+  Object.keys(unlocked||{}).forEach(remember);
+  Object.keys(d.reviews||{}).forEach(remember);
+  return Object.keys(perakim).map(Number).sort((a,b)=>a-b).map(p=>({p,min:perakim[p].min,max:perakim[p].max}));
+}
+function isChazaraUnlocked(key){return !!unlocked[key]}
+function render(){
+  if(recorderState)return;
+  if(!sid)return;
+  $('studentNameTop').textContent=sname;
+  const activeKs=activeChazaraKeys();
+  const reviewedKs=Object.keys(d.reviews||{}).filter(k=>Number(d.reviews[k]?.count)>0);
+  let tot=0,done=0;
+  reviewedKs.forEach(k=>{const c=Number(d.reviews[k]?.count)||0;tot+=c;if(c>=GOAL)done++});
+  $('total').textContent=tot;$('learned').textContent=Object.keys(unlocked).length;$('goalDone').textContent=done;$('streak').textContent=streak();
+  const g=$('grid'),plan=displayPlan();
+  g.innerHTML=plan.length?'':'<div class="empty">No Posuk has been reached yet. Start in Posuk Practice first.</div>';
+  plan.forEach(({p,min,max})=>{
+    const section=document.createElement('div');section.className='perek-group';section.innerHTML=`<div class="perek-title">פרק ${hebNum(p)}</div><div class="perek-grid"></div>`;const pg=section.querySelector('.perek-grid');
+    for(let v=min;v<=max;v++){
+      const k=K(p,v),isUnlocked=isChazaraUnlocked(k),r=d.reviews[k]||{},c=Number(r.count)||0,wrap=document.createElement('div');wrap.className='pasuk-wrap';
+      const b=document.createElement('button');b.className='pasuk';
+      if(!isUnlocked){
+        b.classList.add('locked-gap');b.disabled=true;
+        const savedCount=Number(r.count)||0;
+        b.innerHTML=`<div class="ref">פסוק ${hebNum(v)}</div><div class="count">${savedCount||'—'}</div><div class="last">${savedCount?'Saved Chazaras · locked until mastery':'Not unlocked yet'}</div>`;
+        wrap.appendChild(b);
+        if(savedCount>0){const minus=document.createElement('button');minus.className='undo-btn';minus.type='button';minus.title='Remove most recent saved Chazara';minus.textContent='−';minus.onclick=ev=>{ev.stopPropagation();removeLatestReview(k)};wrap.appendChild(minus)}
+        const gap=document.createElement('div');gap.className='gap-bar';gap.textContent='🔒 Finish Reading + Translation';wrap.appendChild(gap);pg.appendChild(wrap);continue;
+      }
+      const allowed=canReview(k);b.style.background=col(c,GOAL);b.style.color='#12351d';b.disabled=!allowed;b.innerHTML=`<div class="ref">פסוק ${hebNum(v)}</div><div class="count">${c}</div><div class="last">${r.lastAt?'Last: '+new Date(r.lastAt).toLocaleDateString():'Not reviewed yet'}</div>`;b.onclick=()=>normalReview(k);wrap.appendChild(b);
+      if(c>0){const minus=document.createElement('button');minus.className='undo-btn';minus.type='button';minus.title='Remove most recent Chazara';minus.textContent='−';minus.onclick=ev=>{ev.stopPropagation();removeLatestReview(k)};wrap.appendChild(minus)}
+      const rec=document.createElement('button');rec.className='record-bar';rec.dataset.key=k;rec.disabled=!allowed;rec.textContent='🎙️ Record · 2 ★';rec.onclick=ev=>{ev.stopPropagation();toggleRecording(k,rec)};wrap.appendChild(rec);
+      if(!allowed){const reason=reviewLockReason(k),n=document.createElement('div');n.className='locked-note';n.textContent=reason;wrap.appendChild(n);if(!baseCanReview(k)){const a=document.createElement('a');a.className='practice-link';a.href='../record_pesukim/student.html?perek='+p+'&posuk='+v+'&tab=comprehension';a.textContent='Open Posuk Practice →';wrap.appendChild(a)}}
+      pg.appendChild(wrap)
+    }
+    g.appendChild(section)
+  });
+  const q=$('due');q.innerHTML='';const due=activeKs.filter(k=>isChazaraUnlocked(k)&&(!d.reviews[k]?.lastAt||ago(d.reviews[k].lastAt)>=14));if(!due.length)q.innerHTML='<span class="note">Nothing due right now — great Chazara!</span>';due.forEach(k=>{const b=document.createElement('button');b.textContent=R(k)+(d.reviews[k]?.lastAt?' · '+ago(d.reviews[k].lastAt)+' days':' · New');b.disabled=!canReview(k);b.onclick=()=>normalReview(k);q.appendChild(b)})
+}
+function preferredMime(){for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'])if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))return t;return ''}
+function extFor(m){m=String(m||'');if(m.includes('mp4'))return'mp4';if(m.includes('ogg'))return'ogg';return'webm'}
+function stopMediaTracks(st){try{st?.stream?.getTracks().forEach(t=>t.stop())}catch{}try{st?.audioCtx?.close()}catch{}if(st?.raf)cancelAnimationFrame(st.raf);if(st?.timer)clearInterval(st.timer)}
+function drawWave(st){if(!st||!st.analyser||!st.canvas)return;const ctx=st.canvas.getContext('2d'),w=st.canvas.width=st.canvas.clientWidth*devicePixelRatio,h=st.canvas.height=45*devicePixelRatio,arr=new Uint8Array(st.analyser.fftSize);st.analyser.getByteTimeDomainData(arr);ctx.clearRect(0,0,w,h);ctx.strokeStyle='#2563eb';ctx.lineWidth=2*devicePixelRatio;ctx.beginPath();let sum=0;for(let i=0;i<arr.length;i++){const y=(arr[i]-128)/128;sum+=y*y;const x=i/(arr.length-1)*w,py=h/2+y*h*.42;i?ctx.lineTo(x,py):ctx.moveTo(x,py)}ctx.stroke();const rms=Math.sqrt(sum/arr.length);st.peak=Math.max(st.peak,rms);st.frames++;if(rms>.015)st.voiced++;const now=performance.now();if(now-st.lastSample>110){st.samples.push(rms);st.lastSample=now}st.raf=requestAnimationFrame(()=>drawWave(st))}
+function resetRecordingUI(st,message=''){if(!st)return;st.button.disabled=false;st.button.classList.remove('recording');st.button.textContent='🎙️ Record · 2 ★';if(message){st.status.innerHTML='<span class="error">'+message+'</span>';setTimeout(()=>{try{st.panel.remove()}catch{}},1400)}else{try{st.panel.remove()}catch{}}}
+async function toggleRecording(key,button){if(reviewSubmitting)return;if(recorderState){if(recorderState.key!==key){showNotice('Finish the recording already in progress first.');return}recorderState.recorder.stop();button.disabled=true;button.textContent='Saving…';return}if(!canReview(key))return;if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Recording is not supported on this browser.');return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true}),mime=preferredMime(),rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined),chunks=[];document.querySelectorAll('.rec-panel').forEach(x=>x.remove());document.querySelectorAll('.record-bar.recording').forEach(x=>{x.classList.remove('recording');x.textContent='🎙️ Record · 2 ★'});const wrap=button.parentElement,panel=document.createElement('div');panel.className='rec-panel';panel.innerHTML='<canvas></canvas><div class="rec-status">Recording… 0.0s</div>';wrap.insertBefore(panel,button.nextSibling);button.classList.add('recording');button.textContent='⏹ Stop';const AudioCtx=window.AudioContext||window.webkitAudioContext,audioCtx=new AudioCtx(),source=audioCtx.createMediaStreamSource(stream),analyser=audioCtx.createAnalyser();analyser.fftSize=512;source.connect(analyser);const st=recorderState={key,button,panel,canvas:panel.querySelector('canvas'),status:panel.querySelector('.rec-status'),stream,recorder:rec,audioCtx,analyser,start:performance.now(),chunks,samples:[],peak:0,voiced:0,frames:0,lastSample:0,raf:null,timer:null};st.timer=setInterval(()=>{st.status.textContent='Recording… '+((performance.now()-st.start)/1000).toFixed(1)+'s'},200);drawWave(st);rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};rec.onstop=()=>finishRecording(st);rec.start(250)}catch(e){console.error(e);alert('Could not start the microphone. Please allow microphone access and try again.');recorderState=null}}
+function compactWave(samples,max=64){if(samples.length<=max)return samples.map(v=>Number(v.toFixed(4)));const out=[];for(let i=0;i<max;i++){const a=Math.floor(i*samples.length/max),b=Math.max(a+1,Math.floor((i+1)*samples.length/max));out.push(Number((samples.slice(a,b).reduce((x,y)=>x+y,0)/(b-a)).toFixed(4)))}return out}
+function blobToDataURL(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(reader.error||new Error('Could not read recording.'));reader.readAsDataURL(blob)})}
+function preserveRecording(blob,key,error,writeStarted){
+  const box=document.createElement('section');box.className='panel';
+  const title=document.createElement('h2');title.textContent='Recording could not finish saving';
+  const note=document.createElement('p');note.textContent=(error?.code==='storage/unauthorized'?'Audio upload permission was denied. ':error?.message||'The recording could not be saved.')+(writeStarted?' Check your recordings and count before recording this Posuk again; part of the save may have reached the server.':' Your audio is still available below.');
+  const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download='chazara_'+key+'.'+extFor(blob.type);link.textContent='Download this recording';
+  const audio=document.createElement('audio');audio.controls=true;audio.src=url;audio.style.display='block';
+  // Keep the recovery copy in place while Follow Teacher is asking this student to move.
+  // The audio exists only as a page-local blob until the student downloads it.
+  box.setAttribute('data-ftt-unsaved','true');
+  const acknowledged=document.createElement('button');acknowledged.type='button';
+  acknowledged.textContent='I downloaded my recording — allow teacher navigation';
+  acknowledged.onclick=()=>{box.removeAttribute('data-ftt-unsaved');acknowledged.disabled=true;acknowledged.textContent='Recording saved — ready to continue';};
+  box.append(title,note,audio,link,acknowledged);$('grid').parentElement.insertBefore(box,$('grid'));
+}
+async function finishRecording(st){
+  const durationMs=Math.round(performance.now()-st.start);stopMediaTracks(st);
+  const blob=new Blob(st.chunks,{type:st.recorder.mimeType||'audio/webm'}),soundDetected=st.peak>.018&&st.voiced>=Math.max(4,Math.floor(st.frames*.04));
+  if(durationMs<5000||!soundDetected){resetRecordingUI(st,'Please try again.');recorderState=null;return}
+  if(!canReview(st.key)){resetRecordingUI(st,reviewLockReason(st.key)||'That Posuk is not available for another Chazara right now.');recorderState=null;render();return}
+  let saved=false,writeStarted=false,eventId;
+  const step=(work,label)=>{st.status.textContent=label+'…';return ChazaraRecordingSave.deadline(work,30000,label)};
+  try{
+    const eventRef=db.ref(EVENTS+sid).push();eventId=eventRef.key;
+    const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
+    st.status.textContent='Saving audio…';
+    let url='',audioDataURL='',storagePath=path,storageError=null;
+    // Always try Storage first; it keeps audio private-by-path and the teacher page fast.
+    try{localStorage.removeItem('chazaraPreferDatabaseAudio')}catch{}
+    const preferDatabase=false;
+    try{
+      if(preferDatabase)throw Object.assign(new Error('Using faster database audio save.'),{code:'recording/prefer-database'});
+      // Storage currently fails on some student devices. Only give it a few
+      // seconds; after one fallback on this device, future recordings skip
+      // Storage entirely so saving feels immediate instead of pausing ~20 sec.
+      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},45000);
+    }catch(err){
+      storageError=err;
+      if(err?.code!=='recording/prefer-database')console.warn('Storage upload failed; using database audio fallback',err);
+      storagePath='';
+      st.status.textContent='Finishing recording…';
+      if(blob.size>5*1024*1024)throw Object.assign(new Error('This recording is too large to save. Please make a shorter recording.'),{cause:err});
+      audioDataURL=await blobToDataURL(blob);
+    }
+    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
+    writeStarted=true;
+    await step(eventRef.set(event),'Saving recording');
+    await step(incrementReview(st.key),'Saving Chazara count');
+    await step(eventRef.update({reviewApplied:true}),'Confirming recording');
+    chazaraEvents[eventId]={...event,createdAt:Date.now(),reviewApplied:true};saved=true;
+  }catch(error){
+    console.error('Recorded Chazara save failed',error);resetRecordingUI(st,'Save did not finish. Your audio is available below.');preserveRecording(blob,st.key,error,writeStarted);
+  }finally{
+    recorderState=null;render();renderRecordings();
+  }
+  // The recording is already saved. Point syncing must never hold its UI open.
+  if(saved){showCheer();showNotice('Recording saved. Sending points for teacher approval…');requestPoints('chazara-recording',eventId)}
+}
+
+function slugifyStudentName(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
+async function signInStudentHere(){location.href='../index.html';return;
+  const btn=$('studentSignInBtn'),msg=$('studentSignInMsg'),typed=$('studentNameInput').value.trim(),pin=$('classPinInput').value.trim();
+  const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
+  if(!typed){msg.textContent='Please type the student name.';return}
+  if(!pin){msg.textContent='Please enter the passcode.';return}
+  btn.disabled=true;msg.textContent='Checking…';
+  try{
+    const [centralSnap,legacySnap]=await Promise.all([
+      db.ref('b3Games/students').once('value'),
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
+    const central=centralSnap.val()||{},legacyRows=legacySnap.val()||{};
+    const sameName=(id,profile)=>normalize(profile?.name)===normalize(typed)||normalize(id)===normalize(typed);
+    const named=Object.entries(central).filter(([id,row])=>row?.profile&&row.profile.active!==false&&sameName(id,row.profile));
+    let matches=named.filter(([,row])=>String(row.profile.passcode||'').trim()===String(pin).trim());
+
+    // During the B3 account migration some new profiles retained an older PIN.
+    // Accept the same student's valid legacy PIN instead of locking him out.
+    if(!matches.length){
+      matches=named.filter(([id])=>{
+        const old=legacyRows[id];
+        return old&&old.active!==false&&String(old.passcode||'5770').trim()===String(pin).trim();
+      });
+    }
+    if(matches.length>1){msg.textContent='More than one account matches. Sign in from the main B3 page.';return}
+
+    let id='',profile=null,legacy=null;
+    if(matches.length===1){
+      id=matches[0][0];profile=matches[0][1].profile;legacy=legacyRows[id]||null;
+    }else{
+      const legacyMatches=Object.entries(legacyRows).filter(([id,row])=>
+        row&&row.active!==false&&sameName(id,row)&&String(row.passcode||'5770').trim()===String(pin).trim());
+      if(legacyMatches.length>1){msg.textContent='More than one account matches. Sign in from the main B3 page.';return}
+      if(legacyMatches.length===1){
+        id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
+        profile={name:legacy.name||typed,active:true,classId:legacy.classId||''};
+      }
+    }
+    if(!id||!profile){msg.textContent='Check your name and passcode.';return}
+    if(profile.active===false){msg.textContent='Your student access is turned off. Ask your teacher.';return}
+
+    const name=String(profile.name||legacy?.name||typed);
+    sessionStorage.setItem('b3Games_studentId',id);
+    sessionStorage.setItem('b3Games_studentName',name);
+    sessionStorage.setItem('b3Games_classPin',String(pin).trim());
+    sessionStorage.setItem('posukPractice_studentId',id);
+    sessionStorage.setItem('posukPractice_studentName',name);
+
+    // Preserve class identity for points/approvals when Chazara is opened directly.
+    const memberships=(central[id]?.memberships)||{};
+    const classId=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId)?.classId
+      ||profile.classId||legacy?.classId||'';
+    if(classId){
+      sessionStorage.setItem('b3Games_studentClass',String(classId));
+      sessionStorage.setItem('weeklyQuiz_classId',String(classId));
+    }
+    location.reload();
+  }catch(e){console.error(e);msg.textContent='Could not sign in. Please try again.'}
+  finally{btn.disabled=false}
+}
+
+if($('studentSignInBtn'))$('studentSignInBtn').onclick=signInStudentHere;
+if($('classPinInput'))$('classPinInput').addEventListener('keydown',e=>{if(e.key==='Enter')signInStudentHere()});
+setInterval(()=>{if(sid)render()},60000);
+// Students switch accounts on the Fun Torah Tools homepage only.
+$('switchStudentBtn').onclick=()=>{location.href='../index.html'};
+(async()=>{
+const guestPreview=!!(window.B3Guest&&window.B3Guest.isGuest());
+const account=guestPreview?{authorized:false}:await new Promise(resolve=>{
+  const deadline=Date.now()+10000;
+  const wait=()=>{
+    if(window.B3SiteSettings)window.B3SiteSettings.onAuthStateChanged((user,authorized)=>resolve({user,authorized}));
+    else if(Date.now()<deadline)setTimeout(wait,100);
+    else resolve({authorized:false});
+  };
+  wait();setTimeout(()=>resolve({authorized:false}),10000);
+});
+if(guestPreview){
+  // Guest Mode: 3 sample pesukim, everything stays in this tab and nothing is saved.
+  enableTeacherPreview();sid='guest_preview';sname='Guest preview - 3 sample pesukim, nothing is saved';
+  const sampleAttempt={demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}};
+  attemptsRoot={'preview_1_1':sampleAttempt,'preview_1_2':sampleAttempt,'preview_1_3':sampleAttempt};
+  await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);
+}else if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+  enableTeacherPreview();sid='teacher_preview';sname='Teacher Preview - sample chart, no student work or points saved';
+  attemptsRoot={'preview_1_1':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}},'preview_1_2':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}}};
+  await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);
+}
+if(!sid){$('studentNameTop').textContent='Not signed in';$('switchStudentBtn').classList.add('hidden');$('noStudent').classList.remove('hidden');return}$('studentNameTop').textContent=sname;$('app').classList.remove('hidden');try{const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once('value'),db.ref('posukPractice/attempts/'+sid).once('value'),db.ref(EVENTS+sid).once('value')]);if(stateSnap.exists())d=norm(stateSnap.val());attemptsRoot=attemptSnap.val()||{};chazaraEvents=eventSnap.val()||{};rebuildUnlocked();renderRecordings();db.ref('posukPractice/attempts/'+sid).on('value',s=>{attemptsRoot=s.val()||{};rebuildUnlocked()});db.ref(EVENTS+sid).on('value',s=>{chazaraEvents=s.val()||{};render();renderRecordings()});retryPendingPointSyncs()}catch(e){console.warn(e);render();renderRecordings()}})();
+</script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-follow-pointer1"></script>
+</body>
+</html>
+

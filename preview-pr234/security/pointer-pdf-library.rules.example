@@ -1,0 +1,15 @@
+// Merge this match block into the EXISTING deployed Firebase Storage rules.
+// It is intentionally NOT wired into firebase.json: deploying a replacement
+// ruleset would risk breaking Chazara, Posuk Practice and Class Gallery storage.
+// Review all enclosing match blocks for permissive wildcard grants first.
+match /pointerPdfLibrary/{teacherUid}/{fileId} {
+  allow get, list, delete: if request.auth != null && request.auth.uid == teacherUid;
+  allow create: if request.auth != null && request.auth.uid == teacherUid
+    && fileId.matches('[-a-zA-Z0-9]+[.]pdf')
+    && request.resource.size <= 500 * 1024 * 1024
+    && request.resource.contentType == 'application/pdf';
+  allow update: if request.auth != null && request.auth.uid == teacherUid
+    && resource.size == request.resource.size
+    && resource.md5Hash == request.resource.md5Hash
+    && request.resource.contentType == 'application/pdf';
+}

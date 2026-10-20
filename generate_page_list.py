@@ -40,7 +40,7 @@ def last_changed(path: Path):
 pages = []
 for path in ROOT.rglob("*.html"):
     relative = path.relative_to(ROOT)
-    if relative.as_posix().lower() in EXCLUDED:
+    if relative.parts[0] == "preview-pr234" or relative.as_posix().lower() in EXCLUDED:
         continue
     if any(part.startswith(".") for part in relative.parts):
         continue
