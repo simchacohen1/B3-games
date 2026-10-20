@@ -4654,9 +4654,20 @@ async function gradeCurrentQuestionAnswer(){
     if(next>=0){comprehensionQIndex=next;renderComprehensionQuestionUI();}
   },1300);
 }
+// Verified correction for an already-cached generated question. Resolve the
+// phrase against the displayed tokens, so stale model indexes cannot reject
+// the explicit subject of Bereishis 19:1. Other questions keep their own keys.
+function verifiedQuestionAnswerWordSets(question){
+  const prompt=String(question&&question.question||'').toLowerCase().replace(/[^a-z ]/g,'').replace(/\s+/g,' ').trim();
+  if(!/^who came (?:to|into) (?:sedom|sodom)$/.test(prompt)) return null;
+  const words=getQuestionPosukWords(question).map(word=>word.replace(/[\u0591-\u05BD\u05BF-\u05C7]/g,'').replace(/[^\u05D0-\u05EA]/g,''));
+  if(words.slice(0,4).join(' ')!=='ויבאו שני המלאכים סדמה') return null;
+  return [[1,2]];
+}
 function matchesAnyAnswerWordSet(selected,question){
   const chosen=[...new Set(selected.map(Number))].sort((a,b)=>a-b);
-  const sets=Array.isArray(question&&question.answerWordSets)?question.answerWordSets:[];
+  const sets=verifiedQuestionAnswerWordSets(question)||
+    (Array.isArray(question&&question.answerWordSets)?question.answerWordSets:[]);
   return sets.some(set=>{
     const target=[...new Set((Array.isArray(set)?set:[]).map(Number))].sort((a,b)=>a-b);
     return target.length>0&&chosen.length===target.length&&chosen.every((value,index)=>value===target[index]);
@@ -4868,12 +4879,12 @@ document.getElementById('checkWordSelectionBtn').onclick = gradeCurrentQuestionA
 function buildQuestionHint(question){
   const q=String(question&&question.question||'').trim().toLowerCase();
   let clue='Think about what the question is asking, then look for those words in the pasuk.';
-  if(/^who\b/.test(q)) clue='The answer is a person’s name. Listen for a name in the pasuk.';
+  if(/^who\b/.test(q)) clue='Look for the words that tell who the question is about.';
   else if(/^where\b/.test(q)) clue='The answer tells where. Listen for a place in the pasuk.';
   else if(/^when\b/.test(q)) clue='The answer tells when. Listen for a time word in the pasuk.';
   else if(/^how many\b/.test(q)) clue='The answer is a number. Listen for the number in the pasuk.';
   else if(/^what (?:did|does|was|were|is|are|happened)\b/.test(q)) clue='Think about the action or thing the question asks about. Listen for those words in the pasuk.';
-  const sets=Array.isArray(question&&question.answerWordSets)?question.answerWordSets:[];
+  const sets=verifiedQuestionAnswerWordSets(question)||(Array.isArray(question&&question.answerWordSets)?question.answerWordSets:[]);
   const wordCount=getQuestionPosukWords(question).length;
   const places=sets.map(indices=>{
     const center=indices.reduce((sum,index)=>sum+index,0)/indices.length;
