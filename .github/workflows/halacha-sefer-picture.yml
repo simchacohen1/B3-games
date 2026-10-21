@@ -1,0 +1,21 @@
+name: Halacha Sefer-style picture checks
+on:
+  pull_request:
+    paths:
+      - 'halacha/sefer-style.js'
+      - 'halacha/sefer-style.css'
+      - 'halacha/index.html'
+      - 'e2e/halacha-sefer-style.spec.ts'
+      - '.github/workflows/halacha-sefer-picture.yml'
+jobs:
+  picture-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/halacha-sefer-style.spec.ts --project=chromium --reporter=line
