@@ -19,7 +19,8 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simch
   const body=req.body||{};
   if(body.action==='halachaToken'){
    // Check the *actual* individual passcode and rate limit before issuing credentials.
-   const student=await studentAuth(store,{action:'login',name:body.name,pin:body.pin},req.ip);
+   // studentId is only a hint that skips scanning every student; name and passcode must still match.
+   const student=await studentAuth(store,{action:'login',name:body.name,pin:body.pin,studentId:body.studentId},req.ip);
    const studentId=String(body.studentId||'');
    const classId=String(body.classId||student.classId||'');
    const validId=/^[A-Za-z0-9_-]{1,100}$/;

@@ -48,8 +48,8 @@
 
   var rootBase = new URL("./", scriptEl.src);
   // One free, opt-in audio switch shared by student activities.
-  // Audio Mode never makes a paid synthesis request.
-  if (!document.querySelector('script[data-ftt-audio-mode]')) {
+  // Pages that already load the shared script should not fetch it again.
+  if (!document.querySelector('script[data-ftt-audio-mode],script[src*="audio-mode.js"]')) {
     var audioScript = document.createElement("script");
     audioScript.src = new URL("audio-mode.js?v=20261012-game-show-choices", rootBase).href;
     audioScript.defer = true;
@@ -143,15 +143,18 @@
   var requestInFlight = false;
   var refreshRequested = false;
   var firstDecisionMade = false;
-  var firstLoadFailsafe = setTimeout(function () {
-    if (firstDecisionMade) return;
-    console.warn("B3 game gate: first access check is taking too long.");
-    showClosed(
-      "Still checking access…",
-      "The access check is taking longer than expected. This page will keep trying automatically."
-    );
-  }, FIRST_LOAD_FAILSAFE_MS);
-
+  var firstLoadFailsafe = null;
+  function startFirstLoadFailsafe() {
+    if (firstDecisionMade || firstLoadFailsafe) return;
+    firstLoadFailsafe = setTimeout(function () {
+      if (firstDecisionMade) return;
+      console.warn("B3 game gate: first access check is taking too long.");
+      showClosed(
+        "Still checking access…",
+        "The access check is taking longer than expected. This page will keep trying automatically."
+      );
+    }, FIRST_LOAD_FAILSAFE_MS);
+  }
   function reveal() {
     var el = document.getElementById("b3-gate-hide-style");
     if (el && el.parentNode) el.parentNode.removeChild(el);
@@ -255,12 +258,27 @@
       verifiedTeacherAccess.role === "admin");
   }
 
-  function loadOneScript(url) {
+  function loadOneScript(url, ordered) {
     return new Promise(function(resolve,reject){
       var script=document.createElement("script");script.src=url;
+      // ordered: download in parallel but run in the order they were added.
+      if(ordered)script.async=false;
       script.onload=resolve;script.onerror=function(e){script.remove();reject(e);};document.head.appendChild(script);
     });
   }
+  // Ask the browser to start downloading the files every page needs before the
+  // sequential setup below gets to them.
+  function preloadScript(url) {
+    try {
+      var link=document.createElement("link");
+      link.rel="preload";link.as="script";link.href=url;
+      (document.head||document.documentElement).appendChild(link);
+    } catch (error) {}
+  }
+  var CONFIG_URL = new URL("firebase-config.js", rootBase).href;
+  var SITE_SETTINGS_URL = new URL("site-settings.js?v=20261008-owner-demo", rootBase).href;
+  if (!window.B3_FIREBASE_CONFIG) preloadScript(CONFIG_URL);
+  if (!window.B3SiteSettings) preloadScript(SITE_SETTINGS_URL);
   // If gstatic.com is blocked (some school networks), fall back to the copy hosted on this site.
   function loadAuthScript(url) {
     var m=/gstatic\.com\/firebasejs\/12\.15\.0\/(firebase-[a-z]+-compat\.js)$/.exec(url);
@@ -297,21 +315,48 @@
       // Add missing Firebase pieces in the SAME version the page already uses.
       // Mixing versions (for example 12.x auth on a 10.x page) silently stops
       // the page's database from connecting, so nothing loads or saves.
-      if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
-      var sdk=String(window.firebase.SDK_VERSION||"12.15.0"),major=parseInt(sdk,10)||12,suffix=major>=9?"-compat.js":".js";
+      var sdk=String((window.firebase&&window.firebase.SDK_VERSION)||"12.15.0"),major=parseInt(sdk,10)||12,suffix=major>=9?"-compat.js":".js";
       var base="https://www.gstatic.com/firebasejs/"+sdk+"/firebase-";
-      if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
-      if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
-      if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      var missing=[];
+      if(!window.firebase) missing.push(base.replace(/\/[^/]*$/,"/")+"firebase-app"+suffix);
+      if(!window.firebase||!window.firebase.auth) missing.push(base+"auth"+suffix);
+      if(!window.firebase||!window.firebase.database) missing.push(base+"database"+suffix);
+      if(!window.B3_FIREBASE_CONFIG) missing.push(CONFIG_URL);
+      if(missing.length){
+        try {
+          // One round of parallel downloads (run in order) instead of one file at a time.
+          await Promise.all(missing.map(function(url){return loadOneScript(url,true);}));
+        } catch (parallelError) {
+          // A blocked CDN: fall back to the one-at-a-time loader with the local copies.
+          if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
+          var sdk2=String(window.firebase.SDK_VERSION||"12.15.0"),major2=parseInt(sdk2,10)||12,suffix2=major2>=9?"-compat.js":".js";
+          var base2="https://www.gstatic.com/firebasejs/"+sdk2+"/firebase-";
+          if(!window.firebase.auth) await loadAuthScript(base2+"auth"+suffix2);
+          if(!window.firebase.database) await loadAuthScript(base2+"database"+suffix2);
+          if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(CONFIG_URL);
+        }
+      }
       if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-      if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      // Teacher helpers download while Firebase restores the saved sign-in.
+      var settingsScript = window.B3SiteSettings ? Promise.resolve() : loadAuthScript(SITE_SETTINGS_URL);
+      settingsScript.catch(function(){});
       await waitForFirebaseAuthState(window.firebase.auth());
+      // Student reads need only Firebase sign-in, not the teacher helpers.
       markAuthReady();
+      await settingsScript;
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
         markAuthReady();
+        var wasTeacher=Boolean(verifiedTeacherAccess&&verifiedTeacherAccess.authorized);
         teacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
         if(resolveGalleryTeacherClass())return;
+        // The usual student case: the sign-in check found no teacher, so nothing
+        // changed for a student who is already verified. Do not repeat every
+        // request just to learn that.
+        if(!authorized&&!wasTeacher){
+          if(requestInFlight)return;
+          if(studentActive&&lastSettings&&firstDecisionMade)return;
+        }
         checkNow();
       });
     } catch(error){
@@ -331,14 +376,14 @@
     return String(c || "").trim();
   }
 
-  async function fetchJson(url) {
+  async function fetchJson(url, anonymous) {
     var params = new URLSearchParams();
     params.set("_", String(Date.now()));
     // Firebase's REST API accepts Firebase ID tokens using the `auth` query
     // parameter. Use the current signed-in user's token so private rules can
     // authorize this gate's narrow reads. Public settings continue to work
     // before authentication is available.
-    try {
+    if (!anonymous) try {
       // Do not race this against a short timer: the protected profile and
       // membership reads below must never fall back to anonymous requests
       // just because Firebase's scripts or persisted auth state initialize
@@ -405,6 +450,23 @@
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
     if(!studentId)return "";
+    // The class fields are requested for the remembered class at the same time
+    // as the profile and memberships. They are used only if the memberships
+    // confirm that class; otherwise they are ignored and the right class is read.
+    var classBase=function(id){return DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(id);};
+    var readClassFields=function(id){
+      var classPath=classBase(id);
+      return Promise.all([
+        fetchJson(classPath+"/active.json"),
+        fetchJson(classPath+"/siteEnabled.json"),
+        fetchJson(classPath+"/access.json"),
+        fetchJson(classPath+"/toolGrants.json"),
+        fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
+      ]);
+    };
+    var guess=/^[A-Za-z0-9_-]{1,100}$/.test(storedClass)?storedClass:"";
+    var guessedFields=guess?readClassFields(guess):null;
+    if(guessedFields)guessedFields.catch(function(){});
     var rows=await Promise.all([
       fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
       fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
@@ -419,17 +481,10 @@
       if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
     if(!studentClassId)return "";
-    var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
     // The display name is not used to authorize tool access. Avoid a
     // redundant, occasionally slow Firebase read on every gate refresh.
     // Keep every permission-critical field and the student membership check.
-    var classFields=await Promise.all([
-      fetchJson(classPath+"/active.json"),
-      fetchJson(classPath+"/siteEnabled.json"),
-      fetchJson(classPath+"/access.json"),
-      fetchJson(classPath+"/toolGrants.json"),
-      fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
-    ]);
+    var classFields=await ((guessedFields&&studentClassId===guess)?guessedFields:readClassFields(studentClassId));
     var member=classFields[4];
     assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
@@ -650,26 +705,41 @@
     requestInFlight = true;
     followActivityOpen = false;
 
+    var settingsUrl = DATABASE_URL + "/" + SETTINGS_PATH + ".json";
+    // Settings are public and do not depend on Firebase auth restoration. Start
+    // this request immediately so a slow auth observer cannot delay the gate.
+    var settingsRead = fetchJson(settingsUrl, true).catch(function () { return fetchJson(settingsUrl); });
+    settingsRead.catch(function () {});
+    startFirstLoadFailsafe();
     Promise.resolve().then(async function () {
-      if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
-      if(storedTeacherBypass())return;
+      // These three are independent, so they run together: the permission
+      // script, the public site settings, and the student/teacher class reads.
+      var policyReady = window.B3StudentTools ? null :
+        loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
+      if (policyReady) policyReady.catch(function () {});
+      if(storedTeacherBypass()){if(policyReady)await policyReady;return;}
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
         var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
-          active:await fetchJson(teacherClassPath+"/active.json"),
-          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
-          access:await fetchJson(teacherClassPath+"/access.json"),
-          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
-        }:null;
+        if((verifiedTeacherAccess.classIds||[]).includes(selected)){
+          var teacherFields=await Promise.all([
+            fetchJson(teacherClassPath+"/active.json"),
+            fetchJson(teacherClassPath+"/siteEnabled.json"),
+            fetchJson(teacherClassPath+"/access.json"),
+            fetchJson(teacherClassPath+"/toolGrants.json")
+          ]);
+          teacherClassRecord={active:teacherFields[0],siteEnabled:teacherFields[1],access:teacherFields[2],toolGrants:teacherFields[3]};
+        } else teacherClassRecord=null;
+        if(policyReady)await policyReady;
         return;
       }
       await resolveStudentClass();
       // Optional navigation must not block verification of tool permissions.
       if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
       followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
+      if(policyReady)await policyReady;
     }).then(function () {
-      return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
+      return settingsRead;
     }).then(function (settings) {
       // When teacher auth finishes during a student-first check, ignore that
       // stale decision; the queued pass will load the teacher's class record.

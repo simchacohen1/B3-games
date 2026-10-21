@@ -4,6 +4,11 @@
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    // Only LOOK for a saved sign-in. If Firebase has not created its database yet,
+    // cancel instead of creating an empty one: an empty database stops Firebase
+    // sign-in from starting at all on a first visit or private window.
+    idbReq.onupgradeneeded = function(e) { try { e.target.transaction.abort(); } catch (_) {} };
+    idbReq.onerror = function(e) { e.preventDefault(); };
     idbReq.onsuccess = function(e) {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
@@ -39,7 +44,7 @@
 <script src="../firebase-config.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="chazara" data-back-href="../index.html"></script>
+<script src="../game-gate.js?v=20261021-signin-speed2" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
 <body>
 <div class="wrap">
