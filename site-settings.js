@@ -1033,22 +1033,12 @@
       if (index===1) target.searchParams.set('demo','1');
       link.href=target.href; link.textContent=index===0?'Teacher version':'Student version';
       link.style.cssText='padding:8px 14px;border-radius:8px;background:white;color:#163c49;text-decoration:none;border:1px solid #cbd8d5';
-      if (index===1 && classId) {
-        // Student version = the teacher's own demo student, in a new tab,
-        // landing on this tool. Falls back to the old preview if that fails.
-        const studentPage = new URL(path,SITE_BASE); studentPage.searchParams.set('class',classId);
-        const nextPath = studentPage.pathname.slice(base.pathname.length) + studentPage.search;
-        link.title = 'Opens your demo student in a new tab';
-        link.onclick = function (event) {
-          if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
-          event.preventDefault();
-          const studentTab = window.open('about:blank','_blank');
-          if (!studentTab) { alert('Please allow pop-ups for Fun Torah Tools, then try again.'); return; }
-          openMyDemoStudent(classId, studentTab, nextPath).catch(function (error) {
-            console.warn('Demo student unavailable; opening preview instead', error);
-            try { studentTab.location.replace(link.href); } catch (e) { location.href = link.href; }
-          });
-        };
+      if (index===1) {
+        // This is a teacher-authorized, read-only student preview. Do not
+        // impersonate a student or switch Firebase identities from this link.
+        // The separate "Sign in as a student" action remains available when
+        // a teacher intentionally needs to test an actual student session.
+        link.title = 'Preview the student version with your teacher login; student progress is not saved';
       }
       bar.appendChild(link);
     });
