@@ -400,7 +400,7 @@
     <div class="modal-actions">
       <button class="good" onclick="adjustCurrentAnswer(true)">Mark Correct</button>
       <button class="danger" onclick="adjustCurrentAnswer(false)">Mark Incorrect</button>
-      <button class="secondary" onclick="clearCurrentAnswer()">Clear for retry</button>
+      <button class="secondary" id="modalClearBtn" onclick="clearCurrentAnswer()">Clear for retry</button>
       <button class="secondary" onclick="closeAnswerModal()">Close</button>
     </div>
   </div>
@@ -1926,18 +1926,47 @@ function renderLiveGrid(){
 function launchById(id){return allLaunches[id]||(id===activeLaunchId?liveLaunch:null);}
 function responsesByLaunch(id){return allResponses[id]||(id===activeLaunchId?liveResponses:{});}
 function openAnswerModal(studentId,i,source,launchId){
-  const lid=launchId||(source==='live'?activeLaunchId:resultsLaunchId),launch=launchById(lid),responses=responsesByLaunch(lid),r=responseFor(studentId,i,responses);if(!launch||!r)return;
-  const q=asArray(launch.quizSnapshot&&launch.quizSnapshot.questions)[i],choices=asArray(q&&q.choices),chosen=choices[Number(r.choiceIndex)]||'(unknown)',correct=choices[Number(q.correctIndex)]||'(unknown)',st=roster[studentId]||{};
-  modalContext={launchId:lid,studentId,i,response:r};document.getElementById('modalAdjustmentNote').value='';document.getElementById('modalAnswerInfo').innerHTML='<b>'+esc(st.name||r.name||studentId)+'</b> — Question '+(i+1)+'<br><br><b>Question:</b> '+esc(q.q||'')+'<br><b>Student answer:</b> '+esc(chosen)+'<br><b>Answer key:</b> '+esc(correct)+'<br><b>Current final result:</b> '+(r.correct?'Correct':'Incorrect')+(r.adjusted?' <span class="audit-note">(teacher adjusted)</span>':'');document.getElementById('answerModal').classList.remove('hidden');
+  const lid=launchId||(source==='live'?activeLaunchId:resultsLaunchId),launch=launchById(lid),responses=responsesByLaunch(lid),r=responseFor(studentId,i,responses);if(!launch)return;
+  const q=asArray(launch.quizSnapshot&&launch.quizSnapshot.questions)[i];if(!q)return;const choices=asArray(q.choices),chosen=r?(r.noAnswer?'(no answer — teacher graded)':choices[Number(r.choiceIndex)]||'(unknown)'):'(no answer submitted)',correct=choices[Number(q.correctIndex)]||'(unknown)',st=roster[studentId]||{};
+  modalContext={launchId:lid,studentId,i,response:r||null};document.getElementById('modalAdjustmentNote').value='';document.getElementById('modalAnswerInfo').innerHTML='<b>'+esc(st.name||(r&&r.name)||studentId)+'</b> — Question '+(i+1)+'<br><br><b>Question:</b> '+esc(q.q||'')+'<br><b>Student answer:</b> '+esc(chosen)+'<br><b>Answer key:</b> '+esc(correct)+'<br><b>Current final result:</b> '+(r?(r.correct?'Correct':'Incorrect'):'Not answered')+(r&&r.adjusted?' <span class="audit-note">(teacher adjusted)</span>':'');document.getElementById('modalClearBtn').classList.toggle('hidden',!r);document.getElementById('answerModal').classList.remove('hidden');
 }
 function closeAnswerModal(){document.getElementById('answerModal').classList.add('hidden');modalContext=null;}
 async function writeAudit(type,before,after,note,extra={}){if(!modalContext)return;const ref=db.ref(QROOT+'/audit/'+modalContext.launchId+'/'+modalContext.studentId).push();await ref.set({type,questionIndex:modalContext.i,before,after,note:note||'',at:firebase.database.ServerValue.TIMESTAMP,...extra});}
+// Keeps the student's saved completion score in step with teacher changes
+// (the student's "past quizzes" list reads it). Only touches an existing completion.
+async function syncCompletionScore(launchId,studentId){
+  const cref=db.ref(QROOT+'/completions/'+launchId+'/'+studentId);if(!(await cref.once('value')).exists())return;
+  const qs=launchQuestions(launchById(launchId)),sr=(await db.ref(QROOT+'/responses/'+launchId+'/'+studentId).once('value')).val()||{};let correct=0,answered=0;
+  qs.forEach((_,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct===true)correct++;}});
+  await cref.update({correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):0});
+}
 async function adjustCurrentAnswer(markCorrect){
-  if(!modalContext)return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response,before=!!r.correct;if(before===!!markCorrect&&!note){closeAnswerModal();return;}
-  await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});closeAnswerModal();
+  if(!modalContext)return;const ctx=modalContext,note=document.getElementById('modalAdjustmentNote').value.trim(),r=ctx.response,ref=db.ref(QROOT+'/responses/'+ctx.launchId+'/'+ctx.studentId+'/'+ctx.i);
+  try{
+    if(!r){
+      // Unanswered: create a teacher-graded record, but never over a real answer that arrived meanwhile.
+      const st=roster[ctx.studentId]||{},rec={choiceIndex:-1,noAnswer:true,manual:true,originalCorrect:false,correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||'',name:st.name||ctx.studentId};
+      const res=await ref.transaction(cur=>cur===null?rec:undefined);
+      if(!res.committed){alert('The student just submitted an answer for this question. Please click the box again to review it.');closeAnswerModal();return;}
+      await writeAudit('score_adjustment',null,!!markCorrect,note,{wasUnanswered:true,originalCorrect:false});
+    }else{
+      const before=!!r.correct;if(before===!!markCorrect&&!note){closeAnswerModal();return;}
+      await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});
+      await ref.update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});
+    }
+    await syncCompletionScore(ctx.launchId,ctx.studentId);
+  }catch(e){console.error(e);alert('Could not save the change. Please check your connection and try again.');return;}
+  closeAnswerModal();
 }
 async function clearCurrentAnswer(){
-  if(!modalContext)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response;await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).remove();closeAnswerModal();
+  if(!modalContext||!modalContext.response)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const ctx=modalContext,note=document.getElementById('modalAdjustmentNote').value.trim(),r=ctx.response;
+  try{
+    await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});
+    await db.ref(QROOT+'/responses/'+ctx.launchId+'/'+ctx.studentId+'/'+ctx.i).remove();
+    // A finished quiz blocks new answers, so reopen it for this student; they finish again after retrying.
+    const cref=db.ref(QROOT+'/completions/'+ctx.launchId+'/'+ctx.studentId);if((await cref.once('value')).exists())await cref.remove();
+  }catch(e){console.error(e);alert('Could not save the change. Please check your connection and try again.');return;}
+  closeAnswerModal();
 }
 
 // ---------- Results / history ----------
@@ -1962,7 +1991,7 @@ function renderResults(){
   let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';
   students.forEach(st=>{
     const display=studentDisplayAttempt(resultsLaunchId,st.id),showingOther=display.id!==resultsLaunchId,dqs=showingOther?launchQuestions(allLaunches[display.id]):qs,dr=allResponses[display.id]||{},dsr=dr[st.id]||{},score=launchScore(display.id,st.id),comp=completions[display.id]&&completions[display.id][st.id];
-    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="event.stopPropagation();openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(display.id)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');
+    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];if(!r)return'<td class="cell blank" onclick="event.stopPropagation();openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(display.id)+'\')">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="event.stopPropagation();openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(display.id)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');
     const nameCell=esc(st.name)+(showingOther?'<div class="small" style="color:var(--blue);cursor:pointer" onclick="event.stopPropagation();resultsLaunchId=\''+esc(display.id)+'\';renderLaunchHistory();renderResults();" title="This score is from a later retake — click to open it directly">showing Retake '+display.attempt+'</div>':'');
     let retakeCell;
     if(display.pendingNewer.length){
@@ -2057,7 +2086,7 @@ function studentDisplayAttempt(baseId,studentId){
 }
 function resultsMatrix(){
   const l=allLaunches[resultsLaunchId];if(!l)return[];const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},rows=[['Quiz',l.quizSnapshot&&l.quizSnapshot.title||''],['Class',classLabel(l.classId)],['Date',fmtDate(l.createdAt)],['Attempt',l.retakeOf?'Retake '+(l.attemptNumber||2):'First attempt'],[],['Student','Score','Percent',...qs.map((_,i)=>'Q'+(i+1))]];
-  students.forEach(st=>{const score=launchScore(resultsLaunchId,st.id),sr=rr[st.id]||{},answers=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'';const choices=asArray(q.choices);return(r.correct?'Correct: ':'Incorrect: ')+(choices[Number(r.choiceIndex)]||'')+(r.adjusted?' [adjusted]':'');});rows.push([st.name,score.correct+'/'+score.total,score.pct+'%',...answers]);});return rows;
+  students.forEach(st=>{const score=launchScore(resultsLaunchId,st.id),sr=rr[st.id]||{},answers=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'';const choices=asArray(q.choices);return(r.correct?'Correct: ':'Incorrect: ')+(r.noAnswer?'(no answer)':(choices[Number(r.choiceIndex)]||''))+(r.adjusted?' [adjusted]':'');});rows.push([st.name,score.correct+'/'+score.total,score.pct+'%',...answers]);});return rows;
 }
 function csvEscape(v){const s=String(v??'');return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCSV(){const rows=resultsMatrix(),l=allLaunches[resultsLaunchId];if(!rows.length||!l)return;const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=((l.quizSnapshot&&l.quizSnapshot.title)||'B3_Quiz').replace(/[^a-z0-9]+/gi,'_')+'_'+l.classId+'_'+resultsLaunchId.slice(0,13)+'.csv';a.click();URL.revokeObjectURL(a.href);}
