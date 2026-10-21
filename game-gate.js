@@ -665,7 +665,8 @@
         return;
       }
       await resolveStudentClass();
-      if (studentActive) await startFollowTeacherListener(studentClassId, getStoredStudentId());
+      // Optional navigation must not block verification of tool permissions.
+      if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
       followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
