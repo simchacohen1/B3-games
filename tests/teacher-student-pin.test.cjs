@@ -11,10 +11,10 @@ function fixture({teacher=false,profile={name:'Synthetic Student',active:true},p
   const saved=new Map([['b3Games_studentId','synthetic_student'],['b3Games_studentName','Synthetic Student'],['b3Games_studentClass','alpha'],['b3Games_classPin',pin]]);
   const calls=[],entered=[],messages=[];let reads=0,loginShown=0;
   const ctx={
-    isAuthorizedTeacher:teacher,isStudentPreview:false,isGuest:()=>false,previewStudentId:'',
+    isAuthorizedTeacher:teacher,isStudentPreview:false,isGuest:()=>false,previewStudentId:'',settingsApi:{},
     sessionStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},
     db:{ref:path=>({once:async()=>{reads++;return{exists:()=>!!profile,val:()=>profile};}})},
-    studentAuthCall:async body=>{calls.push(body);if(body.action==='verify'&&verifyError)throw verifyError;if(body.action==='login')return{ok:true,id:'synthetic_student',name:'Synthetic Student',classId:'alpha',classChoices:[{id:'alpha',name:'Alpha'}]};return{ok:true};},
+    studentAuthCall:async body=>{calls.push(body);if(verifyError)throw verifyError;if(body.action==='login')return{ok:true,id:'synthetic_student',name:'Synthetic Student',classId:'alpha',customToken:'synthetic-token',classChoices:[{id:'alpha',name:'Alpha'}]};return{ok:true};},
     studentClassChoices:[],resolvedStudentClass:async()=>'',enterStudent:async identity=>entered.push(identity),
     showChecking(){},showLogin(){loginShown++;},setLoginMsg:message=>messages.push(message),
     el:id=>({value:''}),console
@@ -26,10 +26,10 @@ function fixture({teacher=false,profile={name:'Synthetic Student',active:true},p
 test('saved student session is verified server-side and restored into its active class',async()=>{
   const f=fixture();await f.run();
   assert.deepEqual(JSON.parse(JSON.stringify(f.calls)),[
-    {action:'verify',studentId:'synthetic_student',pin:'synthetic-pin'},
-    {action:'login',name:'Synthetic Student',pin:'synthetic-pin'}
+    // One server call checks the passcode and returns the sign-in token.
+    {action:'login',name:'Synthetic Student',pin:'synthetic-pin',studentId:'synthetic_student'}
   ]);
-  assert.deepEqual(JSON.parse(JSON.stringify(f.entered)),[{id:'synthetic_student',name:'Synthetic Student',classId:'alpha'}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.entered)),[{id:'synthetic_student',name:'Synthetic Student',classId:'alpha',customToken:'synthetic-token'}]);
   assert.equal(f.saved.get('b3Games_classPin'),'synthetic-pin');
 });
 

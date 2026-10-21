@@ -18,18 +18,45 @@ async function rateLimit(store,ip,now){
 async function studentAuth(store,body,ip='unknown',now=Date.now()){
  const get=store.get;
  const action=String(body?.action||'');
- if(action==='login'||action==='choosePin'||action==='verify')await rateLimit(store,ip,now);
+ // The attempt counter runs alongside the first reads instead of before them.
+ // Nothing is returned to the caller until the counter has allowed the request.
+ const limited=(action==='login'||action==='choosePin'||action==='verify')?rateLimit(store,ip,now):Promise.resolve();
+ limited.catch(()=>{});
  if(action==='login'||action==='choosePin'){
   const typed=clean(body.name),pin=clean(body.pin);
-  if(!normalize(typed))fail(400,'Please type your name.');
-  if(!pin||pin.length>100)fail(400,'Please enter your passcode.');
-  const [central,legacyRows]=await Promise.all([get('b3Games/students'),get('posukPractice/allowedStudents')]);
+  if(!normalize(typed)){await limited;fail(400,'Please type your name.');}
+  if(!pin||pin.length>100){await limited;fail(400,'Please enter your passcode.');}
   const sameName=(id,row)=>normalize(row?.name)===normalize(typed)||normalize(id)===normalize(typed);
-  const ids=new Set();
-  Object.entries(central||{}).forEach(([id,row])=>{if(key(id)&&row?.profile&&row.profile.active!==false&&sameName(id,row.profile))ids.add(id)});
-  Object.entries(legacyRows||{}).forEach(([id,row])=>{if(key(id)&&row&&row.active!==false&&!central?.[id]?.profile&&sameName(id,row))ids.add(id)});
-  const matches=[];
-  for(const id of ids){const code=await readPasscode(get,id,{allowLegacyDefault:true});if(equal(code.passcode,pin))matches.push({id,code});}
+  const findMatches=async(central,legacyRows)=>{
+   const ids=new Set();
+   Object.entries(central||{}).forEach(([id,row])=>{if(key(id)&&row?.profile&&row.profile.active!==false&&sameName(id,row.profile))ids.add(id)});
+   Object.entries(legacyRows||{}).forEach(([id,row])=>{if(key(id)&&row&&row.active!==false&&!central?.[id]?.profile&&sameName(id,row))ids.add(id)});
+   const found=[];
+   for(const id of ids){const code=await readPasscode(get,id,{allowLegacyDefault:true});if(equal(code.passcode,pin))found.push({id,code});}
+   return found;
+  };
+  let central,legacyRows,matches=null;
+  // A returning browser knows which student it is. Check only that student
+  // instead of downloading every student's record. The same name and passcode
+  // are still required; anything that does not match falls back to the full
+  // check below, so a wrong hint can never sign anyone else in.
+  const hint=clean(body.studentId);
+  if(action==='login'&&key(hint)){
+   const [profile,legacy,memberships]=await Promise.all([
+    get('b3Games/students/'+hint+'/profile'),
+    get('posukPractice/allowedStudents/'+hint),
+    get('b3Games/students/'+hint+'/memberships'),
+    limited
+   ]);
+   const hintedCentral=profile?{[hint]:{profile,memberships:memberships||{}}}:{};
+   const hintedLegacy=legacy?{[hint]:legacy}:{};
+   const hinted=await findMatches(hintedCentral,hintedLegacy);
+   if(hinted.length===1){matches=hinted;central=hintedCentral;legacyRows=hintedLegacy;}
+  }
+  if(!matches){
+   [central,legacyRows]=await Promise.all([get('b3Games/students'),get('posukPractice/allowedStudents'),limited]);
+   matches=await findMatches(central,legacyRows);
+  }
   if(matches.length>1)fail(409,'More than one student has this name and passcode. Ask your teacher for a different passcode.');
   if(!matches.length)fail(401,'Check your name and passcode.');
   const {id,code}=matches[0];
@@ -81,6 +108,7 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
   const classId=activeMembership?.classId||(!removedOnPurpose?legacyClassId:null);
   return {ok:true,id,name,classId,requiresPinChange:privateCode?.chosenPinVersion!==1};
  }
+ await limited;
  if(action==='verify'){
   const id=clean(body.studentId),pin=clean(body.pin);
   if(!key(id)||!pin)fail(401,'Please sign in again.');
