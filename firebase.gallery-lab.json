@@ -1,0 +1,1 @@
+{"database":{"rules":"firebase-rules.hardened.json"},"storage":{"rules":"storage-rules.hardened.rules"},"emulators":{"auth":{"host":"127.0.0.1","port":9299},"database":{"host":"127.0.0.1","port":9200},"storage":{"host":"127.0.0.1","port":9399},"hub":{"host":"127.0.0.1","port":9440},"logging":{"host":"127.0.0.1","port":9450},"ui":{"enabled":false},"singleProjectMode":true}}
