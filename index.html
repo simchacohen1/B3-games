@@ -1442,7 +1442,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
     const legacyB3Class=["et","wt"].includes(myClassId);
     if(!legacyB3Class){
-      if(myClassRecord?.active===false||myClassRecord?.siteEnabled===false||myClassRecord?.access?.mode==="locked"){
+      if(myClassRecord?.active===false){
         el("gamesArea").classList.add("hidden");el("lockedCard").classList.remove("hidden");el("lockedTitle").textContent="Your class is locked";el("lockedMessage").textContent="Your teacher can reopen your class.";return;
       }
       const grants=myClassRecord?.toolGrants||{};
@@ -1464,15 +1464,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       return;
     }
 
-    const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
+    // Homepage access is independent of the retired website/class-wide locks.
+    // Activity grants and ET/WT per-tool switches remain authoritative.
     let visible=0;
     gameDefinitions.forEach(game=>{
       const globallyActive=currentSettings.games?.[game.id]!==false;
       const classOpen=currentSettings.classGames?.[myClassId]?.[game.id]!==false;
-      const exceptionAllowed=studentHasOverride(game.id)||classHasLockedGameOverride(game.id,myClassId);
-      const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&globallyActive&&(info.open||exceptionAllowed);
+      const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&globallyActive;
       const closed=show&&!classOpen;
-
       game.element.classList.toggle("hidden",!show);
       game.element.classList.toggle("activity-closed",closed);
       let badge=game.element.querySelector(".activity-closed-badge");
@@ -1481,37 +1480,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         badge.className="activity-closed-badge";
         badge.textContent="Closed right now";
         game.element.appendChild(badge);
-      }else if(!closed&&badge){
-        badge.remove();
-      }
+      }else if(!closed&&badge){badge.remove();}
       if(show)visible++;
     });
     updateGameGroupVisibility();
-
-    if(info.open){
-      el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
-      el("lockedCard").classList.add("hidden");
-      el("gamesArea").classList.remove("hidden");
-      el("specialAccessNote")?.classList.add("hidden");
-      el("disabledMessage").classList.toggle("hidden",visible!==0);
-      return;
-    }
-
-    if(visible>0){
-      el("studentClassLabel").textContent=classLabels[myClassId]+" · special activity access";
-      el("lockedCard").classList.add("hidden");
-      el("gamesArea").classList.remove("hidden");
-      el("specialAccessNote")?.classList.remove("hidden");
-      el("disabledMessage").classList.add("hidden");
-      return;
-    }
-
-    el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
-    el("gamesArea").classList.add("hidden");
+    el("studentClassLabel").textContent=classLabels[myClassId]+" · individual activity access";
+    el("lockedCard").classList.add("hidden");
+    el("gamesArea").classList.remove("hidden");
     el("specialAccessNote")?.classList.add("hidden");
-    el("lockedCard").classList.remove("hidden");
-    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is locked":classLabels[myClassId]+" is locked right now";
-    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use Fun Torah Tools right now. Rabbi Cohen can give you access to a specific activity.";
+    el("disabledMessage").classList.toggle("hidden",visible!==0);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
