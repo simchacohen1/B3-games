@@ -146,7 +146,7 @@
       });
     }
     function commit(message){
-      if(readonly)return;
+      if(readonly){status.textContent=message||'Teacher preview only — coloring is not saved.';return;}
       S[key]=actions.slice();save();status.textContent=message||'Saving your picture to your account…';
     }
     function chooseTool(t){
@@ -157,7 +157,7 @@
     }
     svg.querySelectorAll('[data-color-part]').forEach(function(n){
       function onColor(){
-        if(readonly||tool!=='fill'||halachaCloudLoading)return;
+        if(tool!=='fill'||(!readonly&&halachaCloudLoading))return;
         actions.push({tool:'fill',part:n.getAttribute('data-color-part'),color:color});
         redraw();commit('✓ Section colored. Choose another area.');
       }
@@ -176,7 +176,7 @@
     eraser.onclick=function(){chooseTool('eraser');};
     function point(e){var r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*620/r.width,(e.clientY-r.top)*380/r.height];}
     canvas.addEventListener('pointerdown',function(e){
-      if(readonly||tool==='fill'||halachaCloudLoading)return;
+      if(tool==='fill'||(!readonly&&halachaCloudLoading))return;
       e.preventDefault();canvas.setPointerCapture(e.pointerId);
       drawing={tool:tool,color:color,size:tool==='eraser'?Math.max(12,Number(size.value)*2):Number(size.value),points:[point(e)]};
       actions.push(drawing);redraw();
@@ -184,8 +184,8 @@
     canvas.addEventListener('pointermove',function(e){if(!drawing)return;drawing.points.push(point(e));redraw();});
     function finish(){if(!drawing)return;drawing=null;commit('✓ Picture saved.');}
     canvas.addEventListener('pointerup',finish);canvas.addEventListener('pointercancel',finish);
-    undo.onclick=function(){if(readonly||!actions.length)return;actions.pop();redraw();commit('Last coloring action undone.');};
-    clear.onclick=function(){if(readonly||!actions.length||!confirm('Clear the colors on this Halacha picture?'))return;actions=[];redraw();commit('Picture cleared.');};
+    undo.onclick=function(){if(!actions.length)return;actions.pop();redraw();commit('Last coloring action undone.');};
+    clear.onclick=function(){if(!actions.length||!confirm('Clear the colors on this Halacha picture?'))return;actions=[];redraw();commit('Picture cleared.');};
     download.onclick=function(){
       var copy=svg.cloneNode(true);copy.removeAttribute('role');
       copy.setAttribute('xmlns',NS);
@@ -200,7 +200,7 @@
       image.onerror=function(){URL.revokeObjectURL(url);status.textContent='Could not create PNG. Try printing the page.';};
       image.src=url;
     };
-    if(readonly){right.querySelectorAll('button').forEach(function(b){if(b!==download)b.disabled=true;});canvas.style.pointerEvents='none';}
+    if(readonly){status.textContent='Teacher preview: coloring is temporary and does not change student work.';}
     chooseTool('fill');redraw();
 
     // Match the vocabulary in the same tap/drag style as Sefer HaMitzvos.
