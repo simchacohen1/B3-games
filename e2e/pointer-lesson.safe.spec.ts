@@ -38,7 +38,7 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
     (window as any).__present=()=>{
       const peer:any=(window as any).__peer;
       const connection:any=new Emitter();
-      connection.peer=room;
+      connection.peer=(window as any).__room;
       connection.metadata={kind:'activity-lesson',presentationId:'offline'};
       connection.close=()=>{};
       connection.answer=()=>{
