@@ -5,7 +5,7 @@ import path from 'node:path';
 // Fully synthetic class session: no production API, no real students.
 const script=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/activity-share.js'),'utf8');
 
-async function preparePointer(page: any) {
+async function preparePointer(page: any, admitted = true) {
   await page.route('**/*',route=>route.abort());
   await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('activity-share.js') ? {contentType:'text/javascript',body:script} : route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
   await page.goto('https://pointer-offline.test/activity');
@@ -58,7 +58,7 @@ async function preparePointer(page: any) {
     w.__sessionCallback({val:()=>({[w.__room]:{roomId:w.__room,createdAt:Date.now()}})});
   });
   await expect.poll(()=>page.evaluate(()=>!!(window as any).__connection)).toBe(true);
-  await page.evaluate(()=>{
+  if(admitted) await page.evaluate(()=>{
     (window as any).__connection.emit('data',{type:'present'});
     (window as any).__connection.emit('data',{type:'lesson-presentation',id:'offline',active:true});
     (window as any).__present();
@@ -76,7 +76,7 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
 
 
 test('Pointer: an unadmitted presentation cannot open teacher media',async({page})=>{
-  await preparePointer(page);
+  await preparePointer(page,false);
   await page.evaluate(()=>{
     const c=(window as any).__connection;
     c.emit('data',{type:'lesson-presentation',id:'unadmitted',active:true});
