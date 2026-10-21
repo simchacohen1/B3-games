@@ -1517,10 +1517,23 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   // Student sign-in is checked on the server; passcodes never reach the browser.
   const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
   async function studentAuthCall(body){
-    const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw Object.assign(new Error(data.error||"Could not check your login. Try again."),{status:response.status});
-    return data;
+    // Retry temporary function failures, never rejected credentials.
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok){
+          const error=Object.assign(new Error(data.error||(response.status>=500?"Sign-in service is temporarily unavailable. Please try again.":"Could not check your login. Try again.")),{status:response.status});
+          if(response.status>=500&&attempt===0){await new Promise(resolve=>setTimeout(resolve,1000));continue;}
+          throw error;
+        }
+        return data;
+      }catch(error){
+        if(attempt===0&&(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError)){await new Promise(resolve=>setTimeout(resolve,1000));continue;}
+        if(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError)throw new Error("Sign-in connection is slow. Please try again in a moment.");
+        throw error;
+      }
+    }
   }
   async function checkStudentAccess(name,pin){
     const typed=String(name||"").trim(),enteredPin=String(pin||"").trim();
