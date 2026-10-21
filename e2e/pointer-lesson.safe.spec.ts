@@ -7,7 +7,7 @@ const script=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/
 
 test('Pointer: student sees teacher presentation without losing unfinished work',async({page})=>{
   await page.route('**/*',route=>route.abort());
-  await page.route('https://pointer-offline.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
+  await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
   await page.goto('https://pointer-offline.test/activity');
   await page.evaluate(()=>{
     const room='class-pointer-12345678-1234-1234-1234-123456789abc';
@@ -16,7 +16,7 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
     sessionStorage.setItem('b3Games_classPin','synthetic-pin');
     (window as any).firebase={apps:[{}],database:()=>({ref:()=>({on:(_event:string,callback:Function)=>{(window as any).__sessionCallback=callback;}})})};
     (window as any).B3_FIREBASE_CONFIG={};
-    (window as any).FunTorahStudentClass={resolve:async()=>({workspaceId:'demo-workspace',classId:'et'})};
+    (window as any).FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
     (window as any).fetch=async()=>({ok:true,status:200,json:async()=>({ok:true,token:'synthetic-token'})});
     class Emitter {
       handlers:Record<string,Function[]>={};
