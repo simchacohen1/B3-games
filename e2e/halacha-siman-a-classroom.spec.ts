@@ -17,7 +17,7 @@ async function fixture(page:any,teacher=false){
   },{ids,teacher});
   await page.addScriptTag({path:script});
   await expect(page.locator('.ha-classroom')).toHaveCount(7);
-  await page.waitForFunction(()=>Array.from(document.querySelectorAll('.ha-art canvas')).every(c=>c.width>0&&c.height>0));
+  await expect(page.locator('.ha-art canvas[data-ready="true"]')).toHaveCount(7);
 }
 test('seven original Siman Alef lessons have distinct art and hide, not erase, old scrapbook',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(String(e)));
