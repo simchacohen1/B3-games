@@ -570,12 +570,8 @@
       showClosed("This activity is turned off for you", "Your teacher can change your tool access.");return;
     }
     if(studentClassId!=="et"&&studentClassId!=="wt"){
-      if(lastSettings.siteEnabled===false){
-        showClosed("Fun Torah Tools is closed", "The administrator has activated the emergency lock.");return;
-      }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 
@@ -620,10 +616,6 @@
       return;
     }
 
-    if (lastSettings.siteEnabled === false && (studentClassId === "et" || studentClassId === "wt")) {
-      showClosed("Fun Torah Tools is closed", "Fun Torah Tools is locked right now. Your teacher can give you access to a specific activity.");
-      return;
-    }
 
     if (!studentClassId) {
       showClosed("Please sign in first", "Go back to Fun Torah Tools and sign in again so the site can verify your class.");
@@ -634,12 +626,9 @@
       showOpen();
       return;
     }
-    var info = classIsOpen(lastSettings, studentClassId);
-    if (info.open) {
-      showOpen();
-    } else {
-      showClosed((studentClassId === "et" ? "ET" : "WT") + " is locked right now", "Your teacher can press Unlock Now for your class. This page checks again every few seconds.");
-    }
+    // Per-tool policy above already checked grants and ET/WT enablement.
+    // The retired website-wide/class-wide schedule must not block a tool.
+    showOpen();
   }
 
   function checkNow() {
