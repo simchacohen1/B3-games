@@ -58,7 +58,18 @@ function applyUnlockInputs(draft,desired){
     draft.unlocked[track]=sections;
   }
 }
-$('save').onclick=async()=>{
+let autoTimer=null, saving=false, editSequence=0;
+function scheduleSave(){
+  dirty=true;editSequence++;
+  clearTimeout(autoTimer);
+  notice('Saving changes automatically…');
+  autoTimer=setTimeout(()=>{if(!saving)void saveChanges();},650);
+}
+async function saveChanges(){
+  if(saving||!user||!config)return;
+  clearTimeout(autoTimer);
+  saving=true;
+  const savingSequence=editSequence;
   const desired={};
   const tracks=Object.keys(config.unlocked||{});
   const generic=!tracks.every(id=>['et','wt'].includes(id));
@@ -86,14 +97,33 @@ $('save').onclick=async()=>{
       result=await call('teacherSave',{config:rebased});
     }
     config=result.config;
-    dirty=false;
-    editors();
-    notice('Saved. Your assigned class will see the updated access.');
+    // Do not replace controls while the teacher is making another edit.
+    if(editSequence===savingSequence){
+      dirty=false;
+      editors();
+      notice('All changes saved automatically.');
+    }else{
+      loadedSections=structuredClone(config.sections);
+      notice('Saving latest changes…');
+    }
   }catch(e){
     notice('Not saved: '+(e.message||'Please try again.'));
     window.scrollTo({top:0,behavior:'smooth'});
-  }finally{$('save').disabled=false}
-};
-$('dashboard').onchange=()=>dirty=true;$('track').onchange=table;$('reload').onclick=async()=>{if(dirty&&!confirm('Reload and discard unsaved lesson edits?'))return;try{await load()}catch(e){notice(e.message)}};$('signIn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>notice(e.message));$('signOut').onclick=()=>B3SiteSettings.signOut();
+  }finally{
+    $('save').disabled=false;
+    saving=false;
+    if(editSequence!==savingSequence&&dirty){
+      clearTimeout(autoTimer);
+      autoTimer=setTimeout(()=>void saveChanges(),650);
+    }
+  }
+}
+$('save').onclick=()=>void saveChanges();
+$('dashboard').addEventListener('change',event=>{
+  // The track filter is not a lesson setting and must not trigger a write.
+  if(event.target.closest('#track'))return;
+  scheduleSave();
+});
+$('track').onchange=table;$('reload').onclick=async()=>{if(dirty&&!confirm('Reload and discard unsaved lesson edits?'))return;try{await load()}catch(e){notice(e.message)}};$('signIn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>notice(e.message));$('signOut').onclick=()=>B3SiteSettings.signOut();
 C.paras.forEach((p,i)=>{if(!p.trim())return;const row=node('p',i+' · '+p);row.dir=i<2?'ltr':'rtl';row.style.fontSize='24px';$('transcript').append(row)});$('audio').src='audio.mp3';
 B3SiteSettings.onAuthStateChanged(async(u,ok)=>{user=ok?u:null;$('signIn').hidden=!!user;$('dashboard').hidden=!user;if(user)try{await load()}catch(e){notice(e.message)}else{roster={};students={};$('roster').replaceChildren();$('detail').replaceChildren();notice('Sign in with your teacher Google account.')}});
