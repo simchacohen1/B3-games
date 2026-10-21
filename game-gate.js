@@ -656,12 +656,25 @@
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
         var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
-          active:await fetchJson(teacherClassPath+"/active.json"),
-          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
-          access:await fetchJson(teacherClassPath+"/access.json"),
-          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
-        }:null;
+        if ((verifiedTeacherAccess.classIds||[]).includes(selected)) {
+          // All four reads are independent. Fetch concurrently so one slow
+          // class field does not delay the other requests. Promise.all still
+          // fails closed if any permission-critical read fails.
+          var teacherFields=await Promise.all([
+            fetchJson(teacherClassPath+"/active.json"),
+            fetchJson(teacherClassPath+"/siteEnabled.json"),
+            fetchJson(teacherClassPath+"/access.json"),
+            fetchJson(teacherClassPath+"/toolGrants.json")
+          ]);
+          teacherClassRecord={
+            active:teacherFields[0],
+            siteEnabled:teacherFields[1],
+            access:teacherFields[2],
+            toolGrants:teacherFields[3]
+          };
+        } else {
+          teacherClassRecord=null;
+        }
         return;
       }
       await resolveStudentClass();
