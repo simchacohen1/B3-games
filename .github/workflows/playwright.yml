@@ -1,9 +1,14 @@
 name: Playwright Tests
 on:
-  push:
-    branches: [ main, master ]
+  workflow_dispatch:
   pull_request:
     branches: [ main, master ]
+
+# Keep only the newest pending run for each workflow and branch/PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     timeout-minutes: 60
