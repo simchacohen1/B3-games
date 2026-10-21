@@ -190,10 +190,9 @@
       q('classSelect').replaceChildren(...assigned.map(id => {
         const option = document.createElement('option');option.value=id;option.textContent=id.toUpperCase();return option;
       }));
-      // Embedded mode uses the shared toolbar's class selector to avoid
-      // showing two conflicting class choices.
-      q('classSelect').disabled = new URLSearchParams(location.search).get('embed') === '1';
-      q('classSelect').title = q('classSelect').disabled ? 'Choose the class from the teacher toolbar.' : '';
+      // Class selection stays available inside the Follow Teacher panel.
+      q('classSelect').disabled = false;
+      q('classSelect').title = '';
       q('gate').classList.add('hidden');q('app').classList.remove('hidden');
       const preferred = new URLSearchParams(location.search).get('class');
       const id = preferred && assigned.includes(preferred) ? preferred : assigned[0];
