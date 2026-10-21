@@ -663,7 +663,8 @@
         return;
       }
       await resolveStudentClass();
-      if (studentActive) await startFollowTeacherListener(studentClassId, getStoredStudentId());
+      // Follow Teacher is optional and must never delay or fail the tool access check.
+      if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
       followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
