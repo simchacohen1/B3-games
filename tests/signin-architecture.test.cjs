@@ -79,3 +79,25 @@ test('teacher class reads start together and preserve field mapping', async () =
   assert.equal(context.teacherClassRecord.access.mode, 'open');
   assert.equal(context.teacherClassRecord.toolGrants.halacha, true);
 });
+
+test('teacher class access fails closed when any required read fails', async () => {
+  const vm = require('node:vm');
+  const code = read('game-gate.js');
+  const start = code.indexOf('var teacherFields=await Promise.all([');
+  const end = code.indexOf('        } else {', start);
+  assert.ok(start >= 0 && end > start);
+  const snippet = code.slice(start, end).replace(/        }\s*$/, '');
+  const context = {
+    Promise,
+    teacherClassPath: 'test-class',
+    fetchJson: (url) => url.endsWith('/access.json')
+      ? Promise.reject(new Error('permission_denied'))
+      : Promise.resolve(true),
+    teacherClassRecord: null,
+  };
+  await assert.rejects(
+    vm.runInNewContext('(async () => { ' + snippet + ' })()', context),
+    /permission_denied/
+  );
+  assert.equal(context.teacherClassRecord, null, 'partial permissions must not authorize a teacher');
+});
