@@ -126,6 +126,7 @@ async function signInB3(name,pin,idHint=''){
   });
   const j=await r.json();
   if(!r.ok) throw new Error(j.error||'Could not sign in');
+  await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
   await auth.signInWithCustomToken(j.customToken);
 
   const finalId=j.b3StudentId||b3StudentId;
@@ -160,7 +161,16 @@ async function trySharedB3Login(){
   const needHome=msg=>{if(note)note.textContent=msg;if(link)link.style.display='';};
   if(!(id&&name&&pin))return needHome('Please sign in on Fun Torah Tools first.');
   if(note)note.textContent='Signing you in with your Fun Torah Tools login…';
-  try{await signInB3(name,pin,id);if(note)note.textContent=''}
+  try{
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    if(auth.currentUser){
+      const {claims}=await auth.currentUser.getIdTokenResult();
+      if(claims.b3StudentId===id&&claims.b3ClassId===sessionStorage.getItem('b3Games_studentClass')&&claims.studentRewardsRole==='student'&&claims.studentRewardsStudentId){
+        if(note)note.textContent='';return;
+      }
+    }
+    await signInB3(name,pin,id);if(note)note.textContent='';
+  }
   catch(err){needHome((err.message||String(err))+' Please sign in again on Fun Torah Tools.')}
 }
 

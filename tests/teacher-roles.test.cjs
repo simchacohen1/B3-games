@@ -12,10 +12,10 @@ const teacher={uid:'regular',email:'teacher@example.test',getIdToken:async()=>''
 test('teacher record cannot confer admin role or wildcard class access',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:true,role:'admin',classIds:{own:true,'*':true,other:false}}},teacher);const a=await t.window.readAccessForTest(teacher);assert.equal(a.role,'teacher');assert.deepEqual(Array.from(a.classIds),['own'])});
 test('disabled teacher cannot regain access through an old invitation',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:false},'b3Games/workspaces/b3-2026/teacherInvites':{old:{email:teacher.email,active:true}}},teacher);assert.equal((await t.window.readAccessForTest(teacher)).authorized,false)});
 test('ordinary teacher cannot save global activity settings',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:true,classIds:{own:true}}},teacher);await assert.rejects(t.window.B3SiteSettings.updateGameEnabled('yiddish',false),/administrator/);assert.equal(t.writes.length,0)});
-test('owner retains administrator access',async()=>{const owner={...teacher,email:'simcha5770@gmail.com'};const t=settings({},owner);assert.equal((await t.window.readAccessForTest(owner)).role,'admin')});
+test('owner retains administrator access',async()=>{const owner={...teacher,email:'simcha5770@gmail.com',emailVerified:true};const t=settings({},owner);assert.equal((await t.window.readAccessForTest(owner)).role,'admin')});
 
 test('repeated owner migration does not erase passcodes or reactivate blocked memberships',async()=>{
- const owner={...teacher,uid:'owner',email:'simcha5770@gmail.com'};
+ const owner={...teacher,uid:'owner',email:'simcha5770@gmail.com',emailVerified:true};
  const central={child:{profile:{name:'Child',passcode:'9876',active:false},memberships:{'b3-2026_et':{workspaceId:'b3-2026',classId:'et',active:false}}}};
  const t=settings({'posukPractice/allowedStudents':{child:{name:'Child',classId:'et',active:true}},'b3Games/students':central,'b3Games/workspaces/b3-2026/classes':{et:{members:{child:{active:false}}}}},owner);
  const db={ref:path=>({once:async()=>({val:()=>({'posukPractice/allowedStudents':{child:{name:'Child',classId:'et'}},'b3Games/students':central,'b3Games/workspaces/b3-2026/classes':{et:{members:{child:{active:false}}}}})[path]??null}),update:async v=>t.writes.push([path,v])})};
@@ -25,7 +25,7 @@ test('repeated owner migration does not erase passcodes or reactivate blocked me
 
 test('owner seeding never writes passcodes into public profiles',async()=>{
  for(const [codes,expected] of [[['4321','4321'],undefined],[['4321','9999'],undefined]]){
-  const owner={...teacher,uid:'owner',email:'simcha5770@gmail.com'};
+  const owner={...teacher,uid:'owner',email:'simcha5770@gmail.com',emailVerified:true};
   const t=settings({'posukPractice/allowedStudents':{child:{classId:'et',name:'Child'}},'b3Games/students':{child:{profile:{name:'Child',active:false}}},'b3Games/workspaces/b3-2026/classes':{et:{members:{child:{passcode:codes[0]}}},wt:{members:{child:{passcode:codes[1]}}}}},owner);
   await t.window.migrateForTest({db:t.db},owner);
   assert.equal(t.writes[0][1]['b3Games/students/child/profile/passcode'],expected);
@@ -51,3 +51,5 @@ test('new classes honor emergency lock but use independent activity grants',()=>
  assert.doesNotMatch(branch,/lastSettings\.games\?\.\[gameId\]===false/);
  assert.match(branch,/assignedClass\.access\?\.mode==="locked"/);
 });
+
+test('unverified owner email does not confer administrator access',async()=>{const owner={...teacher,email:'simcha5770@gmail.com',emailVerified:false};const t=settings({},owner);assert.equal((await t.window.readAccessForTest(owner)).authorized,false)});

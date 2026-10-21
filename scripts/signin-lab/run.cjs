@@ -18,7 +18,8 @@ for(const track of ['et','wt']){
  data.b3Games.students[sid]={profile:{active:true,classId:track,name:'Synthetic '+track},memberships:{one:{active:true,workspaceId:'b3-2026',classId:track}}};
  data.b3Games.workspaces['b3-2026'].classes[track]={active:true,siteEnabled:true,access:{mode:'open'},toolGrants:Object.fromEntries(activities.map(t=>[t,true])),members:{[sid]:{active:true}}};
 }
-const requests=[];
+const requests=[];let backend=null;
+const localize=source=>source.replaceAll("https://us-central1-b3-games.cloudfunctions.net",base+"/api");
 async function rest(p,method='GET',body){
  const u=new URL(`http://127.0.0.1:${dbPort}/${p}.json`);u.searchParams.set('ns',namespace);
  const r=await fetch(u,{method,headers:{Authorization:'Bearer owner','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -48,6 +49,7 @@ let delay=0,deny=false,baseline=false;
 const server=http.createServer(async(req,res)=>{
  try{
  const u=new URL(req.url,base);
+ if(u.pathname.startsWith('/api/')){if(!backend){res.writeHead(503);res.end();return;}return backend.router(req,res);}
  if(u.pathname.startsWith('/db/')){
   requests.push({path:u.pathname,method:req.method,at:Date.now()});
   if(delay)await new Promise(r=>setTimeout(r,delay));
@@ -57,12 +59,12 @@ const server=http.createServer(async(req,res)=>{
   const r=await fetch(target);res.writeHead(r.status,{'Content-Type':'application/json'});res.end(await r.text());return;
  }
  if(u.pathname==='/firebase-config.js'){res.setHeader('Content-Type','text/javascript');res.end('window.B3_FIREBASE_CONFIG='+JSON.stringify(config));return;}
- if(['/halacha/index.html','/student-rewards/student.html'].includes(u.pathname)){
+ if(['/index.html','/halacha/index.html','/student-rewards/student.html','/weekly-quiz/index.html'].includes(u.pathname)){
   let page=fs.readFileSync(path.join(root,u.pathname),'utf8');
   page=page.replace(/<script[^>]*src=["']https:\/\/www\.gstatic\.com[^"']+["'][^>]*><\/script>/g,'');
   const localSDK=['app','auth','database'].map(part=>'<script src="/vendor/firebase/12.15.0/firebase-'+part+'-compat.js"></script>').join('');
   page=page.replace(/<head[^>]*>/i,match=>match+localSDK+'<script>'+bootstrap+'</script>');
-  res.setHeader('Content-Type','text/html');res.end(page);return;
+  res.setHeader('Content-Type','text/html');res.end(localize(page));return;
  }
  if(u.pathname==='/login'){res.setHeader('Content-Type','text/html');res.end(html());return;}
  if(u.pathname==='/tool'){
@@ -70,7 +72,7 @@ const server=http.createServer(async(req,res)=>{
   const tool=u.searchParams.get('tool')||'halacha';
   res.end(u.searchParams.has('gateLoadsSDK')?`<!doctype html><html><head><script src="/vendor/firebase/12.15.0/firebase-app-compat.js"></script><script>window.B3_FIREBASE_CONFIG=${JSON.stringify(config)};</script><script src="/game-gate.js" data-game-id="${tool}"></script></head><body>Synthetic fallback test</body></html>`:html(tool));return;
  }
- if(u.pathname==='/site-settings.js'){res.setHeader('Content-Type','text/javascript');res.end(`if(!window.__labConnected){${bootstrap}}`+fs.readFileSync(path.join(root,'site-settings.js'),'utf8'));return;}
+ if(u.pathname==='/site-settings.js'){res.setHeader('Content-Type','text/javascript');res.end(`if(!window.__labConnected){${bootstrap}}`+localize(fs.readFileSync(path.join(root,'site-settings.js'),'utf8')));return;}
  if(u.pathname==='/game-gate.js'){
   const src=baseline?require('node:child_process').execFileSync('git',['show','3aafc7c:game-gate.js'],{cwd:root,encoding:'utf8'}):fs.readFileSync(path.join(root,'game-gate.js'),'utf8');
   res.setHeader('Content-Type','text/javascript');res.end(src.replace('https://b3-games-default-rtdb.firebaseio.com',base+'/db'));return;
@@ -78,7 +80,7 @@ const server=http.createServer(async(req,res)=>{
  if(['/audio-mode.js','/follow-teacher/core.js','/follow-teacher/student.js'].includes(u.pathname)){res.setHeader('Content-Type','text/javascript');res.end('');return;}
  const p=path.resolve(root,'.'+decodeURIComponent(u.pathname));
  if(!p.startsWith(root+path.sep)||!fs.existsSync(p)){res.writeHead(404);res.end();return;}
- res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.woff2':'font/woff2'})[path.extname(p)]||'application/octet-stream');res.end(fs.readFileSync(p));
+ res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.woff2':'font/woff2'})[path.extname(p)]||'application/octet-stream');res.end(p.endsWith(".js")?localize(fs.readFileSync(p,"utf8")):fs.readFileSync(p));
  }catch(e){res.writeHead(500);res.end(String(e));}
 });
 (async()=>{
@@ -87,12 +89,15 @@ const server=http.createServer(async(req,res)=>{
  const auth=new AuthEmulator({projectId:project,host:'127.0.0.1',port:authPort});
  try{
   await auth.start();
+  if(process.env.SIGNIN_LAB_STAGE==='1')backend=require('./backend.cjs')({root,project,namespace,authPort,dbPort,config});
   for(let i=0;i<100;i++){try{await rest('.settings/rules','PUT',JSON.parse(fs.readFileSync(path.join(root,'firebase-rules.hardened.json'),'utf8')));break;}catch(e){if(i===99)throw e;await new Promise(r=>setTimeout(r,100));}}
   await rest('','PUT',data);
   await new Promise(r=>server.listen(port,'127.0.0.1',r));
+  if(!process.env.SIGNIN_LAB_CASE){
   const security=spawn(process.execPath,['--test','tests/security-rules-emulator.test.cjs'],{cwd:root,env:{...process.env,B3_RUN_RTDB_EMULATOR_TESTS:'1',FIREBASE_DATABASE_EMULATOR_PORT:String(dbPort)},stdio:'inherit'});
   const securityCode=await new Promise(resolve=>security.on('exit',resolve));
   if(securityCode!==0)throw Error('Database security tests failed: '+securityCode);
-  await require('./browser.cjs')({base,authPort,activities,requests,rest,namespace,dbPort,setDelay:v=>delay=v,setDeny:v=>deny=v,setBaseline:v=>baseline=v});
- }finally{server.closeAllConnections();await new Promise(r=>server.close(r));await auth.stop();java.kill();}
+  }
+  await require(process.env.SIGNIN_LAB_STAGE==='1'?'./staging.cjs':'./browser.cjs')({base,authPort,activities,requests,rest,namespace,dbPort,backend,setDelay:v=>delay=v,setDeny:v=>deny=v,setBaseline:v=>baseline=v});
+ }finally{server.closeAllConnections();await new Promise(r=>server.close(r));if(backend)await backend.close();await auth.stop();java.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

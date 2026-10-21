@@ -110,7 +110,7 @@ module.exports=async function(lab){
  });
  // Before/after comparison uses the exact pre-repair gate from the PR history.
  // These are local controlled-delay gate timings, not live website login timings.
- for(const kind of ['student','teacher'])for(const baseline of [true,false]){
+ if(!process.env.SIGNIN_LAB_SKIP_PERFORMANCE)for(const kind of ['student','teacher'])for(const baseline of [true,false]){
   setBaseline(baseline);setDelay(120);
   const samples=[],counts=[],settledCounts=[];
   const {context,page}=await fresh();

@@ -1,0 +1,416 @@
+{
+  "results": [
+    {
+      "name": "actual homepage rejects wrong passcode and accepts ET/WT private passcodes",
+      "status": "passed"
+    },
+    {
+      "name": "actual student Halacha and Rewards exchanges persist in each tab without repeat login",
+      "status": "passed"
+    },
+    {
+      "name": "Google popup sign-in claims only the invited teacher and survives refresh",
+      "status": "passed"
+    },
+    {
+      "name": "actual Quiz page loads and submits through the authenticated backend",
+      "status": "passed"
+    },
+    {
+      "name": "uninvited Google teacher and student token cannot claim teacher access",
+      "status": "passed"
+    },
+    {
+      "name": "real Halacha/rewards/quiz HTTP handlers enforce credentials, class, and token claims",
+      "status": "passed"
+    }
+  ],
+  "backendCalls": [
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 401
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 401
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsLogin",
+      "action": "",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "student-point-history",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "class-reward-status",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "student-point-history",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "class-reward-status",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsLogin",
+      "action": "",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "student-point-history",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsAutoAward",
+      "action": "class-reward-status",
+      "status": 200
+    },
+    {
+      "name": "funTorahTeacherClaim",
+      "action": "",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "launch",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "launch",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "answer",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "launch",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "complete",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 200
+    },
+    {
+      "name": "funTorahTeacherClaim",
+      "action": "",
+      "status": 403
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahTeacherClaim",
+      "action": "",
+      "status": 403
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 401
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 403
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsLogin",
+      "action": "",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "launch",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "answer",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "answer",
+      "status": 409
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "complete",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 403
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "login",
+      "status": 200
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 401
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 403
+    },
+    {
+      "name": "funTorahStudentAuth",
+      "action": "halachaToken",
+      "status": 200
+    },
+    {
+      "name": "studentRewardsLogin",
+      "action": "",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "launch",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "answer",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "answer",
+      "status": 409
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "complete",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 403
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 200
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    },
+    {
+      "name": "weeklyQuizStudent",
+      "action": "history",
+      "status": 401
+    }
+  ],
+  "unexpectedOutboundRequests": []
+}

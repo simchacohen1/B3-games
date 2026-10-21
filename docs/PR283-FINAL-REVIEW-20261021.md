@@ -77,3 +77,7 @@ Still unverified:
 - Repeated `site-settings.js` authorization subscribers can still duplicate their own SDK reads/admin mirroring. This checkpoint removes duplicate shared-gate startup work and stale callbacks, without refactoring that larger subsystem.
 
 Before any production release, run a separately authorized staging exercise matrix with the relevant backend functions, resolve the existing stale stylesheet assertion, review the diff, and obtain explicit merge/deployment/rules authorization as applicable. Do not read real student records to fill these gaps without approval.
+
+## Superseding final review
+
+The missing actual passcode, Google-popup, and tool-specific backend exchange tests have now been completed in isolation, and the stale stylesheet assertion was repaired. Read `docs/PR283-DEPLOYMENT-REVIEW-20261021.md` and `docs/PR283-STAGING-RESULTS-20261021.json` for the current 159-test/15-browser-scenario checkpoint and explicit production-release verdict. The older limitations above are historical where superseded by that report.

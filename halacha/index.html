@@ -797,9 +797,10 @@ async function halachaAuthReady(){
  const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
  const classId=String(sessionStorage.getItem("b3Games_studentClass")||"").trim();
  if(!name||!pin||!classId)throw new Error("Your Fun Torah Tools sign-in is missing.");
+ await halachaAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
  if(halachaAuth.currentUser){
    const t=await halachaAuth.currentUser.getIdTokenResult();
-   if(t.claims.b3StudentId===HALACHA_STUDENT_ID)return halachaAuth.currentUser;
+   if(t.claims.b3StudentId===HALACHA_STUDENT_ID&&t.claims.b3ClassId===classId)return halachaAuth.currentUser;
    await halachaAuth.signOut();
  }
  const credentials={name,pin,studentId:HALACHA_STUDENT_ID,classId};
@@ -821,7 +822,7 @@ async function halachaAuthReady(){
    throw new Error(body.error||"Could not authenticate this student.");
  await halachaAuth.signInWithCustomToken(body.customToken);
  const t=await halachaAuth.currentUser.getIdTokenResult();
- if(t.claims.b3StudentId!==HALACHA_STUDENT_ID)throw new Error("Student account did not match.");
+ if(t.claims.b3StudentId!==HALACHA_STUDENT_ID||t.claims.b3ClassId!==classId)throw new Error("Student account or class did not match.");
  return halachaAuth.currentUser;
 }
 halachaAuthReady().then(loadCloudHalacha).catch(e=>{
