@@ -1,0 +1,34 @@
+/* Halacha Sefer-style picture study: scoped to the new additive lesson panel. */
+.hal-sefer-study{margin:14px 18px 18px;padding:16px;border:2px solid #b5d5e9;border-radius:16px;background:#fff;box-shadow:0 3px 12px #173b6214;color:#173b62}
+.hal-sefer-title{margin:0 auto 9px;font-size:clamp(22px,2.8vw,32px);line-height:1.35;text-align:center;direction:rtl;background:#fff8e6;border:2px solid #d9c28b;border-radius:11px;padding:8px 12px;max-width:850px}
+.hal-sefer-description{margin:0 0 16px;text-align:center;font-size:19px;line-height:1.5;font-weight:700;color:#273e54}
+.hal-sefer-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(285px,.85fr);gap:16px;align-items:start}
+.hal-sefer-art,.hal-sefer-right{min-width:0}
+.hal-sefer-picture{position:relative;max-width:720px;margin:auto;aspect-ratio:620/380;background:white;border-radius:15px;overflow:hidden}
+.hal-sefer-picture svg{display:block;width:100%;height:100%;touch-action:manipulation}
+.hal-sefer-picture svg [data-color-part]{cursor:pointer;outline:none}
+.hal-sefer-picture svg [data-color-part]:focus-visible{filter:drop-shadow(0 0 5px #f59e0b)}
+.hal-sefer-picture canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}
+.hal-sefer-status{min-height:24px;margin:8px 2px;color:#24567b;font-size:14px;font-weight:700}
+.hal-sefer-right{padding:12px;border:2px solid #c5dbe9;border-radius:13px;background:#f3f9ff}
+.hal-sefer-right h3{font-size:19px;color:#173b62;margin:0 0 10px}
+.hal-sefer-palette{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
+.hal-sefer-palette button{min-width:57px;min-height:43px;padding:5px;border-radius:8px;border:3px solid transparent;font-size:12px;font-weight:900;cursor:pointer}
+.hal-sefer-palette button[aria-pressed=true]{border-color:#182d4c;outline:2px solid white;outline-offset:-5px}
+.hal-sefer-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.hal-sefer-buttons button{padding:8px;border:1px solid #a8c4d7;border-radius:9px;background:white;cursor:pointer;font-size:14px;font-weight:700}
+.hal-sefer-buttons button.on{background:#1468af;color:#fff}
+.hal-sefer-buttons button:disabled{opacity:.5;cursor:not-allowed}
+.hal-sefer-brushsize{display:flex;align-items:center;gap:8px;font-size:13px}
+.hal-sefer-brushsize input{flex:1;min-width:60px}
+.hal-sefer-vocab{margin-top:17px;border-top:2px solid #d2e4ef;padding-top:13px}
+.hal-sefer-hint{font-size:13px;margin:0 0 10px;color:#526579}
+.hal-sefer-matches{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hal-sefer-matches>div{display:flex;flex-direction:column;gap:8px}
+.hal-sefer-matches button{width:100%;min-height:57px;padding:8px;border:2px solid #c7dbe8;border-radius:10px;background:#fff;cursor:pointer;font-weight:700;font-size:15px;line-height:1.25}
+.hal-sefer-matches .hal-sefer-hebrew button{font-size:19px}
+.hal-sefer-matches button.selected{border-color:#ed9a2b;background:#fff2d7}
+.hal-sefer-matches button.good{border-color:#3aa36b;background:#e4f9ec;color:#166238}
+.hal-sefer-feedback{font-weight:800;min-height:24px;color:#14547c;margin:10px 0 0}
+@media(max-width:850px){.hal-sefer-layout{grid-template-columns:1fr}.hal-sefer-study{margin:10px 8px;padding:10px}.hal-sefer-picture{width:100%}.hal-sefer-right{padding:10px}}
+@media print{.hal-sefer-buttons,.hal-sefer-palette,.hal-sefer-brushsize,.hal-sefer-vocab,.hal-sefer-status{display:none!important}.hal-sefer-layout{display:block}.hal-sefer-picture{max-width:100%}.hal-sefer-study{box-shadow:none;break-inside:avoid}}
