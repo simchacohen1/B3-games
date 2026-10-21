@@ -300,13 +300,23 @@
       if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
       var sdk=String(window.firebase.SDK_VERSION||"12.15.0"),major=parseInt(sdk,10)||12,suffix=major>=9?"-compat.js":".js";
       var base="https://www.gstatic.com/firebasejs/"+sdk+"/firebase-";
-      if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
-      if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
-      if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      // Speed: auth, database and config do not depend on each other, so
+      // download them together instead of one after another.
+      await Promise.all([
+        window.firebase.auth ? null : loadAuthScript(base+"auth"+suffix),
+        window.firebase.database ? null : loadAuthScript(base+"database"+suffix),
+        window.B3_FIREBASE_CONFIG ? null : loadAuthScript(new URL("firebase-config.js",rootBase).href)
+      ]);
       if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-      if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      // site-settings.js (~70 KB) is only needed for the teacher callback below.
+      // Download it while Firebase restores the saved session, and release the
+      // student's protected reads as soon as auth state is known.
+      var siteSettingsReady = window.B3SiteSettings ? Promise.resolve() :
+        loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      siteSettingsReady.catch(function(){});
       await waitForFirebaseAuthState(window.firebase.auth());
       markAuthReady();
+      await siteSettingsReady;
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
         markAuthReady();
         teacherCheckPending=false;
@@ -401,10 +411,34 @@
     }).catch(error=>console.warn("Follow Teacher not available",error));
   }
 
+  // Permission-critical class fields for one class and this student's own
+  // member record. Never the whole class node.
+  function fetchStudentClassFields(classId,studentId) {
+    var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(classId);
+    return Promise.all([
+      fetchJson(classPath+"/active.json"),
+      fetchJson(classPath+"/siteEnabled.json"),
+      fetchJson(classPath+"/access.json"),
+      fetchJson(classPath+"/toolGrants.json"),
+      fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
+    ]);
+  }
+  function verifiedClassKey(studentId){return "b3Games_gateVerifiedClass_"+studentId;}
+  function readVerifiedClass(studentId){try{return sessionStorage.getItem(verifiedClassKey(studentId))||"";}catch(e){return "";}}
+  function writeVerifiedClass(studentId,classId){try{if(classId)sessionStorage.setItem(verifiedClassKey(studentId),classId);else sessionStorage.removeItem(verifiedClassKey(studentId));}catch(e){}}
+
   async function resolveStudentClass() {
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
     if(!studentId)return "";
+    // Speed: the class verified on the previous check/page is almost always
+    // still right, so read its fields at the same time as the profile and
+    // memberships (one round of requests instead of two). These early results
+    // are used ONLY if the fresh membership check below confirms the same
+    // class; otherwise they are discarded and the real class is read.
+    var guessedClass=readVerifiedClass(studentId);
+    var guessedFields=guessedClass?fetchStudentClassFields(guessedClass,studentId):null;
+    if(guessedFields)guessedFields.catch(function(){});
     var rows=await Promise.all([
       fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
       fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
@@ -418,22 +452,17 @@
       var legacy=await fetchJson(DATABASE_URL+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
       if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
-    if(!studentClassId)return "";
-    var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    if(!studentClassId){writeVerifiedClass(studentId,"");return "";}
     // The display name is not used to authorize tool access. Avoid a
     // redundant, occasionally slow Firebase read on every gate refresh.
     // Keep every permission-critical field and the student membership check.
-    var classFields=await Promise.all([
-      fetchJson(classPath+"/active.json"),
-      fetchJson(classPath+"/siteEnabled.json"),
-      fetchJson(classPath+"/access.json"),
-      fetchJson(classPath+"/toolGrants.json"),
-      fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
-    ]);
+    var classFields=await (guessedFields&&guessedClass===studentClassId
+      ? guessedFields : fetchStudentClassFields(studentClassId,studentId));
     var member=classFields[4];
     assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
-    if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
+    if(assignedClass.active===false||!member||member.active===false){studentClassId="";writeVerifiedClass(studentId,"");return "";}
+    writeVerifiedClass(studentId,studentClassId);
     studentActive=true;
     // Follow Teacher is an optional, class-scoped navigation listener.
     // It starts only after the shared gate has resolved an active student.
@@ -651,25 +680,34 @@
     followActivityOpen = false;
 
     Promise.resolve().then(async function () {
-      if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
-      if(storedTeacherBypass())return;
-      if(verifiedTeacherAccess?.authorized){
-        var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
-        var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
-          active:await fetchJson(teacherClassPath+"/active.json"),
-          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
-          access:await fetchJson(teacherClassPath+"/access.json"),
-          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
-        }:null;
-        return;
-      }
-      await resolveStudentClass();
-      // Optional navigation must not block verification of tool permissions.
-      if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
-      followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
-    }).then(function () {
-      return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
+      // Speed: the site settings, the tool-policy script and the student/teacher
+      // access reads are independent. Start them together and decide only when
+      // ALL of them have finished (any failure still fails closed below).
+      var settingsReady=fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
+      var policyReady=window.B3StudentTools?null:loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
+      var accessReady=(async function(){
+        if(storedTeacherBypass())return;
+        if(verifiedTeacherAccess?.authorized){
+          var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
+          var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
+          if(!(verifiedTeacherAccess.classIds||[]).includes(selected)){teacherClassRecord=null;return;}
+          var t=await Promise.all([
+            fetchJson(teacherClassPath+"/active.json"),
+            fetchJson(teacherClassPath+"/siteEnabled.json"),
+            fetchJson(teacherClassPath+"/access.json"),
+            fetchJson(teacherClassPath+"/toolGrants.json")
+          ]);
+          teacherClassRecord={active:t[0],siteEnabled:t[1],access:t[2],toolGrants:t[3]};
+          return;
+        }
+        await resolveStudentClass();
+        // Optional navigation must not block verification of tool permissions.
+        if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
+        followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
+      })();
+      settingsReady.catch(function(){});accessReady.catch(function(){});
+      var done=await Promise.all([settingsReady,policyReady,accessReady]);
+      return done[0];
     }).then(function (settings) {
       // When teacher auth finishes during a student-first check, ignore that
       // stale decision; the queued pass will load the teacher's class record.
