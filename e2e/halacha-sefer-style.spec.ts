@@ -48,11 +48,12 @@ test('matching Hebrew and English words gives correct and incorrect feedback',as
   await page.locator('#a .hal-sefer-hebrew button').filter({hasText:'אֱמוּנָה'}).click();
   await expect(page.locator('#a .hal-sefer-feedback')).toContainText('Correct');
 });
-test('teacher view is read-only; no coloring writes',async ({page})=>{
+test('teacher view colors temporarily without account writes',async ({page})=>{
   await fixture(page,true);
   await page.locator('#a [data-color-part="left-page"]').evaluate((n:Element)=>n.dispatchEvent(new MouseEvent('click',{bubbles:true})));
-  await expect(page.locator('#a [data-color-part="left-page"]')).toHaveAttribute('fill','#ffffff');
+  await expect(page.locator('#a [data-color-part="left-page"]')).toHaveAttribute('fill','#fdd835');
   expect(await page.evaluate(()=>(window as any).__saves)).toBe(0);
+  expect(await page.evaluate(()=>(window as any).S.halacha_sefer_color_a)).toBeUndefined();
 });
 test('cloud state change triggers fresh picture panels with saved colors',async ({page})=>{
   await fixture(page);
