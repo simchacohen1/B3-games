@@ -41,3 +41,15 @@ test('student rewards uses Firebase custom token authentication', () => {
   const code = read('student-rewards/student.js');
   assert.match(code, /signInWithCustomToken\(j\.customToken\)/);
 });
+
+test('teacher class access reads run concurrently and retain all four checks', () => {
+  const code = read('game-gate.js');
+  const start = code.indexOf('var teacherFields=await Promise.all([');
+  const end = code.indexOf(']);', start);
+  assert.ok(start >= 0 && end > start, 'teacher reads must use Promise.all');
+  const block = code.slice(start, end);
+  for (const field of ['active', 'siteEnabled', 'access', 'toolGrants']) {
+    assert.ok(block.includes('"/' + field + '.json"'), field + ' access read missing');
+  }
+  assert.match(code, /teacherClassRecord=null;/);
+});
