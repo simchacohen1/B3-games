@@ -1464,14 +1464,16 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       return;
     }
 
-    // Homepage access is independent of the retired website/class-wide locks.
-    // Activity grants and ET/WT per-tool switches remain authoritative.
+    // Homepage remains available. The normal ET/WT class schedule still
+    // locks all activities by default, with existing tool/student exceptions.
+    const schedule=settingsApi.describeClassAccess({...currentSettings,siteEnabled:true},myClassId,new Date());
     let visible=0;
     gameDefinitions.forEach(game=>{
       const globallyActive=currentSettings.games?.[game.id]!==false;
       const classOpen=currentSettings.classGames?.[myClassId]?.[game.id]!==false;
       const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&globallyActive;
-      const closed=show&&!classOpen;
+      const exceptionAllowed=studentHasOverride(game.id)||classHasLockedGameOverride(game.id,myClassId);
+      const closed=show&&(!classOpen||(!schedule.open&&!exceptionAllowed));
       game.element.classList.toggle("hidden",!show);
       game.element.classList.toggle("activity-closed",closed);
       let badge=game.element.querySelector(".activity-closed-badge");
@@ -1484,7 +1486,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(show)visible++;
     });
     updateGameGroupVisibility();
-    el("studentClassLabel").textContent=classLabels[myClassId]+" · individual activity access";
+    el("studentClassLabel").textContent=classLabels[myClassId]+(schedule.open?" · activities follow your class schedule":" · tools locked on your class schedule");
     el("lockedCard").classList.add("hidden");
     el("gamesArea").classList.remove("hidden");
     el("specialAccessNote")?.classList.add("hidden");
