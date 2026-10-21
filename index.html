@@ -872,16 +872,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function closeVersionModal(){el("versionModal")?.classList.add("hidden");}
   function openVersionModal(game){
     const teacherHref=teacherVersionByGame[game.id];
-    const studentHref=game.element.getAttribute("href");
-    if(!teacherHref||!studentHref)return false;
-    // Restore both choices for teachers. The Student Version uses the
-    // normal student page and its existing authorization safeguards.
-    const studentLink=el("versionStudentLink");
-    const teacherLink=el("versionTeacherLink");
-    studentLink.href=studentHref;
-    teacherLink.href=teacherHref;
-    el("versionModalTitle").textContent="Open "+(game.element.querySelector(".card-title")?.textContent||"activity");
-    el("versionModal").classList.remove("hidden");
+    if(!teacherHref)return false;
+    // Open directly in the teacher tool. site-settings.js provides the
+    // persistent Teacher version / Student version navigation inside it.
+    window.location.assign(teacherHref);
     return true;
   }
 
