@@ -10,7 +10,8 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
   await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
   await page.goto('https://pointer-offline.test/activity');
   await page.evaluate(()=>{
-    Object.defineProperty(document.body, 'append', {value: undefined, configurable: true}); // Avoid loading unmocked student whiteboard dependencies.\n    const room='class-pointer-12345678-1234-1234-1234-123456789abc';
+    Object.defineProperty(document.body, 'append', {value: undefined, configurable: true}); // Avoid loading unmocked student whiteboard dependencies.
+    const room='class-pointer-12345678-1234-1234-1234-123456789abc';
     (window as any).__room=room;
     sessionStorage.setItem('b3Games_studentId','synthetic-student');
     sessionStorage.setItem('b3Games_classPin','synthetic-pin');
