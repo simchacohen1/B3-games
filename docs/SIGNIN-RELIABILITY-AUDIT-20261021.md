@@ -33,3 +33,19 @@ One reliable homepage sign-in, reuse the authenticated identity across tools, no
 
 ## Immediate next steps
 Inspect the full login functions in `index.html`, `site-settings.js`, `game-gate.js`, `halacha/index.html`, and `student-rewards/student.js`; add synthetic test coverage and baseline timing measurements before modifying authentication.
+
+## Detailed findings — second pass
+- `site-settings.js:944-974`: Google login uses a separate LOCAL-persistence Firebase auth instance and copies the user into the SESSION-persistence instance. This is deliberate isolation between remembered teacher and student tabs; removing it without replacement would be unsafe.
+- `site-settings.js:1048-1100`: each `onAuthStateChanged` subscription can invoke `readUserAccess(user)` and the admin callback can also run workspace mirroring/migration. Measure the frequency of these operations before deciding whether to deduplicate.
+- `index.html:1565-1589`: the homepage already reuses the initial student login token when supplied; do not reintroduce an unnecessary second token request.
+- `halacha/index.html:782-820`: Halacha checks the existing Firebase identity first, but requests a fresh `halachaToken` and signs in when missing/mismatched, with a fallback to `studentRewardsLogin` for older deployments. Test whether this fallback is still required before removing it.
+- `game-gate.js:401-440`: the class lookup is two sequential groups of protected reads (profile/membership, then five class properties). The individual calls in each group are parallel; a single slow call can delay the whole group.
+- Existing teacher preview and student impersonation are distinct identity flows and must remain separate.
+
+## Acceptance criteria for first code repair
+- Existing teacher Google session survives refresh, opens teacher tools without a new popup, and never becomes a student session.
+- ET and WT students sign in once and can navigate all assigned tools; no additional passcode prompts.
+- An unassigned student, disabled member, locked tool, and expired credential are denied; network timeouts never authorize.
+- Student A cannot read/write Student B's records; teacher previews do not write student data.
+- Repeated tool opens do not repeat unnecessary sign-in token exchanges.
+- Measured p50/p95 sign-in and tool-open timings improve against a captured baseline; no fabricated speed target.
