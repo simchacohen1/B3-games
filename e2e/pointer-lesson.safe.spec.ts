@@ -7,7 +7,7 @@ const script=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/
 
 test('Pointer: student sees teacher presentation without losing unfinished work',async({page})=>{
   await page.route('**/*',route=>route.abort());
-  await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
+  await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('activity-share.js') ? {contentType:'text/javascript',body:script} : route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
   await page.goto('https://pointer-offline.test/activity');
   await page.evaluate(()=>{
     Object.defineProperty(document.body, 'append', {value: undefined, configurable: true}); // Avoid loading unmocked student whiteboard dependencies.
@@ -51,7 +51,7 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
       peer.emit('call',connection);
     };
   });
-  await page.addScriptTag({content:script});
+  await page.addScriptTag({url:'https://pointer-offline.test/class-pointer-prototype/activity-share.js'});
   await expect.poll(()=>page.evaluate(()=>!!(window as any).__sessionCallback)).toBe(true);
   await page.evaluate(()=>{
     const w:any=window;
