@@ -16,3 +16,5 @@ Games are toggled on/off from the "Admin" button on the homepage (backed by Fire
 Every game/tool now lives in its own folder (mirroring `rashi-letters/`, `record_pesukim/`, `shorashim/`, `game-show/`, `work-timer/`, `class-slides/`, etc.). Only files genuinely shared across pages stay at the repo root: `index.html`, `all-pages.html`, `firebase-config.js`, `firebase-rules.json`, `site-settings.js`, `generate_page_list.py`.
 
 Teacher dashboards, prototypes, and other utilities (Work Timer, class slides, teacher consoles, etc.) aren't linked from the homepage but are all listed automatically at `all-pages.html`, which regenerates itself on every push via `generate_page_list.py` / `.github/workflows/update-page-list.yml`.
+
+<!-- GitHub Pages rebuild requested 2026-10-21 after runner queue cancellation; no application changes. -->
