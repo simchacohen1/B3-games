@@ -138,8 +138,8 @@
     reopen.style.cssText='display:none;position:fixed;left:14px;bottom:14px;z-index:2147483638;padding:12px 18px;border:2px solid white;border-radius:12px;background:#1d4ed8;color:white;font:700 16px system-ui;cursor:pointer';
     // The embedded activity presence view must have its own tools: the retired Pointer page is never opened.
     const drawTools=document.createElement('div');drawTools.id='fttLessonDrawTools';
-    drawTools.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
-    const lessonModes=[['point','☝ Pointer'],['highlight','🖍 Highlight'],['box','▧ Highlight box'],['pen','✎ Pen'],['line','━ Line'],['pen-arrow','➜ Arrow'],['rectangle','▭ Rectangle'],['ellipse','◯ Oval'],['triangle','△ Triangle'],['text','T Text']];
+    drawTools.style.cssText='display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;max-width:100%';
+    const lessonModes=[['point','☝','Pointer'],['highlight','🖍','Highlight'],['box','▧','Highlight box'],['pen','✎','Pen'],['line','━','Line'],['pen-arrow','➜','Arrow'],['rectangle','▭','Rectangle'],['ellipse','◯','Oval'],['triangle','△','Triangle'],['text','T','Text']];
     const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonColor='#57b8ff',lessonSize=.016,lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
     const lessonStage=document.createElement('div');
     lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
@@ -156,28 +156,35 @@
     const allowedMode=mode=>mode==='point'?lessonLevel!=='none':lessonLevel==='pen'||lessonLevel==='highlight'&&['highlight','box'].includes(mode);
     function redrawToolbar(){
       if(!allowedMode(lessonTool))lessonTool=lessonLevel==='none'?'point':lessonLevel==='highlight'?'highlight':lessonLevel==='pen'?'pen':'point';
-      for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool))}
-      viewOnly.hidden=lessonLevel!=='none';undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';colorSelect.disabled=lessonLevel==='none';sizeSelect.disabled=lessonLevel==='none';
+      for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool));button.style.background=mode===lessonTool?'#fef08a':'#193b6c';button.style.color=mode===lessonTool?'#102748':'white';button.style.borderColor=mode===lessonTool?'#facc15':'#86a6df'}
+      viewOnly.hidden=lessonLevel!=='none';undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';for(const button of [...colorButtons,...sizeButtons])button.disabled=lessonLevel==='none';
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
     }
-    for(const [mode,title] of lessonModes){
-      const button=document.createElement('button');button.type='button';button.textContent=title;
-      button.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer;font:700 13px system-ui';
+    for(const [mode,symbol,name] of lessonModes){
+      const button=document.createElement('button');button.type='button';button.textContent=symbol;button.title=name;button.setAttribute('aria-label',name);
+      button.style.cssText='width:48px;height:48px;padding:0;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;font:900 27px system-ui;line-height:1;touch-action:manipulation';
       button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
-    const colorSelect=document.createElement('select');colorSelect.setAttribute('aria-label','Drawing color');colorSelect.title='Drawing color';
-    for(const [color,name] of [['#57b8ff','Sky blue'],['#ffcc00','Yellow'],['#ff7979','Coral'],['#75df9a','Green'],['#dca0ff','Purple'],['#ffa65c','Orange'],['#7ce4dc','Teal'],['#1f2937','Black'],['#1d4ed8','Blue ink']]){const o=document.createElement('option');o.value=color;o.textContent=name;colorSelect.append(o)}
-    colorSelect.value=lessonColor;
-    const sizeSelect=document.createElement('select');sizeSelect.setAttribute('aria-label','Drawing size');sizeSelect.title='Drawing size';
-    for(const [size,name] of [[.008,'Fine'],[.016,'Medium'],[.028,'Bold']]){const o=document.createElement('option');o.value=String(size);o.textContent=name;sizeSelect.append(o)}
-    sizeSelect.value=String(lessonSize);
-    for(const sel of [colorSelect,sizeSelect])sel.style.cssText='padding:7px;border:1px solid #86a6df;border-radius:8px;background:#193b6c;color:white;font:700 13px system-ui';
-    colorSelect.addEventListener('change',()=>{lessonColor=colorSelect.value});sizeSelect.addEventListener('change',()=>{lessonSize=Number(sizeSelect.value)});
-    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽 Clear mine';clear.title='Clear only my own drawings';clear.style.cssText=undo.style.cssText;
+    const colors=[['#57b8ff','Sky blue'],['#ffcc00','Yellow'],['#ff7979','Coral'],['#75df9a','Green'],['#dca0ff','Purple'],['#ffa65c','Orange'],['#7ce4dc','Teal'],['#1f2937','Black'],['#1d4ed8','Blue ink']];
+    const colorSelect=document.createElement('div');colorSelect.setAttribute('role','group');colorSelect.setAttribute('aria-label','Choose drawing color');
+    colorSelect.style.cssText='display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:center';
+    const colorButtons=[];
+    const selectColor=color=>{lessonColor=color;for(const b of colorButtons){const on=b.dataset.color===color;b.setAttribute('aria-pressed',String(on));b.style.border=on?'4px solid #fff':'3px solid #55739c';b.style.outline=on?'3px solid #facc15':'none';b.style.transform=on?'scale(1.09)':'none'}};
+    for(const [color,name] of colors){const b=document.createElement('button');b.type='button';b.dataset.color=color;b.title=name;b.setAttribute('aria-label',name);b.style.cssText='width:39px;height:39px;border-radius:50%;background:'+color+';cursor:pointer;touch-action:manipulation;flex:none';b.addEventListener('click',()=>selectColor(color));colorButtons.push(b);colorSelect.append(b)}
+    const sizeSelect=document.createElement('div');sizeSelect.setAttribute('role','group');sizeSelect.setAttribute('aria-label','Choose line thickness');sizeSelect.style.cssText='display:flex;gap:6px;align-items:center';
+    const sizeButtons=[];
+    const selectSize=value=>{lessonSize=value;for(const b of sizeButtons){const on=Number(b.dataset.size)===value;b.setAttribute('aria-pressed',String(on));b.style.background=on?'#fef08a':'#193b6c';b.style.borderColor=on?'#facc15':'#86a6df'}};
+    for(const [size,name,thickness] of [[.008,'Thin',2],[.016,'Medium',5],[.028,'Thick',9]]){const b=document.createElement('button');b.type='button';b.dataset.size=String(size);b.title=name;b.setAttribute('aria-label',name+' line');b.style.cssText='width:47px;height:47px;display:flex;align-items:center;justify-content:center;border:3px solid #86a6df;border-radius:11px;background:#193b6c;cursor:pointer;touch-action:manipulation';const line=document.createElement('span');line.style.cssText='width:28px;height:'+thickness+'px;border-radius:10px;background:#fff';b.append(line);b.addEventListener('click',()=>selectSize(size));sizeButtons.push(b);sizeSelect.append(b)}
+    undo.textContent='↶';undo.title='Undo my last drawing';undo.setAttribute('aria-label','Undo my last drawing');
+    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽';clear.title='Clear only my drawings';clear.setAttribute('aria-label','Clear only my drawings');
+    for(const b of [undo,clear])b.style.cssText='width:47px;height:47px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:900 26px system-ui;cursor:pointer;touch-action:manipulation';
     clear.addEventListener('click',()=>{if(admitted&&lessonActive&&presenceConn?.open&&lessonLevel!=='none')presenceConn.send({type:'edit-highlights',action:'clear'})});
-    drawTools.append(colorSelect,sizeSelect,undo,clear,viewOnly);
-    const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
+    const bottomRow=document.createElement('div');bottomRow.style.cssText='display:flex;gap:8px;align-items:center;justify-content:center';
+    bottomRow.append(sizeSelect,undo,clear);
+    drawTools.append(colorSelect,bottomRow,viewOnly);
+    selectColor(lessonColor);selectSize(lessonSize);
+        const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
     function picture(){
       const rect=typeof lessonStage.getBoundingClientRect==='function'?lessonStage.getBoundingClientRect():{width:0,height:0},width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
       if(!width||!height||!rect.width||!rect.height)return{left:0,top:0,width:rect.width,height:rect.height};
