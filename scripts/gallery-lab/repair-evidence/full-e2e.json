@@ -1,0 +1,415 @@
+{
+  "project": "demo-gallery-lab",
+  "results": [
+    {
+      "step": 1,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SF5UYqum5zfxKRO8N",
+        "screenshot": "et-pin-pending.png"
+      }
+    },
+    {
+      "step": 2,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SF7C-bt6G_-Sc9TO0",
+        "screenshot": "et-add-sent.png"
+      }
+    },
+    {
+      "step": 3,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "queueCount": 2,
+        "screenshot": "et-teacher-queue.png"
+      }
+    },
+    {
+      "step": 4,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "approvedIds": [
+          "-P4SF5UYqum5zfxKRO8N",
+          "-P4SF7C-bt6G_-Sc9TO0"
+        ],
+        "screenshot": "et-teacher-approved.png"
+      }
+    },
+    {
+      "step": 5,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "studentGallery",
+          "activeStudentName": "Gallery Synthetic ET",
+          "posts": [
+            {
+              "id": "-P4SF5UYqum5zfxKRO8N",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SF7C-bt6G_-Sc9TO0",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SF7C-bt6G_-Sc9TO0",
+            "-P4SF5UYqum5zfxKRO8N"
+          ]
+        },
+        "screenshot": "et-personal-gallery.png"
+      }
+    },
+    {
+      "step": 6,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SF5UYqum5zfxKRO8N",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SF7C-bt6G_-Sc9TO0",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SF7C-bt6G_-Sc9TO0",
+            "-P4SF5UYqum5zfxKRO8N"
+          ]
+        },
+        "images": [
+          {
+            "complete": true,
+            "width": 1150
+          },
+          {
+            "complete": true,
+            "width": 1
+          }
+        ],
+        "screenshot": "et-hallway-posts.png"
+      }
+    },
+    {
+      "step": 7,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "afterRefresh": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SF5UYqum5zfxKRO8N",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SF7C-bt6G_-Sc9TO0",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SF7C-bt6G_-Sc9TO0",
+            "-P4SF5UYqum5zfxKRO8N"
+          ]
+        },
+        "afterReopen": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SF5UYqum5zfxKRO8N",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SF7C-bt6G_-Sc9TO0",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SF7C-bt6G_-Sc9TO0",
+            "-P4SF5UYqum5zfxKRO8N"
+          ]
+        },
+        "screenshot": "et-reopened.png"
+      }
+    },
+    {
+      "step": 1,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SFi4rW_6MlSsSw1cS",
+        "screenshot": "wt-pin-pending.png"
+      }
+    },
+    {
+      "step": 2,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SFjBNnNWKF8CiQUsr",
+        "screenshot": "wt-add-sent.png"
+      }
+    },
+    {
+      "step": 3,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "queueCount": 2,
+        "screenshot": "wt-teacher-queue.png"
+      }
+    },
+    {
+      "step": 4,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "approvedIds": [
+          "-P4SFi4rW_6MlSsSw1cS",
+          "-P4SFjBNnNWKF8CiQUsr"
+        ],
+        "screenshot": "wt-teacher-approved.png"
+      }
+    },
+    {
+      "step": 5,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "studentGallery",
+          "activeStudentName": "Gallery Synthetic WT",
+          "posts": [
+            {
+              "id": "-P4SFi4rW_6MlSsSw1cS",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SFjBNnNWKF8CiQUsr",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SFjBNnNWKF8CiQUsr",
+            "-P4SFi4rW_6MlSsSw1cS"
+          ]
+        },
+        "screenshot": "wt-personal-gallery.png"
+      }
+    },
+    {
+      "step": 6,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SFi4rW_6MlSsSw1cS",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SFjBNnNWKF8CiQUsr",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SFjBNnNWKF8CiQUsr",
+            "-P4SFi4rW_6MlSsSw1cS"
+          ]
+        },
+        "images": [
+          {
+            "complete": true,
+            "width": 1150
+          },
+          {
+            "complete": true,
+            "width": 1
+          }
+        ],
+        "screenshot": "wt-hallway-posts.png"
+      }
+    },
+    {
+      "step": 7,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "afterRefresh": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SFi4rW_6MlSsSw1cS",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SFjBNnNWKF8CiQUsr",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SFjBNnNWKF8CiQUsr",
+            "-P4SFi4rW_6MlSsSw1cS"
+          ]
+        },
+        "afterReopen": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SFi4rW_6MlSsSw1cS",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SFjBNnNWKF8CiQUsr",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SFjBNnNWKF8CiQUsr",
+            "-P4SFi4rW_6MlSsSw1cS"
+          ]
+        },
+        "screenshot": "wt-reopened.png"
+      }
+    },
+    {
+      "step": 8,
+      "class": "ET+WT",
+      "result": "PASS",
+      "evidence": {
+        "et": {
+          "ownIds": [
+            "-P4SF5UYqum5zfxKRO8N",
+            "-P4SF7C-bt6G_-Sc9TO0"
+          ],
+          "foreignStudentStatus": 403,
+          "foreignTeacherStatus": 403
+        },
+        "wt": {
+          "ownIds": [
+            "-P4SFi4rW_6MlSsSw1cS",
+            "-P4SFjBNnNWKF8CiQUsr"
+          ],
+          "foreignStudentStatus": 403,
+          "foreignTeacherStatus": 403
+        }
+      }
+    }
+  ],
+  "created": {
+    "et": [
+      "-P4SF5UYqum5zfxKRO8N",
+      "-P4SF7C-bt6G_-Sc9TO0"
+    ],
+    "wt": [
+      "-P4SFi4rW_6MlSsSw1cS",
+      "-P4SFjBNnNWKF8CiQUsr"
+    ]
+  },
+  "errors": [
+    {
+      "label": "guard",
+      "message": "Refused to connect to 'https://b3-games-default-rtdb.firebaseio.com/.json' because it violates the following Content Security Policy directive: \"connect-src 'self' http://127.0.0.1:9299 http://127.0.0.1:9200 http://127.0.0.1:9399 ws://127.0.0.1:9200\".\n"
+    },
+    {
+      "label": "guard",
+      "message": "Fetch API cannot load https://b3-games-default-rtdb.firebaseio.com/.json. Refused to connect because it violates the document's Content Security Policy."
+    },
+    {
+      "label": "teacher-et",
+      "message": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "label": "teacher-wt",
+      "message": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    }
+  ],
+  "blocked": [],
+  "isolation": {
+    "nonlocalBrowserRequests": 0
+  },
+  "browserRequestCount": 692
+}

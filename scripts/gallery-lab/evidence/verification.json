@@ -1,0 +1,447 @@
+{
+  "date": "2026-10-21",
+  "environment": "local Firebase Auth/Database/Storage emulators only",
+  "baseCommit": "87d1ae55bafa4d623c733fe58cd5447a62342bd7",
+  "results": [
+    {
+      "step": 1,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SA6iwlfDyK7WvHEGh",
+        "screenshot": "et-pin-pending.png"
+      }
+    },
+    {
+      "step": 2,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SA8FOdD_yoM0DW77X",
+        "screenshot": "et-add-sent.png"
+      }
+    },
+    {
+      "step": 3,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "queueCount": 2,
+        "screenshot": "et-teacher-queue.png"
+      }
+    },
+    {
+      "step": 4,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "approvedIds": [
+          "-P4SA6iwlfDyK7WvHEGh",
+          "-P4SA8FOdD_yoM0DW77X"
+        ],
+        "screenshot": "et-teacher-approved.png"
+      }
+    },
+    {
+      "step": 5,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "studentGallery",
+          "activeStudentName": "Gallery Synthetic ET",
+          "posts": [
+            {
+              "id": "-P4SA6iwlfDyK7WvHEGh",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SA8FOdD_yoM0DW77X",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SA8FOdD_yoM0DW77X",
+            "-P4SA6iwlfDyK7WvHEGh"
+          ]
+        },
+        "screenshot": "et-personal-gallery.png"
+      }
+    },
+    {
+      "step": 6,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SA6iwlfDyK7WvHEGh",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SA8FOdD_yoM0DW77X",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SA8FOdD_yoM0DW77X",
+            "-P4SA6iwlfDyK7WvHEGh"
+          ]
+        },
+        "images": [
+          {
+            "complete": true,
+            "width": 1150
+          },
+          {
+            "complete": true,
+            "width": 1
+          }
+        ],
+        "screenshot": "et-hallway-posts.png"
+      }
+    },
+    {
+      "step": 7,
+      "class": "et",
+      "result": "PASS",
+      "evidence": {
+        "afterRefresh": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SA6iwlfDyK7WvHEGh",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SA8FOdD_yoM0DW77X",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SA8FOdD_yoM0DW77X",
+            "-P4SA6iwlfDyK7WvHEGh"
+          ]
+        },
+        "afterReopen": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SA6iwlfDyK7WvHEGh",
+              "title": "LAB ET Pin Work",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SA8FOdD_yoM0DW77X",
+              "title": "LAB ET Add to Gallery",
+              "status": "approved",
+              "classId": "et",
+              "studentName": "Gallery Synthetic ET",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SA8FOdD_yoM0DW77X",
+            "-P4SA6iwlfDyK7WvHEGh"
+          ]
+        },
+        "screenshot": "et-reopened.png"
+      }
+    },
+    {
+      "step": 1,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SAggHhRyrfkX-tTX3",
+        "screenshot": "wt-pin-pending.png"
+      }
+    },
+    {
+      "step": 2,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "postId": "-P4SAhv_G9Qvvr2INA_u",
+        "screenshot": "wt-add-sent.png"
+      }
+    },
+    {
+      "step": 3,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "queueCount": 2,
+        "screenshot": "wt-teacher-queue.png"
+      }
+    },
+    {
+      "step": 4,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "approvedIds": [
+          "-P4SAggHhRyrfkX-tTX3",
+          "-P4SAhv_G9Qvvr2INA_u"
+        ],
+        "screenshot": "wt-teacher-approved.png"
+      }
+    },
+    {
+      "step": 5,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "studentGallery",
+          "activeStudentName": "Gallery Synthetic WT",
+          "posts": [
+            {
+              "id": "-P4SAggHhRyrfkX-tTX3",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SAhv_G9Qvvr2INA_u",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SAhv_G9Qvvr2INA_u",
+            "-P4SAggHhRyrfkX-tTX3"
+          ]
+        },
+        "screenshot": "wt-personal-gallery.png"
+      }
+    },
+    {
+      "step": 6,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "state": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SAggHhRyrfkX-tTX3",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SAhv_G9Qvvr2INA_u",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SAhv_G9Qvvr2INA_u",
+            "-P4SAggHhRyrfkX-tTX3"
+          ]
+        },
+        "images": [
+          {
+            "complete": true,
+            "width": 1150
+          },
+          {
+            "complete": true,
+            "width": 1
+          }
+        ],
+        "screenshot": "wt-hallway-posts.png"
+      }
+    },
+    {
+      "step": 7,
+      "class": "wt",
+      "result": "PASS",
+      "evidence": {
+        "afterRefresh": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SAggHhRyrfkX-tTX3",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SAhv_G9Qvvr2INA_u",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SAhv_G9Qvvr2INA_u",
+            "-P4SAggHhRyrfkX-tTX3"
+          ]
+        },
+        "afterReopen": {
+          "sceneMode": "hallway",
+          "activeStudentName": null,
+          "posts": [
+            {
+              "id": "-P4SAggHhRyrfkX-tTX3",
+              "title": "LAB WT Pin Work",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            },
+            {
+              "id": "-P4SAhv_G9Qvvr2INA_u",
+              "title": "LAB WT Add to Gallery",
+              "status": "approved",
+              "classId": "wt",
+              "studentName": "Gallery Synthetic WT",
+              "hasImage": true
+            }
+          ],
+          "meshes": [
+            "-P4SAhv_G9Qvvr2INA_u",
+            "-P4SAggHhRyrfkX-tTX3"
+          ]
+        },
+        "screenshot": "wt-reopened.png"
+      }
+    },
+    {
+      "step": 8,
+      "class": "ET+WT",
+      "result": "PASS",
+      "evidence": {
+        "et": {
+          "ownIds": [
+            "-P4SA6iwlfDyK7WvHEGh",
+            "-P4SA8FOdD_yoM0DW77X"
+          ],
+          "foreignStudentStatus": 403,
+          "foreignTeacherStatus": 403
+        },
+        "wt": {
+          "ownIds": [
+            "-P4SAggHhRyrfkX-tTX3",
+            "-P4SAhv_G9Qvvr2INA_u"
+          ],
+          "foreignStudentStatus": 403,
+          "foreignTeacherStatus": 403
+        }
+      }
+    }
+  ],
+  "mediaAdapterSmoke": {
+    "result": "PASS",
+    "ownMediaStatus": 200,
+    "localDownloadBytes": 35,
+    "crossClassStatus": 403
+  },
+  "network": {
+    "recordedBrowserRequests": 692,
+    "nonlocalBrowserRequests": 0,
+    "blockedBrowserRequests": [],
+    "consoleMessages": [
+      {
+        "label": "guard",
+        "message": "Refused to connect to 'https://b3-games-default-rtdb.firebaseio.com/.json' because it violates the following Content Security Policy directive: \"connect-src 'self' http://127.0.0.1:9299 http://127.0.0.1:9200 http://127.0.0.1:9399 ws://127.0.0.1:9200\".\n"
+      },
+      {
+        "label": "guard",
+        "message": "Fetch API cannot load https://b3-games-default-rtdb.firebaseio.com/.json. Refused to connect because it violates the document's Content Security Policy."
+      },
+      {
+        "label": "teacher-et",
+        "message": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      },
+      {
+        "label": "teacher-et",
+        "message": "THREE.WebGLState: SecurityError: Failed to execute 'texSubImage2D' on 'WebGL2RenderingContext': Tainted canvases may not be loaded.\n    at Object.texSubImage2D (http://127.0.0.1:8887/_three.js:7:374190)\n    at J (http://127.0.0.1:8887/_three.js:7:387929)\n    at Xa.w [as setTexture2D] (http://127.0.0.1:8887/_three.js:7:380642)\n    at ea.Is [as setValue] (http://127.0.0.1:8887/_three.js:7:318212)\n    at oa.upload (http://127.0.0.1:8887/_three.js:7:322477)\n    at http://127.0.0.1:8887/_three.js:7:436490\n    at to.renderBufferDirect (http://127.0.0.1:8887/_three.js:7:437075)\n    at $t (http://127.0.0.1:8887/_three.js:7:442088)\n    at Kt (http://127.0.0.1:8887/_three.js:7:441677)\n    at Jt (http://127.0.0.1:8887/_three.js:7:441318)"
+      },
+      {
+        "label": "student-et",
+        "message": "THREE.WebGLState: SecurityError: Failed to execute 'texSubImage2D' on 'WebGL2RenderingContext': Tainted canvases may not be loaded.\n    at Object.texSubImage2D (http://127.0.0.1:8887/_three.js:7:374190)\n    at J (http://127.0.0.1:8887/_three.js:7:387929)\n    at Xa.w [as setTexture2D] (http://127.0.0.1:8887/_three.js:7:380642)\n    at ea.Is [as setValue] (http://127.0.0.1:8887/_three.js:7:318212)\n    at oa.upload (http://127.0.0.1:8887/_three.js:7:322477)\n    at http://127.0.0.1:8887/_three.js:7:436490\n    at to.renderBufferDirect (http://127.0.0.1:8887/_three.js:7:437075)\n    at $t (http://127.0.0.1:8887/_three.js:7:442088)\n    at Kt (http://127.0.0.1:8887/_three.js:7:441677)\n    at Jt (http://127.0.0.1:8887/_three.js:7:441318)"
+      },
+      {
+        "label": "teacher-wt",
+        "message": "Gallery read failed: TypeError: Failed to fetch\n    at loadScopedPosts (http://127.0.0.1:8887/class-gallery/index.html?class=wt:2092:23)"
+      },
+      {
+        "label": "teacher-wt",
+        "message": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      },
+      {
+        "label": "teacher-wt",
+        "message": "THREE.WebGLState: SecurityError: Failed to execute 'texSubImage2D' on 'WebGL2RenderingContext': Tainted canvases may not be loaded.\n    at Object.texSubImage2D (http://127.0.0.1:8887/_three.js:7:374190)\n    at J (http://127.0.0.1:8887/_three.js:7:387929)\n    at Xa.w [as setTexture2D] (http://127.0.0.1:8887/_three.js:7:380642)\n    at ea.Is [as setValue] (http://127.0.0.1:8887/_three.js:7:318212)\n    at oa.upload (http://127.0.0.1:8887/_three.js:7:322477)\n    at http://127.0.0.1:8887/_three.js:7:436490\n    at to.renderBufferDirect (http://127.0.0.1:8887/_three.js:7:437075)\n    at $t (http://127.0.0.1:8887/_three.js:7:442088)\n    at Kt (http://127.0.0.1:8887/_three.js:7:441677)\n    at Jt (http://127.0.0.1:8887/_three.js:7:441318)"
+      },
+      {
+        "label": "student-wt",
+        "message": "THREE.WebGLState: SecurityError: Failed to execute 'texSubImage2D' on 'WebGL2RenderingContext': Tainted canvases may not be loaded.\n    at Object.texSubImage2D (http://127.0.0.1:8887/_three.js:7:374190)\n    at J (http://127.0.0.1:8887/_three.js:7:387929)\n    at Xa.w [as setTexture2D] (http://127.0.0.1:8887/_three.js:7:380642)\n    at ea.Is [as setValue] (http://127.0.0.1:8887/_three.js:7:318212)\n    at oa.upload (http://127.0.0.1:8887/_three.js:7:322477)\n    at http://127.0.0.1:8887/_three.js:7:436490\n    at to.renderBufferDirect (http://127.0.0.1:8887/_three.js:7:437075)\n    at $t (http://127.0.0.1:8887/_three.js:7:442088)\n    at Kt (http://127.0.0.1:8887/_three.js:7:441677)\n    at Jt (http://127.0.0.1:8887/_three.js:7:441318)"
+      },
+      {
+        "label": "reopened-wt",
+        "message": "THREE.WebGLState: SecurityError: Failed to execute 'texSubImage2D' on 'WebGL2RenderingContext': Tainted canvases may not be loaded.\n    at Object.texSubImage2D (http://127.0.0.1:8887/_three.js:7:374190)\n    at J (http://127.0.0.1:8887/_three.js:7:387929)\n    at Xa.w [as setTexture2D] (http://127.0.0.1:8887/_three.js:7:380642)\n    at ea.Is [as setValue] (http://127.0.0.1:8887/_three.js:7:318212)\n    at oa.upload (http://127.0.0.1:8887/_three.js:7:322477)\n    at http://127.0.0.1:8887/_three.js:7:436490\n    at to.renderBufferDirect (http://127.0.0.1:8887/_three.js:7:437075)\n    at $t (http://127.0.0.1:8887/_three.js:7:442088)\n    at Kt (http://127.0.0.1:8887/_three.js:7:441677)\n    at Jt (http://127.0.0.1:8887/_three.js:7:441318)"
+      }
+    ]
+  },
+  "unchangedApplicationSHA256": {
+    "class-gallery/index.html": "2b956f017b3a9a9c3cbf1dcafaaf9e30d0fa2aff436539cdb161f64f16a571ab",
+    "gallery-share.js": "9857900e69bbce55957668ffdd0807d0ee60e15ef55a5ac945118f31643b4976",
+    "backend/functions/student-auth.js": "374bb7a6639a9de1cdcde68c19f7cb430535c56934d6c03d7b642be608c40be7",
+    "backend/functions/class-gallery-read.js": "cacd4000e4f570b564f8a60c72895b7168e55dcc0edb87704c83e25b1e6038b3",
+    "backend/functions/class-gallery-submit.js": "81214b47cdf1536fe02f6d3968c2701d0402bef645cf364dcb11cf985fbd0515",
+    "backend/functions/private-media-url.js": "2c1bbbcd43fe1aafc53b9865a127c498934137f178d789fb2bed53f80a5bc642",
+    "firebase-rules.hardened.json": "0efb36132aeebf2a0090f17fd6e949c61153393584de68d8701a0fd4c2351d13",
+    "storage-rules.hardened.rules": "3d1151b52e3a96ce6d8e229f71d1385c2eb0c39676cdfb3e96846d84df0b602d"
+  }
+}

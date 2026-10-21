@@ -1,0 +1,48 @@
+[
+  {
+    "method": "OPTIONS",
+    "origin": "https://funtorahtools.com",
+    "status": 200,
+    "headers": {
+      "access-control-allow-methods": "POST, GET, HEAD, DELETE, PATCH",
+      "access-control-allow-headers": "Authorization, Content-Type, Range, X-Firebase-Storage-Version, X-Firebase-Storage-XSRF, X-Firebase-AppCheck, X-Firebase-GMPID, X-Goog-AuthUser, X-Goog-Upload-Command, X-Goog-Upload-Header-Content-Length, X-Goog-Upload-Header-Content-Type, X-Goog-Upload-Protocol",
+      "access-control-max-age": "3600",
+      "access-control-expose-headers": "Content-Range, X-Firebase-Storage-XSRF",
+      "access-control-allow-origin": "*"
+    },
+    "note": "Nonexistent synthetic filename; response body not read."
+  },
+  {
+    "method": "OPTIONS",
+    "origin": "https://www.funtorahtools.com",
+    "status": 200,
+    "headers": {
+      "access-control-allow-methods": "POST, GET, HEAD, DELETE, PATCH",
+      "access-control-allow-headers": "Authorization, Content-Type, Range, X-Firebase-Storage-Version, X-Firebase-Storage-XSRF, X-Firebase-AppCheck, X-Firebase-GMPID, X-Goog-AuthUser, X-Goog-Upload-Command, X-Goog-Upload-Header-Content-Length, X-Goog-Upload-Header-Content-Type, X-Goog-Upload-Protocol",
+      "access-control-max-age": "3600",
+      "access-control-expose-headers": "Content-Range, X-Firebase-Storage-XSRF",
+      "access-control-allow-origin": "*"
+    },
+    "note": "Nonexistent synthetic filename; response body not read."
+  },
+  {
+    "method": "HEAD",
+    "origin": "https://funtorahtools.com",
+    "status": 403,
+    "headers": {
+      "access-control-expose-headers": "Cache-Control, Content-Length, Content-Range, Date, Expires, Server, Transfer-Encoding, X-Firebase-Storage-XSRF, X-GUploader-UploadID, X-Google-Trace",
+      "access-control-allow-origin": "*"
+    },
+    "note": "Nonexistent synthetic filename; response body not read."
+  },
+  {
+    "method": "HEAD",
+    "origin": "https://www.funtorahtools.com",
+    "status": 403,
+    "headers": {
+      "access-control-expose-headers": "Cache-Control, Content-Length, Content-Range, Date, Expires, Server, Transfer-Encoding, X-Firebase-Storage-XSRF, X-GUploader-UploadID, X-Google-Trace",
+      "access-control-allow-origin": "*"
+    },
+    "note": "Nonexistent synthetic filename; response body not read."
+  }
+]

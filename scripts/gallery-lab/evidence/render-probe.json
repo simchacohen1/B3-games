@@ -1,0 +1,94 @@
+[
+  {
+    "class": "et",
+    "phase": "personal",
+    "remotePost": "-P4SBn5UVcktDyiavSf1",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "et",
+    "phase": "hallway",
+    "remotePost": "-P4SBn5UVcktDyiavSf1",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "et",
+    "phase": "refresh",
+    "remotePost": "-P4SBn5UVcktDyiavSf1",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "et",
+    "phase": "reopen",
+    "remotePost": "-P4SBn5UVcktDyiavSf1",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "et",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  },
+  {
+    "class": "wt",
+    "phase": "personal",
+    "remotePost": "-P4SBvzwTp-scopTUPuW",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "wt",
+    "phase": "hallway",
+    "remotePost": "-P4SBvzwTp-scopTUPuW",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "wt",
+    "phase": "refresh",
+    "remotePost": "-P4SBvzwTp-scopTUPuW",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "wt",
+    "phase": "reopen",
+    "remotePost": "-P4SBvzwTp-scopTUPuW",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": false,
+    "inlineOriginClean": true,
+    "result": "FAIL",
+    "error": "Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+  },
+  {
+    "class": "wt",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  }
+]
