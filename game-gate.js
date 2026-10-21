@@ -26,7 +26,7 @@
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 30000;
-  var FETCH_TIMEOUT_MS = 4500;
+  // Bound slow Firebase reads while preserving the fail-closed decision.\n  var FETCH_TIMEOUT_MS = 15000;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
@@ -358,13 +358,15 @@
     // leave the entire page hidden because the gate was waiting for a decision.
     return new Promise(function (resolve, reject) {
       var settled = false;
+      var controller = new AbortController();
       var timer = setTimeout(function () {
         if (settled) return;
         settled = true;
+        controller.abort();
         reject(new Error("Access check timed out"));
       }, FETCH_TIMEOUT_MS);
 
-      fetch(target, { cache: "no-store" }).then(function (res) {
+      fetch(target, { cache: "no-store", signal: controller.signal }).then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       }).then(function (data) {
