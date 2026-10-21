@@ -139,8 +139,8 @@
     // The embedded activity presence view must have its own tools: the retired Pointer page is never opened.
     const drawTools=document.createElement('div');drawTools.id='fttLessonDrawTools';
     drawTools.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
-    const lessonModes=[['point','☝ Pointer'],['highlight','🖍 Highlight'],['pen','✎ Pen']];
-    const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
+    const lessonModes=[['point','☝ Pointer'],['highlight','🖍 Highlight'],['box','▧ Highlight box'],['pen','✎ Pen'],['line','━ Line'],['pen-arrow','➜ Arrow'],['rectangle','▭ Rectangle'],['ellipse','◯ Oval'],['triangle','△ Triangle'],['text','T Text']];
+    const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonColor='#57b8ff',lessonSize=.016,lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
     const lessonStage=document.createElement('div');
     lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
     const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
@@ -153,11 +153,11 @@
     hitLayer.style.cssText='position:absolute;cursor:crosshair;touch-action:none';
     const viewOnly=document.createElement('span');viewOnly.textContent='View only';viewOnly.style.cssText='font-size:13px;opacity:.85';
     const undo=document.createElement('button');undo.type='button';undo.textContent='↶ Undo';undo.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer';
-    const allowedMode=mode=>lessonLevel==='pen'||mode==='point'&&lessonLevel!=='none'||mode==='highlight'&&lessonLevel==='highlight';
+    const allowedMode=mode=>mode==='point'?lessonLevel!=='none':lessonLevel==='pen'||lessonLevel==='highlight'&&['highlight','box'].includes(mode);
     function redrawToolbar(){
       if(!allowedMode(lessonTool))lessonTool=lessonLevel==='none'?'point':lessonLevel==='highlight'?'highlight':lessonLevel==='pen'?'pen':'point';
       for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool))}
-      viewOnly.hidden=lessonLevel!=='none';undo.hidden=!['highlight','pen'].includes(lessonTool)||!allowedMode(lessonTool);
+      viewOnly.hidden=lessonLevel!=='none';undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';colorSelect.disabled=lessonLevel==='none';sizeSelect.disabled=lessonLevel==='none';
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
     }
     for(const [mode,title] of lessonModes){
@@ -166,7 +166,17 @@
       button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
-    drawTools.append(undo,viewOnly);
+    const colorSelect=document.createElement('select');colorSelect.setAttribute('aria-label','Drawing color');colorSelect.title='Drawing color';
+    for(const [color,name] of [['#57b8ff','Sky blue'],['#ffcc00','Yellow'],['#ff7979','Coral'],['#75df9a','Green'],['#dca0ff','Purple'],['#ffa65c','Orange'],['#7ce4dc','Teal'],['#1f2937','Black'],['#1d4ed8','Blue ink']]){const o=document.createElement('option');o.value=color;o.textContent=name;colorSelect.append(o)}
+    colorSelect.value=lessonColor;
+    const sizeSelect=document.createElement('select');sizeSelect.setAttribute('aria-label','Drawing size');sizeSelect.title='Drawing size';
+    for(const [size,name] of [[.008,'Fine'],[.016,'Medium'],[.028,'Bold']]){const o=document.createElement('option');o.value=String(size);o.textContent=name;sizeSelect.append(o)}
+    sizeSelect.value=String(lessonSize);
+    for(const sel of [colorSelect,sizeSelect])sel.style.cssText='padding:7px;border:1px solid #86a6df;border-radius:8px;background:#193b6c;color:white;font:700 13px system-ui';
+    colorSelect.addEventListener('change',()=>{lessonColor=colorSelect.value});sizeSelect.addEventListener('change',()=>{lessonSize=Number(sizeSelect.value)});
+    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽 Clear mine';clear.title='Clear only my own drawings';clear.style.cssText=undo.style.cssText;
+    clear.addEventListener('click',()=>{if(admitted&&lessonActive&&presenceConn?.open&&lessonLevel!=='none')presenceConn.send({type:'edit-highlights',action:'clear'})});
+    drawTools.append(colorSelect,sizeSelect,undo,clear,viewOnly);
     const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
     function picture(){
       const rect=typeof lessonStage.getBoundingClientRect==='function'?lessonStage.getBoundingClientRect():{width:0,height:0},width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
@@ -184,9 +194,19 @@
         const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
         if(!points.length)continue;
         const color=/^#[0-9a-fA-F]{6}$/.test(stroke.color)?stroke.color:'#57b8ff';
-        const alpha=stroke.tool==='highlight'?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
-        const d=points.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' ');
-        const mark=svg('path',{d,stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',opacity:alpha});
+        const alpha=['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
+        const a=points[0],b=points[points.length-1],x1=a.x*1000,y1=a.y*1000,x2=b.x*1000,y2=b.y*1000;
+        const x=Math.min(x1,x2),y=Math.min(y1,y2),w=Math.abs(x2-x1),h=Math.abs(y2-y1);
+        const attrs={stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',opacity:alpha};
+        let mark;
+        if(stroke.tool==='box')mark=svg('rect',{x,y,width:w,height:h,fill:color,opacity:alpha});
+        else if(stroke.tool==='rectangle')mark=svg('rect',{x,y,width:w,height:h,...attrs});
+        else if(stroke.tool==='ellipse')mark=svg('ellipse',{cx:x+w/2,cy:y+h/2,rx:w/2,ry:h/2,...attrs});
+        else if(stroke.tool==='triangle')mark=svg('polygon',{points:`${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}`,...attrs});
+        else if(stroke.tool==='line')mark=svg('line',{x1,y1,x2,y2,...attrs});
+        else if(stroke.tool==='pen-arrow'){mark=svg('g',{});mark.append(svg('line',{x1,y1,x2,y2,...attrs}));const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(width*3,10);mark.append(svg('path',{d:`M${x2-radius*Math.cos(angle-.5)} ${y2-radius*Math.sin(angle-.5)} L${x2} ${y2} L${x2-radius*Math.cos(angle+.5)} ${y2-radius*Math.sin(angle+.5)}`,...attrs}));}
+        else if(stroke.tool==='text'){mark=svg('text',{x:x1,y:y1,'font-size':Math.max(16,width*2.2),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
+        else {const drawn=stroke.tool==='underline'?[a,{x:b.x,y:a.y}]:points;mark=svg('path',{d:drawn.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' '),...attrs})}
         markLayer.appendChild(mark);
       }
       for(const [id,point] of Object.entries(lessonMarks.points||{})){
@@ -203,7 +223,13 @@
       if(!admitted||!lessonActive||!allowedMode(lessonTool)||e.button!==0)return;
       const p=normalized(e);if(!p)return;e.preventDefault();
       if(lessonTool==='point'){presenceConn?.send({type:'point',point:{...p,tool:'target'}});return}
-      lessonDraft={tool:lessonTool,color:'#57b8ff',size:.016,points:[p,p]};
+      if(lessonTool==='text'){
+        const content=window.prompt('Text for the lesson (Hebrew or English):','');
+        if(!content?.trim())return;
+        const stroke={tool:'text',color:lessonColor,size:lessonSize,points:[p,{x:Math.min(1,p.x+.2),y:Math.min(1,p.y+.06)}],text:content.slice(0,240)};
+        presenceConn?.send({type:'highlight',stroke});return;
+      }
+      lessonDraft={tool:lessonTool,color:lessonColor,size:lessonSize,points:[p,p]};
       try{hitLayer.setPointerCapture(e.pointerId)}catch{}renderLessonMarks();
     });
     hitLayer.addEventListener('pointermove',e=>{
@@ -212,7 +238,7 @@
       if(lessonTool==='point'){if(Date.now()-lastPointSend>=75){lastPointSend=Date.now();presenceConn?.send({type:'point',point:{...p,tool:'target'}})}return}
       if(!lessonDraft)return;
       const pts=lessonDraft.points,last=pts[pts.length-1];
-      if(pts.length<256&&Math.hypot(p.x-last.x,p.y-last.y)>.003){pts.push(p);renderLessonMarks()}
+      if(!['pen','highlight'].includes(lessonDraft.tool)){lessonDraft.points=[pts[0],p];renderLessonMarks()}else if(pts.length<256&&Math.hypot(p.x-last.x,p.y-last.y)>.003){pts.push(p);renderLessonMarks()}
     });
     function finishDrawing(e){
       if(!lessonDraft)return;
