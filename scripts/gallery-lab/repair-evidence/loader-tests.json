@@ -1,0 +1,6 @@
+{
+  "command": "node --test tests/gallery-image-cors.test.cjs",
+  "passed": 4,
+  "failed": 0,
+  "cases": ["anonymous CORS before src", "inline legacy image compatibility", "safe failed-load placeholder", "no-image placeholder"]
+}

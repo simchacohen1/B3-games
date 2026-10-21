@@ -939,7 +939,15 @@ function createProjectCard(post){
     ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle='#354453';ctx.font='700 34px Caveat, cursive';wrapCanvasText(ctx,post.title||'Untitled',32,445,448,38,2);ctx.fillStyle='#6d5b48';ctx.font='700 18px Quicksand';ctx.fillText(post.studentName||'',32,552);ctx.font='600 15px Quicksand';ctx.fillStyle='#99846f';ctx.fillText(post.className||'',32,579);
   };
   redraw(null);const tex=makeTexture(c);const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
-  if(post.image){const img=new Image();img.onload=()=>{redraw(img);tex.needsUpdate=true};img.src=post.image;}
+  if(post.image){
+    const img=new Image();
+    // Storage screenshots are cross-origin. Request CORS before starting the
+    // load so drawing the image keeps this WebGL texture's canvas origin-clean.
+    img.crossOrigin='anonymous';
+    img.onload=()=>{redraw(img);tex.needsUpdate=true};
+    img.onerror=()=>console.warn('Gallery picture could not load for post',post.id);
+    img.src=post.image;
+  }
   return mesh;
 }
 

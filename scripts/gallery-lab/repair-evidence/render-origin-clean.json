@@ -1,0 +1,94 @@
+[
+  {
+    "class": "et",
+    "phase": "personal",
+    "remotePost": "-P4SE-VAnTGi-4gAPo5R",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "et",
+    "phase": "hallway",
+    "remotePost": "-P4SE-VAnTGi-4gAPo5R",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "et",
+    "phase": "refresh",
+    "remotePost": "-P4SE-VAnTGi-4gAPo5R",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "et",
+    "phase": "reopen",
+    "remotePost": "-P4SE-VAnTGi-4gAPo5R",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "et",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  },
+  {
+    "class": "wt",
+    "phase": "personal",
+    "remotePost": "-P4SE9IY4SP94ShwOG8d",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "wt",
+    "phase": "hallway",
+    "remotePost": "-P4SE9IY4SP94ShwOG8d",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "wt",
+    "phase": "refresh",
+    "remotePost": "-P4SE9IY4SP94ShwOG8d",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "wt",
+    "phase": "reopen",
+    "remotePost": "-P4SE9IY4SP94ShwOG8d",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": ""
+  },
+  {
+    "class": "wt",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  }
+]

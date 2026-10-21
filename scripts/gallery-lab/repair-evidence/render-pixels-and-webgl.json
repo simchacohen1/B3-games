@@ -1,0 +1,126 @@
+[
+  {
+    "class": "et",
+    "phase": "personal",
+    "remotePost": "-P4SGNVfGa2Us2GRq-el",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "et",
+    "phase": "hallway",
+    "remotePost": "-P4SGNVfGa2Us2GRq-el",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "et",
+    "phase": "refresh",
+    "remotePost": "-P4SGNVfGa2Us2GRq-el",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "et",
+    "phase": "reopen",
+    "remotePost": "-P4SGNVfGa2Us2GRq-el",
+    "inlineControl": "inline_et",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "et",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  },
+  {
+    "class": "wt",
+    "phase": "personal",
+    "remotePost": "-P4SGX6JsfG32UcNTc2J",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "wt",
+    "phase": "hallway",
+    "remotePost": "-P4SGX6JsfG32UcNTc2J",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "wt",
+    "phase": "refresh",
+    "remotePost": "-P4SGX6JsfG32UcNTc2J",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "wt",
+    "phase": "reopen",
+    "remotePost": "-P4SGX6JsfG32UcNTc2J",
+    "inlineControl": "inline_wt",
+    "remoteOriginClean": true,
+    "inlineOriginClean": true,
+    "result": "PASS",
+    "error": "",
+    "pixelCheck": {
+      "photoPixelsMatch": true,
+      "webglError": 0
+    }
+  },
+  {
+    "class": "wt",
+    "phase": "anonymous-CORS-control",
+    "result": "PASS",
+    "note": "Separate diagnostic canvas only; Gallery code unchanged."
+  }
+]

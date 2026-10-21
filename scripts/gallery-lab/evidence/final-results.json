@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-21",
+  "environment": "local emulators only",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Pin Work submission",
+      "et": "PASS",
+      "wt": "PASS",
+      "note": ""
+    },
+    {
+      "step": 2,
+      "name": "Add to Gallery screenshot submission",
+      "et": "PASS",
+      "wt": "PASS",
+      "note": ""
+    },
+    {
+      "step": 3,
+      "name": "Correct teacher queue",
+      "et": "PASS",
+      "wt": "PASS",
+      "note": ""
+    },
+    {
+      "step": 4,
+      "name": "Teacher approval and queue clears",
+      "et": "PASS",
+      "wt": "PASS",
+      "note": ""
+    },
+    {
+      "step": 5,
+      "name": "Personal gallery picture visibility",
+      "et": "FAIL",
+      "wt": "FAIL",
+      "note": "Screenshot 3D textures tainted; inline image control passes."
+    },
+    {
+      "step": 6,
+      "name": "Hallway picture visibility",
+      "et": "FAIL",
+      "wt": "FAIL",
+      "note": "Screenshot 3D textures tainted; inline image control passes."
+    },
+    {
+      "step": 7,
+      "name": "Refresh/reopen picture visibility",
+      "et": "FAIL",
+      "wt": "FAIL",
+      "note": "Screenshot 3D textures tainted; inline image control passes."
+    },
+    {
+      "step": 8,
+      "name": "ET/WT separation",
+      "et": "PASS",
+      "wt": "PASS",
+      "note": ""
+    }
+  ],
+  "defect": {
+    "file": "class-gallery/index.html",
+    "function": "createProjectCard",
+    "cause": "Image loaded without crossOrigin anonymous before drawing into a CanvasTexture. Cross-origin screenshot image taints canvas; WebGL texture upload is rejected.",
+    "proposedRepair": "Set crossOrigin=\"anonymous\" before src, verify Storage CORS, handle image errors, retain texture regression checks.",
+    "productionRepairMade": false
+  },
+  "productionRecordsAccessed": false,
+  "productionFilesChanged": false,
+  "issue206": "Keep open pending separate repair and live verification."
+}
