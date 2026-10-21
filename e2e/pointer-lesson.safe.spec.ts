@@ -5,7 +5,7 @@ import path from 'node:path';
 // Fully synthetic class session: no production API, no real students.
 const script=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/activity-share.js'),'utf8');
 
-test('Pointer: student sees teacher presentation without losing unfinished work',async({page})=>{
+async function preparePointer(page: any) {
   await page.route('**/*',route=>route.abort());
   await page.route('https://pointer-offline.test/**', route => route.fulfill(route.request().url().includes('activity-share.js') ? {contentType:'text/javascript',body:script} : route.request().url().includes('.js') ? {contentType:'text/javascript',body:''} : {contentType:'text/html',body:'<!doctype html><title>Activity</title><input id="answer" value="unfinished work"><div>Learning activity</div>'}));
   await page.goto('https://pointer-offline.test/activity');
@@ -63,9 +63,39 @@ test('Pointer: student sees teacher presentation without losing unfinished work'
     (window as any).__connection.emit('data',{type:'lesson-presentation',id:'offline',active:true});
     (window as any).__present();
   });
+}
+
+test('Pointer: student sees teacher presentation without losing unfinished work',async({page})=>{
+  await preparePointer(page);
   await expect(page.locator('#fttTeacherLessonOverlay')).toBeVisible();
   await expect(page.locator('#answer')).toHaveValue('unfinished work');
   await page.getByRole('button',{name:'Back to Activity'}).click();
   await expect(page.locator('#answer')).toHaveValue('unfinished work');
   await expect(page.locator('#fttTeacherLessonOverlay')).toBeHidden();
+});
+
+
+test('Pointer: an unadmitted presentation cannot open teacher media',async({page})=>{
+  await preparePointer(page);
+  await page.evaluate(()=>{
+    const c=(window as any).__connection;
+    c.emit('data',{type:'lesson-presentation',id:'unadmitted',active:true});
+    (window as any).__present();
+  });
+  await expect(page.locator('#fttTeacherLessonOverlay')).toBeHidden();
+  await expect(page.locator('#answer')).toHaveValue('unfinished work');
+});
+
+test('Pointer: a removed student loses the teacher presentation',async({page})=>{
+  await preparePointer(page);
+  await page.evaluate(()=>{
+    const c=(window as any).__connection;
+    c.emit('data',{type:'present'});
+    c.emit('data',{type:'lesson-presentation',id:'offline',active:true});
+    (window as any).__present();
+  });
+  await expect(page.locator('#fttTeacherLessonOverlay')).toBeVisible();
+  await page.evaluate(()=>(window as any).__connection.emit('data',{type:'removed'}));
+  await expect(page.locator('#fttTeacherLessonOverlay')).toBeHidden();
+  await expect(page.locator('#answer')).toHaveValue('unfinished work');
 });
