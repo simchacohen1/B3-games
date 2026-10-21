@@ -417,16 +417,18 @@
     }
     if(!studentClassId)return "";
     var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    // The display name is not used to authorize tool access. Avoid a
+    // redundant, occasionally slow Firebase read on every gate refresh.
+    // Keep every permission-critical field and the student membership check.
     var classFields=await Promise.all([
-      fetchJson(classPath+"/name.json"),
       fetchJson(classPath+"/active.json"),
       fetchJson(classPath+"/siteEnabled.json"),
       fetchJson(classPath+"/access.json"),
       fetchJson(classPath+"/toolGrants.json"),
       fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
     ]);
-    var member=classFields[5];
-    assignedClass={name:classFields[0],active:classFields[1],siteEnabled:classFields[2],access:classFields[3],toolGrants:classFields[4],members:{}};
+    var member=classFields[4];
+    assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
     if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
     studentActive=true;
