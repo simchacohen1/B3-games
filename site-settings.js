@@ -1052,16 +1052,22 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
-    return services.auth.onAuthStateChanged(async function (user) {
+    let generation = 0;
+    let listening = true;
+    const unsubscribe = services.auth.onAuthStateChanged(async function (user) {
+      const eventGeneration = ++generation;
+      const isCurrent = () => listening && generation === eventGeneration && services.auth.currentUser === user;
       // A student identity sitting in a non-student tab is not this tab's
       // identity: let the remembered teacher replace it.
       if (user && !isGoogleUser(user) && !isStudentTab() && !teacherRestoreBlocked()) {
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
       }
+      if (!isCurrent()) return;
       if (!user) {
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
+        if (!isCurrent()) return;
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
         callback(null, false, currentAccess);
@@ -1079,6 +1085,9 @@
         return;
       }
       readUserAccess(user).then(function(access){
+        // A completed read from an older auth event must never authorize a
+        // signed-out/replaced user, including after this observer is removed.
+        if (!isCurrent()) return;
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
@@ -1096,6 +1105,7 @@
         }
       });
     });
+    return function () { listening = false; generation++; unsubscribe(); };
   }
 
   // ---------------------------------------------------------------------

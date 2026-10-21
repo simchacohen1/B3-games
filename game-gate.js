@@ -302,6 +302,9 @@
   async function watchTeacherAccess() {
     if (teacherWatchStarted) return;
     teacherWatchStarted = true;
+    teacherCheckPending = true;
+    var stopTeacherWatch = null;
+    var authorizationTimer = null;
     try {
       // Let the page's own Firebase scripts finish before supplying missing ones.
       if(document.readyState === "loading") await new Promise(function(resolve){document.addEventListener("DOMContentLoaded",resolve,{once:true});});
@@ -320,7 +323,16 @@
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       await boundedAccess(waitForFirebaseAuthState(window.firebase.auth()));
       markAuthReady();
-      window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
+      authorizationTimer = setTimeout(function () {
+        if (!teacherCheckPending) return;
+        if (stopTeacherWatch) stopTeacherWatch();
+        teacherWatchStarted = false;
+        teacherCheckPending = false;
+        verifiedTeacherAccess = null;
+        showClosed("Having trouble checking access", "Sign-in verification timed out. This page will retry automatically.");
+      }, FETCH_TIMEOUT_MS);
+      stopTeacherWatch = window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
+        clearTimeout(authorizationTimer);
         markAuthReady();
         teacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
@@ -328,6 +340,8 @@
         checkNow();
       });
     } catch(error){
+      clearTimeout(authorizationTimer);
+      if (stopTeacherWatch) stopTeacherWatch();
       teacherWatchStarted=false;
       markAuthReady();
       teacherCheckPending=false;
@@ -662,6 +676,9 @@
     // Guest Mode: a preview, no student to check. guest-mode.js blocks all saving.
     if (isGuestPreview()) { showOpen(); return; }
     if (!teacherWatchStarted) void watchTeacherAccess();
+    // Wait for the first verified teacher/student role before issuing access
+    // reads. Otherwise startup checks run twice and can use the wrong role.
+    if (teacherCheckPending) return;
     if (requestInFlight) { refreshRequested = true; return; }
     requestInFlight = true;
     followActivityOpen = false;

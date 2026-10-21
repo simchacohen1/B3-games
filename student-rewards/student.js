@@ -39,8 +39,11 @@ async function openTeacherPreview(){
   const account=await teacherAccountReady;
   if(!account.user||!account.authorized||window.B3SiteSettings.getActingStudent())return false;
   if(teacherPreview)return true;
+  // Preview reads use the authenticated teacher app. The isolated student
+  // app may be signed out and must never receive the teacher identity.
+  const previewDb=C.ensureFirebase().db;
+  const [rewards,categories]=await Promise.all([previewDb.ref(`${ROOT}/rewards`).once('value'),previewDb.ref(`${ROOT}/categories`).once('value')]);
   teacherPreview=true;
-  const [rewards,categories]=await Promise.all([db.ref(`${ROOT}/rewards`).once('value'),db.ref(`${ROOT}/categories`).once('value')]);
   state.studentId='teacher_preview';
   state.student={name:'Teacher Preview — sample points',initials:'TP',color:'#24344a',rewardBalance:100};
   state.serverRewardBalance=100;state.storeOpen=true;

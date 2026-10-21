@@ -35,7 +35,7 @@ test('hung REST read aborts and fails closed',async()=>{
   installReads(c);await assert.rejects(c.fetchJson('http://127.0.0.1/synthetic.json'),/timed out/);assert.equal(signal.aborted,true);
 });
 function checkContext(extra={}){
-  const c=context({isGuestPreview:()=>false,teacherWatchStarted:true,requestInFlight:false,refreshRequested:false,followActivityOpen:false,
+  const c=context({isGuestPreview:()=>false,teacherWatchStarted:true,teacherCheckPending:false,requestInFlight:false,refreshRequested:false,followActivityOpen:false,
     DATABASE_URL:'http://127.0.0.1',SETTINGS_PATH:'settings',storedTeacherBypass:()=>false,
     verifiedTeacherAccess:null,window:{B3StudentTools:{},FTTFollowStudent:null},resolveStudentClass:async()=>{},
     studentActive:true,teacherClassRecord:{active:true},lastSettings:{siteEnabled:true},gameId:'halacha',
@@ -99,4 +99,10 @@ test('periodic refresh skips hidden tabs',()=>{
   let poll,checks=0;const c=context({document:{visibilityState:'hidden'},POLL_INTERVAL_MS:30000,checkNow:()=>checks++,setInterval:callback=>{poll=callback;}});
   const line=source.split('\n').find(line=>line.includes('setInterval(function () { if (document.visibilityState'));
   vm.runInContext(line,c);poll();assert.equal(checks,0);c.document.visibilityState='visible';poll();assert.equal(checks,1);
+});
+
+test('startup waits for role resolution instead of duplicating student reads',async()=>{
+  let reads=0;const c=checkContext({teacherCheckPending:true,fetchJson:async()=>{reads++;return {};}});
+  c.checkNow();assert.equal(reads,0);assert.equal(c.requestInFlight,false);
+  c.teacherCheckPending=false;c.checkNow();await flush(c);assert.equal(reads,1);
 });
