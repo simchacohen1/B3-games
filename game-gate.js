@@ -26,7 +26,8 @@
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 30000;
-  // Bound slow Firebase reads while preserving the fail-closed decision.\n  var FETCH_TIMEOUT_MS = 15000;
+  // Bound slow Firebase reads while preserving the fail-closed decision.
+  var FETCH_TIMEOUT_MS = 15000;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
