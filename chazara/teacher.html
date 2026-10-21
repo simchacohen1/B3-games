@@ -78,7 +78,7 @@
   <div id="manualList" class="manual-list"><div class="manual-empty">Choose a student to see matching Chazaras.</div></div>
 </div>
 <div class="panel recordings-panel" id="recordingsPanel">
-  <div class="approval-head"><div><h2>🎧 Chazara Recordings</h2><div class="sub">Listen to students’ recorded Chazaras. Mark a recording Fully Checked after you have listened carefully; use the filter to see only recordings that still need a full review.</div></div><span class="approval-count" id="recordingCount">0</span></div>
+  <div class="approval-head"><div><h2>🎧 Chazara Recordings</h2><div class="sub">Listen to students’ recorded Chazaras. Mark a recording Fully Checked after you have listened carefully; use the filter to see only recordings that still need a full review.</div></div><div class="approval-actions"><button class="approve-all hidden" id="recordingsApproveAllBtn" type="button" title="Approve pending Chazara points only. Recordings will still need full review.">Approve All Pending Points</button><span class="approval-count" id="recordingCount">0</span></div></div>
   <div class="recording-filters">
     <label class="recording-filter-field"><span>Student</span><select id="recordingStudentFilter"><option value="">All students</option></select></label>
     <label class="recording-filter-field"><span>Perek</span><select id="recordingPerekFilter"><option value="">All perakim</option></select></label>
@@ -190,9 +190,9 @@ function updateApprovalRow(row,id,item){const amount=Number(item.amount||0),sign
 function makeApprovalRow(id,item){const row=document.createElement('div');row.className='request-row';row.dataset.request=id;row.innerHTML='<div class="request-main"><strong data-name></strong><div class="request-reason" data-reason></div><div class="request-meta" data-meta></div></div><div class="request-amount" data-amount></div><div class="req-buttons"><button class="req-approve" data-approve>Approve</button><button class="req-reject" data-reject>Reject</button></div>';updateApprovalRow(row,id,item);return row}
 function renderApprovals(){
   const rows=Object.entries(pendingPointRequests||{}).map(([id,item])=>({id,item:item||{}})).sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
-  $("approvalCount").textContent=rows.length?`${rows.length} pending`:"0";$("approveAllBtn").classList.toggle("hidden",!rows.length);
+  $("approvalCount").textContent=rows.length?`${rows.length} pending`:"0";$("approveAllBtn").classList.toggle("hidden",!rows.length);const recordingsApproveAll=$("recordingsApproveAllBtn");if(recordingsApproveAll){recordingsApproveAll.classList.toggle("hidden",!rows.length);recordingsApproveAll.textContent=`Approve All Pending Points (${rows.length})`;}
   const box=$("approvalList");
-  if(!rows.length){box.innerHTML='<div class="approval-empty"><b>No student activity points waiting.</b><br>Chazara and Posuk Practice requests will appear here for review.</div>';return}
+  if(!rows.length){box.innerHTML='<div class="approval-empty"><b>No student activity points waiting.</b><br>Chazara point requests will appear here for approval.</div>';return}
   box.querySelectorAll('.approval-empty').forEach(x=>x.remove());const wanted=new Set(rows.map(x=>x.id));box.querySelectorAll('.request-row').forEach(row=>{if(!wanted.has(row.dataset.request))row.remove()});
   rows.forEach(({id,item},i)=>{let row=Array.from(box.children).find(x=>x.classList?.contains('request-row')&&x.dataset.request===id);if(!row)row=makeApprovalRow(id,item);else updateApprovalRow(row,id,item);const at=box.children[i]||null;if(at!==row)box.insertBefore(row,at)})
 }
@@ -240,9 +240,10 @@ async function rejectPointRequest(id,quiet=false){
 }
 $("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject,oldText=b.textContent;b.disabled=true;b.textContent=a?"Approving…":"Rejecting…";try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false;b.textContent=oldText}};
 $("approveAllBtn").onclick=async()=>{const ids=Object.keys(pendingPointRequests||{});if(!ids.length)return;if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;$("approveAllBtn").disabled=true;let done=0;for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id});done++}catch(err){console.error(err)}}$("approveAllBtn").disabled=false;setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved.`);await loadApprovals()};
+$("recordingsApproveAllBtn").onclick=()=>{if(!$("approveAllBtn").disabled)$("approveAllBtn").click()};
 $("approvalSignInBtn").onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(provider)}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
 
-setInterval(()=>{if(fullDashboardLoaded&&auth.currentUser&&teacherScope)loadApprovals()},30000);
+setInterval(()=>{if(auth.currentUser&&teacherScope)loadApprovals()},30000);
 
 if($("manualToggleBtn"))$("manualToggleBtn").onclick=()=>{const panel=$("manualPanel");panel.classList.remove("hidden");$("manualToggleBtn").setAttribute("aria-expanded","true");panel.scrollIntoView({behavior:"smooth",block:"start"})};
 if($("manualCloseBtn"))$("manualCloseBtn").onclick=()=>{const panel=$("manualPanel");panel.classList.add("hidden");$("manualToggleBtn")?.setAttribute("aria-expanded","false");$("studentOverview")?.scrollIntoView({behavior:"smooth",block:"start"})};
@@ -325,7 +326,7 @@ async function loadClassScope(user,access){
    const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};if(target===E)value=Object.fromEntries(Object.entries(value).filter(([,e])=>window.FunTorahTeacherScope.recordAllowed(scope,id,e)));target[id]=value;refreshScopedViews();};
    studentListeners.push([ref,handler]);ref.on('value',handler);
   }
-  $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();if(fullDashboardLoaded)await loadApprovals();
+  $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();await loadApprovals();
  }catch(error){if(generation===scopeGeneration)$('teacherGate').textContent=error.message||'Could not load your class.';}
 }
 window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScope(user,access||{authorized}));
