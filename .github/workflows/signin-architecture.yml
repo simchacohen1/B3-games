@@ -1,0 +1,23 @@
+name: Sign-in architecture checks
+on:
+  pull_request:
+    paths:
+      - 'game-gate.js'
+      - 'site-settings.js'
+      - 'index.html'
+      - 'halacha/index.html'
+      - 'student-rewards/student.js'
+      - 'tests/signin-architecture.test.cjs'
+      - '.github/workflows/signin-architecture.yml'
+  workflow_dispatch:
+jobs:
+  signin-architecture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run read-only sign-in architecture checks
+        run: node --test tests/signin-architecture.test.cjs
