@@ -23,7 +23,7 @@ test('student homepage signs in with a verified custom token', () => {
 
 test('access gate waits for restored auth and retains bounded fail-closed reads', () => {
   const code = read('game-gate.js');
-  assert.match(code, /await authReadyPromise/);
+  assert.match(code, /await boundedAccess\(authReadyPromise\)/);
   assert.match(code, /FETCH_TIMEOUT_MS\s*=\s*15000/);
   assert.match(code, /reject\(new Error\("Access check timed out"\)\)/);
   assert.match(code, /"memberships\.json"|\/members\/|memberships\.json/);
@@ -42,13 +42,13 @@ test('student rewards uses Firebase custom token authentication', () => {
   assert.match(code, /signInWithCustomToken\(j\.customToken\)/);
 });
 
-test('teacher class access reads run concurrently and retain all four checks', () => {
+test('teacher class access reads run concurrently and retain both authorization checks', () => {
   const code = read('game-gate.js');
   const start = code.indexOf('var teacherFields=await Promise.all([');
   const end = code.indexOf(']);', start);
   assert.ok(start >= 0 && end > start, 'teacher reads must use Promise.all');
   const block = code.slice(start, end);
-  for (const field of ['active', 'siteEnabled', 'access', 'toolGrants']) {
+  for (const field of ['active', 'toolGrants']) {
     assert.ok(block.includes('"/' + field + '.json"'), field + ' access read missing');
   }
   assert.match(code, /teacherClassRecord=null;/);
@@ -69,14 +69,12 @@ test('teacher class reads start together and preserve field mapping', async () =
     teacherClassRecord: null,
   };
   const run = vm.runInNewContext('(async () => { ' + snippet + ' })()', context);
-  assert.equal(pending.size, 4, 'all four requests must start without waiting for each other');
-  for (const [field, value] of [['active', true], ['siteEnabled', true], ['access', {mode:'open'}], ['toolGrants', {halacha:true}]]) {
+  assert.equal(pending.size, 2, 'both required requests must start without waiting for each other');
+  for (const [field, value] of [['active', true], ['toolGrants', {halacha:true}]]) {
     pending.get('test-class/' + field + '.json')(value);
   }
   await run;
   assert.equal(context.teacherClassRecord.active, true);
-  assert.equal(context.teacherClassRecord.siteEnabled, true);
-  assert.equal(context.teacherClassRecord.access.mode, 'open');
   assert.equal(context.teacherClassRecord.toolGrants.halacha, true);
 });
 
@@ -90,7 +88,7 @@ test('teacher class access fails closed when any required read fails', async () 
   const context = {
     Promise,
     teacherClassPath: 'test-class',
-    fetchJson: (url) => url.endsWith('/access.json')
+    fetchJson: (url) => url.endsWith('/toolGrants.json')
       ? Promise.reject(new Error('permission_denied'))
       : Promise.resolve(true),
     teacherClassRecord: null,

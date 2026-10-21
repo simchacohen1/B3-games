@@ -12,9 +12,9 @@ test('Firebase REST gate reads attach the active Firebase ID token',()=>{
 });
 
 test('protected gate reads wait for Firebase auth initialization instead of falling back anonymously',()=>{
-  assert.match(source,/await authReadyPromise;/);
-  assert.match(source,/await auth\.authStateReady\(\)/);
-  assert.match(source,/await waitForFirebaseAuthState\(window\.firebase\.auth\(\)\)/);
+  assert.match(source,/await boundedAccess\(authReadyPromise\);/);
+  assert.match(source,/await boundedAccess\(auth\.authStateReady\(\)\)/);
+  assert.match(source,/await boundedAccess\(waitForFirebaseAuthState\(window\.firebase\.auth\(\)\)\)/);
   assert.match(source,/auth\.onAuthStateChanged\(function\(\)\s*\{\s*finish\(\);\s*\},\s*finish\)/);
   assert.doesNotMatch(source,/Promise\.race\([\s\S]{0,220}authReadyPromise/);
 });
@@ -34,9 +34,9 @@ test('all eight strict-rule affected student activities retain the shared access
 });
 
 test('Firebase v8 auth startup waits for persisted state before the gate releases reads',async()=>{
-  const match=normalized.match(/function waitForFirebaseAuthState\(auth\) \{[\s\S]*?\n  \}\n  async function watchTeacherAccess/);
+  const match=normalized.match(/function waitForFirebaseAuthState\(auth\) \{[\s\S]*?\n  \}\n  var teacherWatchStarted/);
   assert.ok(match,'shared auth readiness helper exists');
-  const helper=match[0].replace(/\n  async function watchTeacherAccess[\s\S]*$/,'');
+  const helper=match[0].replace(/\n  var teacherWatchStarted[\s\S]*$/,'');
   const vm=require('node:vm');
   const context={Promise};
   vm.runInNewContext(helper+';globalThis.waitForFirebaseAuthState=waitForFirebaseAuthState;',context);
@@ -74,6 +74,6 @@ test('all affected student activities load the corrected authenticated gate vers
     'sefer-hamitzvos/index.html'
   ]){
     const html=fs.readFileSync(path,'utf8');
-    assert.match(html,/game-gate\.js\?v=20261020-pointer-lifecycle5/,path+' must not use the stale access gate');
+    assert.match(html,/game-gate\.js\?v=20261021-follow-unblock/,path+' must not use the stale access gate');
   }
 });
