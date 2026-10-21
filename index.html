@@ -5,6 +5,11 @@
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    // Only LOOK for a saved sign-in. If Firebase has not created its database yet,
+    // cancel instead of creating an empty one: an empty database stops Firebase
+    // sign-in from starting at all on a first visit or private window.
+    idbReq.onupgradeneeded = function(e) { try { e.target.transaction.abort(); } catch (_) {} };
+    idbReq.onerror = function(e) { e.preventDefault(); };
     idbReq.onsuccess = function(e) {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
@@ -1516,7 +1521,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
   const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  // A sleeping sign-in server needs 10+ seconds to start. Wake it now, while the
+  // student is still typing; the reply is ignored.
+  try{fetch(STUDENT_AUTH_URL,{method:"GET",cache:"no-store"}).catch(()=>{});}catch(e){}
   async function studentAuthCall(body){
+    // A browser that already knows its student lets the server check just that
+    // student (same name + passcode still required) instead of scanning everyone.
+    if(body&&body.action==="login"&&!body.studentId){
+      try{const known=sessionStorage.getItem("b3Games_studentId");if(known)body={...body,studentId:known};}catch(e){}
+    }
     // Retry temporary function failures, never rejected credentials.
     for(let attempt=0;attempt<2;attempt++){
       try{
@@ -1723,6 +1736,13 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         return;
         } finally { actingStudentRestoreInFlight=false; }
       }
+      // Start the server passcode check at the same moment as the profile read
+      // instead of waiting for it. The result is only used after the profile
+      // checks below pass.
+      const earlyPin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+      const earlyName=sessionStorage.getItem("b3Games_studentName")||id;
+      const earlyLogin=actingStudent?null:studentAuthCall({action:"login",name:earlyName,pin:earlyPin,studentId:id});
+      if(earlyLogin)earlyLogin.catch(()=>{});
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
       let d=snap.val()||{};
       if(!snap.exists()){
@@ -1746,24 +1766,33 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       // Every activity reuses the passcode saved at homepage sign-in. If it is
       // missing or out of date, ask once here instead of inside each activity.
-      if(!isStudentPreview){
-        const saved=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
-        let stale=!saved;
-        if(saved){try{const verified=await studentAuthCall({action:"verify",studentId:id,pin:saved});stale=false;}catch(e){stale=e.status===401||e.status===403;}}
-        if(isAuthorizedTeacher)return;
-        if(stale){
-          sessionStorage.removeItem("b3Games_classPin");
-          el("studentNameInput").value=d.name?String(d.name):"";
-          showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
+      // One server call checks the saved passcode AND returns the sign-in
+      // token (it used to be "verify", then "login", then "login" again).
+      let identity;
+      const rejected=e=>e&&(e.status===401||e.status===403);
+      try{
+        if(!earlyPin&&!isStudentPreview)throw Object.assign(new Error("No saved passcode."),{status:401});
+        try{identity=await earlyLogin;}
+        catch(e){
+          // The saved name may differ from the profile name; retry once with it.
+          if(e&&e.status===401&&d.name&&d.name!==earlyName)identity=await studentAuthCall({action:"login",name:d.name,pin:earlyPin,studentId:id});
+          else throw e;
         }
+      }catch(e){
+        if(isAuthorizedTeacher)return;
+        if(isStudentPreview||!rejected(e))throw e;
+        sessionStorage.removeItem("b3Games_classPin");
+        el("studentNameInput").value=d.name?String(d.name):"";
+        showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
       }
-      const identity=await studentAuthCall({action:"login",name:d.name||sessionStorage.getItem("b3Games_studentName")||id,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});
       studentClassChoices=Array.isArray(identity.classChoices)?identity.classChoices:[];
       const storedClassId=sessionStorage.getItem("b3Games_studentClass");
       const restoredClassId=(studentClassChoices.find(c=>c.id===storedClassId)||studentClassChoices.find(c=>c.id===identity.classId)||studentClassChoices[0]||{}).id||await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
-      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId,
+        // Reuse the token from the call above when it was issued for this class.
+        customToken:identity.classId===restoredClassId?identity.customToken:""});
     }catch(e){console.warn(e);showLogin();}
   }
 
@@ -1771,7 +1800,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Clear the student identity first so auth callbacks cannot restore the
     // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
-    resetPinForm();
     studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();

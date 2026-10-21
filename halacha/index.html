@@ -2,6 +2,11 @@
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    // Only LOOK for a saved sign-in. If Firebase has not created its database yet,
+    // cancel instead of creating an empty one: an empty database stops Firebase
+    // sign-in from starting at all on a first visit or private window.
+    idbReq.onupgradeneeded = function(e) { try { e.target.transaction.abort(); } catch (_) {} };
+    idbReq.onerror = function(e) { e.preventDefault(); };
     idbReq.onsuccess = function(e) {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
@@ -186,7 +191,7 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script><script src="../student-class.js?v=20261007-tab-login"></script>
-<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="halacha" data-back-href="../index.html"></script>
+<script src="../game-gate.js?v=20261021-signin-speed1" data-game-id="halacha" data-back-href="../index.html"></script>
 <link rel="stylesheet" href="scrapbook-editor.css?v=20261019-page-grid-fix1"><script src="../word-bank/bank-core.js?v=20261019-bank1"></script><script src="../word-bank/halacha-vocabulary.js?v=20261019-bank1"></script><link rel="stylesheet" href="sefer-style.css?v=20261020-guided-only2"><link rel="stylesheet" href="siman-a-classroom.css?v=20261021-guided1"></head><body><header><div class=bar><a href="../word-bank/index.html" class="halacha-wordbank-link">📚 My Word Bank</a><h1 id="halachaTitle">📘 My Halacha Lessons — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="halachaAccessPanelMain" class="halacha-access-panel"><h3>🔒 Student Siman Access</h3><div id="halachaAccessRowsMain">Loading class access…</div><div class="halacha-access-note">Choose the furthest Siman students may open. Earlier Simanim remain open; later Simanim stay locked.</div></div><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
