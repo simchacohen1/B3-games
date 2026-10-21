@@ -27,103 +27,102 @@ function storyDetail(sd){
 function detail(id,v){const data=students[id]||{},p=data.words||{};$('detail').replaceChildren(node('h2',v.name||id),storyDetail(data.storyDetective||{}));const grid=node('div','');grid.className='grid';for(const w of C.words){const card=node('div','');card.className='word';const yi=node('div',w.yi);yi.className='yi';yi.lang='yi';card.append(yi,node('p',w.en),node('span',!p[w.id]?'New':p[w.id].credits>=2?'Learned':'Practicing'));grid.append(card)}$('detail').append(grid)}
 const stepsIn=s=>Math.max(1,Math.ceil((s.words||[]).length/4));
 function stepRange(i){let a=1;for(let k=0;k<i;k++)a+=stepsIn(config.sections[k]);const b=a+stepsIn(config.sections[i])-1;return a===b?'Step '+a:'Steps '+a+'–'+b}
-function stepsOpen(t){const n=config.unlockedSteps&&config.unlockedSteps[t];if(Number.isInteger(n))return n;let s=0;for(let k=0;k<(config.unlocked[t]||0);k++)s+=stepsIn(config.sections[k]);return s}
+function stepsOpen(t,c=config){const n=c.unlockedSteps&&c.unlockedSteps[t];if(Number.isInteger(n))return n;let s=0;for(let k=0;k<Math.min(c.unlocked?.[t]||0,c.sections.length);k++)s+=stepsIn(c.sections[k]);return s}
 function sectionsFor(steps){let s=0,k=0;while(k<config.sections.length&&s<steps){s+=stepsIn(config.sections[k]);k++}return k}
 function editors(){const ids=Object.keys(config.unlocked||{});const generic=!ids.every(id=>['et','wt'].includes(id));$('wt').closest('label').hidden=generic;$('et').closest('label').firstChild.textContent=generic?'Class steps open ':'ET steps open ';$('wt').closest('label').firstChild.textContent='WT steps open ';$('track').replaceChildren(node('option','All assigned students'),...ids.map(id=>{const o=node('option',id.toUpperCase());o.value=id;return o;}));$('track').firstChild.value='all';for(const track of ['et','wt']){$(track).replaceChildren();const total=config.sections.reduce((n,s)=>n+stepsIn(s),0);for(let i=0;i<=total;i++){const o=node('option',i===0?'All closed':i===1?'Step 1':'Steps 1–'+i);o.value=i;$(track).append(o)}$(track).value=stepsOpen(generic?ids[0]:track)}$('editors').replaceChildren();config.sections.forEach((s,i)=>{const box=node('section','');box.className='section-editor';box.append(node('h3','Section '+(i+1)+' · '+stepRange(i)));for(const [key,title] of [['start','Start second'],['end','End second'],['first','First paragraph'],['last','Last paragraph']]){const label=node('label',title),input=node('input','');input.type='number';input.step=key==='start'||key==='end'?'0.1':'1';input.min='0';input.value=(key==='start'||key==='end')?Math.max(0,Number(s[key])-44):s[key];input.dataset.field=key;label.append(input);box.append(label)}const check=node('label','I checked this audio section and its words'),cb=node('input','');cb.type='checkbox';cb.checked=s.verified;cb.dataset.field='verified';check.prepend(cb);box.append(check);const list=node('div','');list.className='word-checks';C.words.forEach(w=>{const label=node('label',w.yi+' — '+w.en),input=node('input','');input.type='checkbox';input.value=w.id;input.checked=s.words.includes(w.id);input.dataset.word='1';label.prepend(input);list.append(label)});box.append(list);$('editors').append(box)})}
-// Keep a clean copy of the lesson so a concurrent ET/WT unlock save can be
-// safely retried without replacing another teacher's newer lesson edits.
-let loadedSections=null;
-const originalEditors=editors;
-editors=function(){originalEditors();loadedSections=structuredClone(config.sections)};
+// ---- Saving ----------------------------------------------------------------
+// `config` always holds the last settings confirmed by the server. Edits are
+// queued and saved in the background:
+//  * ET / WT step selectors -> teacherSetUnlock, one track at a time, so a
+//    change to one track can never overwrite the other track.
+//  * audio sections / words  -> teacherSave (lesson content only, with a
+//    version check so two sessions cannot silently overwrite each other).
+// The "Saved" confirmation is shown only after the server has committed the
+// change and returned it.
+const stepLabel=n=>n===0?'All closed':n===1?'Step 1':'Steps 1–'+n;
+function trackIds(){return Object.keys(config.unlocked||{})}
+function isGeneric(){return !trackIds().every(id=>['et','wt'].includes(id))}
+function trackForSelect(id){return isGeneric()?trackIds()[0]:id}
+function selectForTrack(track){return isGeneric()?'et':track}
+function trackName(track){return isGeneric()?'Class':track.toUpperCase()}
 function applyLessonInputs(draft){
   document.querySelectorAll('.section-editor').forEach((box,i)=>{
     for(const input of box.querySelectorAll('[data-field]')){
-      draft.sections[i][input.dataset.field]=input.type==='checkbox'?input.checked:
-        ((input.dataset.field==='start'||input.dataset.field==='end')?Number(input.value)+44:Number(input.value));
+      const f=input.dataset.field;
+      draft.sections[i][f]=input.type==='checkbox'?input.checked:
+        ((f==='start'||f==='end')?Math.round((Number(input.value)+44)*10)/10:Number(input.value));
     }
     draft.sections[i].words=[...box.querySelectorAll('[data-word]:checked')].map(x=>x.value);
   });
   if(draft.sections[0])draft.sections[0].start=0;
+  return draft;
 }
-function applyUnlockInputs(draft,desired){
-  draft.unlockedSteps=draft.unlockedSteps||{};
-  for(const [track,n] of Object.entries(desired)){
-    if(!Object.prototype.hasOwnProperty.call(draft.unlocked||{},track))continue;
-    draft.unlockedSteps[track]=n;
-    let sections=0,open=0;
-    while(sections<draft.sections.length&&open<n){
-      open+=Math.max(1,Math.ceil((draft.sections[sections].words||[]).length/4));
-      sections++;
-    }
-    draft.unlocked[track]=sections;
-  }
-}
-let autoTimer=null, saving=false, editSequence=0;
+function lessonDraft(){return applyLessonInputs({version:config.version,sections:structuredClone(config.sections)})}
+function lessonChanged(){return !!config&&JSON.stringify(lessonDraft().sections)!==JSON.stringify(config.sections)}
+let autoTimer=null,saving=false,pendingLesson=false,lessonBlocked=false;const pendingUnlocks={};
+function hasPending(){return pendingLesson||Object.keys(pendingUnlocks).length>0}
+function refreshDirty(){dirty=hasPending()||lessonBlocked}
+function showTrackValues(){for(const track of trackIds()){if(Object.hasOwn(pendingUnlocks,track))continue;const sel=$(selectForTrack(track));if(sel)sel.value=String(stepsOpen(track))}}
 function scheduleSave(){
-  dirty=true;editSequence++;
+  refreshDirty();
   clearTimeout(autoTimer);
-  notice('Saving changes automatically…');
-  autoTimer=setTimeout(()=>{if(!saving)void saveChanges();},650);
+  notice('Saving changes…');
+  autoTimer=setTimeout(()=>void saveChanges(),650);
 }
 async function saveChanges(){
-  if(saving||!user||!config)return;
+  if(!user||!config)return;
+  if(saving){clearTimeout(autoTimer);autoTimer=setTimeout(()=>void saveChanges(),650);return}
   clearTimeout(autoTimer);
-  saving=true;
-  const savingSequence=editSequence;
-  const desired={};
-  const tracks=Object.keys(config.unlocked||{});
-  const generic=!tracks.every(id=>['et','wt'].includes(id));
-  for(const track of tracks)desired[track]=Number($(generic?'et':track).value);
-  const draft=structuredClone(config);
-  applyLessonInputs(draft);
-  applyUnlockInputs(draft,desired);
-  const sectionsChanged=JSON.stringify(draft.sections)!==JSON.stringify(loadedSections);
-  $('save').disabled=true;
+  saving=true;$('save').disabled=true;
+  const saved=[],problems=[];let lessonSaved=false;
   try{
-    let result;
-    try{
-      result=await call('teacherSave',{config:draft});
-    }catch(e){
-      if(!/Settings changed elsewhere|Reload before saving/i.test(e.message||''))throw e;
-      // Refresh only on an unlock-only save; never overwrite changed audio,
-      // vocabulary or another teacher's lesson edits without review.
-      if(sectionsChanged)throw Error('Another session changed these lesson settings. Your edits are still visible. Copy them before refreshing.');
-      const fresh=await call('teacherLoad');
-      if(fresh.storyGranted===false)throw Error('Yiddish is no longer assigned to this class.');
-      if(JSON.stringify(fresh.config.sections)!==JSON.stringify(loadedSections))
-        throw Error('The lesson itself changed elsewhere. Please refresh and review it before saving.');
-      const rebased=structuredClone(fresh.config);
-      applyUnlockInputs(rebased,desired);
-      result=await call('teacherSave',{config:rebased});
+    while(hasPending()){
+      if(pendingLesson){
+        pendingLesson=false;
+        if(lessonChanged()){
+          try{
+            const r=await call('teacherSave',{config:lessonDraft()});
+            config=r.config;lessonSaved=true;lessonBlocked=false;saved.push('lesson settings');
+          }catch(e){lessonBlocked=true;problems.push(e.message||'Lesson settings could not be saved.')}
+        }
+      }
+      for(const track of Object.keys(pendingUnlocks)){
+        const steps=pendingUnlocks[track];delete pendingUnlocks[track];
+        if(stepsOpen(track)===steps)continue;
+        try{
+          const r=await call('teacherSetUnlock',{track,steps,expectedSteps:stepsOpen(track)});
+          config=r.config;
+          if(stepsOpen(track)!==steps)throw Error('The server did not confirm the change. Please try again.');
+          saved.push(trackName(track)+': '+stepLabel(steps));
+        }catch(e){
+          if(e.status===409&&e.details&&Number.isInteger(e.details.current)){
+            // Someone else changed this track meanwhile. Show their value and
+            // let the teacher decide; never overwrite it automatically.
+            try{const fresh=await call('teacherLoad');if(fresh.config)config=fresh.config}catch(_){}
+            problems.push(trackName(track)+' was changed to '+stepLabel(e.details.current)+' in another session, so '+stepLabel(steps)+' was not saved. Choose again if you still want to change it.');
+          }else problems.push(trackName(track)+' steps: '+(e.message||'could not be saved.'));
+        }
+      }
     }
-    config=result.config;
-    // Do not replace controls while the teacher is making another edit.
-    if(editSequence===savingSequence){
-      dirty=false;
-      editors();
-      notice('All changes saved automatically.');
-    }else{
-      loadedSections=structuredClone(config.sections);
-      notice('Saving latest changes…');
-    }
-  }catch(e){
-    notice('Not saved: '+(e.message||'Please try again.'));
-    window.scrollTo({top:0,behavior:'smooth'});
   }finally{
-    $('save').disabled=false;
-    saving=false;
-    if(editSequence!==savingSequence&&dirty){
-      clearTimeout(autoTimer);
-      autoTimer=setTimeout(()=>void saveChanges(),650);
-    }
+    saving=false;$('save').disabled=false;
+    refreshDirty();
+    if(lessonSaved&&!pendingLesson&&!lessonChanged())editors();else showTrackValues();
+    const time=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    if(problems.length)notice('Not saved: '+problems.join(' ')+(saved.length?' (Saved: '+saved.join(', ')+'.)':''));
+    else if(saved.length)notice('✓ Saved and confirmed by the server at '+time+': '+saved.join(', ')+'.');
+    else if(!hasPending())notice('No changes to save.');
+    if(problems.length)window.scrollTo({top:0,behavior:'smooth'});
   }
 }
-$('save').onclick=()=>void saveChanges();
+$('save').onclick=()=>{pendingLesson=true;void saveChanges()};
 $('dashboard').addEventListener('change',event=>{
+  const t=event.target;
   // The track filter is not a lesson setting and must not trigger a write.
-  if(event.target.closest('#track'))return;
-  scheduleSave();
+  if(t.closest('#track'))return;
+  if(t.id==='et'||t.id==='wt'){pendingUnlocks[trackForSelect(t.id)]=Number(t.value);scheduleSave();return}
+  if(t.closest('#editors')){pendingLesson=true;scheduleSave()}
 });
-$('track').onchange=table;$('reload').onclick=async()=>{if(dirty&&!confirm('Reload and discard unsaved lesson edits?'))return;try{await load()}catch(e){notice(e.message)}};$('signIn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>notice(e.message));$('signOut').onclick=()=>B3SiteSettings.signOut();
+$('track').onchange=table;$('reload').onclick=async()=>{if(dirty&&!confirm('Reload and discard unsaved lesson edits?'))return;try{clearTimeout(autoTimer);pendingLesson=false;lessonBlocked=false;for(const k of Object.keys(pendingUnlocks))delete pendingUnlocks[k];await load()}catch(e){notice(e.message)}};$('signIn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>notice(e.message));$('signOut').onclick=()=>B3SiteSettings.signOut();
 C.paras.forEach((p,i)=>{if(!p.trim())return;const row=node('p',i+' · '+p);row.dir=i<2?'ltr':'rtl';row.style.fontSize='24px';$('transcript').append(row)});$('audio').src='audio.mp3';
 B3SiteSettings.onAuthStateChanged(async(u,ok)=>{user=ok?u:null;$('signIn').hidden=!!user;$('dashboard').hidden=!user;if(user)try{await load()}catch(e){notice(e.message)}else{roster={};students={};$('roster').replaceChildren();$('detail').replaceChildren();notice('Sign in with your teacher Google account.')}});
