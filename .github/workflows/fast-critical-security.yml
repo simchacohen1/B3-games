@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+
+# Keep only the newest pending run for each workflow and branch/PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   critical-security:
     runs-on: ubuntu-latest
