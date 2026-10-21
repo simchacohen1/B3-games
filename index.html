@@ -898,6 +898,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let approvalCenterLoading=false;
   let approvalCounts={};
   let approvalClassCounts={};
+  let approvalClassNames={};
   let approvalAttemptsCache=null,approvalAttemptsAt=0,approvalSweepAt=0;
   const APPROVAL_POLL_MS=60000,APPROVAL_ATTEMPTS_MAX_AGE_MS=5*60000,APPROVAL_SWEEP_MIN_MS=5*60000;
   const POINTS_API_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
@@ -1001,7 +1002,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function approvalClassSplitText(map){
     if(!map)return "";
     const names={et:"ET",wt:"WT"};
-    const parts=Object.keys(map).filter(function(k){return map[k]>0;}).sort().map(function(k){return (names[k]||(k?k.toUpperCase():"Unassigned"))+" "+map[k];});
+    // Student Rewards class ids are long ids (for example class-b3-wt); show the class name.
+    const label=function(k){const n=String(approvalClassNames[k]||names[k]||k||"Unassigned");return n.replace(/^B3\s+/i,"");};
+    const parts=Object.keys(map).filter(function(k){return map[k]>0;}).sort(function(a,b){return label(a).localeCompare(label(b));}).map(function(k){return label(k)+" "+map[k];});
     return parts.length?"("+parts.join(" · ")+")":"";
   }
   function approvalClassFallback(x){return x&&x.className?({"B3 ET":"et","B3 WT":"wt"})[x.className]||"":"";}
@@ -1035,7 +1038,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
       ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
       ["gallery",db.ref("classGallery/posts").once("value")],
-      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")]
+      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")],
+      ["rewardClasses",db.ref("studentRewards/classes").once("value")]
     ];
     const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
     const data={};const failed=[];
@@ -1053,6 +1057,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
     if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
     const Q=window.FunTorahApprovalQueue;
+    approvalClassNames={};
+    Object.keys(data.rewardClasses||{}).forEach(function(id){const c=data.rewardClasses[id];if(c&&c.name)approvalClassNames[id]=c.name;});
     // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
     // milestones never count as manual approvals.
     const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];

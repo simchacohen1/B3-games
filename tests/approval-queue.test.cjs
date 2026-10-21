@@ -120,3 +120,22 @@ test('backend milestone route returns approved points to the student page',()=>{
   const student=fs.readFileSync('record_pesukim/student.html','utf8');
   assert.match(student,/data\.awarded && data\.status === 'approved' \? Number\(data\.amount \|\| 0\) : 0/);
 });
+
+test('owner can reach the Student Rewards Approvals tab (activity points, Approve All, refunds)',()=>{
+  const js=fs.readFileSync('student-rewards/teacher.js','utf8');
+  const owner=js.match(/OWNER_NAV=(\[[^\]]*\])/);assert.ok(owner);
+  assert.ok(JSON.parse(owner[1]).includes('Approvals'),'owner navigation lists Approvals');
+  const approvals=js.slice(js.indexOf('if(state.tab==="Approvals"){'),js.indexOf('if(state.tab==="Approvals"){')+900);
+  assert.match(approvals,/approveAllActivityPoints/);
+  assert.match(approvals,/\[data-refund-approve\]/,'refund buttons work on the Approvals tab');
+  assert.match(js,/data-go="Approvals"/);
+});
+
+test('homepage shows class names (ET / WT), not internal class ids',()=>{
+  const home=fs.readFileSync('index.html','utf8');
+  assert.match(home,/\["rewardClasses",db\.ref\("studentRewards\/classes"\)\.once\("value"\)\]/);
+  const fn=home.slice(home.indexOf('function approvalClassSplitText'),home.indexOf('function approvalClassFallback'));
+  const ctx={approvalClassNames:{'class-34056e86':'B3 ET','class-b3-wt':'B3 WT'}};
+  const f=vm.runInNewContext('('+fn.replace('function approvalClassSplitText','function')+')',ctx);
+  assert.equal(f({'class-b3-wt':2,'class-34056e86':1}),'(ET 1 · WT 2)');
+});
