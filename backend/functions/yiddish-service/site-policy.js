@@ -685,7 +685,7 @@
 
   function isClassOpen(settings, classId, date) {
     const normalized = normalizeSettings(settings);
-    if (normalized.siteEnabled === false) return false;
+    // Retire the site-wide master lock; retain ET/WT scheduled tool access.
     if (!["et", "wt"].includes(classId)) return false;
 
     const access = normalized.classAccess[classId];
@@ -696,7 +696,7 @@
 
   function describeClassAccess(settings, classId, date) {
     const normalized = normalizeSettings(settings);
-    if (normalized.siteEnabled === false) return { open: false, reason: "Emergency master lock" };
+    // Website stays available; classroom schedule remains authoritative.
     if (!["et", "wt"].includes(classId)) return { open: false, reason: "Class not assigned" };
 
     const access = normalized.classAccess[classId];
