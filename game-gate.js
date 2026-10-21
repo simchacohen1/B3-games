@@ -26,7 +26,7 @@
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 30000;
-  var FETCH_TIMEOUT_MS = 4500;
+  // Bound slow Firebase reads while preserving the fail-closed decision.\n  var FETCH_TIMEOUT_MS = 15000;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
@@ -358,13 +358,15 @@
     // leave the entire page hidden because the gate was waiting for a decision.
     return new Promise(function (resolve, reject) {
       var settled = false;
+      var controller = new AbortController();
       var timer = setTimeout(function () {
         if (settled) return;
         settled = true;
+        controller.abort();
         reject(new Error("Access check timed out"));
       }, FETCH_TIMEOUT_MS);
 
-      fetch(target, { cache: "no-store" }).then(function (res) {
+      fetch(target, { cache: "no-store", signal: controller.signal }).then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       }).then(function (data) {
@@ -417,16 +419,18 @@
     }
     if(!studentClassId)return "";
     var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    // The display name is not used to authorize tool access. Avoid a
+    // redundant, occasionally slow Firebase read on every gate refresh.
+    // Keep every permission-critical field and the student membership check.
     var classFields=await Promise.all([
-      fetchJson(classPath+"/name.json"),
       fetchJson(classPath+"/active.json"),
       fetchJson(classPath+"/siteEnabled.json"),
       fetchJson(classPath+"/access.json"),
       fetchJson(classPath+"/toolGrants.json"),
       fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
     ]);
-    var member=classFields[5];
-    assignedClass={name:classFields[0],active:classFields[1],siteEnabled:classFields[2],access:classFields[3],toolGrants:classFields[4],members:{}};
+    var member=classFields[4];
+    assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
     if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
     studentActive=true;
