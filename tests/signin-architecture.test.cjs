@@ -53,3 +53,29 @@ test('teacher class access reads run concurrently and retain all four checks', (
   }
   assert.match(code, /teacherClassRecord=null;/);
 });
+
+test('teacher class reads start together and preserve field mapping', async () => {
+  const vm = require('node:vm');
+  const code = read('game-gate.js');
+  const start = code.indexOf('var teacherFields=await Promise.all([');
+  const end = code.indexOf('        } else {', start);
+  assert.ok(start >= 0 && end > start);
+  const snippet = code.slice(start, end).replace(/        }\s*$/, '');
+  const pending = new Map();
+  const context = {
+    Promise,
+    teacherClassPath: 'test-class',
+    fetchJson: (url) => new Promise((resolve) => pending.set(url, resolve)),
+    teacherClassRecord: null,
+  };
+  const run = vm.runInNewContext('(async () => { ' + snippet + ' })()', context);
+  assert.equal(pending.size, 4, 'all four requests must start without waiting for each other');
+  for (const [field, value] of [['active', true], ['siteEnabled', true], ['access', {mode:'open'}], ['toolGrants', {halacha:true}]]) {
+    pending.get('test-class/' + field + '.json')(value);
+  }
+  await run;
+  assert.equal(context.teacherClassRecord.active, true);
+  assert.equal(context.teacherClassRecord.siteEnabled, true);
+  assert.equal(context.teacherClassRecord.access.mode, 'open');
+  assert.equal(context.teacherClassRecord.toolGrants.halacha, true);
+});
