@@ -707,7 +707,7 @@ async function listPendingChazaraRequests(scope){
     for(const studentId of Object.keys(scope.students)){
       for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
     }
-    return rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    return (await sweepPendingMilestones(rows)).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
   // Owner viewing all classes has no class scope. Self-heal every student's
   // saved Chazaras too, so the owner's "All classes" view also recovers
@@ -722,8 +722,29 @@ async function listPendingChazaraRequests(scope){
     const item=child.val() || {};
     if(item.status === "pending" && isReviewableRequest(item)) rows.push({id:child.key,...item});
   });
-  rows.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
-  return rows;
+  const manual=await sweepPendingMilestones(rows);
+  manual.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+  return manual;
+}
+
+const AUTOMATIC_MILESTONE_REVIEWER="Automatic: Posuk Practice milestone";
+async function approveAutomaticMilestone(requestId){
+  const result=await approvePendingRequest(requestId,AUTOMATIC_MILESTONE_REVIEWER);
+  if(result.ok&&result.status==="approved"&&!result.alreadyHandled){
+    await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).update({approvedAutomatically:true}).catch(()=>{});
+  }
+  return result;
+}
+// Older milestone requests created before automatic approval are paid the
+// next time any teacher loads the Chazara approval list.
+async function sweepPendingMilestones(rows){
+  const manual=[];
+  for(const row of rows){
+    if(isMilestoneRequest(row)){
+      try{await approveAutomaticMilestone(row.id)}catch(err){console.warn("Automatic milestone approval failed",row.id,err)}
+    }else manual.push(row);
+  }
+  return manual;
 }
 
 async function approvePendingRequest(requestId,reviewedBy){
@@ -1446,6 +1467,14 @@ exports.studentRewardsAutoAward = onRequest(
       }
 
       const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});
+      // Posuk Practice 100% milestones are verified above from the student's
+      // saved attempt, so they are paid immediately with no teacher approval.
+      // approvePendingRequest is idempotent: a request that is already
+      // approved (or was rejected earlier) is left exactly as it is.
+      if(isMilestoneRequest({source})&&result.status==="pending"){
+        const auto=await approveAutomaticMilestone(requestId);
+        if(auto.ok&&auto.status==="approved")return res.status(200).json({ok:true,requested:result.created,awarded:!auto.alreadyHandled,status:"approved",requestId,amount:Number(auto.actualAmount??amount)});
+      }
       if(shorashimVerification?.eventRef){
         await shorashimVerification.eventRef.update({pointRequestId:requestId,pointRequestStatus:result.status,pointRequestCreatedAt:Date.now()});
       }

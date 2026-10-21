@@ -124,7 +124,20 @@ function getActivityPointRequests(){
     .filter(x=>!state.classId || !x.item.classId || x.item.classId===state.classId)
     .sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
 }
-function pendingActivityPointRequests(){return getActivityPointRequests().filter(x=>x.item.status==="pending")}
+// Posuk Practice 100% milestones are automatic and never wait in this queue
+// (shared rule in ../approval-queue.js, also used by the homepage and Chazara page).
+function approvalQueueRules(){return window.FunTorahApprovalQueue||{needsManualApproval:i=>i?.status==="pending"&&!["reading100","translation100","understand100"].includes(String(i?.source||"")),isPendingAutomatic:i=>i?.status==="pending"&&["reading100","translation100","understand100"].includes(String(i?.source||""))}}
+function pendingActivityPointRequests(){const Q=approvalQueueRules();return getActivityPointRequests().filter(x=>x.item.status==="pending"&&Q.needsManualApproval(x.item))}
+let automaticPointSweepRunning=false;
+async function sweepAutomaticPosukPoints(){
+  if(automaticPointSweepRunning)return;
+  const Q=approvalQueueRules(), ids=getActivityPointRequests().filter(x=>Q.isPendingAutomatic(x.item)).map(x=>x.id);
+  if(!ids.length)return;
+  automaticPointSweepRunning=true;
+  try{for(const id of ids)await approveActivityPoint(id,true)}
+  catch(err){console.warn("Automatic Posuk point approval failed",err)}
+  finally{automaticPointSweepRunning=false}
+}
 function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length+pendingRefundRequests().length}
 // REFUND REQUESTS - 2026-10-08
 // Students ask for points back on any purchase or class contribution; nothing
@@ -252,6 +265,7 @@ async function loadRoot(){
   }
   if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";
   prepareDraft();renderClassSelect();setHeader();buildNav();
+  setTimeout(()=>{sweepAutomaticPosukPoints()},0);
 }
 async function ensureRewardModelV2(){
   if(state.root?.settings?.rewardModelV2Seeded===true)return false;
@@ -680,6 +694,12 @@ function activityPointRow(x){
 function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId],status=x.item.status||"pending";return `<div class="request"><em style="background:${esc(safeColor(s))}">${esc(s?.initials||"?")}</em><span><strong>${esc(s?.name||x.sid)}</strong><small>${esc(r?.name||"Reward")} · ${Number(x.item.cost)||0} ★ · ${esc(status)}</small></span>${status==="pending"?`<button class="deny" data-decline="${esc(x.sid)}|${esc(x.key)}">×</button><button class="approve" data-approve="${esc(x.sid)}|${esc(x.key)}">✓</button>`:""}${status==="ready"?`<button class="approve" data-collect="${esc(x.sid)}|${esc(x.key)}">Given</button>`:""}</div>`}
 async function setChazaraPointStatus(item,status){
   if(!item?.eventId||!item?.practiceStudentId)return;
+  // Shorashim recordings mirror their status on the Shorashim recording event,
+  // which is what the homepage and Shorashim page count.
+  if(["shorashim-recording","shorashim-no-hints"].includes(String(item.source||""))){
+    try{await db.ref(`posukPractice/shorashimLearning/recordingEvents/${item.practiceStudentId}/${item.eventId}/pointRequestStatus`).set(status)}catch(e){console.warn('Could not mirror Shorashim point status',e)}
+    return;
+  }
   const path=`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}`;
   const field=Number(item.amount||0)<0?"removalPointRequestStatus":"pointRequestStatus";
   try{await db.ref(path+'/'+field).set(status)}catch(e){console.warn('Could not mirror Chazara point status',e)}

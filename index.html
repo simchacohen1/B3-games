@@ -418,6 +418,7 @@ body > .subtitle::after {
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
 <script src="site-settings.js?v=20261020-demo-student"></script>
+<script src="approval-queue.js?v=20261021-approvals"></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -896,6 +897,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let approvalCenterAutoShown=false;
   let approvalCenterLoading=false;
   let approvalCounts={};
+  let approvalClassCounts={};
+  let approvalAttemptsCache=null,approvalAttemptsAt=0,approvalSweepAt=0;
+  const APPROVAL_POLL_MS=60000,APPROVAL_ATTEMPTS_MAX_AGE_MS=5*60000,APPROVAL_SWEEP_MIN_MS=5*60000;
+  const POINTS_API_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 
   const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
   const studentNudgeMessages={
@@ -988,9 +993,34 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     }
     list.innerHTML=active.map(function(item){
       const count=Number(approvalCounts[item.key]||0);
-      return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+'</small></span><span class="approval-center-count">'+count+'</span></a>';
+      const split=approvalClassSplitText(approvalClassCounts[item.key]);
+      return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+(split?' '+split:'')+'</small></span><span class="approval-center-count">'+count+'</span></a>';
     }).join("");
     return total;
+  }
+  function approvalClassSplitText(map){
+    if(!map)return "";
+    const names={et:"ET",wt:"WT"};
+    const parts=Object.keys(map).filter(function(k){return map[k]>0;}).sort().map(function(k){return (names[k]||(k?k.toUpperCase():"Unassigned"))+" "+map[k];});
+    return parts.length?"("+parts.join(" · ")+")":"";
+  }
+  function approvalClassFallback(x){return x&&x.className?({"B3 ET":"et","B3 WT":"wt"})[x.className]||"":"";}
+  // Posuk Practice 100% milestones are automatic. Anything still pending from
+  // before the automatic flow is paid through the same server approve action
+  // teachers use (idempotent: an already-approved request is never paid twice).
+  async function sweepAutomaticPosukPoints(pointRequestsMap){
+    const Q=window.FunTorahApprovalQueue;
+    if(!Q||!isAuthorizedAdmin||Date.now()-approvalSweepAt<APPROVAL_SWEEP_MIN_MS)return;
+    const ids=Q.automaticQueue(pointRequestsMap).map(function(x){return x.id;});
+    if(!ids.length)return;
+    approvalSweepAt=Date.now();
+    try{
+      const user=firebase.auth().currentUser;if(!user)return;
+      const token=await user.getIdToken();
+      for(const id of ids){
+        await fetch(POINTS_API_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action:"approve-point-request",requestId:id})}).catch(function(err){console.warn("Automatic Posuk point approval failed",id,err);});
+      }
+    }catch(err){console.warn("Automatic Posuk point sweep failed",err);}
   }
   function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
   function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
@@ -999,7 +1029,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     approvalCenterLoading=true;
     renderApprovalCenter();
     const reads=[
-      ["attempts",db.ref("posukPractice/attempts").once("value")],
+      // The full Posuk attempts tree is large; reuse it for a few minutes.
+      ["attempts",(approvalAttemptsCache&&Date.now()-approvalAttemptsAt<APPROVAL_ATTEMPTS_MAX_AGE_MS)?Promise.resolve(approvalAttemptsCache):db.ref("posukPractice/attempts").once("value").then(function(snap){approvalAttemptsCache=snap;approvalAttemptsAt=Date.now();return snap;})],
       ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
       ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
       ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
@@ -1021,10 +1052,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     const galleryClass=Object.keys(galleryByClass).sort(function(a,b){return galleryByClass[b]-galleryByClass[a];})[0];
     const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
     if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
-    const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
+    const Q=window.FunTorahApprovalQueue;
+    // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
+    // milestones never count as manual approvals.
+    const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];
+    approvalClassCounts={
+      chazara:Q.countByClass(chazaraPending,approvalClassFallback),
+      gallery:Q.countByClass(galleryPending.map(function(x){return {classId:x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et"};}))
+    };
+    if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
-      chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
+      chazara:chazaraPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
       gallery:galleryPending.length,
@@ -1049,13 +1088,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(approvalCenterTimer)clearInterval(approvalCenterTimer);
     // Keep the corner approval badge updated without auto-opening the center modal.
     loadApprovalCenter(false);
-    approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
+    approvalCenterTimer=setInterval(function(){if(!document.hidden)loadApprovalCenter(false);},APPROVAL_POLL_MS);
   }
   function stopApprovalCenter(){
     if(approvalCenterTimer){clearInterval(approvalCenterTimer);approvalCenterTimer=null;}
     el("approvalCenterButton").classList.add("hidden");
     closeApprovalCenter();
     approvalCounts={};
+    approvalClassCounts={};
+    approvalAttemptsCache=null;approvalAttemptsAt=0;
     approvalCenterAutoShown=false;
   }
 
@@ -2176,7 +2217,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
   el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
-  el("approvalCenterRefresh")?.addEventListener("click",()=>loadApprovalCenter(false));
+  el("approvalCenterRefresh")?.addEventListener("click",()=>{approvalAttemptsAt=0;loadApprovalCenter(false);});
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
