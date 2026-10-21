@@ -572,6 +572,9 @@
     if(studentClassId!=="et"&&studentClassId!=="wt"){
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
+      if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){
+        showClosed("Your class tools are locked", "Your teacher can unlock the assigned tools.");return;
+      }
       showOpen();return;
     }
 
@@ -626,9 +629,16 @@
       showOpen();
       return;
     }
-    // Per-tool policy above already checked grants and ET/WT enablement.
-    // The retired website-wide/class-wide schedule must not block a tool.
-    showOpen();
+    // Keep the existing ET/WT automatic class timetable as the default
+    // gate for every tool. Individual activity and student exceptions above
+    // remain effective. The separate master website switch is retired.
+    var info = classIsOpen(lastSettings, studentClassId);
+    if (info.open) {
+      showOpen();
+    } else {
+      showClosed((studentClassId === "et" ? "ET" : "WT") + " tools are locked right now",
+        "Your teacher can open an individual activity or adjust the class schedule.");
+    }
   }
 
   function checkNow() {
