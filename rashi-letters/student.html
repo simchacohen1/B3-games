@@ -692,7 +692,7 @@ async function checkAccess(name, pin){
     db.ref('b3Games/siteSettings').once('value')
   ]);
   const siteSettings=siteSettingsSnap.val()||{},gamesMap=siteSettings.games||{};
-  if(siteSettings.siteEnabled===false||gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
   if(lockSnap.val()===true)return {ok:false,reason:'Practice is closed right now. Ask your teacher.'};
   let profile=profileSnap.val();
   if(!profile){

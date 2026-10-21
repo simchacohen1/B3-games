@@ -345,7 +345,7 @@ function applyMasterBlocked() {
 db.ref('b3Games/siteSettings').on('value', snap => {
   const settings = snap.val() || {};
   const gamesMap = settings.games || {};
-  masterBlocked = settings.siteEnabled === false || gamesMap['game-show'] === false;
+  masterBlocked = gamesMap['game-show'] === false;
   applyMasterBlocked();
 }, err => {
   console.warn('Could not read master site settings', err);
