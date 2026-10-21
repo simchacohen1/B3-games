@@ -29,7 +29,7 @@ test('device changes remain pending until an account save succeeds',()=>{
 });
 test('student token endpoint validates passcode, requested student and active class before issuing token',()=>{
  assert.match(server,/action==='halachaToken'/);
- assert.match(server,/await studentAuth\(store,\{action:'login',name:body\.name,pin:body\.pin\},req\.ip\)/);
+ assert.match(server,/await studentAuth\(store,\{action:'login',name:body\.name,pin:body\.pin,studentId:body\.studentId\},req\.ip\)/);
  assert.match(server,/student\.id!==studentId/);
  assert.match(server,/!enrolled\|\|!cls\|\|cls\.active===false/);
  assert.match(server,/studentTools\.allowed\(cls,studentId,'halacha'\)/);

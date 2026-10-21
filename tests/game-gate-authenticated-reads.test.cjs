@@ -74,6 +74,6 @@ test('all affected student activities load the corrected authenticated gate vers
     'sefer-hamitzvos/index.html'
   ]){
     const html=fs.readFileSync(path,'utf8');
-    assert.match(html,/game-gate\.js\?v=20261020-pointer-lifecycle5/,path+' must not use the stale access gate');
+    assert.match(html,/game-gate\.js\?v=20261021-signin-speed2/,path+' must load the authenticated sign-in performance gate');
   }
 });

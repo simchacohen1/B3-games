@@ -122,6 +122,38 @@ test('the gate reads public settings and the permission script alongside the cla
  assert.doesNotMatch(check,/if\(!window\.B3StudentTools\)await loadOneScript/);
 });
 
+test('the first public settings read starts before waiting for Firebase auth restoration',()=>{
+ const check=gate.slice(gate.indexOf('function checkNow()'));
+ const publicRead=check.indexOf('settingsRead = fetchJson(settingsUrl, true)');
+ const studentWork=check.indexOf('await resolveStudentClass()');
+ assert.ok(publicRead>=0&&publicRead<studentWork,'public settings start before private profile and membership reads wait on auth');
+});
+
+test('the access warning timer starts with the access request, not during script evaluation',()=>{
+ assert.match(gate,/var firstLoadFailsafe = null;/);
+ assert.match(gate,/function startFirstLoadFailsafe\(\)/);
+ assert.match(gate,/startFirstLoadFailsafe\(\);/);
+ assert.doesNotMatch(gate,/var firstLoadFailsafe = setTimeout/);
+});
+
+test('the gate does not inject a second audio-mode request when a page already loads it',()=>{
+ assert.match(gate,/script\[data-ftt-audio-mode\],script\[src\*="audio-mode\.js"\]/);
+});
+
+test('Posuk Practice does not GET the POST-only reward endpoint on page load',()=>{
+ const page=read('record_pesukim/student.html');
+ const reward=page.slice(page.indexOf('const STUDENT_REWARDS_AUTO_AWARD_URL'),page.indexOf('function showRewardToast'));
+ assert.match(page,/fetch\(STUDENT_REWARDS_AUTO_AWARD_URL,\{[\s\S]{0,100}method:'POST'/);
+ assert.doesNotMatch(page,/fetch\(STUDENT_REWARDS_AUTO_AWARD_URL,\s*\{\s*mode:\s*['"]no-cors/);
+});
+
+test('Halacha creates the mini controls node before inserting the text-box toggle',()=>{
+ const page=read('halacha/index.html');
+ const helper=page.slice(page.indexOf('function ensureBgToggle(e){'),page.indexOf('document.addEventListener("click"',page.indexOf('function ensureBgToggle(e){')));
+ assert.match(helper,/if\(!mini\)\{mini=document\.createElement\("div"\);mini\.className="mini";e\.appendChild\(mini\)\}/);
+ assert.ok(helper.indexOf('e.appendChild(mini)')<helper.indexOf('mini.insertBefore(b,mini.firstChild)'));
+});
+
 test('student reads wait only for Firebase sign-in, not the teacher helper script',()=>{
  const watch=gate.slice(gate.indexOf('async function watchTeacherAccess'),gate.indexOf('function getStoredStudentId'));
  assert.ok(watch.indexOf('markAuthReady();')<watch.indexOf('await settingsScript'),'auth is released before site-settings.js finishes');
@@ -162,6 +194,6 @@ test('every page that uses the gate loads the new gate file version',()=>{
  for(const file of pages()){
   const s=fs.readFileSync(file,'utf8');
   const m=s.match(/game-gate\.js\?v=([A-Za-z0-9._-]+)/);
-  if(m&&m[1].startsWith('20261021-'))assert.equal(m[1],'20261021-signin-speed1',path.relative(root,file));
+  if(m&&m[1].startsWith('20261021-'))assert.equal(m[1],'20261021-signin-speed2',path.relative(root,file));
  }
 });

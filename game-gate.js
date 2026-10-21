@@ -48,8 +48,8 @@
 
   var rootBase = new URL("./", scriptEl.src);
   // One free, opt-in audio switch shared by student activities.
-  // Audio Mode never makes a paid synthesis request.
-  if (!document.querySelector('script[data-ftt-audio-mode]')) {
+  // Pages that already load the shared script should not fetch it again.
+  if (!document.querySelector('script[data-ftt-audio-mode],script[src*="audio-mode.js"]')) {
     var audioScript = document.createElement("script");
     audioScript.src = new URL("audio-mode.js?v=20261012-game-show-choices", rootBase).href;
     audioScript.defer = true;
@@ -143,15 +143,18 @@
   var requestInFlight = false;
   var refreshRequested = false;
   var firstDecisionMade = false;
-  var firstLoadFailsafe = setTimeout(function () {
-    if (firstDecisionMade) return;
-    console.warn("B3 game gate: first access check is taking too long.");
-    showClosed(
-      "Still checking access…",
-      "The access check is taking longer than expected. This page will keep trying automatically."
-    );
-  }, FIRST_LOAD_FAILSAFE_MS);
-
+  var firstLoadFailsafe = null;
+  function startFirstLoadFailsafe() {
+    if (firstDecisionMade || firstLoadFailsafe) return;
+    firstLoadFailsafe = setTimeout(function () {
+      if (firstDecisionMade) return;
+      console.warn("B3 game gate: first access check is taking too long.");
+      showClosed(
+        "Still checking access…",
+        "The access check is taking longer than expected. This page will keep trying automatically."
+      );
+    }, FIRST_LOAD_FAILSAFE_MS);
+  }
   function reveal() {
     var el = document.getElementById("b3-gate-hide-style");
     if (el && el.parentNode) el.parentNode.removeChild(el);
@@ -703,17 +706,17 @@
     followActivityOpen = false;
 
     var settingsUrl = DATABASE_URL + "/" + SETTINGS_PATH + ".json";
-    var settingsRead = null;
+    // Settings are public and do not depend on Firebase auth restoration. Start
+    // this request immediately so a slow auth observer cannot delay the gate.
+    var settingsRead = fetchJson(settingsUrl, true).catch(function () { return fetchJson(settingsUrl); });
+    settingsRead.catch(function () {});
+    startFirstLoadFailsafe();
     Promise.resolve().then(async function () {
       // These three are independent, so they run together: the permission
       // script, the public site settings, and the student/teacher class reads.
       var policyReady = window.B3StudentTools ? null :
         loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
       if (policyReady) policyReady.catch(function () {});
-      // The public settings need no sign-in. If they ever stop being public,
-      // the signed-in request below still works.
-      settingsRead = fetchJson(settingsUrl, true).catch(function () { return fetchJson(settingsUrl); });
-      settingsRead.catch(function () {});
       if(storedTeacherBypass()){if(policyReady)await policyReady;return;}
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();

@@ -35,7 +35,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261021-signin-speed1" data-game-id="posuk-practice-scroll"></script>
+<script src="../game-gate.js?v=20261021-signin-speed2" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1574,8 +1574,6 @@ const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/s
    teacher-reviewed request. Each request is recorded once per Posuk.
    ========================================================= */
 const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
-// Wake the point service on page load so the reward popup is not delayed by a cold start.
-fetch(STUDENT_REWARDS_AUTO_AWARD_URL, { mode: 'no-cors' }).catch(() => {});
 
 function showRewardToast(points,pending=false){
   if(!points) return;
