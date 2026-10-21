@@ -12,7 +12,7 @@
   var loader = document.currentScript;
   var base = new URL('./', loader && loader.src || location.href);
   var API = null, bar = null, select = null, lock = null, follow = null;
-  var homeFollow = null, modal = null, modalTitle = null;
+  var homeFollow = null, modal = null, modalTitle = null, modalClassSelect = null;
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
   var lastFollowClass = '';
@@ -58,6 +58,16 @@
     if (homeFollow) homeFollow.setAttribute('aria-expanded', 'false');
     if (lock) lock.setAttribute('aria-expanded', 'false');
   }
+  function updatePanelClass(id) {
+    if (!classes.some(function(row) { return row.id === id; })) return;
+    remember(id);
+    if (select) select.value = id;
+    if (modalClassSelect) modalClassSelect.value = id;
+    if (!modal || modal.hidden || !activePanel) return;
+    var which = activePanel;
+    activePanel = '';
+    openPanel(which);
+  }
   function openPanel(which) {
     var id = currentClass();
     if (!authorized || !ID.test(id) || !classes.some(function(row) { return row.id === id; })) return;
@@ -65,7 +75,8 @@
     if (!modal.hidden && activePanel === which) { closePanel(); return; }
     activePanel = which;
     modal.hidden = false;
-    modalTitle.textContent = (which === 'access' ? '🔒 Class Access · ' : '👣 Follow the Teacher · ') + chosenLabel();
+    modalTitle.textContent = which === 'access' ? '🔒 Class Access' : '👣 Follow the Teacher';
+    if (modalClassSelect) modalClassSelect.value = id;
     accessFrame.hidden = which !== 'access';
     followFrame.hidden = which !== 'follow';
     if (which === 'access') {
@@ -112,9 +123,9 @@
     select = el('select'); select.id = 'fttTeacherQuickClass'; select.setAttribute('aria-label','Teaching class');
     lock = el('button', '', '🔒'); lock.id='fttTeacherQuickLock'; lock.setAttribute('aria-label','Open Class Access'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
     follow = el('button', '', '👣'); follow.setAttribute('aria-label','Open or close Follow the Teacher'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
-    bar.append(label, select, lock, follow);
+    bar.append(lock, follow);
     document.body.appendChild(bar);
-    select.addEventListener('change', function () { if (classes.some(function(c){return c.id===select.value;})) { remember(select.value); if (!modal.hidden && activePanel) { closePanel(); } } });
+    select.addEventListener('change', function () { updatePanelClass(select.value); });
     lock.addEventListener('click', function(){ openPanel('access'); });
     follow.addEventListener('click', function(){ openPanel('follow'); });
 
@@ -123,6 +134,12 @@
     var card = el('div','ftt-quick-card'), head = el('div','ftt-quick-head');
     modalTitle = el('span', '', 'Teacher controls');
     var actions = el('div','ftt-quick-actions');
+    var classLabel = el('label', '', 'Class'); classLabel.htmlFor = 'fttTeacherModalClass';
+    modalClassSelect = el('select'); modalClassSelect.id = 'fttTeacherModalClass';
+    modalClassSelect.setAttribute('aria-label','Choose class for teacher controls');
+    modalClassSelect.style.cssText = 'max-width:180px;padding:8px;border:1px solid #cbd5e1;border-radius:9px;background:white;color:#1e293b;font:700 14px Arial';
+    modalClassSelect.addEventListener('change', function(){ updatePanelClass(modalClassSelect.value); });
+    actions.append(classLabel, modalClassSelect);
     var popout = el('button','ftt-quick-popout','↗ Separate window'); popout.type = 'button';
     popout.title = 'Keep Follow running in its own window while you visit other teacher pages';
     var dismiss = el('button','ftt-quick-close','✕ Close'); dismiss.type = 'button';
@@ -145,6 +162,11 @@
       var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
     });
     select.value = selected;
+    if (modalClassSelect) {
+      modalClassSelect.replaceChildren();
+      classes.forEach(function(row) { var opt = el('option','',row.name);opt.value=row.id;modalClassSelect.appendChild(opt); });
+      modalClassSelect.value = selected;
+    }
   }
   function syncHomeButton(access) {
     var homeBar = document.getElementById('homeClassBar');
