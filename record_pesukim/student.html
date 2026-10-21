@@ -4979,17 +4979,47 @@ function promiseWithTimeout(promise, ms, label){
 }
 
 const translationPieceCache = new Map();
-async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
-  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
-  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
+const translationPieceRequests = new Map();
+function translationPieceKey(part){
+  return JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+}
+function cachedTranslationPieces(part){
+  const key = translationPieceKey(part);
+  if(translationPieceCache.has(key)) return translationPieceCache.get(key);
+  try{
+    const levels = JSON.parse(localStorage.getItem('posukPractice_translationPieces_v1_' + key));
+    if(Array.isArray(levels) && levels.length){
+      translationPieceCache.set(key, levels);
+      return levels;
+    }
+  }catch(err){ /* Storage may be unavailable. */ }
+  return null;
+}
+function rememberTranslationPieces(key, levels){
+  translationPieceCache.set(key, levels);
+  try{
+    localStorage.setItem('posukPractice_translationPieces_v1_' + key, JSON.stringify(levels));
+  }catch(err){ /* Retain the memory cache if storage is full or disabled. */ }
+}
+function fetchOrGenerateTranslationLevelsForPart(part){
+  const cached = cachedTranslationPieces(part);
+  if(cached) return Promise.resolve(cached);
+  const key = translationPieceKey(part);
+  if(translationPieceRequests.has(key)) return translationPieceRequests.get(key);
+  const request = fetchTranslationLevelsForPart(part, key)
+    .finally(() => translationPieceRequests.delete(key));
+  translationPieceRequests.set(key, request);
+  return request;
+}
+async function fetchTranslationLevelsForPart(part, cacheKey){
+  const perekNum = currentPerekNum;
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
-    if(myToken !== translationLoadToken) return null;
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      translationPieceCache.set(cacheKey, snap.val().levels);
+      rememberTranslationPieces(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -4998,7 +5028,8 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
 
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
-    const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
+    const refs = await fetchClassroomReferenceChapter(perekNum);
+    const classroomReferenceTranslation = refs[part.posukNum - 1] || '';
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     let res;
@@ -5008,21 +5039,21 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
+          translationCacheKey: part.key,
           posukText: part.text,
           posukTranslation: part.translation || '',
           classroomReferenceTranslation,
-          perekNum: currentPerekNum,
+          perekNum,
           posukNum: part.posukNum
         })
       });
     }finally{ clearTimeout(timeout); }
-    if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     // Keep successful pieces for this visit too, including when returning
     // to a posuk. Failed requests remain retryable.
-    translationPieceCache.set(cacheKey, data.levels);
+    rememberTranslationPieces(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
@@ -5548,6 +5579,8 @@ async function finishTranslationPillRecording(idx){
 function gradeSingleTranslationSegment(idx, level){
   const chunk = level.chunks[idx];
   const seg = translationSegments[idx];
+  const gradingToken = translationLoadToken;
+  const isCurrent = () => gradingToken === translationLoadToken && translationSegments[idx] === seg;
   const promise = (async () => {
     if(!GRADE_TRANSLATION_CHUNK_URL || GRADE_TRANSLATION_CHUNK_URL.indexOf('PASTE') === 0){
       return;
@@ -5563,9 +5596,12 @@ function gradeSingleTranslationSegment(idx, level){
         const kehotRefs = await fetchKehotChapterTranslation(currentPerekNum);
         formData.append('kehotReferenceTranslation', kehotRefs[(chunk.posukNum || currentPosukNum) - 1] || '');
       }catch(_err){}
+      if(!isCurrent()) return;
       const res = await B3PaidApi.fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
       if(!res.ok) throw new Error('Grading request failed');
       const data = await res.json();
+      if(!isCurrent()) return;
+      if(!['correct', 'incorrect', 'no_speech'].includes(data.verdict)) throw new Error('Invalid grading result');
       if(data.verdict === 'no_speech'){
         translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'', evidenceSaved:false };
       } else {
@@ -5581,12 +5617,15 @@ function gradeSingleTranslationSegment(idx, level){
         translationGradedResults[idx].evidenceSaved = false;
       }
     }catch(err){
+      if(!isCurrent()) return;
       console.error('gradeTranslationChunk error', err);
-      translationGradedResults[idx] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'', evidenceSaved:false };
+      document.getElementById('translationResult').textContent = 'Could not check this piece. Your recording is kept; please try again.';
+      return;
     }
     // Show the live score/breakdown card as soon as THIS piece is graded.
     // If its evidence could not be saved, the dispute control stays hidden
     // rather than sending the teacher a dispute with no recording.
+    if(!isCurrent()) return;
     showTranslationSummary(level);
     renderCurrentChunk();
   })();
