@@ -417,6 +417,16 @@ async function galleryPrivateMediaUrl(path){
 async function resolveGalleryMedia(rows){await Promise.all(rows.map(async p=>{for(const [field,pathField] of [['audioUrl','audioStoragePath'],['videoUrl','videoStoragePath']])if(p[pathField]){try{p[field]=await galleryPrivateMediaUrl(p[pathField])}catch(error){console.warn('Gallery media unavailable:',error.message);p[field]=''}}}));return rows;}
 function wrapCanvasText(ctx,text,x,y,maxWidth,lineHeight,maxLines){ const words=String(text||'').split(/\s+/); let line='',lines=[]; for(const word of words){ const test=line?line+' '+word:word; if(ctx.measureText(test).width>maxWidth && line){lines.push(line);line=word;if(lines.length>=maxLines-1) break;}else line=test;} if(line&&lines.length<maxLines)lines.push(line); lines.forEach((ln,i)=>ctx.fillText(ln,x,y+i*lineHeight)); return lines.length; }
 function roundedRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+// Speed: signs and labels are drawn once and reused when the 3D room is rebuilt,
+// so the browser does not re-upload hundreds of pictures to the graphics card each time.
+const labelTextureCache=new Map();
+function cachedLabelTexture(key,draw){
+  const fontsReady=!document.fonts||document.fonts.status==='loaded';
+  if(fontsReady&&labelTextureCache.has(key))return labelTextureCache.get(key);
+  const tex=makeTexture(draw());
+  if(fontsReady){tex.userData.keep=true;labelTextureCache.set(key,tex);}
+  return tex;
+}
 function makeTexture(canvas){ const tex=new THREE.CanvasTexture(canvas); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.()||1); tex.needsUpdate=true; return tex; }
 function classroomLabel(id){ return CLASSROOMS.find(r=>r.id===id)?.label || 'Main Hallway'; }
 function populateRoomSelect(){
@@ -873,11 +883,12 @@ function addDirectoryBoard(side,z,classLabel,names,frameMat,corkMat){
 }
 
 function makeDirectoryNameLabel(name,w,h){
+  const tex=cachedLabelTexture('dir:'+name,()=>{
   const c=document.createElement('canvas');c.width=1000;c.height=72;const ctx=c.getContext('2d');
   ctx.fillStyle='rgba(255,250,240,.96)';roundedRect(ctx,5,5,990,62,14);ctx.fill();
   ctx.strokeStyle='rgba(126,91,55,.34)';ctx.lineWidth=3;ctx.stroke();
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#43566a';ctx.font='700 31px Quicksand, sans-serif';ctx.fillText(name,500,37);
-  const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
+  return c;});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
 }
 
 function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,wallX=6.51,targetExtra={}){
@@ -915,10 +926,11 @@ function addDoor(side,z,woodMat,trimMat,label,roomId){
 }
 
 function makePlaqueMesh(title,subtitle,w,h){
+  const tex=cachedLabelTexture('plaque:'+title+'\n'+subtitle,()=>{
   const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d');
   const g=ctx.createLinearGradient(0,0,1024,0);g.addColorStop(0,'#7f4d2c');g.addColorStop(.5,'#b37848');g.addColorStop(1,'#7a4828');ctx.fillStyle=g;roundedRect(ctx,12,12,1000,232,28);ctx.fill();ctx.strokeStyle='#5f351f';ctx.lineWidth=12;ctx.stroke();
   ctx.textAlign='center';ctx.fillStyle='#fff6e7';ctx.font='700 74px Caveat, cursive';ctx.fillText(title,512,111);ctx.font='700 30px Quicksand, sans-serif';ctx.fillStyle='#f4dfbf';ctx.fillText(subtitle,512,174);
-  const tex=makeTexture(c);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.62,side:THREE.FrontSide});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+  return c;});const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.62,side:THREE.FrontSide});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
 }
 function makeDoubleSidedPlaque(title,subtitle,w,h){
   const g=new THREE.Group();
@@ -927,21 +939,31 @@ function makeDoubleSidedPlaque(title,subtitle,w,h){
   return g;
 }
 function makeSmallBoardTitle(text,w,h){
-  const c=document.createElement('canvas');c.width=768;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='rgba(247,241,228,.96)';roundedRect(ctx,4,4,760,152,18);ctx.fill();ctx.strokeStyle='#8e5b35';ctx.lineWidth=12;ctx.stroke();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#48586a';ctx.font='700 56px Caveat, cursive';ctx.fillText(text,384,84);const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.8,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
+  const tex=cachedLabelTexture('board:'+text,()=>{const c=document.createElement('canvas');c.width=768;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='rgba(247,241,228,.96)';roundedRect(ctx,4,4,760,152,18);ctx.fill();ctx.strokeStyle='#8e5b35';ctx.lineWidth=12;ctx.stroke();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#48586a';ctx.font='700 56px Caveat, cursive';ctx.fillText(text,384,84);return c;});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.8,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
 }
 function makeEmptyCard(){
-  const c=document.createElement('canvas');c.width=600;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle='#fffaf0';roundedRect(ctx,12,12,576,276,18);ctx.fill();ctx.strokeStyle='#d8c9b0';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle='#8c7b69';ctx.font='700 30px Quicksand';ctx.fillText('Waiting for work to be pinned…',300,158);const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.05),new THREE.MeshStandardMaterial({map:tex,side:THREE.DoubleSide,roughness:.86,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  const tex=cachedLabelTexture('empty',()=>{const c=document.createElement('canvas');c.width=600;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle='#fffaf0';roundedRect(ctx,12,12,576,276,18);ctx.fill();ctx.strokeStyle='#d8c9b0';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle='#8c7b69';ctx.font='700 30px Quicksand';ctx.fillText('Waiting for work to be pinned…',300,158);return c;});return new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.05),new THREE.MeshStandardMaterial({map:tex,side:THREE.DoubleSide,roughness:.86,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
 }
 
 const projectCardCache=new Map();
 function projectCardKey(post){const img=String(post.image||'');return [post.id,post.title,post.category,post.studentName,post.className,img.length,img.slice(0,48),img.slice(-48)].join('|');}
-function pruneProjectCardCache(){const live=new Set(posts.map(projectCardKey));for(const k of projectCardCache.keys())if(!live.has(k))projectCardCache.delete(k);}
+function pruneProjectCardCache(){const live=new Set(posts.map(projectCardKey));for(const [k,entry] of projectCardCache)if(!live.has(k)){entry.tex?.dispose?.();projectCardCache.delete(k);}}
 function createProjectCard(post){
   const key=projectCardKey(post);let entry=projectCardCache.get(key);
   if(!entry){entry=drawProjectCardCanvas(post);projectCardCache.set(key,entry);}
-  const tex=makeTexture(entry.canvas);entry.textures.add(tex);tex.addEventListener('dispose',()=>entry.textures.delete(tex));
+  if(!entry.tex){entry.tex=makeTexture(entry.canvas);entry.tex.userData.keep=true;entry.textures.add(entry.tex);}
+  const tex=entry.tex;
   const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
   return mesh;
+}
+const cardRedrawQueue=[];
+function queueCardRedraw(fn){
+  cardRedrawQueue.push(fn);
+  if(cardRedrawQueue.length===1)requestAnimationFrame(function step(){
+    const start=performance.now();
+    let done=0;while(cardRedrawQueue.length&&done<2&&performance.now()-start<8){done++;try{cardRedrawQueue.shift()();}catch(e){console.warn(e);}}
+    if(cardRedrawQueue.length)requestAnimationFrame(step);
+  });
 }
 function drawProjectCardCanvas(post){
   const c=document.createElement('canvas');c.width=512;c.height=610;const ctx=c.getContext('2d');const entry={canvas:c,textures:new Set()};
@@ -959,7 +981,9 @@ function drawProjectCardCanvas(post){
     // Pictures stored on another site must allow CORS, or WebGL refuses the whole texture
     // ("Tainted canvases may not be loaded") and the hallway glitches. If they don't, keep the placeholder.
     if(!/^(data|blob):/i.test(post.image))img.crossOrigin='anonymous';
-    img.onload=()=>{redraw(img);try{ctx.getImageData(0,0,1,1);}catch(e){redraw(null);}entry.textures.forEach(t=>t.needsUpdate=true);};
+    // Speed: decode the picture in the background, then draw a few cards per frame instead of all at once.
+    // (crossOrigin is set above, so a picture without permission fails to load instead of breaking the 3D view.)
+    img.onload=()=>{(img.decode?img.decode():Promise.resolve()).catch(()=>{}).then(()=>queueCardRedraw(()=>{redraw(img);entry.textures.forEach(t=>t.needsUpdate=true);}));};
     img.onerror=()=>console.warn('Gallery picture could not be shown in 3D:',post.title||post.id);
     img.src=post.image;
   }
@@ -1178,7 +1202,7 @@ function closeAvatarChooser(save=true){
 }
 
 
-function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map)m.map.dispose?.();m.dispose?.();});}});}
+function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map&&!m.map.userData?.keep)m.map.dispose?.();m.dispose?.();});}});}
 
 function currentPresenceSpace(){
   if(sceneMode==='classroom')return 'classroom:'+String(activeClassroomId||'');
