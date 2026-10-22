@@ -8,7 +8,7 @@ const integration=fs.readFileSync('halacha/illustrations-integration.js','utf8')
 const source=fs.readFileSync('halacha/siman-c-source.js','utf8');
 
 test('recovered package assets are integrated without replacing existing Siman 2 lessons',()=>{
-  assert.match(html,/illustrations-integration\.js\?v=20261022-recovered3/);
+  assert.match(html,/illustrations-integration\.js\?v=20261022-recovered4/);
   assert.match(html,/siman-c-source\.js\?v=20261022-authentic-text1/);
   const start=html.indexOf('const lessons=['),end=html.indexOf('];',start);
   const lessons=Function('return ('+html.slice(start,end+1).replace('const lessons=','')+')')();
