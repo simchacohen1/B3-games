@@ -4,7 +4,7 @@
 'use strict';
 const artRoot='recovered-art/';
 const siman2={
- s2a:[1,2],s2b:[3],s2extra:[3],s2c:[4,5],s2d:[6,7,8,9]
+ s2a:[1,2],s2b:[3,4,5],s2extra:[3,4,5],s2c:[6,7,8],s2d:[9]
 };
 const siman3={s3a:[1],s3b:[2],s3c:[3],s3d:[4],s3e:[5],s3f:[6],s3g:[7],s3h:[8]};
 const vocabulary={
@@ -18,15 +18,25 @@ const vocabulary={
  8:[['מִדָּה בֵינוֹנִית','a moderate degree'],['קֹמָה זְקוּפָה','upright posture']],
  9:[['שְׁתֵּי נָשִׁים','two women'],['כְּלָבִים','dogs'],['חֲזִירִים','swine']]
 };
+const vocabulary3={
+ 1:[['צָנוּעַ','modest'],['כַּחֲשֵׁכָה כָּאוֹרָה','darkness is like light']],
+ 2:[['הַכְנָעָה','humility'],['צְנִיעוּת','modesty']],
+ 3:[['חֻקּוֹת הַגּוֹיִים','the customs of the nations'],['עֲנָוָה','humility']],
+ 4:[['בְּגָדִים נְקִיִּים','clean clothing'],['גַּאֲוָה','pride']],
+ 5:[['יָמִין','right'],['שְׂמֹאל','left']],
+ 6:[['שְׁנֵי בְגָדִים','two garments'],['שִׁכְחָה','forgetfulness']],
+ 7:[['גִּלּוּי הָרֹאשׁ','uncovered head'],['דָּבָר שֶׁבִּקְדֻשָּׁה','holy words']],
+ 8:[['מִדָּה בֵינוֹנִית','moderation'],['קֹמָה זְקוּפָה','standing straight']]
+};
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const styles=document.createElement('style');
 styles.textContent=`
-.hal-recovered{margin:16px 0 20px;padding:14px;border:2px solid #a9cfdf;border-radius:15px;background:#f7fbff}
+.hal-recovered{margin:16px 0 20px;padding:clamp(12px,2vw,24px);border:2px solid #b4d4e3;border-radius:20px;background:linear-gradient(145deg,#f5fbff,#fffbf3);box-shadow:0 7px 24px #173b6214}
 .hal-recovered h3{margin:0 0 10px;color:#173b62}
-.hal-recovered-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-.hal-recovered-card{margin:0;padding:9px;background:white;border:1px solid #ccdce5;border-radius:12px;box-shadow:0 2px 6px #183b5910}
-.hal-recovered-card img{width:100%;height:auto;display:block;cursor:pointer}
-.hal-recovered-card figcaption{font-weight:850;text-align:center;padding:7px}
+.hal-recovered-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.hal-recovered-card{margin:0;padding:14px;background:#fff;border:1px solid #c4d9e6;border-radius:16px;box-shadow:0 4px 12px #183b5910;min-width:0}
+.hal-recovered-card img{width:100%;height:auto;display:block;border-radius:9px;background:#fff;object-fit:contain;max-height:360px}
+.hal-recovered-card figcaption{font-weight:850;text-align:right;padding:8px;font-size:22px;color:#173b62}
 .hal-recovered-actions{display:flex;gap:7px;flex-wrap:wrap}
 .hal-recovered-actions button,.hal-recovered button{border:0;border-radius:8px;padding:8px 10px;background:#155d8c;color:#fff;font-weight:800;cursor:pointer}
 .hal-recovered-actions button:disabled,.hal-recovered button:disabled{opacity:.55;cursor:not-allowed}
@@ -36,8 +46,15 @@ styles.textContent=`
 .hal-recovered-colors input[type=color]{width:42px;height:38px}
 .hal-recovered-words{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .hal-recovered-word{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #bed5e1;border-radius:9px;padding:6px 8px}
-.hal-recovered-word strong{font-size:19px}
-.hal-recovered-word button{font-size:12px;padding:6px}
+.hal-recovered-word strong{font-size:20px}
+.hal-recovered-word button{font-size:12px;padding:8px}
+.hal-recovered-lead{font-size:15px;color:#48627a;margin:3px 0 16px}
+.hal-recovered-word{flex-wrap:wrap}.hal-recovered-word .hal-word-meaning[hidden]{display:none}
+.hal-recovered-word .hal-word-meaning{font-weight:700;color:#245276}
+.hal-recovered-words{padding:12px;background:#eaf5fb;border-radius:13px}
+.hal-recovered-actions{margin-top:10px}
+.hal-recovered button:focus-visible{outline:3px solid #e3a824;outline-offset:3px}
+@media(max-width:640px){.hal-recovered-grid{grid-template-columns:1fr}.hal-recovered-card{padding:10px}}
 `;
 document.head.appendChild(styles);
 function readonly(){return !!window.HALACHA_TEACHER_PREVIEW||!!window.HALACHA_TEACHER_VIEW||new URLSearchParams(location.search).has('teacherView')}
@@ -81,14 +98,14 @@ function addGallery(lessonId,seifNumbers,simanNumber){
  const host=document.getElementById(lessonId);if(!host||host.querySelector('.hal-recovered'))return;
  const box=document.createElement('section');box.className='hal-recovered';box.setAttribute('aria-label','Illustrations and vocabulary for Kitzur seifim');
  const head=document.createElement('h3');head.textContent='סימן '+(simanNumber===2?'ב׳':'ג׳')+' — Illustrated Seifim';box.append(head);
- const grid=document.createElement('div');grid.className='hal-recovered-grid';box.append(grid);
+ const lead=document.createElement('p');lead.className='hal-recovered-lead';lead.textContent='Read the seif, explore its picture, then identify the key Hebrew words. Color the picture and add your work to your scrapbook.';box.append(lead);const grid=document.createElement('div');grid.className='hal-recovered-grid';box.append(grid);
  if(simanNumber===2&&lessonId==='s2a'){
   const summary=document.createElement('figure');summary.className='hal-recovered-card';
   const summaryImage=document.createElement('img');summaryImage.src=artRoot+'siman-2-summary.png';summaryImage.alt='Siman 2 summary illustration';summaryImage.loading='lazy';summaryImage.decoding='async';
   const summaryCaption=document.createElement('figcaption');summaryCaption.textContent='סיכום סימן ב׳';summary.append(summaryImage,summaryCaption);grid.append(summary);
  }
  const sourceMap={};
- (simanNumber===2?window.HalachaSimanBSource:window.HalachaSimanCSource||[]).forEach((text,index)=>sourceMap[index+1]=text);
+ (simanNumber===2?(window.HalachaSimanBSource||[]):(window.HalachaSimanCSource||[])).forEach((text,index)=>sourceMap[index+1]=text);
  for(const seif of seifNumbers){
   const file=simanNumber===2?'siman-2-seif-'+String(seif).padStart(2,'0')+'.png':'siman-3-seif-'+String(seif).padStart(2,'0')+'.png';
   const url=artRoot+file,figure=document.createElement('figure');figure.className='hal-recovered-card';
@@ -100,7 +117,7 @@ function addGallery(lessonId,seifNumbers,simanNumber){
   actions.append(colorButton,sourceButton);figure.append(img,cap,actions);grid.append(figure);
  }
  const words=document.createElement('div');words.className='hal-recovered-words';
- [...new Set(seifNumbers.flatMap(n=>vocabulary[n]||[]).map(item=>JSON.stringify(item)))].map(x=>JSON.parse(x)).forEach(([he,en])=>{const row=document.createElement('div');row.className='hal-recovered-word';const term=document.createElement('strong');term.textContent=he;term.lang='he';term.dir='rtl';const meaning=document.createElement('span');meaning.textContent=en;const find=document.createElement('button');find.type='button';find.textContent='Find source';find.onclick=()=>{const related=seifNumbers.find(n=>(vocabulary[n]||[]).some(pair=>pair[0]===he));const sourceButton=[...box.querySelectorAll('.hal-recovered-actions button')].find(b=>b.textContent==='Read seif'&&b.closest('figure')?.textContent.includes('סעיף '+related));if(sourceButton)sourceButton.click();else{const panel=box.querySelector('.hal-recovered-source');if(panel)panel.open=true}};const add=document.createElement('button');add.type='button';add.textContent='＋ Scrapbook';add.disabled=readonly();add.onclick=()=>putText(lessonId,he,true);row.append(term,meaning,find,add);words.append(row)});
+ [...new Set(seifNumbers.flatMap(n=>(simanNumber===2?vocabulary:vocabulary3)[n]||[]).map(item=>JSON.stringify(item)))].map(x=>JSON.parse(x)).forEach(([he,en])=>{const row=document.createElement('div');row.className='hal-recovered-word';const term=document.createElement('strong');term.textContent=he;term.lang='he';term.dir='rtl';const meaning=document.createElement('span');meaning.textContent=en;const find=document.createElement('button');find.type='button';find.textContent='Find source';find.onclick=()=>{const related=seifNumbers.find(n=>((simanNumber===2?vocabulary:vocabulary3)[n]||[]).some(pair=>pair[0]===he));const sourceButton=[...box.querySelectorAll('.hal-recovered-actions button')].find(b=>b.textContent==='Read seif'&&b.closest('figure')?.textContent.includes('סעיף '+related));if(sourceButton)sourceButton.click();else{const panel=box.querySelector('.hal-recovered-source');if(panel)panel.open=true}};const add=document.createElement('button');add.type='button';add.textContent='＋ Scrapbook';add.disabled=readonly();add.onclick=()=>putText(lessonId,he,true);meaning.className='hal-word-meaning';meaning.hidden=true;const reveal=document.createElement('button');reveal.type='button';reveal.textContent='Reveal English';reveal.setAttribute('aria-expanded','false');reveal.onclick=()=>{meaning.hidden=!meaning.hidden;reveal.textContent=meaning.hidden?'Reveal English':'Hide English';reveal.setAttribute('aria-expanded',String(!meaning.hidden))};row.append(term,reveal,meaning,find,add);words.append(row)});
  box.append(words);
  const target=host.querySelector('.work');host.insertBefore(box,target||null);
 }

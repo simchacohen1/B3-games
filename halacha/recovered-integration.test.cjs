@@ -8,15 +8,16 @@ const integration=fs.readFileSync('halacha/illustrations-integration.js','utf8')
 const source=fs.readFileSync('halacha/siman-c-source.js','utf8');
 
 test('recovered package assets are integrated without replacing existing Siman 2 lessons',()=>{
-  assert.match(html,/illustrations-integration\.js\?v=20261022-recovered4/);
+  assert.match(html,/illustrations-integration\.js\?v=20261022-redesign2/);
   assert.match(html,/siman-c-source\.js\?v=20261022-authentic-text1/);
   const start=html.indexOf('const lessons=['),end=html.indexOf('];',start);
   const lessons=Function('return ('+html.slice(start,end+1).replace('const lessons=','')+')')();
   for(const id of ['s2a','s2b','s2extra','s2c','s2d','f'])assert.ok(lessons.some(l=>l.id===id),id);
   for(const id of ['s3a','s3b','s3c','s3d','s3e','s3f','s3g','s3h'])assert.ok(lessons.some(l=>l.id===id),id);
-  assert.ok(integration.includes("s2a:[1,2],s2b:[3],s2extra:[3],s2c:[4,5],s2d:[6,7,8,9]"));
+  assert.ok(integration.includes("s2a:[1,2],s2b:[3,4,5],s2extra:[3,4,5],s2c:[6,7,8],s2d:[9]"));
   assert.match(integration,/s3a:\[1\].*s3h:\[8\]/s);
   assert.match(source,/Transcribed with nekudot from Wikisource/);
+  assert.match(integration,/Reveal English/);
   new vm.Script(integration);new vm.Script(source);
 });
 
