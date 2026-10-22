@@ -1426,6 +1426,11 @@
     openActAsStudentPicker: openActAsStudentPicker,
     openMyDemoStudent: openMyDemoStudent
   };
+  // Resolve relative to this shared file so nested lessons and preview paths work.
+  const teacherControlBannerUrl = new URL(
+    "teacher-control-banner.js?v=20261022-1",
+    document.currentScript?.src || location.href
+  ).href;
   // One shared entry point shows the teacher release notice across site pages.
   // The banner independently verifies teacher access before it displays or acts.
   if (window === window.top) {
@@ -1433,9 +1438,7 @@
       if (document.getElementById("fttTeacherControlScript")) return;
       const script = document.createElement("script");
       script.id = "fttTeacherControlScript";
-      script.src = (location.pathname.includes("/class-pointer-prototype/") ||
-                    location.pathname.includes("/follow-teacher/") ? "../" : "") +
-                   "teacher-control-banner.js?v=20261022-1";
+      script.src = teacherControlBannerUrl;
       document.head.appendChild(script);
     };
     if (document.readyState === "loading")
