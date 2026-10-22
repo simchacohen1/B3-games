@@ -250,7 +250,7 @@ function init(){
  const live=el('span','cp-live-chip','Live');
  const tabControls=$('tabControls');
  const switchWrap=el('div','cp-switch-wrap');
- const switchBtn=el('button','cp-switch-btn','Switch / stop');switchBtn.type='button';
+ const switchBtn=el('button','cp-switch-btn','Switch');switchBtn.type='button';
  switchBtn.setAttribute('aria-haspopup','true');switchBtn.setAttribute('aria-expanded','false');switchBtn.setAttribute('aria-controls','cpSwitchMenu');
  const switchMenu=el('div','cp-switch-menu');switchMenu.id='cpSwitchMenu';switchMenu.hidden=true;
  switchMenu.append(el('small',null,'Switch to'));
@@ -261,13 +261,12 @@ function init(){
   switchMenu.append(node);
  }
  const stopBtn=iconButton('cp-stop-btn','stop','Stop presenting');
- switchMenu.append(stopBtn);
  switchWrap.append(switchBtn,switchMenu);
  const fullBtn=$('fullScreenLesson');
  if(fullBtn){fullBtn.replaceChildren(icon('full'));fullBtn.setAttribute('aria-label','Full screen');fullBtn.title='Full screen';fullBtn.classList.add('cp-icon-btn')}
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
- liveWrap.append(switchWrap);
+ liveWrap.append(switchWrap,stopBtn);
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
@@ -344,7 +343,7 @@ function init(){
   const boards=document.body.classList.contains('boards-on');
   document.body.classList.toggle('cp-is-live',isLive);
   pickerCard.hidden=isLive||boards||panel.hidden;
-  liveWrap.hidden=!isLive||boards;
+  liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   if(!isLive)openSwitch(false);
