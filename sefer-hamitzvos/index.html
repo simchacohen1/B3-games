@@ -67,11 +67,13 @@ function persist(){
   cardWriteChains.set(path,writing);
   writing.then(()=>{
    if(cardWriteChains.get(path)===writing)cardWriteChains.delete(path);
-   if(card===num&&rev===paintRevision){followPaintPending=false;saveStatus('✓ Saved to my account');}
+   if(card===num&&rev===paintRevision)saveStatus('✓ Saved to my account');
+   if(!cardSaveTimers.size&&!cardWriteChains.size)followPaintPending=false;
   }).catch(e=>{
    if(cardWriteChains.get(path)===writing)cardWriteChains.delete(path);
    console.warn('Sefer HaMitzvos account save failed',e);
-   if(card===num){followPaintPending=false;saveStatus('Saved on this device — account save failed');}
+   if(card===num)saveStatus('Saved on this device — account save failed');
+   if(!cardSaveTimers.size&&!cardWriteChains.size)followPaintPending=false;
   });
  },350);
  cardSaveTimers.set(path,timer);
