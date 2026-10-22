@@ -34,7 +34,7 @@ test('all student tools load the corrected activity screen-sharing script withou
 
 test('the classroom loads the updated PeerJS reconnection handling', () => {
   const html = fs.readFileSync(path.join(root, 'class-pointer-prototype/classroom.html'), 'utf8');
-  assert.match(html, /classroom[.]js[?]v=20261020-pointer-lifecycle2/);
+  assert.match(html, /classroom[.]js[?]v=20261022-gate1/);
   assert.match(html, /activity-screen-teacher[.]js[?]v=20261018-embedded1/);
 });
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{

@@ -1,7 +1,7 @@
 'use strict';
 const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
-   if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
+   // The dashboard-entry check lives in classroom-gate.js, which runs first and stops the page when blocked.
 const members=new Map();
 // Students stay in Shorashim and other Fun Torah Tools pages. Their authenticated
 // presence connections can receive embedded whiteboard messages without navigating.
@@ -332,7 +332,7 @@ async function startClass(){
     if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     $('startClass').hidden=true;
     const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('dashboard','student');link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
     // An explicit Follow Teacher launch starts with the teacher's shared whiteboard.
     // This uses the existing classroom document viewer, not the student-board broadcast.
     if(new URL(location.href).searchParams.get('followTeacherWhiteboard')==='1')openFollowWhiteboard();
