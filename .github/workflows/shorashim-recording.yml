@@ -16,6 +16,11 @@ on:
       - 'tests/shorashim-card-transition.test.cjs'
       - 'tests/shorashim-teacher-screenshots.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
+# Newer runs on the same PR/branch cancel superseded ones (including main,
+# where only the latest commit is what gets deployed).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest

@@ -23,6 +23,13 @@ on:
       - 'tests/firebase-security-audit.test.cjs'
       - '.github/workflows/firebase-security-audit.yml'
 
+# Newer runs on the same PR/branch cancel superseded ones. Security and
+# access checks on main get a unique group per run, so they are never
+# cancelled or replaced and every main commit keeps its own result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

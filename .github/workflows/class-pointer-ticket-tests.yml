@@ -15,6 +15,11 @@ on:
       - 'tests/class-pointer-session-rules-emulator.cjs'
       - 'e2e/class-pointer-activity-screen.spec.cjs'
   workflow_dispatch:
+# Newer runs on the same PR/branch cancel superseded ones (including main,
+# where only the latest commit is what gets deployed).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   ticket-tests:
     runs-on: ubuntu-latest

@@ -20,6 +20,12 @@ on:
       - 'index.html'
       - '.github/workflows/follow-teacher-tests.yml'
 
+# Newer runs on the same PR/branch cancel superseded ones (including main,
+# where only the latest commit is what gets deployed).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
