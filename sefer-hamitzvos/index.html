@@ -158,7 +158,6 @@ function load(n){
  if(active){active=null;persist();}
  $('workspace').classList.toggle('hidden',false);$('colorControls').classList.toggle('hidden',false);
  num=Math.max(1,Math.min(613,Number(n)||1));
- window.FTTSeferWordActivity&&window.FTTSeferWordActivity.open(refByCard[num],num);
  $('card').value=num;active=null;
  $('mitzvahDescription').textContent=window.FTT_MITZVAH_DESCRIPTIONS?.[refByCard[num]]||'';
  const mitzvahRef=refByCard[num],hebrewTitle=hebrewMitzvahTitles[mitzvahRef]||'';
@@ -177,6 +176,7 @@ function load(n){
  // and segmenting every intermediate card, which previously froze the page.
  navigationTimer=setTimeout(()=>{
   if(loadRevision!==artLoadRevision)return;
+  window.FTTSeferWordActivity&&window.FTTSeferWordActivity.open(refByCard[loadedCard],loadedCard);
   img.onload=()=>{
    if(loadRevision!==artLoadRevision)return;
    cv.width=img.naturalWidth;cv.height=img.naturalHeight;
