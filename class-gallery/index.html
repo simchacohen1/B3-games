@@ -604,18 +604,23 @@ if(tagSettingsRef){
 }
 window.addEventListener('pagehide',()=>{if(presenceOwnRef)presenceOwnRef.remove().catch(()=>{});});
 
-function makeNoiseTexture(base='#eee3d2',grid=false){
+const proceduralCanvasCache=new Map();
+function cachedProceduralTexture(key,draw){let c=proceduralCanvasCache.get(key);if(!c){c=draw();proceduralCanvasCache.set(key,c);}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
+function makeNoiseTexture(base='#eee3d2',grid=false){return cachedProceduralTexture('noise:'+base+':'+grid,()=>drawNoiseCanvas(base,grid));}
+function drawNoiseCanvas(base,grid){
   const c=document.createElement('canvas'); c.width=c.height=512; const ctx=c.getContext('2d');
   ctx.fillStyle=base;ctx.fillRect(0,0,512,512);
   for(let i=0;i<16000;i++){const a=Math.random()*.035;ctx.fillStyle=`rgba(60,40,20,${a})`;ctx.fillRect(Math.random()*512,Math.random()*512,1,1);}
   if(grid){ctx.strokeStyle='rgba(96,111,125,.22)';ctx.lineWidth=2;for(let i=0;i<=512;i+=128){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,512);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(512,i);ctx.stroke();}}
-  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+  return c;
 }
-function makeWoodTexture(){
-  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,512,0);g.addColorStop(0,'#6a3f23');g.addColorStop(.45,'#a26a3d');g.addColorStop(1,'#724429');ctx.fillStyle=g;ctx.fillRect(0,0,512,512);for(let y=0;y<512;y+=18){ctx.strokeStyle=`rgba(55,26,10,${.09+Math.random()*.07})`;ctx.lineWidth=1+Math.random()*2;ctx.beginPath();ctx.moveTo(0,y+Math.random()*6);for(let x=0;x<512;x+=32)ctx.lineTo(x,y+Math.sin(x*.04+y)*3+Math.random()*2);ctx.stroke();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+function makeWoodTexture(){return cachedProceduralTexture('wood',drawWoodCanvas);}
+function drawWoodCanvas(){
+  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,512,0);g.addColorStop(0,'#6a3f23');g.addColorStop(.45,'#a26a3d');g.addColorStop(1,'#724429');ctx.fillStyle=g;ctx.fillRect(0,0,512,512);for(let y=0;y<512;y+=18){ctx.strokeStyle=`rgba(55,26,10,${.09+Math.random()*.07})`;ctx.lineWidth=1+Math.random()*2;ctx.beginPath();ctx.moveTo(0,y+Math.random()*6);for(let x=0;x<512;x+=32)ctx.lineTo(x,y+Math.sin(x*.04+y)*3+Math.random()*2);ctx.stroke();}return c;
 }
-function makeCorkTexture(){
-  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');ctx.fillStyle='#bd8550';ctx.fillRect(0,0,512,512);for(let i=0;i<7200;i++){const x=Math.random()*512,y=Math.random()*512,r=Math.random()*1.7+.4;ctx.fillStyle=Math.random()>.5?'rgba(91,52,25,.16)':'rgba(255,229,190,.16)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+function makeCorkTexture(){return cachedProceduralTexture('cork',drawCorkCanvas);}
+function drawCorkCanvas(){
+  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');ctx.fillStyle='#bd8550';ctx.fillRect(0,0,512,512);for(let i=0;i<7200;i++){const x=Math.random()*512,y=Math.random()*512,r=Math.random()*1.7+.4;ctx.fillStyle=Math.random()>.5?'rgba(91,52,25,.16)':'rgba(255,229,190,.16)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}return c;
 }
 function addBox(parent,w,h,d,mat,x,y,z,cast=true,receive=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=receive;parent.add(m);return m;}
 function addHallObstacleSegment(x,z,w,d,yaw,wallMat,trimMat){
@@ -928,8 +933,18 @@ function makeEmptyCard(){
   const c=document.createElement('canvas');c.width=600;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle='#fffaf0';roundedRect(ctx,12,12,576,276,18);ctx.fill();ctx.strokeStyle='#d8c9b0';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle='#8c7b69';ctx.font='700 30px Quicksand';ctx.fillText('Waiting for work to be pinned…',300,158);const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.05),new THREE.MeshStandardMaterial({map:tex,side:THREE.DoubleSide,roughness:.86,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
 }
 
+const projectCardCache=new Map();
+function projectCardKey(post){const img=String(post.image||'');return [post.id,post.title,post.category,post.studentName,post.className,img.length,img.slice(0,48),img.slice(-48)].join('|');}
+function pruneProjectCardCache(){const live=new Set(posts.map(projectCardKey));for(const k of projectCardCache.keys())if(!live.has(k))projectCardCache.delete(k);}
 function createProjectCard(post){
-  const c=document.createElement('canvas');c.width=512;c.height=610;const ctx=c.getContext('2d');
+  const key=projectCardKey(post);let entry=projectCardCache.get(key);
+  if(!entry){entry=drawProjectCardCanvas(post);projectCardCache.set(key,entry);}
+  const tex=makeTexture(entry.canvas);entry.textures.add(tex);tex.addEventListener('dispose',()=>entry.textures.delete(tex));
+  const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
+  return mesh;
+}
+function drawProjectCardCanvas(post){
+  const c=document.createElement('canvas');c.width=512;c.height=610;const ctx=c.getContext('2d');const entry={canvas:c,textures:new Set()};
   const redraw=(img)=>{
     ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#fffdf8';roundedRect(ctx,8,8,496,594,9);ctx.fill();ctx.strokeStyle='rgba(92,69,44,.25)';ctx.lineWidth=3;ctx.stroke();
     ctx.save();ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=8;ctx.shadowOffsetY=4;ctx.fillStyle='#f2eee5';ctx.fillRect(34,34,444,300);ctx.restore();
@@ -938,9 +953,17 @@ function createProjectCard(post){
     const colors={Chumash:'#386b98',Parsha:'#b38a2e',Halacha:'#5c875f',Other:'#826aa6'};ctx.fillStyle=colors[post.category]||'#826aa6';roundedRect(ctx,32,360,142,38,18);ctx.fill();ctx.fillStyle='white';ctx.font='700 18px Quicksand';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(post.category||'Other',103,379);
     ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle='#354453';ctx.font='700 34px Caveat, cursive';wrapCanvasText(ctx,post.title||'Untitled',32,445,448,38,2);ctx.fillStyle='#6d5b48';ctx.font='700 18px Quicksand';ctx.fillText(post.studentName||'',32,552);ctx.font='600 15px Quicksand';ctx.fillStyle='#99846f';ctx.fillText(post.className||'',32,579);
   };
-  redraw(null);const tex=makeTexture(c);const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
-  if(post.image){const img=new Image();img.onload=()=>{redraw(img);tex.needsUpdate=true};img.src=post.image;}
-  return mesh;
+  redraw(null);
+  if(post.image){
+    const img=new Image();
+    // Pictures stored on another site must allow CORS, or WebGL refuses the whole texture
+    // ("Tainted canvases may not be loaded") and the hallway glitches. If they don't, keep the placeholder.
+    if(!/^(data|blob):/i.test(post.image))img.crossOrigin='anonymous';
+    img.onload=()=>{redraw(img);try{ctx.getImageData(0,0,1,1);}catch(e){redraw(null);}entry.textures.forEach(t=>t.needsUpdate=true);};
+    img.onerror=()=>console.warn('Gallery picture could not be shown in 3D:',post.title||post.id);
+    img.src=post.image;
+  }
+  return entry;
 }
 
 function buildClassroom(room){
@@ -2046,6 +2069,8 @@ setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 // when the underlying posts have not changed. Only a changed post snapshot
 // can trigger a full rebuild; media URL renewal is handled separately.
 let lastGalleryPostsSnapshot=null,galleryApplyRevision=0;
+let lastGallerySceneSignature=null;
+function gallerySceneSignature(rows){return rows.filter(p=>p.status==='approved').map(projectCardKey).concat(rows.filter(p=>p.status==='approved').map(p=>p.id+':'+(p.galleryRoom||'')+':'+(p.createdAt||''))).sort().join('\n');}
 function applyGalleryPosts(data){
   const snapshot=JSON.stringify(data||{});
   if(snapshot===lastGalleryPostsSnapshot)return;
@@ -2055,7 +2080,8 @@ function applyGalleryPosts(data){
   // Pictures are already in the post data. Show the gallery immediately;
   // private audio/video URLs can finish loading without blocking 3D posts.
   posts=rows;updatePending();
-  if(scene)buildScene();
+  const sceneSig=gallerySceneSignature(rows);
+  if(scene&&sceneSig!==lastGallerySceneSignature){lastGallerySceneSignature=sceneSig;buildScene();pruneProjectCardCache();}
   refreshRemoteAvatars();
   const renderOpenPanels=()=>{
     if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();
@@ -2082,17 +2108,24 @@ if(dbRef){
       notice.textContent='Class Gallery could not load saved posts. Your work may still be saved; do not resubmit yet. '+message;
     };
     let galleryFetchInFlight=false;
+    let galleryResponseHash=null,galleryResponseUser=null;
     const loadScopedPosts=async()=>{
       if(galleryFetchInFlight)return;
       galleryFetchInFlight=true;
       try{
         const user=firebase.auth().currentUser;
         if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
+        // A new signed-in identity must not reuse another person's response hash.
+        if(galleryResponseUser!==user.uid){galleryResponseHash=null;galleryResponseUser=user.uid;}
         const token=await user.getIdToken();
-        const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        const readUrl='https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId)+(galleryResponseHash?'&since='+encodeURIComponent(galleryResponseHash):'');
+        const r=await fetch(readUrl,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
         const j=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(r.status===404?'The gallery service is unavailable. Please tell your teacher.':(j.error||'Could not connect to your classroom.'));
         document.getElementById('galleryReadError')?.remove();
+        if(j.unchanged===true)return;
+        // Legacy backends without hashes still work and return their complete snapshot.
+        galleryResponseHash=typeof j.hash==='string'&&/^[a-f0-9]{64}$/.test(j.hash)?j.hash:null;
         applyGalleryPosts(j.posts||{});
       }catch(err){console.error('Gallery read failed:',err);showGalleryReadError(err?.message||'Please tell your teacher.');}
       finally{galleryFetchInFlight=false;}
