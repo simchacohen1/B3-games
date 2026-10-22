@@ -15,7 +15,7 @@ const questions={
 3:{1:['How should a person behave even in private?','With modesty','To impress others','Without thinking'],2:['What quality are we learning?','Modesty','Showing off','Pride'],3:['What should guide Jewish clothing?','Our values and halacha','Every fashion','Someone else’s approval'],4:['What kind of clothing should we wear?','Clean and appropriate','Only expensive clothing','Only colorful clothing'],5:['What do the directions right and left teach us?','There is a proper order','Order never matters','Always start with the left'],6:['What should we be careful about when dressing?','The order and care described in the seif','Rushing without care','Never dressing'],7:['What reminds a person of Hashem?','Keeping the head properly covered','Taking off every hat','Looking upward'],8:['How should a person carry himself?','With humility','With arrogance','To be noticed']]}
 };
 const labels=['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
-const css=document.createElement('style');css.textContent=String.raw\`
+const css=document.createElement('style');css.textContent=String.raw`
 .section.fresh-siman-on > :not(.fresh-siman-root){display:none!important}
 .fresh-siman-root{font:16px/1.5 "Trebuchet MS",Arial,sans-serif;color:#193c53;max-width:1160px;margin:10px auto 28px}
 .fresh-top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:#173b62;color:white;padding:17px 22px;border-radius:18px 18px 0 0}
@@ -40,7 +40,7 @@ const css=document.createElement('style');css.textContent=String.raw\`
 .fresh-color-editor label{display:inline-flex;gap:8px;align-items:center}
 .fresh-muted{font-size:13px;color:#4b6373}
 @media(max-width:800px){.fresh-split{grid-template-columns:1fr}.fresh-top h2{font-size:21px}.fresh-source{font-size:22px}}
-\`;document.head.append(css);
+`;document.head.append(css);
 function normalize(s){return s.normalize('NFD').replace(/[\u0591-\u05c7]/g,'').replace(/[־\u200e\u200f]/g,' ').replace(/\s+/g,' ').trim();}
 function makeSource(el,text,entries,output){
  const parts=text.split(/(\s+)/),known=entries.map(([w,en])=>({tokens:normalize(w).split(' '),en}));
