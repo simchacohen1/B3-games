@@ -48,6 +48,8 @@ styles.textContent=`
 .hal-recovered-word{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #bed5e1;border-radius:9px;padding:6px 8px}
 .hal-recovered-word strong{font-size:20px}
 .hal-recovered-word button{font-size:12px;padding:8px}
+.hal-guided-activities-toggle{display:block;width:min(100%,760px);margin:14px auto 22px;padding:15px 18px;border:2px solid #98c4df;border-radius:14px;background:#e9f5fc;color:#173b62;font-size:17px;font-weight:800;cursor:pointer}
+.hal-guided-activities-toggle:focus-visible{outline:3px solid #e3a824;outline-offset:3px}
 .hal-recovered-lead{font-size:15px;color:#48627a;margin:3px 0 16px}
 .hal-recovered-word{flex-wrap:wrap}.hal-recovered-word .hal-word-meaning[hidden]{display:none}
 .hal-recovered-word .hal-word-meaning{font-weight:700;color:#245276}
@@ -120,6 +122,18 @@ function addGallery(lessonId,seifNumbers,simanNumber){
  [...new Set(seifNumbers.flatMap(n=>(simanNumber===2?vocabulary:vocabulary3)[n]||[]).map(item=>JSON.stringify(item)))].map(x=>JSON.parse(x)).forEach(([he,en])=>{const row=document.createElement('div');row.className='hal-recovered-word';const term=document.createElement('strong');term.textContent=he;term.lang='he';term.dir='rtl';const meaning=document.createElement('span');meaning.textContent=en;const find=document.createElement('button');find.type='button';find.textContent='Find source';find.onclick=()=>{const related=seifNumbers.find(n=>((simanNumber===2?vocabulary:vocabulary3)[n]||[]).some(pair=>pair[0]===he));const sourceButton=[...box.querySelectorAll('.hal-recovered-actions button')].find(b=>b.textContent==='Read seif'&&b.closest('figure')?.textContent.includes('סעיף '+related));if(sourceButton)sourceButton.click();else{const panel=box.querySelector('.hal-recovered-source');if(panel)panel.open=true}};const add=document.createElement('button');add.type='button';add.textContent='＋ Scrapbook';add.disabled=readonly();add.onclick=()=>putText(lessonId,he,true);meaning.className='hal-word-meaning';meaning.hidden=true;const reveal=document.createElement('button');reveal.type='button';reveal.textContent='Reveal English';reveal.setAttribute('aria-expanded','false');reveal.onclick=()=>{meaning.hidden=!meaning.hidden;reveal.textContent=meaning.hidden?'Reveal English':'Hide English';reveal.setAttribute('aria-expanded',String(!meaning.hidden))};row.append(term,reveal,meaning,find,add);words.append(row)});
  box.append(words);
  const target=host.querySelector('.work');host.insertBefore(box,target||null);
+ if(target&&!host.querySelector('.hal-guided-activities-toggle')){
+  const toggle=document.createElement('button');toggle.type='button';toggle.className='hal-guided-activities-toggle';
+  toggle.textContent='Open practice activities and saved work';toggle.setAttribute('aria-expanded','false');
+  target.hidden=true;target.style.display='none';
+  toggle.addEventListener('click',()=>{
+   const show=target.hidden;target.hidden=!show;target.style.display=show?'grid':'none';
+   toggle.textContent=show?'Hide practice activities and saved work':'Open practice activities and saved work';
+   toggle.setAttribute('aria-expanded',String(show));
+  });
+  host.insertBefore(toggle,target);
+ }
+
 }
 function boot(){
  Object.entries(siman2).forEach(([id,seifim])=>addGallery(id,seifim,2));
