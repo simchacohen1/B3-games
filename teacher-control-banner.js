@@ -156,9 +156,16 @@
     let ids = (access.classIds || []).filter(validId);
     if (access.role === 'admin') {
       try {
-        const snapshot = await db.ref('b3Games/workspaces/' + WS + '/classes').once('value');
-        ids = Object.keys(snapshot.val() || {}).filter(validId);
-      } catch (_) { ids = []; }
+        // Read class IDs only. Do not download rosters or class data on every site page.
+        const token = await user.getIdToken();
+        const classUrl = db.ref('b3Games/workspaces/' + WS + '/classes').toString();
+        const response = await fetch(classUrl + '.json?shallow=true&auth=' + encodeURIComponent(token));
+        if (!response.ok) throw Error('Could not list assigned classes');
+        ids = Object.keys(await response.json() || {}).filter(validId);
+      } catch (_) {
+        // Do not grant access from this hint; the follow-state read still enforces rules.
+        ids = ['et', 'wt', new URLSearchParams(location.search).get('class')].filter(validId);
+      }
     }
     if (revision !== authRevision) return;
     for (const id of [...new Set(ids)]) {
