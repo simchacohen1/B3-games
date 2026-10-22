@@ -193,7 +193,9 @@
     area.append(styleOf(q.ch,'rashi','lab-target'));
     area.append(note('Which '+type.label.toLowerCase()+' letter matches the Rashi letter above?'));
     const row=E('div','lab-choices'),feedback=E('div','lab-feedback');
-    const next=btn('Next question →',()=>{r.idx++;showQuestion();},'btn');
+    const questionIndex=r.idx;
+    const advance=()=>{if(currentRound!==r || r.idx!==questionIndex)return; r.idx++;showQuestion();};
+    const next=btn('Next question →',advance,'btn');
     next.style.display='none';
     candidates(q.ch,q.group).forEach(opt=>{
       const b=E('button','lab-option');b.type='button'; b.setAttribute('aria-label','Letter '+opt);
@@ -226,7 +228,12 @@
           // This is practice; existing alphabet mastery is never reduced by mistakes.
           await logAttempt('similar','letter',good).catch(()=>{});
         }
-        next.style.display='inline-block';
+        if(good) {
+          // Advance automatically; no extra click required after a correct answer.
+          setTimeout(advance,900);
+        } else {
+          next.style.display='inline-block';
+        }
       });
       row.appendChild(b);
     });
