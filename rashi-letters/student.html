@@ -1161,8 +1161,15 @@ async function handleAnswer(letter, btnEl){
     }
   }
 
+  // Keep question transitions responsive even when Firebase is slow.
+  // Progress is still saved, but saving no longer blocks the next question.
   rashiFollowPending=true;
-  try{await Promise.all(writes);rashiFollowPending=false;}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  Promise.all(writes).then(()=>{
+    rashiFollowPending=false;
+  }).catch(()=>{
+    rashiFollowPending=false;
+    if(version===viewVersion) fb.textContent+=' Progress could not save. Check your connection.';
+  });
   if(version!==viewVersion) return;
 
   if(practiceFinished){
