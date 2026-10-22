@@ -1426,6 +1426,22 @@
     openActAsStudentPicker: openActAsStudentPicker,
     openMyDemoStudent: openMyDemoStudent
   };
+  // One shared entry point shows the teacher release notice across site pages.
+  // The banner independently verifies teacher access before it displays or acts.
+  if (window === window.top) {
+    const loadTeacherControlBanner = function () {
+      if (document.getElementById("fttTeacherControlScript")) return;
+      const script = document.createElement("script");
+      script.id = "fttTeacherControlScript";
+      script.src = (location.pathname.includes("/class-pointer-prototype/") ||
+                    location.pathname.includes("/follow-teacher/") ? "../" : "") +
+                   "teacher-control-banner.js?v=20261022-1";
+      document.head.appendChild(script);
+    };
+    if (document.readyState === "loading")
+      document.addEventListener("DOMContentLoaded", loadTeacherControlBanner, { once: true });
+    else loadTeacherControlBanner();
+  }
   // Pages that never ask about sign-in still need their sign-in screens shown.
   if (authChecking) {
     const watch = function () { try { onAuthStateChanged(function () {}); } catch (e) { endAuthChecking(); } };
