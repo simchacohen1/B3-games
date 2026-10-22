@@ -15,6 +15,8 @@ function setup(deferredMedia=false){
   const context={
     posts:[],scene:{},isTeacher:false,console,
     updatePending(){},
+    projectCardKey:post=>post.title,
+    pruneProjectCardCache(){},
     buildScene(){stats.builds++;},
     refreshRemoteAvatars(){stats.refreshes++;},
     resolveGalleryMedia(rows){
@@ -54,8 +56,8 @@ test('posts appear before private audio or video links resolve',async()=>{
 
 test('out-of-order media completion cannot rebuild or replace current posts',async()=>{
   const {context,stats}=setup(true);
-  context.applyGalleryPosts({a:{title:'Old'}});
-  context.applyGalleryPosts({a:{title:'New'}});
+  context.applyGalleryPosts({a:{title:'Old',status:'approved'}});
+  context.applyGalleryPosts({a:{title:'New',status:'approved'}});
   assert.equal(stats.builds,2);
   stats.mediaResolvers[0]();
   await Promise.resolve();

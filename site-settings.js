@@ -393,6 +393,7 @@
   let rememberedTeacherAuth = null;
   let teacherRestore = null;
   let teacherSignOutVersion = 0;
+  let teacherSignInVersion = 0;
 
   // A separate Firebase app remembers Google credentials. The default app
   // remains tab-scoped so a passcode login cannot replace a teacher elsewhere.
@@ -483,7 +484,7 @@
   let currentAccess = { authorized: false, role: "", classIds: [] };
 
   function isBootstrapAdmin(user) {
-    return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+    return Boolean(user && user.emailVerified === true && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
   function readUserAccess(user) {
@@ -944,15 +945,24 @@
   function signInWithGoogle() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
+    const attempt = ++teacherSignInVersion;
+    const signOutVersion = teacherSignOutVersion;
+    function assertCurrentSignIn(user) {
+      if (attempt !== teacherSignInVersion || signOutVersion !== teacherSignOutVersion ||
+          (user && services.auth.currentUser?.uid !== user.uid)) {
+        throw Object.assign(new Error("Sign-in was cancelled."), {code:"b3/sign-in-cancelled"});
+      }
+    }
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
     try { sessionStorage.removeItem(NO_RESTORE_KEY); } catch (_) {}
     const savedAuth = getRememberedTeacherAuth();
     return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
-      .then(function () { return savedAuth.signInWithPopup(provider); }).catch(function (error) {
+      .then(function () { assertCurrentSignIn(); return savedAuth.signInWithPopup(provider); }).catch(function (error) {
       const code = error && error.code ? error.code : "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
+        assertCurrentSignIn();
         return savedAuth.signInWithRedirect(provider).then(function () { return null; });
       }
       throw error;
@@ -960,9 +970,11 @@
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
+      assertCurrentSignIn();
       return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
-        .then(function () { return services.auth.updateCurrentUser(result.user); })
-        .then(function () { return readUserAccess(result.user); }).then(function(access){
+        .then(function () { assertCurrentSignIn(); return services.auth.updateCurrentUser(result.user); })
+        .then(function () { assertCurrentSignIn(result.user); return readUserAccess(result.user); }).then(function(access){
+        assertCurrentSignIn(result.user);
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
@@ -975,6 +987,13 @@
         }
         return result.user;
       });
+    }).catch(function (error) {
+      // A popup can finish after Sign out. Clear that cancelled attempt only
+      // if no newer sign-in has begun; never sign a newer session out.
+      if (attempt === teacherSignInVersion && signOutVersion !== teacherSignOutVersion) {
+        return savedAuth.signOut().then(()=>services.auth.signOut()).then(()=>{throw error;});
+      }
+      throw error;
     });
   }
 
@@ -1052,16 +1071,22 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
-    return services.auth.onAuthStateChanged(async function (user) {
+    let generation = 0;
+    let listening = true;
+    const unsubscribe = services.auth.onAuthStateChanged(async function (user) {
+      const eventGeneration = ++generation;
+      const isCurrent = () => listening && generation === eventGeneration && services.auth.currentUser === user;
       // A student identity sitting in a non-student tab is not this tab's
       // identity: let the remembered teacher replace it.
       if (user && !isGoogleUser(user) && !isStudentTab() && !teacherRestoreBlocked()) {
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
       }
+      if (!isCurrent()) return;
       if (!user) {
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
+        if (!isCurrent()) return;
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
         callback(null, false, currentAccess);
@@ -1079,6 +1104,9 @@
         return;
       }
       readUserAccess(user).then(function(access){
+        // A completed read from an older auth event must never authorize a
+        // signed-out/replaced user, including after this observer is removed.
+        if (!isCurrent()) return;
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
@@ -1096,6 +1124,7 @@
         }
       });
     });
+    return function () { listening = false; generation++; unsubscribe(); };
   }
 
   // ---------------------------------------------------------------------

@@ -60,5 +60,5 @@ test('review remains in selected-card order unless Shuffle is chosen',()=>{
   assert.match(categories,/value === 'shuffle'/);
   assert.match(html,/<input type="radio" name="reviewOrderMode" value="order" checked>/);
   assert.match(html,/review-categories\.js\?v=20261019-newest-review/);
-  assert.match(html,/app\.js\?v=20261019-newest-review/);
+  assert.match(html,/app\.js\?v=20261020-follow-pointer1/);
 });

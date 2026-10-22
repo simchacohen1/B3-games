@@ -16,7 +16,9 @@ exports.weeklyQuizStudent=onRequest({
   const bearer=String(req.headers.authorization||'');
   if(!bearer.startsWith('Bearer '))return res.status(401).json({error:'Student sign-in required.'});
   try{
-    const decoded=await admin.auth().verifyIdToken(bearer.slice(7),true);
+    const decoded=await admin.auth().verifyIdToken(bearer.slice(7),true).catch(()=>{
+      throw Object.assign(new Error('Student sign-in expired. Please sign in again.'),{status:401});
+    });
     const db=admin.database();
     const result=await weeklyQuizStudentAction({
       decoded,

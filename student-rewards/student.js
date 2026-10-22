@@ -39,8 +39,11 @@ async function openTeacherPreview(){
   const account=await teacherAccountReady;
   if(!account.user||!account.authorized||window.B3SiteSettings.getActingStudent())return false;
   if(teacherPreview)return true;
+  // Preview reads use the authenticated teacher app. The isolated student
+  // app may be signed out and must never receive the teacher identity.
+  const previewDb=C.ensureFirebase().db;
+  const [rewards,categories]=await Promise.all([previewDb.ref(`${ROOT}/rewards`).once('value'),previewDb.ref(`${ROOT}/categories`).once('value')]);
   teacherPreview=true;
-  const [rewards,categories]=await Promise.all([db.ref(`${ROOT}/rewards`).once('value'),db.ref(`${ROOT}/categories`).once('value')]);
   state.studentId='teacher_preview';
   state.student={name:'Teacher Preview — sample points',initials:'TP',color:'#24344a',rewardBalance:100};
   state.serverRewardBalance=100;state.storeOpen=true;
@@ -123,6 +126,7 @@ async function signInB3(name,pin,idHint=''){
   });
   const j=await r.json();
   if(!r.ok) throw new Error(j.error||'Could not sign in');
+  await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
   await auth.signInWithCustomToken(j.customToken);
 
   const finalId=j.b3StudentId||b3StudentId;
@@ -157,7 +161,16 @@ async function trySharedB3Login(){
   const needHome=msg=>{if(note)note.textContent=msg;if(link)link.style.display='';};
   if(!(id&&name&&pin))return needHome('Please sign in on Fun Torah Tools first.');
   if(note)note.textContent='Signing you in with your Fun Torah Tools login…';
-  try{await signInB3(name,pin,id);if(note)note.textContent=''}
+  try{
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    if(auth.currentUser){
+      const {claims}=await auth.currentUser.getIdTokenResult();
+      if(claims.b3StudentId===id&&claims.b3ClassId===sessionStorage.getItem('b3Games_studentClass')&&claims.studentRewardsRole==='student'&&claims.studentRewardsStudentId){
+        if(note)note.textContent='';return;
+      }
+    }
+    await signInB3(name,pin,id);if(note)note.textContent='';
+  }
   catch(err){needHome((err.message||String(err))+' Please sign in again on Fun Torah Tools.')}
 }
 

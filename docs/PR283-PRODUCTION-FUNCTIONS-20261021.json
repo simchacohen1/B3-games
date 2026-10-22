@@ -1,0 +1,51 @@
+{
+  "observedAt": "2026-10-22T02:07:03.380Z",
+  "project": "b3-games",
+  "region": "us-central1",
+  "inventory": {
+    "firebaseFunctions": 26,
+    "cloudRunServices": 26,
+    "weeklyQuizStudent": "absent from both complete inventories"
+  },
+  "functions": {
+    "funTorahStudentAuth": {
+      "generation": 2,
+      "publicInvoker": true,
+      "ingress": "all",
+      "revision": "funtorahstudentauth-00008-zic",
+      "firebaseFunctionsHash": "6efa73265ba85aec9882f4619d8b5afff51032c1",
+      "revisionMaxInstances": 10,
+      "timeoutSeconds": 60,
+      "concurrency": 80,
+      "trafficPercent": 100,
+      "runtime": "nodejs22",
+      "deployedEastern": "2026-10-18 01:59:56 -0400"
+    },
+    "funTorahTeacherClaim": {
+      "generation": 2,
+      "publicInvoker": true,
+      "ingress": "all",
+      "revision": "funtorahteacherclaim-00006-moc",
+      "firebaseFunctionsHash": "72c82d0970d415c58a8f85a0b25c7b49fe1dcbd4",
+      "revisionMaxInstances": 5,
+      "timeoutSeconds": 60,
+      "concurrency": 80,
+      "trafficPercent": 100,
+      "runtime": "nodejs20",
+      "deployedEastern": "2026-10-08 17:19:55 -0400"
+    },
+    "studentRewardsLogin": {
+      "generation": 2,
+      "publicInvoker": true,
+      "ingress": "all",
+      "revision": "studentrewardslogin-00011-peg",
+      "firebaseFunctionsHash": "c9fdc6c5aaa98797a2bec0e210bab60e7b111dc4",
+      "revisionMaxInstances": 20,
+      "timeoutSeconds": 60,
+      "concurrency": 80,
+      "trafficPercent": 100,
+      "runtime": "nodejs22",
+      "deployedEastern": "2026-10-11 08:45:18 -0400"
+    }
+  }
+}

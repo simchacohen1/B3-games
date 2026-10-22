@@ -157,9 +157,10 @@
     // Do not replace the older sticker tray or alter its saved piece keys.
     var pageStyles = aside.querySelector('.studio-backgrounds');
     var old = aside.querySelector('.studio-stickers');
-    if (pageStyles) aside.insertBefore(shelf, pageStyles);
-    else if (old) aside.insertBefore(shelf, old);
-    else aside.appendChild(shelf);
+    var before = pageStyles || old;
+    // Organizers can nest these trays; insertBefore needs a direct child.
+    while (before && before.parentNode !== aside) before = before.parentNode;
+    aside.insertBefore(shelf, before || null);
   }
   // Reinstall the picture gallery and sticker shelf after restoring the
   // teacher/student scrapbook from account. No saved pages are edited.

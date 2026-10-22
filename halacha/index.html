@@ -222,6 +222,7 @@ const HALACHA_PARAMS=new URLSearchParams(location.search);
 const HALACHA_TEACHER_VIEW=HALACHA_PARAMS.get("teacherView")||"";
 const HALACHA_TEACHER_LESSON=HALACHA_PARAMS.get("teacher")==="1";
 const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
+const HALACHA_READ_ONLY_PREVIEW=HALACHA_TEACHER_PREVIEW&&HALACHA_PARAMS.get("demo")==="1";
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":sessionStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
@@ -248,6 +249,7 @@ function cloudPath(){
 window.addEventListener('ftt:before-follow-navigation',e=>{if(halachaDirty||halachaCloudLoading||document.querySelector('.draw-layer:active'))e.preventDefault();});
 function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
 function save(){
+ if(HALACHA_READ_ONLY_PREVIEW){setSaveStatus("Teacher preview — nothing is saved");return}
  if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — student work is read only");return}
  if(HALACHA_TEACHER_LESSON){
    teacherDirty=true;
@@ -795,9 +797,10 @@ async function halachaAuthReady(){
  const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
  const classId=String(sessionStorage.getItem("b3Games_studentClass")||"").trim();
  if(!name||!pin||!classId)throw new Error("Your Fun Torah Tools sign-in is missing.");
+ await halachaAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
  if(halachaAuth.currentUser){
    const t=await halachaAuth.currentUser.getIdTokenResult();
-   if(t.claims.b3StudentId===HALACHA_STUDENT_ID)return halachaAuth.currentUser;
+   if(t.claims.b3StudentId===HALACHA_STUDENT_ID&&t.claims.b3ClassId===classId)return halachaAuth.currentUser;
    await halachaAuth.signOut();
  }
  const credentials={name,pin,studentId:HALACHA_STUDENT_ID,classId};
@@ -819,7 +822,7 @@ async function halachaAuthReady(){
    throw new Error(body.error||"Could not authenticate this student.");
  await halachaAuth.signInWithCustomToken(body.customToken);
  const t=await halachaAuth.currentUser.getIdTokenResult();
- if(t.claims.b3StudentId!==HALACHA_STUDENT_ID)throw new Error("Student account did not match.");
+ if(t.claims.b3StudentId!==HALACHA_STUDENT_ID||t.claims.b3ClassId!==classId)throw new Error("Student account or class did not match.");
  return halachaAuth.currentUser;
 }
 halachaAuthReady().then(loadCloudHalacha).catch(e=>{
@@ -894,7 +897,7 @@ if(window.B3SiteSettings&&typeof B3SiteSettings.onAuthStateChanged==="function")
  B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
    const btn=document.getElementById("teacherModeBtn");
    if(btn)btn.style.display=authorized?"":"none";
-   if(authorized)renderHalachaTeacherAccess(access||{});
+   if(authorized&&!HALACHA_READ_ONLY_PREVIEW)renderHalachaTeacherAccess(access||{});
    if(authorized&&HALACHA_TEACHER_LESSON)setHalachaMode(HALACHA_PARAMS.get("demo")!=="1");
  });
 }

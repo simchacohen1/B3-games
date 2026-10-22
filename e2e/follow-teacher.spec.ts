@@ -38,7 +38,7 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   await page.addScriptTag({content:core});
   await page.addScriptTag({content:teacher});
   await expect(page.locator('#app')).toBeVisible();
-  await expect(page.locator('input[name="mode"][value="independent"]')).toHaveCount(0);
+  await expect(page.locator('input[name="mode"][value="independent"]')).toBeVisible();
   await expect(page.locator('input[name="mode"][value="free"]')).toBeChecked();
   await page.locator('#subdestination').selectOption('review');
   await page.locator('input[name="mode"][value="locked"]').check();

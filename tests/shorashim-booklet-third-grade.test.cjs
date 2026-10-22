@@ -88,7 +88,7 @@ test('three-choice UI, week dropdown, source load order and review filter are wi
   for(let n=1;n<=30;n++)assert.match(html,new RegExp('<option value="'+n+'">Week '+n+'</option>'));
   assert.match(html,/data-review-perek="booklet"/);
   assert.match(html,/Change List/);
-  assert.ok(html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v=20261019-booklet-1'));
+  assert.ok(html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v=20261020-follow-pointer1'));
   assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261019-booklet-1'));
   assert.match(review,/reviewPerekFilter === 'booklet'/);
   assert.match(teacher,/window\.FTT_BOOKLET_SHORASHIM\.find/);

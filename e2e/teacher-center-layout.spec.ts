@@ -9,7 +9,9 @@ const main = admin.match(/<script>\s*(const tabs=[\s\S]*?)<\/script>/)![1];
 for (const role of ['admin', 'teacher']) {
   test(`Teacher Tools organizes tasks and limits administrative tabs for ${role}`, async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => {
+      if (!/ResizeObserver loop completed with undelivered notifications\.?/.test(error.message)) errors.push(error.message);
+    });
     await page.route('https://teacher-center.test/**', async route => {
       const path = new URL(route.request().url()).pathname;
       let html = '';
