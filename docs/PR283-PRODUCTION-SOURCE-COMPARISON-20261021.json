@@ -1,0 +1,53 @@
+{
+  "observedAt": "2026-10-22T02:07:50.460Z",
+  "normalization": "CRLF to LF and trim outer whitespace; not a complete transitive bundle comparison",
+  "files": [
+    {
+      "file": "student-auth.js",
+      "normalizedMatch": true,
+      "deployedNormalizedSha256": "d48819fc56661e5dd8b06ccdc3d2b3e75fb1a3773a6011e06340182358084740",
+      "candidateNormalizedSha256": "d48819fc56661e5dd8b06ccdc3d2b3e75fb1a3773a6011e06340182358084740"
+    },
+    {
+      "file": "student-auth-core.cjs",
+      "normalizedMatch": true,
+      "deployedNormalizedSha256": "30caf9fc92a43e11ecc8da5f68f760a945955a6ff473555d805a35e373e28799",
+      "candidateNormalizedSha256": "30caf9fc92a43e11ecc8da5f68f760a945955a6ff473555d805a35e373e28799"
+    },
+    {
+      "file": "teacher-claim.js",
+      "normalizedMatch": false,
+      "deployedNormalizedSha256": "fc1054b3f4a84d0e1325d6cd67b1a9525a7b06fbf81d4f473c5c2532273556a1",
+      "candidateNormalizedSha256": "16ae13852e55052906ed4c3896d37b67e3fefe14afe8985064e08f07957ddf4c"
+    },
+    {
+      "file": "teacher-claim-core.cjs",
+      "normalizedMatch": false,
+      "deployedNormalizedSha256": "4d44bc49778606ba21430fa88e3d5fbf16728eeef21fa9d976e0a500d257ef61",
+      "candidateNormalizedSha256": "b1fbe77c68ef491b0f2adc156b71197b4519f70663649d04f3a616293d21b353"
+    },
+    {
+      "file": "student-rewards-functions.js",
+      "normalizedMatch": true,
+      "deployedNormalizedSha256": "a3e4472e12e09d398a80eb522fa8a37cc3f7d37e4e227e30d863217e8604381f",
+      "candidateNormalizedSha256": "a3e4472e12e09d398a80eb522fa8a37cc3f7d37e4e227e30d863217e8604381f"
+    },
+    {
+      "file": "student-login-core.cjs",
+      "normalizedMatch": true,
+      "deployedNormalizedSha256": "533e50524cbfafa892c7dd5b50f261292f24626a40887471a9dd828a1e602a00",
+      "candidateNormalizedSha256": "533e50524cbfafa892c7dd5b50f261292f24626a40887471a9dd828a1e602a00"
+    }
+  ],
+  "syntheticUnassignedInvitation": {
+    "deployed": {
+      "authorized": true,
+      "writes": 1
+    },
+    "candidate": {
+      "authorized": false,
+      "error": "A class must be assigned before teacher access is enabled.",
+      "writes": 0
+    }
+  }
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "function": "funTorahStudentAuth",
+    "origin": "https://funtorahtools.com",
+    "status": 204,
+    "allowOrigin": "https://funtorahtools.com",
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "funTorahStudentAuth",
+    "origin": "https://www.funtorahtools.com",
+    "status": 204,
+    "allowOrigin": "https://www.funtorahtools.com",
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "funTorahTeacherClaim",
+    "origin": "https://funtorahtools.com",
+    "status": 204,
+    "allowOrigin": "https://funtorahtools.com",
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "funTorahTeacherClaim",
+    "origin": "https://www.funtorahtools.com",
+    "status": 204,
+    "allowOrigin": null,
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "studentRewardsLogin",
+    "origin": "https://funtorahtools.com",
+    "status": 204,
+    "allowOrigin": "https://funtorahtools.com",
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "studentRewardsLogin",
+    "origin": "https://www.funtorahtools.com",
+    "status": 204,
+    "allowOrigin": "https://www.funtorahtools.com",
+    "allowHeaders": "authorization,content-type",
+    "allowMethods": "GET,HEAD,PUT,PATCH,POST,DELETE"
+  },
+  {
+    "function": "weeklyQuizStudent",
+    "origin": "https://funtorahtools.com",
+    "status": 404,
+    "allowOrigin": null
+  },
+  {
+    "function": "weeklyQuizStudent",
+    "origin": "https://www.funtorahtools.com",
+    "status": 404,
+    "allowOrigin": null
+  }
+]
