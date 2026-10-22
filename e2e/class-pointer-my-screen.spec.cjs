@@ -137,12 +137,17 @@ test('dedicated presentation view follows surface changes, hides exit only while
     await expect(overlay.locator('a')).toBeHidden();
     expect(page.url()).toContain('/class-pointer-prototype/student-view.html');
   }
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(0);
+  await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'none'}));
+  await expect(page.locator('#fttLessonDrawTools button[aria-label="Pointer"]:visible')).toHaveCount(0);
+  await expect(page.locator('#fttLessonDrawTools button:enabled')).toHaveCount(12); // color and line-size selectors remain harmless until a drawing mode is granted
   await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(3);
+  await expect(page.locator('#fttLessonDrawTools button[aria-label="Pointer"]:visible')).toHaveCount(1);
+  await expect(page.locator('#fttLessonDrawTools button[aria-label="Pen"]:visible')).toHaveCount(1);
   // Run the actual shared gate's capture handlers while ordinary activity UI is locked.
   const gate=fs.readFileSync(path.join(__dirname,'../game-gate.js'),'utf8');
-  const handlers=gate.slice(gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach'),gate.indexOf('  if (!isGuestPreview()) watchTeacherAccess();'));
+  const start=gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach');
+  const end=gate.indexOf('  checkNow();',start);
+  const handlers=gate.slice(start,end);
   expect(handlers).toContain('B3PointerAssignedUI');
   await page.evaluate(()=>{
     const lock=document.createElement('div');lock.id='testOrdinaryToolsLocked';
@@ -152,9 +157,9 @@ test('dedicated presentation view follows surface changes, hides exit only while
   await page.addScriptTag({content:'(()=>{const overlay=document.getElementById("testOrdinaryToolsLocked");'+handlers+'})();'});
   await page.locator('#answer').dispatchEvent('click');
   expect(await page.evaluate(()=>window.__ordinaryClicks)).toBe(0);
-  await page.getByRole('button',{name:'✎ Pen',exact:true}).click();
-  await expect(page.getByRole('button',{name:'✎ Pen',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(4);
+  await page.getByRole('button',{name:'Pen',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Pen',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#fttLessonDrawTools button:visible:enabled')).toHaveCount(24);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(true);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#answer')))).toBe(false);
   await page.evaluate(()=>{window.__locked=false;window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'))});

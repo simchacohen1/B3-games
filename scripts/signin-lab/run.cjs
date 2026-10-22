@@ -61,6 +61,7 @@ const server=http.createServer(async(req,res)=>{
  if(u.pathname==='/firebase-config.js'){res.setHeader('Content-Type','text/javascript');res.end('window.B3_FIREBASE_CONFIG='+JSON.stringify(config));return;}
  if(['/index.html','/halacha/index.html','/student-rewards/student.html','/weekly-quiz/index.html'].includes(u.pathname)){
   let page=fs.readFileSync(path.join(root,u.pathname),'utf8');
+  page=page.replace(/<script[^>]*src=["'][^"']*vendor\/firebase\/[^"']+["'][^>]*><\/script>/g,'');
   page=page.replace(/<script[^>]*src=["']https:\/\/www\.gstatic\.com[^"']+["'][^>]*><\/script>/g,'');
   const localSDK=['app','auth','database'].map(part=>'<script src="/vendor/firebase/12.15.0/firebase-'+part+'-compat.js"></script>').join('');
   page=page.replace(/<head[^>]*>/i,match=>match+localSDK+'<script>'+bootstrap+'</script>');
