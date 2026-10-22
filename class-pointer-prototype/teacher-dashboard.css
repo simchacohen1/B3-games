@@ -50,7 +50,9 @@ body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-live-wrap .cp-switch-menu button:hover:not(:disabled){background:#f3f6fb!important}
 .cp-live-wrap .cp-switch-menu button:disabled{display:none}
 .cp-live-wrap .cp-switch-menu #stopScreen{display:none}
-.cp-live-wrap .cp-switch-menu .cp-stop-btn{margin-top:4px;border-top:1px solid var(--cp-line);border-radius:0 0 8px 8px;color:#991b1b!important;font-weight:600;border-top:1px solid var(--cp-line)!important}
+.cp-live-wrap>.cp-stop-btn{display:inline-flex;align-items:center;gap:8px;background:#dc2626;border-color:#b91c1c;color:#fff;font-weight:600}
+.cp-live-wrap>.cp-stop-btn:hover{background:#b91c1c}
+.cp-live-wrap>.cp-stop-btn svg{stroke:currentColor}
 .cp-live-wrap button:focus-visible{outline:3px solid var(--cp-blue);outline-offset:2px}
 .cp-topbar-btn,.cp-topbar-logo{display:inline-flex;align-items:center;gap:8px}
 

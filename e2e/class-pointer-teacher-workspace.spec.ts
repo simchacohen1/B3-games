@@ -446,3 +446,49 @@ test('embedded Follow Teacher workspace keeps the parent-selected class authorit
   await expect(frame.locator('#pdfView')).toBeVisible({timeout:20000});
   expect(context.pages()).toHaveLength(1);await context.close();
 });
+
+test('Stop sharing stays on the Live bar on every tab and ends the share from one click or Chrome\'s own bar', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  await context.addInitScript(() => {
+    (window as any).__tracks = [];
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180; canvas.getContext('2d')!.fillRect(0, 0, 320, 180);
+      const stream = canvas.captureStream(5); const track = stream.getVideoTracks()[0];
+      const settings = track.getSettings.bind(track); (track as any).getSettings = () => ({ ...settings(), displaySurface: 'monitor' });
+      (window as any).__tracks.push(track);
+      return stream;
+    } });
+  });
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  const stop = page.locator('.cp-live-wrap > .cp-stop-btn');
+  const stopScreen = page.locator('#stopScreen');
+  const share = async () => { await page.evaluate(() => (document.getElementById('shareScreen') as HTMLButtonElement).click()); await expect(stopScreen).toBeEnabled(); };
+  const tab = (name: string) => page.getByRole('button', { name, exact: true }).click();
+
+  await share();
+  await expect(stop).toBeVisible(); await expect(stop).toContainText('Stop sharing my screen');
+  expect(await stop.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(220, 38, 38)');
+  await shot(page, 'stop-my-screen');
+  for (const name of ['Student screens', 'Student whiteboards']) {
+    await tab(name);
+    await expect(stop).toBeVisible(); await expect(page.locator('.cp-live-wrap')).toBeVisible();
+    await shot(page, 'stop-' + name.replace(/\s/g, '-'));
+  }
+  await tab('My screen');
+
+  // One click on Stop ends the share from any tab.
+  await tab('Student whiteboards');
+  await stop.click();
+  await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
+  await tab('My screen');
+  await expect(page.locator('#placeholder')).not.toHaveAttribute('hidden'); await expect(page.locator('#cpSourcePicker')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__tracks.every((t: MediaStreamTrack) => t.readyState === 'ended'))).toBe(true);
+
+  // Chrome's own "Stop sharing" bar fires 'ended' on the captured track.
+  await share(); await expect(stop).toBeVisible();
+  await page.evaluate(() => (window as any).__tracks.at(-1).dispatchEvent(new Event('ended')));
+  await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
+  await expect(page.locator('#placeholder')).not.toHaveAttribute('hidden'); await expect(page.locator('#cpSourcePicker')).toBeVisible();
+  expect(errors).toEqual([]);
+  await context.close();
+});
