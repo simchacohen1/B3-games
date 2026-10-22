@@ -21,7 +21,7 @@
 
 ## Verification
 
-- Earlier focused synthetic regression suites after integration: **269 passed, 0 failed, 0 skipped**. New PR #283 merge-base CI failures are being repaired and tests rerun on the rebased head.
+- Focused synthetic regression suites after integration: **269 passed, 0 failed, 0 skipped** (184 sign-in/security/auth/tool checks plus 85 approval, Gallery, Halacha, and Shorashim checks). New PR #283 merge-base CI failures are being repaired and tests rerun on the rebased head.
 - `node --check` passed for `game-gate.js`, `backend/functions/student-auth-core.cjs`, and `backend/functions/student-auth.js`; whitespace checks passed when recognizing the repository's CRLF files.
 - Existing PR #283 evidence remains separate: its synthetic browser staging reported 15 scenarios passed, its RTDB emulator run reported 18 rule tests passed, and its synthetic gate benchmark reported student p50 449→332 ms and teacher p50 449→200 ms under an injected 120 ms REST delay. These older results were not rerun against this combined checkpoint and are not production measurements.
 - Current live site was opened in Chrome in signed-out mode. Homepage and Halacha route loaded; Halacha presented its access gate and displayed its local-only save notice. A teacher-demo direct URL presented a membership/sign-in gate. No production credentials were used.
