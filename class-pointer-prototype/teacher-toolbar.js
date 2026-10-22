@@ -2,6 +2,7 @@
 // One compact teacher toolbar right above the lesson. In full screen it floats inside the lesson.
 // It drives the original hidden controls (same ids), so classroom.js, highlighting.js and viewport.js are unchanged.
 (function(){
+  if(window.ClassPointerBlocked)return;
   const studentView=!!new URL(location.href).searchParams.get('room');
   const source=id=>document.getElementById(id);
   if(studentView){
@@ -157,10 +158,15 @@
   function adoptViewControls(){
     if(studentView)return;
     const slot=$('tbViewSlot');
+    if(!slot||!document.body)return;
     for(const view of document.querySelectorAll('.share-view-controls'))if(view.parentNode!==slot)slot.appendChild(view);
-    $('tbViewWrap').hidden=!$('tbViewSlot').querySelector('.share-view-controls')&&$('stopScreen').disabled;
+    const wrap=$('tbViewWrap'),stop=$('stopScreen');
+    if(wrap)wrap.hidden=!slot.querySelector('.share-view-controls')&&!!stop&&stop.disabled;
   }
-  new MutationObserver(adoptViewControls).observe(document.body,{childList:true,subtree:true});
+  if(document.body){
+    const viewObserver=new MutationObserver(()=>{if(!document.body||!$('tbViewSlot')){viewObserver.disconnect();return;}adoptViewControls();});
+    viewObserver.observe(document.body,{childList:true,subtree:true});
+  }
 
   // Drag handle remains visible even when the dock is collapsed.
   const moveHandle=document.createElement('button');
