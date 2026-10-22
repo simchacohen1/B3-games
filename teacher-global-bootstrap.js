@@ -26,7 +26,7 @@
       // The shared config loads Gallery Share, which in turn loads the toolbar.
       await add(new URL('firebase-config.js',base).href);
     } else if (!window.__fttTeacherToolbarLoading) {
-      await add(new URL('teacher-global-controls.js?v=20261020-uniform2',base).href);
+      await add(new URL('teacher-global-controls.js?v=20261022-pointer1',base).href);
     }
   }
   start().catch(function(error){console.warn('Teacher quick controls unavailable:',error);});

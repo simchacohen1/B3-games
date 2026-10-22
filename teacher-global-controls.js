@@ -11,8 +11,8 @@
 
   var loader = document.currentScript;
   var base = new URL('./', loader && loader.src || location.href);
-  var API = null, bar = null, select = null, lock = null, follow = null;
-  var homeFollow = null, modal = null, modalTitle = null, modalClassSelect = null;
+  var API = null, bar = null, select = null, lock = null, follow = null, pointer = null;
+  var homeFollow = null, homePointer = null, modal = null, modalTitle = null, modalClassSelect = null;
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
   var lastFollowClass = '';
@@ -29,6 +29,29 @@
     var homeSelect = document.getElementById('homeClassSelect');
     if (homeFollow && homeSelect && ID.test(homeSelect.value)) return homeSelect.value;
     return selected;
+  }
+  var POINTER_PATH = 'class-pointer-prototype/classroom.html';
+  function onPointerPage() {
+    return /\/class-pointer-prototype\/classroom\.html$/.test(location.pathname);
+  }
+  function classIsValid(id) {
+    return authorized && ID.test(id) && classes.some(function(row) { return row.id === id; });
+  }
+  // Class Pointer needs screen sharing and PeerJS, so it opens in its own named
+  // tab (reused on repeat clicks), never in the panel iframe.
+  function openPointer() {
+    var id = currentClass();
+    if (onPointerPage() || !classIsValid(id)) return;
+    window.open(classUrl(POINTER_PATH, id), 'classPointer');
+  }
+  function syncPointerButtons() {
+    var ok = classIsValid(currentClass());
+    [pointer, homePointer].forEach(function(btn) {
+      if (!btn) return;
+      btn.hidden = !ok;
+      btn.disabled = !ok;
+      if (onPointerPage()) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
+    });
   }
   function getPreferred() {
     try { return localStorage.getItem('b3ControlClass') || ''; } catch (_) { return ''; }
@@ -62,6 +85,7 @@
     if (!classes.some(function(row) { return row.id === id; })) return;
     remember(id);
     if (select) select.value = id;
+    syncPointerButtons();
     if (modalClassSelect) modalClassSelect.value = id;
     if (!modal || modal.hidden || !activePanel) return;
     var which = activePanel;
@@ -104,7 +128,9 @@
       '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:999px;width:34px;height:34px;padding:0;background:#f0ebff;color:#5c4592;font:800 18px Arial;cursor:pointer;white-space:nowrap;display:inline-grid;place-items:center}',
       '#fttTeacherQuickBar #fttTeacherQuickLock{background:#1f2937;color:white}',
       '#fttTeacherQuickBar button:focus-visible,.ftt-home-follow:focus-visible{outline:3px solid #2563eb;outline-offset:2px}',
-      '#fttTeacherQuickBar button[aria-expanded=true],.ftt-home-follow[aria-expanded=true]{background:#dbeafe}',
+      '#fttTeacherQuickBar button[aria-expanded=true],.ftt-home-follow[aria-expanded=true],#fttTeacherQuickBar button[aria-current=page],.ftt-home-follow[aria-current=page]{background:#dbeafe}',
+      '#fttTeacherQuickBar button[hidden],.ftt-home-follow[hidden]{display:none!important}',
+      '#fttTeacherQuickBar button[aria-current=page],.ftt-home-follow[aria-current=page]{cursor:default}',
       '.ftt-home-follow{font-size:18px!important;padding:5px 9px!important;border-radius:999px!important}',
       '#fttTeacherQuickModal{position:fixed;inset:0;z-index:100500;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:12px;font-family:Arial,sans-serif}',
       '#fttTeacherQuickModal .ftt-quick-card{background:#fff;color:#1e293b;border-radius:18px;width:min(980px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 65px #0005}',
@@ -118,16 +144,19 @@
     document.head.appendChild(style);
 
     bar = el('nav'); bar.id = 'fttTeacherQuickBar'; bar.hidden = true;
-    bar.setAttribute('aria-label', 'Teacher class and Follow controls');
+    bar.setAttribute('aria-label', 'Teacher class, Follow and Class Pointer controls');
     var label = el('label', '', 'Class'); label.htmlFor = 'fttTeacherQuickClass';
     select = el('select'); select.id = 'fttTeacherQuickClass'; select.setAttribute('aria-label','Teaching class');
     lock = el('button', '', '🔒'); lock.id='fttTeacherQuickLock'; lock.setAttribute('aria-label','Open Class Access'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
     follow = el('button', '', '👣'); follow.setAttribute('aria-label','Open or close Follow the Teacher'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
-    bar.append(lock, follow);
+    pointer = el('button', '', '👆'); pointer.id = 'fttTeacherQuickPointer'; pointer.type = 'button';
+    pointer.setAttribute('aria-label','Open Class Pointer for the selected class'); pointer.title = 'Open Class Pointer for the selected class';
+    bar.append(lock, follow, pointer);
     document.body.appendChild(bar);
     select.addEventListener('change', function () { updatePanelClass(select.value); });
     lock.addEventListener('click', function(){ openPanel('access'); });
     follow.addEventListener('click', function(){ openPanel('follow'); });
+    pointer.addEventListener('click', openPointer);
 
     modal = el('div'); modal.id = 'fttTeacherQuickModal'; modal.hidden = true;
     modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-label','Teacher quick controls');
@@ -177,7 +206,10 @@
     if (!useHome) {
       if (homeFollow) homeFollow.remove();
       homeFollow = null;
+      if (homePointer) homePointer.remove();
+      homePointer = null;
       bar.hidden = false;
+      syncPointerButtons();
       return;
     }
     bar.hidden = true;
@@ -189,11 +221,24 @@
       homeFollow.addEventListener('click',function(){openPanel('follow');});
       homeBar.appendChild(homeFollow);
     }
+    if (!homePointer || !homeBar.contains(homePointer)) {
+      homePointer = el('button','ftt-home-follow','👆');
+      homePointer.type = 'button';homePointer.title = 'Open Class Pointer for the selected class';
+      homePointer.setAttribute('aria-label','Open Class Pointer for the selected class');
+      homePointer.addEventListener('click',openPointer);
+      homeBar.appendChild(homePointer);
+    }
+    if (homeBar && !homeBar.__fttPointerWatch) {
+      homeBar.__fttPointerWatch = true;
+      homeBar.addEventListener('change', function(){ syncPointerButtons(); });
+    }
+    syncPointerButtons();
   }
   function reset() {
     authorized = false; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
+    if (homePointer) {homePointer.remove();homePointer=null;}
     if (accessFrame) accessFrame.removeAttribute('src');
     if (followFrame) followFrame.removeAttribute('src');
     lastFollowClass = '';
