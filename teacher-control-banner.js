@@ -31,14 +31,31 @@
   function isPointerPage() {
     return location.pathname.endsWith('/class-pointer-prototype/classroom.html');
   }
+  function teachingIn(view) {
+    try {
+      const bridge = view.ClassPointerBridge;
+      return Boolean(bridge?.isTeacher && bridge.started?.() && bridge.sharing?.());
+    } catch (_) { return false; }
+  }
   function activePointerHere() {
-    const bridge = window.ClassPointerBridge;
-    return Boolean(isPointerPage() && bridge?.isTeacher && bridge.started?.() && bridge.sharing?.());
+    if (isPointerPage() && teachingIn(window)) return true;
+    // Follow Teacher can embed a same-origin Pointer teaching workspace.
+    return [...document.querySelectorAll('iframe')].some(frame => teachingIn(frame.contentWindow));
+  }
+  function pointerClassHere() {
+    if (isPointerPage() && teachingIn(window))
+      return new URLSearchParams(location.search).get('class') || '';
+    for (const frame of document.querySelectorAll('iframe')) {
+      if (!teachingIn(frame.contentWindow)) continue;
+      try { return new URLSearchParams(frame.contentWindow.location.search).get('class') || ''; }
+      catch (_) {}
+    }
+    return new URLSearchParams(location.search).get('class') || '';
   }
   function allPointerShares() {
     const result = [];
     if (!teacherKey) return result;
-    if (pointerHere) result.push({tab:TAB_ID, classId:new URLSearchParams(location.search).get('class') || ''});
+    if (pointerHere) result.push({tab:TAB_ID, classId:pointerClassHere()});
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -105,7 +122,7 @@
     const active = !!teacherKey && activePointerHere();
     if (active) {
       try { localStorage.setItem(SHARE_KEY, JSON.stringify({
-        teacherKey, classId:new URLSearchParams(location.search).get('class') || '', at:Date.now()
+        teacherKey, classId:pointerClassHere(), at:Date.now()
       })); } catch (_) {}
     } else if (pointerHere) {
       try { localStorage.removeItem(SHARE_KEY); } catch (_) {}
@@ -164,8 +181,14 @@
     }, undefined, false);
   }
   function endPointerOnThisTab() {
-    if (window.ClassPointerBridge?.isTeacher && window.ClassPointerBridge.started?.())
-      document.dispatchEvent(new Event('ftt:release-teacher-control'));
+    const release = view => {
+      try {
+        if (view.ClassPointerBridge?.isTeacher && view.ClassPointerBridge.started?.())
+          view.document.dispatchEvent(new view.Event('ftt:release-teacher-control'));
+      } catch (_) { /* Ignore cross-origin iframes. */ }
+    };
+    release(window);
+    document.querySelectorAll('iframe').forEach(frame => release(frame.contentWindow));
   }
   async function releaseControls() {
     if (releasing || !teacherKey || !teacherUser) return;
