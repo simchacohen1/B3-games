@@ -1,6 +1,7 @@
 'use strict';
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
+const {createHash}=require('node:crypto');
 if(!admin.apps.length)admin.initializeApp();
 
 function visibleGalleryPosts(rows,classId,studentId,canReview){
@@ -36,7 +37,15 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     const legacy=['et','wt'].includes(classId),path=legacy?'classGallery/posts':`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts`;
     const snap=await db.ref(path).get(),rows=snap.val()||{};
     const posts=visibleGalleryPosts(rows,classId,identity.b3StudentId,isTeacher||owner||adminRow.val()===true);
-    return res.status(200).json({posts});
+    // Hash only the authorized view: teachers and students can see different posts.
+    // Legacy clients receive the complete payload when no hash is supplied.
+    const postsJson=JSON.stringify(posts);
+    const hash=createHash('sha256').update(postsJson).digest('hex');
+    const since=String(req.query?.since||'');
+    if(/^[a-f0-9]{64}$/.test(since)&&since===hash){
+      return res.status(200).json({unchanged:true,hash});
+    }
+    return res.status(200).json({posts,hash});
   }catch(error){
     const code=Number.isInteger(error.code)&&error.code>=400&&error.code<600?error.code:500;
     if(code===500)console.error('classGalleryRead',error);
