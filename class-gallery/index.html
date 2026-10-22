@@ -2108,17 +2108,24 @@ if(dbRef){
       notice.textContent='Class Gallery could not load saved posts. Your work may still be saved; do not resubmit yet. '+message;
     };
     let galleryFetchInFlight=false;
+    let galleryResponseHash=null,galleryResponseUser=null;
     const loadScopedPosts=async()=>{
       if(galleryFetchInFlight)return;
       galleryFetchInFlight=true;
       try{
         const user=firebase.auth().currentUser;
         if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
+        // A new signed-in identity must not reuse another person's response hash.
+        if(galleryResponseUser!==user.uid){galleryResponseHash=null;galleryResponseUser=user.uid;}
         const token=await user.getIdToken();
-        const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        const readUrl='https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId)+(galleryResponseHash?'&since='+encodeURIComponent(galleryResponseHash):'');
+        const r=await fetch(readUrl,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
         const j=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(r.status===404?'The gallery service is unavailable. Please tell your teacher.':(j.error||'Could not connect to your classroom.'));
         document.getElementById('galleryReadError')?.remove();
+        if(j.unchanged===true)return;
+        // Legacy backends without hashes still work and return their complete snapshot.
+        galleryResponseHash=typeof j.hash==='string'&&/^[a-f0-9]{64}$/.test(j.hash)?j.hash:null;
         applyGalleryPosts(j.posts||{});
       }catch(err){console.error('Gallery read failed:',err);showGalleryReadError(err?.message||'Please tell your teacher.');}
       finally{galleryFetchInFlight=false;}
