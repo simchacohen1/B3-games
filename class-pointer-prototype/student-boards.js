@@ -12,7 +12,7 @@
   const B=window.ClassPointerBridge;
   if(!B)return;
   const $=id=>id==='stage'&&B.embedded?B.embeddedStage:document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
-  const PALETTE=[['#1f2937','Black'],['#1d4ed8','Blue'],['#c62828','Red'],['#2e7d32','Green'],['#7b1fa2','Purple'],['#ef6c00','Orange']];
+  const PALETTE=[['#1f2937','Black'],['#777777','Gray'],['#ffffff','White'],['#1d4ed8','Blue'],['#29b6f6','Sky Blue'],['#4dd0e1','Turquoise'],['#009688','Teal'],['#c62828','Red'],['#ff7043','Coral'],['#ef6c00','Orange'],['#ffc107','Gold'],['#fff176','Yellow'],['#cddc39','Lime'],['#8bc34a','Light Green'],['#2e7d32','Green'],['#a5d6a7','Mint'],['#7b1fa2','Purple'],['#ab47bc','Violet'],['#b39ddb','Lavender'],['#ec407a','Pink'],['#f48fb1','Light Pink'],['#795548','Brown'],['#bcaaa4','Tan'],['#ffd1a9','Peach']];
   const COLORS=PALETTE.map(item=>item[0]);
   const SIZES=[[0.003,'Thin',5],[0.006,'Medium',9],[0.012,'Thick',14],[0.03,'Color',22]];
   const SIZE_VALUES=SIZES.map(item=>item[0]);

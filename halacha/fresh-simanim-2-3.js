@@ -38,6 +38,10 @@ const css=document.createElement('style');css.textContent=String.raw`
 .fresh-color-editor{margin-top:10px;padding:10px;background:#f3f9fc;border:1px solid #bcd4e3;border-radius:10px}
 .fresh-color-editor canvas{display:block;width:100%;touch-action:none;border:1px solid #bfcbd4;background:white;margin-top:8px}
 .fresh-color-editor label{display:inline-flex;gap:8px;align-items:center}
+.fresh-palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(35px,1fr));gap:8px;max-width:500px;margin:13px 0}
+.fresh-swatch{height:35px;min-width:35px;cursor:pointer;border:2px solid #718598;border-radius:9px}
+.fresh-swatch[aria-pressed="true"]{outline:3px solid #1b79bb;outline-offset:2px}
+.fresh-swatch:focus-visible{outline:3px solid #e3a824;outline-offset:2px}
 .fresh-muted{font-size:13px;color:#4b6373}
 @media(max-width:800px){.fresh-split{grid-template-columns:1fr}.fresh-top h2{font-size:21px}.fresh-source{font-size:22px}}
 `;document.head.append(css);
@@ -57,10 +61,14 @@ function makeColor(box,url){
  const controls=document.createElement('div');controls.className='fresh-color-editor';
  const label=document.createElement('label');label.textContent='Choose a fill color: ';
  const input=document.createElement('input');input.type='color';input.value='#e7c75b';label.append(input);
+ const palette=document.createElement('div');palette.className='fresh-palette';palette.setAttribute('role','group');palette.setAttribute('aria-label','Quick coloring colors');
+ const colors=['#ffffff','#222222','#777777','#c2c2c2','#e53935','#ff7043','#ff9800','#ffc107','#fff176','#cddc39','#8bc34a','#43a047','#009688','#4dd0e1','#29b6f6','#1976d2','#3949ab','#7e57c2','#ab47bc','#ec407a','#f48fb1','#8d6e63','#bcaaa4','#f5deb3','#ffd1a9','#a5d6a7','#b39ddb','#90caf9'];
+ colors.forEach((hex,index)=>{const swatch=document.createElement('button');swatch.type='button';swatch.className='fresh-swatch';swatch.style.backgroundColor=hex;swatch.setAttribute('aria-label','Choose color '+(index+1));swatch.title=hex;swatch.setAttribute('aria-pressed',String(hex===input.value));swatch.addEventListener('click',()=>{input.value=hex;palette.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===swatch)))});palette.append(swatch)});
+ input.addEventListener('input',()=>palette.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.title.toLowerCase()===input.value.toLowerCase()))));
  const reset=document.createElement('button');reset.textContent='Reset colors';reset.type='button';
  const canvas=document.createElement('canvas');canvas.setAttribute('aria-label','Color an enclosed space in the illustration');
  const hint=document.createElement('p');hint.className='fresh-muted';hint.textContent='Click an enclosed white space to color it. This practice drawing is not saved.';
- controls.append(label,reset,hint,canvas);box.append(controls);
+ controls.append(label,palette,reset,hint,canvas);box.append(controls);
  const context=canvas.getContext('2d',{willReadFrequently:true}),img=new Image();
  img.onload=()=>{canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;context.drawImage(img,0,0)};
  img.onerror=()=>hint.textContent='The picture could not be loaded.';
