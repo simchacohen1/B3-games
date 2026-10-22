@@ -96,6 +96,57 @@ async function loadColoring(card){
  }catch(e){console.warn('Sefer HaMitzvos account load failed',e);paintLoading=false;saveStatus('Saved on this device — account unavailable');}
 }
 function draw(){ctx.clearRect(0,0,cv.width,cv.height);for(const s of strokes){if(s.type==='fill'||!Array.isArray(s.points))continue;ctx.globalCompositeOperation=s.erase?'destination-out':'source-over';ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();s.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(s.points.length===1){const [x,y]=s.points[0];ctx.lineTo(x+.1,y+.1)}ctx.stroke()}ctx.globalCompositeOperation='source-over'}
+// Work on large image regions in a worker when supported. A failed worker
+// uses the original on-page algorithm rather than allowing unsafe paint.
+let maskWorker=null;
+function finishMask(mask,card,revision){
+ if(revision!==artLoadRevision||card!==num)return;
+ regionMask=mask;
+ if(mask){
+  regionMaskCache.delete(card);regionMaskCache.set(card,mask);
+  // Detailed cards use several MB each; never keep an unlimited history.
+  while(regionMaskCache.size>2)regionMaskCache.delete(regionMaskCache.keys().next().value);
+ }
+ $('notice').textContent=mask?'':'Safe coloring sections unavailable; use Brush.';
+ loadColoring(card);
+}
+function startMask(card,revision){
+ const cached=regionMaskCache.get(card);
+ if(cached&&cached.width===cv.width&&cached.height===cv.height){
+  finishMask(cached,card,revision);return;
+ }
+ if(maskWorker){
+  try{
+   // Transfer a copy; the original source pixels are still needed to replay
+   // existing legacy coloring without changing saved student records.
+   const pixels=sourcePixels.data.slice().buffer;
+   maskWorker.postMessage({card,revision,width:cv.width,height:cv.height,pixels},[pixels]);
+   return;
+  }catch(error){console.warn('Sefer mask worker unavailable',error);maskWorker.terminate();maskWorker=null;}
+ }
+ finishMask(window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height),card,revision);
+}
+try{
+ if(typeof Worker==='function'){
+  maskWorker=new Worker('mask-worker.js?v=20261022-navigation1');
+  maskWorker.onmessage=event=>{
+   const result=event.data||{};
+   if(result.revision!==artLoadRevision||result.card!==num)return;
+   if(result.error){
+    console.warn('Sefer mask worker failed',result.error);
+    finishMask(window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height),result.card,result.revision);
+    return;
+   }
+   if(!(result.labels instanceof ArrayBuffer))return;
+   finishMask({width:result.width,height:result.height,labels:new Uint32Array(result.labels)},result.card,result.revision);
+  };
+  maskWorker.onerror=event=>{
+   console.warn('Sefer mask worker crashed',event.message||event);
+   maskWorker.terminate();maskWorker=null;
+   if(paintLoading&&sourcePixels)finishMask(window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height),num,artLoadRevision);
+  };
+ }
+}catch(error){console.warn('Sefer mask worker unsupported',error);maskWorker=null;}
 function load(n){
  if(!canBrowseDates){
   const today=calendar.studyToday(new Date(),window.FTTSunTimes);
@@ -132,19 +183,7 @@ function load(n){
    strokes=[]; // Never redraw the previous card's strokes over new artwork.
    prepareFillSource();
    $('notice').textContent='Loading safe coloring sections…';
-   const cached=regionMaskCache.get(loadedCard);
-   if(cached&&cached.width===cv.width&&cached.height===cv.height){
-    regionMaskCache.delete(loadedCard);regionMaskCache.set(loadedCard,cached);
-    regionMask=cached;
-   }else{
-    regionMask=window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);
-    if(regionMask){
-     regionMaskCache.set(loadedCard,regionMask);
-     while(regionMaskCache.size>3)regionMaskCache.delete(regionMaskCache.keys().next().value);
-    }
-   }
-   $('notice').textContent=regionMask?'':'Safe coloring sections unavailable; use Brush.';
-   loadColoring(loadedCard);
+   startMask(loadedCard,loadRevision);
   };
   img.onerror=()=>{if(loadRevision===artLoadRevision){paintLoading=false;$('notice').textContent='Coloring image not available';}};
   img.src=(newArt.has(loadedCard)?'coloring-v2/':'coloring/')+fmt(loadedCard)+'.png'+(newArt.has(loadedCard)?'?v=20261016-october':'');
