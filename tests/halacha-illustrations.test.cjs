@@ -56,7 +56,8 @@ test('new scrapbook stickers reuse existing authorized save and teacher read-onl
 
 test('illustrated stickers remain visible before the long scrapbook background choices',()=>{
   assert.match(script,/aside\.querySelector\('\.studio-backgrounds'\)/);
-  assert.match(script,/aside\.insertBefore\(shelf, pageStyles\)/);
+  assert.match(script,/var before = pageStyles \|\| old/);
+  assert.match(script,/aside\.insertBefore\(shelf, before \|\| null\)/);
   const style=fs.readFileSync(path.join(root,'illustrated-seif-a.css'),'utf8');
   assert.match(style,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(style,/@media\(max-width:1000px\)/);

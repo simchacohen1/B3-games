@@ -21,13 +21,14 @@
 
 ## Verification
 
-- Earlier focused synthetic regression suite after integration: **184 passed, 0 failed, 0 skipped**. New PR #283 merge-base CI failures are being repaired and tests rerun on the rebased head.
+- Earlier focused synthetic regression suites after integration: **269 passed, 0 failed, 0 skipped**. New PR #283 merge-base CI failures are being repaired and tests rerun on the rebased head.
 - `node --check` passed for `game-gate.js`, `backend/functions/student-auth-core.cjs`, and `backend/functions/student-auth.js`; whitespace checks passed when recognizing the repository's CRLF files.
 - Existing PR #283 evidence remains separate: its synthetic browser staging reported 15 scenarios passed, its RTDB emulator run reported 18 rule tests passed, and its synthetic gate benchmark reported student p50 449→332 ms and teacher p50 449→200 ms under an injected 120 ms REST delay. These older results were not rerun against this combined checkpoint and are not production measurements.
 - Current live site was opened in Chrome in signed-out mode. Homepage and Halacha route loaded; Halacha presented its access gate and displayed its local-only save notice. A teacher-demo direct URL presented a membership/sign-in gate. No production credentials were used.
 - Live homepage response measured once with `curl`: 200, 162,412 bytes, DNS 0.000029 s, TLS 2.7995 s, TTFB 2.9313 s, total 2.9779 s. One sample is not a reliable before/after benchmark. Python requests to routes returned 403 with that client and are not treated as confirmed site failures.
 - Three additional homepage requests all returned 200 with 162,412 bytes; total times were 6.58 s, 3.85 s, and 2.60 s. TLS setup took 6.32 s, 3.71 s, and 2.47 s; TTFB was 6.53 s, 3.81 s, and 2.55 s. These are signed-out, single-route measurements; they point to variable connection setup and are not a before/after comparison.
 - Local Chromium/Firefox/WebKit Playwright execution is blocked: Playwright browser download returned a truncated/invalid archive; no local browser binaries are installed. Cloud browser verification used Chrome only and did not log in.
+- A full browser-only Chazara approval test could not run locally because Chromium is unavailable. The non-browser approval suite passed. Earlier PR #283 synthetic browser and emulator results were from its prior checkpoint and were not repeated against this combined tree.
 - GitHub CI on the prior PR head reported failures in Class Pointer unit/browser regressions, Follow Teacher and broad browser coverage. Those checks must pass on the rebased head before a release-ready verdict.
 
 ## Confirmed release blockers from the existing read-only production review

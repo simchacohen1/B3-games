@@ -23,7 +23,7 @@ test('drawing controls occupy a separate right-hand rail, never the canvas',()=>
  assert.match(editor,/window\.studioRailColor=/);
  assert.match(editor,/window\.studioRailSize=/);
  assert.match(html,/scrapbook-editor\.js\?v=20261019-sticker-click2/);
- assert.match(html,/scrapbook-editor\.css\?v=20261019-all-stickers1/);
+ assert.match(html,/scrapbook-editor\.css\?v=20261019-page-grid-fix1/);
 });
 test('drawings still use their original separate page canvases and saving keys',()=>{
  assert.match(editor,/const pages = id =>/);
