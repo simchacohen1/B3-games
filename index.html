@@ -30,6 +30,8 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <style>
@@ -408,17 +410,17 @@ body > .subtitle::after {
     if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
   });
 </script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="backend/functions/student-tool-policy.js"></script>
-<script src="student-tool-controls.js"></script>
-<script src="follow-teacher/core.js?v=20261020-follow-pointer1"></script>
-<script src="follow-teacher/student.js?v=20261020-follow-pointer1"></script>
-<script src="guest-mode.js?v=20261011-guest"></script>
-<script src="site-settings.js?v=20261020-demo-student"></script>
-<script src="approval-queue.js?v=20261021-approvals"></script>
+<script src="vendor/firebase/12.15.0/firebase-app-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
+<script src="firebase-config.js?v=20261001-teacherauth" defer></script>
+<script src="backend/functions/student-tool-policy.js" defer></script>
+<script src="student-tool-controls.js" defer></script>
+<script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
+<script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
+<script src="guest-mode.js?v=20261011-guest" defer></script>
+<script src="site-settings.js?v=20261020-demo-student" defer></script>
+<script src="approval-queue.js?v=20261021-approvals" defer></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -465,7 +467,7 @@ body > .subtitle::after {
             <section class="game-group island-place " data-game-group="skills">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" loading="lazy" decoding="async" width="74" height="74" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
 <a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
       </section>
             <section class="game-group island-place " data-game-group="more-learning">
@@ -631,6 +633,8 @@ body > .subtitle::after {
   </div>
 
 <script>
+// Runs after the deferred scripts above have loaded (faster first paint).
+document.addEventListener("DOMContentLoaded",function(){
 (function(){
   "use strict";
   const settingsApi=window.B3SiteSettings;
@@ -2460,6 +2464,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     finishHomepageBootstrap();
   });
 })();
+},{once:true});
 </script>
 <script defer src="class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
