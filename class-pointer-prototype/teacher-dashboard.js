@@ -81,11 +81,13 @@ function init(){
  everyoneLabel.append(el('span',null,'Can use on my screen'));
  const LEVEL_LONG=[['none','Nothing'],['point','Pointer'],['highlight','Pointer + highlight'],['pen','Pointer + highlight + pen']];
  const LEVEL_SHORT=[['none','Nothing'],['point','Pointer'],['highlight','+ Highlight'],['pen','+ Pen']];
+ const TOOL_LEVEL_COLORS={none:{background:'#ffffff',color:'#334155'},point:{background:'#dbeafe',color:'#1e40af'},highlight:{background:'#fef08a',color:'#713f12'},pen:{background:'#dcfce7',color:'#166534'}};
+ function colorToolSelect(select){const c=TOOL_LEVEL_COLORS[select.value]||TOOL_LEVEL_COLORS.none;select.style.backgroundColor=c.background;select.style.color=c.color;select.style.fontWeight=select.value==='none'?'400':'700';}
  const everyoneSelect=el('select');everyoneSelect.id='cpEveryoneLevel';
  for(const [v,t] of LEVEL_LONG){const o=el('option',null,t);o.value=v;everyoneSelect.append(o)}
  everyoneLabel.append(everyoneSelect);
  everyone.append(everyoneLabel,el('span','cp-everyone-help','Change one student below if needed.'));
- everyoneSelect.addEventListener('change',()=>window.ClassPointerRoster?.setAll(everyoneSelect.value));
+ everyoneSelect.addEventListener('change',()=>{colorToolSelect(everyoneSelect);window.ClassPointerRoster?.setAll(everyoneSelect.value)});
  sidebar.append(everyone);
 
  /* One table: name, level on my screen, screen sharing, whiteboard. */
@@ -176,6 +178,7 @@ function init(){
   const focused=document.activeElement&&tableBody.contains(document.activeElement)?document.activeElement.dataset.key:null;
   tableBody.replaceChildren();
   if(R())everyoneSelect.value=R().everyone();
+  colorToolSelect(everyoneSelect);
   if(!list.length){
    const empty=el('p','cp-student-empty',$('endClass')?.disabled?'Start a class to see your students here.':'No students yet. Use Invite students to send the join link.');
    tableBody.append(empty);
@@ -209,8 +212,9 @@ function init(){
    level.setAttribute('aria-label',row.name+' on my screen');
    for(const [v,t] of LEVEL_SHORT){const o=el('option',null,t);o.value=v;level.append(o)}
    level.value=R()?.levelForName(row.name)||'none';
+   colorToolSelect(level);
    level.disabled=!R();
-   level.addEventListener('change',()=>R()?.setLevelForName(row.name,level.value));
+   level.addEventListener('change',()=>{colorToolSelect(level);R()?.setLevelForName(row.name,level.value)});
    const checks=[];
    for(const [kind,label] of [['screens','screen sharing'],['boards','whiteboard']]){
     const c=el('input','cp-check');c.type='checkbox';c.dataset.key=kind+':'+row.name;
