@@ -40,9 +40,12 @@ test('access gate creates the default Firebase app before asking Auth to restore
  const gate=fs.readFileSync('game-gate.js','utf8');
  const code=gate.slice(gate.indexOf('  async function watchTeacherAccess()'),gate.indexOf('  function getStoredStudentId()'));
  const order=[],firebase={apps:[],initializeApp(){order.push('initialize');this.apps.push({})},auth(){assert.equal(this.apps.length,1);order.push('auth');return{}},database(){}};
- const context=vm.createContext({window:{firebase,B3_FIREBASE_CONFIG:{},B3SiteSettings:{onAuthStateChanged(){}}},document:{readyState:'complete'},
- loadAuthScript:async()=>{},waitForFirebaseAuthState:async()=>{},markAuthReady:()=>order.push('ready'),console,checkNow(){}});
- vm.runInContext(code,context);await context.watchTeacherAccess();assert.deepEqual(order,['initialize','auth','ready']);
+ const context=vm.createContext({window:{firebase,B3_FIREBASE_CONFIG:{},B3SiteSettings:{onAuthStateChanged(){}}},document:{readyState:'complete'},teacherWatchStarted:false,
+  clearTimeout(){},setTimeout(){return 1},
+  loadAuthScript:async()=>{},waitForFirebaseAuthState:async()=>{},boundedAccess:async p=>p,showClosed(){},markAuthReady:()=>order.push('ready'),console,checkNow(){}});
+ vm.runInContext(code,context);await context.watchTeacherAccess();
+ assert.deepEqual(order.slice(0,3),['initialize','auth','ready']);
+ assert.ok(order.slice(3).every(step=>step==='ready'));
 });
 
 

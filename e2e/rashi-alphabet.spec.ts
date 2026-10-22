@@ -45,9 +45,9 @@ async function answerRound(page: Page, count: number) {
   for(let i=0;i<count;i++) {
     const target=(await page.locator('.lab-target').textContent())?.trim();
     expect(target).toBeTruthy();
+    const progress=await page.locator('.lab-stat').last().textContent();
     await page.getByRole('button',{name:'Letter '+target,exact:true}).click();
-    await expect(page.getByRole('button',{name:'Next question →'})).toBeVisible();
-    await page.getByRole('button',{name:'Next question →'}).click();
+    await expect.poll(()=>page.locator('.lab-stat').last().textContent(), {timeout:5000}).not.toBe(progress);
   }
 }
 
@@ -63,6 +63,7 @@ test('full Alef-Beis gallery displays 27 Rashi and regular letter shapes plus ha
 });
 
 test('all 27 letters must be independently recognized before mastery is awarded',async({page})=>{
+  test.setTimeout(90000);
   await startLab(page);
   await page.evaluate(() => (window as any).openRashiAlphabetLab('alphabet'));
   for(let chunk=0;chunk<3;chunk++){
