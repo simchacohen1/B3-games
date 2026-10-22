@@ -95,10 +95,23 @@
   const labelAt=i=>labels?labels[i]:data[i*4]|(data[i*4+1]<<8)|(data[i*4+2]<<16);
   const label=labelAt(y*width+x);
   if(!label)return {reason:'border'};
+  // Recoloring one region should not rescan 1.5 million pixels on every tap.
+  // Cache only a handful of bounded regions; source labels remain unchanged.
+  if(labels&&mask.recentPixels?.has(label)){
+   const saved=mask.recentPixels.get(label);
+   mask.recentPixels.delete(label);mask.recentPixels.set(label,saved);
+   return {pixels:saved,region:label};
+  }
   const pixels=[];
   for(let i=0;i<total;i++)if(labelAt(i)===label)pixels.push(i);
   if(!pixels.length||pixels.length>total*.18)return {reason:'open'};
-  return {pixels:Uint32Array.from(pixels),region:label};
+  const result=Uint32Array.from(pixels);
+  if(labels){
+   if(!mask.recentPixels)mask.recentPixels=new Map();
+   mask.recentPixels.set(label,result);
+   while(mask.recentPixels.size>4)mask.recentPixels.delete(mask.recentPixels.keys().next().value);
+  }
+  return {pixels:result,region:label};
  }
  const api={traceRegion,createRegionMask,regionFromMask};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.FTTMitzvahFill=api;
