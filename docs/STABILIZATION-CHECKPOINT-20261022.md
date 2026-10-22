@@ -6,7 +6,7 @@
 - Candidate branch: `audit/signin-reliability-20261021`, rebased onto the latest `main` during the PR #283 CI repair continuation.
 - Keep PR #283 draft; do not merge or deploy.
 - PR #281 student-authentication changes were incorporated into this candidate. Where its gate changes conflicted, the candidate retained PR #283's fail-closed role/membership checks and merged only the compatible session and tool fixes.
-- No production config, functions, rules, student accounts, or student data were changed or accessed.
+- No production config, functions, or rules were changed. Production metadata was inspected read-only; no student accounts or student data were accessed.
 
 ## Repairs in this checkpoint
 
