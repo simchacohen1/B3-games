@@ -107,6 +107,15 @@ function addGallery(lessonId,seifNumbers,simanNumber){
 function boot(){
  Object.entries(siman2).forEach(([id,seifim])=>addGallery(id,seifim,2));
  Object.entries(siman3).forEach(([id,seifim])=>addGallery(id,seifim,3));
+ const sectionsHost=document.getElementById('sections');
+ if(sectionsHost&&window.MutationObserver){
+  const observer=new MutationObserver(records=>{
+   if(!records.some(record=>record.addedNodes.length))return;
+   Object.entries(siman2).forEach(([id,seifim])=>addGallery(id,seifim,2));
+   Object.entries(siman3).forEach(([id,seifim])=>addGallery(id,seifim,3));
+  });
+  observer.observe(sectionsHost,{childList:true});
+ }
  if(typeof lessons!=='undefined'){lessons.forEach(lesson=>{if(lesson.siman==='ג'&&lesson.id.startsWith('s3'))lesson.sourceText=lesson.sourceText||''})}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
