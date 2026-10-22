@@ -66,4 +66,22 @@ test('all 613 descriptions and vocabulary selections are explicit and preserve t
  for(const ref of ['P225','N296'])assert.ok(c.FTTSeferVocabulary.forRef(ref).some(w=>plain(w.hebrew)==='עיר מקלט'));
  assert.match(d.N154,/Do not.*wrong order/);assert.match(d.P105,/seminal discharge/);assert.ok(!d.P105.includes('<br>'));
 });
+test('off-thread segmentation matches unchanged artwork and repeat taps reuse one bounded region',()=>{
+ const art=png(root+manifest[484].source),direct=createRegionMask(art,art.width,art.height);
+ const context={Uint8ClampedArray,Uint32Array,ArrayBuffer,console};let response;
+ context.self=context;
+ context.importScripts=()=>vm.runInNewContext(fs.readFileSync(root+'fill.js','utf8'),context);
+ context.postMessage=(message,transfers)=>{response=message;assert.ok(transfers.includes(message.labels));};
+ vm.runInNewContext(fs.readFileSync(root+'mask-worker.js','utf8'),context);
+ const input=new Uint8ClampedArray(art.data).buffer;
+ context.onmessage({data:{revision:7,card:484,width:art.width,height:art.height,pixels:input}});
+ assert.equal(response.revision,7);assert.equal(response.card,484);
+ assert.equal(response.error,undefined);
+ assert.equal(crypto.createHash('sha256').update(Buffer.from(response.labels)).digest('hex'),manifest[484].labelsSha256);
+ const mask={width:art.width,height:art.height,labels:new Uint32Array(response.labels)};
+ const firstIndex=mask.labels.findIndex(Boolean),x=firstIndex%mask.width,y=Math.floor(firstIndex/mask.width);
+ const first=regionFromMask(mask,mask.width,mask.height,x,y),second=regionFromMask(mask,mask.width,mask.height,x,y);
+ assert.strictEqual(second.pixels,first.pixels,'same image region is cached, not scanned again');
+ assert.ok(mask.recentPixels.size<=4,'bounded pixel cache');
+});
 module.exports={png};
