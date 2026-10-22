@@ -42,7 +42,7 @@
   function openPointer() {
     var id = currentClass();
     if (onPointerPage() || !classIsValid(id)) return;
-    window.open(classUrl(POINTER_PATH, id), 'classPointer');
+    window.open(classUrl(POINTER_PATH, id, {dashboard:'teacher'}), 'classPointer');
   }
   function syncPointerButtons() {
     var ok = classIsValid(currentClass());
