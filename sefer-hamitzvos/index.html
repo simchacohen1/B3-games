@@ -34,7 +34,7 @@ const palette=[['Red','#e53935'],['Coral','#ff7043'],['Orange','#fb8c00'],['Ambe
 for(const [name,color] of palette){const b=document.createElement('button');b.type='button';b.className='color-button';b.textContent=name;b.style.backgroundColor=color;b.style.color=['Yellow','Lemon','Lime','Light Green','Turquoise','Sky Blue','Lavender','Pink','Tan','Peach','Cream','Mint','Ice Blue','Silver','White'].includes(name)?'#163451':'white';b.setAttribute('aria-label',name);b.setAttribute('aria-pressed',String(color===selectedColor));b.onclick=()=>{selectedColor=color;if(activeTool==='eraser')setTool('brush');for(const other of $('colors').children)other.setAttribute('aria-pressed',String(other===b));};$('colors').appendChild(b);}
 let followPaintPending=false;
 window.addEventListener('ftt:before-follow-navigation',e=>{if(followPaintPending||paintLoading||active)e.preventDefault();});
-let mitzvahDb=null,paintRevision=0,paintLoading=false,paintSaveTimer=null,localSavedAt=0;
+let mitzvahDb=null,paintRevision=0,paintLoading=false,localSavedAt=0;const cardSaveTimers=new Map(),cardWriteChains=new Map(),regionMaskCache=new Map();let navigationTimer=null;
 try{if(window.firebase&&window.B3_FIREBASE_CONFIG){if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);mitzvahDb=firebase.database();}}catch(e){console.warn('Sefer HaMitzvos cloud unavailable',e);}
 function saveStatus(message){const el=$('accountSaveStatus');if(el)el.textContent=message;}
 function studentCardPath(card){const sid=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');return sid?'b3Games/students/'+sid+'/seferHamitzvos/coloring/'+card+(versionedSaveArt.has(Number(card))?'-v2':''):null;}
@@ -44,26 +44,40 @@ function rgb(hex){const n=parseInt(hex.slice(1),16);return[(n>>16)&255,(n>>8)&25
 function colorRegion(target,pixels,color){const c=rgb(color),data=target.data;for(const index of pixels){const i=index*4;data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=255;}}
 function fillRegionAt(seed,color,target=fillPixels,maskVersion=1){if(!sourcePixels)return{reason:'unavailable'};const result=maskVersion===1?window.FTTMitzvahFill.regionFromMask(regionMask,cv.width,cv.height,seed[0],seed[1]):window.FTTMitzvahFill.traceRegion(sourcePixels,cv.width,cv.height,seed[0],seed[1]);if(result.pixels)colorRegion(target,result.pixels,color);return result;}
 function rebuildFillLayer(){if(!sourcePixels||!fillPixels)return;fillPixels=fillCtx.createImageData(cv.width,cv.height);for(const item of strokes){if(item.type==='fill'&&Array.isArray(item.seed))fillRegionAt(item.seed,item.color,fillPixels,item.maskVersion||0);else if(item.eraseFill&&Array.isArray(item.points)){fillCtx.putImageData(fillPixels,0,0);fillCtx.save();fillCtx.globalCompositeOperation='destination-out';fillCtx.strokeStyle='#000';fillCtx.lineWidth=item.size;fillCtx.lineCap='round';fillCtx.lineJoin='round';fillCtx.beginPath();item.points.forEach(([x,y],i)=>i?fillCtx.lineTo(x,y):fillCtx.moveTo(x,y));if(item.points.length===1)fillCtx.lineTo(item.points[0][0]+.1,item.points[0][1]+.1);fillCtx.stroke();fillCtx.restore();fillPixels=fillCtx.getImageData(0,0,cv.width,cv.height);}}fillCtx.clearRect(0,0,fillCv.width,fillCv.height);fillCtx.putImageData(fillPixels,0,0);}
-function prepareFillSource(){const img=$('outline');sourceCanvas.width=cv.width;sourceCanvas.height=cv.height;sourceCtx.clearRect(0,0,cv.width,cv.height);sourceCtx.drawImage(img,0,0,cv.width,cv.height);sourcePixels=sourceCtx.getImageData(0,0,cv.width,cv.height);fillPixels=fillCtx.createImageData(cv.width,cv.height);rebuildFillLayer();}
+function prepareFillSource(){const img=$('outline');sourceCanvas.width=cv.width;sourceCanvas.height=cv.height;sourceCtx.clearRect(0,0,cv.width,cv.height);sourceCtx.drawImage(img,0,0,cv.width,cv.height);sourcePixels=sourceCtx.getImageData(0,0,cv.width,cv.height);fillPixels=fillCtx.createImageData(cv.width,cv.height);fillCtx.clearRect(0,0,fillCv.width,fillCv.height);}
 function applyAreaFill(pointOnCanvas){if(!sourcePixels){$('notice').textContent='The picture is still loading. Try again in a moment.';return;}const seed=[Math.floor(pointOnCanvas[0]),Math.floor(pointOnCanvas[1])],result=fillRegionAt(seed,selectedColor);if(!result.pixels){$('notice').textContent=result.reason==='unavailable'?'Safe coloring sections are still loading. Please try again.':result.reason==='open'?'That area is too open to fill safely. Choose a smaller section.':'Tap inside an enclosed section, away from the black border.';return;}fillCtx.putImageData(fillPixels,0,0);strokes.push({type:'fill',seed,color:selectedColor,maskVersion:1});$('notice').textContent='Section filled. Tap another section or choose a new color.';persist();}
 function persist(){
  if(sessionStorage.getItem('b3Games_guest')==='1'||window.B3_READ_ONLY_TEACHER_PREVIEW)return;
  followPaintPending=true;
- const card=num,rev=++paintRevision,copy=JSON.parse(JSON.stringify(strokes));localSavedAt=Date.now();
- try{localStorage.setItem(key(card),JSON.stringify(copy));localStorage.setItem(key(card)+':savedAt',String(localSavedAt));saveStatus('Saved on this device — saving to account…');}
- catch(e){saveStatus('Save failed on this device — use Save PNG');return;}
+ const card=num,rev=++paintRevision,copy=JSON.parse(JSON.stringify(strokes));
+ localSavedAt=Math.max(Date.now(),localSavedAt+1);
+ const savedAt=localSavedAt;
+ try{localStorage.setItem(key(card),JSON.stringify(copy));localStorage.setItem(key(card)+':savedAt',String(savedAt));saveStatus('Saved on this device — saving to account…');}
+ catch(e){followPaintPending=false;saveStatus('Save failed on this device — use Save PNG');return;}
  if(paintLoading)return;
- clearTimeout(paintSaveTimer);
  const path=studentCardPath(card);
- if(!mitzvahDb||!path){saveStatus('Saved on this device only — sign in to save to account');return;}
- paintSaveTimer=setTimeout(()=>{if(card!==num||rev!==paintRevision)return;
- mitzvahDb.ref(path).set({strokes:copy,updatedAt:localSavedAt}).then(()=>{
-  if(card===num&&rev===paintRevision){followPaintPending=false;saveStatus('✓ Saved to my account');}
- }).catch(e=>{console.warn('Sefer HaMitzvos account save failed',e);if(card===num)saveStatus('Saved on this device — account save failed');});
+ if(!mitzvahDb||!path){followPaintPending=false;saveStatus('Saved on this device only — sign in to save to account');return;}
+ // Each card owns its debounce. Switching pictures cannot discard its pending save.
+ if(cardSaveTimers.has(path))clearTimeout(cardSaveTimers.get(path));
+ const timer=setTimeout(()=>{
+  if(cardSaveTimers.get(path)===timer)cardSaveTimers.delete(path);
+  // Serialize writes for the same card; an earlier network request cannot arrive last.
+  const prior=cardWriteChains.get(path)||Promise.resolve();
+  const writing=prior.catch(()=>{}).then(()=>mitzvahDb.ref(path).set({strokes:copy,updatedAt:savedAt}));
+  cardWriteChains.set(path,writing);
+  writing.then(()=>{
+   if(cardWriteChains.get(path)===writing)cardWriteChains.delete(path);
+   if(card===num&&rev===paintRevision){followPaintPending=false;saveStatus('✓ Saved to my account');}
+  }).catch(e=>{
+   if(cardWriteChains.get(path)===writing)cardWriteChains.delete(path);
+   console.warn('Sefer HaMitzvos account save failed',e);
+   if(card===num){followPaintPending=false;saveStatus('Saved on this device — account save failed');}
+  });
  },350);
+ cardSaveTimers.set(path,timer);
 }
 async function loadColoring(card){
- const rev=++paintRevision;paintLoading=true;clearTimeout(paintSaveTimer);
+ const rev=++paintRevision;paintLoading=true;
  restore();draw();rebuildFillLayer();saveStatus('Checking saved coloring…');
  const path=studentCardPath(card);
  if(!mitzvahDb||!path){paintLoading=false;saveStatus('Saved on this device only — sign in to save to account');return;}
@@ -80,7 +94,60 @@ async function loadColoring(card){
  }catch(e){console.warn('Sefer HaMitzvos account load failed',e);paintLoading=false;saveStatus('Saved on this device — account unavailable');}
 }
 function draw(){ctx.clearRect(0,0,cv.width,cv.height);for(const s of strokes){if(s.type==='fill'||!Array.isArray(s.points))continue;ctx.globalCompositeOperation=s.erase?'destination-out':'source-over';ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();s.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(s.points.length===1){const [x,y]=s.points[0];ctx.lineTo(x+.1,y+.1)}ctx.stroke()}ctx.globalCompositeOperation='source-over'}
-function load(n){if(!canBrowseDates){const today=calendar.studyToday(new Date(),window.FTTSunTimes);if(selectedDate>today)return;const lesson=calendar.lesson(selectedDate,days);if(!lesson.mitzvos.some(ref=>Number(cardByRef[ref])===Number(n)))return;}$('workspace').classList.toggle('hidden',false);$('colorControls').classList.toggle('hidden',false);num=Math.max(1,Math.min(613,Number(n)||1));window.FTTSeferWordActivity&&window.FTTSeferWordActivity.open(refByCard[num],num);$('card').value=num;active=null;$('mitzvahDescription').textContent=window.FTT_MITZVAH_DESCRIPTIONS?.[refByCard[num]]||'';const mitzvahRef=refByCard[num],hebrewTitle=hebrewMitzvahTitles[mitzvahRef]||'';$('mitzvahHebrewTitle').textContent=hebrewTitle;$('mitzvahHebrewTitle').hidden=!hebrewTitle;$('label').textContent=mitzvahRef?refLabel(mitzvahRef)+' · Card '+num:'Card '+num;document.querySelectorAll('#dayCards button').forEach(b=>{const on=Number(b.dataset.card)===num;b.classList.toggle('primary',on);b.setAttribute('aria-pressed',String(on));});const img=$('outline'),loadRevision=++artLoadRevision,loadedCard=num;regionMask=null;sourcePixels=null;img.onload=async()=>{if(loadRevision!==artLoadRevision)return;cv.width=img.naturalWidth;cv.height=img.naturalHeight;fillCv.width=img.naturalWidth;fillCv.height=img.naturalHeight;prepareFillSource();$('notice').textContent='Loading safe coloring sections…';regionMask=window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);$('notice').textContent=regionMask?'':'Safe coloring sections unavailable; use Brush.';loadColoring(loadedCard);};img.onerror=()=>$('notice').textContent='Coloring image not available';img.src=(newArt.has(num)?'coloring-v2/':'coloring/')+fmt(num)+'.png'+(newArt.has(num)?'?v=20261016-october':'')}
+function load(n){
+ if(!canBrowseDates){
+  const today=calendar.studyToday(new Date(),window.FTTSunTimes);
+  if(selectedDate>today)return;
+  const lesson=calendar.lesson(selectedDate,days);
+  if(!lesson.mitzvos.some(ref=>Number(cardByRef[ref])===Number(n)))return;
+ }
+ // Finish an interrupted brush stroke against the OLD card, never the new one.
+ if(active){active=null;persist();}
+ $('workspace').classList.toggle('hidden',false);$('colorControls').classList.toggle('hidden',false);
+ num=Math.max(1,Math.min(613,Number(n)||1));
+ window.FTTSeferWordActivity&&window.FTTSeferWordActivity.open(refByCard[num],num);
+ $('card').value=num;active=null;
+ $('mitzvahDescription').textContent=window.FTT_MITZVAH_DESCRIPTIONS?.[refByCard[num]]||'';
+ const mitzvahRef=refByCard[num],hebrewTitle=hebrewMitzvahTitles[mitzvahRef]||'';
+ $('mitzvahHebrewTitle').textContent=hebrewTitle;$('mitzvahHebrewTitle').hidden=!hebrewTitle;
+ $('label').textContent=mitzvahRef?refLabel(mitzvahRef)+' · Card '+num:'Card '+num;
+ document.querySelectorAll('#dayCards button').forEach(b=>{
+  const on=Number(b.dataset.card)===num;b.classList.toggle('primary',on);b.setAttribute('aria-pressed',String(on));
+ });
+ const img=$('outline'),loadRevision=++artLoadRevision,loadedCard=num;
+ paintLoading=true;regionMask=null;sourcePixels=null;
+ clearTimeout(navigationTimer);
+ img.onload=null;img.onerror=null;
+ $('notice').textContent='Opening picture…';
+ // Rapid Previous/Next clicks render only the final picture. Avoid decoding
+ // and segmenting every intermediate card, which previously froze the page.
+ navigationTimer=setTimeout(()=>{
+  if(loadRevision!==artLoadRevision)return;
+  img.onload=()=>{
+   if(loadRevision!==artLoadRevision)return;
+   cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+   fillCv.width=img.naturalWidth;fillCv.height=img.naturalHeight;
+   strokes=[]; // Never redraw the previous card's strokes over new artwork.
+   prepareFillSource();
+   $('notice').textContent='Loading safe coloring sections…';
+   const cached=regionMaskCache.get(loadedCard);
+   if(cached&&cached.width===cv.width&&cached.height===cv.height){
+    regionMaskCache.delete(loadedCard);regionMaskCache.set(loadedCard,cached);
+    regionMask=cached;
+   }else{
+    regionMask=window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);
+    if(regionMask){
+     regionMaskCache.set(loadedCard,regionMask);
+     while(regionMaskCache.size>3)regionMaskCache.delete(regionMaskCache.keys().next().value);
+    }
+   }
+   $('notice').textContent=regionMask?'':'Safe coloring sections unavailable; use Brush.';
+   loadColoring(loadedCard);
+  };
+  img.onerror=()=>{if(loadRevision===artLoadRevision){paintLoading=false;$('notice').textContent='Coloring image not available';}};
+  img.src=(newArt.has(loadedCard)?'coloring-v2/':'coloring/')+fmt(loadedCard)+'.png'+(newArt.has(loadedCard)?'?v=20261016-october':'');
+ },120);
+}
 function point(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]}
 cv.addEventListener('pointerdown',e=>{if(paintLoading){$('notice').textContent='Please wait for your saved coloring to load.';return;}if(activeTool==='fill'){applyAreaFill(point(e));return;}cv.setPointerCapture(e.pointerId);active={color:selectedColor,size:Number($('size').value),erase,eraseFill:erase,points:[point(e)]};strokes.push(active);draw();if(erase)rebuildFillLayer()});cv.addEventListener('pointermove',e=>{if(active){active.points.push(point(e));draw();if(active.eraseFill)rebuildFillLayer()}});for(const event of ['pointerup','pointercancel'])cv.addEventListener(event,()=>{if(active){active=null;persist()}});
 $('prev').onclick=()=>load(num-1);$('next').onclick=()=>load(num+1);$('card').onchange=e=>load(e.target.value);$('brush').onclick=()=>setTool('brush');$('eraser').onclick=()=>setTool('eraser');$('fill').onclick=()=>setTool('fill');$('undo').onclick=()=>{strokes.pop();persist();draw();rebuildFillLayer()};$('clear').onclick=()=>{if(confirm('Clear your coloring on this card?')){strokes=[];persist();draw();rebuildFillLayer()}};
