@@ -198,7 +198,7 @@ test('Bigger picture button enlarges the picture, coloring still works, and it c
   const big = await width();
   expect(big).toBeGreaterThan(small * 1.25);
   await page.locator('#fill').click();
-  const seed = await page.evaluate(() => { const L = regionMask.object.labels as Uint32Array, c = new Map<number, number>(); for (const l of L) if (l) c.set(l, (c.get(l) || 0) + 1); const id = [...c].filter(([, n]) => n > 5000 && n < 40000)[0][0]; const i = L.indexOf(id); return [i % cv.width, Math.floor(i / cv.width)]; });
+  const seed = await page.evaluate(() => { const L = regionMask.object.labels as Uint32Array, c = new Map<number, number>(); for (const l of L) if (l) c.set(l, (c.get(l) || 0) + 1); const id = [...c].filter(([, n]) => n > 5000 && n < 40000)[0][0]; const W = cv.width, H = L.length / W; let best = L.indexOf(id); for (let i = 0; i < L.length; i++) { if (L[i] !== id) continue; const x = i % W, y = Math.floor(i / W); let inside = x > 4 && y > 4 && x < W - 5 && y < H - 5; for (let dy = -4; inside && dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (L[(y + dy) * W + x + dx] !== id) { inside = false; break; } if (inside) { best = i; break; } } return [best % W, Math.floor(best / W)]; });
   await tapEvent(page, seed[0], seed[1]);
   await expect(page.locator('#notice')).toContainText('Section filled');
   if (shots) await page.screenshot({ path: path.join(shots, '4-bigger-picture-499.png') });
