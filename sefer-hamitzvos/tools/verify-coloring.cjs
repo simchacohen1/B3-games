@@ -24,7 +24,7 @@ function fixture(local=new Map(),remote=new Map()){
 }
 (async()=>{
  const f=fixture();await f.ready(484);
- for(const n of [1,475,484,487,499,613]){
+ for(const n of [1,475,484,487,495,496,497,498,499,613]){
   await f.ready(n);const seeds=f.run(`(()=>{const d=regionMask.labels,w=cv.width,counts=new Map(),seeds=new Map();for(let i=0;i<d.length;i++){const id=d[i];if(id){counts.set(id,(counts.get(id)||0)+1);seeds.set(id,i)}}return [...counts].filter(([,n])=>n>=9).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([id])=>{const i=seeds.get(id);return[i%w,Math.floor(i/w)]})})()`);
   f.run('strokes=[];rebuildFillLayer();selectedColor="#e53935";setTool("fill")');f.scale(.5);f.tap(...seeds[0]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);const first=f.hash();
   f.run('selectedColor="#1976d2"');f.scale(1.25);f.tap(...seeds[1],'touch');assert.deepEqual(f.pixel(...seeds[1]),[25,118,210,255]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);
