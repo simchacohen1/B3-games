@@ -472,7 +472,13 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   const resize=()=>{const height=d.body.offsetHeight;if(frame.style.height!==height+'px')frame.style.height=height+'px';};
-  new ResizeObserver(resize).observe(d.body);
+  // Defer iframe writes until after observer delivery to avoid a resize loop.
+  let resizePending=false;
+  new ResizeObserver(()=>{
+    if(resizePending)return;
+    resizePending=true;
+    requestAnimationFrame(()=>{resizePending=false;if(frame.contentDocument===d)resize();});
+  }).observe(d.body);
   resize();
   organize();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
