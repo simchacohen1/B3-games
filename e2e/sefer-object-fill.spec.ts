@@ -174,3 +174,20 @@ test('line art stays above the paint, and undo/redo works through real buttons',
   await page.locator('#redo').click(); expect(await pixel(page, 1100, 850)).toEqual([67, 160, 71, 255]);
   if (shots) await page.locator('.art').screenshot({ path: path.join(shots, '3-undo-redo-478.png') });
 });
+
+test('Bigger picture button enlarges the picture, coloring still works, and it can shrink back', async ({ page }) => {
+  test.setTimeout(120000);
+  await openSefer(page); await loadCard(page, 499);
+  const width = () => page.evaluate(() => document.getElementById('paint')!.getBoundingClientRect().width);
+  const small = await width();
+  await page.locator('#zoom').click();
+  const big = await width();
+  expect(big).toBeGreaterThan(small * 1.25);
+  await page.locator('#fill').click();
+  const seed = await page.evaluate(() => { const L = regionMask.object.labels as Uint32Array, c = new Map<number, number>(); for (const l of L) if (l) c.set(l, (c.get(l) || 0) + 1); const id = [...c].filter(([, n]) => n > 5000 && n < 40000)[0][0]; const i = L.indexOf(id); return [i % cv.width, Math.floor(i / cv.width)]; });
+  await tap(page, seed[0], seed[1]);
+  await expect(page.locator('#notice')).toContainText('Section filled');
+  if (shots) await page.screenshot({ path: path.join(shots, '4-bigger-picture-499.png') });
+  await page.locator('#zoom').click();
+  expect(await width()).toBeLessThan(big);
+});
