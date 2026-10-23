@@ -1,7 +1,7 @@
 'use strict';
 // Segmentation runs off the main page so paging through detailed artwork stays responsive.
 // The unchanged fill algorithm remains the single source of truth for safety boundaries.
-importScripts('fill.js?v=20261020-regions2');
+importScripts('fill.js?v=20261023-fringe1');
 self.onmessage=function(event){
  const request=event.data||{};
  try{
