@@ -18,14 +18,6 @@
       "permission": ".read"
     },
     {
-      "path": "/b3Quiz",
-      "permission": ".read"
-    },
-    {
-      "path": "/b3Quiz",
-      "permission": ".write"
-    },
-    {
       "path": "/classGallery",
       "permission": ".read"
     },
