@@ -51,6 +51,13 @@ async function tap(page: Page, x: number, y: number) {
   }, [x, y]);
   await page.mouse.click(box.x, box.y);
 }
+// Same click, delivered as a pointer event on the canvas (steady across browsers when many clicks run in a row).
+async function tapEvent(page: Page, x: number, y: number) {
+  await page.locator('#paint').evaluate((canvas, p) => {
+    const r = canvas.getBoundingClientRect(), c = canvas as HTMLCanvasElement;
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, pointerType: 'mouse', clientX: r.left + (p.x + 0.5) * r.width / c.width, clientY: r.top + (p.y + 0.5) * r.height / c.height }));
+  }, { x, y });
+}
 const pixel = (page: Page, x: number, y: number) => page.evaluate(([px, py]) => {
   const c = document.getElementById('fillPaint') as HTMLCanvasElement;
   return [...c.getContext('2d')!.getImageData(px, py, 1, 1).data];
@@ -88,7 +95,14 @@ test('hands, sleeves, faces, shirts, shoes and belts: each curated object fills 
     expect(groups.length).toBeGreaterThanOrEqual(9);
     for (const g of groups) {
       await page.evaluate(() => { strokes = []; (window as any).rebuildFillLayer(); });
-      await tap(page, ...g.join[0]);
+      await tapEvent(page, ...g.join[0]);
+      // The fill finishes a moment after the tap (slower in Firefox/WebKit), so wait until something is colored.
+      await page.waitForFunction(() => {
+        const f = document.getElementById('fillPaint') as HTMLCanvasElement;
+        const d = f.getContext('2d')!.getImageData(0, 0, f.width, f.height).data;
+        for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
+        return false;
+      }, null, { timeout: 30000 });
       const r = await page.evaluate(group => {
         const o = regionMask.object, w = o.width, id = o.labels[Math.floor(group.join[0][1]) * w + Math.floor(group.join[0][0])];
         const fill = (document.getElementById('fillPaint') as HTMLCanvasElement), px = fill.getContext('2d')!.getImageData(0, 0, fill.width, fill.height).data;
@@ -120,7 +134,7 @@ test('colored pictures with detail: screenshots of pants, hands, faces, shoes', 
     let i = 0;
     for (const g of groups) {
       await page.getByRole('button', { name: palette[i++ % palette.length], exact: true }).click();
-      await tap(page, ...g.join[0]);
+      await tapEvent(page, ...g.join[0]);
     }
     if (shots) await page.locator('.art').screenshot({ path: path.join(shots, `2-all-objects-colored-${card}.png`) });
   }
@@ -185,7 +199,7 @@ test('Bigger picture button enlarges the picture, coloring still works, and it c
   expect(big).toBeGreaterThan(small * 1.25);
   await page.locator('#fill').click();
   const seed = await page.evaluate(() => { const L = regionMask.object.labels as Uint32Array, c = new Map<number, number>(); for (const l of L) if (l) c.set(l, (c.get(l) || 0) + 1); const id = [...c].filter(([, n]) => n > 5000 && n < 40000)[0][0]; const i = L.indexOf(id); return [i % cv.width, Math.floor(i / cv.width)]; });
-  await tap(page, seed[0], seed[1]);
+  await tapEvent(page, seed[0], seed[1]);
   await expect(page.locator('#notice')).toContainText('Section filled');
   if (shots) await page.screenshot({ path: path.join(shots, '4-bigger-picture-499.png') });
   await page.locator('#zoom').click();
