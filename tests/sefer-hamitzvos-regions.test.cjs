@@ -86,7 +86,7 @@ test('off-thread segmentation matches unchanged artwork and repeat taps reuse on
 });
 test('white fringe completion paints enclosed gaps without crossing ink or another section',()=>{
  const {includeSafeWhiteFringe}=require('../sefer-hamitzvos/fill.js');
- const width=14,height=12,total=width*height,labels=new Uint32Array(total),data=new Uint8ClampedArray(total*4);
+ const width=20,height=16,total=width*height,labels=new Uint32Array(total),data=new Uint8ClampedArray(total*4);
  for(let i=0;i<total;i++){data[i*4]=255;data[i*4+1]=255;data[i*4+2]=255;data[i*4+3]=255;}
  for(let y=2;y<=9;y++)for(let x=2;x<=5;x++)labels[y*width+x]=1;
  // An artificially closed white gap within one enclosed region.
