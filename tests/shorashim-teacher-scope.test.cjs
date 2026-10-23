@@ -14,7 +14,7 @@ test('legacy Shorashim teacher loads only its assigned roster and students',()=>
   assert.match(teacher,/scopedStudentIds\.map\(id=>db\.ref\(`\$\{ROOT\}\/leaderboards\/match\/8\/\$\{id\}`\)/);
   assert.match(teacher,/function bindFullScopeListener\(\)\{[\s\S]*?if\(legacyScoped\(\)\|\|fullScopeListenerBound\)return;[\s\S]*?studentsRef\.on\('child_added'/);
   assert.doesNotMatch(teacher,/db\.ref\(SPACE\)\.on\('value'/);
-  for(const key of ['catalog','settings','leaderboards'])assert.ok(teacher.includes(\`on('\${key}'\`));
+  for(const key of ['catalog','settings','leaderboards'])assert.ok(teacher.includes("on('"+key+"'"));
   assert.match(teacher,/const studentsRef=db\.ref\(\`\$\{SPACE\}\/students\`\)/);
   assert.match(teacher,/studentsRef\.on\('child_changed',updateStudent\)/);
   assert.match(teacher,/studentsRef\.on\('child_removed'/);
