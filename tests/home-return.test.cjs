@@ -10,7 +10,7 @@ function fixture({teacher=false,missing=false,verify}={}){
   const saved=new Map([['b3Games_studentId','old-student'],['b3Games_studentName','Old student'],...(missing?[]:[['b3Games_classPin','dummy-test-value']])]);
   let resolveRead,reads=0,entered=0;
   const firstRead=new Promise(resolve=>resolveRead=resolve);
-  const context=vm.createContext({isAuthorizedTeacher:teacher,isStudentPreview:false,previewStudentId:'',myStudentId:'',myStudentName:'',myClassId:'',workspaceId:'b3-2026',isGuest:()=>false,
+  const context=vm.createContext({settingsApi:{getActingStudent:()=>null},actingStudentRestoreInFlight:false,studentAccessRevoked:false,isAuthorizedTeacher:teacher,isStudentPreview:false,previewStudentId:'',myStudentId:'',myStudentName:'',myClassId:'',workspaceId:'b3-2026',isGuest:()=>false,
     sessionStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},document:{querySelectorAll:()=>[]},el:classes,
     db:{ref:()=>({once:()=>{reads++;return firstRead}})},studentAuthCall:verify||(()=>Promise.resolve({ok:true})),resolvedStudentClass:async()=> 'et',
     enterStudent:async()=>entered++,console,renderStudentAccess:()=>{classes('loginCard').classList.add('hidden');classes('gamesArea').classList.remove('hidden')}

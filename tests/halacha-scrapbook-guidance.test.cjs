@@ -3,7 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const source=fs.readFileSync('halacha/scrapbook-guidance.js','utf8');
+const source=fs.readFileSync('halacha/scrapbook-guidance.js','utf8').replace(/\r\n/g,'\n');
 const style=fs.readFileSync('halacha/scrapbook-guidance.css','utf8');
 const page=fs.readFileSync('halacha/index.html','utf8');
 const ids=[...page.matchAll(/\{(?:"id"|id):"([^"]+)"[^}]*?(?:"title"|title):"([^"]+)"/g)].map(x=>x[1]);

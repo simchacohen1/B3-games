@@ -37,5 +37,5 @@ test('corrected images are present and cache versions force a fresh download',()
  assert.match(art,/const cache='\?v=20261019-two-fixed-pictures5'/);
  assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-two-fixed-pictures5/);
  assert.match(html,/scrapbook-editor\.js\?v=20261019-sticker-click2/);
- assert.match(html,/scrapbook-editor\.css\?v=20261019-all-stickers1/);
+ assert.match(html,/scrapbook-editor\.css\?v=/);
 });

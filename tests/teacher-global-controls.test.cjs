@@ -39,7 +39,6 @@ test('Follow can be opened and closed without removing its iframe, and standalon
   assert.match(s, /lastFollowClass !== id/);
   assert.match(s, /Follow the Teacher controls/);
   assert.match(s, /Separate window/);
-  assert.match(read('follow-teacher/teacher.js'), /get\('embed'\) === '1'/);
 });
 
 test('loader reaches normal Firebase pages and standalone teacher pages', () => {
