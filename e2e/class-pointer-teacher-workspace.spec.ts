@@ -95,7 +95,7 @@ async function enterFullScreen(page: Page) {
   await expect(page.locator('#stage')).toHaveClass(/lesson-fullscreen/);
 }
 
-test('full-screen Students panel is larger, can be dragged by its heading and resized', async ({ browser }) => {
+test('full-screen Students panel opens compact and can be dragged by its heading', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
@@ -103,8 +103,8 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   const drawer = page.locator('#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open');
   await expect(drawer).toBeVisible();
   const before = (await drawer.boundingBox())!;
-  expect(before.width).toBeGreaterThanOrEqual(340);
-  expect(before.height).toBeGreaterThanOrEqual(400);
+  expect(before.width).toBeGreaterThanOrEqual(300);
+  expect(before.height).toBeGreaterThanOrEqual(200);
 
   const head = drawer.locator('.cp-drawer-head');
   const h = (await head.boundingBox())!;
@@ -117,17 +117,8 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   expect(moved.x).toBeGreaterThan(before.x + 200);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
-  // The browser's resize corner writes plain inline sizes; the stylesheet must not override them.
-  await page.mouse.move(moved.x + moved.width - 3, moved.y + moved.height - 3);
-  await page.mouse.down();
-  await page.mouse.move(moved.x + moved.width + 80, moved.y + moved.height - 120, { steps: 8 });
-  await page.mouse.up();
-  const resized = (await drawer.boundingBox())!;
-  await shot(page, 'drawer-resized');
-  expect(resized.width).toBeGreaterThan(moved.width + 40);
-  expect(resized.height).toBeLessThan(moved.height - 60);
-  await drawer.evaluate((el: HTMLElement) => { el.style.width = '420px'; el.style.height = '300px'; });
-  expect(Math.round((await drawer.boundingBox())!.width)).toBe(420);
+  // The compact Students panel (teacher-dashboard.js) is intentionally not user-resizable (resize:none).
+  expect(await drawer.evaluate((el: HTMLElement) => getComputedStyle(el).resize)).toBe('none');
 
   // Permission rows still work inside the moved panel and leaving full screen restores the normal layout.
   await expect(drawer.getByText('Pointer Test Student One').first()).toBeVisible();
