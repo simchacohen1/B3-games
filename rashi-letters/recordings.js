@@ -121,7 +121,7 @@
     }
     const done=status==='pending'||status==='approved'||cfg.isPreview();
     if(s.onDone)u.footer.append(button(done?'Continue →':'Skip for now →','gold',()=>leave(s.onDone)));
-    u.footer.append(button('⬅ Menu','gold',()=>leave(cfg.onBack)));
+    u.footer.append(button(s.back?'⬅ All readings':'⬅ Menu','gold',()=>leave(s.back||cfg.onBack)));
   }
   function setMsg(text,isErr){const u=ensureScreen();u.msg.textContent=text||'';u.msg.className='rr-msg'+(isErr?' rr-err':'');}
 
@@ -183,11 +183,12 @@
   }
 
   /* ---------- public ---------- */
-  async function open(section,onDone){
+  async function open(section,onDone,back){
     const u=ensureScreen();
     cfg.hideOthers();
+    if(hub)hub.style.display='none';
     if(session)leave();
-    session={id:section.id,label:section.label,words:(section.words||[]).slice(),onDone,state:'idle',blob:null};
+    session={id:section.id,label:section.label,words:(section.words||[]).slice(),onDone,back,state:'idle',blob:null};
     u.card.style.display='block';render();setMsg('Checking…');
     await loadStatus(false);
     if(session&&session.id===section.id){setMsg('');render();}
@@ -199,17 +200,27 @@
     if(!canRecord(statusOf(section.id))){onDone&&onDone();return;}
     return open(section,onDone);
   }
-  // Menu list: one row per finished section with its status.
-  async function renderMenu(container,sections){
-    container.replaceChildren();
-    if(!sections.length||(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest()))return;
-    container.append(el('h3',null,'🎤 Record Reading — earn '+POINTS+' points each'));
-    const rows=sections.map(sec=>{const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record Reading','',()=>open(sec,()=>{}));row.append(name,chip,go);container.append(row);return {sec,chip,go};});
-    const map=await loadStatus(false);
-    rows.forEach(r=>{const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
+  // "Reading with Mic" page: every section is a choice, each with its status.
+  let hub=null;
+  async function openHub(sections){
+    if(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest()){if(root.B3Guest.unlock)root.B3Guest.unlock('Sign in to unlock','Sign in to record your reading and earn points.');return;}
+    ensureScreen();
+    if(session)leave();
+    cfg.hideOthers();
+    if(!hub){hub=el('div','card');hub.id='recordHub';hub.style.textAlign='center';ui.card.parentNode.insertBefore(hub,ui.card);}
+    hub.style.display='block';
+    hub.replaceChildren(el('h2',null,'🎤 Reading with Mic'),el('p','rr-sub','Pick a set of Rashi words, read them out loud, and send it to your teacher. Each approved reading earns '+POINTS+' points.'));
+    const list=el('div'),rows=sections.map(sec=>{
+      const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record','',()=>open(sec,()=>openHub(sections),()=>openHub(sections)));
+      row.append(name,chip,go);list.append(row);return {sec,chip,go};});
+    hub.append(list,button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
+    const map=cfg.isPreview()?{}:await loadStatus(false);
+    rows.forEach(r=>{const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);
+      r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
       if(st==='pending'||st==='approved')r.go.textContent='View';});
   }
+  function hideHub(){if(hub)hub.style.display='none';}
   function init(options){cfg=Object.assign(cfg,options||{});}
   function reset(){statusMap=null;statusAt=0;}
-  return {init,open,offer,renderMenu,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
+  return {init,open,offer,openHub,hideHub,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
 });
