@@ -97,6 +97,7 @@ test('white fringe completion paints enclosed gaps without crossing ink or anoth
  const mask={width,height,labels},seed=regionFromMask(mask,width,height,3,5);
  const complete=includeSafeWhiteFringe(mask,{data},seed);
  assert.ok([...complete.pixels].includes(5*width+4),'white gap receives same color');
+ assert.ok(![...complete.pixels].includes(4*width+6),'a one-sided white gap never spills outside the outline');
  assert.ok(complete.pixels.every(i=>data[i*4]>=232),'dark pixels untouched');
  assert.ok(complete.pixels.every(i=>labels[i]===1||labels[i]===0),'other labeled region untouched');
  assert.strictEqual(includeSafeWhiteFringe(mask,{data},seed).pixels,complete.pixels,'result cached');
