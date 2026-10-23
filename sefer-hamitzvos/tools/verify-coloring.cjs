@@ -24,7 +24,7 @@ function fixture(local=new Map(),remote=new Map()){
 }
 (async()=>{
  const f=fixture();await f.ready(484);
- for(const n of [1,475,484,487,499,613]){
+ for(const n of [1,475,484,487,495,496,497,498,499,613]){
   await f.ready(n);const seeds=f.run(`(()=>{const d=regionMask.labels,w=cv.width,counts=new Map(),seeds=new Map();for(let i=0;i<d.length;i++){const id=d[i];if(id){counts.set(id,(counts.get(id)||0)+1);seeds.set(id,i)}}return [...counts].filter(([,n])=>n>=9).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([id])=>{const i=seeds.get(id);return[i%w,Math.floor(i/w)]})})()`);
   f.run('strokes=[];rebuildFillLayer();selectedColor="#e53935";setTool("fill")');f.scale(.5);f.tap(...seeds[0]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);const first=f.hash();
   f.run('selectedColor="#1976d2"');f.scale(1.25);f.tap(...seeds[1],'touch');assert.deepEqual(f.pixel(...seeds[1]),[25,118,210,255]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);
@@ -35,6 +35,23 @@ function fixture(local=new Map(),remote=new Map()){
   reloaded.els.get('clear').onclick();assert.ok(reloaded.hash().every(v=>v===0),'reset clears paint');
   console.log(`PASS ${n}: native fill, adjacent preservation, mouse/touch scaling, erase, undo, save, reload, reset`);
  }
+ // Regression: switching dates before the 350ms debounce must not lose
+ // the first card's account save or leave old pixels on the new picture.
+ const rapid=fixture();await rapid.ready(484);
+ const quickSeed=rapid.run('(()=>{const d=regionMask.labels,w=cv.width,i=d.findIndex(v=>v>0);return [i%w,Math.floor(i/w)]})()');
+ rapid.run('selectedColor="#ff7043";setTool("fill")');rapid.tap(...quickSeed);
+ rapid.run('load(485);load(486);load(487)');
+ await rapid.ready();await new Promise(r=>setTimeout(r,550));
+ assert.equal(rapid.run('num'),487,'last requested picture wins');
+ assert.equal(rapid.run('paintLoading'),false,'navigation finishes');
+ assert.equal(rapid.run('strokes.length'),0,'old card drawing is not shown on new art');
+ assert.ok(rapid.run('regionMaskCache.size<=3'),'recent masks are bounded');
+ const saved484=rapid.remote.get('b3Games/students/synthetic-only/seferHamitzvos/coloring/484-v2');
+ assert.equal(saved484?.strokes.length,1,'old card save survives immediate next/previous navigation');
+ assert.equal(rapid.run('cardSaveTimers.size'),0,'no pending card timers linger');
+ await rapid.ready(484);
+ assert.deepEqual(rapid.pixel(...quickSeed),[255,112,67,255],'saved picture remains colored when revisited');
+ console.log('PASS rapid history navigation preserves prior saves, isolates colors, and bounds mask cache');
  // Legacy stroke replay remains the original tracer, and does not rewrite records.
  await f.ready(484);const seed=f.run('(()=>{const r=FTTMitzvahFill.traceRegion(sourcePixels,cv.width,cv.height,400,400);return r.pixels?[400,400]:null})()');
  assert.ok(seed);f.run(`strokes=[{type:'fill',seed:${JSON.stringify(seed)},color:'#43a047'}];rebuildFillLayer();persist()`);const legacy=f.hash();await new Promise(r=>setTimeout(r,400));const old=fixture(f.local,f.remote);await old.ready(484);assert.deepEqual(old.hash(),legacy);assert.equal(old.run('strokes[0].maskVersion'),undefined);console.log('PASS legacy saved coloring remains pixel-identical after reload');
