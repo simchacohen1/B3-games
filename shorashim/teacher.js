@@ -14,6 +14,8 @@ const legacyScoped=()=>!!activeLegacyClassScope&&!isSiteAdmin;
 const teacherSettingsPath=()=>legacyScoped()?`${ROOT}/classes/${activeLegacyClassScope}/settings`:`${SPACE}/settings`;
 const scopedListeners=[];
 let fullScopeListenerBound=false;
+let fullScopeReady=false,fullScopeInitialPromise=null,fullScopeRosterSync=null;
+let legacyScopeReady=false,legacyStudentSync=null;
 // Teacher access is verified through the signed-in Google teacher account.
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
@@ -477,25 +479,17 @@ async function loadAll(){
     const selected=roster.classes.find(row=>row.id===activeLegacyClassScope);
     if(!selected)throw new Error('This class is not assigned to your teacher account.');
     scopedStudentIds=selected.studentIds||[];
-    const [catalogSnap,globalSettingsSnap,classSettingsSnap,...studentSnaps]=await Promise.all([
-      db.ref(`${ROOT}/catalog`).once('value'),db.ref(`${ROOT}/settings`).once('value'),db.ref(`${ROOT}/classes/${activeLegacyClassScope}/settings`).once('value'),
-      ...scopedStudentIds.map(id=>db.ref(`${ROOT}/students/${id}`).once('value'))
-    ]);
-    state.catalog=withAllTracks(catalogSnap.val()||state.catalog);
-    state.settings={minReviewMs:500,studentSiteOpen:true,...(globalSettingsSnap.val()||{}),...(classSettingsSnap.val()||{})};
-    state.students=Object.fromEntries(scopedStudentIds.map((id,index)=>[id,studentSnaps[index]?.val()]).filter(([,value])=>value));
+    state.students={};
     state.leaderboards={match:{'8':{}}};
-    const scores=await Promise.all(scopedStudentIds.map(id=>db.ref(`${ROOT}/leaderboards/match/8/${id}`).once('value')));
-    scores.forEach((snap,index)=>{if(snap.exists())state.leaderboards.match['8'][scopedStudentIds[index]]=snap.val();});
-    bindLegacyScopedListeners(globalSettingsSnap.val()||{});
+    await bindLegacyScopedListeners();
+    legacyScopeReady=true;legacyStudentSync?.ready();
     $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
     loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
   }
-  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
-  state.catalog=withAllTracks(a.val()||state.catalog);
-  state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
-  state.students=c.val()||{};
-  state.leaderboards=d.val()||{};
+  // Initial snapshots from the live, scoped listeners populate these values once.
+  // The same subscriptions then deliver changes without a second startup download.
+  state.students={};
+  await bindFullScopeListener();
   // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
   // so a word deleted later stays deleted even after page reloads or file updates.
   const needsCatalogSeed=!CLASS_MODE&&!legacyScoped()&&Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
@@ -517,9 +511,10 @@ async function loadAll(){
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
-  renderAll();
+  renderCatalog();renderLeaderboard();
   loadShorashimRecordings();
-  bindFullScopeListener();
+  fullScopeReady=true;
+  fullScopeRosterSync?.ready();
   const updates=[];
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
@@ -530,42 +525,49 @@ async function loadAll(){
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function bindFullScopeListener(){
-  if(legacyScoped()||fullScopeListenerBound)return;
+  if(legacyScoped())return Promise.resolve();
+  if(fullScopeListenerBound)return fullScopeInitialPromise||Promise.resolve();
   fullScopeListenerBound=true;
-  const on=(path,callback)=>db.ref(`${SPACE}/${path}`).on('value',snap=>{
-    if($('teacherApp').classList.contains('hidden'))return;
-    callback(snap.val());
+  const observe=(path,apply,render)=>new Promise(resolve=>{
+    let initial=true;
+    db.ref(`${SPACE}/${path}`).on('value',snap=>{
+      if($('teacherApp').classList.contains('hidden'))return;
+      apply(snap.val());
+      if(initial){initial=false;resolve();}
+      else if(fullScopeReady)render();
+    });
   });
-  on('catalog',value=>{if(value||CLASS_MODE)state.catalog=withAllTracks(value);renderAll();});
-  on('settings',value=>{if(value){state.settings={minReviewMs:500,studentSiteOpen:true,...value};renderStudentSiteControl();}renderAll();});
-  on('leaderboards',value=>{state.leaderboards=value||{};renderAll();});
+  fullScopeInitialPromise=Promise.all([
+    observe('catalog',value=>{if(value||CLASS_MODE)state.catalog=withAllTracks(value);},renderCatalog),
+    observe('settings',value=>{state.settings={minReviewMs:500,studentSiteOpen:true,...(value||{})};$('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();},renderCatalog),
+    observe('leaderboards',value=>{state.leaderboards=value||{};},renderLeaderboard)
+  ]);
   const studentsRef=db.ref(`${SPACE}/students`);
-  const updateStudent=snap=>{
-    if($('teacherApp').classList.contains('hidden'))return;
-    state.students[snap.key]=snap.val();
-    renderAll();
-  };
-  studentsRef.on('child_added',snap=>{
-    // The initial child_added events enumerate students already loaded by loadAll().
-    // Ignore those duplicates; accept records added while the teacher page is open.
-    if(Object.prototype.hasOwnProperty.call(state.students,snap.key))return;
-    updateStudent(snap);
-  });
-  studentsRef.on('child_changed',updateStudent);
-  studentsRef.on('child_removed',snap=>{
-    if($('teacherApp').classList.contains('hidden'))return;
-    delete state.students[snap.key];
-    renderAll();
-  });
+  fullScopeRosterSync=window.B3ShorashimTeacherRosterSync.bindStudentEvents(studentsRef,state,renderDashboard);
+  return fullScopeInitialPromise;
 }
-function bindLegacyScopedListeners(initialGlobalSettings={}){
-  let globalSettings=initialGlobalSettings,classSettings=state.settings;
-  const on=(path,callback)=>{const ref=db.ref(path);scopedListeners.push(ref);ref.on('value',callback);};
-  on(`${ROOT}/catalog`,snap=>{if(snap.exists())state.catalog=withAllTracks(snap.val());renderAll();});
-  on(`${ROOT}/settings`,snap=>{globalSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};renderStudentSiteControl();renderCatalog();});
-  on(`${ROOT}/classes/${activeLegacyClassScope}/settings`,snap=>{classSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};renderStudentSiteControl();renderCatalog();});
-  scopedStudentIds.forEach(id=>on(`${ROOT}/students/${id}`,snap=>{if(snap.exists())state.students[id]=snap.val();else delete state.students[id];renderAll();}));
-  scopedStudentIds.forEach(id=>on(`${ROOT}/leaderboards/match/8/${id}`,snap=>{if(snap.exists())state.leaderboards.match['8'][id]=snap.val();else delete state.leaderboards.match['8'][id];renderLeaderboard();}));
+function bindLegacyScopedListeners(){
+  let globalSettings={},classSettings={};
+  const initial=[];
+  const on=(path,callback,render)=>{
+    const ref=db.ref(path);scopedListeners.push(ref);
+    initial.push(new Promise(resolve=>{
+      let first=true;
+      ref.on('value',snap=>{
+        callback(snap);
+        if(first){first=false;resolve();}
+        else if(legacyScopeReady)render?.();
+      });
+    }));
+  };
+  on(`${ROOT}/catalog`,snap=>{if(snap.exists())state.catalog=withAllTracks(snap.val());},renderCatalog);
+  on(`${ROOT}/settings`,snap=>{globalSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};$('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();},renderCatalog);
+  on(`${ROOT}/classes/${activeLegacyClassScope}/settings`,snap=>{classSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};$('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();},renderCatalog);
+  const studentRefs=Object.fromEntries(scopedStudentIds.map(id=>[id,db.ref(`${ROOT}/students/${id}`)]));
+  legacyStudentSync=window.B3ShorashimTeacherRosterSync.bindStudentValues(studentRefs,state,renderDashboard);
+  initial.push(legacyStudentSync.initial);
+  scopedStudentIds.forEach(id=>on(`${ROOT}/leaderboards/match/8/${id}`,snap=>{if(snap.exists())state.leaderboards.match['8'][id]=snap.val();else delete state.leaderboards.match['8'][id];},renderLeaderboard));
+  return Promise.all(initial);
 }
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
 function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
@@ -1175,3 +1177,4 @@ async function togglePictureChoice(id,artValue){
     +'.teacher-art-count{width:100%;font-size:12px;color:#555;margin:0 0 2px}';
   document.head.appendChild(s);
 })();
+
