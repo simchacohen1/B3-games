@@ -2133,6 +2133,9 @@ if(dbRef){
     };
     let galleryFetchInFlight=false;
     let galleryResponseHash=null,galleryResponseUser=null;
+    // Version check: the server keeps a small per-class change counter. While it is unchanged the poll is a tiny reply.
+    // A full reload still happens every 5 minutes as a safety net in case a counter update is ever missed.
+    let galleryVersion=null,galleryFullAt=0;const GALLERY_FULL_REFRESH_MS=5*60*1000;
     const loadScopedPosts=async()=>{
       if(galleryFetchInFlight)return;
       galleryFetchInFlight=true;
@@ -2140,13 +2143,17 @@ if(dbRef){
         const user=firebase.auth().currentUser;
         if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
         // A new signed-in identity must not reuse another person's response hash.
-        if(galleryResponseUser!==user.uid){galleryResponseHash=null;galleryResponseUser=user.uid;}
+        if(galleryResponseUser!==user.uid){galleryResponseHash=null;galleryVersion=null;galleryFullAt=0;galleryResponseUser=user.uid;}
+        const sendVersion=!!galleryVersion&&Date.now()-galleryFullAt<GALLERY_FULL_REFRESH_MS;
         const token=await user.getIdToken();
-        const readUrl='https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId)+(galleryResponseHash?'&since='+encodeURIComponent(galleryResponseHash):'');
+        const readUrl='https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId)+(galleryResponseHash?'&since='+encodeURIComponent(galleryResponseHash):'')+(sendVersion?'&v='+galleryVersion:'');
         const r=await fetch(readUrl,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
         const j=await r.json().catch(()=>({}));
         if(!r.ok)throw new Error(r.status===404?'The gallery service is unavailable. Please tell your teacher.':(j.error||'Could not connect to your classroom.'));
         document.getElementById('galleryReadError')?.remove();
+        const newVersion=Number.isSafeInteger(j.version)&&j.version>0?j.version:null;
+        if(!sendVersion)galleryFullAt=Date.now();
+        galleryVersion=newVersion;
         if(j.unchanged===true)return;
         // Legacy backends without hashes still work and return their complete snapshot.
         galleryResponseHash=typeof j.hash==='string'&&/^[a-f0-9]{64}$/.test(j.hash)?j.hash:null;
@@ -2256,7 +2263,7 @@ document.getElementById('powerOverlay').addEventListener('click',e=>{if(e.target
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
 // ET and WT share one post list, but each gallery shows one class. Tell the teacher what is
 // waiting in the other class and let them jump there, so no pending project is hidden.
-let otherClassPendingCheckedAt=0;
+let otherClassPendingCheckedAt=0,otherClassVersion=null,otherClassCount=null,otherClassFullAt=0;
 function renderReviewClassSwitch(){
   const wrap=document.getElementById('reviewClassWrap');if(!wrap)return;
   if(!legacyGallery||!isTeacher||isGuestGallery){wrap.style.display='none';return;}
@@ -2269,9 +2276,14 @@ function renderReviewClassSwitch(){
   const note=document.getElementById('reviewClassOther');
   (async()=>{try{
     const token=await firebase.auth().currentUser.getIdToken();
-    const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+other,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    const reuse=otherClassVersion&&otherClassCount!==null&&Date.now()-otherClassFullAt<5*60*1000;
+    const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+other+(reuse?'&v='+otherClassVersion:''),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
     if(!r.ok){note.textContent='Projects from '+label(other)+' are on its own gallery.';return;}
-    const n=Object.values((await r.json()).posts||{}).filter(p=>p&&p.status==='pending').length;
+    const otherReply=await r.json();
+    let n;
+    if(reuse&&otherReply.unchanged===true)n=otherClassCount;
+    else{n=Object.values(otherReply.posts||{}).filter(p=>p&&p.status==='pending').length;otherClassCount=n;otherClassFullAt=Date.now();}
+    otherClassVersion=Number.isSafeInteger(otherReply.version)&&otherReply.version>0?otherReply.version:null;
     note.textContent=n?`${n} project${n===1?'':'s'} waiting in ${label(other)}.`:`Nothing waiting in ${label(other)}.`;
     btn.classList.toggle('attention',n>0);
   }catch(e){note.textContent='Projects from '+label(other)+' are on its own gallery.';}})();
