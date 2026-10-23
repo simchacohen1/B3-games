@@ -18,7 +18,7 @@ function fixture(local=new Map(),remote=new Map()){
  const c={document,sessionStorage:api(session),localStorage:api(local),Image:Picture,URLSearchParams,Intl,console,confirm:()=>true,setTimeout,clearTimeout,setInterval:()=>0,location:{search:''},Date:class extends Date{constructor(...args){super(...(args.length?args:['2026-10-20T14:00:00Z']))}}};
  c.window=c;c.addEventListener=()=>{};c.B3SiteSettings={onAuthStateChanged:fn=>fn({},true,{role:'teacher',authorized:true})};c.B3_FIREBASE_CONFIG={};
  c.firebase={apps:[{}],database:()=>({ref:key=>({once:async()=>({val:()=>remote.get(key)}),set:async value=>{remote.set(key,value)}})})};
- vm.createContext(c);for(const file of ['schedule.js','sun-times.js','calendar.js','descriptions.js','fill.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),c);
+ vm.createContext(c);for(const file of ['schedule.js','sun-times.js','calendar.js','descriptions.js','region-groups.js','fill.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),c);
  vm.runInContext(src,c);
  return {c,els,local,remote,scale:v=>scale=v,run:code=>vm.runInContext(code,c),tap(x,y,type='mouse'){const cv=els.get('paint'),r=cv.getBoundingClientRect();cv.events.pointerdown({clientX:r.left+(x+.5)*scale,clientY:r.top+(y+.5)*scale,pointerType:type,pointerId:1});cv.events.pointerup?.({pointerId:1})},async ready(n){if(n)this.run(`load(${n})`);for(let tries=0;tries<100;tries++){await new Promise(r=>setTimeout(r,10));if(this.run('!!regionMask && !paintLoading'))return}throw Error('picture/mask failed to load')},hash(){return Buffer.from(els.get('fillPaint').getContext('2d').getImageData(0,0,els.get('paint').width,els.get('paint').height).data)},pixel(x,y){return [...els.get('fillPaint').getContext('2d').getImageData(x,y,1,1).data]}};
 }
@@ -55,4 +55,33 @@ function fixture(local=new Map(),remote=new Map()){
  // Legacy stroke replay remains the original tracer, and does not rewrite records.
  await f.ready(484);const seed=f.run('(()=>{const r=FTTMitzvahFill.traceRegion(sourcePixels,cv.width,cv.height,400,400);return r.pixels?[400,400]:null})()');
  assert.ok(seed);f.run(`strokes=[{type:'fill',seed:${JSON.stringify(seed)},color:'#43a047'}];rebuildFillLayer();persist()`);const legacy=f.hash();await new Promise(r=>setTimeout(r,400));const old=fixture(f.local,f.remote);await old.ready(484);assert.deepEqual(old.hash(),legacy);assert.equal(old.run('strokes[0].maskVersion'),undefined);console.log('PASS legacy saved coloring remains pixel-identical after reload');
+ // Object-aware fill: one tap colors the whole pants (every strip between fold lines), nothing next to it.
+ {
+  const g=fixture();await g.ready(475);
+  g.run('strokes=[];rebuildFillLayer();selectedColor="#1976d2";setTool("fill")');
+  const strips=[[205,800],[380,800],[266,914],[270,795],[1018,861],[1162,848]],blue=[25,118,210,255];
+  const shoe=[160,1010],ground=[305,800],belt=[345,640],shirt=[345,522];
+  const seen=g.hash();
+  g.tap(...strips[0]);
+  for(const s of strips.slice(0,4))assert.deepEqual(g.pixel(...s),blue,'every strip of the left pants is colored by ONE tap '+s);
+  for(const s of [strips[4],strips[5],shoe,ground,shirt])assert.equal(g.pixel(...s)[3],0,'neighbouring objects stay uncolored '+s);
+  assert.equal(g.run('strokes[0].objectVersion'),2);assert.equal(g.run('strokes[0].maskVersion'),1);
+  const one=g.hash();
+  g.run('selectedColor="#e53935"');g.tap(...strips[2]);
+  for(const s of strips.slice(0,4))assert.deepEqual(g.pixel(...s),[229,57,53,255],'repeat coloring replaces the whole object '+s);
+  g.els.get('undo').onclick();assert.deepEqual(g.hash(),one,'undo restores the previous color of the whole object');
+  g.els.get('undo').onclick();assert.deepEqual(g.hash(),seen,'second undo clears');
+  g.els.get('redo').onclick();assert.deepEqual(g.hash(),one,'redo brings the first color back');
+  g.els.get('redo').onclick();for(const s of strips.slice(0,4))assert.deepEqual(g.pixel(...s),[229,57,53,255]);
+  g.els.get('undo').onclick();g.run('selectedColor="#43a047"');g.tap(...belt);
+  assert.equal(g.run('redoStack.length'),0,'a new stroke clears redo');
+  g.els.get('redo').onclick();assert.equal(g.run('strokes.length'),2,'redo with nothing to redo changes nothing');
+  await new Promise(r=>setTimeout(r,400));const again=fixture(g.local,g.remote);await again.ready(475);
+  assert.deepEqual(again.hash(),g.hash(),'object fills survive save and reload');
+  // A picture colored before this change keeps its exact pixels (strip-only legacy section fill).
+  const legacy=fixture();await legacy.ready(475);
+  legacy.run('strokes=[{type:"fill",seed:[205,800],color:"#43a047",maskVersion:1}];rebuildFillLayer()');
+  assert.deepEqual(legacy.pixel(205,800),[67,160,71,255]);assert.equal(legacy.pixel(380,800)[3],0,'legacy record still fills only its own section');
+  console.log('PASS 475 object-aware: whole pants in one tap, no leaks, repeat color, undo, redo, save, reload, legacy record');
+ }
 })().catch(e=>{console.error(e);process.exitCode=1});
