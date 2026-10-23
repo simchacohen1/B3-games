@@ -157,7 +157,7 @@ test('ET and WT assigned student listeners stay confined to their class rosters'
   etSync.dispose();wtSync.dispose();
 });
 
-test('authorized sign-in starts one listener set and RTDB reconnect keeps it single',async t=>{
+test('authorized sign-in starts one listener set; page refresh and RTDB reconnect stay single',async t=>{
   const context=await makeContext(t);if(!context)return;
   const {writer,teacher}=context;await set(ref(writer,`${ROOT}/classes/room-b/students`),{'student-1':syntheticStudent('et-1',1)});
   const state={students:{}};let attaches=0,draws=0,added=0;
@@ -177,5 +177,21 @@ test('authorized sign-in starts one listener set and RTDB reconnect keeps it sin
   assert.equal(added,1,'reconnection does not redownload the initial roster');
   assert.equal(draws,0,'reconnection does not redraw the dashboard without a data change');
   sync.dispose();
+
+  // A browser refresh creates a new page runtime and one new listener set.
+  // The previous runtime's cleanup must prevent overlap or a second listener
+  // surviving in the same page instance.
+  const refreshedState={students:{}};let refreshedAttaches=0,refreshedChildAdds=0,refreshedDraws=0;
+  const refreshedAuthStateChanged=(user,authorized)=>{
+    if(!user||!authorized||refreshedAttaches)return;
+    refreshedAttaches++;
+    const target=instrumentRef(ref(teacher,`${ROOT}/classes/room-b/students`),(event,snap)=>{if(event==='child_added')refreshedChildAdds++;});
+    const pageSync=bindStudentEvents(target,refreshedState,()=>refreshedDraws++);pageSync.ready();
+  };
+  refreshedAuthStateChanged({uid:'synthetic-teacher'},true);
+  await until(()=>refreshedState.students['student-1'],'refreshed page initial roster');await sleep();
+  assert.equal(refreshedAttaches,1,'refresh creates one listener set in the new page runtime');
+  assert.equal(refreshedChildAdds,1,'refresh downloads the current assigned roster once');
+  assert.equal(refreshedDraws,1,'refresh renders the initial dashboard once');
 });
 
