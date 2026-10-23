@@ -84,4 +84,21 @@ test('off-thread segmentation matches unchanged artwork and repeat taps reuse on
  assert.strictEqual(second.pixels,first.pixels,'same image region is cached, not scanned again');
  assert.ok(mask.recentPixels.size<=4,'bounded pixel cache');
 });
+test('white fringe completion paints enclosed gaps without crossing ink or another section',()=>{
+ const {includeSafeWhiteFringe}=require('../sefer-hamitzvos/fill.js');
+ const width=14,height=12,total=width*height,labels=new Uint32Array(total),data=new Uint8ClampedArray(total*4);
+ for(let i=0;i<total;i++){data[i*4]=255;data[i*4+1]=255;data[i*4+2]=255;data[i*4+3]=255;}
+ for(let y=2;y<=9;y++)for(let x=2;x<=5;x++)labels[y*width+x]=1;
+ // An artificially closed white gap within one enclosed region.
+ labels[5*width+4]=0;
+ for(let y=2;y<=9;y++)for(let x=9;x<=11;x++)labels[y*width+x]=2;
+ // Genuine dark border must never get colored.
+ for(let y=1;y<=10;y++){const i=y*width+7;data[i*4]=data[i*4+1]=data[i*4+2]=0;}
+ const mask={width,height,labels},seed=regionFromMask(mask,width,height,3,5);
+ const complete=includeSafeWhiteFringe(mask,{data},seed);
+ assert.ok([...complete.pixels].includes(5*width+4),'white gap receives same color');
+ assert.ok(complete.pixels.every(i=>data[i*4]>=232),'dark pixels untouched');
+ assert.ok(complete.pixels.every(i=>labels[i]===1||labels[i]===0),'other labeled region untouched');
+ assert.strictEqual(includeSafeWhiteFringe(mask,{data},seed).pixels,complete.pixels,'result cached');
+});
 module.exports={png};
