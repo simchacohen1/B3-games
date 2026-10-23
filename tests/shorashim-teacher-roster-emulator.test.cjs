@@ -6,12 +6,16 @@ const {TextEncoder}=require('node:util');
 const {initializeTestEnvironment}=require('@firebase/rules-unit-testing');
 const firebase=require('firebase/compat/app');
 require('firebase/compat/database');
-const {bindStudentEvents,bindStudentValues}=require('../shorashim/teacher-roster-sync.js');
+const vm=require('node:vm');
 
 const RUN=process.env.B3_RUN_RTDB_EMULATOR_TESTS==='1';
 const PROJECT='demo-shorashim-cost-audit';
 const ROOT='posukPractice/shorashimLearning';
 const encoder=new TextEncoder();
+const teacherSource=require('node:fs').readFileSync(require('node:path').join(__dirname,'../shorashim/teacher.js'),'utf8');
+const helperBlock=teacherSource.match(/const B3ShorashimTeacherRosterSync=\(\(\)=>\{[\s\S]*?\}\)\(\);/);
+if(!helperBlock)throw new Error('Could not find production Shorashim roster listener implementation');
+const {bindStudentEvents,bindStudentValues}=vm.runInNewContext(`${helperBlock[0]}; B3ShorashimTeacherRosterSync;`,{setTimeout,clearTimeout});
 
 function bytes(value){return encoder.encode(JSON.stringify(value)).byteLength;}
 const ref=(database,path)=>database.ref(path);
