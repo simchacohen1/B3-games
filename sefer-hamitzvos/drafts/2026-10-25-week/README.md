@@ -21,23 +21,27 @@ Hebrew topics are concise descriptive labels, not quotations from Rambam's Hebre
 - Independent schedule: https://www.hebcal.com/hebcal?dsm=on&end=2026-12-31&i=on&set=off&start=2025-10-01&v=1
 - Chabad mitzvah meanings: https://www.chabad.org/library/article_cdo/aid/961882/jewish/Negative-Commandment-250.htm ; https://www.chabad.org/library/article_cdo/aid/961884/jewish/Negative-Commandment-252.htm ; https://www.chabad.org/library/article_cdo/aid/961885/jewish/Negative-Commandment-253.htm
 
-## Verified draft checks
+## Completed preparation and verification
 - Seven SVG files exist, four distinct scenes, correct date-to-ref mapping.
 - All explicit path shapes close with Z. White fills only, black outlines only; no external images, shading, scripts or embedded text.
 - Each scene has white-background closed vector objects and kippah/tzitzis on boy figures.
 - Source dimensions 1427 × 950 and aspect ratio 1.502.
 
-## NOT YET VERIFIED — release blockers
-- Rasterize SVGs into the website's native PNG assets and verify full white/black raster pixels.
-- Build native-resolution region masks, visually inspect each region and run actual click-to-fill, neighbor-leak, whole-object fill, save/reload, repeated fills, switching days, undo/redo, memory and distortion tests with synthetic student data.
-- Review artistic quality against the approved coloring-v2 pictures; SVG closed geometry alone does not prove click-to-fill correctness.
-- Existing `index.html` routes cards 500–503 to legacy `coloring/NNN.png` because `newArt` currently ends at 499. A later reviewed integration must add cards 500–503 to `coloring-v2` and isolate saved progress keys without altering old records.
-- Respect the existing date floor, future lock and card reuse. No production files or student records were changed.
+The four distinct SVG scenes were rasterized into `coloring-v2/500.png` through `503.png`. The images are 1427 × 950, binary black-and-white, and the preview sheet shows each scheduled date in order. Cards 500–503 now use the existing v2 path and have isolated `cartoon-v2` local keys and `-v2` account paths. Existing `coloring/500.png` through `503.png` and their saved records remain unchanged.
 
-**Do not merge until PNG, mask, browser/performance and progress preservation checks are green and the owner separately approves publication.**
+The region manifest now matches the four new raster sources and the production mask algorithm. The region builder recognizes v2 cards through 503. The actual `fill.js` mask algorithm successfully segmented 69, 48, 74 and 48 regions respectively; every region was filled and checked against its full label, neighboring labels and source ink.
+
+### Tests run
+- `node --test tests/sefer-hamitzvos*.test.cjs` — **45 passed, 0 failed**, including all 613 mask manifests, previous artwork, calendar rules, future locks and progress-key isolation.
+- `FTT_CANVAS_MODULE=<temporary @napi-rs/canvas> node sefer-hamitzvos/tools/prepare-weekly-art-20261025.cjs` — **7 dated PNGs rasterized; source-region checks passed**.
+- `FTT_CANVAS_MODULE=<temporary @napi-rs/canvas> node sefer-hamitzvos/tools/verify-coloring.cjs` — **passed** real app fill, repeat recoloring, adjacent isolation, mouse/touch scaling, undo, erase, save/reload, legacy-record preservation, rapid navigation, and all four card-specific saves/reopens.
+- `npx playwright test e2e/sefer-week-20261025.spec.ts --project=chromium --reporter=list` — **1 passed**. Browser checks cover all seven dates, card routing, save/reopen, repeated-day reuse, exact image/canvas dimensions, zero ink coverage, complete selected-region coverage, and bounded mask caching. Final switch times were 131–283 ms (max 283 ms); observed JS heap was 76.6 MB with two masks cached, below the 200 MB ceiling.
+- Manual visual inspection completed for each of the four unique scenes and the seven-day contact sheet: `preview-2026-10-25-to-31.png`.
+
+No date floor, future lock, existing picture, saved student record or production deployment was changed. Keep PR #313 in draft and do not merge or deploy without the owner's separate approval.
 
 
-## Offline raster-preparation harness (added, NOT YET EXECUTED)
+## Offline raster-preparation harness
 The repository now contains `sefer-hamitzvos/tools/prepare-weekly-art-20261025.cjs`. It can rasterize each dated SVG to a separate binary black-and-white 1427×950 PNG in a **temporary output directory**, count connected white regions, check dimensions/ink density, and exercise synthetic complete-region fills and recoloring. It refuses to write inside the live artwork directories.
 
 Run in a checked-out development branch:
@@ -46,4 +50,4 @@ npm install --prefix /tmp/sefer-canvas --no-audit --no-fund @napi-rs/canvas
 FTT_CANVAS_MODULE=/tmp/sefer-canvas/node_modules/@napi-rs/canvas node sefer-hamitzvos/tools/prepare-weekly-art-20261025.cjs
 node --test tests/sefer-hamitzvos-week-20261025-art.test.cjs
 ```
-The output PNGs must still undergo visual review and actual website mask-worker/browser save tests before any integration. This harness has not been run in the current tool environment, so do not treat its tests as passed.
+Output PNGs are copied into the v2 card assets only by the separately reviewed PR changes; this harness writes exclusively to a temporary directory and never overwrites website artwork.

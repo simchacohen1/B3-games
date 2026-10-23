@@ -28,3 +28,14 @@ test('seven coloring sources use closed paths, white interiors, black outlines a
  }
  assert.equal(unique.size,4,'repeated mitzvos should reuse exactly four scenes');
 });
+test('new PNG assets are the exact four scenes routed by the existing engine',()=>{
+ const html=fs.readFileSync(path.join(root,'sefer-hamitzvos/index.html'),'utf8');
+ const manifest=JSON.parse(fs.readFileSync(path.join(root,'sefer-hamitzvos/region-manifest.json'),'utf8'));
+ for(const n of [500,501,502,503]){
+  const file=path.join(root,'sefer-hamitzvos/coloring-v2',String(n).padStart(3,'0')+'.png');
+  assert.ok(fs.existsSync(file),file);assert.ok(fs.statSync(file).size>10000,file+' raster content');
+  assert.equal(manifest[n].source,`coloring-v2/${String(n).padStart(3,'0')}.png`);
+ }
+ assert.match(html,/newArt=new Set\([^)]*500,501,502,503\]\)/);
+ assert.match(html,/versionedSaveArt=new Set\([^)]*500,501,502,503\]\)/);
+});
