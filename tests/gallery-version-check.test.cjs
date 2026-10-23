@@ -175,6 +175,40 @@ test('two quick writes in a row produce two different counter values',async()=>{
   assert.ok(verCls(db,'et')>one);
 });
 
+test('bulk "approve all" and bulk remove (one multi-path update) bump the class, in both list layouts',async()=>{
+  const {db}=setup({identity:{},seed:{
+    classGallery:{posts:{a:{classId:'et',status:'pending'},b:{classId:'et',status:'pending'}}},
+    ...ws({classes:{sc:{resources:{gallery:{posts:{x:{classId:'sc',status:'pending'},y:{classId:'sc',status:'pending'}}}}}}})}});
+  await db.ref('classGallery/posts').update({'a/status':'approved','b/status':'approved'});await db.settle();
+  const etAfterApprove=verCls(db,'et');assert.ok(etAfterApprove>0);
+  await db.ref('classGallery/posts').update({'a':null,'b':null});await db.settle();
+  assert.ok(verCls(db,'et')>etAfterApprove);
+  await db.ref(`${WS}classes/sc/resources/gallery/posts`).update({'x/status':'approved','y/status':'approved'});await db.settle();
+  const scAfter=verCls(db,'sc');assert.ok(scAfter>0);
+  await db.ref(`${WS}classes/sc/resources/gallery/posts`).update({'x':null});await db.settle();
+  assert.ok(verCls(db,'sc')>scAfter);
+  assert.equal(verCls(db,'wt'),0);
+});
+test('replacing a picture link or deleting a picture field bumps the class so no stale picture is shown',async()=>{
+  const {db}=setup({identity:{},seed:{classGallery:{posts:{p:{classId:'wt',status:'approved',image:'https://example.test/one.jpg'}}}}});
+  await db.ref('classGallery/posts/p/image').set('https://example.test/two.jpg');await db.settle();
+  const first=verCls(db,'wt');assert.ok(first>0);
+  await db.ref('classGallery/posts/p/image').remove();await db.settle();
+  assert.ok(verCls(db,'wt')>first);
+});
+test('a student-side stale browser (older counter) is never told "unchanged" after a picture edit',async()=>{
+  const {db,call}=setup({identity:student('et'),seed:readSeed('et')});
+  const first=await call('et');
+  await db.ref('classGallery/posts/a/image').set('https://example.test/new.jpg');await db.settle();
+  const next=await call('et',{v:String(first.body.version)});
+  assert.equal(next.body.posts.a.image,'https://example.test/new.jpg');
+});
+test('the page writes gallery posts only through paths the triggers watch',()=>{
+  const writes=[...page.matchAll(/dbRef\.(?:child\([^)]*\)\.)?(push|update|set|remove|transaction)\(/g)].map(m=>m[1]);
+  assert.ok(writes.length>=5);
+  assert.ok(!/firebase\.database\(\)\.ref\(['"`](?!\.info)[^'"`]*gallery[^'"`]*posts/i.test(page.replace(/readUrl[^;]*;/g,'')),'no second, unwatched write path');
+});
+
 // ---------- the read function ----------
 const readSeed=cls=>({...baseSeed(cls),classGallery:{posts:{
   a:{classId:'et',status:'approved',image:'data:image/jpeg;base64,AAAA'},
