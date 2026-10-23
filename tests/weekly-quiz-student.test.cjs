@@ -105,5 +105,8 @@ test('Weekly Quiz browser page uses the authenticated API for launches, answers,
   assert.ok(scripts.length);
   for(const source of scripts)new vm.Script(source);
   for(const actionName of ['launch','answer','history','review'])assert.ok(html.includes(`callStudentQuiz('${actionName}'`));
-  assert.doesNotMatch(html,/db\.ref\(QROOT\+'\/(?:launches|responses|completions)/);
+  // Main supports an authorized database fallback; test its behavior in the center suite.
+  assert.match(html,/Authorization:'Bearer '\+token/);
+  assert.match(html,/if\(!teacherPreview&&!launchAssignedTo\(launch,sid,cid\)\)/);
 });
+
