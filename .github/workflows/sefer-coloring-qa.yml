@@ -24,10 +24,12 @@ jobs:
         run: |
           node --check sefer-hamitzvos/fill.js
           node --check sefer-hamitzvos/mask-worker.js
+          node --check sefer-hamitzvos/region-groups.js
+          node --check tests/sefer-hamitzvos-objects.test.cjs
           node --check sefer-hamitzvos/tools/verify-coloring.cjs
           node --check tests/sefer-hamitzvos-regions.test.cjs
       - name: Region, access, and calendar tests
-        run: node --test tests/sefer-hamitzvos-regions.test.cjs tests/sefer-hamitzvos-fill.test.cjs tests/sefer-hamitzvos-calendar.test.cjs tests/sefer-hamitzvos.test.cjs
+        run: node --test tests/sefer-hamitzvos-regions.test.cjs tests/sefer-hamitzvos-fill.test.cjs tests/sefer-hamitzvos-calendar.test.cjs tests/sefer-hamitzvos.test.cjs tests/sefer-hamitzvos-objects.test.cjs
       - name: Install test-only native canvas
         run: npm install --prefix /tmp/sefer-canvas --no-audit --no-fund @napi-rs/canvas
       - name: Real rendering, navigation, persistence and undo (synthetic account)
@@ -39,4 +41,4 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
       - name: Browser navigation and painting on actual DOM
-        run: npx playwright test e2e/sefer-coloring-focus.spec.ts --project=chromium --reporter=line
+        run: npx playwright test e2e/sefer-coloring-focus.spec.ts e2e/sefer-object-fill.spec.ts --project=chromium --reporter=line
