@@ -194,3 +194,27 @@ test('the duplicate "clean clothes" tab is hidden from Siman Beis', async ({ pag
   await expect(page.locator('#tabs button[data-id="s2extra"]')).toBeHidden();
   await expect(page.locator('#tabs button[data-id="s2a"]')).toBeVisible();
 });
+
+test('highlighted words and word buttons never include commas or periods', async ({ page }) => {
+  await open(page);
+  for (const id of ['s2a', 's2b', 's2c', 's3a', 's3d']) {
+    await showLesson(page, id);
+    const texts: string[] = await page.locator(`#${id} .ha-keyword, #${id} .ha-wordchips button`).allInnerTexts();
+    expect(texts.length).toBeGreaterThan(0);
+    for (const t of texts) expect(t, `${id}: "${t}"`).not.toMatch(/[,.;:!?()]/);
+  }
+});
+
+test('the left sliver of the neighbouring panel is trimmed from the small pictures', async ({ page }) => {
+  await open(page);
+  await showLesson(page, 's2b');
+  const canvas = page.locator('#s2b .ha-classroom').first().locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // the first columns of the picture must not be the dark outline of another panel's text
+  const darkShare = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const w = Math.max(6, Math.floor(c.width * 0.03)), d = c.getContext('2d')!.getImageData(0, 0, w, c.height).data;
+    let dark = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 90 && d[i + 1] < 90 && d[i + 2] < 90) dark++;
+    return dark / (w * c.height);
+  });
+  expect(darkShare).toBeLessThan(0.25);
+});
