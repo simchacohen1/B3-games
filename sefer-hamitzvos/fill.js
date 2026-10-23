@@ -142,6 +142,10 @@
      seen[j]=1;
      const p=j*4;
      if(data[p+3]===0||data[p]<232||data[p+1]<232||data[p+2]<232)continue;
+     // Require enclosure on at least two sides: never bleed out through a
+     // one-sided outline crack into white background.
+     const near=[j%width?j-1:-1,(j%width)+1<width?j+1:-1,j>=width?j-width:-1,j+width<total?j+width:-1];
+     if(near.filter(k=>k>=0&&labels[k]===region).length<2)continue;
      // A gap bordering another valid region is not safe to reclaim.
      const xx=j%width,yy=(j/width)|0;
      let competing=false;
