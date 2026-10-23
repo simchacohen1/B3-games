@@ -93,6 +93,19 @@
   .accuracy-low{ color:var(--rimon); font-weight:700; }
   .empty{ text-align:center; padding:40px; color:var(--ink-soft); }
   .rashi-sample{ font-family:'Mekorot Rashi', serif; font-size:1.4rem; }
+  #recPanel{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:14px 18px; margin-bottom:18px; }
+  #recPanel h2{ margin:0 0 4px; font-size:1.25rem; color:var(--rimon-dark); }
+  #recPanel .rec-sub{ margin:0 0 10px; color:var(--ink-soft); font-size:0.9rem; }
+  .rec-item{ border-top:1px solid var(--parchment-dark); padding:12px 0; display:grid; gap:6px; }
+  .rec-head{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-weight:700; }
+  .rec-class{ background:var(--rimon); color:#fff; border-radius:999px; padding:1px 10px; font-size:0.78rem; }
+  .rec-words{ font-family:'Mekorot Rashi', serif; font-size:1.7rem; direction:rtl; text-align:right; line-height:1.5; }
+  .rec-meta{ color:var(--ink-soft); font-size:0.85rem; }
+  .rec-item audio{ width:100%; max-width:520px; }
+  .rec-actions{ display:flex; flex-wrap:wrap; gap:10px; }
+  .btn.green{ background:#2e7d4f; box-shadow:0 3px 0 #1f5736; }
+  .btn:disabled{ opacity:.55; cursor:default; }
+  .rec-msg{ min-height:1.2em; font-size:0.85rem; }
 
 :root{--parchment:#fff;--parchment-dark:#e5eafa;--ink:#172547;--ink-soft:#475675;--rimon:#6553d6;--rimon-dark:#3f3099;--gold:#b8c4e7;--gold-light:#ede9ff;--shadow:#283f7520}
 body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial-gradient(ellipse at 95% 60%,#ccf5ed,transparent 45%),#f3f6ff;font-family:'Quicksand',Arial,sans-serif}
@@ -121,6 +134,12 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     </div>
     <button class="btn gold" id="refreshBtn">Refresh</button>
   </div>
+
+  <section id="recPanel" aria-live="polite">
+    <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
+    <p class="rec-sub">Listen, then approve (+2 points) or ask the student to try again.</p>
+    <div id="recList"><div class="empty">Loading…</div></div>
+  </section>
 
   <div id="tableHolder">
     <div class="empty">Loading…</div>
@@ -232,6 +251,51 @@ async function loadDashboard(){
   holder.innerHTML = html;
 }
 
+// ---- Rashi reading recordings: approval list (server checks class scope) ----
+const REWARDS_API = 'https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+async function rashiApi(action, extra){
+  const user = firebase.auth().currentUser;
+  if(!user) throw new Error('Please sign in again.');
+  const token = await user.getIdToken();
+  const classId = (teacherScope && teacherScope.selected) || new URLSearchParams(location.search).get('class') || '';
+  const res = await fetch(REWARDS_API, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify({ action, classId, ...(extra||{}) }) });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'Something went wrong.');
+  return data;
+}
+function renderRecordings(rows){
+  const list = document.getElementById('recList');
+  document.getElementById('recCount').textContent = rows.length ? '(' + rows.length + ')' : '';
+  if(!rows.length){ list.innerHTML = '<div class="empty">✅ No Rashi recordings are waiting.</div>'; return; }
+  list.innerHTML = rows.map(r =>
+    '<div class="rec-item" data-id="' + escapeHtml(r.id) + '">' +
+      '<div class="rec-head"><span>' + escapeHtml(r.studentName) + '</span>' +
+        (r.className ? '<span class="rec-class">' + escapeHtml(r.className) + '</span>' : '') +
+        '<span>' + escapeHtml(r.sectionLabel) + (r.attempt > 1 ? ' · try #' + Number(r.attempt) : '') + '</span></div>' +
+      (r.words && r.words.length ? '<div class="rec-words" lang="he">' + r.words.map(escapeHtml).join(' &nbsp; ') + '</div>' : '') +
+      '<div class="rec-meta">' + escapeHtml(fmtTime(r.createdAt)) + (r.durationMs ? ' · ' + Math.round(r.durationMs/1000) + ' sec' : '') + '</div>' +
+      (r.audioUrl ? '<audio controls preload="none" src="' + escapeHtml(r.audioUrl) + '"></audio>' : '<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>') +
+      '<div class="rec-actions"><button class="btn green" data-act="approve">✅ Approve (+2 Points)</button><button class="btn gold" data-act="reject">🔄 Try Again</button></div>' +
+      '<div class="rec-msg"></div></div>').join('');
+}
+async function loadRecordings(){
+  const list = document.getElementById('recList');
+  if(!teacherScope){ list.innerHTML = '<div class="empty">Sign in to see recordings.</div>'; return; }
+  try{ renderRecordings((await rashiApi('rashi-list-pending')).requests || []); }
+  catch(error){ list.innerHTML = '<div class="empty">' + escapeHtml(error.message || 'Could not load recordings.') + '</div>'; }
+}
+document.getElementById('recList').addEventListener('click', async e => {
+  const btn = e.target.closest('button[data-act]'); if(!btn || btn.disabled) return;
+  const item = btn.closest('.rec-item'), msg = item.querySelector('.rec-msg');
+  item.querySelectorAll('button').forEach(b => b.disabled = true);   // one click only
+  try{
+    const out = await rashiApi(btn.dataset.act === 'approve' ? 'rashi-approve' : 'rashi-reject', { requestId: item.dataset.id });
+    msg.textContent = out.alreadyHandled ? 'Already handled earlier — nothing more was changed.'
+      : btn.dataset.act === 'approve' ? '✅ Approved. +' + (out.actualAmount ?? 2) + ' points.' : '🔄 Sent back to try again.';
+    setTimeout(loadRecordings, 1200);
+  }catch(error){ msg.textContent = error.message || 'Could not save.'; item.querySelectorAll('button').forEach(b => b.disabled = false); }
+});
+
 async function loadLockState(){
   const snap = await db.ref('rashiLetters/settings/accessLocked').once('value');
   document.getElementById('lockToggle').checked = (snap.val() === true);
@@ -239,7 +303,7 @@ async function loadLockState(){
 document.getElementById('lockToggle').addEventListener('change', async (e) => {
   await db.ref('rashiLetters/settings/accessLocked').set(e.target.checked);
 });
-document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+document.getElementById('refreshBtn').addEventListener('click', () => { loadDashboard(); loadRecordings(); });
 
 async function loadTeacher(user, access){
   const gate = document.getElementById('teacherGate'), app = document.getElementById('teacherApp');
@@ -263,6 +327,8 @@ async function loadTeacher(user, access){
     gate.style.display = 'none'; app.style.display = '';
     if(isOwner) loadLockState();
     loadDashboard();
+    loadRecordings();
+    if(new URLSearchParams(location.search).get('tab') === 'recordings') document.getElementById('recPanel').scrollIntoView();
   }catch(error){
     app.style.display = 'none'; gate.style.display = '';
     gate.textContent = error.message || 'Could not load your class.';

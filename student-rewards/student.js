@@ -337,7 +337,7 @@ function pointHistoryRows(){
   for(const item of state.activityPointHistory||[]){
     const amount=Number(item.actualAmount??item.amount??0);
     if(!amount)continue;
-    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','chazara-reject':'Chazara approval reversed','shorashim-recording':'Shorashim · Recorded Chazara','shorashim-no-hints':'Shorashim · No Hints Challenge','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
+    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','chazara-reject':'Chazara approval reversed','shorashim-recording':'Shorashim · Recorded Chazara','shorashim-no-hints':'Shorashim · No Hints Challenge','rashi-recording':'Rashi Letters · Recorded reading','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
     rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:historyTime(item.reviewedAt||item.createdAt)});
   }
   for(const [cid,dates] of Object.entries(state.root.awards||{})){

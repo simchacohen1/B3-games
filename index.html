@@ -938,6 +938,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
     {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
@@ -1066,14 +1067,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
     // milestones never count as manual approvals.
     const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];
+    const rashiPending=data.pointRequests?Q.rashiQueue(data.pointRequests).map(function(x){return x.item;}):[];
     approvalClassCounts={
       chazara:Q.countByClass(chazaraPending,approvalClassFallback),
+      rashiRecordings:Q.countByClass(rashiPending,function(x){return x&&x.workspaceClassId||approvalClassFallback(x);}),
       gallery:Q.countByClass(galleryPending.map(function(x){return {classId:x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et"};}))
     };
     if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
       chazara:chazaraPending.length,
+      rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
       gallery:galleryPending.length,
