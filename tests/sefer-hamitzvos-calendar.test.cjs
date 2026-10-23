@@ -32,7 +32,7 @@ test('cycle rollover shows introductory lessons without selecting an unrelated c
 });
 test('date navigation selects daily cards, can return to Today, and makes every assigned mitzvah selectable',()=>{
  const els=new Map(),storage=new Map();
- function el(){return {style:{},dataset:{},classList:{toggle(){}},setAttribute(){},appendChild(child){this.children.push(child);},replaceChildren(){this.children=[];},children:[],addEventListener(){},getContext(){return {clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}}}};}
+ function el(){return {style:{},dataset:{},classList:{toggle(){},add(){},remove(){}},setAttribute(){},appendChild(child){this.children.push(child);},replaceChildren(){this.children=[];},children:[],addEventListener(){},getContext(){return {clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}}}};}
  const document={getElementById(id){if(!els.has(id))els.set(id,el());return els.get(id);},querySelectorAll(){return els.get('dayCards')?.children||[];},createElement:el};
  const storageApi={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-12T14:00:00Z']));}};
