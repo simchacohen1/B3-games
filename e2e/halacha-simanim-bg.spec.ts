@@ -134,7 +134,7 @@ test('coloring: fill, undo, redo; saved; survives a reload; other lessons unaffe
   const box = (await canvas.boundingBox())!;
   const cw = await canvas.evaluate((c: HTMLCanvasElement) => c.width), ch = await canvas.evaluate((c: HTMLCanvasElement) => c.height);
   const clickAt = { x: (spot!.x / cw) * box.width, y: (spot!.y / ch) * box.height };
-  const key = 'halacha_picture_siman_bg_v1_s3a_1';
+  const key = 'halacha_picture_siman_bg_v1_s3a_1_large';
   const saved = () => page.evaluate(`(S['${key}']||[]).length`);
   const pixel = () => canvas.evaluate((c: HTMLCanvasElement, s: any) => Array.from(c.getContext('2d')!.getImageData(s.x, s.y, 1, 1).data), spot);
   expect((await pixel())[0]).toBeGreaterThan(235);
@@ -155,7 +155,7 @@ test('coloring: fill, undo, redo; saved; survives a reload; other lessons unaffe
   await card.locator('.ha-redo').click();
   expect(await saved()).toBe(1);
   // other lesson untouched
-  expect(await page.evaluate("(S['halacha_picture_siman_bg_v1_s3b_1']||[]).length")).toBe(0);
+  expect(await page.evaluate("(S['halacha_picture_siman_bg_v1_s3b_1_large']||[]).length")).toBe(0);
   // reload: the colored section comes back
   await page.reload();
   await page.waitForFunction(() => document.querySelector('button.simanCard'));
@@ -283,6 +283,28 @@ test('Siman Beis seifim 1-9 use the large pictures; a fill stays inside its shap
   });
   expect(share).toBeGreaterThan(0.002);
   expect(share).toBeLessThan(0.3);
+});
+
+test('Siman Gimmel seifim 1-8 use the large pictures and a fill stays inside its shape', async ({ page }) => {
+  await open(page);
+  for (const id of GIMMEL) {
+    await showLesson(page, id);
+    const canvas = page.locator(`#${id} .ha-classroom`).first().locator('canvas');
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    expect(await canvas.evaluate((c: HTMLCanvasElement) => c.width), `${id} uses the large picture`).toBeGreaterThanOrEqual(1000);
+  }
+  await showLesson(page, 's3c'); // three boys: the middle one is the right one
+  const canvas = page.locator('#s3c .ha-classroom').first().locator('canvas');
+  const box = (await canvas.boundingBox())!;
+  await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.4 } }); // middle boy's shirt
+  expect(await page.evaluate("(S['halacha_picture_siman_bg_v1_s3c_3_large']||[]).length")).toBe(1);
+  const share = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; let red = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 120 && d[i + 2] < 120) red++;
+    return red / (c.width * c.height);
+  });
+  expect(share).toBeGreaterThan(0.002);
+  expect(share).toBeLessThan(0.2);
 });
 
 test('each seif is its own slide: one at a time, Next/Back switch slides, Show more text stays available', async ({ page }) => {
