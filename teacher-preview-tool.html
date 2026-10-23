@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Teacher Tool Preview — Fun Torah Tools</title>
+<script src="teacher-preview-roster.js?v=20261018-roster"></script>
 <style>
   *{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#203047;font-family:Arial,sans-serif}
   header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 24px;background:#172033;color:#fff;flex-wrap:wrap}
@@ -184,7 +185,8 @@
         const summary = document.createElement("p");summary.textContent = "Teacher: " + teacher.name + " · Class: " + (cls.name || classId);
         const students = document.createElement("h3");students.textContent = "Assigned students";
         const ul = document.createElement("ul");
-        Object.values(cls.members || {}).filter(m => m && m.active !== false).forEach(m => { const li=document.createElement("li");li.textContent=m.name || "Student";ul.append(li); });
+        const roster = await B3TeacherPreviewRoster.activeClassStudents(db, api.workspaceId || "b3-2026", classId);
+        roster.forEach(student => { const li=document.createElement("li");li.textContent=student.name;ul.append(li); });
         const grants = document.createElement("p");
         grants.textContent = "Enabled tools: " + (Object.entries(cls.toolGrants || {}).filter(([,on]) => on === true).map(([id]) => TOOLS[id]?.[0] || id).join(", ") || "None");
         status.replaceChildren(heading,summary,students,ul,grants);
