@@ -17,13 +17,13 @@ test('Shorashim teacher loads its assigned roster once and keeps subscriptions n
   for(const key of ['catalog','settings','leaderboards'])assert.match(teacher,new RegExp(`observe\\('${key}'`));
   assert.match(teacher,/const studentsRef=db\.ref\(`\$\{SPACE\}\/students`\)/);
   assert.doesNotMatch(teacher,/db\.ref\(`\$\{SPACE\}\/students`\)\.once\('value'\)/);
-  assert.match(teacher,/fullScopeRosterSync=window\.B3ShorashimTeacherRosterSync\.bindStudentEvents\(studentsRef,state,renderDashboard\)/);
+  assert.match(teacher,/fullScopeRosterSync=B3ShorashimTeacherRosterSync\.bindStudentEvents\(studentsRef,state,renderDashboard\)/);
   assert.match(teacher,/await bindFullScopeListener\(\)/);
   assert.match(teacher,/fullScopeRosterSync\?\.ready\(\)/);
   assert.match(teacher,/bindStudentValues\(studentRefs,state,renderDashboard\)/);
   assert.doesNotMatch(teacher,/db\.ref\(`\$\{ROOT\}\/students\/\$\{id\}`\)\.once\('value'\)/);
   assert.match(teacher,/if\(fullScopeReady\)render\(\)/);
-  assert.match(page,/teacher-roster-sync\.js/);
+  assert.match(teacher,/const B3ShorashimTeacherRosterSync=\(\(\)=>/);
   assert.match(teacher,/loadShorashimRecordings\(\);\s*fullScopeReady=true;/);
 });
 
