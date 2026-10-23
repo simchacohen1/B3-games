@@ -532,14 +532,30 @@ function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
   fullScopeListenerBound=true;
-  db.ref(SPACE).on('value',snap=>{
+  const on=(path,callback)=>db.ref(`${SPACE}/${path}`).on('value',snap=>{
     if($('teacherApp').classList.contains('hidden'))return;
-    const v=snap.val()||{};
-    if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
-    if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
-    if(v.students)state.students=v.students;
-    if(v.leaderboards)state.leaderboards=v.leaderboards;
-    renderAll()
+    callback(snap.val());
+  });
+  on('catalog',value=>{if(value||CLASS_MODE)state.catalog=withAllTracks(value);renderAll();});
+  on('settings',value=>{if(value){state.settings={minReviewMs:500,studentSiteOpen:true,...value};renderStudentSiteControl();}renderAll();});
+  on('leaderboards',value=>{state.leaderboards=value||{};renderAll();});
+  const studentsRef=db.ref(`${SPACE}/students`);
+  const updateStudent=snap=>{
+    if($('teacherApp').classList.contains('hidden'))return;
+    state.students[snap.key]=snap.val();
+    renderAll();
+  };
+  studentsRef.on('child_added',snap=>{
+    // The initial child_added events enumerate students already loaded by loadAll().
+    // Ignore those duplicates; accept records added while the teacher page is open.
+    if(Object.prototype.hasOwnProperty.call(state.students,snap.key))return;
+    updateStudent(snap);
+  });
+  studentsRef.on('child_changed',updateStudent);
+  studentsRef.on('child_removed',snap=>{
+    if($('teacherApp').classList.contains('hidden'))return;
+    delete state.students[snap.key];
+    renderAll();
   });
 }
 function bindLegacyScopedListeners(initialGlobalSettings={}){
