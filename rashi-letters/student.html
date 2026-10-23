@@ -214,6 +214,8 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
 
 /* Look-alike letters */
+.letter-pick-btn.mic-tile{grid-column:1/-1;background:linear-gradient(135deg,#ffe3e3,#fff1d6)!important;border:3px solid #d93b3b;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px}
+.letter-pick-btn.mic-tile span{font-size:40px}.letter-pick-btn.mic-tile small{font-size:17px;font-weight:800;color:#8a1f1f}
 .letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
 .letter-pick-btn.similar-tile span{font-size:32px;letter-spacing:3px}
 #similarScreen{display:none}
@@ -322,7 +324,6 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <h3>Choose any Rashi activity — all levels are open:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
-    <div class="mode-gate-section" id="recMenu"></div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
       <h3>What do you want to practice?</h3>
       <div class="mode-type-row">
@@ -406,7 +407,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 </div>
 
 <script src="../student-class.js?v=20261007-tab-login"></script>
-<script src="recordings.js?v=20261023-rashi-rec"></script>
+<script src="recordings.js?v=20261023-rashi-mic-tile"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
@@ -847,6 +848,14 @@ function renderLetterGrid(){
     };
     grid.appendChild(b);
   });
+  if(window.RashiRecordings){
+    const mic=document.createElement('button');
+    mic.className='letter-pick-btn mic-tile';
+    mic.innerHTML='<span>🎤</span><small>Reading with Mic — earn 2 points per reading</small>';
+    mic.setAttribute('aria-label','Reading with Mic: record yourself reading Rashi words');
+    mic.onclick=()=>window.RashiRecordings.openHub(allRecSections());
+    grid.appendChild(mic);
+  }
 }
 
 /* ---------- Locked path in "Reading Rashi Made Easy Shmeezy" order ---------- */
@@ -924,7 +933,7 @@ function selectPracticeLetter(unitId, btnEl){
 function showModeGate(){
   clearTimeout(questionTimer); viewVersion++;
   { const rs=document.getElementById('recordScreen'); if(rs) rs.style.display='none'; }
-  renderRecMenu();
+  if(window.RashiRecordings) window.RashiRecordings.hideHub();
   document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
   const cur = currentStep();
   document.getElementById('continueBtn').textContent = cur < 0 ? '★ Quest complete — practice any step below' : '▶ Continue my quest · Step ' + (cur+1) + ' of ' + STEPS.length + ': ' + stepName(STEPS[cur]);
@@ -1205,12 +1214,11 @@ function offerUnitRecording(unit){
   if(i<0 || !window.RashiRecordings) return goNextStep();
   window.RashiRecordings.offer(unitRecSection(i), goNextStep);
 }
-function renderRecMenu(){
-  const box=document.getElementById('recMenu'); if(!box || !window.RashiRecordings) return;
-  const sections=[];
-  UNITS.forEach((u,i)=>{ if(guidedIndex>i) sections.push(unitRecSection(i)); });
-  [2,3,4].forEach(n=>{ if(chainFlags['words'+n+'Done']) sections.push(wordsRecSection(n)); });
-  window.RashiRecordings.renderMenu(box, sections);
+// "Reading with Mic": every section is open as a choice (all levels are open).
+function allRecSections(){
+  const sections=UNITS.map((u,i)=>unitRecSection(i));
+  [2,3,4].forEach(n=>sections.push(wordsRecSection(n, PRACTICE_WORDS.filter(w=>baseLetters(w).length===n).slice(0,6))));
+  return sections;
 }
 if(window.RashiRecordings) window.RashiRecordings.init({
   isPreview:()=>teacherPreview,
