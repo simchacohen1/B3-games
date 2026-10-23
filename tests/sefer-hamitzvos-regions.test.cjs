@@ -30,7 +30,7 @@ test('all 613 masks match native artwork, never include outline pixels, and reje
   assert.equal(sizes.size,m.regions);assert.ok([...sizes.values()].every(n=>n<=mask.width*mask.height*.18),card+' no page-size fill');
  }
 });
-for(const n of [1,475,476,484,487,499,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
+for(const n of [1,475,476,484,487,495,496,497,498,499,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
  const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),seeds=new Map(),counts=new Map();
  for(let i=0;i<mask.width*mask.height;i++){const id=mask.labels[i];if(id){seeds.set(id,i);counts.set(id,(counts.get(id)||0)+1);}}
  const small=[...counts].filter(([,n])=>n>=3).sort((a,b)=>a[1]-b[1])[0],large=[...counts].sort((a,b)=>b[1]-a[1])[0];
