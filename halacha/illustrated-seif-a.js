@@ -157,8 +157,8 @@
     // Do not replace the older sticker tray or alter its saved piece keys.
     var pageStyles = aside.querySelector('.studio-backgrounds');
     var old = aside.querySelector('.studio-stickers');
-    if (pageStyles) aside.insertBefore(shelf, pageStyles);
-    else if (old) aside.insertBefore(shelf, old);
+    if (pageStyles) pageStyles.parentNode.insertBefore(shelf, pageStyles);
+    else if (old) old.parentNode.insertBefore(shelf, old);
     else aside.appendChild(shelf);
   }
   // Reinstall the picture gallery and sticker shelf after restoring the

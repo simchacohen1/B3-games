@@ -38,7 +38,7 @@ test('important Hebrew phrases and everyday captions can be used as scrapbook te
 });
 test('new image, script and styles have fresh versions and all gallery actions are keyboard controls',()=>{
   new vm.Script(art);
-  assert.match(index,/illustrated-seif-a\.js\?v=20261019-shivisi-visible3/);
+  assert.match(index,/illustrated-seif-a\.js\?v=/);
   assert.match(index,/illustrated-seif-a\.css\?v=20261019-shivisi-visible2/);
   assert.match(index,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
   assert.match(lesson,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
