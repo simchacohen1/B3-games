@@ -306,3 +306,36 @@ test('each seif is its own slide: one at a time, Next/Back switch slides, Show m
   expect(await page.evaluate("document.querySelector('.section.on').id")).toBe('s2b');
   expect(await visibleSeifim()).toEqual(['5']);
 });
+
+test('Full text window: Whole lesson and Whole Siman show every seif together with no scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 800 });
+  await open(page);
+  await showLesson(page, 's2b'); // seifim 3, 4, 5
+  await page.locator('#s2b .ha-classroom').first().locator('.ha-fulltext-btn').click();
+  const dialog = page.locator('.ha-ft-dialog');
+  const body = dialog.locator('.ha-ft-body');
+  const scrolls = () => body.evaluate((el: HTMLElement) => ({ v: el.scrollHeight - el.clientHeight, h: el.scrollWidth - el.clientWidth, font: parseFloat(getComputedStyle(el).fontSize) }));
+
+  // whole lesson = the three seifim of lesson 2, in order
+  await dialog.getByRole('button', { name: 'Whole lesson' }).click();
+  await expect(dialog.locator('.ha-ft-seif')).toHaveCount(3);
+  const expected = (await page.locator('#s2b .ha-classroom .ha-hebrew').allTextContents()).join('').replace(/\s+/g, '');
+  const shown = (await body.locator('.ha-ft-text').allInnerTexts()).join('').replace(/\s+/g, '');
+  expect(shown).toBe(expected);
+  let s = await scrolls();
+  expect(s.v).toBeLessThanOrEqual(1); expect(s.h).toBeLessThanOrEqual(1);
+
+  // whole Siman Beis = all nine seifim, still readable and without scrolling
+  await dialog.getByRole('button', { name: 'Whole Siman' }).click();
+  await expect(dialog.locator('.ha-ft-seif')).toHaveCount(9);
+  s = await scrolls();
+  expect(s.font).toBeGreaterThanOrEqual(14);
+  expect(s.v).toBeLessThanOrEqual(1); expect(s.h).toBeLessThanOrEqual(1);
+  await expect(dialog.getByRole('button', { name: 'Whole Siman' })).toHaveAttribute('aria-pressed', 'true');
+
+  // back to one seif
+  await dialog.getByRole('button', { name: 'This seif' }).click();
+  await expect(dialog.locator('.ha-ft-seif')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
