@@ -1,0 +1,36 @@
+name: Sefer HaMitzvos coloring QA
+
+on:
+  pull_request:
+    paths:
+      - "sefer-hamitzvos/**"
+      - "tests/sefer-hamitzvos*.cjs"
+      - ".github/workflows/sefer-coloring-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coloring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check scripts compile
+        run: |
+          node --check sefer-hamitzvos/fill.js
+          node --check sefer-hamitzvos/mask-worker.js
+          node --check sefer-hamitzvos/tools/verify-coloring.cjs
+          node --check tests/sefer-hamitzvos-regions.test.cjs
+      - name: Region, access, and calendar tests
+        run: node --test tests/sefer-hamitzvos-regions.test.cjs tests/sefer-hamitzvos-fill.test.cjs tests/sefer-hamitzvos-calendar.test.cjs tests/sefer-hamitzvos.test.cjs
+      - name: Install test-only native canvas
+        run: npm install --prefix /tmp/sefer-canvas --no-audit --no-fund @napi-rs/canvas
+      - name: Real rendering, navigation, persistence and undo (synthetic account)
+        env:
+          FTT_CANVAS_MODULE: /tmp/sefer-canvas/node_modules/@napi-rs/canvas
+        run: node sefer-hamitzvos/tools/verify-coloring.cjs
