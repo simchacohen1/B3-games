@@ -27,8 +27,10 @@ function changedClassIds(before,after,pathClassId){
   return [...ids].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
 }
 
-async function bumpVersions(db,increment,classIds){
-  await Promise.all(classIds.map(id=>db.ref(versionPath(id)).set(increment(1))));
+// A transaction adds 1 atomically, so two writes at the same moment still give two different values.
+// (Found by the emulator run: admin.database.ServerValue is not reliably available inside a deployed trigger.)
+async function bumpVersions(db,classIds){
+  await Promise.all(classIds.map(id=>db.ref(versionPath(id)).transaction(cur=>(Number.isSafeInteger(cur)&&cur>0?cur:0)+1)));
 }
 
 module.exports={versionPath,postClassId,changedClassIds,bumpVersions};

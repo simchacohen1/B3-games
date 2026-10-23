@@ -79,7 +79,7 @@ function loadModule(file,mocks){
 
 function setup({identity,seed={}}={}){
   const db=makeDb(seed);
-  const admin={apps:[{}],initializeApp(){},auth:()=>({verifyIdToken:async()=>identity}),database:Object.assign(()=>db,{ServerValue:{increment:n=>({__inc:n})}})};
+  const admin={apps:[{}],initializeApp(){},auth:()=>({verifyIdToken:async()=>identity}),database:()=>db};
   const mocks={
     'firebase-admin':admin,
     'firebase-functions/v2/https':{onRequest:(options,handler)=>handler},

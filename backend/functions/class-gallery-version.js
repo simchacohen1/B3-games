@@ -11,25 +11,24 @@ const admin=require('firebase-admin');
 const {changedClassIds,bumpVersions}=require('./class-gallery-meta');
 if(!admin.apps.length)admin.initializeApp();
 
-async function handleGalleryWrite(db,increment,{before,after,pathClassId}){
+async function handleGalleryWrite(db,{before,after,pathClassId}){
   const classIds=changedClassIds(before,after,pathClassId);
   if(!classIds.length)return {bumped:[]};
-  await bumpVersions(db,increment,classIds);
+  await bumpVersions(db,classIds);
   return {bumped:classIds};
 }
 exports.handleGalleryWrite=handleGalleryWrite;
 
 const options={region:'us-central1',instance:'b3-games-default-rtdb',memory:'256MiB'};
-const increment=n=>admin.database.ServerValue.increment(n);
 
 // ET / WT keep their posts in the original shared list.
 exports.classGalleryVersionLegacy=onValueWritten(
   {...options,ref:'/classGallery/posts/{postId}'},
-  event=>handleGalleryWrite(admin.database(),increment,{before:event.data.before.val(),after:event.data.after.val()})
+  event=>handleGalleryWrite(admin.database(),{before:event.data.before.val(),after:event.data.after.val()})
 );
 
 // Every other class has its own list under its class record.
 exports.classGalleryVersionWorkspace=onValueWritten(
   {...options,ref:'/b3Games/workspaces/b3-2026/classes/{classId}/resources/gallery/posts/{postId}'},
-  event=>handleGalleryWrite(admin.database(),increment,{before:event.data.before.val(),after:event.data.after.val(),pathClassId:event.params.classId})
+  event=>handleGalleryWrite(admin.database(),{before:event.data.before.val(),after:event.data.after.val(),pathClassId:event.params.classId})
 );
