@@ -1,1 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 680" width="960" height="680"><rect width="960" height="680" fill="#fff"/><g fill="#fff" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><rect x="25" y="25" width="910" height="630" rx="26"/><g transform="translate(280 238) scale(1)"><path d="M-63 258 Q-78 188 -46 121 Q-11 91 35 120 Q77 173 62 258Z"/><rect x="-75" y="247" width="150" height="24" rx="9"/><ellipse cx="0" cy="54" rx="47" ry="58"/><path d="M-44 26 Q0 -16 44 26 L43 39 Q0 22 -43 39Z" fill="#fff"/><path d="M-38 17 Q-27 -11 0 -13 Q28 -11 39 17 Q0 5 -38 17Z" fill="#000" stroke="#000"/><path d="M-12 65 L-10 66 M12 65 L14 66"/><path d="M-17 84 Q0 96 17 84"/><path d="M-45 148 L-88 207 L-68 224 L-20 173"/><path d="M47 148 L88 205 L69 226 L16 170"/></g><g transform="translate(670 238) scale(1)"><path d="M-63 258 Q-78 188 -46 121 Q-11 91 35 120 Q77 173 62 258Z"/><rect x="-75" y="247" width="150" height="24" rx="9"/><ellipse cx="0" cy="54" rx="47" ry="58"/><path d="M-44 26 Q0 -16 44 26 L43 39 Q0 22 -43 39Z" fill="#fff"/><path d="M-38 17 Q-27 -11 0 -13 Q28 -11 39 17 Q0 5 -38 17Z" fill="#000" stroke="#000"/><path d="M-12 65 L-10 66 M12 65 L14 66"/><path d="M-17 84 Q0 96 17 84"/><path d="M-45 148 L-88 207 L-68 224 L-20 173"/><path d="M47 148 L88 205 L69 226 L16 170"/></g><path d="M400 180 Q420 105 505 105 H560 Q648 106 648 177 Q648 243 559 245 H520 L473 289 L479 244 Q407 234 400 180Z"/><path d="M440 171 Q478 150 505 177 Q535 151 574 175 Q555 214 506 226 Q457 208 440 171Z"/><path d="M319 534 Q469 600 632 531"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1427" height="950" viewBox="0 0 1200 800" role="img" aria-label="Do not hurt another person with words">
+<title>Do not hurt another person with words</title>
+<desc>Black and white coloring artwork for Sefer HaMitzvos N251. Figures wear kippahs and visible tzitzis. Each filled shape is a closed vector object.</desc>
+<rect width="1200" height="800" fill="#fff"/>
+<g fill="#fff" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+<rect x="22" y="22" width="1156" height="756" rx="26"/>
+<ellipse cx="170" cy="120" rx="55" ry="25"/><ellipse cx="205" cy="112" rx="42" ry="32"/><ellipse cx="235" cy="125" rx="47" ry="22"/><ellipse cx="975" cy="108" rx="45" ry="23"/><ellipse cx="1008" cy="98" rx="43" ry="28"/><ellipse cx="1045" cy="112" rx="49" ry="22"/>
+<path d="M72 594 L101 322 L138 594 Z"/><ellipse cx="115" cy="265" rx="94" ry="86"/><ellipse cx="175" cy="292" rx="84" ry="79"/><rect x="84" y="576" width="80" height="33" rx="12"/><rect x="942" y="552" width="156" height="28" rx="9"/><rect x="959" y="580" width="18" height="69" rx="5"/><rect x="1066" y="580" width="18" height="69" rx="5"/>
+<path d="M475 125 Q480 99 514 99 L710 99 Q740 99 740 130 L740 218 Q740 247 710 247 L592 247 L554 282 L552 247 L514 247 Q475 247 475 217 Z"/>
+<path d="M611 155 Q580 120 554 159 Q548 185 611 225 Q674 185 667 159 Q641 120 611 155 Z"/>
+<g transform="translate(315 300) scale(0.92)">
+<path d="M-62 270 L-58 389 L-10 390 L-2 278 Z"/><path d="M4 278 L11 390 L60 390 L65 270 Z"/>
+<ellipse cx="-37" cy="396" rx="49" ry="18"/><ellipse cx="38" cy="396" rx="49" ry="18"/>
+<rect x="-69" y="255" width="13" height="88" rx="4"/><rect x="-49" y="258" width="12" height="91" rx="4"/><rect x="42" y="258" width="12" height="91" rx="4"/><rect x="62" y="255" width="13" height="88" rx="4"/>
+<path d="M-66 105 Q-96 115 -97 150 L-92 276 Q0 294 92 276 L97 150 Q96 115 66 105 Z"/>
+<path d="M-70 116 L-140 180 L-115 211 L-38 150 Z"/><path d="M70 116 L140 180 L115 211 L38 150 Z"/>
+<ellipse cx="-129" cy="207" rx="24" ry="19"/><ellipse cx="129" cy="207" rx="24" ry="19"/>
+<path d="M-30 104 L0 139 L30 104 Z"/><rect x="-69" y="255" width="138" height="19" rx="5"/>
+<circle cx="-54" cy="0" r="18"/><circle cx="54" cy="0" r="18"/><ellipse cx="0" cy="2" rx="55" ry="67"/>
+<path d="M-50 -45 Q-40 -97 0 -99 Q40 -97 50 -45 Q0 -59 -50 -45 Z"/>
+<ellipse cx="-19" cy="3" rx="5" ry="8"/><ellipse cx="19" cy="3" rx="5" ry="8"/><ellipse cx="0" cy="26" rx="5" ry="8"/><ellipse cx="0" cy="49" rx="22" ry="7"/>
+
+</g><g transform="translate(893 300) scale(0.92)">
+<path d="M-62 270 L-58 389 L-10 390 L-2 278 Z"/><path d="M4 278 L11 390 L60 390 L65 270 Z"/>
+<ellipse cx="-37" cy="396" rx="49" ry="18"/><ellipse cx="38" cy="396" rx="49" ry="18"/>
+<rect x="-69" y="255" width="13" height="88" rx="4"/><rect x="-49" y="258" width="12" height="91" rx="4"/><rect x="42" y="258" width="12" height="91" rx="4"/><rect x="62" y="255" width="13" height="88" rx="4"/>
+<path d="M-66 105 Q-96 115 -97 150 L-92 276 Q0 294 92 276 L97 150 Q96 115 66 105 Z"/>
+<path d="M-70 116 L-140 180 L-115 211 L-38 150 Z"/><path d="M70 116 L140 180 L115 211 L38 150 Z"/>
+<ellipse cx="-129" cy="207" rx="24" ry="19"/><ellipse cx="129" cy="207" rx="24" ry="19"/>
+<path d="M-30 104 L0 139 L30 104 Z"/><rect x="-69" y="255" width="138" height="19" rx="5"/>
+<circle cx="-54" cy="0" r="18"/><circle cx="54" cy="0" r="18"/><ellipse cx="0" cy="2" rx="55" ry="67"/>
+<path d="M-50 -45 Q-40 -97 0 -99 Q40 -97 50 -45 Q0 -59 -50 -45 Z"/>
+<ellipse cx="-19" cy="3" rx="5" ry="8"/><ellipse cx="19" cy="3" rx="5" ry="8"/><ellipse cx="0" cy="26" rx="5" ry="8"/><ellipse cx="0" cy="49" rx="22" ry="7"/>
+
+</g><rect x="38" y="706" width="1124" height="45" rx="20"/><ellipse cx="128" cy="682" rx="45" ry="15"/><ellipse cx="1080" cy="684" rx="55" ry="17"/><rect x="100" y="665" width="7" height="38" rx="3"/><circle cx="103" cy="660" r="15"/><circle cx="92" cy="656" r="9"/><circle cx="113" cy="656" r="9"/><rect x="153" y="677" width="7" height="38" rx="3"/><circle cx="156" cy="672" r="15"/><circle cx="145" cy="668" r="9"/><circle cx="166" cy="668" r="9"/><rect x="1030" y="665" width="7" height="38" rx="3"/><circle cx="1033" cy="660" r="15"/><circle cx="1022" cy="656" r="9"/><circle cx="1043" cy="656" r="9"/><rect x="1090" y="677" width="7" height="38" rx="3"/><circle cx="1093" cy="672" r="15"/><circle cx="1082" cy="668" r="9"/><circle cx="1103" cy="668" r="9"/>
+</g></svg>
