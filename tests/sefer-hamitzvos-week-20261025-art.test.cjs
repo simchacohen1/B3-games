@@ -17,7 +17,7 @@ test('seven coloring sources use closed paths, white interiors, black outlines a
   assert.ok(fs.existsSync(file),file);
   const svg=fs.readFileSync(file,'utf8');unique.add(svg);
   assert.match(svg,/<svg[^>]*width="1427" height="950" viewBox="0 0 1200 800"/);
-  assert.match(svg,/<rect width="1200" height="800" fill="#fff"\/>/);
+  assert.ok(svg.includes('<rect width="1200" height="800" fill="#fff"/>'));
   assert.doesNotMatch(svg,/<(?:script|image|text|line|polyline|use)\b/i);
   assert.doesNotMatch(svg,/\b(?:href|filter|opacity|gradient|mask)=/i);
   assert.doesNotMatch(svg,/fill="#(?!fff\b)|stroke="#(?!000\b)/i);
