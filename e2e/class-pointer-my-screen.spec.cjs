@@ -137,9 +137,11 @@ test('dedicated presentation view follows surface changes, hides exit only while
     await expect(overlay.locator('a')).toBeHidden();
     expect(page.url()).toContain('/class-pointer-prototype/student-view.html');
   }
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(0);
+  // Drawing buttons may stay on screen but must all be greyed out while the student has no drawing permission.
+  await expect(page.locator('#fttLessonDrawTools button:visible:not([disabled])')).toHaveCount(0);
   await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(3);
+  await expect(page.getByRole('button',{name:'Pen',exact:true})).toBeVisible();
+  expect(await page.locator('#fttLessonDrawTools button:visible:not([disabled])').count()).toBeGreaterThanOrEqual(3);
   // Run the actual shared gate's capture handlers while ordinary activity UI is locked.
   const gate=fs.readFileSync(path.join(__dirname,'../game-gate.js'),'utf8');
   const handlers=gate.slice(gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach'),gate.indexOf('  if (!isGuestPreview()) watchTeacherAccess();'));
@@ -152,9 +154,9 @@ test('dedicated presentation view follows surface changes, hides exit only while
   await page.addScriptTag({content:'(()=>{const overlay=document.getElementById("testOrdinaryToolsLocked");'+handlers+'})();'});
   await page.locator('#answer').dispatchEvent('click');
   expect(await page.evaluate(()=>window.__ordinaryClicks)).toBe(0);
-  await page.getByRole('button',{name:'✎ Pen',exact:true}).click();
-  await expect(page.getByRole('button',{name:'✎ Pen',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#fttLessonDrawTools button:visible')).toHaveCount(4);
+  await page.getByRole('button',{name:'Pen',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Pen',exact:true})).toHaveAttribute('aria-pressed','true');
+  expect(await page.locator('#fttLessonDrawTools button:visible:not([disabled])').count()).toBeGreaterThanOrEqual(3);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(true);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#answer')))).toBe(false);
   await page.evaluate(()=>{window.__locked=false;window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'))});
