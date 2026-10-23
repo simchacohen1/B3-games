@@ -113,6 +113,55 @@
   }
   return {pixels:result,region:label};
  }
- const api={traceRegion,createRegionMask,regionFromMask};
+ // The closing step deliberately puts virtual barriers over short cracks.
+ // Their white fringe should still be colored, without ever painting real ink
+ // or another labeled region. This is a limited cosmetic recovery only: it does
+ // not guess whether separately outlined semantic objects should be merged.
+ function includeSafeWhiteFringe(mask,imageData,result,maxDistance=2){
+  if(!result?.pixels||!mask?.labels||!imageData?.data)return result;
+  const {width,height,labels}=mask,total=width*height,data=imageData.data;
+  if(!Number.isInteger(width)||!Number.isInteger(height)||labels.length!==total||data.length!==total*4)return result;
+  const original=result.pixels,region=result.region;
+  if(!region)return result;
+  if(!mask.fringeCache)mask.fringeCache=new Map();
+  if(mask.fringeCache.has(region)){
+   const saved=mask.fringeCache.get(region);
+   mask.fringeCache.delete(region);mask.fringeCache.set(region,saved);
+   return {pixels:saved,region};
+  }
+  const seen=new Uint8Array(total),added=[];
+  for(const i of original)seen[i]=1;
+  let frontier=original;
+  for(let step=0;step<maxDistance&&frontier.length;step++){
+   const next=[];
+   for(const i of frontier){
+    const x=i%width,y=(i/width)|0;
+    const neighbours=[x?i-1:-1,x+1<width?i+1:-1,y?i-width:-1,y+1<height?i+width:-1];
+    for(const j of neighbours){
+     if(j<0||seen[j]||labels[j])continue;
+     seen[j]=1;
+     const p=j*4;
+     if(data[p+3]===0||data[p]<232||data[p+1]<232||data[p+2]<232)continue;
+     // A gap bordering another valid region is not safe to reclaim.
+     const xx=j%width,yy=(j/width)|0;
+     let competing=false;
+     for(let dy=-1;dy<=1&&!competing;dy++)for(let dx=-1;dx<=1;dx++){
+      const nx=xx+dx,ny=yy+dy;if(nx<0||ny<0||nx>=width||ny>=height)continue;
+      const other=labels[ny*width+nx];
+      if(other&&other!==region){competing=true;break;}
+     }
+     if(competing)continue;
+     added.push(j);next.push(j);
+    }
+   }
+   frontier=next;
+  }
+  const expanded=new Uint32Array(original.length+added.length);
+  expanded.set(original);expanded.set(added,original.length);
+  mask.fringeCache.set(region,expanded);
+  while(mask.fringeCache.size>4)mask.fringeCache.delete(mask.fringeCache.keys().next().value);
+  return {pixels:expanded,region};
+ }
+ const api={traceRegion,createRegionMask,regionFromMask,includeSafeWhiteFringe};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.FTTMitzvahFill=api;
 })(typeof window==='object'?window:globalThis);
