@@ -16,6 +16,60 @@ const scopedListeners=[];
 let fullScopeListenerBound=false;
 let fullScopeReady=false,fullScopeInitialPromise=null,fullScopeRosterSync=null;
 let legacyScopeReady=false,legacyStudentSync=null;
+const B3ShorashimTeacherRosterSync=(()=>{
+  function bindStudentEvents(studentsRef,state,renderDashboard,options={}){
+    const delay=Number.isFinite(options.renderDelayMs)?options.renderDelayMs:100;
+    let ready=false,renderTimer=null,closed=false;
+    const queueRender=()=>{
+      if(!ready||closed)return;
+      clearTimeout(renderTimer);
+      renderTimer=setTimeout(()=>{renderTimer=null;if(!closed&&ready)renderDashboard();},delay);
+    };
+    const upsert=snap=>{
+      if(closed)return;
+      const value=snap.val();
+      if(value==null)delete state.students[snap.key];
+      else state.students[snap.key]=value;
+      queueRender();
+    };
+    const remove=snap=>{if(closed)return;delete state.students[snap.key];queueRender();};
+    studentsRef.on('child_added',upsert);
+    studentsRef.on('child_changed',upsert);
+    studentsRef.on('child_removed',remove);
+    return {
+      ready(){if(ready)return;ready=true;queueRender();},
+      dispose(){if(closed)return;closed=true;clearTimeout(renderTimer);studentsRef.off('child_added',upsert);studentsRef.off('child_changed',upsert);studentsRef.off('child_removed',remove);}
+    };
+  }
+  function bindStudentValues(studentRefs,state,renderDashboard,options={}){
+    const delay=Number.isFinite(options.renderDelayMs)?options.renderDelayMs:100;
+    let ready=false,renderTimer=null,closed=false;
+    const queueRender=()=>{
+      if(!ready||closed)return;
+      clearTimeout(renderTimer);
+      renderTimer=setTimeout(()=>{renderTimer=null;if(!closed&&ready)renderDashboard();},delay);
+    };
+    const callbacks=new Map();
+    const initial=Object.entries(studentRefs).map(([id,studentRef])=>new Promise(resolve=>{
+      let first=true;
+      const callback=snap=>{
+        if(closed)return;
+        if(snap.exists())state.students[id]=snap.val();
+        else delete state.students[id];
+        if(first){first=false;resolve();}
+        else queueRender();
+      };
+      studentRef.on('value',callback);
+      callbacks.set(id,callback);
+    }));
+    return {
+      initial:Promise.all(initial),
+      ready(){ready=true;},
+      dispose(){if(closed)return;closed=true;clearTimeout(renderTimer);for(const [id,studentRef] of Object.entries(studentRefs))studentRef.off('value',callbacks.get(id));}
+    };
+  }
+  return {bindStudentEvents,bindStudentValues};
+})();
 // Teacher access is verified through the signed-in Google teacher account.
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
@@ -543,7 +597,7 @@ function bindFullScopeListener(){
     observe('leaderboards',value=>{state.leaderboards=value||{};},renderLeaderboard)
   ]);
   const studentsRef=db.ref(`${SPACE}/students`);
-  fullScopeRosterSync=window.B3ShorashimTeacherRosterSync.bindStudentEvents(studentsRef,state,renderDashboard);
+  fullScopeRosterSync=B3ShorashimTeacherRosterSync.bindStudentEvents(studentsRef,state,renderDashboard);
   return fullScopeInitialPromise;
 }
 function bindLegacyScopedListeners(){
@@ -564,7 +618,7 @@ function bindLegacyScopedListeners(){
   on(`${ROOT}/settings`,snap=>{globalSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};$('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();},renderCatalog);
   on(`${ROOT}/classes/${activeLegacyClassScope}/settings`,snap=>{classSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};$('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();},renderCatalog);
   const studentRefs=Object.fromEntries(scopedStudentIds.map(id=>[id,db.ref(`${ROOT}/students/${id}`)]));
-  legacyStudentSync=window.B3ShorashimTeacherRosterSync.bindStudentValues(studentRefs,state,renderDashboard);
+  legacyStudentSync=B3ShorashimTeacherRosterSync.bindStudentValues(studentRefs,state,renderDashboard);
   initial.push(legacyStudentSync.initial);
   scopedStudentIds.forEach(id=>on(`${ROOT}/leaderboards/match/8/${id}`,snap=>{if(snap.exists())state.leaderboards.match['8'][id]=snap.val();else delete state.leaderboards.match['8'][id];},renderLeaderboard));
   return Promise.all(initial);
