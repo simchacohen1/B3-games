@@ -37,6 +37,8 @@ const strip=s=>String(s||'').replace(/[֑-ׇ]/g,'');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const colors=['#e53838','#ff9216','#fddd27','#40b85b','#248df0','#9255d6','#926044','#252525','#ed81b1','#ffffff'];
 const colorNames={'#e53838':'Red','#ff9216':'Orange','#fddd27':'Yellow','#40b85b':'Green','#248df0':'Blue','#9255d6':'Purple','#926044':'Brown','#252525':'Black','#ed81b1':'Pink','#ffffff':'White'};
+// Add a file name here (for example 'siman-2-seif-01.png') after putting the large picture in halacha/art/simanim/.
+const LARGE_ART=new Set([]);
 const SKIP=new Set(['s2extra']); // duplicate of Siman Gimmel seif 3 (kept in the data, hidden from the tabs)
 const keyFor=(id,n)=>'halacha_picture_siman_bg_v1_'+id+'_'+n;
 const readonly=()=>Boolean(typeof HALACHA_TEACHER_PREVIEW!=='undefined'&&HALACHA_TEACHER_PREVIEW);
@@ -45,6 +47,7 @@ hide.textContent='#tabs button[data-id="s2extra"]{display:none!important}'
  +'.ha-bg .ha-art canvas{aspect-ratio:auto!important;width:auto;max-width:100%;max-height:720px;margin:0 auto}'
  +'.ha-bg .ha-art{display:flex;flex-direction:column;align-items:center;justify-content:flex-start}'
  +'.ha-bg .ha-art .ha-status{width:100%}'
+ +'.ha-bg .ha-art canvas.wide{width:100%;max-height:none;aspect-ratio:auto}'
  +'.ha-bg-notes{margin:0 14px 10px}.ha-bg-check .ha-checkanswers{display:flex;flex-wrap:wrap;gap:8px;margin:6px 12px 6px}'
  +'.ha-bg-check .ha-checkanswers button{background:#fff;border:2px solid #a8c3d9;border-radius:10px;padding:8px 12px;font-weight:700;color:#24465a}'
  +'.ha-bg-check .ha-checkanswers button.correct{background:#d9f5df;border-color:#4f985d}.ha-bg-check .ha-checkanswers button.incorrect{background:#ffe0dd;border-color:#cc6f67}'
@@ -82,7 +85,9 @@ function fillHebrew(el,text,entries,onPick){
   }
   if(hit){
    const b=document.createElement('button');b.type='button';b.className='ha-keyword';
-   b.textContent=parts.slice(i,hit.end+1).join('');if(!surfaces[hit.e.i])surfaces[hit.e.i]=b.textContent;b.onclick=()=>onPick(hit.e.i);el.append(b);i=hit.end+1;
+   const raw=parts.slice(i,hit.end+1).join(''),m=raw.match(/^([^\u0590-\u05FF]*)([\s\S]*?)([^\u0590-\u05FF]*)$/);
+   b.textContent=m[2];if(!surfaces[hit.e.i])surfaces[hit.e.i]=m[2];b.onclick=()=>onPick(hit.e.i);
+   if(m[1])el.append(document.createTextNode(m[1]));el.append(b);if(m[3])el.append(document.createTextNode(m[3]));i=hit.end+1;
   }else{el.append(document.createTextNode(parts[i]));i++}
  }
  return surfaces;
@@ -117,7 +122,7 @@ function make(sectionId,number,seif){
  if(siblings.length)siblings[siblings.length-1].after(el);else section.insertBefore(el,section.firstChild);
  section.classList.add('ha-new');
  const $=s=>el.querySelector(s),canvas=$('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
- const key=keyFor(sectionId,seif);
+ let key=keyFor(sectionId,seif);
  let image=new Image(),base=null,actions=[],redoStack=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false;
  const status=t=>{$('.ha-status').textContent=t};
  const commit=t=>{if(!readonly()&&typeof halachaCloudLoading!=='undefined'&&halachaCloudLoading){status('Please wait for your account to finish loading.');return}persist(key,actions);status(t)};
@@ -140,7 +145,7 @@ function make(sectionId,number,seif){
  }
  function redraw(){if(!base)return;ctx.putImageData(base,0,0);
   for(const a of actions){if(a.t==='fill'){recolor(a.x,a.y,a.c)}else if(a.pts&&a.pts.length){ctx.lineWidth=a.t==='eraser'?20:(a.size||9);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=a.t==='eraser'?'white':a.c;ctx.beginPath();a.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(a.pts.length===1)ctx.lineTo(a.pts[0][0]+.1,a.pts[0][1]+.1);ctx.stroke()}}
-  ctx.globalCompositeOperation='multiply';ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalCompositeOperation='source-over';
+  ctx.globalCompositeOperation='multiply';{const sx=Number(image.dataset.sx||0);ctx.drawImage(image,sx,0,image.naturalWidth-sx,image.naturalHeight,0,0,canvas.width,canvas.height)}ctx.globalCompositeOperation='source-over';
  }
  const pointer=e=>{const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(canvas.width-1,Math.round((e.clientX-r.left)*canvas.width/r.width))),Math.max(0,Math.min(canvas.height-1,Math.round((e.clientY-r.top)*canvas.height/r.height)))]};
  canvas.addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();
@@ -192,14 +197,30 @@ function make(sectionId,number,seif){
   redraw();status(readonly()?'Teacher preview: coloring is temporary and is not saved.':'Choose a color and tap inside the picture to fill it.');
  }
  el.halachaRestorePicture=restore;
+ const pictureName='siman-'+number+'-seif-'+String(seif).padStart(2,'0')+'.png';
+ let usingLarge=LARGE_ART.has(pictureName);
+ // Small strips come with a sliver of the neighbouring panel on the left; start at the blue panel border.
+ function stripStart(img){
+  const probe=document.createElement('canvas');probe.width=img.naturalWidth;probe.height=img.naturalHeight;
+  const c=probe.getContext('2d',{willReadFrequently:true});c.drawImage(img,0,0);
+  const d=c.getImageData(0,0,probe.width,probe.height).data,limit=Math.floor(probe.width*0.4);
+  for(let x=0;x<limit;x++){let blue=0;for(let y=0;y<probe.height;y++){const k=(y*probe.width+x)*4;if(d[k+2]>190&&d[k]<150&&d[k+2]-d[k]>60)blue++}if(blue>probe.height*0.55)return x}
+  return 0;
+ }
  image.onload=()=>{
-  // The pictures are small, so draw them 3x larger (smooth) for easier tapping; outlines stay closed.
-  canvas.width=Math.round(image.naturalWidth*SCALE);canvas.height=Math.round(image.naturalHeight*SCALE);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingQuality='high';ctx.drawImage(image,0,0,canvas.width,canvas.height);
-  base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';restore();
+  const large=usingLarge&&image.naturalWidth>=700;
+  canvas.classList.toggle('wide',large);
+  const sx=large?0:stripStart(image),sw=image.naturalWidth-sx;
+  // Small pictures are drawn 3x larger (smooth) so they are easier to tap; outlines stay closed.
+  const scale=large?1:SCALE;
+  key=keyFor(sectionId,seif)+(large?'_large':'');
+  canvas.width=Math.round(sw*scale);canvas.height=Math.round(image.naturalHeight*scale);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingQuality='high';ctx.drawImage(image,sx,0,sw,image.naturalHeight,0,0,canvas.width,canvas.height);
+  base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';
+  image.dataset.sx=String(sx);restore();
  };
- image.onerror=()=>status('Could not load this lesson picture.');
- image.src='recovered-art/siman-'+number+'-seif-'+String(seif).padStart(2,'0')+'.png';
+ image.onerror=()=>{if(usingLarge){usingLarge=false;image.src='recovered-art/'+pictureName;return}status('Could not load this lesson picture.')};
+ image.src=usingLarge?'art/simanim/'+pictureName:'recovered-art/'+pictureName;
 }
 function init(){Object.entries(map).forEach(([id,[n,seifim]])=>{if(!SKIP.has(id))seifim.forEach(s=>make(id,n,s))})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

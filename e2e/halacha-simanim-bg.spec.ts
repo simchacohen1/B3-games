@@ -194,3 +194,66 @@ test('the duplicate "clean clothes" tab is hidden from Siman Beis', async ({ pag
   await expect(page.locator('#tabs button[data-id="s2extra"]')).toBeHidden();
   await expect(page.locator('#tabs button[data-id="s2a"]')).toBeVisible();
 });
+
+test('highlighted words and word buttons never include commas or periods', async ({ page }) => {
+  await open(page);
+  for (const id of ['s2a', 's2b', 's2c', 's3a', 's3d']) {
+    await showLesson(page, id);
+    const texts: string[] = await page.locator(`#${id} .ha-keyword, #${id} .ha-wordchips button`).allInnerTexts();
+    expect(texts.length).toBeGreaterThan(0);
+    for (const t of texts) expect(t, `${id}: "${t}"`).not.toMatch(/[,.;:!?()]/);
+  }
+});
+
+test('the left sliver of the neighbouring panel is trimmed from the small pictures', async ({ page }) => {
+  await open(page);
+  await showLesson(page, 's2b');
+  const canvas = page.locator('#s2b .ha-classroom').first().locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // the first columns of the picture must not be the dark outline of another panel's text
+  const darkShare = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const w = Math.max(6, Math.floor(c.width * 0.03)), d = c.getContext('2d')!.getImageData(0, 0, w, c.height).data;
+    let dark = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 90 && d[i + 1] < 90 && d[i + 2] < 90) dark++;
+    return dark / (w * c.height);
+  });
+  expect(darkShare).toBeLessThan(0.25);
+});
+
+test('Full text window: whole seif visible in a big window with no scrolling, closes with Esc and returns focus', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await open(page);
+  // longest seifim in Beis, Gimmel and the longest Aleph lesson
+  for (const [id, cardIndex] of [['s2c', 0], ['s3b', 0], ['e', 0]] as [string, number][]) {
+    await showLesson(page, id);
+    const card = page.locator(`#${id} .ha-classroom`).nth(cardIndex);
+    const button = card.locator('.ha-fulltext-btn');
+    await expect(button).toBeVisible();
+    const original = (await card.locator('.ha-hebrew').innerText()).replace(/\s+/g, '');
+    await button.click();
+    const dialog = page.locator('.ha-ft-dialog');
+    await expect(dialog).toBeVisible();
+    const shown = (await dialog.locator('.ha-ft-body').innerText()).replace(/\s+/g, '');
+    expect(shown, `${id}: the window shows the entire seif`).toBe(original);
+    const sizes = await dialog.locator('.ha-ft-body').evaluate((el: HTMLElement) => ({ scroll: el.scrollHeight, client: el.clientHeight, font: parseFloat(getComputedStyle(el).fontSize) }));
+    expect(sizes.scroll, `${id}: no scrolling needed`).toBeLessThanOrEqual(sizes.client + 1);
+    expect(sizes.font, `${id}: text stays readable`).toBeGreaterThanOrEqual(16);
+    const box = (await dialog.boundingBox())!;
+    expect(box.width).toBeGreaterThan(1280 * 0.85);
+    expect(box.height).toBeGreaterThan(800 * 0.85);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(button).toBeFocused();
+  }
+});
+
+test('Full text window: highlighted words show their meaning and the window has a Close button', async ({ page }) => {
+  await open(page);
+  await showLesson(page, 's3d');
+  const card = page.locator('#s3d .ha-classroom').first();
+  await card.locator('.ha-fulltext-btn').click();
+  const dialog = page.locator('.ha-ft-dialog');
+  await dialog.locator('.ha-ft-word').first().click();
+  expect(((await dialog.locator('.ha-ft-foot').innerText()) || '').length).toBeGreaterThan(5);
+  await dialog.getByRole('button', { name: /Close/ }).click();
+  await expect(dialog).toBeHidden();
+});
