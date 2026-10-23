@@ -2,6 +2,24 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {createHash}=require('node:crypto');
+// Per-class change counter, bumped by the triggers in class-gallery-version.js.
+// Kept inline so this file loads on its own; a test checks the path matches class-gallery-meta.js.
+const versionPath=classId=>`classGalleryMeta/${classId}/version`;
+const goodVersion=v=>Number.isSafeInteger(v)&&v>0;
+async function readVersion(db,classId){
+  try{
+    const ref=db.ref(versionPath(classId));
+    const current=(await ref.get()).val();
+    if(goodVersion(current))return current;
+    const result=await ref.transaction(cur=>goodVersion(cur)?undefined:1);
+    const value=result&&result.snapshot&&result.snapshot.val();
+    return goodVersion(value)?value:null;
+  }catch(error){
+    console.warn('classGalleryMeta version unavailable',error&&error.message);
+    return null;
+  }
+}
+const parseClientVersion=raw=>/^[1-9]\d{0,14}$/.test(String(raw==null?'':raw))?Number(raw):null;
 if(!admin.apps.length)admin.initializeApp();
 
 function visibleGalleryPosts(rows,classId,studentId,canReview){
@@ -35,6 +53,11 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     const allowed=owner||adminRow.val()===true||isMember||isTeacher;
     if(!allowed||!cls.exists()||cls.child('active').val()===false)return res.status(403).json({error:'Active class access required.'});
     const legacy=['et','wt'].includes(classId),path=legacy?'classGallery/posts':`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts`;
+    // Version check: one tiny read tells us whether any post in this class changed
+    // since the browser's last full load. Read it BEFORE the posts so a write that
+    // lands in between is simply picked up on the next poll, never missed.
+    const version=await readVersion(db,classId);
+    if(version!==null&&parseClientVersion(req.query?.v)===version)return res.status(200).json({unchanged:true,version});
     const snap=await db.ref(path).get(),rows=snap.val()||{};
     const posts=visibleGalleryPosts(rows,classId,identity.b3StudentId,isTeacher||owner||adminRow.val()===true);
     // Hash only the authorized view: teachers and students can see different posts.
@@ -43,9 +66,9 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     const hash=createHash('sha256').update(postsJson).digest('hex');
     const since=String(req.query?.since||'');
     if(/^[a-f0-9]{64}$/.test(since)&&since===hash){
-      return res.status(200).json({unchanged:true,hash});
+      return res.status(200).json({unchanged:true,hash,...(version!==null?{version}:{})});
     }
-    return res.status(200).json({posts,hash});
+    return res.status(200).json({posts,hash,...(version!==null?{version}:{})});
   }catch(error){
     const code=Number.isInteger(error.code)&&error.code>=400&&error.code<600?error.code:500;
     if(code===500)console.error('classGalleryRead',error);
