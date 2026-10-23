@@ -393,7 +393,7 @@ let hallDoorPositions = {};
 /* ---------- basic helpers ---------- */
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
 function resizeImage(file,maxWidth){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>maxWidth){h=Math.round(h*(maxWidth/w));w=maxWidth;} const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.72));}; img.onerror=reject; img.src=e.target.result;};r.onerror=reject;r.readAsDataURL(file);}); }
-function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream'}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
+function uploadToStorage(file,path,onProgress,extraMeta){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream',...(extraMeta||{})}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
 // Keeps the database small: the picture goes to Storage and the post keeps only its link.
 // If anything fails (not signed in, offline, no permission) the caller keeps the inline picture, so posting never breaks.
 async function galleryImageToStorage(dataUrl,id){
@@ -404,7 +404,7 @@ async function galleryImageToStorage(dataUrl,id){
     if(!firebase.auth().currentUser)return null;
     const blob=await (await fetch(dataUrl)).blob();
     const path=`classGallery/${galleryClassId}/${presenceStudentId}/${id}/image.jpg`;
-    const work=(async()=>{await uploadToStorage(blob,path);return firebase.storage().ref(path).getDownloadURL();})();
+    const work=(async()=>{await uploadToStorage(blob,path,null,{cacheControl:'public, max-age=31536000, immutable'});return firebase.storage().ref(path).getDownloadURL();})();
     return await Promise.race([work,new Promise((_,rej)=>setTimeout(()=>rej(new Error('picture upload timed out')),25000))]);
   }catch(err){console.warn('Picture stayed inline:',err&&err.message);return null;}
 }
