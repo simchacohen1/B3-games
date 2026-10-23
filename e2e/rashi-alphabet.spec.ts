@@ -46,8 +46,8 @@ async function answerRound(page: Page, count: number) {
     const target=(await page.locator('.lab-target').textContent())?.trim();
     expect(target).toBeTruthy();
     await page.getByRole('button',{name:'Letter '+target,exact:true}).click();
-    await expect(page.getByRole('button',{name:'Next question →'})).toBeVisible();
-    await page.getByRole('button',{name:'Next question →'}).click();
+    // A correct answer now moves on by itself after about a second (no Next button), so wait for the next question.
+    await page.waitForFunction((previous)=>{const t=document.querySelector('.lab-target');return !t||(t.textContent||'').trim()!==previous;},target,{timeout:5000});
   }
 }
 
