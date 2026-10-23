@@ -34,3 +34,9 @@ jobs:
         env:
           FTT_CANVAS_MODULE: /tmp/sefer-canvas/node_modules/@napi-rs/canvas
         run: node sefer-hamitzvos/tools/verify-coloring.cjs
+      - name: Install Chromium browser test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Browser navigation and painting on actual DOM
+        run: npx playwright test e2e/sefer-coloring-focus.spec.ts --project=chromium --reporter=line
