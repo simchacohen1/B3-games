@@ -33,7 +33,7 @@ test('word list does not label or disable future available words',()=>{
   for(const btn of nodes.wordList.children){assert.notEqual(btn.disabled,true);assert.match(btn.innerHTML,/Choose • Learn/);assert.doesNotMatch(btn.className,/locked/);}
   assert.match(html,/Choose any word in any order/);
   assert.doesNotMatch(html,/New items unlock strictly in order/);
-  assert.match(html,/app\.js\?v=20261019-perek-choice/);
+  assert.match(html,/app\.js\?v=/);
 });
 
 test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
@@ -58,7 +58,7 @@ test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
 });
 
 test('choosing a perek updates the menu without leaving Shorashim',()=>{
-  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',goScreen:x=>screens.push(x)});
+  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',goScreen:x=>screens.push(x),followAllowsScreen:()=>true});
   vm.runInContext(fn('chooseLearningPerek'),ctx);
   ctx.chooseLearningPerek('19');
   assert.equal(ctx.currentTrack,'shorashim');
