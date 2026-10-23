@@ -35,3 +35,15 @@ Hebrew topics are concise descriptive labels, not quotations from Rambam's Hebre
 - Respect the existing date floor, future lock and card reuse. No production files or student records were changed.
 
 **Do not merge until PNG, mask, browser/performance and progress preservation checks are green and the owner separately approves publication.**
+
+
+## Offline raster-preparation harness (added, NOT YET EXECUTED)
+The repository now contains `sefer-hamitzvos/tools/prepare-weekly-art-20261025.cjs`. It can rasterize each dated SVG to a separate binary black-and-white 1427×950 PNG in a **temporary output directory**, count connected white regions, check dimensions/ink density, and exercise synthetic complete-region fills and recoloring. It refuses to write inside the live artwork directories.
+
+Run in a checked-out development branch:
+```bash
+npm install --prefix /tmp/sefer-canvas --no-audit --no-fund @napi-rs/canvas
+FTT_CANVAS_MODULE=/tmp/sefer-canvas/node_modules/@napi-rs/canvas node sefer-hamitzvos/tools/prepare-weekly-art-20261025.cjs
+node --test tests/sefer-hamitzvos-week-20261025-art.test.cjs
+```
+The output PNGs must still undergo visual review and actual website mask-worker/browser save tests before any integration. This harness has not been run in the current tool environment, so do not treat its tests as passed.
