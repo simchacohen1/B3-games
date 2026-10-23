@@ -257,3 +257,30 @@ test('Full text window: highlighted words show their meaning and the window has 
   await dialog.getByRole('button', { name: /Close/ }).click();
   await expect(dialog).toBeHidden();
 });
+
+test('Siman Beis seifim 1-9 use the large pictures; a fill stays inside its shape and is saved under its own key', async ({ page }) => {
+  await open(page);
+  const seifOf: Record<string, number[]> = { s2a: [1, 2], s2b: [3, 4, 5], s2c: [6, 7, 8], s2d: [9] };
+  for (const [id, seifim] of Object.entries(seifOf)) {
+    await showLesson(page, id);
+    for (let i = 0; i < seifim.length; i++) {
+      const canvas = page.locator(`#${id} .ha-classroom`).nth(i).locator('canvas');
+      await expect(canvas).toHaveAttribute('data-ready', 'true');
+      expect(await canvas.evaluate((c: HTMLCanvasElement) => c.width), `${id} seif ${seifim[i]} uses the large picture`).toBe(1100);
+    }
+  }
+  await showLesson(page, 's2a');
+  const card = page.locator('#s2a .ha-classroom').first();
+  const canvas = card.locator('canvas');
+  const box = (await canvas.boundingBox())!;
+  await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.45 } }); // the boy's shirt
+  expect(await page.evaluate("(S['halacha_picture_siman_bg_v1_s2a_1_large']||[]).length")).toBe(1);
+  expect(await page.evaluate("(S['halacha_picture_siman_bg_v1_s2a_1']||[]).length")).toBe(0);
+  const share = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; let red = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 120 && d[i + 2] < 120) red++;
+    return red / (c.width * c.height);
+  });
+  expect(share).toBeGreaterThan(0.002);
+  expect(share).toBeLessThan(0.3);
+});
