@@ -218,3 +218,42 @@ test('the left sliver of the neighbouring panel is trimmed from the small pictur
   });
   expect(darkShare).toBeLessThan(0.25);
 });
+
+test('Full text window: whole seif visible in a big window with no scrolling, closes with Esc and returns focus', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await open(page);
+  // longest seifim in Beis, Gimmel and the longest Aleph lesson
+  for (const [id, cardIndex] of [['s2c', 0], ['s3b', 0], ['e', 0]] as [string, number][]) {
+    await showLesson(page, id);
+    const card = page.locator(`#${id} .ha-classroom`).nth(cardIndex);
+    const button = card.locator('.ha-fulltext-btn');
+    await expect(button).toBeVisible();
+    const original = (await card.locator('.ha-hebrew').innerText()).replace(/\s+/g, '');
+    await button.click();
+    const dialog = page.locator('.ha-ft-dialog');
+    await expect(dialog).toBeVisible();
+    const shown = (await dialog.locator('.ha-ft-body').innerText()).replace(/\s+/g, '');
+    expect(shown, `${id}: the window shows the entire seif`).toBe(original);
+    const sizes = await dialog.locator('.ha-ft-body').evaluate((el: HTMLElement) => ({ scroll: el.scrollHeight, client: el.clientHeight, font: parseFloat(getComputedStyle(el).fontSize) }));
+    expect(sizes.scroll, `${id}: no scrolling needed`).toBeLessThanOrEqual(sizes.client + 1);
+    expect(sizes.font, `${id}: text stays readable`).toBeGreaterThanOrEqual(16);
+    const box = (await dialog.boundingBox())!;
+    expect(box.width).toBeGreaterThan(1280 * 0.85);
+    expect(box.height).toBeGreaterThan(800 * 0.85);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(button).toBeFocused();
+  }
+});
+
+test('Full text window: highlighted words show their meaning and the window has a Close button', async ({ page }) => {
+  await open(page);
+  await showLesson(page, 's3d');
+  const card = page.locator('#s3d .ha-classroom').first();
+  await card.locator('.ha-fulltext-btn').click();
+  const dialog = page.locator('.ha-ft-dialog');
+  await dialog.locator('.ha-ft-word').first().click();
+  expect(((await dialog.locator('.ha-ft-foot').innerText()) || '').length).toBeGreaterThan(5);
+  await dialog.getByRole('button', { name: /Close/ }).click();
+  await expect(dialog).toBeHidden();
+});
