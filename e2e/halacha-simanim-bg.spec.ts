@@ -56,8 +56,8 @@ test('every Beis and Gimmel lesson is visible, has a ready picture and at least 
       const card = cards.nth(i);
       await expect(card.locator('canvas[data-ready="true"]')).toHaveCount(1, { timeout: 10000 });
       expect(await card.locator('.ha-keyword').count(), `${id} card ${i + 1} highlighted words`).toBeGreaterThanOrEqual(3);
-      expect(await card.locator('.ha-hebrew').innerText()).toMatch(/[֐-׿]{3}/);
-      expect(((await card.locator('.ha-summary').innerText()) || '').length).toBeGreaterThan(30);
+      expect(await card.locator('.ha-hebrew').textContent()).toMatch(/[֐-׿]{3}/);
+      expect(((await card.locator('.ha-summary').textContent()) || '').length).toBeGreaterThan(30);
     }
   }
   expect(errors).toEqual([]);
@@ -283,4 +283,26 @@ test('Siman Beis seifim 1-9 use the large pictures; a fill stays inside its shap
   });
   expect(share).toBeGreaterThan(0.002);
   expect(share).toBeLessThan(0.3);
+});
+
+test('each seif is its own slide: one at a time, Next/Back switch slides, Show more text stays available', async ({ page }) => {
+  await open(page);
+  await showLesson(page, 's2b'); // seifim 3, 4, 5
+  const cards = page.locator('#s2b .ha-classroom');
+  expect(await cards.count()).toBe(3);
+  const visibleSeifim = async () => page.evaluate("[...document.querySelectorAll('#s2b .ha-classroom')].filter(c => c.offsetParent !== null).map(c => c.dataset.seif)");
+  expect(await visibleSeifim()).toEqual(['3']);
+  await expect(cards.nth(0).locator('.ha-mast h2')).toContainText('סעיף ג');
+  await cards.nth(0).locator('.ha-next').click();
+  expect(await visibleSeifim()).toEqual(['4']);
+  await expect(cards.nth(1).locator('.ha-halachacard')).toBeVisible();
+  await cards.nth(1).locator('.ha-next').click();
+  expect(await visibleSeifim()).toEqual(['5']);
+  await cards.nth(2).locator('.ha-prev').click();
+  expect(await visibleSeifim()).toEqual(['4']);
+  // Back from the first seif of the next lesson lands on the LAST seif of this lesson
+  await showLesson(page, 's2c');
+  await page.locator('#s2c .ha-classroom').first().locator('.ha-prev').click();
+  expect(await page.evaluate("document.querySelector('.section.on').id")).toBe('s2b');
+  expect(await visibleSeifim()).toEqual(['5']);
 });

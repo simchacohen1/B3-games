@@ -43,7 +43,8 @@ const SKIP=new Set(['s2extra']); // duplicate of Siman Gimmel seif 3 (kept in th
 const keyFor=(id,n)=>'halacha_picture_siman_bg_v1_'+id+'_'+n;
 const readonly=()=>Boolean(typeof HALACHA_TEACHER_PREVIEW!=='undefined'&&HALACHA_TEACHER_PREVIEW);
 const hide=document.createElement('style');
-hide.textContent='#tabs button[data-id="s2extra"]{display:none!important}'
+hide.textContent='.ha-bg.ha-slide-off{display:none!important}@media print{.ha-bg.ha-slide-off{display:block!important}}'
+ +'#tabs button[data-id="s2extra"]{display:none!important}'
  +'.ha-bg .ha-art canvas{aspect-ratio:auto!important;width:auto;max-width:100%;max-height:720px;margin:0 auto}'
  +'.ha-bg .ha-art{display:flex;flex-direction:column;align-items:center;justify-content:flex-start}'
  +'.ha-bg .ha-art .ha-status{width:100%}'
@@ -94,10 +95,20 @@ function fillHebrew(el,text,entries,onPick){
 }
 const flat=[]; // every seif classroom in reading order: {lesson, number, seif}
 Object.entries(map).forEach(([lesson,[number,seifim]])=>{if(!SKIP.has(lesson))seifim.forEach(seif=>flat.push({lesson,number,seif}))});
+// Show exactly one seif (slide) of a lesson at a time.
+function activate(sectionId,seif){
+ const cards=[...document.querySelectorAll('#'+sectionId+' .ha-classroom')];
+ if(!cards.length)return null;
+ const target=cards.find(c=>c.dataset.seif===String(seif))||cards[0];
+ cards.forEach(c=>c.classList.toggle('ha-slide-off',c!==target));
+ const r=target.querySelector('.ha-hebrew'),t=target.querySelector('.ha-text-toggle');
+ if(r&&t)requestAnimationFrame(()=>{t.hidden=!r.classList.contains('expanded')&&r.scrollHeight<=r.clientHeight+4});
+ return target;
+}
 function go(entry){
  if(!entry)return;
  if(typeof show==='function')show(entry.lesson);
- const card=document.querySelector('#'+entry.lesson+' .ha-classroom[data-seif="'+entry.seif+'"]');
+ const card=activate(entry.lesson,entry.seif);
  if(card)card.scrollIntoView({block:'start'});
 }
 function make(sectionId,number,seif){
@@ -121,6 +132,7 @@ function make(sectionId,number,seif){
  const siblings=section.querySelectorAll('.ha-classroom');
  if(siblings.length)siblings[siblings.length-1].after(el);else section.insertBefore(el,section.firstChild);
  section.classList.add('ha-new');
+ if(section.querySelectorAll('.ha-classroom').length>1)el.classList.add('ha-slide-off');
  const $=s=>el.querySelector(s),canvas=$('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
  let key=keyFor(sectionId,seif);
  let image=new Image(),base=null,actions=[],redoStack=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false;
@@ -187,7 +199,7 @@ function make(sectionId,number,seif){
  selectWord(0);
  const reading=$('.ha-hebrew'),toggle=$('.ha-text-toggle');
  toggle.addEventListener('click',()=>{const open=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(open));reading.classList.toggle('expanded',open);toggle.textContent=open?'Show less text':'Show more text'});
- requestAnimationFrame(()=>{if(reading.scrollHeight<=reading.clientHeight+4)toggle.hidden=true});
+ requestAnimationFrame(()=>{if(el.offsetParent!==null&&reading.scrollHeight<=reading.clientHeight+4)toggle.hidden=true});
  const checkBox=$('.ha-checkanswers'),checkStatus=$('.ha-checkstatus');
  q.slice(1).forEach((answer,i)=>{const b=document.createElement('button');b.type='button';b.textContent=answer;b.onclick=()=>{checkBox.querySelectorAll('button').forEach(x=>x.classList.remove('correct','incorrect'));b.classList.add(i===0?'correct':'incorrect');checkStatus.textContent=i===0?'Correct!':'Try again.'};checkBox.append(b)});
  function restore(){
