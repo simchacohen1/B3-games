@@ -38,7 +38,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const colors=['#e53838','#ff9216','#fddd27','#40b85b','#248df0','#9255d6','#926044','#252525','#ed81b1','#ffffff'];
 const colorNames={'#e53838':'Red','#ff9216':'Orange','#fddd27':'Yellow','#40b85b':'Green','#248df0':'Blue','#9255d6':'Purple','#926044':'Brown','#252525':'Black','#ed81b1':'Pink','#ffffff':'White'};
 // Add a file name here (for example 'siman-2-seif-01.png') after putting the large picture in halacha/art/simanim/.
-const LARGE_ART=new Set([]);
+const LARGE_ART=new Set(['siman-2-seif-01.png','siman-2-seif-02.png','siman-2-seif-03.png','siman-2-seif-04.png','siman-2-seif-05.png','siman-2-seif-06.png','siman-2-seif-07.png','siman-2-seif-08.png','siman-2-seif-09.png']);
 const SKIP=new Set(['s2extra']); // duplicate of Siman Gimmel seif 3 (kept in the data, hidden from the tabs)
 const keyFor=(id,n)=>'halacha_picture_siman_bg_v1_'+id+'_'+n;
 const readonly=()=>Boolean(typeof HALACHA_TEACHER_PREVIEW!=='undefined'&&HALACHA_TEACHER_PREVIEW);
