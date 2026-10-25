@@ -24,6 +24,10 @@ Firebase did, created it without Firebase's object store, and kept its handle
 open. Firebase's repair/delete then waited indefinitely. This PR removes that
 session-scanning/modal-hiding script from the pages used in the journey. Auth
 initialization and authorization remain owned by the Firebase SDK and app.
+The follow-up removed it from the remaining 38 site pages (old backup and
+preview copies are left alone). tests/no-early-firebase-idb-scanner.test.cjs
+fails if any page opens that database again, and firebase-auth-emulator.spec.ts
+checks in a fresh browser that Auth creates a healthy database on eight of them.
 
 ## Full browser journey
 
