@@ -107,3 +107,49 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     console.log('Chazara synthetic browser timings '+JSON.stringify({pendingLoadMs,historyLoadMs,pendingReturnMs,fullHistoryReads,pendingEventReads:after.pendingEventReads}));
   }finally{await browser?.close();server.close()}
 });
+
+
+test('Chazara pending and lazy-history reads stay within a teacher assigned to ET, even if API sends a WT row',{timeout:60000},async()=>{
+  const scopedTree=structuredClone(tree);
+  scopedTree.b3Games.workspaces['b3-2026'].teachers={owner:{active:true,classIds:{et:true}}};
+  scopedTree.posukPractice.chazara.events.simcha_cohen.etrec={
+    recorded:true,reviewApplied:true,pointRequestStatus:'pending',
+    workspaceClassId:'et',perek:18,posuk:3,createdAt:8
+  };
+  const scopedFirebaseStub=FIREBASE_STUB.replace(JSON.stringify(tree),JSON.stringify(scopedTree));
+  const scopedSiteStub=SITE_STUB.replace("{authorized:true,role:'admin'}","{authorized:true,role:'teacher',classIds:['et']}");
+  const server=await serve(),port=server.address().port;
+  let browser;
+  try{
+    browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
+    const page=await browser.newPage();
+    await page.route(/gstatic\.com\/firebasejs\//,r=>r.fulfill({contentType:'text/javascript',body:''}));
+    await page.route(/gstatic\.com\/firebasejs\/.*app-compat/,r=>r.fulfill({contentType:'text/javascript',body:scopedFirebaseStub}));
+    await page.route(/site-settings\.js/,r=>r.fulfill({contentType:'text/javascript',body:scopedSiteStub}));
+    await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{}}'}));
+    await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,r=>{
+      const body=JSON.parse(r.request().postData()||'{}');
+      if(body.action==='list-chazara-pending')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[
+        {id:'et-pending',status:'pending',source:'chazara-recording',amount:1,recorded:true,practiceStudentId:'simcha_cohen',eventId:'etrec',studentName:'Simcha',classId:'et',createdAt:8},
+        {id:'wt-foreign',status:'pending',source:'chazara-recording',amount:1,recorded:true,practiceStudentId:'leib_wolf',eventId:'rec1',studentName:'Leib',classId:'wt',createdAt:9}
+      ]})});
+      return r.fulfill({contentType:'application/json',body:'{"ok":true}'});
+    });
+    await page.goto('http://127.0.0.1:'+port+'/chazara/teacher.html');
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1,null,{timeout:15000});
+    const startup=await page.evaluate(()=>({
+      approvals:[...document.querySelectorAll('#approvalList .request-row')].map(r=>r.dataset.request),
+      reads:window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/')),
+      rows:[...document.querySelectorAll('#recordingsList .recording-row')].map(r=>r.dataset.eventKey),
+      classOptions:[...document.querySelectorAll('#f option')].map(o=>o.value)
+    }));
+    assert.deepEqual(startup.approvals,['et-pending'],'foreign-class pending approvals must not appear');
+    assert.deepEqual(startup.reads,['posukPractice/chazara/events/simcha_cohen/etrec'],'only the assigned class pending event is read');
+    assert.deepEqual(startup.rows,['simcha_cohen__etrec'],'only ET recording is displayed');
+    assert.deepEqual(startup.classOptions,['','et'],'teacher has no WT class option');
+    await page.selectOption('#recordingReviewFilter','checked');
+    await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/simcha_cohen'));
+    const histories=await page.evaluate(()=>window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)));
+    assert.deepEqual(histories,['posukPractice/chazara/events/simcha_cohen'],'explicit history fetch must not download WT recordings');
+  }finally{await browser?.close();server.close()}
+});
