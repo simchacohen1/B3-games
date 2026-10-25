@@ -24,7 +24,7 @@ function serve(){return new Promise(r=>{const s=http.createServer((req,res)=>{co
 test('Chazara pending-only startup and lazy historical recording loads with performance timing',{timeout:60000},async()=>{
   const server=await serve(),port=server.address().port;
   // Keep the HTTP server and browser cleanup active even if Chromium fails to start.
-  let browser;const approvals=[];
+  let browser;const approvals=[],historyCalls=[],pendingEventCalls=[];
   try{
   browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
   const page=await browser.newPage();
@@ -35,6 +35,14 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
   await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{}}'}));
   await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,async r=>{
     const body=JSON.parse(r.request().postData()||'{}');
+    if(body.action==='get-chazara-event'){
+      pendingEventCalls.push(body.studentId+'/'+body.eventId);
+      return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,event:tree.posukPractice.chazara.events[body.studentId]?.[body.eventId]||null})});
+    }
+    if(body.action==='list-chazara-history'){
+      historyCalls.push(body.studentId);
+      return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,events:tree.posukPractice.chazara.events[body.studentId]||{}})});
+    }
     if(body.action==='list-chazara-pending')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[
       {id:'c-et',status:'pending',source:'chazara',amount:1,practiceStudentId:'simcha_cohen',studentName:'Simcha',classId:'et',createdAt:2},
       {id:'c-wt',status:'pending',source:'chazara-recording',amount:2,recorded:true,practiceStudentId:'leib_wolf',eventId:'rec1',studentName:'Leib',classId:'wt',createdAt:3},
@@ -67,13 +75,14 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     assert.equal(state.recordingsApproveAll,'Approve All Pending Points (2)');
     assert.equal(state.reviewFilter,'pending');
     assert.deepEqual(state.historyReads,[],'no full student recording history fetched on startup');
-    assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),['posukPractice/chazara/events/leib_wolf/rec1'],'only the pending recording was fetched');
+    assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),[],'no direct event reads, including exact pending events');
+    assert.deepEqual(pendingEventCalls,['leib_wolf/rec1'],'only the pending recording was fetched via scoped API');
     const historyStart=Date.now();
     await page.selectOption('#recordingReviewFilter','checked');
-    await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/leib_wolf'));
     await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
     const historyLoadMs=Date.now()-historyStart;
     assert.equal(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),'✓ Fully checked','historical checked recording loads on demand');
+    assert.ok(historyCalls.includes('leib_wolf'),'history requested from scoped API');
     await page.selectOption('#recordingReviewFilter','pending');
     await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
     assert.match(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),/Needs full review/,'pending-only view restored');
@@ -92,7 +101,7 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     const fullHistoryReads=await page.evaluate(()=>window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)).length);
     const pendingReturnStart=Date.now();
     await page.click('#showPendingOnly');
-    await page.waitForFunction(()=>document.getElementById('recordingReviewFilter').value==='pending'&&!document.getElementById('teacherApp').classList.contains('hidden')&&document.querySelectorAll('#recordingsList .recording-row').length===1&&window.__reads.filter(p=>p==='posukPractice/chazara/events/leib_wolf/rec1').length>=2);
+    await page.waitForFunction(()=>document.getElementById('recordingReviewFilter').value==='pending'&&!document.getElementById('teacherApp').classList.contains('hidden')&&document.querySelectorAll('#recordingsList .recording-row').length===1);
     const pendingReturnMs=Date.now()-pendingReturnStart;
     const after=await page.evaluate(()=>({
       reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
@@ -102,9 +111,10 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     }));
     assert.equal(after.reviewOnly,true,'return to pending-only view');
     assert.equal(after.historyReads,fullHistoryReads,'return to pending does not subscribe to more complete histories');
-    assert.equal(after.detached,2,'return to pending detaches both full-history subscriptions');
-    assert.ok(after.pendingEventReads>=2,'return to pending reloads exact pending event');
-    console.log('Chazara synthetic browser timings '+JSON.stringify({pendingLoadMs,historyLoadMs,pendingReturnMs,fullHistoryReads,pendingEventReads:after.pendingEventReads}));
+    assert.equal(after.detached,0,'full-dashboard never attaches raw event-history subscriptions');
+    assert.equal(after.historyReads,0,'no whole-student recording subtree is read directly');
+    assert.ok(pendingEventCalls.filter(x=>x==='leib_wolf/rec1').length>=2,'return to pending reloads exact pending event via API');
+    console.log('Chazara synthetic browser timings '+JSON.stringify({pendingLoadMs,historyLoadMs,pendingReturnMs,fullHistoryReads,pendingEventApiCalls:pendingEventCalls.length,historyApiCalls:historyCalls.length}));
   }finally{await browser?.close();server.close()}
 });
 
