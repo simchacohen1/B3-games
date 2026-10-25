@@ -66,7 +66,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),['posukPractice/chazara/events/leib_wolf/rec1'],'only the pending recording was fetched');
     await page.selectOption('#recordingReviewFilter','checked');
     await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/leib_wolf'));
-    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
+    await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
     assert.equal(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),'✓ Fully checked','historical checked recording loads on demand');
     await page.selectOption('#recordingReviewFilter','pending');
     await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
