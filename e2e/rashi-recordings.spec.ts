@@ -1,6 +1,21 @@
 import { test, expect, Page } from '@playwright/test';
 import * as path from 'path';
-import { pathToFileURL } from 'url';
+import * as fs from 'fs';
+
+// Serve the checkout from an https test origin instead of file://. Firefox and WebKit do not let
+// page.route() stub sub-resources of file:// pages (so the real game-gate.js lock overlay loaded),
+// and an https origin is a secure context, so navigator.mediaDevices exists in every browser.
+const ROOT = path.resolve(__dirname, '..');
+const SITE = 'https://rashi-recordings.test';
+const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+  '.ttf': 'font/ttf', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
+async function serveRepo(page: Page) {
+  await page.route(SITE + '/**', route => {
+    const file = path.resolve(ROOT, decodeURIComponent(new URL(route.request().url()).pathname).replace(/^\/+/, ''));
+    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return route.fulfill({ status: 404, body: '' });
+    return route.fulfill({ status: 200, contentType: MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', body: fs.readFileSync(file) });
+  });
+}
 
 // Rashi Letters "Record Reading": runs the real student.html and recordings.js
 // with a pretend microphone, pretend server and a made-up student. No real
@@ -11,6 +26,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 type Server = { sections: Record<string, any>; submits: any[]; failNext: number; };
 
 async function openStudentPage(page: Page, server: Server, progress: any = { currentUnitIndex: 1, currentPhase: 'letter' }) {
+  await serveRepo(page);   // registered first so the stubs below take precedence
   await page.route(API, async route => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
@@ -42,7 +58,10 @@ async function openStudentPage(page: Page, server: Server, progress: any = { cur
     w.B3GameGateAuthReady = Promise.resolve();
     w.B3SiteSettings = { onAuthStateChanged: (cb: any) => cb(null, false, null), getActingStudent: () => null };
     // pretend microphone + recorder
-    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] }) as any;
+    const fakeGetUserMedia = async () => ({ getTracks: () => [{ stop() {} }] }) as any;
+    // Playwright's WebKit build has no navigator.mediaDevices at all, so provide the pretend one.
+    if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = fakeGetUserMedia;
+    else Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: fakeGetUserMedia } });
     class FakeRecorder {
       static isTypeSupported() { return true; }
       mimeType = 'audio/webm'; state = 'inactive'; ondataavailable: any; onstop: any;
@@ -53,8 +72,12 @@ async function openStudentPage(page: Page, server: Server, progress: any = { cur
     w.MediaRecorder = FakeRecorder;
     w.Audio = class { onended: any; play() { return Promise.resolve(); } pause() {} } as any;
     w.confirm = () => true;
+    // Note the size of every Blob body the page sends (Playwright's WebKit cannot read Blob request bodies).
+    w.__sentBlobSizes = [];
+    const realFetch = w.fetch.bind(w);
+    w.fetch = (input: any, init?: any) => { if (init && init.body instanceof Blob) w.__sentBlobSizes.push(init.body.size); return realFetch(input, init); };
   }, progress);
-  await page.goto(pathToFileURL(path.resolve('rashi-letters/student.html')).href);
+  await page.goto(SITE + '/rashi-letters/student.html');
   await expect(page.locator('#modeGate')).toBeVisible({ timeout: 15000 });
 }
 const fresh = (): Server => ({ sections: {}, submits: [], failNext: 0 });
@@ -68,7 +91,7 @@ test('menu lists finished sections with a Record Reading button and no status ye
   await expect(row.getByRole('button', { name: /Record Reading/ })).toBeVisible();
 });
 
-test('record, stop, play, rerecord and submit; then it waits for the teacher', async ({ page }) => {
+test('record, stop, play, rerecord and submit; then it waits for the teacher', async ({ page, browserName }) => {
   const server = fresh();
   await openStudentPage(page, server);
   await page.locator('#recMenu').getByRole('button', { name: /Record Reading/ }).click();
@@ -93,7 +116,8 @@ test('record, stop, play, rerecord and submit; then it waits for the teacher', a
   await expect(screen.locator('.rr-banner')).toContainText('⏳ Waiting for Teacher Approval');
   expect(server.submits).toHaveLength(1);
   expect(server.submits[0].section).toBe('zayin');
-  expect(server.submits[0].size).toBeGreaterThan(1000);
+  expect(await page.evaluate(() => (window as any).__sentBlobSizes)).toEqual([6000]);   // the whole recording was sent once
+  if (browserName !== 'webkit') expect(server.submits[0].size).toBeGreaterThan(1000);   // and it arrived at the server
   expect(server.submits[0].type).toBe('audio/webm');
   expect(decodeURIComponent(server.submits[0].words)).toContain('זֶה');
   await expect(screen.getByRole('button', { name: /Record Reading|Submit/ })).toHaveCount(0);   // nothing more to do
@@ -180,6 +204,7 @@ test('existing lessons still run: letter question renders and answers', async ({
 // ---------- Teacher: Rashi Letters Recordings panel ----------
 test('teacher panel shows student, class, section, audio, and approve / try again send one call each', async ({ page }) => {
   const calls: any[] = [];
+  await serveRepo(page);
   let pending = [{ id: 'rashi_kid1_zayin_a1', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'zayin',
     sectionLabel: 'Mission 1 (ז) words', words: ['זֶה', 'זָר'], attempt: 1, createdAt: 1790000000000, durationMs: 9000, amount: 2, audioUrl: 'https://signed.example/a.webm' },
     { id: 'rashi_kid1_bet_a2', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'bet',
@@ -205,7 +230,7 @@ test('teacher panel shows student, class, section, audio, and approve / try agai
     w.firebase = { apps: [{}], initializeApp() {}, database: () => ({ ref }), auth: () => ({ currentUser: { getIdToken: async () => 't' } }) };
     w.B3SiteSettings = { onAuthStateChanged: (cb: any) => setTimeout(() => cb({ uid: 'o' }, true, { authorized: true, role: 'admin' }), 0), signInWithGoogle() {} };
   });
-  await page.goto(pathToFileURL(path.resolve('rashi-letters/teacher.html')).href + '?tab=recordings');
+  await page.goto(SITE + '/rashi-letters/teacher.html?tab=recordings');
   const items = page.locator('.rec-item');
   await expect(items).toHaveCount(2);
   const first = items.first();
