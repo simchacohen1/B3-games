@@ -400,7 +400,7 @@ async function loadClassScope(user,access){
   if(generation!==scopeGeneration)return;
   teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
-  for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/chazara/events',E],['posukPractice/attempts',P]]:[['posukPractice/chazara/events',E]])){
+  for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/chazara/events',E],['posukPractice/attempts',P]]:[])){
    const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};if(target===E){value=Object.fromEntries(Object.entries(value).filter(([,e])=>window.FunTorahTeacherScope.recordAllowed(scope,id,e)));historyStudentsLoaded.add(id)}target[id]=value;refreshScopedViews();};
    studentListeners.push([ref,handler]);ref.on('value',handler);
   }
