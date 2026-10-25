@@ -335,9 +335,11 @@ function waitForStudentAuth(){
   return new Promise(resolve=>{let stop=()=>{};stop=auth.onAuthStateChanged(user=>{stop();resolve(user);},()=>{stop();resolve(null);});});
 }
 // ---- Weekly Quiz data access ----
-// Students always use the secure weeklyQuizStudent Cloud Function; they never
-// read b3Quiz/... from the database directly. Only teacher preview (a signed-in
-// teacher) reads the database, through directStudentQuiz. Both enforce the same
+// Students load quizzes, answers, history and reviews only through the secure
+// weeklyQuizStudent Cloud Function. They still listen directly to the small
+// settings pointers (QROOT/settings/activeLaunchByClass and studentActiveLaunch,
+// see listenForLaunches), so tightening b3Quiz read rules must keep those
+// readable. Only teacher preview reads launches through directStudentQuiz. Both enforce the same
 // assignment rules: the launch's classId must be the student's class and, when
 // the launch targets specific students, this student must be one of them.
 const HISTORY_LAUNCH_LIMIT=60;
