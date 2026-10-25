@@ -59,9 +59,9 @@ async function openStudentPage(page: Page, server: Server, progress: any = { cur
     w.B3SiteSettings = { onAuthStateChanged: (cb: any) => cb(null, false, null), getActingStudent: () => null };
     // pretend microphone + recorder
     const fakeGetUserMedia = async () => ({ getTracks: () => [{ stop() {} }] }) as any;
-    // Playwright's WebKit build has no navigator.mediaDevices at all, so provide the pretend one.
-    if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = fakeGetUserMedia;
-    else Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: fakeGetUserMedia } });
+    // Always replace navigator.mediaDevices itself: Playwright's WebKit on Windows has none, and on
+    // Linux WebKit assigning getUserMedia onto the real object does not take effect.
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: fakeGetUserMedia } });
     class FakeRecorder {
       static isTypeSupported() { return true; }
       mimeType = 'audio/webm'; state = 'inactive'; ondataavailable: any; onstop: any;
