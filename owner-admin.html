@@ -140,6 +140,7 @@ async function reconcilePrincipals(invites,classes){
    if(!sameMap(p.classIds,scope.classIds))updates[inviteBase+"/classIds"]=Object.keys(scope.classIds).length?scope.classIds:null;
    if(JSON.stringify(p.supervisedTeachers||{})!==JSON.stringify(scope.supervisedTeachers))updates[inviteBase+"/supervisedTeachers"]=Object.keys(scope.supervisedTeachers).length?scope.supervisedTeachers:null;
    if(p.active!==scope.active)updates[inviteBase+"/active"]=scope.active;
+   p.active=scope.active;p.classIds=scope.classIds;p.supervisedTeachers=scope.supervisedTeachers;
    const uid=p.claimedUid,record=uid&&linked[uid];
    if(!record||String(record.email||"").toLowerCase()!==String(p.email||"").toLowerCase())continue;
    const teacherBase=root+"/teachers/"+uid;
