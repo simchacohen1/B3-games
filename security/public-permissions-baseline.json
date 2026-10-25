@@ -42,10 +42,6 @@
       "permission": ".write"
     },
     {
-      "path": "/posukPractice/attempts",
-      "permission": ".read"
-    },
-    {
       "path": "/posukPractice/chazara/$section/$studentId",
       "permission": ".write"
     },

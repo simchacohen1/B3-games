@@ -138,13 +138,18 @@
     },
     {
       "path": "/posukPractice/attempts/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"
+    },
+    {
+      "path": "/posukPractice/attempts/$studentId",
       "permission": ".write",
       "expression": true
     },
     {
       "path": "/posukPractice/attempts",
       "permission": ".read",
-      "expression": true
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
     },
     {
       "path": "/posukPractice/chazara/$section/$studentId",
