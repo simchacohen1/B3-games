@@ -269,6 +269,18 @@
       return loadOneScript(new URL("vendor/firebase/12.15.0/"+m[1],rootBase).href);
     });
   }
+  // The tool-permission policy is needed by every access check. Downloading it
+  // once, early and in parallel keeps it off the critical path; a failed load
+  // is not cached, so the next check retries it.
+  var studentToolPolicyReady=null;
+  function ensureStudentToolPolicy() {
+    if(window.B3StudentTools)return Promise.resolve();
+    if(!studentToolPolicyReady){
+      studentToolPolicyReady=loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href)
+        .catch(function(error){studentToolPolicyReady=null;throw error;});
+    }
+    return studentToolPolicyReady;
+  }
   function waitForFirebaseAuthState(auth) {
     if (auth && typeof auth.authStateReady === "function") return auth.authStateReady();
     if (!auth || typeof auth.onAuthStateChanged !== "function") return Promise.resolve();
@@ -297,12 +309,23 @@
       // Add missing Firebase pieces in the SAME version the page already uses.
       // Mixing versions (for example 12.x auth on a 10.x page) silently stops
       // the page's database from connecting, so nothing loads or saves.
+      // firebase-config.js only declares a plain settings object, so it depends
+      // on nothing and can download alongside the SDK instead of after it.
+      // Its failure is captured and rethrown at the point it is actually needed.
+      var configError=null;
+      var configReady=window.B3_FIREBASE_CONFIG?Promise.resolve():
+        loadAuthScript(new URL("firebase-config.js",rootBase).href).catch(function(error){configError=error;});
       if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
       var sdk=String(window.firebase.SDK_VERSION||"12.15.0"),major=parseInt(sdk,10)||12,suffix=major>=9?"-compat.js":".js";
       var base="https://www.gstatic.com/firebasejs/"+sdk+"/firebase-";
-      if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
-      if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
-      if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      // auth and database both attach to the firebase namespace loaded above,
+      // but neither depends on the other, so they download together.
+      await Promise.all([
+        window.firebase.auth?null:loadAuthScript(base+"auth"+suffix),
+        window.firebase.database?null:loadAuthScript(base+"database"+suffix)
+      ]);
+      await configReady;
+      if(configError) throw configError;
       if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       await waitForFirebaseAuthState(window.firebase.auth());
@@ -651,17 +674,24 @@
     followActivityOpen = false;
 
     Promise.resolve().then(async function () {
-      if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
+      await ensureStudentToolPolicy();
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
         var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
-          active:await fetchJson(teacherClassPath+"/active.json"),
-          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
-          access:await fetchJson(teacherClassPath+"/access.json"),
-          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
-        }:null;
+        if((verifiedTeacherAccess.classIds||[]).includes(selected)){
+          // These four permission fields are independent of one another, and the
+          // security rules require them to be read as separate fields rather
+          // than as one class record. Request them at the same time: awaiting
+          // them in turn cost four round trips on every teacher page load.
+          var teacherFields=await Promise.all([
+            fetchJson(teacherClassPath+"/active.json"),
+            fetchJson(teacherClassPath+"/siteEnabled.json"),
+            fetchJson(teacherClassPath+"/access.json"),
+            fetchJson(teacherClassPath+"/toolGrants.json")
+          ]);
+          teacherClassRecord={active:teacherFields[0],siteEnabled:teacherFields[1],access:teacherFields[2],toolGrants:teacherFields[3]};
+        } else teacherClassRecord=null;
         return;
       }
       await resolveStudentClass();
