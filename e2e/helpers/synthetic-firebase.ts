@@ -36,25 +36,33 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
         window.B3_FIREBASE_CONFIG=${JSON.stringify(config)};
         window.B3_APP_CONTEXT={workspaceId:${JSON.stringify(WORKSPACE)}};
         (function(){
-          var sdk=window.firebase, realAuth=sdk.auth, initialize=sdk.initializeApp;
-          if(initialize.__syntheticConfigured)return;
+          var sdk=window.firebase;
           function configure(auth){
             if(!auth.__syntheticConfigured){
               auth.useEmulator('http://127.0.0.1:${AUTH_PORT}',{disableWarnings:true});
               auth.__syntheticConfigured=true;
-              auth.signInWithPopup=function(){return auth.signInWithCredential(realAuth.GoogleAuthProvider.credential(JSON.stringify({sub:${JSON.stringify('fictional-'+identity)},email:${JSON.stringify(identity==='owner'?OWNER:'teacher@example.test')},email_verified:true,name:${JSON.stringify('Fictional '+identity)}})));};
+              auth.signInWithPopup=function(){return auth.signInWithCredential(sdk.auth.GoogleAuthProvider.credential(JSON.stringify({sub:${JSON.stringify('fictional-'+identity)},email:${JSON.stringify(identity==='owner'?OWNER:'teacher@example.test')},email_verified:true,name:${JSON.stringify('Fictional '+identity)}})));};
             }
             return auth;
           }
-          function syntheticAuth(){return configure(realAuth.apply(this,arguments));}
-          Object.assign(syntheticAuth,realAuth);sdk.auth=syntheticAuth;
-          sdk.initializeApp=function(options,name){
-            var app=initialize.call(sdk,window.B3_FIREBASE_CONFIG,name),getAuth=app.auth.bind(app);
-            app.auth=function(){return configure(getAuth());};
-            app.auth();
-            return app;
-          };
-          sdk.initializeApp.__syntheticConfigured=true;
+          // Legacy tools load app/database before Auth. Configure their app
+          // options immediately, and connect Auth as soon as its SDK arrives.
+          if(!sdk.initializeApp.__syntheticConfigured){
+            var initialize=sdk.initializeApp;
+            sdk.initializeApp=function(options,name){
+              var app=initialize.call(sdk,window.B3_FIREBASE_CONFIG,name);
+              if(typeof app.auth==='function')configure(app.auth());
+              return app;
+            };
+            sdk.initializeApp.__syntheticConfigured=true;
+          }
+          if(sdk.auth){
+            var realAuth=sdk.auth.__syntheticOriginal||sdk.auth;
+            function syntheticAuth(){return configure(realAuth.apply(this,arguments));}
+            Object.assign(syntheticAuth,realAuth);
+            syntheticAuth.__syntheticOriginal=realAuth;sdk.auth=syntheticAuth;
+            sdk.apps.forEach(function(app){configure(app.auth());});
+          }
         })();`;
 
   await page.context().route('**/*',async(route:Route)=>{
@@ -63,7 +71,7 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
       const sdkFile=path.basename(url.pathname).replace(/^firebase-(app|auth|database|storage)\.js$/, 'firebase-$1-compat.js');
       const file=path.join(ROOT,'vendor/firebase/12.15.0',sdkFile);
       if(!fs.existsSync(file))throw Error('Missing Firebase SDK '+file);
-      return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file,'utf8')+(path.basename(file)==='firebase-auth-compat.js'?'\n'+bootstrap:'')});
+      return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file,'utf8')+(['firebase-app-compat.js','firebase-auth-compat.js'].includes(path.basename(file))?'\n'+bootstrap:'')});
     }
     if(url.pathname==='/firebase-config.js'){
       return route.fulfill({contentType:'text/javascript',body:bootstrap});
