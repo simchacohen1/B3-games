@@ -61,10 +61,19 @@ test('Approve All is wired for pending items on Chazara and Student Rewards',()=
   assert.match(rewards,/\$\("#approveAllActivity"\)\.onclick=approveAllActivityPoints/);
 });
 
-test('history stays deferred until the teacher asks for the full dashboard',()=>{
+test('pending-only Chazara reads exact pending recordings; history needs an explicit filter or dashboard request',()=>{
   const chazara=fs.readFileSync('chazara/teacher.html','utf8');
-  assert.match(chazara,/fullDashboardLoaded\?\[\['posukPractice\/chazara\/students',D\],\['posukPractice\/chazara\/events',E\],\['posukPractice\/attempts',P\]\]:\[\['posukPractice\/chazara\/events',E\]\]/);
-  assert.match(chazara,/<option value="needs" selected>Needs full review<\/option>/);
+  assert.match(chazara,/fullDashboardLoaded\?\[\['posukPractice\/chazara\/students',D\],\['posukPractice\/chazara\/events',E\],\['posukPractice\/attempts',P\]\]:\[\]/,
+    'default teacher sign-in must not subscribe to complete recording histories');
+  assert.match(chazara,/teacherApi\('list-chazara-pending'\)/,
+    'pending requests are read through the authorized API');
+  assert.match(chazara,/db\.ref\('posukPractice\/chazara\/events\/'\+studentId\+'\/'\+eventId\)\.once\('value'\)/,
+    'startup reads only the event identified by a pending approval');
+  assert.match(chazara,/db\.ref\('posukPractice\/chazara\/events\/'\+id\)\.once\('value'\)/,
+    'full history is available only on explicit filter request');
+  assert.match(chazara,/if\(recordingFilters\(\)\.review==='pending'\)\{historyGeneration\+\+;historyLoading=false;renderRecordings\(\);return\}/,
+    'returning to pending cancels in-flight history work');
+  assert.match(chazara,/<option value="pending" selected>Awaiting point approval<\/option>/);
 });
 
 // ---- Backend: automatic milestone approval (idempotent, preserves history) ----
