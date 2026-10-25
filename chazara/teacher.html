@@ -218,7 +218,7 @@ async function loadRecordingHistory(){
   }
  }
  if(generation!==scopeGeneration||request!==historyGeneration)return;
- historyLoading=false;renderRecordings();
+ historyLoading=false;if(fullDashboardLoaded)refreshScopedViews();else renderRecordings();
  if(failed)setRecordingActionStatus('Some recording histories could not be loaded. Please try the filter again.',true);
 }
 function recordingFilterChanged(){
