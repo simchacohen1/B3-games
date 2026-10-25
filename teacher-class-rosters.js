@@ -59,11 +59,8 @@
     const classes = rows.filter(Boolean);
     if (requested && classes.length === 0) throw new Error("This class is unavailable.");
     if (!classes.length) throw new Error("No active classes are assigned to this teacher.");
-    // Keep the familiar ET / WT order, followed by any other assigned classes.
-    classes.sort((a, b) =>
-      (a.id === "et" ? -2 : a.id === "wt" ? -1 : 0) -
-      (b.id === "et" ? -2 : b.id === "wt" ? -1 : 0) ||
-      a.name.localeCompare(b.name));
+    // All classes share the same ordering, regardless of their IDs.
+    classes.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     return {
       classes, selectedId: requested || classes[0].id,
       uid: session.user.uid, role: session.access.role
