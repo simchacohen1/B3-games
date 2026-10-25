@@ -43,7 +43,7 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
   });
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
   // Base artwork and approved replacement artwork both use valid coloring paths.
-  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring(?:-v2)?\\/\\d+\\.png$/);
+  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring(?:-v2)?\/\d+\.png$/);
   await expect.poll(() => page.locator('#outline').evaluate(
     (img: HTMLImageElement) => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
   )).toBe(true);
