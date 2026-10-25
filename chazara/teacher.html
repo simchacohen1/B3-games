@@ -117,7 +117,7 @@ function setApprovalStatus(msg,bad=false){const el=$("approvalStatus");el.textCo
 function drawSavedWave(canvas,samples){
   if(!canvas)return;const arr=Array.isArray(samples)?samples.map(Number).filter(Number.isFinite):[];const ratio=window.devicePixelRatio||1,w=Math.max(260,canvas.clientWidth||700),h=canvas.clientHeight||46;canvas.width=w*ratio;canvas.height=h*ratio;const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);const mid=h/2,step=8,barWidth=6,count=Math.max(1,Math.floor(w/step));ctx.fillStyle='#253246';for(let i=0;i<count;i++){const a=arr.length?arr[Math.min(arr.length-1,Math.floor(i*arr.length/count))]:0;const amp=Math.min(1,Math.max(0,a*18));const barHeight=arr.length?Math.max(4,amp*(h-10)):4;const x=i*step+(step-barWidth)/2;const y=mid-barHeight/2;ctx.beginPath();ctx.roundRect(x,y,barWidth,barHeight,barWidth/2);ctx.fill()}
 }
-function allRecordedEvents(){return Object.entries(E||{}).flatMap(([studentId,map])=>Object.entries(map||{}).map(([id,e])=>({id,studentId,...(e||{})}))).filter(e=>e.recorded===true&&e.reviewApplied===true&&e.removed!==true).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0))}
+function allRecordedEvents(){return Object.entries(E||{}).flatMap(([studentId,map])=>Object.entries(map||{}).map(([id,e])=>({id,studentId,...(e||{})}))).filter(e=>e.recorded===true&&(e.reviewApplied===true||pendingRecordingKeys.has(recordingKey(e)))&&e.removed!==true).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0))}
 function recordingName(e){return String(e.studentName||R[e.studentId]?.name||e.studentId||'Student')}
 function fillRecordingSelect(select,items,allLabel){if(!select)return;const old=select.value;select.innerHTML='';const first=document.createElement('option');first.value='';first.textContent=allLabel;select.appendChild(first);items.forEach(item=>{const o=document.createElement('option');o.value=String(item.value);o.textContent=String(item.label);select.appendChild(o)});if(Array.from(select.options).some(o=>o.value===old))select.value=old;else select.value=''}
 function recordingFilters(){return{student:$('recordingStudentFilter')?.value||'',perek:$('recordingPerekFilter')?.value||'',pasuk:$('recordingPasukFilter')?.value||'',review:$('recordingReviewFilter')?.value||'',date:$('recordingDateFilter')?.value||'',dateFrom:$('recordingDateFrom')?.value||'',dateTo:$('recordingDateTo')?.value||''}}
@@ -338,6 +338,8 @@ if($("recordingsList"))$("recordingsList").onclick=async e=>{
     const old=checkedBtn.textContent;checkedBtn.disabled=true;checkedBtn.textContent=wasChecked?'Undoing…':'Saving…';setRecordingActionStatus(wasChecked?'Marking recording as needing full review…':'Marking recording as fully checked…');
     try{
       await teacherApi('teacher-set-recording-full-review',{studentId,eventId,checked:!wasChecked});
+      if(E[studentId]?.[eventId]){E[studentId][eventId].teacherFullyChecked=!wasChecked;E[studentId][eventId].teacherFullyCheckedAt=!wasChecked?Date.now():null}
+      renderRecordings();renderApprovals();
       setRecordingActionStatus(wasChecked?'Recording marked as needing full review again.':'Recording marked ✓ Fully checked.');
     }catch(err){console.error(err);setRecordingActionStatus(String(err?.message||err),true)}
     finally{checkedBtn.disabled=false;checkedBtn.textContent=old}
@@ -353,6 +355,8 @@ if($("recordingsList"))$("recordingsList").onclick=async e=>{
   const old=b.textContent;b.disabled=true;b.textContent='Rejecting…';setRecordingActionStatus('Rejecting recording and reopening the posuk…');
   try{
     const data=await teacherApi('teacher-reject-chazara-recording',{studentId,eventId});
+    if(E[studentId]?.[eventId]){E[studentId][eventId].teacherRejected=true;E[studentId][eventId].pointRequestStatus='rejected'}
+    renderRecordings();await loadApprovals();
     const amt=Number(data.pointsAmount||0);
     if(data.pointsAction==='reversed'&&amt<0)setRecordingActionStatus(`Recording rejected. ${Math.abs(amt)} point${Math.abs(amt)===1?'':'s'} removed and the posuk reopened.`);
     else if(data.pointsAction==='cancelled')setRecordingActionStatus('Recording rejected. Pending points cancelled and the posuk reopened.');
