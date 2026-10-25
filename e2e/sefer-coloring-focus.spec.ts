@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+
+// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25-31 2026.
+const APPROVED_ART_SHA256: Record<string, string> = {
+  '500': '886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81',
+  '501': 'c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f',
+  '502': 'd834c4b7164f225654eaccf3caa17e5959ef9404228bd954adb70e33a4cfa4dd',
+  '503': '8e7c1509b8bc392c560f002fa1369ddf4f7108dd7428ddb5dfde4546434cb5d5',
+};
 
 test('Sefer pictures keep correctly aligned fill after rapid date navigation (synthetic browser)', async ({ page }) => {
   test.setTimeout(120000);
@@ -41,14 +50,23 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
       : 'text/plain';
     await route.fulfill({ status: 200, contentType: type, body: fs.readFileSync(filename) });
   });
+  const servedArt = new Map<string, string>();
+  page.on('response', async response => {
+    const match = new URL(response.url()).pathname.match(/\/coloring-v2\/(\d+)\.png$/);
+    if (match) servedArt.set(match[1], crypto.createHash('sha256').update(await response.body()).digest('hex'));
+  });
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
-  // Base artwork and approved replacement artwork both use valid coloring paths.
-  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring(?:-v2)?\/\d+\.png$/);
+  await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
+  const firstCard = await page.locator('#card').inputValue();
+  // Today's picture must be the owner-approved artwork, byte for byte. When a new
+  // week's art is approved, add its SHA-256 here.
+  const todayArt = firstCard.padStart(3, '0');
+  expect(APPROVED_ART_SHA256[todayArt], `today's card ${firstCard} has no approved artwork registered`).toBeTruthy();
+  await expect(page.locator('#outline')).toHaveAttribute('src', new RegExp(`coloring-v2/${todayArt}\\.png(?:\\?|$)`));
   await expect.poll(() => page.locator('#outline').evaluate(
     (img: HTMLImageElement) => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
   )).toBe(true);
-  await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
-  const firstCard = await page.locator('#card').inputValue();
+  await expect.poll(() => servedArt.get(todayArt)).toBe(APPROVED_ART_SHA256[todayArt]);
   const first = await page.evaluate(() => {
     const labels = regionMask.labels as Uint32Array;
     const counts = new Map<number, number>();
