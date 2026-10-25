@@ -8,7 +8,7 @@ const ROOT=path.resolve(__dirname,'..');
 const tree={b3Games:{workspaces:{'b3-2026':{classes:{
   et:{name:'B3 ET',members:{simcha_cohen:{name:'Simcha'}}},
   wt:{name:'B3 WT',members:{leib_wolf:{name:'Leib'}}}}}},students:{}},
-  posukPractice:{chazara:{events:{simcha_cohen:{},leib_wolf:{}}}}};
+  posukPractice:{chazara:{events:{simcha_cohen:{},leib_wolf:{rec1:{recorded:true,reviewApplied:true,pointRequestStatus:"pending",perek:18,posuk:1,createdAt:3},older:{recorded:true,reviewApplied:true,pointRequestStatus:"approved",teacherFullyChecked:true,perek:18,posuk:2,createdAt:1}}}}}};
 const FIREBASE_STUB=`(function(){const T=${JSON.stringify(tree)};window.__reads=[];
 const at=p=>p.split('/').filter(Boolean).reduce((o,k)=>o==null?undefined:o[k],T);
 const snap=v=>({val:()=>v===undefined?null:v,exists:()=>v!=null});
@@ -34,7 +34,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     const body=JSON.parse(r.request().postData()||'{}');
     if(body.action==='list-chazara-pending')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[
       {id:'c-et',status:'pending',source:'chazara',amount:1,practiceStudentId:'simcha_cohen',studentName:'Simcha',classId:'et',createdAt:2},
-      {id:'c-wt',status:'pending',source:'chazara-recording',amount:2,recorded:true,practiceStudentId:'leib_wolf',studentName:'Leib',classId:'wt',createdAt:3},
+      {id:'c-wt',status:'pending',source:'chazara-recording',amount:2,recorded:true,practiceStudentId:'leib_wolf',eventId:'rec1',studentName:'Leib',classId:'wt',createdAt:3},
       {id:'m-et',status:'pending',source:'reading100',amount:3,practiceStudentId:'simcha_cohen',studentName:'Simcha',classId:'et',createdAt:4},
       {id:'s-et',status:'pending',source:'shorashim-recording',amount:2,practiceStudentId:'simcha_cohen',studentName:'Simcha',classId:'et',createdAt:5}]})});
     if(body.action==='approve-point-request'){approvals.push(body.requestId);return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,status:'approved',actualAmount:1})})}
@@ -43,6 +43,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
   try{
     await page.goto(`http://127.0.0.1:${port}/chazara/teacher.html`);
     await page.waitForFunction(()=>document.querySelectorAll('#approvalList .request-row').length>0,null,{timeout:15000});
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1,null,{timeout:15000});
     const state=await page.evaluate(()=>({
       reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
       panelVisible:getComputedStyle(document.getElementById('approvalPanel')).display!=='none',
@@ -52,7 +53,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
       recordingsApproveAll:document.getElementById('recordingsApproveAllBtn').textContent,
       recordingsApproveAllVisible:!document.getElementById('recordingsApproveAllBtn').classList.contains('hidden'),
       reviewFilter:document.getElementById('recordingReviewFilter').value,
-      historyReads:window.__reads.filter(p=>p.startsWith('posukPractice/attempts')||p.startsWith('posukPractice/chazara/students'))}));
+      historyReads:window.__reads.filter(p=>p.startsWith('posukPractice/attempts')||p.startsWith('posukPractice/chazara/students')||p==='posukPractice/chazara/events/simcha_cohen'||p==='posukPractice/chazara/events/leib_wolf')}));
     assert.equal(state.reviewOnly,true,'opens in pending-only view');
     assert.equal(state.panelVisible,true,'pending point approvals visible without the full dashboard');
     assert.deepEqual(state.rows.sort(),['c-et','c-wt'],'Chazara only: no Posuk milestone, no Shorashim');
@@ -60,8 +61,16 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     assert.equal(state.approveAllVisible,true);
     assert.equal(state.recordingsApproveAllVisible,true);
     assert.equal(state.recordingsApproveAll,'Approve All Pending Points (2)');
-    assert.equal(state.reviewFilter,'needs');
-    assert.deepEqual(state.historyReads,[],'historical data not loaded initially');
+    assert.equal(state.reviewFilter,'pending');
+    assert.deepEqual(state.historyReads,[],'no full student recording history fetched on startup');
+    assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),['posukPractice/chazara/events/leib_wolf/rec1'],'only the pending recording was fetched');
+    await page.selectOption('#recordingReviewFilter','checked');
+    await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/leib_wolf'));
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
+    assert.equal(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),'✓ Fully checked','historical checked recording loads on demand');
+    await page.selectOption('#recordingReviewFilter','pending');
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
+    assert.match(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),/Needs full review/,'pending-only view restored');
     await page.waitForFunction(()=>true);await page.waitForTimeout(300);
     assert.deepEqual(approvals,['m-et'],'Posuk milestone paid automatically, nothing else approved');
     // Approve All approves exactly the pending Chazara items.
