@@ -335,33 +335,28 @@ function waitForStudentAuth(){
   return new Promise(resolve=>{let stop=()=>{};stop=auth.onAuthStateChanged(user=>{stop();resolve(user);},()=>{stop();resolve(null);});});
 }
 // ---- Weekly Quiz data access ----
-// Preferred path: the secure weeklyQuizStudent Cloud Function. If that function
-// is not reachable (not deployed: 404 without CORS, network failure) or the
-// student has no function-ready token, fall back to the Realtime Database
-// paths the teacher dashboard writes to (b3Quiz/...). Both paths enforce the
-// same assignment rules: the launch's classId must be the student's class and,
-// when the launch targets specific students, this student must be one of them.
-let quizBackendMode=''; // '' (unknown) | 'function' | 'direct'
+// Students always use the secure weeklyQuizStudent Cloud Function; they never
+// read b3Quiz/... from the database directly. Only teacher preview (a signed-in
+// teacher) reads the database, through directStudentQuiz. Both enforce the same
+// assignment rules: the launch's classId must be the student's class and, when
+// the launch targets specific students, this student must be one of them.
 const HISTORY_LAUNCH_LIMIT=60;
 const quizError=(status,message)=>Object.assign(new Error(message),{status});
 async function callStudentQuizFunction(action,payload){
   const user=await waitForStudentAuth();
-  if(!user)throw Object.assign(new Error('No student token.'),{backendUnavailable:true});
+  if(!user)throw quizError(401,'Please sign in again to open your quiz.');
   const token=await user.getIdToken();
   let response;
+  // 503 is a temporary problem, so the quiz keeps retrying quietly.
   try{response=await fetch(STUDENT_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});}
-  catch(e){throw Object.assign(new Error('Quiz service unreachable.'),{backendUnavailable:true});}
+  catch(e){throw quizError(503,'The quiz could not connect. Check your internet and try again.');}
   const data=await response.json().catch(()=>({}));
-  if(response.status===404||response.status===401)throw Object.assign(new Error(data.error||'Quiz service unavailable.'),{backendUnavailable:true});
-  if(!response.ok)throw quizError(response.status,data.error||'Could not load this quiz. Try again.');
+  if(response.status===401)throw quizError(401,'Please sign in again to open your quiz.');
+  if(!response.ok)throw quizError(response.status>=500?503:response.status,data.error||'Could not load this quiz. Try again.');
   return data;
 }
 async function callStudentQuiz(action,payload={}){
-  if(!teacherPreview&&quizBackendMode!=='direct'){
-    try{const data=await callStudentQuizFunction(action,payload);quizBackendMode='function';return data;}
-    catch(e){if(!e.backendUnavailable||quizBackendMode==='function')throw e;quizBackendMode='direct';}
-  }
-  return directStudentQuiz(action,payload);
+  return teacherPreview?directStudentQuiz(action,payload):callStudentQuizFunction(action,payload);
 }
 function launchAssignedTo(launch,studentId,classId){
   if(!launch||typeof launch!=='object')return false;
@@ -730,31 +725,11 @@ function renderPreviewBar(){
   bar.classList.remove('hidden');
 }
 
-let quizLoadError='',activeLaunchListeners=[];
-function detachActiveLaunchListeners(){activeLaunchListeners.forEach(ref=>ref.off());activeLaunchListeners=[];}
-// Database mode: follow the open quiz with realtime listeners (data is sent
-// only when it changes) instead of re-downloading it every few seconds.
-function attachDirectLaunchListeners(id){
-  detachActiveLaunchListeners();
-  const onError=error=>{console.warn('Quiz listener error:',error);if(activeLaunchId===id&&!launchData){quizLoadError='Could not load this quiz.';render();}};
-  const launchRef=db.ref(QROOT+'/launches/'+id);
-  launchRef.on('value',snap=>{
-    if(activeLaunchId!==id)return;const value=snap.val();
-    if(!value){launchData=null;quizLoadError='This quiz could not be found. Ask your teacher for a new link.';render();return;}
-    quizLoadError='';launchData={id,...value};assignedInfo[id]={launch:launchData,error:''};render();renderAssigned();
-  },onError);
-  activeLaunchListeners.push(launchRef);
-  if(teacherPreview)return;
-  const responseRef=db.ref(QROOT+'/responses/'+id+'/'+myStudentId);
-  responseRef.on('value',snap=>{if(activeLaunchId!==id)return;myResponses=snap.val()||{};render();},onError);
-  const completionRef=db.ref(QROOT+'/completions/'+id+'/'+myStudentId);
-  completionRef.on('value',snap=>{if(activeLaunchId!==id)return;const value=snap.val();if(value){allCompletions[id]={[myStudentId]:value};render();renderAssigned();}},onError);
-  activeLaunchListeners.push(responseRef,completionRef);
-}
+let quizLoadError='';
 function chooseActiveLaunch(id){
   id=id||'';
-  if(id===activeLaunchId&&(launchData||launchPollTimer||activeLaunchListeners.length))return;
-  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;detachActiveLaunchListeners();
+  if(id===activeLaunchId&&(launchData||launchPollTimer))return;
+  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
   activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;quizLoadError='';
   if(!id){render();return;}
   const cached=assignedInfo[id];
@@ -771,11 +746,7 @@ function chooseActiveLaunch(id){
       if(result.completion)allCompletions[id]={[myStudentId]:result.completion};
       if(allLaunches[id])allLaunches[id]=launchData;
       render();renderAssigned();
-      if(quizBackendMode==='direct'){
-        // Switch from polling to realtime listeners once we know the database path is in use.
-        if(launchPollTimer){clearInterval(launchPollTimer);launchPollTimer=null;}
-        if(!activeLaunchListeners.length)attachDirectLaunchListeners(id);
-      }else if(++refreshCount%12===0)await listenForHistory();
+      if(++refreshCount%12===0)await listenForHistory();
     }catch(error){
       console.warn('Could not refresh quiz:',error);if(activeLaunchId!==id)return;
       // A permanent answer (not assigned / not found) is shown right away; a
@@ -809,8 +780,7 @@ function launchAllowsStudent(){
   if(!launchData)return false;
   if(teacherPreview)return true;
   // The secure function already filters; the safe launch it returns omits the roster.
-  if(quizBackendMode==='function')return launchData.classId===myClassId;
-  return launchAssignedTo(launchData,myStudentId,myClassId);
+  return launchData.classId===myClassId;
 }
 
 function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard','loadingQuizCard','quizErrorCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
@@ -1013,7 +983,7 @@ restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error
   applyMasterBlocked();
 });
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 

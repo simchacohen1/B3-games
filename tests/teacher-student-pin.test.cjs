@@ -11,7 +11,7 @@ function fixture({teacher=false,profile={name:'Synthetic Student',active:true},p
   const saved=new Map([['b3Games_studentId','synthetic_student'],['b3Games_studentName','Synthetic Student'],['b3Games_studentClass','alpha'],['b3Games_classPin',pin]]);
   const calls=[],entered=[],messages=[];let reads=0,loginShown=0;
   const ctx={
-    isAuthorizedTeacher:teacher,isStudentPreview:false,isGuest:()=>false,previewStudentId:'',
+    isAuthorizedTeacher:teacher,isStudentPreview:false,isGuest:()=>false,previewStudentId:'',settingsApi:{getActingStudent:()=>null},
     sessionStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},
     db:{ref:path=>({once:async()=>{reads++;return{exists:()=>!!profile,val:()=>profile};}})},
     studentAuthCall:async body=>{calls.push(body);if(body.action==='verify'&&verifyError)throw verifyError;if(body.action==='login')return{ok:true,id:'synthetic_student',name:'Synthetic Student',classId:'alpha',classChoices:[{id:'alpha',name:'Alpha'}]};return{ok:true};},
