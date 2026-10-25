@@ -15,6 +15,15 @@ const ALLOWED_NEW = [
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'halachaAccess'],
 ];
 
+// Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
+// 2026-10-24: Posuk Practice recording links stop being public (student, active teacher, admin, owner).
+const APPROVED_CHANGES = [
+  [['posukPractice', 'attempts', '.read'],
+    "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
+  [['posukPractice', 'attempts', '$studentId', '.read'],
+    "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
+];
+
 function stripComments(text) { // the console allows // and /* */ comments; remove them outside strings
   let out = '', inStr = false, q = '', i = 0;
   while (i < text.length) {
@@ -30,6 +39,8 @@ function stripComments(text) { // the console allows // and /* */ comments; remo
 const parse = text => JSON.parse(stripComments(text));
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const allowedNew = p => ALLOWED_NEW.some(a => a.length === p.length && a.every((s, i) => s === p[i]));
+const approvedChange = (p, value) => APPROVED_CHANGES.some(([a, v]) =>
+  a.length === p.length && a.every((s, i) => s === p[i]) && value === v);
 
 function compare(live, candidate) {
   const problems = [];
@@ -41,9 +52,9 @@ function compare(live, candidate) {
       }
       for (const k of Object.keys(b)) if (!(k in a)) {
         const np = [...p, k];
-        if (!allowedNew(np)) problems.push('ADDED     /' + np.join('/') + '  (not in the approved list)');
+        if (!allowedNew(np) && !approvedChange(np, b[k])) problems.push('ADDED     /' + np.join('/') + '  (not in the approved list)');
       }
-    } else if (JSON.stringify(a) !== JSON.stringify(b)) {
+    } else if (JSON.stringify(a) !== JSON.stringify(b) && !approvedChange(p, b)) {
       problems.push('CHANGED   /' + p.join('/') + '\n    live:      ' + JSON.stringify(a) + '\n    candidate: ' + JSON.stringify(b));
     }
   };
@@ -51,7 +62,7 @@ function compare(live, candidate) {
   return problems;
 }
 
-module.exports = { compare, parse, stripComments, ALLOWED_NEW };
+module.exports = { compare, parse, stripComments, ALLOWED_NEW, APPROVED_CHANGES };
 
 if (require.main === module) {
   const [livePath, candPath = 'firebase-rules.json'] = process.argv.slice(2);

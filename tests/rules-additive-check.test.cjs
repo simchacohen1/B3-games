@@ -39,6 +39,12 @@ test('another unapproved addition next to halachaAccess is still caught', () => 
   const c = candidate(); c.rules.b3Games.workspaces.$workspaceId.classes.$classId.somethingElse = { '.write': true };
   assert.ok(compare(l, c).some(p => p.startsWith('ADDED') && p.includes('/somethingElse')));
 });
+test('the approved recording-link tightening must match exactly; any other value is caught', () => {
+  const c = candidate(); c.rules.posukPractice.attempts['.read'] = 'auth != null';
+  assert.ok(compare(live(), c).some(p => p.startsWith('CHANGED') && p.includes('/posukPractice/attempts/.read')));
+  const d = candidate(); d.rules.posukPractice.attempts.$studentId['.read'] = true;
+  assert.ok(compare(live(), d).some(p => p.startsWith('ADDED') && p.includes('/posukPractice/attempts/$studentId/.read')));
+});
 test('console-style comments in a saved live rules file are tolerated', () => {
   const text = '// saved from console\n{"rules": {/* x */ ".read": false, "a": {"b": "has // inside"}}}';
   assert.deepEqual(parse(text), { rules: { '.read': false, a: { b: 'has // inside' } } });
