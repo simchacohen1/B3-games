@@ -12,7 +12,7 @@ const BOOTSTRAP='simcha5770@gmail.com';
 // Rename one literal in a test-only copy, keeping the exact owner/verified-email
 // restrictions. Neither production sources nor checked-in rules are rewritten.
 function fictionalOwner(source:string){return source.replaceAll(BOOTSTRAP,OWNER);}
-export function fictionalOwnerRules(){return fictionalOwner(fs.readFileSync(path.join(ROOT,'firebase-rules.hardened.json'),'utf8'));}
+export function fictionalOwnerRules(){return fictionalOwner(fs.readFileSync(path.join(ROOT,'firebase-rules.json'),'utf8'));}
 export async function serveSyntheticSite():Promise<{server:http.Server,origin:string}>{
   if(!PROJECT.startsWith('demo-'))throw Error('Synthetic setup requires a demo project.');
   const server=http.createServer((req,res)=>{

@@ -20,6 +20,7 @@ async function seedSyntheticClassroom() {
       classId: CLASS_ID, started: true, mode: 'test', showScore: true,
       quizSnapshot: { title: 'Fictional Pilot Quiz', questions: [{ q: 'Which choice is correct?', choices: ['Choice A', 'Choice B'], correctIndex: 1 }, { q: 'Which number is two?', choices: ['One', 'Two'], correctIndex: 1 }] }
     });
+    await set(ref(db, `b3Quiz/classes/${CLASS_ID}/settings/activeLaunchByClass/${CLASS_ID}`), 'quiz_one');
     await set(ref(db, `b3Games/workspaces/${WORKSPACE}/classes/et`), { name: 'Synthetic ET preservation check', active: true, members: { synthetic_et: { name: 'Synthetic ET Student', active: true } } });
     await set(ref(db, `b3Games/workspaces/${WORKSPACE}/classes/wt`), { name: 'Synthetic WT preservation check', active: true, members: { synthetic_wt: { name: 'Synthetic WT Student', active: true } } });
   });
@@ -114,20 +115,51 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.getByRole('link', { name: /Weekly Quiz/i }).click();
   await expect(page.getByText('Fictional Pilot Quiz')).toBeVisible();
   await expect(page.getByText('Which choice is correct?')).toBeVisible();
-  await page.getByRole('button', { name: /B\. Choice B/ }).click();
-  await page.getByRole('button', { name: /submit/i }).click();
-  await expect(page.getByText(/completed|100%|correct/i).first()).toBeVisible();
-
-  const studentIds = Object.entries(enrolled || {}).map(([id, row]: [string, any]) => [id, row.name]);
-  const ariId = studentIds.find(([, name]) => name === 'Ari Example')?.[0];
+  const ariId=Object.entries(enrolled).find(([,row]:[string,any])=>row.name==='Ari Example')?.[0];
   expect(ariId).toBeTruthy();
-  const completion = await env.withSecurityRulesDisabled(async context =>
-    (await get(ref(context.database(), `b3Quiz/classes/${CLASS_ID}/completions/quiz_one/${ariId}`))).val()
-  );
-  expect(completion).toBeTruthy();
-
+  async function readFixture(path:string){return env.withSecurityRulesDisabled(async c=>(await get(ref(c.database(),path))).val());}
+  const quizRoot=`b3Quiz/classes/${CLASS_ID}`;
+  await page.getByRole('button', { name: /B\. Choice B/ }).click();
+  await page.locator('#submitBtn').click();
+  await expect.poll(async()=> (await readFixture(`${quizRoot}/responses/quiz_one/${ariId}/0`))?.choiceIndex).toBe(1);
   await page.reload();
-  await expect(page.getByText(/completed|100%|correct/i).first()).toBeVisible();
+  await expect(page.locator('#progressText')).toHaveText('1 of 2 answered');
+  await expect(page.locator('#choices .choice.selected')).toBeDisabled();
+  await page.locator('#questionNav').getByRole('button',{name:'2',exact:true}).click();
+  await page.getByRole('button',{name:/B\. Two/}).click();
+  await page.locator('#submitBtn').click();
+  await expect.poll(async()=> (await readFixture(`${quizRoot}/completions/quiz_one/${ariId}`))?.pct).toBe(100);
+  await page.reload();
+  await expect(page.locator('#completeCard')).toBeVisible();
+  await expect(page.locator('#completeScore')).toContainText('100%');
+  await expect(page.locator('#pastQuizList')).toContainText('Fictional Pilot Quiz');
+  await page.getByRole('link',{name:/Fun Torah Tools/}).first().click();
+  await expect(page.locator('#studentNameLabel')).toHaveText('Ari Example');
+
+  // A second real learning page saves a completed letter step, then reloads it.
+  await page.locator('a[href*="rashi-letters/student.html"]').click();
+  await expect(page.locator('#modeGate')).toBeVisible();
+  await page.getByRole('button',{name:/Step 6:/}).click();
+  for(let i=0;i<3;i++){
+    const choices=page.locator('#choicesRow .choice-btn');
+    await expect(choices.first()).toBeEnabled();
+    const target=(await page.locator('#rashiLetter').innerText()).trim();
+    await page.locator('#choicesRow').getByRole('button',{name:target,exact:true}).click();
+    if(i<2)await expect(page.locator('#sessionStars')).toContainText('★ '+(i+1));
+  }
+  await expect.poll(async()=> (await readFixture(`rashiLetters/progress/${ariId}`))?.currentPhase).toBe('word');
+  await page.reload();
+  await expect(page.locator('#modeGate')).toBeVisible();
+  await page.getByRole('button',{name:/Step 6:/}).click();
+  await expect(page.locator('#phasePill')).toHaveText('Word');
+  await page.getByRole('link',{name:/Fun Torah Tools/}).first().click();
+  await expect(page.locator('#studentNameLabel')).toHaveText('Ari Example');
+  const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);
+  expect(claims.b3StudentId).toBe(ariId);expect(claims.b3ClassId).toBe(CLASS_ID);
+  expect(claims.b3StudentRole).toBe('student');
+  expect(await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/et/members`)).toEqual({synthetic_et:{name:'Synthetic ET Student',active:true}});
+  expect(await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/wt/members`)).toEqual({synthetic_wt:{name:'Synthetic WT Student',active:true}});
+  await studentContext.close();
   expect(failedFirebase).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
