@@ -1,3 +1,24 @@
+# Approved PNG installation — October 24, 2026
+
+Cards 500–503 now use the FINAL APPROVED originals from `Sefer_HaMitzvos_Cards_500-503_APPROVED.zip`, copied byte-for-byte. No cropping, resizing, thresholding, or regeneration was applied. The SVGs and preview below are rejected historical drafts, not the installed artwork. Do not use the old preparation script to replace these PNGs.
+
+The schedule remains Oct 25–26 N250/500, Oct 27–28 N251/501, Oct 29–30 N253/502, Oct 31 N252/503. Native masks were rebuilt and independently verified; only these four cards use closed-section masks in both worker and fallback paths. New local/account save namespaces preserve all prior records without replaying old strokes on different artwork. Asset query versions were updated.
+
+Validation: 57/57 `node --test tests/sefer-hamitzvos*.test.cjs` tests passed. Chromium browser test passed all seven dates, repeated fills, exact section coverage, ink/neighbor isolation, local save/reopen, simulated account save/reopen after device saves were removed, and date switches. Switches: 173–308 ms; observed heap 56.8 MB; mask cache two entries. Browser used Chromium 141 because the configured Chromium 156 download was unavailable. All data was synthetic; production Firebase was untouched. The native Canvas harness could not decode the metadata-bearing PNGs in this runtime, so browser verification is the rendering evidence.
+
+Original SHA-256 checks:
+
+- 500: `886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81`
+- 501: `c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f`
+- 502: `d834c4b7164f225654eaccf3caa17e5959ef9404228bd954adb70e33a4cfa4dd`
+- 503: `8e7c1509b8bc392c560f002fa1369ddf4f7108dd7428ddb5dfde4546434cb5d5`
+
+No merge or deployment authorized or performed.
+
+---
+
+## Historical rejected drafts
+
 # Sefer HaMitzvos coloring artwork — October 25–31, 2026
 
 **DRAFT ONLY — DO NOT MERGE OR DEPLOY.**

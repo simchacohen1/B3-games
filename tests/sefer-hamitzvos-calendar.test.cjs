@@ -95,8 +95,8 @@ test('new October artwork has isolated coloring keys and cloud save paths',()=>{
  assert.equal(savePath(481),'b3Games/students/student-1/seferHamitzvos/coloring/481');
  assert.equal(savePath(482),'b3Games/students/student-1/seferHamitzvos/coloring/482-v2');
  assert.equal(savePath(499),'b3Games/students/student-1/seferHamitzvos/coloring/499-v2');
- assert.equal(savePath(500),'b3Games/students/student-1/seferHamitzvos/coloring/500-v2');
- assert.equal(savePath(503),'b3Games/students/student-1/seferHamitzvos/coloring/503-v2');
+ assert.equal(savePath(500),'b3Games/students/student-1/seferHamitzvos/coloring/500-approved-20261025');
+ assert.equal(savePath(503),'b3Games/students/student-1/seferHamitzvos/coloring/503-approved-20261025');
  assert.match(html,/20261016-october/);
  assert.match(html,/20261025-week/);
 });

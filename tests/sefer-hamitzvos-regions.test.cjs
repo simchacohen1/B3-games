@@ -52,7 +52,7 @@ for(const n of [500,501,502,503])test(`new weekly picture ${n}: every engine reg
  const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),counts=new Map(),seeds=new Map();
  for(let i=0;i<mask.labels.length;i++){const id=mask.labels[i];if(id){counts.set(id,(counts.get(id)||0)+1);if(!seeds.has(id))seeds.set(id,i);}}
  assert.equal(counts.size,m.regions);
- const target=new Uint8Array(mask.labels.length);
+ const target=new Uint32Array(mask.labels.length);
  for(const [id,size] of counts){
   const seed=seeds.get(id),result=regionFromMask(mask,mask.width,mask.height,seed%mask.width,Math.floor(seed/mask.width));
   assert.equal(result.region,id,`seed resolves to region ${id}`);assert.equal(result.pixels.length,size,`region ${id} is complete`);

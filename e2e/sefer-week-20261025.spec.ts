@@ -12,6 +12,12 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
     sessionStorage.setItem('b3Games_studentClass', 'et');
     localStorage.setItem('ftt-sefer-hamitzvos:'+JSON.stringify(['b3-2026','et','synthetic-sefer-week-20261025',500]),
       JSON.stringify([{ type: 'legacy-record-preserved' }]));
+    const w=window as any;
+    w.B3_FIREBASE_CONFIG={};
+    w.firebase={apps:[{}],database:()=>({ref:(path:string)=>({
+      once:async()=>({val:()=>JSON.parse(localStorage.getItem('synthetic-cloud:'+path)||'null')}),
+      set:async(value:any)=>{localStorage.setItem('synthetic-cloud:'+path,JSON.stringify(value));}
+    })})};
     (window as any).B3SiteSettings = {
       onAuthStateChanged: (callback: Function) => callback({}, true, { authorized: true, role: 'teacher' })
     };
@@ -45,6 +51,7 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
     ['2026-10-31', 'N252', 503],
   ] as const;
   const timings: number[] = [];
+  const savedPictures = new Map<string,string>();
   for (const [date, ref, card] of week) {
     const started = Date.now();
     await page.evaluate(date => showDate(date), date);
@@ -55,7 +62,7 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       .toContain(String(card));
     expect(await page.locator('#outline').getAttribute('src')).toContain(`coloring-v2/${String(card).padStart(3, '0')}.png`);
     expect(await page.evaluate(() => [cv.width, cv.height, ($('outline') as HTMLImageElement).naturalWidth,
-      ($('outline') as HTMLImageElement).naturalHeight])).toEqual([1427, 950, 1427, 950]);
+      ($('outline') as HTMLImageElement).naturalHeight])).toEqual(card===503?[1537,1023,1537,1023]:[1536,1024,1536,1024]);
 
     if (date === '2026-10-25') {
       const seeds = await page.evaluate(() => {
@@ -89,7 +96,7 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       expect(fillCheck.colors).toEqual([[25,118,210,255],[67,160,71,255]]);
       expect(fillCheck.inkCovered).toBe(0); expect(fillCheck.otherRegionPixels).toBe(0);expect(fillCheck.coverage).toEqual([true,true]);
       expect(fillCheck.legacy).toBe(JSON.stringify([{type:'legacy-record-preserved'}]));
-      expect(await page.evaluate(()=>key(500))).toContain('"cartoon-v2"');
+      expect(await page.evaluate(()=>key(500))).toContain('"approved-20261025"');
       expect(await page.evaluate(()=>JSON.parse(localStorage.getItem(key(500))||'[]'))).toHaveLength(3);
     }
     if (date === '2026-10-26') {
@@ -97,6 +104,23 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       const saved = await page.evaluate(() => JSON.parse(localStorage.getItem(key(500))||'[]'));
       expect(saved.filter((stroke:any)=>stroke.type==='fill')).toHaveLength(3);
     }
+    if(card!==500 && !savedPictures.has(date)) {
+      await page.evaluate(()=>{const i=regionMask.labels.findIndex(Boolean);selectedColor='#8e24aa';applyAreaFill([i%cv.width+.5,Math.floor(i/cv.width)+.5]);});
+    }
+    savedPictures.set(date,await page.evaluate(()=>fillCv.toDataURL()));
+  }
+  await page.waitForFunction(()=>!cardSaveTimers.size&&!cardWriteChains.size);
+  for(const card of [500,501,502,503]) {
+    expect(await page.evaluate(card=>!!localStorage.getItem('synthetic-cloud:'+studentCardPath(card)),card)).toBe(true);
+  }
+  // Remove device saves to prove account restoration on reopening.
+  await page.evaluate(()=>{for(const card of [500,501,502,503]){localStorage.removeItem(key(card));localStorage.removeItem(key(card)+':savedAt');}});
+  await page.reload();
+  await page.evaluate(()=>{canBrowseDates=true;});
+  for(const [date,expected] of savedPictures) {
+    await page.evaluate(date=>showDate(date),date);
+    await page.waitForFunction(()=>!!regionMask&&!paintLoading);
+    expect(await page.evaluate(()=>fillCv.toDataURL())).toBe(expected);
   }
   expect(Math.max(...timings)).toBeLessThan(15000);
   const runtime = await page.evaluate(() => ({cache:regionMaskCache.size, memory:(performance as any).memory?.usedJSHeapSize||0}));

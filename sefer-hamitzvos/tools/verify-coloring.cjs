@@ -40,8 +40,8 @@ function fixture(local=new Map(),remote=new Map()){
   console.log(`PASS ${n}: native fill, adjacent preservation, mouse/touch scaling, erase, undo, save, reload, reset`);
  }
  for(const n of [500,501,502,503]){
-  const localKey=f.run(`key(${n})`),cloudPath=`b3Games/students/synthetic-only/seferHamitzvos/coloring/${n}-v2`;
-  assert.ok(localKey.endsWith('"cartoon-v2"]'),'new art has isolated local save key');
+  const localKey=f.run(`key(${n})`),cloudPath=`b3Games/students/synthetic-only/seferHamitzvos/coloring/${n}-approved-20261025`;
+  assert.ok(localKey.endsWith('"approved-20261025"]'),'new art has isolated local save key');
   assert.ok(f.local.has(localKey),'new art saves locally');assert.ok(f.remote.has(cloudPath),'new art saves to its versioned account path');
  }
  assert.equal(f.local.get(legacyLocalKey),legacyLocalValue,'preexisting local card 500 progress remains untouched');
@@ -73,7 +73,7 @@ function fixture(local=new Map(),remote=new Map()){
  }
  for(const sample of weekSamples.slice().reverse()){
   await week.ready(sample.n);assert.deepEqual(week.pixel(...sample.seed),sample.color,`card ${sample.n} reopens with its saved fill`);
-  assert.ok(week.remote.has(`b3Games/students/synthetic-only/seferHamitzvos/coloring/${sample.n}-v2`),`day card ${sample.n} save persisted separately`);
+  assert.ok(week.remote.has(`b3Games/students/synthetic-only/seferHamitzvos/coloring/${sample.n}-approved-20261025`),`day card ${sample.n} save persisted separately`);
  }
  assert.equal(week.run('regionMaskCache.size')<=3,true,'weekly navigation keeps the region cache bounded');
  console.log('PASS Oct 25–31 cards: repeat days restore saved colors and keep card data separate');
