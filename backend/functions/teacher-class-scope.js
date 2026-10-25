@@ -7,7 +7,11 @@ async function roster(get,access,selected,tool='chazara'){
  const owner=access.role==='admin';
  if(selected&&!validKey(selected))fail('Choose a valid class.');
  if(!owner&&selected&&!(access.classIds||[]).includes(selected))fail('This class is not assigned to your teacher account.');
- const ids=selected?[selected]:owner?['et','wt']:(access.classIds||[]);
+ let ids=selected?[selected]:(access.classIds||[]);
+ if(owner&&!selected){
+  const all=await get('b3Games/workspaces/'+WS+'/classes')||{};
+  ids=Object.keys(all).filter(id=>validKey(id)&&all[id]&&all[id].active!==false).sort();
+ }
  if(!owner&&ids.length!==1)fail('Choose a class from your teacher dashboard.');
  const result={students:{},classes:{},selected:selected||(!owner?ids[0]:''),owner};
  for(const classId of ids){
