@@ -23,7 +23,30 @@ jobs:
       - name: Install test dependencies
         run: npm ci
       - name: Run class, teacher role, and backend regression tests
-        run: node --test tests/*.test.cjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These two legacy *.test.cjs files use Playwright's test runner,
+          # not Node's test runner; passing them to node --test hangs the job.
+          # Do not ignore failures from any actual Node tests.
+          shopt -s nullglob
+          node_tests=()
+          for file in tests/*.test.cjs; do
+            case "$file" in
+              tests/auth-check.test.cjs|tests/firebase-bandwidth.test.cjs)
+                echo "Not a Node test (Playwright syntax): $file"
+                ;;
+              *)
+                node_tests+=("$file")
+                ;;
+            esac
+          done
+          if (( ${#node_tests[@]} == 0 )); then
+            echo "No Node tests found - failing closed" >&2
+            exit 1
+          fi
+          echo "Running ${#node_tests[@]} Node regression test files"
+          node --test "${node_tests[@]}"
       - name: Validate migrated frontend and backend JavaScript
         run: |
           node --check site-settings.js
