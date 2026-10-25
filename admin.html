@@ -472,7 +472,9 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   const resize=()=>{const height=d.body.offsetHeight;if(frame.style.height!==height+'px')frame.style.height=height+'px';};
-  new ResizeObserver(resize).observe(d.body);
+  // Resize on the next frame: changing the frame's height inside the observer callback
+  // re-lays out the observed body and raises "ResizeObserver loop" errors (seen in Safari).
+  new ResizeObserver(()=>requestAnimationFrame(resize)).observe(d.body);
   resize();
   organize();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
