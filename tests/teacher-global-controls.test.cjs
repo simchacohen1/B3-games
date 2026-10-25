@@ -39,7 +39,9 @@ test('Follow can be opened and closed without removing its iframe, and standalon
   assert.match(s, /lastFollowClass !== id/);
   assert.match(s, /Follow the Teacher controls/);
   assert.match(s, /Separate window/);
-  assert.match(read('follow-teacher/teacher.js'), /get\('embed'\) === '1'/);
+  assert.match(s, /classUrl\('follow-teacher\/teacher\.html', id, \{embed:'1'\}\)/);
+  // Since 212bbd98 the embedded Follow panel keeps its own class selector enabled.
+  assert.match(read('follow-teacher/teacher.js'), /q\('classSelect'\)\.disabled = false;/);
 });
 
 test('loader reaches normal Firebase pages and standalone teacher pages', () => {

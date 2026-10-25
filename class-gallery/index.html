@@ -393,7 +393,21 @@ let hallDoorPositions = {};
 /* ---------- basic helpers ---------- */
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
 function resizeImage(file,maxWidth){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>maxWidth){h=Math.round(h*(maxWidth/w));w=maxWidth;} const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.72));}; img.onerror=reject; img.src=e.target.result;};r.onerror=reject;r.readAsDataURL(file);}); }
-function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream'}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
+function uploadToStorage(file,path,onProgress,extraMeta){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream',...(extraMeta||{})}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
+// Keeps the database small: the picture goes to Storage and the post keeps only its link.
+// If anything fails (not signed in, offline, no permission) the caller keeps the inline picture, so posting never breaks.
+async function galleryImageToStorage(dataUrl,id){
+  try{
+    if(!/^data:image\/jpeg;base64,/.test(dataUrl)||!presenceStudentId)return null;
+    // Right after the page opens the sign-in may still be restoring; give it a few seconds before giving up.
+    if(!firebase.auth().currentUser)await new Promise(res=>{const off=firebase.auth().onAuthStateChanged(u=>{if(u){off();res();}});setTimeout(()=>{off();res();},4000);});
+    if(!firebase.auth().currentUser)return null;
+    const blob=await (await fetch(dataUrl)).blob();
+    const path=`classGallery/${galleryClassId}/${presenceStudentId}/${id}/image.jpg`;
+    const work=(async()=>{await uploadToStorage(blob,path,null,{cacheControl:'public, max-age=31536000, immutable'});return firebase.storage().ref(path).getDownloadURL();})();
+    return await Promise.race([work,new Promise((_,rej)=>setTimeout(()=>rej(new Error('picture upload timed out')),25000))]);
+  }catch(err){console.warn('Picture stayed inline:',err&&err.message);return null;}
+}
 // Reuse recently signed media links instead of calling the private-media
 // service again for every post whenever one gallery entry is edited.
 const galleryMediaUrlCache=new Map();
@@ -2203,7 +2217,7 @@ document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();const submit=document.getElementById('submitBtn'),status=document.getElementById('statusMsg');submit.disabled=true;status.textContent='Pinning...';status.style.color='#5b4632';
   const className=isTeacher?document.getElementById('classSelect').value:(galleryClassId==='et'?'B3 ET':galleryClassId==='wt'?'B3 WT':galleryClassId),studentName=isTeacher?document.getElementById('studentName').value.trim():String(sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||storedPresenceName||'').trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
-  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;let audioStoragePath=null,videoStoragePath=null;if(audio){status.textContent='Uploading audio... 0%';audioStoragePath=await uploadToStorage(audio,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoStoragePath=await uploadToStorage(video,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl:null,videoUrl:null,audioStoragePath,videoStoragePath,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
+  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;if(image){status.textContent='Uploading picture...';image=await galleryImageToStorage(image,id)||image;}let audioStoragePath=null,videoStoragePath=null;if(audio){status.textContent='Uploading audio... 0%';audioStoragePath=await uploadToStorage(audio,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoStoragePath=await uploadToStorage(video,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl:null,videoUrl:null,audioStoragePath,videoStoragePath,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
 });
 
 /* ---------- review ---------- */
@@ -2582,7 +2596,7 @@ openPowerShop=function(){
 };
 document.getElementById('powerShopBtn').onclick=openPowerShop;
 </script>
-<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 

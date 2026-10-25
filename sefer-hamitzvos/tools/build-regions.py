@@ -30,7 +30,7 @@ def regions(path):
 def main():
     manifest={}
     for n in range(1,614):
-        family='coloring-v2' if 475<=n<=499 else 'coloring'
+        family='coloring-v2' if 475<=n<=503 else 'coloring'
         source=ROOT/family/f'{n:03}.png'
         labels,rgba,radius=regions(source)
         rgb=np.stack((labels&255,(labels>>8)&255,(labels>>16)&255),axis=2).astype('uint8')
