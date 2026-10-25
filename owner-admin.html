@@ -185,7 +185,7 @@ async function load(){
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
 q("addPrincipal").onclick=async()=>{
  const email=q("principalEmail").value.trim().toLowerCase(),name=q("principalName").value.trim();
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){q("status").textContent="Enter a valid principal Google email.";return}
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid principal Google email.";return}
  const root="b3Games/workspaces/"+WS,ref=db.ref(root+"/teacherInvites/"+key(email));
  if((await ref.once("value")).exists()){q("status").textContent="That account is already invited. Remove it before changing its account type.";return}
  try{
