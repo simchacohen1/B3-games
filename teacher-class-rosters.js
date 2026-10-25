@@ -3,7 +3,8 @@
   // Shared, authenticated roster lookup for teacher-only class tools.
   // An unassigned class ID in a URL never grants access to its roster.
   const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
-  const ROOT = "b3Games/workspaces/" + (window.B3SiteSettings?.workspaceId || "b3-2026") + "/classes";
+  const WORKSPACE_ID = window.B3SiteSettings?.workspaceId || "b3-2026";
+  const ROOT = "b3Games/workspaces/" + WORKSPACE_ID + "/classes";
   async function load() {
     if (!window.B3SiteSettings || !window.firebase || !firebase.database) {
       throw new Error("Teacher sign-in is unavailable. Open this tool from your Teacher Center.");
@@ -44,7 +45,7 @@
       const checked = await Promise.all(entries.map(async ([studentId, member]) => {
         const [profileSnap, membershipSnap] = await Promise.all([
           db.ref("b3Games/students/" + studentId + "/profile").once("value"),
-          db.ref("b3Games/students/" + studentId + "/memberships/b3-2026_" + id).once("value")
+          db.ref("b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + id).once("value")
         ]);
         const profile = profileSnap.val();
         const membership = membershipSnap.val();

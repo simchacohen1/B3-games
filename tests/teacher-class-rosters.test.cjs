@@ -4,16 +4,16 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function fixture({requested='alpha',access={authorized:true,role:'teacher',classIds:['alpha']}}={}){
+function fixture({workspace='b3-2026',requested='alpha',access={authorized:true,role:'teacher',classIds:['alpha']}}={}){
   const reads=[];
   const tree={
-    'b3Games/workspaces/b3-2026/classes/alpha':{active:true,name:'Alpha',members:{synthetic_one:{active:true},inactive_child:{active:false}}},
+    ['b3Games/workspaces/'+workspace+'/classes/alpha']:{active:true,name:'Alpha',members:{synthetic_one:{active:true},inactive_child:{active:false}}},
     'b3Games/students/synthetic_one/profile':{name:'Synthetic One',active:true,classId:'alpha'},
-    'b3Games/students/synthetic_one/memberships/b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true}
+    ['b3Games/students/synthetic_one/memberships/'+workspace+'_alpha']:{workspaceId:workspace,classId:'alpha',active:true}
   };
   const db={ref:path=>({once:async()=>{reads.push(path);return{val:()=>tree[path]??null}}})};
   const listeners=[];
-  const B3SiteSettings={workspaceId:'b3-2026',onAuthStateChanged(fn){listeners.push(fn);fn({uid:'teacher_alpha'},true,access)}};
+  const B3SiteSettings={workspaceId:workspace,onAuthStateChanged(fn){listeners.push(fn);fn({uid:'teacher_alpha'},true,access)}};
   const firebase={database:()=>db};
   const window={B3SiteSettings,firebase};
   const context={window,B3SiteSettings,firebase,URLSearchParams,location:{search:requested?'?class='+requested:''}};
@@ -38,4 +38,13 @@ test('teacher roster cannot select an unassigned class',async()=>{
   const f=fixture({requested:'beta'});
   await assert.rejects(f.load(),/not assigned/);
   assert.deepEqual(f.reads,[]);
+});
+
+
+test('teacher roster resolves memberships in the configured workspace',async()=>{
+  const workspace='school_2026',f=fixture({workspace}),result=await f.load();
+  assert.deepEqual(Array.from(result.classes[0].studentIds),['synthetic_one']);
+  assert.ok(f.reads.includes('b3Games/workspaces/school_2026/classes/alpha'));
+  assert.ok(f.reads.includes('b3Games/students/synthetic_one/memberships/school_2026_alpha'));
+  assert.ok(!f.reads.includes('b3Games/students/synthetic_one/memberships/b3-2026_alpha'));
 });
