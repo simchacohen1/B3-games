@@ -15,7 +15,7 @@ Use a private/incognito window so nothing is already signed in. Press Ctrl+Shift
 7. [ ] Chazara Chart: opens with 3 sample pesukim.
 8. [ ] Shorashim: only a few sample words; finishing them shows "Sign in to unlock". Record button shows "Sign in to unlock".
 9. [ ] Rashi Letters: first 3 steps work; step 4 shows "Sign in to unlock".
-10. [ ] Yiddish: Step 1 only (4 words); Practice works; Steps 2-8 locked. Also try Flashcards, Missing Word, Sound Builder, Story Detective and "Read the illustrated story".
+10. [ ] Yiddish: Step 1 only (4 words); Practice works; Steps 2-8 locked. Also try Flashcards, Missing Word, Sound Builder and "Read the illustrated story".
 11. [ ] Gematria: 6 practice questions and 1 timed round, then "Sign in to unlock". "Play with Friends" says sign in.
 12. [ ] Halacha, Weekly Quiz, Game Show: clicking each shows "Sign in to unlock" and stays on the home page.
 13. [ ] Class Gallery: 8 sample posts from "Sample Student A-H", purple DEMO tag, no real student names. "Pin a project" says sign in.
