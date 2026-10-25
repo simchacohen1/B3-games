@@ -32,3 +32,29 @@ test('principal recognition cannot be inferred from a teacher name',()=>{
  assert.equal(principal({role:'principal'}),true);
  assert.equal(principal({role:'teacher',accountType:'principal'}),true);
 });
+
+test('principal Google claim stays teacher-privileged, not admin, and retains supervised teachers',async()=>{
+ const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
+ const root='b3Games/workspaces/b3-2026',writes={};
+ const principalInvite={email:'principal@example.com',active:true,role:'principal',accountType:'principal',
+   classIds:{et:true,wt:true},supervisedTeachers:{a:{name:'Rabbi A',classIds:{et:true,wt:true}}}};
+ const store={get:async key=>key===root+'/teacherInvites'?{principal_example_com:principalInvite}:null,
+   update:async updates=>Object.assign(writes,updates)};
+ const identity={uid:'principal-uid',email:'principal@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ const result=await claimTeacher(store,identity);
+ assert.equal(result.role,'teacher');
+ assert.equal(result.accountType,'principal');
+ assert.deepEqual(result.classIds,['et','wt']);
+ assert.equal(writes[root+'/teachers/principal-uid'].role,'teacher');
+ assert.equal(writes[root+'/teachers/principal-uid'].accountType,'principal');
+ assert.equal(writes[root+'/classes/et/teacherIds/principal-uid'],true);
+ assert.equal(writes[root+'/admins/principal-uid'],undefined);
+});
+test('principal claim refuses inactive invitations',async()=>{
+ const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
+ const root='b3Games/workspaces/b3-2026';
+ const store={get:async key=>key===root+'/teacherInvites'?{principal_example_com:{email:'principal@example.com',role:'principal',active:false,classIds:{et:true}}}:null,
+    update:async()=>{throw Error('Must not grant')}};
+ const identity={uid:'principal-uid',email:'principal@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ await assert.rejects(claimTeacher(store,identity),/No active teacher invitation/);
+});
