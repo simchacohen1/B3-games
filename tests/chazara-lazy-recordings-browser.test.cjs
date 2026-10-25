@@ -125,6 +125,21 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
   // Keep the production access check enabled; the synthetic class must include the grant.
   scopedTree.b3Games.workspaces['b3-2026'].classes.et.toolGrants={chazara:true};
   scopedTree.b3Games.workspaces['b3-2026'].teachers={owner:{active:true,classIds:{et:true}}};
+  scopedTree.b3Games.students.simcha_cohen={
+    profile:{name:'Simcha',active:true},
+    memberships:{
+      a:{workspaceId:'b3-2026',classId:'et',active:true},
+      b:{workspaceId:'b3-2026',classId:'wt',active:true}
+    }
+  };
+  scopedTree.posukPractice.chazara.events.simcha_cohen.etold={
+    recorded:true,reviewApplied:true,pointRequestStatus:'approved',teacherFullyChecked:true,
+    workspaceClassId:'et',perek:18,posuk:4,createdAt:4
+  };
+  scopedTree.posukPractice.chazara.events.simcha_cohen.wtshared={
+    recorded:true,reviewApplied:true,pointRequestStatus:'approved',teacherFullyChecked:true,
+    workspaceClassId:'wt',perek:18,posuk:5,createdAt:5
+  };
   scopedTree.posukPractice.chazara.events.simcha_cohen.etrec={
     recorded:true,reviewApplied:true,pointRequestStatus:'pending',
     workspaceClassId:'et',perek:18,posuk:3,createdAt:8
@@ -132,7 +147,7 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
   const scopedFirebaseStub=FIREBASE_STUB.replace(JSON.stringify(tree),JSON.stringify(scopedTree));
   const scopedSiteStub=SITE_STUB.replace("{authorized:true,role:'admin'}","{authorized:true,role:'teacher',classIds:['et']}");
   const server=await serve(),port=server.address().port;
-  let browser;
+  let browser;const historyCalls=[],pendingEventCalls=[];
   try{
     browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
     const page=await browser.newPage();
@@ -142,6 +157,16 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
     await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{}}'}));
     await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,r=>{
       const body=JSON.parse(r.request().postData()||'{}');
+      if(body.action==='get-chazara-event'){
+        pendingEventCalls.push(body.studentId+'/'+body.eventId);
+        const event=scopedTree.posukPractice.chazara.events[body.studentId]?.[body.eventId]||null;
+        return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,event})});
+      }
+      if(body.action==='list-chazara-history'){
+        historyCalls.push(body.studentId);
+        const events=Object.fromEntries(Object.entries(scopedTree.posukPractice.chazara.events[body.studentId]||{}).filter(([,e])=>e.workspaceClassId==='et'));
+        return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,events})});
+      }
       if(body.action==='list-chazara-pending')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[
         {id:'et-pending',status:'pending',source:'chazara-recording',amount:1,recorded:true,practiceStudentId:'simcha_cohen',eventId:'etrec',studentName:'Simcha',classId:'et',createdAt:8},
         {id:'wt-foreign',status:'pending',source:'chazara-recording',amount:1,recorded:true,practiceStudentId:'leib_wolf',eventId:'rec1',studentName:'Leib',classId:'wt',createdAt:9}
@@ -157,12 +182,16 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
       classOptions:[...document.querySelectorAll('#f option')].map(o=>o.value)
     }));
     assert.deepEqual(startup.approvals,['et-pending'],'foreign-class pending approvals must not appear');
-    assert.deepEqual(startup.reads,['posukPractice/chazara/events/simcha_cohen/etrec'],'only the assigned class pending event is read');
+    assert.deepEqual(startup.reads,[],'pending audio never bypasses scoped API');
+    assert.deepEqual(pendingEventCalls,['simcha_cohen/etrec'],'only the assigned class pending event is fetched');
     assert.deepEqual(startup.rows,['simcha_cohen__etrec'],'only ET recording is displayed');
     assert.deepEqual(startup.classOptions,['','et'],'teacher has no WT class option');
     await page.selectOption('#recordingReviewFilter','checked');
-    await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/simcha_cohen'));
+    await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
     const histories=await page.evaluate(()=>window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)));
-    assert.deepEqual(histories,['posukPractice/chazara/events/simcha_cohen'],'explicit history fetch must not download WT recordings');
+    assert.deepEqual(histories,[],'explicit history must never download a raw mixed-class student subtree');
+    assert.deepEqual(historyCalls,['simcha_cohen'],'history API queried only the assigned student');
+    assert.equal(await page.locator('#recordingsList .recording-row').count(),1,'only the ET checked event is displayed');
+    assert.equal(await page.locator('#recordingsList .recording-row').getAttribute('data-event-key'),'simcha_cohen__etold');
   }finally{await browser?.close();server.close()}
 });
