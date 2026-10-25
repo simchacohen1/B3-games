@@ -4978,17 +4978,48 @@ function promiseWithTimeout(promise, ms, label){
 }
 
 const translationPieceCache = new Map();
-async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
-  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
-  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
+const translationPieceRequests = new Map();
+function translationPieceKey(part){
+  return JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+}
+function cachedTranslationPieces(part){
+  const key = translationPieceKey(part);
+  if(translationPieceCache.has(key)) return translationPieceCache.get(key);
+  try{
+    const levels = JSON.parse(localStorage.getItem('posukPractice_translationPieces_v1_' + key));
+    if(Array.isArray(levels) && levels.length){
+      translationPieceCache.set(key, levels);
+      return levels;
+    }
+  }catch(err){ /* Storage may be unavailable. */ }
+  return null;
+}
+function rememberTranslationPieces(key, levels){
+  translationPieceCache.set(key, levels);
+  try{
+    localStorage.setItem('posukPractice_translationPieces_v1_' + key, JSON.stringify(levels));
+  }catch(err){ /* Retain the memory cache if storage is full or disabled. */ }
+}
+// Simultaneous requests for the same piece share one database read. Stale
+// results are discarded by loadOrGenerateTranslationChunks' own token check.
+function fetchOrGenerateTranslationLevelsForPart(part){
+  const cached = cachedTranslationPieces(part);
+  if(cached) return Promise.resolve(cached);
+  const key = translationPieceKey(part);
+  if(translationPieceRequests.has(key)) return translationPieceRequests.get(key);
+  const request = fetchTranslationLevelsForPart(part, key)
+    .finally(() => translationPieceRequests.delete(key));
+  translationPieceRequests.set(key, request);
+  return request;
+}
+async function fetchTranslationLevelsForPart(part, cacheKey){
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
-    if(myToken !== translationLoadToken) return null;
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      translationPieceCache.set(cacheKey, snap.val().levels);
+      rememberTranslationPieces(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -5015,13 +5046,12 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
         })
       });
     }finally{ clearTimeout(timeout); }
-    if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     // Keep successful pieces for this visit too, including when returning
     // to a posuk. Failed requests remain retryable.
-    translationPieceCache.set(cacheKey, data.levels);
+    rememberTranslationPieces(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
@@ -6607,7 +6637,7 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 

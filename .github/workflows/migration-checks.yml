@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Install test dependencies
         run: npm ci
+      - name: Install Playwright Chromium for browser regression tests
+        run: npx playwright install --with-deps chromium
       - name: Run class, teacher role, and backend regression tests
         run: node --test tests/*.test.cjs
       - name: Validate migrated frontend and backend JavaScript

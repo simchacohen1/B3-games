@@ -44,7 +44,11 @@ const SAVED={saved:true,partial_mark_may_exist:false,do_not_retry:false,test_id:
 test('files are valid; the old Sync button stays disabled; scripts load in order',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
-  assert.match(page,/classtime-preview\.js(?:\?[^\"]*)?"><\/script>\s*<script src="\.\/classtime-save\.js">/);
+  // Saving is paused for safety (commit 2e9fc86f): the page must say so and must not load
+  // the save script at all. Re-enabling saving must update this check deliberately.
+  assert.match(page,/<strong>Saving paused for safety\.<\/strong>/);
+  assert.match(page,/<script src="\.\/classtime-preview\.js(?:\?[^\"]*)?"><\/script>/);
+  assert.doesNotMatch(page,/classtime-save\.js/);
   assert.equal((page.match(/id="saveBtn"/g)||[]).length,1);
   assert.match(page,/<div id="savePanel" hidden>/);
 });
