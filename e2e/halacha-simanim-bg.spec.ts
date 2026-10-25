@@ -112,7 +112,7 @@ test('vocabulary: clicking a word shows its meaning and Practice offers choices'
   await expect(card.locator('.ha-answers button')).toHaveCount(3);
 });
 
-test('coloring: fill, undo, redo; saved; survives a reload; other lessons unaffected', async ({ page }) => {
+test('coloring (Siman Gimmel, large picture): fill, undo, redo; saved; survives a reload; other lessons unaffected', async ({ page }) => {
   await open(page);
   await showLesson(page, 's3a');
   const card = page.locator('#s3a .ha-classroom').first();
@@ -134,7 +134,7 @@ test('coloring: fill, undo, redo; saved; survives a reload; other lessons unaffe
   const box = (await canvas.boundingBox())!;
   const cw = await canvas.evaluate((c: HTMLCanvasElement) => c.width), ch = await canvas.evaluate((c: HTMLCanvasElement) => c.height);
   const clickAt = { x: (spot!.x / cw) * box.width, y: (spot!.y / ch) * box.height };
-  const key = 'halacha_picture_siman_bg_v1_s3a_1';
+  const key = 'halacha_picture_siman_bg_v1_s3a_1_large';
   const saved = () => page.evaluate(`(S['${key}']||[]).length`);
   const pixel = () => canvas.evaluate((c: HTMLCanvasElement, s: any) => Array.from(c.getContext('2d')!.getImageData(s.x, s.y, 1, 1).data), spot);
   expect((await pixel())[0]).toBeGreaterThan(235);
@@ -338,4 +338,14 @@ test('Full text window: Whole lesson and Whole Siman show every seif together wi
   await expect(dialog.locator('.ha-ft-seif')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+test('Siman Gimmel seifim 1-8 use the large pictures too', async ({ page }) => {
+  await open(page);
+  for (const id of ['s3a', 's3b', 's3c', 's3d', 's3e', 's3f', 's3g', 's3h']) {
+    await showLesson(page, id);
+    const canvas = page.locator(`#${id} .ha-classroom`).first().locator('canvas');
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    expect(await canvas.evaluate((c: HTMLCanvasElement) => c.width), `${id} uses the large picture`).toBe(1100);
+  }
 });

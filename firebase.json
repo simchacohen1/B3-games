@@ -14,6 +14,6 @@
     }
   ],
   "database": {
-    "rules": "firebase-rules.hardened.json"
+    "rules": "firebase-rules.json"
   }
 }
