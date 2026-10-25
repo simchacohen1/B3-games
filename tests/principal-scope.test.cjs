@@ -58,3 +58,16 @@ test('principal claim refuses inactive invitations',async()=>{
  const identity={uid:'principal-uid',email:'principal@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
  await assert.rejects(claimTeacher(store,identity),/No active teacher invitation/);
 });
+
+test('principal invitation form validates real email addresses without accepting spaces',()=>{
+ const html=require('node:fs').readFileSync('owner-admin.html','utf8');
+ const line=html.split(/\r?\n/).find(x=>x.includes('Enter a valid principal Google email.'));
+ assert.ok(line,'principal invitation email validation must exist');
+ const start=line.indexOf('if(!')+4,end=line.indexOf('.test(email))');
+ assert.ok(start>=4&&end>start,'principal email validation must use a regular expression');
+ const emailPattern=Function('return ('+line.slice(start,end)+')')();
+ for(const email of ['principal@example.com','teacher+principal@school.org'])
+  assert.equal(emailPattern.test(email),true,'valid principal email rejected: '+email);
+ for(const email of ['bad name@example.com','principal@example','bad@@example.com'])
+  assert.equal(emailPattern.test(email),false,'invalid principal email accepted: '+email);
+});
