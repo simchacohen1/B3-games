@@ -90,7 +90,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     const fullHistoryReads=await page.evaluate(()=>window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)).length);
     const pendingReturnStart=Date.now();
     await page.click('#showPendingOnly');
-    await page.waitForFunction(()=>document.getElementById('recordingReviewFilter').value==='pending'&&document.querySelectorAll('#recordingsList .recording-row').length===1);
+    await page.waitForFunction(()=>document.getElementById('recordingReviewFilter').value==='pending'&&!document.getElementById('teacherApp').classList.contains('hidden')&&document.querySelectorAll('#recordingsList .recording-row').length===1&&window.__reads.filter(p=>p==='posukPractice/chazara/events/leib_wolf/rec1').length>=2);
     const pendingReturnMs=Date.now()-pendingReturnStart;
     const after=await page.evaluate(()=>({
       reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
