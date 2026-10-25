@@ -129,7 +129,7 @@
     {
       "path": "/b3Games/workspaces/$workspaceId/classes/$classId",
       "permission": ".read",
-      "expression": "auth != null && (auth.token.b3ClassId == $classId || (auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists()))"
+      "expression": "auth != null && auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false"
     },
     {
       "path": "/b3Games/classGalleryPresence",

@@ -6,6 +6,7 @@
 //   firebase emulators:exec --only database --project demo-b3-live-rules
 //     --config firebase.security-test.json
 //     "node --test tests/live-rules-class-records-read-emulator.test.cjs"
+// The live-rules emulator tests share one database: run several with --test-concurrency=1.
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -30,7 +31,8 @@ test.before(async()=>{
     const db=context.database();
     const fixtures={
       [alpha]:{name:'Synthetic Alpha',active:true,classPin:'0000',toolGrants:{chazara:true},
-        members:{synthetic_one:{name:'Synthetic One',active:true}}},
+        members:{synthetic_one:{name:'Synthetic One',active:true},synthetic_old:{name:'Synthetic Old'},
+          synthetic_inactive:{name:'Synthetic Inactive',active:false}}},
       [WS+'/classes/beta']:{name:'Synthetic Beta',active:true,members:{synthetic_two:{name:'Synthetic Two',active:true}}},
       [WS+'/teachers/teacher_alpha']:{active:true,classIds:{alpha:true}},
       [WS+'/teachers/teacher_legacy']:{classIds:{et:true}},
@@ -67,18 +69,26 @@ testEmulator('other workspace areas stay publicly readable',async()=>{
   for(const path of [WS+'/teachers',WS+'/teacherInvites',WS+'/contentGrants/alpha'])await succeeds(get(ref(anon,path)));
 });
 
-testEmulator('a student reads their own class (by class list or signed-in class), not another class',async()=>{
+testEmulator('a student reads their own class only while on its list and not inactive',async()=>{
   const member=db('student_uid_one',{b3StudentId:'synthetic_one',b3ClassId:'alpha'});
   await succeeds(get(ref(member,alpha)));
   await succeeds(get(ref(member,alpha+'/members')));
   await fails(get(ref(member,WS+'/classes/beta')));
   await fails(get(ref(member,WS+'/classes')));
-  // Not on the class list, but the server confirmed this class at sign-in.
-  const tokenOnly=db('student_uid_legacy',{b3StudentId:'synthetic_legacy',b3ClassId:'alpha'});
-  await succeeds(get(ref(tokenOnly,alpha+'/toolGrants')));
-  // On the class list, signed in to another class.
-  const listOnly=db('student_uid_one_b',{b3StudentId:'synthetic_one',b3ClassId:'beta'});
-  await succeeds(get(ref(listOnly,alpha+'/active')));
+  // On the list with no active flag (older records): allowed, as the gate allows them.
+  await succeeds(get(ref(db('student_uid_old',{b3StudentId:'synthetic_old',b3ClassId:'alpha'}),alpha+'/toolGrants')));
+  // On the list, signed in to another class: membership is what counts.
+  await succeeds(get(ref(db('student_uid_one_b',{b3StudentId:'synthetic_one',b3ClassId:'beta'}),alpha+'/active')));
+});
+
+testEmulator('removed, inactive or unlisted students cannot read the class, even with a matching sign-in claim',async()=>{
+  // Teacher "Remove" deletes the member entry; the student's sign-in claim can outlive it.
+  const removed=db('student_uid_removed',{b3StudentId:'synthetic_removed',b3ClassId:'alpha'});
+  await fails(get(ref(removed,alpha)));
+  await fails(get(ref(removed,alpha+'/members')));
+  await fails(get(ref(db('student_uid_inactive',{b3StudentId:'synthetic_inactive',b3ClassId:'alpha'}),alpha+'/active')));
+  // A teacher-style token with no student id never matches the member check.
+  await fails(get(ref(db('no_student_id',{b3ClassId:'alpha'}),alpha)));
 });
 
 testEmulator('active teachers read classes; inactive teachers cannot',async()=>{

@@ -39,7 +39,7 @@ const APPROVED_CHANGES = [
   [['b3Games', 'workspaces', '$workspaceId', 'classes', '.read'],
     "auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() != false"],
   [['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', '.read'],
-    "auth != null && (auth.token.b3ClassId == $classId || (auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists()))"],
+    "auth != null && auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false"],
 ];
 // Approved removals, each allowed only while its replacement is present in the candidate.
 const APPROVED_REMOVALS = [
