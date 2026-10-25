@@ -9,10 +9,10 @@ const tree={b3Games:{workspaces:{'b3-2026':{classes:{
   et:{name:'B3 ET',members:{simcha_cohen:{name:'Simcha'}}},
   wt:{name:'B3 WT',members:{leib_wolf:{name:'Leib'}}}}}},students:{}},
   posukPractice:{chazara:{events:{simcha_cohen:{},leib_wolf:{rec1:{recorded:true,reviewApplied:true,pointRequestStatus:"pending",perek:18,posuk:1,createdAt:3},older:{recorded:true,reviewApplied:true,pointRequestStatus:"approved",teacherFullyChecked:true,perek:18,posuk:2,createdAt:1}}}}}};
-const FIREBASE_STUB=`(function(){const T=${JSON.stringify(tree)};window.__reads=[];
+const FIREBASE_STUB=`(function(){const T=${JSON.stringify(tree)};window.__reads=[];window.__unsubscribed=[];
 const at=p=>p.split('/').filter(Boolean).reduce((o,k)=>o==null?undefined:o[k],T);
 const snap=v=>({val:()=>v===undefined?null:v,exists:()=>v!=null});
-const ref=p=>({once:async()=>{window.__reads.push(p);return snap(at(p))},on:(t,h)=>{window.__reads.push(p);setTimeout(()=>h(snap(at(p))),0)},off(){},child:c=>ref(p+'/'+c)});
+const ref=p=>({once:async()=>{window.__reads.push(p);return snap(at(p))},on:(t,h)=>{window.__reads.push(p);setTimeout(()=>h(snap(at(p))),0)},off(){window.__unsubscribed.push(p)},child:c=>ref(p+'/'+c)});
 const user={uid:'owner',email:'owner@example.com',getIdToken:async()=>'tok'};
 window.firebase={apps:[1],initializeApp(){},database:()=>({ref}),auth:Object.assign(()=>({currentUser:user,onAuthStateChanged(){}}),{GoogleAuthProvider:function(){}}),storage:()=>({})};})();`;
 const SITE_STUB=`window.B3SiteSettings={onAuthStateChanged(cb){setTimeout(()=>cb(firebase.auth().currentUser,true,{authorized:true,role:'admin'}),0)},signInWithGoogle(){}};`;
@@ -41,9 +41,11 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     return r.fulfill({contentType:'application/json',body:'{"ok":true}'});
   });
   try{
+    const initialStart=Date.now();
     await page.goto(`http://127.0.0.1:${port}/chazara/teacher.html`);
     await page.waitForFunction(()=>document.querySelectorAll('#approvalList .request-row').length>0,null,{timeout:15000});
     await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1,null,{timeout:15000});
+    const pendingLoadMs=Date.now()-initialStart;
     const state=await page.evaluate(()=>({
       reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
       panelVisible:getComputedStyle(document.getElementById('approvalPanel')).display!=='none',
@@ -64,9 +66,11 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     assert.equal(state.reviewFilter,'pending');
     assert.deepEqual(state.historyReads,[],'no full student recording history fetched on startup');
     assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),['posukPractice/chazara/events/leib_wolf/rec1'],'only the pending recording was fetched');
+    const historyStart=Date.now();
     await page.selectOption('#recordingReviewFilter','checked');
     await page.waitForFunction(()=>window.__reads.includes('posukPractice/chazara/events/leib_wolf'));
     await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
+    const historyLoadMs=Date.now()-historyStart;
     assert.equal(await page.locator('#recordingsList .recording-row [data-review-status]').textContent(),'✓ Fully checked','historical checked recording loads on demand');
     await page.selectOption('#recordingReviewFilter','pending');
     await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
@@ -83,5 +87,21 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     // History loads only on request.
     await page.click('#showFullDashboard');
     await page.waitForFunction(()=>window.__reads.some(p=>p.startsWith('posukPractice/attempts')));
+    const fullHistoryReads=await page.evaluate(()=>window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)).length);
+    const pendingReturnStart=Date.now();
+    await page.click('#showPendingOnly');
+    await page.waitForFunction(()=>document.getElementById('recordingReviewFilter').value==='pending'&&document.querySelectorAll('#recordingsList .recording-row').length===1);
+    const pendingReturnMs=Date.now()-pendingReturnStart;
+    const after=await page.evaluate(()=>({
+      reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
+      historyReads:window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)).length,
+      detached:window.__unsubscribed.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p)).length,
+      pendingEventReads:window.__reads.filter(p=>p==='posukPractice/chazara/events/leib_wolf/rec1').length
+    }));
+    assert.equal(after.reviewOnly,true,'return to pending-only view');
+    assert.equal(after.historyReads,fullHistoryReads,'return to pending does not subscribe to more complete histories');
+    assert.equal(after.detached,2,'return to pending detaches both full-history subscriptions');
+    assert.ok(after.pendingEventReads>=2,'return to pending reloads exact pending event');
+    console.log('Chazara synthetic browser timings '+JSON.stringify({pendingLoadMs,historyLoadMs,pendingReturnMs,fullHistoryReads,pendingEventReads:after.pendingEventReads}));
   }finally{await browser.close();server.close()}
 });
