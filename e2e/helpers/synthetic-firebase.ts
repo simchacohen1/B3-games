@@ -31,20 +31,13 @@ export async function serveSyntheticSite():Promise<{server:http.Server,origin:st
 export async function closeSyntheticSite(server:http.Server){if(!server)return;server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
 export async function configureBrowser(page:Page,errors:string[],failed:string[],identity:'owner'|'teacher'='teacher'){
   const origin=()=>new URL(page.url()).origin;
-  await page.context().route('**/*',async(route:Route)=>{
-    const req=route.request(),url=new URL(req.url());
-    if(url.hostname==='www.gstatic.com'&&url.pathname.includes('/firebasejs/')){
-      const file=path.join(ROOT,'vendor/firebase/12.15.0',path.basename(url.pathname));
-      if(!fs.existsSync(file))throw Error('Missing Firebase SDK '+file);
-      return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file)});
-    }
-    if(url.pathname==='/firebase-config.js'){
       const config={apiKey:'fake-api-key',authDomain:'127.0.0.1',databaseURL:`http://127.0.0.1:${DB_PORT}?ns=${PROJECT}`,projectId:PROJECT,storageBucket:'synthetic.invalid',messagingSenderId:'1',appId:'synthetic'};
-      return route.fulfill({contentType:'text/javascript',body:`
+  const bootstrap=`
         window.B3_FIREBASE_CONFIG=${JSON.stringify(config)};
         window.B3_APP_CONTEXT={workspaceId:${JSON.stringify(WORKSPACE)}};
         (function(){
           var sdk=window.firebase, realAuth=sdk.auth, initialize=sdk.initializeApp;
+          if(initialize.__syntheticConfigured)return;
           function configure(auth){
             if(!auth.__syntheticConfigured){
               auth.useEmulator('http://127.0.0.1:${AUTH_PORT}',{disableWarnings:true});
@@ -61,7 +54,23 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
             app.auth();
             return app;
           };
-        })();`});
+          sdk.initializeApp.__syntheticConfigured=true;
+        })();`;
+
+  await page.context().route('**/*',async(route:Route)=>{
+    const req=route.request(),url=new URL(req.url());
+    if(url.hostname==='www.gstatic.com'&&url.pathname.includes('/firebasejs/')){
+      const file=path.join(ROOT,'vendor/firebase/12.15.0',path.basename(url.pathname));
+      if(!fs.existsSync(file))throw Error('Missing Firebase SDK '+file);
+      return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file,'utf8')+(path.basename(file)==='firebase-auth-compat.js'?'\n'+bootstrap:'')});
+    }
+    if(url.pathname==='/firebase-config.js'){
+      return route.fulfill({contentType:'text/javascript',body:bootstrap});
+    }
+    if(url.hostname==='b3-games-default-rtdb.firebaseio.com'){
+      url.protocol='http:';url.host=`127.0.0.1:${DB_PORT}`;url.searchParams.set('ns',PROJECT);
+      const response=await route.fetch({url:url.href});
+      return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin()}});
     }
     if(url.hostname==='us-central1-b3-games.cloudfunctions.net'){
       if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':origin(),'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization,content-type'}});

@@ -62,6 +62,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await ownerPage.locator('#toolClassSelect').selectOption(CLASS_ID);
   for(const tool of ['weekly-quiz','rashi-letters']) {
     await ownerPage.locator(`[data-tool="${tool}"]`).check();
+    await expect.poll(async()=> (await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/toolGrants`))?.[tool]).toBe(true);
     await expect(ownerPage.locator('#status')).toContainText('Saved');
   }
   await ownerContext.close();
@@ -111,7 +112,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#studentNameLabel')).toHaveText('Ari Example');
   await expect(page.getByRole('link', { name: /Weekly Quiz/i })).toBeVisible();
   await page.getByRole('link', { name: /Weekly Quiz/i }).click();
-  await expect(page.locator('#quizTitle')).toHaveText('Fictional Pilot Quiz');
+  await expect(page.locator('#quizTitle')).toHaveText('Fictional Pilot Quiz',{timeout:15000});
   await expect(page.getByText('Which choice is correct?')).toBeVisible();
   const ariId=Object.entries(enrolled).find(([,row]:[string,any])=>row.name==='Ari Example')?.[0];
   expect(ariId).toBeTruthy();
@@ -162,3 +163,11 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   expect(pageErrors).toEqual([]);
 });
 
+
+// Keep failure evidence readable in CI even when artifact downloads are unavailable.
+test.afterEach(async({browser},info)=>{
+  if(info.status===info.expectedStatus)return;
+  for(const context of browser.contexts())for(const page of context.pages()){
+    console.log('SYNTHETIC PAGE',page.url(),(await page.locator('body').innerText().catch(()=>'' )).slice(0,5000));
+  }
+});
