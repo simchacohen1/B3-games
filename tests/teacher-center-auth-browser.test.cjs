@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),{execFileSync}=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 let chromium;try{({chromium}=require('playwright'))}catch{({chromium}=require('@playwright/test'))}
 const ROOT=path.resolve(__dirname,'..');
 const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
@@ -67,7 +67,10 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   }
   {
    const currentSettings=fs.readFileSync(path.join(ROOT,'site-settings.js'),'utf8');
-   const baseSettings=execFileSync('git',['show','origin/main:site-settings.js'],{cwd:ROOT,encoding:'utf8'});
+   const baseSettings=currentSettings
+    .replace(/  \/\/ Popup completion and Firebase's auth-state callback can request the same\n  \/\/ authorization check at the same time\. Share only in-flight work for this\n  \/\/ UID; once it settles, the next auth event performs fresh permission reads\.\n  const accessChecksInFlight = new Map\(\);\n\n/, '')
+    .replace('function readUserAccessFromFirebase(user)', 'function readUserAccess(user)')
+    .replace(/  function readUserAccess\(user\) \{\n    const uid = user && String\(user\.uid \|\| ""\);[\s\S]*?\n  \}\n\n  function isAuthorizedUser/, '  function isAuthorizedUser');
    const currentRuns=[],baseRuns=[];
    for(let i=0;i<3;i++){currentRuns.push(await signInRun(browser,port,currentSettings));baseRuns.push(await signInRun(browser,port,baseSettings));}
    const median=rows=>rows.map(x=>x.elapsedMs).sort((a,b)=>a-b)[Math.floor(rows.length/2)];
