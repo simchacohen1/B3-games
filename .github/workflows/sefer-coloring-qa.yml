@@ -30,10 +30,17 @@ jobs:
             exit 0
           fi
           git diff --name-only "$PR_BASE_SHA" HEAD > /tmp/coloring-changed-files.txt
-          if grep -Eq '^(sefer-hamitzvos/|tests/sefer-hamitzvos[^/]*\\.cjs$|\\.github/workflows/sefer-coloring-qa\\.yml$)' /tmp/coloring-changed-files.txt; then
-            echo "run_coloring=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_coloring=false" >> "$GITHUB_OUTPUT"
+          run_coloring=false
+          while IFS= read -r file; do
+            case "$file" in
+              sefer-hamitzvos/*|tests/sefer-hamitzvos*.cjs|.github/workflows/sefer-coloring-qa.yml)
+                run_coloring=true
+                break
+                ;;
+            esac
+          done < /tmp/coloring-changed-files.txt
+          echo "run_coloring=$run_coloring" >> "$GITHUB_OUTPUT"
+          if [[ "$run_coloring" == "false" ]]; then
             echo "No Sefer changes: coloring test is not applicable to this PR."
           fi
       - uses: actions/setup-node@v4
