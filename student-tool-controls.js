@@ -1,8 +1,8 @@
 (function(){
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function render(classId,cls,catalog,ownerLegacy=false){
-    const tools=Object.entries(catalog).filter(([id])=>window.B3StudentTools.studentActivities.includes(id)&&(ownerLegacy||window.B3StudentTools.granted(cls,id)));
+  function render(classId,cls,catalog){
+    const tools=Object.entries(catalog).filter(([id])=>window.B3StudentTools.studentActivities.includes(id)&&window.B3StudentTools.granted(cls,id));
     const seen=new Set(),choices=tools.filter(([id])=>{const canonical=window.B3StudentTools.aliases(id)[0];if(seen.has(canonical))return false;seen.add(canonical);return true;});
     const students=Object.entries(cls.members||{}).filter(([,m])=>m&&m.active!==false);
     if(!choices.length)return '';
