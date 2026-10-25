@@ -29,7 +29,7 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
       await route.abort();
       return;
     }
-    const requested = decodeURIComponent(url.pathname).replace(/^\/, '');
+    const requested = decodeURIComponent(url.pathname).replace(/^\//, '');
     const filename = path.resolve(root, requested || 'sefer-hamitzvos/index.html');
     if (!filename.startsWith(root + path.sep) || !fs.existsSync(filename) || !fs.statSync(filename).isFile()) {
       await route.fulfill({ status: 404, body: '' });
