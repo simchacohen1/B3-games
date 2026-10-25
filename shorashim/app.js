@@ -313,7 +313,9 @@ async function enterCloudStudent(name,studentId){
   showMode('student');startCloudListeners();renderGamesLock();
   // Do not rewrite a student's entire cards/history just to mark a sign-in.
   try{
-    await cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`).update({name:s.name,lastActive:s.lastActive});
+    const studentRef=cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`);
+    if(studentSnap.exists())await studentRef.update({name:s.name,lastActive:s.lastActive});
+    else await studentRef.set(s); // First login initializes a complete record once.
     setCloudStatus('☁️ Saved');
   }catch(err){
     console.warn('Could not update Shorashim sign-in activity',err);
