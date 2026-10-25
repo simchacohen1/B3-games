@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function fixture({requested='alpha',access={authorized:true,role:'teacher',classIds:['alpha']},extraRows={}}={}){
+function fixture({requested='alpha',access={authorized:true,role:'teacher',classIds:['alpha']},extraRows={},workspaceId='b3-2026'}={}){
   const reads=[];
   const tree={
     'b3Games/workspaces/b3-2026/classes/alpha':{active:true,name:'Alpha',members:{synthetic_one:{active:true},inactive_child:{active:false}}},
@@ -14,7 +14,7 @@ function fixture({requested='alpha',access={authorized:true,role:'teacher',class
   };
   const db={ref:path=>({once:async()=>{reads.push(path);return{val:()=>tree[path]??null}}})};
   const listeners=[];
-  const B3SiteSettings={workspaceId:'b3-2026',onAuthStateChanged(fn){listeners.push(fn);fn({uid:'teacher_alpha'},true,access)}};
+  const B3SiteSettings={workspaceId,onAuthStateChanged(fn){listeners.push(fn);fn({uid:'teacher_alpha'},true,access)}};
   const firebase={database:()=>db};
   const window={B3SiteSettings,firebase};
   const context={window,B3SiteSettings,firebase,URLSearchParams,location:{search:requested?'?class='+requested:''}};
@@ -51,4 +51,29 @@ test('administrator sees all active classes sorted by display name, not ET/WT pr
  assert.deepEqual(Array.from(result.classes,c=>c.id),['alpha','et']);
  assert.equal(result.selectedId,'alpha');
  assert.ok(!f.reads.includes(root+'/inactive'));
+});
+
+test('arbitrary class membership uses the active workspace, not B3 legacy IDs',async()=>{
+ const root='b3Games/workspaces/school-x/classes/roomC';
+ const f=fixture({workspaceId:'school-x',requested:'roomC',access:{authorized:true,role:'teacher',classIds:['roomC']},extraRows:{
+  [root]:{name:'Room C',active:true,members:{pupil:{active:true}}},
+  'b3Games/students/pupil/profile':{name:'Pupil',active:true},
+  'b3Games/students/pupil/memberships/school-x_roomC':{workspaceId:'school-x',classId:'roomC',active:true}
+ }});
+ const r=await f.load();
+ assert.deepEqual(Array.from(r.classes,c=>c.id),['roomC']);
+ assert.deepEqual(Array.from(r.classes[0].students),['Pupil']);
+ assert.ok(f.reads.includes('b3Games/students/pupil/memberships/school-x_roomC'));
+ assert.ok(!f.reads.some(p=>p.includes('b3-2026_roomC')));
+});
+
+test('membership for another workspace cannot add a student to this teacher roster',async()=>{
+ const root='b3Games/workspaces/school-x/classes/roomC';
+ const f=fixture({workspaceId:'school-x',requested:'roomC',access:{authorized:true,role:'teacher',classIds:['roomC']},extraRows:{
+  [root]:{name:'Room C',active:true,members:{pupil:{active:true}}},
+  'b3Games/students/pupil/profile':{name:'Pupil',active:true},
+  'b3Games/students/pupil/memberships/school-x_roomC':{workspaceId:'other',classId:'roomC',active:true}
+ }});
+ const r=await f.load();
+ assert.deepEqual(Array.from(r.classes[0].students),[]);
 });
