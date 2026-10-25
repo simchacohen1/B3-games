@@ -13,13 +13,13 @@ async function claimTeacher(store,identity,workspaceId='b3-2026',now=Date.now())
  const [inviteId,invite]=entry;
  const classIds=Object.fromEntries(Object.entries(invite.classIds||{}).filter(([id,granted])=>id!=='*'&&granted===true));
  if(!Object.keys(classIds).length)fail(403,'A class must be assigned before teacher access is enabled.');
- const record={uid:identity.uid,email,displayName:invite.name||existing?.displayName||email,role:'teacher',active:true,classIds,inviteId,claimedAt:existing?.claimedAt||now,updatedAt:now};
+ const record={uid:identity.uid,email,displayName:invite.name||existing?.displayName||email,role:'teacher',accountType:invite.accountType==='principal'?'principal':'teacher',supervisedTeachers:invite.accountType==='principal'?invite.supervisedTeachers||{}:{},active:true,classIds,inviteId,claimedAt:existing?.claimedAt||now,updatedAt:now};
  await store.update({
   [root+'/teachers/'+identity.uid]:record,
   [root+'/teacherInvites/'+inviteId+'/claimedUid']:identity.uid,
   [root+'/teacherInvites/'+inviteId+'/claimedAt']:invite.claimedAt||now,
   ...Object.fromEntries(Object.keys(classIds).map(id=>[root+'/classes/'+id+'/teacherIds/'+identity.uid,true]))
  });
- return {authorized:true,role:'teacher',classIds:Object.keys(classIds),inviteId};
+ return {authorized:true,role:'teacher',accountType:record.accountType,supervisedTeachers:record.supervisedTeachers,classIds:Object.keys(classIds),inviteId};
 }
 module.exports={claimTeacher};
