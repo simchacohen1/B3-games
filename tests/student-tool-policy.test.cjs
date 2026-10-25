@@ -19,3 +19,16 @@ test('class-wide teacher writes cannot override administrator tool grants',()=>{
  const rule=JSON.parse(fs.readFileSync('firebase-rules.json','utf8')).rules.b3Games.workspaces.$workspaceId.classes.$classId;
  assert.doesNotMatch(rule['.write'],/teachers/);assert.match(rule.access['.write'],/teachers/);assert.equal(rule.members,undefined);
 });
+
+test('owner and teacher see the same granted tools for any class, including ET and WT',()=>{
+ const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});
+ const cls={toolGrants:{yiddish:true,chazara:false},members:{pupil:{name:'Pupil'}}};
+ const catalog={yiddish:['Yiddish'],chazara:['Chazara']};
+ for(const id of ['et','wt','roomC']){
+  const owner=window.B3StudentToolControls.render(id,cls,catalog,true);
+  const teacher=window.B3StudentToolControls.render(id,cls,catalog,false);
+  assert.equal(owner,teacher);
+  assert.match(owner,/Yiddish/);
+  assert.doesNotMatch(owner,/Chazara/);
+ }
+});
