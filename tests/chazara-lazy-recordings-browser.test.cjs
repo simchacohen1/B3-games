@@ -111,6 +111,9 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
 
 test('Chazara pending and lazy-history reads stay within a teacher assigned to ET, even if API sends a WT row',{timeout:60000},async()=>{
   const scopedTree=structuredClone(tree);
+  // A real assigned teacher can open Chazara only when the class explicitly grants it.
+  // Keep the production access check enabled; the synthetic class must include the grant.
+  scopedTree.b3Games.workspaces['b3-2026'].classes.et.toolGrants={chazara:true};
   scopedTree.b3Games.workspaces['b3-2026'].teachers={owner:{active:true,classIds:{et:true}}};
   scopedTree.posukPractice.chazara.events.simcha_cohen.etrec={
     recorded:true,reviewApplied:true,pointRequestStatus:'pending',
