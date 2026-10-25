@@ -60,7 +60,8 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
   await page.context().route('**/*',async(route:Route)=>{
     const req=route.request(),url=new URL(req.url());
     if(url.hostname==='www.gstatic.com'&&url.pathname.includes('/firebasejs/')){
-      const file=path.join(ROOT,'vendor/firebase/12.15.0',path.basename(url.pathname));
+      const sdkFile=path.basename(url.pathname).replace(/^firebase-(app|auth|database|storage)\.js$/, 'firebase-$1-compat.js');
+      const file=path.join(ROOT,'vendor/firebase/12.15.0',sdkFile);
       if(!fs.existsSync(file))throw Error('Missing Firebase SDK '+file);
       return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file,'utf8')+(path.basename(file)==='firebase-auth-compat.js'?'\n'+bootstrap:'')});
     }
