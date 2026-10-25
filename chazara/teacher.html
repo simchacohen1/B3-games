@@ -206,7 +206,7 @@ async function loadRecordingHistory(){
  let failed=0;
  for(let i=0;i<ids.length;i+=4){
   const results=await Promise.all(ids.slice(i,i+4).map(async id=>{
-   try{const snap=await db.ref('posukPractice/chazara/events/'+id).once('value');return{id,events:snap.val()||{}}}
+   try{const data=await teacherApi('list-chazara-history',{studentId:id});return{id,events:data.events||{}}}
    catch(error){console.warn('Could not load Chazara history for '+id,error);return{id,error}}
   }));
   if(generation!==scopeGeneration||request!==historyGeneration)return;
@@ -279,7 +279,7 @@ async function loadApprovals(){
    const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
    if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
    try{
-    const snap=await db.ref('posukPractice/chazara/events/'+studentId+'/'+eventId).once('value'),event=snap.val();
+    const data=await teacherApi('get-chazara-event',{studentId,eventId}),event=data.event||null;
     if(generation!==scopeGeneration||request!==approvalGeneration)return;
     if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
      if(!E[studentId])E[studentId]={};
@@ -404,11 +404,14 @@ async function loadClassScope(user,access){
   if(generation!==scopeGeneration)return;
   teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
-  for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/chazara/events',E],['posukPractice/attempts',P]]:[])){
-   const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};if(target===E){value=Object.fromEntries(Object.entries(value).filter(([,e])=>window.FunTorahTeacherScope.recordAllowed(scope,id,e)));historyStudentsLoaded.add(id)}target[id]=value;refreshScopedViews();};
+  for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/attempts',P]]:[])){
+   const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};target[id]=value;refreshScopedViews();};
    studentListeners.push([ref,handler]);ref.on('value',handler);
   }
   $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();await loadApprovals();
+  // Full dashboard also gets recording events through the server-scoped API.
+  // Never attach a whole-student recording listener for a shared-class pupil.
+  if(fullDashboardLoaded)await loadRecordingHistory();
  }catch(error){if(generation===scopeGeneration)$('teacherGate').textContent=error.message||'Could not load your class.';}
 }
 window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScope(user,access||{authorized}));
