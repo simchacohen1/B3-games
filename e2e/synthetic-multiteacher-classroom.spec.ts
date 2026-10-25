@@ -76,9 +76,8 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.getByRole('button', { name: 'Sign in with Google' }).click();
   await expect(page.locator('#classes .class-card h2')).toHaveText(['Pilot Room Alpha']);
 
-  const claimedTeacher = await env.withSecurityRulesDisabled(async context =>
-    (await get(ref(context.database(), `b3Games/workspaces/${WORKSPACE}/teachers/${(await page.evaluate(() => window.firebase.auth().currentUser.uid))}`))).val()
-  );
+  const teacherUid=await page.evaluate(()=>window.firebase.auth().currentUser.uid);
+  const claimedTeacher=await readFixture(`b3Games/workspaces/${WORKSPACE}/teachers/${teacherUid}`);
   expect(claimedTeacher?.classIds).toEqual({ [CLASS_ID]: true });
   expect(teacherClassReads.some(url => url.includes('/classes/et/') || url.includes('/classes/wt/'))).toBe(false);
   await expect(page.locator('#classes .class-card h2')).not.toContainText('Synthetic ET preservation check');
@@ -95,11 +94,10 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
     await adminFrame.locator('#managedStudentName').fill(name);
     await adminFrame.locator('#managedStudentPasscode').fill(passcode);
     await adminFrame.locator('#createManagedStudentButton').click();
+    await expect(adminFrame.locator('#managedStudentName')).toHaveValue('');
     await expect(adminFrame.locator('#classManagementStatus')).toContainText('Student created in this class.');
   }
-  const enrolled = await env.withSecurityRulesDisabled(async context =>
-    (await get(ref(context.database(), `b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/members`))).val()
-  );
+  const enrolled=await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/members`);
   expect(Object.values(enrolled || {}).map((row: any) => row.name).sort()).toEqual(syntheticStudents.map(row => row[0]).sort());
 
   // Keep student authentication in a separate tab/profile, with no remembered teacher.
@@ -113,11 +111,11 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#studentNameLabel')).toHaveText('Ari Example');
   await expect(page.getByRole('link', { name: /Weekly Quiz/i })).toBeVisible();
   await page.getByRole('link', { name: /Weekly Quiz/i }).click();
-  await expect(page.getByText('Fictional Pilot Quiz')).toBeVisible();
+  await expect(page.locator('#quizTitle')).toHaveText('Fictional Pilot Quiz');
   await expect(page.getByText('Which choice is correct?')).toBeVisible();
   const ariId=Object.entries(enrolled).find(([,row]:[string,any])=>row.name==='Ari Example')?.[0];
   expect(ariId).toBeTruthy();
-  async function readFixture(path:string){return env.withSecurityRulesDisabled(async c=>(await get(ref(c.database(),path))).val());}
+  async function readFixture(path:string){let value:any;await env.withSecurityRulesDisabled(async c=>{value=(await get(ref(c.database(),path))).val();});return value;}
   const quizRoot=`b3Quiz/classes/${CLASS_ID}`;
   await page.getByRole('button', { name: /B\. Choice B/ }).click();
   await page.locator('#submitBtn').click();
