@@ -112,9 +112,24 @@
       "expression": true
     },
     {
-      "path": "/b3Games/workspaces",
+      "path": "/b3Games/workspaces/$workspaceId/$other",
       "permission": ".read",
       "expression": true
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId",
+      "permission": ".read",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes",
+      "permission": ".read",
+      "expression": "auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() != false"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.b3ClassId == $classId || (auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists()))"
     },
     {
       "path": "/b3Games/classGalleryPresence",

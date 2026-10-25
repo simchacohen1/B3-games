@@ -24,6 +24,12 @@ test('removing the blanket b3Games read without its $other replacement is caught
   const c = candidate(); delete c.rules.b3Games.$other;
   assert.ok(compare(live(), c).some(p => p.includes('REMOVED') && p.includes('/b3Games/.read')));
 });
+test('class records step: putting back a public workspaces read or weakening the class read is caught', () => {
+  const c = candidate(); c.rules.b3Games.workspaces['.read'] = true;
+  assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/b3Games/workspaces/.read')));
+  const d = candidate(); d.rules.b3Games.workspaces.$workspaceId.classes.$classId['.read'] = 'auth != null';
+  assert.ok(compare(live(), d).some(p => p.startsWith('ADDED') && p.includes('/classes/$classId/.read')));
+});
 test('the student-records step must match exactly: a weaker $other or student read is caught', () => {
   const c = candidate(); c.rules.b3Games.$other['.write'] = true;
   assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/b3Games/$other')));
