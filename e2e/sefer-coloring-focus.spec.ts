@@ -42,7 +42,12 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
     await route.fulfill({ status: 200, contentType: type, body: fs.readFileSync(filename) });
   });
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
-  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring-v2/);
+  // Both existing and approved replacement artwork must load and remain colorable.
+  // PR #313 changes the asset directory; do not require unpublished assets on main.
+  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring(?:-v2)?\/\d+\.png$/);
+  await expect.poll(() => page.locator('#outline').evaluate(
+    (img: HTMLImageElement) => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
+  )).toBe(true);
   await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
   const firstCard = await page.locator('#card').inputValue();
   const first = await page.evaluate(() => {
