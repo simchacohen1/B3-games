@@ -22,6 +22,19 @@ const APPROVED_CHANGES = [
     "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
   [['posukPractice', 'attempts', '$studentId', '.read'],
     "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
+  // 2026-10-24: student records (b3Games/students) stop being public. The blanket b3Games read is
+  // replaced by explicit public reads on every other b3Games child, so those stay exactly as open.
+  [['b3Games', '$other'], { '.read': true }],
+  ...['admins', 'teachers', 'siteSettings', 'workspaces', 'classGalleryPresence', 'classGalleryTag', 'classGalleryPresenceSettings']
+    .map(k => [['b3Games', k, '.read'], true]),
+  [['b3Games', 'students', '.read'],
+    "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
+  [['b3Games', 'students', '$studentId', '.read'],
+    "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
+];
+// Approved removals, each allowed only while its replacement is present in the candidate.
+const APPROVED_REMOVALS = [
+  [['b3Games', '.read'], candidate => candidate.b3Games?.$other?.['.read'] === true],
 ];
 
 function stripComments(text) { // the console allows // and /* */ comments; remove them outside strings
@@ -39,15 +52,18 @@ function stripComments(text) { // the console allows // and /* */ comments; remo
 const parse = text => JSON.parse(stripComments(text));
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const allowedNew = p => ALLOWED_NEW.some(a => a.length === p.length && a.every((s, i) => s === p[i]));
+const samePath = (a, p) => a.length === p.length && a.every((s, i) => s === p[i]);
 const approvedChange = (p, value) => APPROVED_CHANGES.some(([a, v]) =>
-  a.length === p.length && a.every((s, i) => s === p[i]) && value === v);
+  samePath(a, p) && JSON.stringify(value) === JSON.stringify(v));
 
 function compare(live, candidate) {
   const problems = [];
+  const candidateRules = candidate.rules || candidate;
+  const approvedRemoval = p => APPROVED_REMOVALS.some(([a, ok]) => samePath(a, p) && ok(candidateRules));
   const walk = (a, b, p) => {
     if (isObj(a) && isObj(b)) {
       for (const k of Object.keys(a)) {
-        if (!(k in b)) problems.push('REMOVED   /' + [...p, k].join('/'));
+        if (!(k in b)) { if (!approvedRemoval([...p, k])) problems.push('REMOVED   /' + [...p, k].join('/')); }
         else walk(a[k], b[k], [...p, k]);
       }
       for (const k of Object.keys(b)) if (!(k in a)) {
@@ -58,16 +74,16 @@ function compare(live, candidate) {
       problems.push('CHANGED   /' + p.join('/') + '\n    live:      ' + JSON.stringify(a) + '\n    candidate: ' + JSON.stringify(b));
     }
   };
-  walk(live.rules || live, candidate.rules || candidate, []);
+  walk(live.rules || live, candidateRules, []);
   return problems;
 }
 
-module.exports = { compare, parse, stripComments, ALLOWED_NEW, APPROVED_CHANGES };
+module.exports = { compare, parse, stripComments, ALLOWED_NEW, APPROVED_CHANGES, APPROVED_REMOVALS };
 
 if (require.main === module) {
   const [livePath, candPath = 'firebase-rules.json'] = process.argv.slice(2);
   if (!livePath) { console.error('Usage: node scripts/rules-additive-check.cjs <saved-live-rules.json> [candidate]'); process.exit(2); }
   const problems = compare(parse(fs.readFileSync(livePath, 'utf8')), parse(fs.readFileSync(candPath, 'utf8')));
   if (problems.length) { console.log('NOT ADDITIVE-ONLY. Do not deploy.\n' + problems.map(x => ' - ' + x).join('\n')); process.exit(1); }
-  console.log('OK: ' + candPath + ' equals the live rules plus only the approved Pointer additions (' + ALLOWED_NEW.map(a => '/' + a.join('/')).join(', ') + ').');
+  console.log('OK: ' + candPath + ' equals the live rules plus only the approved Pointer additions (' + ALLOWED_NEW.map(a => '/' + a.join('/')).join(', ') + ') and the owner-approved privacy changes (' + APPROVED_CHANGES.map(([a]) => '/' + a.join('/')).join(', ') + ').');
 }
