@@ -52,6 +52,8 @@ test('normal Shorashim sign-in avoids leaderboard downloads and full progress re
   assert.doesNotMatch(entry,/loadClassLeaderboard\s*\(/);
   assert.doesNotMatch(entry,/scheduleCloudStudentSave\s*\(/);
   assert.match(entry,/\.update\(\{name:s\.name,lastActive:s\.lastActive\}\)/);
+  assert.match(entry,/if\(studentSnap\.exists\(\)\)await studentRef\.update/);
+  assert.match(entry,/else await studentRef\.set\(s\)/);
   assert.doesNotMatch(sourceOf('startCloudListeners'),/leaderboards\/match/);
   assert.match(sourceOf('startMatchGame'),/startMatchLeaderboard\(pairCount\)/);
   assert.match(sourceOf('cleanupGameRuntime'),/stopMatchLeaderboard\(\)/);
