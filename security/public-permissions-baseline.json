@@ -14,7 +14,35 @@
       "permission": ".write"
     },
     {
-      "path": "/b3Games",
+      "path": "/b3Games/$other",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/admins",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/teachers",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/siteSettings",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/workspaces",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/classGalleryPresence",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/classGalleryTag",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Games/classGalleryPresenceSettings",
       "permission": ".read"
     },
     {
