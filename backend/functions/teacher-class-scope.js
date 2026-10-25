@@ -35,7 +35,11 @@ function recordAllowed(scope,studentId,record){
  if(scope.owner&&!scope.selected)return true;
  const classId=record.workspaceClassId||record.sourceClassId||record.classId;
  if(classId)return classId===student.classId||classId==='b3_'+student.classId;
- return ['et','wt'].includes(student.classId)||student.membershipClassIds.length===1;
+ // Classless legacy records can only be attributed when exactly one verified
+ // membership exists, regardless of the class name. Ambiguous records must
+ // be backfilled with class provenance before a teacher can modify them.
+ const memberships=Array.isArray(student.membershipClassIds)?student.membershipClassIds:[];
+ return memberships.length===1&&memberships[0]===student.classId;
 }
 const api={roster,recordAllowed,validKey};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FunTorahTeacherScope=api;
