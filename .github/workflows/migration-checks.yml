@@ -23,7 +23,10 @@ jobs:
       - name: Install test dependencies
         run: npm ci
       - name: Run class, teacher role, and backend regression tests
-        run: node --test tests/*.test.cjs
+        # The two browser-driven checks under tests/ use Playwright's own runner
+        # and require a signed-in browser session. Keep this job focused on the
+        # dependency-free Node regression suite.
+        run: find tests -maxdepth 1 -type f -name '*.test.cjs' ! -name 'auth-check.test.cjs' ! -name 'firebase-bandwidth.test.cjs' -print0 | xargs -0 node --test
       - name: Validate migrated frontend and backend JavaScript
         run: |
           node --check site-settings.js
