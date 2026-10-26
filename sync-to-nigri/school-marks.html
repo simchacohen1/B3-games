@@ -49,6 +49,7 @@ async function syncMarks(){
   const body={class_section:document.getElementById('grade').value,topic:document.getElementById('topic').value,test_name:document.getElementById('name').value.trim(),type:{'Quiz':'quiz','Test/Project':'test','Classwork':'classwork','Homework':'homework'}[document.getElementById('type').value]||'quiz',date:document.getElementById('date').value,description:'',students:[]};
   if(!body.test_name){alert('Give this mark a name first.');return}
   const status=document.getElementById('status'),btn=document.getElementById('sync');
+  let requestStarted=false;
   btn.disabled=true;status.textContent='Building each student\'s PDF report…';
   try{
     // Never send grades if a completed student's matching PDF cannot be created.
@@ -71,13 +72,14 @@ async function syncMarks(){
       return student;
     });
     status.textContent='Syncing marks and PDF reports to Nigri…';
+    requestStarted=true;
     const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)});
     const data=await res.json().catch(()=>({}));
     const failures=(data.results||[]).filter(r=>String(r).includes('FAILED'));
     status.textContent=res.ok&&data.status==='success'
       ? 'Saved to Nigri!'+(data.test_id?' (mark #'+data.test_id+')':'')+(failures.length?' — check attachment failures: '+failures.join('; '):'')
       : 'Nigri did not save this: '+(data.detail||res.status);
-  }catch(e){status.textContent='Not sent to Nigri: '+e.message}finally{btn.disabled=false}
+  }catch(e){status.textContent=(requestStarted?'Nigri may have saved marks; check Nigri before retrying: ':'Not sent to Nigri: ')+e.message}finally{btn.disabled=false}
 }
 loadData();
 </script></body></html>
