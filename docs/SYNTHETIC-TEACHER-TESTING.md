@@ -32,7 +32,7 @@ checks in a fresh browser that Auth creates a healthy database on eight of them.
 ## Full browser journey
 
 ```sh
-npx firebase emulators:exec --project demo-ftt-readiness --config firebase.security-test.json --only auth,database,functions "npx playwright test e2e/firebase-auth-emulator.spec.ts e2e/synthetic-multiteacher-classroom.spec.ts --project=chromium --workers=1"
+npx firebase emulators:exec --project demo-ftt-readiness --config firebase.security-test.json --only auth,database,storage,functions "npx playwright test e2e/firebase-auth-emulator.spec.ts e2e/synthetic-multiteacher-classroom.spec.ts --project=chromium --workers=1"
 ```
 
 The dedicated Migration access checks workflow runs this command. The ordinary
