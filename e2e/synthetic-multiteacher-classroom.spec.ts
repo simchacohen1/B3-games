@@ -71,7 +71,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await ownerPage.locator('#assign').click();
   await expect(ownerPage.locator('#assignments')).toContainText('Pilot Room Alpha');
   await ownerPage.locator('#toolClassSelect').selectOption(CLASS_ID);
-  for(const tool of ['weekly-quiz','rashi-letters','posuk-practice-scroll']) {
+  for(const tool of ['weekly-quiz','rashi-letters','posuk-practice-scroll','chazara','shorashim']) {
     await ownerPage.locator(`[data-tool="${tool}"]`).check();
     await expect.poll(async()=> (await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/toolGrants`))?.[tool]).toBe(true);
     await expect(ownerPage.locator('#status')).toContainText('Saved');
@@ -258,6 +258,77 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('.posuk-tile').filter({hasText: /Got it|Perfect|100%/}).first()).toBeVisible();
   await page.locator('#perekList .posuk-tile').first().click();
   await expect(page.locator('#app')).toBeVisible();
+  // Chazara consumes this student's persisted Posuk mastery and keeps its
+  // own class-attributed review and recording history.
+  await page.goto(`${origin}/chazara/index.html`);
+  await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#studentNameTop')).toHaveText('Ari Example');
+  await expect(page.locator('.pasuk:not(:disabled)').first()).toBeVisible();
+  await page.locator('.pasuk:not(:disabled)').first().click();
+  await expect(page.locator('#confirmBox')).toBeVisible();
+  await page.locator('#confirmYes').click();
+  const chazaraRoot=`posukPractice/chazara/students/${ariId}`;
+  await expect.poll(async()=>Number((await readFixture(`${chazaraRoot}/reviews/18_1`))?.count),{timeout:20000}).toBe(1);
+  const recordButton=page.locator('.record-bar[data-key="18_1"]');
+  await expect(recordButton).toBeEnabled();
+  await recordButton.click();
+  await expect(recordButton).toContainText('Stop');
+  await page.waitForTimeout(5200);
+  await recordButton.click();
+  await expect.poll(async()=>{
+    const events=await readFixture(`posukPractice/chazara/events/${ariId}`);
+    return Object.values(events||{}).some((event:any)=>event.recorded===true&&event.reviewApplied===true&&event.workspaceClassId===CLASS_ID);
+  },{timeout:45000}).toBe(true);
+  await expect.poll(async()=>Number((await readFixture(`${chazaraRoot}/reviews/18_1`))?.count),{timeout:20000}).toBe(2);
+  await page.reload();
+  await expect(page.locator('#total')).toHaveText('2');
+  await expect(page.locator('#recordingsList')).toContainText('Awaiting approval');
+  await writeFixture(`posukPractice/shorashimLearning/classes/${CLASS_ID}/catalog`,{
+    shorashim:[{id:'nightly-vayeira',perek:18,front:'appeared',hebrew:'וַיֵּרָא',english:'appeared',art:['👀'],hidden:false}],
+    prefix:[],suffix:[]
+  });
+  await writeFixture(`posukPractice/shorashimLearning/classes/${CLASS_ID}/settings`,{studentSiteOpen:true,minReviewMs:500});
+  await writeFixture(`posukPractice/shorashimLearning/classes/${CLASS_ID}/students/${ariId}`,{
+    name:'Ari Example',cards:{'shorashim:nightly-vayeira':{itemKey:'shorashim:nightly-vayeira',itemType:'shorashim',itemId:'nightly-vayeira',createdAt:1,learnedAt:2,design:{}}},
+    sessions:[],activeSession:null,totalActiveSeconds:0,gamesPlayed:0,gameBests:{match:{}}
+  });
+  await page.goto(`${origin}/shorashim/index.html`);
+  await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
+  await expect(page.locator('#appShell')).toBeVisible();
+  await page.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await expect(page.locator('[data-learning-perek="18"] .perek-progress')).toContainText('1 of 1 learned');
+  await page.locator('[data-learning-perek="18"]').click();
+  await expect(page.locator('#editorContent')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
+  await page.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await expect(page.locator('[data-learning-perek="18"] .perek-progress')).toContainText('1 of 1 learned');
+  expect(await readFixture(`posukPractice/shorashimLearning/students/${ariId}`)).toBeNull();
+  const chazaraTeacherContext=await browser.newContext(),chazaraTeacherPage=await chazaraTeacherContext.newPage();
+  await configureBrowser(chazaraTeacherPage,pageErrors,failedFirebase);
+  await chazaraTeacherPage.goto(`${origin}/teacher-home.html?signin=1`);
+  await chazaraTeacherPage.getByRole('button',{name:'Sign in with Google'}).click();
+  await expect(chazaraTeacherPage.locator('#classes .class-card h2')).toHaveText(['Pilot Room Alpha']);
+  const chazaraTeacherReads:string[]=[];
+  chazaraTeacherPage.on('request',request=>{
+    if(request.url().startsWith(`http://127.0.0.1:${DB_PORT}/`))chazaraTeacherReads.push(request.url());
+  });
+  await chazaraTeacherPage.goto(`${origin}/chazara/teacher.html?class=${CLASS_ID}`);
+  await expect(chazaraTeacherPage.locator('#teacherApp')).toBeVisible();
+  await expect(chazaraTeacherPage.locator('#scopeLabel')).toContainText('Pilot Room Alpha');
+  await chazaraTeacherPage.getByRole('button', { name: 'Show Full Dashboard' }).click();
+  await expect(chazaraTeacherPage.locator('#rows')).toContainText('Ari Example');
+  await expect(chazaraTeacherPage.locator('#rows')).not.toContainText('Synthetic ET');
+  await expect(chazaraTeacherPage.locator('#rows')).not.toContainText('Synthetic WT');
+  await expect.poll(async()=>chazaraTeacherPage.locator('#nt').innerText()).toContain('2');
+  expect(chazaraTeacherReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
+  expect(await readFixture(`posukPractice/chazara/events/${ariId}`)).not.toBeNull();
+  expect(posukClassReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
+  await chazaraTeacherPage.goto(`${origin}/shorashim/index.html?class=${CLASS_ID}`);
+  await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
+  await chazaraTeacherPage.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await expect(chazaraTeacherPage.locator('[data-learning-perek="18"] .perek-progress')).toContainText('0 of 1 learned');
+  await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);
   expect(claims.b3StudentId).toBe(ariId);expect(claims.b3ClassId).toBe(CLASS_ID);
   expect(claims.b3StudentRole).toBe('student');
