@@ -295,6 +295,8 @@ let activeLaunchId='';
 let launchData=null;
 let myResponses={};
 let selectedChoice=null;
+let selectedChoiceQuestion=-1;
+let selectedChoiceLaunchId='';
 let displayedQuestion=0;
 let classLaunchRef=null, personalLaunchRef=null, launchPollTimer=null, refreshActiveLaunch=null;
 let allLaunches={}, allCompletions={};
@@ -712,7 +714,7 @@ function chooseActiveLaunch(id){
   id=id||'';
   if(id===activeLaunchId&&(launchData||launchPollTimer))return;
   if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
-  activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;quizLoadError='';
+  activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;selectedChoiceQuestion=-1;selectedChoiceLaunchId='';displayedQuestion=0;quizLoadError='';
   if(!id){render();return;}
   const cached=assignedInfo[id];
   if(cached&&cached.error&&!cached.launch){quizLoadError=cached.error;render();}
@@ -740,6 +742,8 @@ function chooseActiveLaunch(id){
   refreshActiveLaunch=refresh;refresh();launchPollTimer=setInterval(refresh,2500);
 }
 
+// Polling updates the launch every 2.5 seconds; do not erase an unsubmitted choice.
+function preserveUnsubmittedChoice(resp,question,launch,choice,previousQuestion,previousLaunch){return resp?Number(resp.choiceIndex):(question===previousQuestion&&launch===previousLaunch?choice:null);}
 function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
 function questionState(i){const qs=(launchData&&launchData.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
 function responseFor(i){return myResponses[i]||myResponses[String(i)]||null;}
@@ -833,7 +837,8 @@ function render(){
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
   const questionTextEl=document.getElementById('questionText'),questionParts=renderStudentQuestion(questionTextEl,q.q||'');
   document.getElementById('questionListenBtn').onclick=()=>speakStudentText(questionParts.text,questionTextEl);
-  selectedChoice=resp?Number(resp.choiceIndex):null;
+  selectedChoice=preserveUnsubmittedChoice(resp,displayedQuestion,activeLaunchId,selectedChoice,selectedChoiceQuestion,selectedChoiceLaunchId);
+  selectedChoiceQuestion=displayedQuestion;selectedChoiceLaunchId=activeLaunchId;
   renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
   const fill=document.getElementById('progressFill');if(fill)fill.style.width=Math.round(answeredCount/questions.length*100)+'%';
