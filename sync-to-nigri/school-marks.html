@@ -9,6 +9,8 @@
 <title>School Marks → Nigri</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="../weekly-quiz/report-pdf.js"></script>
 <style>
 body{font-family:Arial,sans-serif;background:#f4f8fb;color:#18324a;margin:0;padding:22px}.wrap{max-width:1100px;margin:auto}.card{background:#fff;border:1px solid #bdd5e8;border-radius:14px;padding:18px;margin:14px 0}.hidden{display:none}.grid{display:grid;grid-template-columns:320px 1fr;gap:16px}@media(max-width:800px){.grid{grid-template-columns:1fr}}button,select,input{font:inherit;padding:9px;border-radius:9px;border:1px solid #bdd5e8}button{cursor:pointer;font-weight:700}.primary{background:#2d6ea3;color:white;border:0}.good{background:#2e8b57;color:white;border:0}.launch{padding:10px;border:1px solid #bdd5e8;border-radius:10px;margin:7px 0;cursor:pointer}.launch.active{border:2px solid #2d6ea3;background:#eef7fd}.small{font-size:12px;color:#667b8c}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #dce7ef;text-align:left}th{background:#edf5fa}.back{color:#2d6ea3;text-decoration:none;font-weight:700}
 </style></head><body><div class="wrap">
@@ -39,8 +41,43 @@ async function loadData(){const [a,b,c]=await Promise.all([db.ref('b3Quiz/launch
 function renderHistory(){const f=document.getElementById('filter').value,box=document.getElementById('history');box.innerHTML='';Object.keys(launches).filter(id=>{const l=launches[id]||{};return !l.retakeOf&&!l.makeupOf&&(f==='all'||l.classId===f)}).sort((a,b)=>(launches[b].createdAt||0)-(launches[a].createdAt||0)).forEach(id=>{const l=launches[id],q=l.quizSnapshot||{},d=document.createElement('div');d.className='launch'+(id===sel?' active':'');d.innerHTML='<b>'+(q.title||'Untitled')+'</b><div class="small">'+grade(l.classId)+'</div>';d.onclick=()=>{sel=id;renderHistory();showQuiz()};box.appendChild(d)})}
 function qs(l){return A(l?.quizSnapshot?.questions)} function score(lid,sid){const q=qs(launches[lid]),r=(responses[lid]||{})[sid]||{};let c=0,a=0;q.forEach((x,i)=>{const z=r[i]||r[String(i)];if(z){a++;if(z.correct)c++}});const done=!!(completions[lid]?.[sid])||(q.length&&a===q.length);return{pct:q.length?Math.round(c/q.length*100):null,done,a}}
 function related(lid,base){if(lid===base)return true;let cur=lid;for(let i=0;i<10;i++){const l=launches[cur]||{},p=l.retakeOf||l.makeupOf;if(!p)return false;if(p===base)return true;cur=p}return false}
-function best(base,sid){const c=[];Object.keys(launches).forEach(lid=>{if(!related(lid,base))return;const l=launches[lid],targets=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[];if(targets.length&&!targets.includes(sid))return;if(!targets.length&&!R[l.classId]?.includes(sid))return;const s=score(lid,sid);if(s.a)c.push({lid,l,s})});if(!c.length)return{mark:null,src:'Missing'};const pool=c.filter(x=>x.s.done);const p=pool.length?pool:c;p.sort((a,b)=>(Number(b.l.attemptNumber)||1)-(Number(a.l.attemptNumber)||1)||(b.l.createdAt||0)-(a.l.createdAt||0));const x=p[0];return{mark:x.s.done?x.s.pct:null,src:x.l.retakeOf?'Retake':x.l.makeupOf?'Make-Up':'Original'}}
-function showQuiz(){const l=launches[sel],q=l.quizSnapshot||{};document.getElementById('title').textContent=q.title||'Results';document.getElementById('details').classList.remove('hidden');document.getElementById('grade').value=grade(l.classId);document.getElementById('topic').value=topic(q.skillType||'comprehension');const d=new Date(Number(l.createdAt));document.getElementById('date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');document.getElementById('name').value=q.title||'Weekly Quiz';const body=document.getElementById('students');body.innerHTML='';R[l.classId].forEach(sid=>{const b=best(sel,sid),tr=document.createElement('tr'),m=b.mark===null;tr.dataset.sid=sid;tr.dataset.mark=m?'0':b.mark;tr.innerHTML='<td>'+N[sid]+'</td><td>'+(m?'0% — missing':b.mark+'%')+'</td><td>'+b.src+'</td><td><select><option value="'+(m?'review':'present')+'" selected>'+(m?'Review / leave unchanged':'Present')+'</option><option value="absent">Absent</option><option value="present">Present</option></select></td>';body.appendChild(tr)})}
-async function syncMarks(){if(!sel)return;const rows=[...document.querySelectorAll('#students tr')],body={class_section:document.getElementById('grade').value,topic:document.getElementById('topic').value,test_name:document.getElementById('name').value.trim(),type:{'Quiz':'quiz','Test/Project':'test','Classwork':'classwork','Homework':'homework'}[document.getElementById('type').value]||'quiz',date:document.getElementById('date').value,description:'',students:rows.map(r=>({name:N[r.dataset.sid],mark:Number(r.dataset.mark),attendance:r.querySelector('select').value}))};if(!body.test_name){alert('Give this mark a name first.');return}const s=document.getElementById('status'),btn=document.getElementById('sync');btn.disabled=true;s.textContent='Syncing to Nigri…';try{const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)}),data=await res.json().catch(()=>({}));s.textContent=res.ok&&data.status==='success'?'Saved to Nigri!'+(data.test_id?' (mark #'+data.test_id+')':''):'Nigri did not save this: '+(data.detail||res.status)}catch(e){s.textContent='Could not reach Nigri sync: '+e.message}finally{btn.disabled=false}}
+function best(base,sid){const c=[];Object.keys(launches).forEach(lid=>{if(!related(lid,base))return;const l=launches[lid],targets=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[];if(targets.length&&!targets.includes(sid))return;if(!targets.length&&!R[l.classId]?.includes(sid))return;const s=score(lid,sid);if(s.a)c.push({lid,l,s})});if(!c.length)return{mark:null,src:'Missing'};const pool=c.filter(x=>x.s.done);const p=pool.length?pool:c;p.sort((a,b)=>(Number(b.l.attemptNumber)||1)-(Number(a.l.attemptNumber)||1)||(b.l.createdAt||0)-(a.l.createdAt||0));const x=p[0];return{mark:x.s.done?x.s.pct:null,lid:x.s.done?x.lid:null,src:x.l.retakeOf?'Retake':x.l.makeupOf?'Make-Up':'Original'}}
+function showQuiz(){const l=launches[sel],q=l.quizSnapshot||{};document.getElementById('title').textContent=q.title||'Results';document.getElementById('details').classList.remove('hidden');document.getElementById('grade').value=grade(l.classId);document.getElementById('topic').value=topic(q.skillType||'comprehension');const d=new Date(Number(l.createdAt));document.getElementById('date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');document.getElementById('name').value=q.title||'Weekly Quiz';const body=document.getElementById('students');body.innerHTML='';R[l.classId].forEach(sid=>{const b=best(sel,sid),tr=document.createElement('tr'),m=b.mark===null;tr.dataset.sid=sid;tr.dataset.mark=m?'0':b.mark;tr.dataset.lid=b.lid||'';tr.dataset.attempt=b.src;tr.dataset.missing=m?'1':'0';tr.innerHTML='<td>'+N[sid]+'</td><td>'+(m?'0% — missing':b.mark+'%')+'</td><td>'+b.src+'</td><td><select><option value="'+(m?'review':'present')+'" selected>'+(m?'Review / leave unchanged':'Present')+'</option><option value="absent">Absent</option><option value="present">Present</option></select></td>';body.appendChild(tr)})}
+async function syncMarks(){
+  if(!sel)return;
+  const rows=[...document.querySelectorAll('#students tr')];
+  const body={class_section:document.getElementById('grade').value,topic:document.getElementById('topic').value,test_name:document.getElementById('name').value.trim(),type:{'Quiz':'quiz','Test/Project':'test','Classwork':'classwork','Homework':'homework'}[document.getElementById('type').value]||'quiz',date:document.getElementById('date').value,description:'',students:[]};
+  if(!body.test_name){alert('Give this mark a name first.');return}
+  const status=document.getElementById('status'),btn=document.getElementById('sync');
+  btn.disabled=true;status.textContent='Building each student\'s PDF report…';
+  try{
+    // Never send grades if a completed student's matching PDF cannot be created.
+    body.students=rows.map(r=>{
+      const sid=r.dataset.sid,student={name:N[sid],mark:Number(r.dataset.mark),attendance:r.querySelector('select').value};
+      if(r.dataset.missing==='1')return student; // No completed quiz; don't fabricate a report.
+      const lid=r.dataset.lid,launch=launches[lid],questions=launch?qs(launch):[];
+      if(!lid||!launch||!questions.length||!window.jspdf||!window.B3QuizReportPDF?.buildStudentReportPDF)
+        throw new Error('PDF generator unavailable for '+student.name+'. No marks were sent.');
+      const answers=(responses[lid]||{})[sid]||{};
+      const pdf=window.B3QuizReportPDF.buildStudentReportPDF({
+        quizTitle:body.test_name,className:body.class_section,dateStr:body.date,
+        attemptTag:r.dataset.attempt||'Original',studentName:student.name,scoreText:'Score: '+student.mark+'%'
+      },questions,answers);
+      if(!pdf)throw new Error('Could not create the PDF for '+student.name+'. No marks were sent.');
+      const safeStudent=(student.name||'student').replace(/[^A-Za-z0-9 _-]/g,'');
+      const safeQuiz=(body.test_name||'Quiz').replace(/[^A-Za-z0-9 _-]/g,'');
+      student.report_base64=pdf;
+      student.report_filename=safeStudent+' - '+safeQuiz+'.pdf';
+      return student;
+    });
+    status.textContent='Syncing marks and PDF reports to Nigri…';
+    const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>({}));
+    const failures=(data.results||[]).filter(r=>String(r).includes('FAILED'));
+    status.textContent=res.ok&&data.status==='success'
+      ? 'Saved to Nigri!'+(data.test_id?' (mark #'+data.test_id+')':'')+(failures.length?' — check attachment failures: '+failures.join('; '):'')
+      : 'Nigri did not save this: '+(data.detail||res.status);
+  }catch(e){status.textContent='Not sent to Nigri: '+e.message}finally{btn.disabled=false}
+}
 loadData();
 </script></body></html>
