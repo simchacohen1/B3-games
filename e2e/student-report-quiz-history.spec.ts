@@ -16,13 +16,19 @@ const R = (i: number, ok: boolean) => ({ choiceIndex: ok ? qs[i].correctIndex : 
 const member = (name: string) => ({ name, active: true });
 
 const DB = {
+  posukPractice: {
+    attempts: { arik_test: { 'perek18_posuk1': { a1: { timestamp: now - 2 * DAY, hebrewFinalScore: 100 } } } },
+    chazara: { students: { arik_test: { goal: 10, reviews: { '18:1': { count: 3, lastAt: now - DAY } } } }, events: { arik_test: { e1: { reviewApplied: true, perek: 18, posuk: 1, reviewNumber: 3, createdAt: now - DAY } } } },
+    shorashimLearning: { students: { arik_test: { cards: { 'shoresh:halach': { learnedAt: now - DAY, itemType: 'shoresh', itemId: 'halach' } } } } },
+  },
+  rashiLetters: { progress: { arik_test: { currentUnitIndex: 0, units: { zayin_letter: { attempts: 6, correct: 5 } } } } },
   b3Games: {
     workspaces: { 'b3-2026': { classes: {
       et: { name: 'East Track', active: true, members: { arik_test: member('Synthetic Arik'), beni_test: member('Synthetic Beni') } },
       wt: { name: 'West Track', active: true, members: { chaim_test: member('Synthetic Chaim') } },
       sc: { name: 'Synthetic Class', active: true, members: { dovid_test: member('Synthetic Dovid') } },
     } } },
-    students: { arik_test: { profile: { createdAt: now - 400 * DAY } } },
+    students: { arik_test: { profile: { createdAt: now - 400 * DAY }, halacha: { siman1: { updatedAt: now - DAY, state: { a_done: true } } } } },
   },
   b3Quiz: {
     launches: {
@@ -110,11 +116,13 @@ test('ET: a boy\'s report lists every quiz, all attempts, question detail and a 
   await expect(sec).toContainText('Practice quiz');
   if (process.env.REPORT_SHOT) await page.screenshot({ path: process.env.REPORT_SHOT, fullPage: true });
   const csv = await csvOf(page, 'Download This Student CSV');
+  if (process.env.REPORT_CSV) fs.writeFileSync(process.env.REPORT_CSV, csv);
   expect(csv).toContain('Synthetic Arik');
   expect(csv).not.toContain('Synthetic Beni');
   expect(csv).not.toContain('Beni Private Quiz');
   expect(csv).toContain('In Progress');
   expect(csv).toContain('Posuk pesukim at 100%');
+  for (const detail of ['"Posuk Practice","Perek 18:1","Read at 100%"', '"Chazara","Perek 18:1","Below goal (10×)","3"', '"Chazara (each one all time)","Perek 18:1"', '"Shorashim","halach"', '"Rashi Letters","Unit 1 ז (letters)","","6","5","83%"', '"Halacha","Section a","Done"']) expect(csv).toContain(detail);
   expect(csv).not.toContain('Who went to Mitzrayim?');
   // the page itself must not scroll sideways at 100% zoom
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

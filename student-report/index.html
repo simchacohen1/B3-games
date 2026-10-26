@@ -407,11 +407,49 @@ function quizSection(s,pl){
  else h+='<div class="tablebox"><table><thead><tr><th>Practice</th><th>Date</th><th>Points</th><th>Percent</th></tr></thead><tbody>'+practice.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(qday(p.date))+'</td><td>'+p.correct+' / '+p.total+'</td><td class="'+tone(p.pct)+'">'+(p.pct===null?'—':p.pct+'%')+'</td></tr>').join('')+'</tbody></table></div>';
  return h+'</div>';
 }
+/* What is behind each total in the class CSV, one row per posuk / card / unit / word / section. */
+function toolDetailRows(s,pl){
+ const r=s.raw,days=+$('period').value,since=days?Date.now()-days*DAY:0,D=t=>t?new Date(+t).toLocaleDateString():'',P=v=>v===null||v===undefined?'':v+'%';
+ const rows=[['Tool','Item','Result','Count','Correct','Percent','Date','Notes']];
+ // Posuk Practice
+ Object.entries(obj(r.att)).sort(([a],[b])=>a.localeCompare(b,undefined,{numeric:true})).forEach(([key,map])=>{
+  const all=Object.values(obj(map)).filter(a=>a&&typeof a==='object');
+  const best=f=>all.reduce((b,a)=>{const v=f(a);return typeof v==='number'&&(b===null||v>b)?v:b},null);
+  const last=Math.max(0,...all.map(a=>num(a.timestamp)||0)),inP=since?all.filter(a=>(num(a.timestamp)||0)>=since).length:all.length;
+  const read=best(readScore);
+  rows.push(['Posuk Practice',posukLabel(key),read===100?'Read at 100%':read===null?'No reading score':'Best reading '+read+'%',all.length,'',P(read),D(last),inP+' tries '+pl+' · best translation '+(P(best(transScore))||'—')+' · best questions '+(P(best(compScore))||'—')]);
+ });
+ // Chazara
+ const chz=obj(r.chz),goal=+chz.goal||10;
+ Object.entries(obj(chz.reviews)).sort(([a],[b])=>a.localeCompare(b,undefined,{numeric:true})).forEach(([key,v])=>{
+  const c=+(v&&v.count)||0,t=+(v&&v.lastAt)||0;if(!c)return;
+  rows.push(['Chazara',posukLabel(key),c>=goal?'At goal ('+goal+'×)':'Below goal ('+goal+'×)',c,'','',D(t),t&&Date.now()-t>=14*DAY?'Due for review (2+ weeks)':'']);
+ });
+ Object.values(obj(r.chzEv)).filter(e=>e&&e.reviewApplied===true&&e.removed!==true&&e.teacherRejected!==true&&e.pointRequestStatus!=='rejected'&&(!since||(+e.createdAt||0)>=since))
+  .sort((a,b)=>(+a.createdAt||0)-(+b.createdAt||0)).forEach(e=>rows.push(['Chazara (each one '+pl+')',e.perek&&e.posuk?'Perek '+e.perek+':'+e.posuk:posukLabel(e.posukKey||''),'Chazara saved','1','','',D(e.createdAt),e.reviewNumber?'chazara #'+e.reviewNumber+' of this posuk':'']));
+ // Shorashim
+ Object.entries(obj(obj(r.sh).cards)).filter(([,c])=>c&&c.learnedAt).sort(([,a],[,b])=>a.learnedAt-b.learnedAt)
+  .forEach(([key,c])=>rows.push(['Shorashim',String(c.word||c.hebrew||c.root||c.itemId||c.wordId||key),'Card learned','','','',D(c.learnedAt),[c.itemType,since&&c.learnedAt>=since?'learned '+pl:''].filter(Boolean).join(' · ')]));
+ // Rashi Letters
+ if(r.rashi){const u=obj(obj(r.rashi).units);RASHI_UNITS.forEach(([id,label],i)=>['_letter','_word'].forEach(sfx=>{const x=obj(u[id+sfx]);const a=+x.attempts||0,c=+x.correct||0;if(a)rows.push(['Rashi Letters','Unit '+(i+1)+' '+label+(sfx==='_word'?' (words)':' (letters)'),'',a,c,P(pctOf(c,a)),'',a>=5&&c/a<0.6?'Tricky':''])}))}
+ // Gematria
+ const g=r.gem;if(g){['learn','words','numbers'].forEach(k=>{const a=+(g[k]&&g[k].attempts)||0,c=+(g[k]&&g[k].correct)||0;if(a)rows.push(['Gematria',k,'',a,c,P(pctOf(c,a)),'',''])});
+  ['speed','match','race'].forEach(k=>{const n=+(g[k]&&g[k].plays)||0;if(n)rows.push(['Gematria',k+' game','Played',n,'','','',''])});
+  Object.entries(obj(g.missed)).filter(([,n])=>n>0).sort((x,y)=>y[1]-x[1]).forEach(([h,n])=>rows.push(['Gematria','Missed letter '+h,'Missed',n,'','','','']))}
+ // Yiddish
+ Object.entries(obj(r.yid&&r.yid.words)).filter(([,w])=>w).forEach(([id,w])=>rows.push(['Yiddish',String(w.word||w.yiddish||id),(+w.credits||0)>=2?'Learned':'Practicing',+w.credits||0,'','','','credits']));
+ // Halacha
+ if(r.hal&&r.hal.state){const st=r.hal.state,todo=HALACHA_IDS.filter(id=>!st[id+'_done']);
+  HALACHA_IDS.filter(id=>st[id+'_done']).forEach(id=>rows.push(['Halacha','Section '+id,'Done','','','','','']));
+  if(todo.length)rows.push(['Halacha','Not done yet ('+todo.length+')','Not done','','','','',todo.join(' ')])}
+ if(s.rew)rows.push(['Student Rewards','Current points',String(s.rew.balance),'','','','','Only the current total is stored in this report']);
+ return rows;
+}
 function studentCsv(s){
  const cls=classes.find(c=>c.id===current),x=extras[current+'/'+s.id]||{},days=+$('period').value;
  // Same summary line he has in the class CSV, then his quizzes.
  const pl=$('period').selectedOptions[0].text;
- const rows=[classCsvHead(pl),classCsvRow(s),[],...B3QuizHistory.studentCsvRows({name:s.name,className:cls?cls.name:current,periodLabel:$('period').selectedOptions[0].text,history:s.quizHist,practice:x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):[]})];
+ const rows=[classCsvHead(pl),classCsvRow(s),[],...toolDetailRows(s,pl.toLowerCase()),[],...B3QuizHistory.studentCsvRows({name:s.name,className:cls?cls.name:current,periodLabel:$('period').selectedOptions[0].text,history:s.quizHist,practice:x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):[]})];
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+B3QuizHistory.toCsv(rows)],{type:'text/csv'}));
  a.download='quiz-history-'+s.name.replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
