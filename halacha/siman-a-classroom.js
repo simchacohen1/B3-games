@@ -115,7 +115,18 @@ function make(id){
  }
  if(plainStart<source.length)reading.appendChild(document.createTextNode(source.slice(plainStart)));
  const artData=window.HALACHA_ALEF_ART&&window.HALACHA_ALEF_ART[id];if(!artData){status('Lesson artwork is missing.');return}
- image.onload=()=>{canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;ctx.drawImage(image,0,0);base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';restore();};
+ image.onload=()=>{
+  canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+  ctx.drawImage(image,0,0);
+  if(id==='a7'){
+    // Special Tefillah: leave the decorative wall frame, but remove its crown symbol.
+    // Update the base pixels so coloring, previews, undo and downloads all stay consistent.
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(649,94,72,110);
+  }
+  base=ctx.getImageData(0,0,canvas.width,canvas.height);
+  ready=true;canvas.dataset.ready='true';restore();
+ };
  image.onerror=()=>status('Could not load this lesson picture.');image.src=artData;
  function restore(){
   if(!ready)return;
