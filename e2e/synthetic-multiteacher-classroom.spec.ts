@@ -210,10 +210,6 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
     route.fulfill(syntheticJson({verdict: 'correct', feedback: 'Good translation.', transcript: 'appeared to him'})));
   await page.route('https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer', route =>
     route.fulfill(syntheticJson({verdict: 'correct', feedback: 'You found the right words!', gradingVersion: 'semantic-v1'})));
-  await page.route('https://us-central1-b3-games.cloudfunctions.net/generateTranslationChunks', route =>
-    route.fulfill(syntheticJson({levels:[{chunks:[{hebrew:'וַיֵּרָ֤א אֵלָיו֙',english:['appeared to him'],posukNum:1}]}]})));
-  await page.route('https://us-central1-b3-games.cloudfunctions.net/generateComprehensionQuestions', route =>
-    route.fulfill(syntheticJson({items:[{question:'What happened to Abraham?',expectedAnswer:'Hashem appeared to him.',answerHebrewPhrases:['וַיֵּרָ֤א אֵלָיו֙'],answerWordSets:[[0,1]]}]})));
   await page.route('https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward', route =>
     route.fulfill(syntheticJson({ok: true, awarded: false})));
   await page.addInitScript(() => {
