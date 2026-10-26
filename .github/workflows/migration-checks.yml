@@ -50,7 +50,7 @@ jobs:
           B3_RUN_RTDB_EMULATOR_TESTS: '1'
           FIREBASE_DATABASE_EMULATOR_PORT: '19100'
           JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx2g'
-        run: npx firebase emulators:exec --project demo-ftt-readiness --config firebase.security-test.json --only auth,database,functions "npx playwright test e2e/firebase-auth-emulator.spec.ts e2e/synthetic-multiteacher-classroom.spec.ts --project=chromium --workers=1"
+        run: npx firebase emulators:exec --project demo-ftt-readiness --config firebase.security-test.json --only auth,database,storage,functions "npx playwright test e2e/firebase-auth-emulator.spec.ts e2e/synthetic-multiteacher-classroom.spec.ts --project=chromium --workers=1"
       - name: Test Classroom Pointer whiteboards and screen sharing
         run: npx playwright test e2e/class-pointer-teacher-workspace.spec.ts --project=chromium
       - name: Validate migrated frontend and backend JavaScript
