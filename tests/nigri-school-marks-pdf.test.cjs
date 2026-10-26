@@ -76,3 +76,10 @@ test('existing Hebrew-capable quiz report builder is exposed to School Marks',()
     [{q:'בחר',choices:['לא','כן'],correctIndex:1}],{0:{correct:true,choiceIndex:1}});
   assert.equal(pdf,'BASE64_PDF');
 });
+
+test('network interruption after sending warns that Nigri might already have saved',async()=>{
+  const f=fixture({fetchImpl:async()=>{throw Error('connection lost')}});
+  await f.logic.syncMarks();
+  assert.equal(f.calls.length,1);
+  assert.match(f.elements.status.textContent,/Nigri may have saved marks; check Nigri before retrying/);
+});
