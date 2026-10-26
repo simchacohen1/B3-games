@@ -46,8 +46,10 @@ function attemptFor(id,l,responses,completion,joinedAt){
  if(comp){status='completed';completedHow='submitted'}
  else if(closed&&total&&answered>=total){status='completed';completedHow='all answered, quiz closed'}
  else if(answered)status='in_progress';
+ const title=String((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled quiz');
  return {
-  launchId:id,title:String((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled quiz'),date,kind:kindOf(l),
+  launchId:id,title,date,kind:kindOf(l),quizId:String(l.quizId||''),
+  sameQuiz:(title.trim().toLowerCase()+'|'+qs.map(q=>String(q.q||'').trim().toLowerCase()).join('|')),
   attemptNumber:Number(l.attemptNumber)||1,status,completedHow,closed,answered,correct,total,
   pct:status==='completed'?pctOf(correct,total):null,
   partialPct:status==='in_progress'?pctOf(correct,answered):null,
@@ -78,8 +80,14 @@ function buildHistory({root,studentId,classId,joinedAt=0,since=0}){
  });
  // Group retakes and make-ups with the quiz they repeat.
  const groupOf=(id,seen=new Set())=>{const l=launches[id]||{};if(l.makeupOf&&launches[l.makeupOf]&&!seen.has(id)){seen.add(id);return groupOf(l.makeupOf,seen)}return String(l.attemptGroupId||id)};
+ // The same quiz given again (same saved quiz, or same name and same questions) is one
+ // quiz with several attempts, not a new quiz he "missed".
+ const link={},find=k=>link[k]&&link[k]!==k?(link[k]=find(link[k])):k,join=(a,b)=>{a=find(a);b=find(b);if(a!==b)link[b]=a};
+ const firstBy={};
+ attempts.forEach(a=>{const g=groupOf(a.launchId);link[g]=link[g]||g;a.group=g;
+  [a.quizId&&'id:'+a.quizId,'qs:'+a.sameQuiz].filter(Boolean).forEach(k=>{if(firstBy[k])join(firstBy[k],g);else firstBy[k]=g})});
  const groups={};
- attempts.forEach(a=>{const g=groupOf(a.launchId);(groups[g]||(groups[g]={key:g,attempts:[]})).attempts.push(a)});
+ attempts.forEach(a=>{const g=find(a.group);(groups[g]||(groups[g]={key:g,attempts:[]})).attempts.push(a)});
  let quizzes=Object.values(groups).map(g=>{
   const at=g.attempts.sort((a,b)=>(a.date-b.date)||(a.attemptNumber-b.attemptNumber));
   const done=at.filter(a=>a.status==='completed'),started=at.filter(a=>a.status==='in_progress');
@@ -93,6 +101,8 @@ function buildHistory({root,studentId,classId,joinedAt=0,since=0}){
  });
  if(since)quizzes=quizzes.filter(q=>q.attempts.some(a=>a.date>=since)||(!q.date));
  quizzes.sort((a,b)=>b.date-a.date);
+ const names={};quizzes.forEach(q=>{const n=q.title.trim().toLowerCase();names[n]=(names[n]||0)+1});
+ quizzes.forEach(q=>{q.sameNameOther=names[q.title.trim().toLowerCase()]>1});
  const unav=since?unavailable.filter(u=>!u.date||u.date>=since):unavailable;
  return {quizzes,unavailable:unav,summary:summarize(quizzes)};
 }

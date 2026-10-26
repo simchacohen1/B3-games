@@ -27,6 +27,7 @@ const DB = {
   b3Quiz: {
     launches: {
       done: L({ classId: 'et', deliveryType: 'live', endedAt: now - 9 * DAY, attemptGroupId: 'done', quizSnapshot: { title: 'Lech Lecha Quiz', questions: qs } }),
+      doneAgain: L({ classId: 'et', deliveryType: 'anytime', attemptGroupId: 'doneAgain', createdAt: now - 8 * DAY, startedAt: now - 8 * DAY, quizSnapshot: { title: 'Lech Lecha Quiz', questions: qs } }),
       half: L({ classId: 'et', deliveryType: 'anytime', targetStudents: { arik_test: true, beni_test: true }, attemptGroupId: 'half', createdAt: now - 3 * DAY, startedAt: now - 3 * DAY, quizSnapshot: { title: 'Vayeira Quiz', questions: qs } }),
       old: L({ classId: 'et', deliveryType: 'live', endedAt: now - 99 * DAY, createdAt: now - 100 * DAY, startedAt: now - 100 * DAY, attemptGroupId: 'old', quizSnapshot: { title: 'Bereishis Quiz', questions: qs } }),
       retake: L({ classId: 'et', deliveryType: 'anytime', targetStudents: { arik_test: true }, retakeOf: 'old', attemptNumber: 2, attemptGroupId: 'old', createdAt: now - 98 * DAY, startedAt: now - 98 * DAY, quizSnapshot: { title: 'Bereishis Quiz', questions: qs } }),
@@ -95,6 +96,7 @@ test('ET: a boy\'s report lists every quiz, all attempts, question detail and a 
   const row = (t: string) => sec.locator('tbody > tr', { hasText: t }).first();
   await expect(row('Lech Lecha Quiz')).toContainText('Completed');
   await expect(row('Lech Lecha Quiz')).toContainText('1 / 2');
+  await expect(row('Lech Lecha Quiz')).toContainText('1 of 2 times');
   await expect(row('Vayeira Quiz')).toContainText('In Progress');
   await expect(row('Bereishis Quiz')).toContainText('100%');
   await expect(sec.locator('tbody > tr', { hasText: 'Beni Private Quiz' })).toHaveCount(0);

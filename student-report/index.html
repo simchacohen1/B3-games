@@ -88,7 +88,7 @@ td.none{color:#cbd5e1}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
-<script src="quiz-history.js?v=20261026-quiz-history"></script>
+<script src="quiz-history.js?v=20261026-repeat-launches"></script>
 </head><body>
 <header>
  <div><h1>📈 Student Report</h1><div class="sub">Every tool, one place — by student or whole class</div></div>
@@ -386,13 +386,13 @@ function quizSection(s,pl){
   '<span class="qchip"><b class="'+tone(q.avg)+'">'+(q.avg===null?'—':q.avg+'%')+'</b>average of completed quizzes</span><span class="qchip"><b>'+q.pointsEarned+' / '+q.pointsPossible+'</b>points on completed quizzes</span></div>';
  if(!hist.quizzes.length&&!hist.unavailable.length)h+='<div class="empty">No Weekly Quizzes were given to him '+esc(pl)+'.</div>';
  else{
-  h+='<div class="tablebox"><table><thead><tr><th>Quiz</th><th>Date</th><th>Status</th><th>Points</th><th>Percent</th><th>Attempts</th><th></th></tr></thead><tbody>';
+  h+='<div class="tablebox"><table><thead><tr><th>Quiz</th><th>Date</th><th>Status</th><th>Points</th><th>Percent</th><th>Tried / given</th><th></th></tr></thead><tbody>';
   hist.quizzes.forEach(z=>{
    const k=z.key,open=openQuiz.has(k),tried=z.attempts.filter(a=>a.status!=='not_started').length;
    let pts='—',pc='—';
    if(z.status==='completed'){pts=z.correct+' / '+z.total;pc='<b class="'+tone(z.pct)+'">'+z.pct+'%</b>'}
    else if(z.partial){pts='<span class="status">'+z.partial.correct+' correct, '+z.partial.answered+' of '+z.partial.total+' answered</span>';pc='<span class="status">in progress</span>'}
-   h+='<tr><td><b>'+esc(z.title)+'</b>'+(z.counted&&z.attempts.length>1?'<span class="note">Score shown is from '+esc(z.counted.kind)+'</span>':'')+'</td><td>'+esc(qday(z.date))+'</td><td>'+pill(z.status)+(z.status!=='completed'&&z.closed?'<span class="note">quiz closed</span>':'')+(z.beforeJoined&&z.status==='not_started'?'<span class="note">given before his account was created</span>':'')+'</td><td>'+pts+'</td><td>'+pc+'</td><td>'+tried+(z.attempts.length>tried?' <span class="status">('+z.attempts.length+' given)</span>':'')+'</td>'+
+   h+='<tr><td><b>'+esc(z.title)+'</b>'+(z.attempts.length>1?'<span class="note">Given '+z.attempts.length+' times — see Details</span>':'')+(z.counted&&z.attempts.length>1?'<span class="note">Score shown is from '+esc(z.counted.kind)+' on '+esc(qday(z.counted.date))+'</span>':'')+(z.sameNameOther?'<span class="note">Another quiz has this name but different questions</span>':'')+'</td><td>'+esc(qday(z.date))+'</td><td>'+pill(z.status)+(z.status!=='completed'&&z.closed?'<span class="note">quiz closed</span>':'')+(z.beforeJoined&&z.status==='not_started'?'<span class="note">given before his account was created</span>':'')+'</td><td>'+pts+'</td><td>'+pc+'</td><td>'+tried+' of '+z.attempts.length+(z.attempts.length===1?' time':' times')+'</td>'+
     '<td class="noprint"><button class="linkbtn" data-qk="'+esc(k)+'">'+(open?'Hide details ▴':'Details ▾')+'</button></td></tr>';
    if(open)h+='<tr class="qdet"><td colspan="7">'+z.attempts.map(attemptHtml).join('')+'</td></tr>';
   });
