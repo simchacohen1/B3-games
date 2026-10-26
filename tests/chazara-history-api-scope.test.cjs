@@ -78,3 +78,28 @@ test('unassigned class selection and revoked teacher deny Chazara read API',asyn
  assert.notEqual(revoked.code,200,'revoked teacher is forbidden');
  assert.equal(x.writes.length,0);
 });
+
+test('pending-only queue does not scan Chazara event histories or write recovery records',async()=>{
+ const x=server(fixture());
+ const response=await x.call('list-chazara-pending');
+ assert.equal(response.code,200,JSON.stringify(response.body));
+ assert.equal(x.reads.some(p=>p==='posukPractice/chazara/events'||p.startsWith('posukPractice/chazara/events/')),false,
+   'pending queue must not read entire event history on server');
+ assert.equal(x.writes.length,0,'pending queue must not repair saved Chazara records');
+});
+test('explicit class-scoped recovery can read histories but never runs on unassigned class',async()=>{
+ const data=fixture(),path='posukPractice/chazara/events/shared';
+ // Already reviewed events: recovery should scan, then leave data unchanged.
+ data[path]=Object.fromEntries(Object.entries(data[path]).map(([id,e])=>[id,{...e,pointRequestStatus:'approved'}]));
+ const x=server(data);
+ const result=await x.call('repair-chazara-pending');
+ assert.equal(result.code,200,JSON.stringify(result.body));
+ assert.ok(x.reads.includes(path),'explicit recovery scans the selected class history');
+ assert.equal(x.writes.length,0,'already-approved events must remain unchanged');
+ const y=server(fixture());
+ const forbidden=await y.call('repair-chazara-pending',{classId:'wt'});
+ assert.notEqual(forbidden.code,200,'unassigned class recovery must fail');
+ assert.equal(y.reads.some(p=>p.startsWith('posukPractice/chazara/events')),false,
+   'no event histories may be read before authorization');
+ assert.equal(y.writes.length,0);
+});
