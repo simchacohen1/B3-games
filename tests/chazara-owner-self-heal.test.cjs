@@ -17,8 +17,22 @@ function setup(){
   console:{error(...a){throw a[1]}},Object,Number,Date,String};
  vm.createContext(ctx);vm.runInContext(code,ctx);return {ctx,created,updates};
 }
-test('owner All-classes view recreates missing requests without needing a database index',async()=>{const x=setup();await x.ctx.listPendingChazaraRequests(null);assert.equal(x.created.length,1);assert.equal(x.created[0].rewardStudentId,'rw1');assert.equal(x.created[0].amount,2);assert.ok(x.updates.some(([p,v])=>p.endsWith('/e1')&&v.pointRequestStatus==='pending'))});
-test('class view repairs and lists pending requests without needing a database index',async()=>{const x=setup();const rows=await x.ctx.listPendingChazaraRequests({owner:false,selected:'et',students:{simcha_cohen:{classId:'et'}}});assert.equal(x.created.length,1);assert.equal(rows.length,1)});
+test('owner All-classes pending view never scans histories or silently repairs saved Chazaras',async()=>{
+ const x=setup();const rows=await x.ctx.listPendingChazaraRequests(null);
+ assert.equal(rows.length,0);assert.equal(x.created.length,0);assert.equal(x.updates.length,0);
+});
+test('class pending view never repairs saved Chazaras during ordinary startup',async()=>{
+ const x=setup();const rows=await x.ctx.listPendingChazaraRequests({owner:false,selected:'et',students:{simcha_cohen:{classId:'et'}}});
+ assert.equal(rows.length,0);assert.equal(x.created.length,0);assert.equal(x.updates.length,0);
+});
+test('explicit selected-class recovery restores a missing request without an index and is idempotent',async()=>{
+ const x=setup(),scope={owner:false,selected:'et',students:{simcha_cohen:{classId:'et'}}};
+ await x.ctx.repairMissingChazaraPointRequests(scope);
+ assert.equal(x.created.length,1);assert.equal(x.created[0].rewardStudentId,'rw1');assert.equal(x.created[0].amount,2);
+ assert.ok(x.updates.some(([p,v])=>p.endsWith('/e1')&&v.pointRequestStatus==='pending'));
+ await x.ctx.repairMissingChazaraPointRequests(scope);
+ assert.equal(x.created.length,1,'a second recovery must not create duplicate requests');
+});
 test('reward student lookup links by b3StudentId without a query index',async()=>{const x=setup();assert.equal(await x.ctx.resolveRewardStudentId('simcha_cohen'),'rw1')});
 test('database-saved recordings with a codec in the audio type pass verification',async()=>{
  const code=slice('async function verifyChazara','async function studentInfo');
