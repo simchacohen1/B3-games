@@ -30,7 +30,7 @@ test('all 613 masks match native artwork, never include outline pixels, and reje
   assert.equal(sizes.size,m.regions);assert.ok([...sizes.values()].every(n=>n<=mask.width*mask.height*.18),card+' no page-size fill');
  }
 });
-for(const n of [1,475,476,484,487,495,496,497,498,499,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
+for(const n of [1,475,476,484,487,495,496,497,498,499,500,501,502,503,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
  const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),seeds=new Map(),counts=new Map();
  for(let i=0;i<mask.width*mask.height;i++){const id=mask.labels[i];if(id){seeds.set(id,i);counts.set(id,(counts.get(id)||0)+1);}}
  const small=[...counts].filter(([,n])=>n>=3).sort((a,b)=>a[1]-b[1])[0],large=[...counts].sort((a,b)=>b[1]-a[1])[0];
@@ -47,6 +47,18 @@ for(const n of [1,475,476,484,487,495,496,497,498,499,613])test(`real picture ${
   const cssX=(x+.5)*factor,cssY=(y+.5)*factor;
   assert.equal(regionFromMask(mask,mask.width,mask.height,cssX/factor,cssY/factor).region,small[0]);
  }
+});
+for(const n of [500,501,502,503])test(`new weekly picture ${n}: every engine region fills exactly once without leaks`,()=>{
+ const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),counts=new Map(),seeds=new Map();
+ for(let i=0;i<mask.labels.length;i++){const id=mask.labels[i];if(id){counts.set(id,(counts.get(id)||0)+1);if(!seeds.has(id))seeds.set(id,i);}}
+ assert.equal(counts.size,m.regions);
+ const target=new Uint32Array(mask.labels.length);
+ for(const [id,size] of counts){
+  const seed=seeds.get(id),result=regionFromMask(mask,mask.width,mask.height,seed%mask.width,Math.floor(seed/mask.width));
+  assert.equal(result.region,id,`seed resolves to region ${id}`);assert.equal(result.pixels.length,size,`region ${id} is complete`);
+  for(const pixel of result.pixels){assert.equal(mask.labels[pixel],id,`region ${id} cannot cross a boundary`);target[pixel]=id;}
+ }
+ for(let i=0;i<target.length;i++)assert.equal(target[i],mask.labels[i],`every fillable pixel belongs to exactly its source region`);
 });
 test('missing, mismatched or giant masks fail closed',()=>{
  assert.equal(regionFromMask(null,9,9,4,4).reason,'unavailable');
