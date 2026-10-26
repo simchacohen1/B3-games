@@ -6,6 +6,8 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+firebase-debug.log*
+database-debug.log
 /playwright/.auth/
 
 firebase_idb.json
