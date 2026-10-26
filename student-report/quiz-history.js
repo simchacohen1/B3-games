@@ -130,29 +130,21 @@ function practiceRows(raw,since=0){
 const STATUS={completed:'Completed',in_progress:'In Progress',not_started:'Not Started'};
 const day=t=>t?new Date(t).toLocaleDateString():'';
 const when=t=>t?new Date(t).toLocaleString():'';
-/* Rows for "Download This Student CSV": one row per attempt, then one per question. */
+/* Rows for "Download This Student CSV": one row per time a quiz was given (no per-question rows). */
 function studentCsvRows({name,className,periodLabel,history,practice}){
- const head=['Student','Class','Period','Row type','Quiz','Quiz date','Quiz status','Attempt','Attempt status','Points earned','Points possible','Percent','Counts toward average','Completed at','Question #','Question','His answer','Correct answer','Question result'];
+ const head=['Student','Class','Period','Row type','Quiz','Quiz date','Quiz status','Attempt','Attempt status','Points earned','Points possible','Percent','Counts toward average','Completed at'];
  const rows=[head],base=[name,className,periodLabel];
  history.quizzes.slice().sort((a,b)=>a.date-b.date).forEach(q=>{
-  if(!q.attempts.length)return;
   q.attempts.forEach(a=>{
-   const started=a.status!=='not_started';
-   rows.push([...base,'Attempt',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status]+(a.completedHow&&a.completedHow!=='submitted'?' ('+a.completedHow+')':'')+(a.status!=='completed'&&a.closed?' (quiz closed)':''),
-    started?a.correct:'',a.total||'',a.status==='completed'?a.pct+'%':(a.status==='in_progress'?'In progress — '+a.answered+' of '+a.total+' answered':''),
-    q.counted===a?'Yes':'No',when(a.completedAt),'','','','','']);
-   if(started)a.questions.forEach(x=>rows.push([...base,'Question',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status],'','','','','',x.n,x.q,x.answer,x.key,(x.result==='correct'?'Correct':x.result==='incorrect'?'Incorrect':'Unanswered')+(x.adjusted?' (teacher adjusted)':'')]));
-   if(started&&!a.questionsAvailable)rows.push([...base,'Question',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status],'','','','','','','Question details unavailable','','','']);
+   rows.push([...base,'Quiz',q.title,day(q.date),STATUS[q.status],a.kind+' · '+day(a.date),STATUS[a.status]+(a.completedHow&&a.completedHow!=='submitted'?' ('+a.completedHow+')':'')+(a.status!=='completed'&&a.closed?' (quiz closed)':''),
+    a.status!=='not_started'?a.correct:'',a.total||'',a.status==='completed'?a.pct+'%':(a.status==='in_progress'?'In progress — '+a.answered+' of '+a.total+' answered':''),
+    q.counted===a?'Yes':'No',when(a.completedAt)]);
   });
  });
- history.unavailable.forEach(u=>rows.push([...base,'Attempt','Quiz record no longer available',day(u.date),'Data unavailable','','Data unavailable','','','','No','','','','','','']));
- (practice||[]).slice().reverse().forEach(p=>{
-  rows.push([...base,'Practice',p.title,day(p.date),'Completed','Practice','Completed',p.correct,p.total,p.pct==null?'':p.pct+'%','No (practice)',when(p.date),'','','','','']);
-  p.questions.forEach(x=>rows.push([...base,'Practice question',p.title,day(p.date),'Completed','Practice','Completed','','','','','',x.n,x.q,'','',x.result==='correct'?'Correct':'Incorrect']));
- });
+ history.unavailable.forEach(u=>rows.push([...base,'Quiz','Quiz record no longer available',day(u.date),'Data unavailable','','Data unavailable','','','','No','']));
+ (practice||[]).slice().reverse().forEach(p=>rows.push([...base,'Practice',p.title,day(p.date),'Completed','Practice','Completed',p.correct,p.total,p.pct==null?'':p.pct+'%','No (practice)',when(p.date)]));
  const s=history.summary;
- rows.push([]);
- rows.push([...base,'Summary','Assigned quizzes: '+s.assigned,'','Completed '+s.completed+' · In progress '+s.inProgress+' · Not started '+s.notStarted,'','',s.pointsEarned,s.pointsPossible,s.avg==null?'':s.avg+'%','Average of completed quizzes only','','','','','','']);
+ rows.push([...base,'Summary','Assigned quizzes: '+s.assigned,'','Completed '+s.completed+' · In progress '+s.inProgress+' · Not started '+s.notStarted,'','',s.pointsEarned,s.pointsPossible,s.avg==null?'':s.avg+'%','Average of completed quizzes only','']);
  return rows;
 }
 function toCsv(rows){return rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n')}

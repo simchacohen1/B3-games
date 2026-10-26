@@ -114,6 +114,8 @@ test('ET: a boy\'s report lists every quiz, all attempts, question detail and a 
   expect(csv).not.toContain('Synthetic Beni');
   expect(csv).not.toContain('Beni Private Quiz');
   expect(csv).toContain('In Progress');
+  expect(csv).toContain('Posuk pesukim at 100%');
+  expect(csv).not.toContain('Who went to Mitzrayim?');
   // the page itself must not scroll sideways at 100% zoom
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: /Back to class/ }).click();

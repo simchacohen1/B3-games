@@ -88,7 +88,7 @@ td.none{color:#cbd5e1}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
-<script src="quiz-history.js?v=20261026-repeat-launches"></script>
+<script src="quiz-history.js?v=20261026-simple-csv"></script>
 </head><body>
 <header>
  <div><h1>📈 Student Report</h1><div class="sub">Every tool, one place — by student or whole class</div></div>
@@ -409,18 +409,20 @@ function quizSection(s,pl){
 }
 function studentCsv(s){
  const cls=classes.find(c=>c.id===current),x=extras[current+'/'+s.id]||{},days=+$('period').value;
- const rows=B3QuizHistory.studentCsvRows({name:s.name,className:cls?cls.name:current,periodLabel:$('period').selectedOptions[0].text,history:s.quizHist,practice:x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):[]});
+ // Same summary line he has in the class CSV, then his quizzes.
+ const pl=$('period').selectedOptions[0].text;
+ const rows=[classCsvHead(pl),classCsvRow(s),[],...B3QuizHistory.studentCsvRows({name:s.name,className:cls?cls.name:current,periodLabel:$('period').selectedOptions[0].text,history:s.quizHist,practice:x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):[]})];
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+B3QuizHistory.toCsv(rows)],{type:'text/csv'}));
  a.download='quiz-history-'+s.name.replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 function closeReport(){openId='';$('report').style.display='none';$('classView').style.display='';$('summary').style.display=''}
 
 /* ---------- CSV ---------- */
+function classCsvHead(pl){return ['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average %, completed quizzes only ('+pl+')','Quizzes completed ('+pl+')','Quizzes assigned ('+pl+')','Points']}
+function classCsvRow(s){const t=s.t;return [s.name,s.last?new Date(s.last).toLocaleDateString():'',s.toolsUsed,t.posuk?.mastered??'',t.posuk?.pesukim??'',t.posuk?.tries??'',t.chazara?.inPeriod??'',t.chazara?.reviewed??'',t.shorashim?.cards??'',t.rashi?.unit??'',t.rashi?.acc??'',t.gematria?.stars??'',t.gematria?.acc??'',t.yiddish?.learned??'',t.halacha?.done??'',t.quiz?.avg??'',t.quiz?.completed??'',t.quiz?.assigned??'',s.rew?.balance??'']}
 function csv(){
  const d=loaded[current];if(!d||!d.view)return;const pl=$('period').selectedOptions[0].text;
- const head=['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average %, completed quizzes only ('+pl+')','Quizzes completed ('+pl+')','Quizzes assigned ('+pl+')','Points'];
- const rows=d.view.map(s=>{const t=s.t;return [s.name,s.last?new Date(s.last).toLocaleDateString():'',s.toolsUsed,t.posuk?.mastered??'',t.posuk?.pesukim??'',t.posuk?.tries??'',t.chazara?.inPeriod??'',t.chazara?.reviewed??'',t.shorashim?.cards??'',t.rashi?.unit??'',t.rashi?.acc??'',t.gematria?.stars??'',t.gematria?.acc??'',t.yiddish?.learned??'',t.halacha?.done??'',t.quiz?.avg??'',t.quiz?.completed??'',t.quiz?.assigned??'',s.rew?.balance??'']});
- const text=[head,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const text=[classCsvHead(pl),...d.view.map(classCsvRow)].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/csv'}));
  const cls=classes.find(c=>c.id===current);a.download='student-report-'+(cls?cls.name:current).replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
