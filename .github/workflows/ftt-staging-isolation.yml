@@ -1,0 +1,27 @@
+name: FTT staging isolation checks
+
+on:
+  pull_request:
+    paths:
+      - 'staging/**'
+      - 'tests/staging-isolation.test.cjs'
+      - 'e2e/staging-isolation.spec.ts'
+      - '.github/workflows/ftt-staging-isolation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node --test tests/staging-isolation.test.cjs
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/staging-isolation.spec.ts --project=chromium

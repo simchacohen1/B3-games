@@ -1,0 +1,164 @@
+/*
+ * Staging-only configuration loader.
+ * The deployment workflow writes staging/firebase-config.generated.js from
+ * explicit, nonproduction configuration. This file must fail before app code
+ * runs when that generated configuration is missing or targets production.
+ */
+(function (root) {
+  'use strict';
+
+  const REQUIRED_PROJECT = 'fun-torah-tools-staging';
+  const BLOCKED_VALUES = [
+    'b3-games',
+    'b3-games.firebaseapp.com',
+    'b3-games.firebasestorage.app',
+    'b3-games-default-rtdb.firebaseio.com',
+    'us-central1-b3-games.cloudfunctions.net',
+    'posuk-scorer.onrender.com',
+    'nigrisync.onrender.com'
+  ];
+
+  function fail(message) {
+    root.__B3_STAGING_BLOCKED__ = true;
+    if (root.document && root.document.documentElement) {
+      root.document.documentElement.dataset.stagingBlocked = 'true';
+    }
+    throw new Error('[FTT staging] ' + message);
+  }
+
+  function getConfig() {
+    const config = root.B3_STAGING_FIREBASE_CONFIG;
+    if (!config || typeof config !== 'object') {
+      fail('Staging Firebase configuration was not generated.');
+    }
+    const expectedDb = 'https://' + REQUIRED_PROJECT + '-default-rtdb.firebaseio.com';
+    if (config.projectId !== REQUIRED_PROJECT ||
+        config.authDomain !== REQUIRED_PROJECT + '.firebaseapp.com' ||
+        config.databaseURL !== expectedDb ||
+        typeof config.storageBucket !== 'string' ||
+        !config.storageBucket.startsWith(REQUIRED_PROJECT + '.')) {
+      fail('Firebase configuration does not point exclusively to the approved staging project.');
+    }
+    for (const key of ['apiKey', 'messagingSenderId', 'appId']) {
+      if (typeof config[key] !== 'string' || !config[key].trim()) {
+        fail('Staging Firebase configuration is incomplete (' + key + ').');
+      }
+    }
+    const serialized = JSON.stringify(config).toLowerCase();
+    if (BLOCKED_VALUES.some(value => serialized.includes(value))) {
+      fail('Production Firebase or third-party configuration was found in the staging config.');
+    }
+    return Object.freeze({ ...config });
+  }
+
+  function requestText(input, init) {
+    let value = '';
+    try {
+      value = typeof input === 'string' ? input : input && input.url ? input.url : String(input || '');
+    } catch (_) {}
+    if (init && init.body != null) {
+      try { value += ' ' + (typeof init.body === 'string' ? init.body : String(init.body)); } catch (_) {}
+    }
+    return value.toLowerCase();
+  }
+
+  function isBlockedRequest(input, init) {
+    const value = requestText(input, init);
+    return BLOCKED_VALUES.some(blocked => value.includes(blocked));
+  }
+
+  function installNetworkGuards(target) {
+    if (!target || target.__B3_STAGING_NETWORK_GUARDS__) return;
+    const block = (input, init) => {
+      if (isBlockedRequest(input, init)) {
+        fail('Blocked a request to a production Firebase or third-party service.');
+      }
+    };
+
+    if (typeof target.fetch === 'function') {
+      const originalFetch = target.fetch.bind(target);
+      target.fetch = function (input, init) {
+        block(input, init);
+        return originalFetch(input, init);
+      };
+    }
+    if (target.XMLHttpRequest) {
+      const xhrOpen = target.XMLHttpRequest.prototype.open;
+      target.XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+        block(url);
+        return xhrOpen.call(this, method, url, ...rest);
+      };
+      const xhrSend = target.XMLHttpRequest.prototype.send;
+      target.XMLHttpRequest.prototype.send = function (body) {
+        block('', { body });
+        return xhrSend.call(this, body);
+      };
+    }
+    for (const constructor of ['WebSocket', 'EventSource']) {
+      const Native = target[constructor];
+      if (typeof Native === 'function') {
+        const Guarded = function (url, ...args) {
+          block(url);
+          return Reflect.construct(Native, [url, ...args], new.target || Native);
+        };
+        Guarded.prototype = Native.prototype;
+        Object.setPrototypeOf(Guarded, Native);
+        target[constructor] = Guarded;
+      }
+    }
+    if (target.navigator && typeof target.navigator.sendBeacon === 'function') {
+      const sendBeacon = target.navigator.sendBeacon.bind(target.navigator);
+      target.navigator.sendBeacon = function (url, data) {
+        block(url, { body: data });
+        return sendBeacon(url, data);
+      };
+    }
+    if (target.HTMLFormElement) {
+      for (const method of ['submit', 'requestSubmit']) {
+        const original = target.HTMLFormElement.prototype[method];
+        if (typeof original === 'function') {
+          target.HTMLFormElement.prototype[method] = function (...args) {
+            block(this.action);
+            return original.apply(this, args);
+          };
+        }
+      }
+    }
+    if (typeof target.addEventListener === 'function') {
+      target.addEventListener('submit', event => {
+        const form = event.target;
+        if (form && form.action) block(form.action);
+      }, true);
+    }
+    Object.defineProperty(target, '__B3_STAGING_NETWORK_GUARDS__', { value: true });
+  }
+
+  function installFirebaseGuard(target, config) {
+    const sdk = target.firebase;
+    if (!sdk || typeof sdk.initializeApp !== 'function') return;
+    if (sdk.__B3_STAGING_INITIALIZE_GUARD__) return;
+    const original = sdk.initializeApp.bind(sdk);
+    sdk.initializeApp = function (provided, name) {
+      const actual = provided || (sdk.apps && sdk.apps.length ? sdk.app().options : null);
+      if (!actual || actual.projectId !== config.projectId ||
+          actual.databaseURL !== config.databaseURL ||
+          actual.storageBucket !== config.storageBucket ||
+          actual.authDomain !== config.authDomain ||
+          actual.apiKey !== config.apiKey) {
+        fail('Firebase refused to initialize with anything except the configured staging project.');
+      }
+      return original(provided, name);
+    };
+    Object.defineProperty(sdk, '__B3_STAGING_INITIALIZE_GUARD__', { value: true });
+  }
+
+  const api = { REQUIRED_PROJECT, BLOCKED_VALUES, getConfig, isBlockedRequest, installNetworkGuards, installFirebaseGuard };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root && root.window === root) {
+    const config = getConfig();
+    root.B3_FIREBASE_CONFIG = config;
+    installNetworkGuards(root);
+    installFirebaseGuard(root, config);
+    root.B3_STAGING_READY = true;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);
