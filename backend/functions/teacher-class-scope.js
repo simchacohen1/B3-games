@@ -7,7 +7,11 @@ async function roster(get,access,selected,tool='chazara'){
  const owner=access.role==='admin';
  if(selected&&!validKey(selected))fail('Choose a valid class.');
  if(!owner&&selected&&!(access.classIds||[]).includes(selected))fail('This class is not assigned to your teacher account.');
- const ids=selected?[selected]:owner?['et','wt']:(access.classIds||[]);
+ let ids=selected?[selected]:(access.classIds||[]);
+ if(owner&&!selected){
+  const all=await get('b3Games/workspaces/'+WS+'/classes')||{};
+  ids=Object.keys(all).filter(id=>validKey(id)&&all[id]&&all[id].active!==false).sort();
+ }
  if(!owner&&ids.length!==1)fail('Choose a class from your teacher dashboard.');
  const result={students:{},classes:{},selected:selected||(!owner?ids[0]:''),owner};
  for(const classId of ids){
@@ -31,7 +35,11 @@ function recordAllowed(scope,studentId,record){
  if(scope.owner&&!scope.selected)return true;
  const classId=record.workspaceClassId||record.sourceClassId||record.classId;
  if(classId)return classId===student.classId||classId==='b3_'+student.classId;
- return ['et','wt'].includes(student.classId)||student.membershipClassIds.length===1;
+ // Classless legacy records can only be attributed when exactly one verified
+ // membership exists, regardless of the class name. Ambiguous records must
+ // be backfilled with class provenance before a teacher can modify them.
+ const memberships=Array.isArray(student.membershipClassIds)?student.membershipClassIds:[];
+ return memberships.length===1&&memberships[0]===student.classId;
 }
 const api={roster,recordAllowed,validKey};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FunTorahTeacherScope=api;
