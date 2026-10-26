@@ -1759,7 +1759,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Clear the student identity first so auth callbacks cannot restore the
     // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
-    resetPinForm();
     studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
