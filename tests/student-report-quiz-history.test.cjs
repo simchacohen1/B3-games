@@ -152,3 +152,23 @@ test('student report page loads the history module and keeps the class CSV',()=>
  assert.match(html,/id="csv"[^>]*>⬇ Class CSV \(whole class\)/);
  assert.doesNotMatch(html,/function quizRows/);
 });
+
+test('the same quiz given more than once is one row with several attempts, not extra missed quizzes',()=>{
+ const other=[{q:'Different?',choices:['A','B'],correctIndex:0}];
+ const root={launches:{
+  first:launch({classId:'et',deliveryType:'live',quizId:'quiz_7',endedAt:NOW-9*DAY,attemptGroupId:'first',quizSnapshot:{title:'Shorashim Perek 18',questions:q3}}),
+  again:launch({classId:'et',deliveryType:'anytime',quizId:'quiz_7',createdAt:NOW-6*DAY,startedAt:NOW-6*DAY,attemptGroupId:'again',quizSnapshot:{title:'Shorashim Perek 18',questions:q3}}),
+  copyA:launch({classId:'et',deliveryType:'live',endedAt:NOW-15*DAY,createdAt:NOW-15*DAY,startedAt:NOW-15*DAY,attemptGroupId:'copyA',quizSnapshot:{title:'Cheshvan Quiz',questions:q3}}),
+  copyB:launch({classId:'et',deliveryType:'live',createdAt:NOW-15*DAY+60000,startedAt:NOW-15*DAY+60000,attemptGroupId:'copyB',quizSnapshot:{title:' cheshvan quiz',questions:q3}}),
+  newQs:launch({classId:'et',deliveryType:'live',createdAt:NOW-2*DAY,startedAt:NOW-2*DAY,attemptGroupId:'newQs',quizSnapshot:{title:'Cheshvan Quiz',questions:other}})
+ },responses:{again:{s_a:{0:right(0),1:right(1),2:wrong(2)}}},completions:{again:{s_a:{completedAt:NOW-6*DAY,correct:2,total:3,pct:67}}}};
+ const h=H.buildHistory({root,studentId:'s_a',classId:'et'});
+ assert.equal(h.quizzes.length,3);
+ const shor=byTitle(h,'Shorashim Perek 18');
+ assert.equal(shor.attempts.length,2);assert.equal(shor.status,'completed');assert.equal(shor.pct,67);
+ const cheshvan=h.quizzes.filter(q=>q.title.trim().toLowerCase()==='cheshvan quiz');
+ assert.equal(cheshvan.length,2,'same name with different questions stays separate');
+ assert.ok(cheshvan.some(q=>q.attempts.length===2),'same name and same questions are joined');
+ assert.ok(cheshvan.every(q=>q.sameNameOther));
+ assert.equal(h.summary.notStarted,2);assert.equal(h.summary.completed,1);
+});
