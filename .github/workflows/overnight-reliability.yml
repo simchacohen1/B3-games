@@ -1,0 +1,92 @@
+name: Overnight reliability
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/overnight-reliability.yml'
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - 'firebase.security-test.json'
+      - 'firebase-rules.hardened.json'
+      - 'storage-rules.hardened.rules'
+      - 'record_pesukim/**'
+      - 'chazara/**'
+      - 'shorashim/**'
+      - 'teacher-class-scope.js'
+      - 'backend/functions/**'
+      - 'package-lock.json'
+      - 'backend/functions/package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: overnight-reliability-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  synthetic-browser-readiness:
+    name: Synthetic learning tools and access boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install browser and Firebase test dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend/functions --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Verify database and storage rules in local emulators
+        env:
+          B3_RUN_RTDB_EMULATOR_TESTS: '1'
+          B3_RUN_STORAGE_EMULATOR_TESTS: '1'
+          FIREBASE_DATABASE_EMULATOR_PORT: '19100'
+          FIREBASE_STORAGE_EMULATOR_PORT: '19199'
+          JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx2g'
+        run: npx firebase emulators:exec --project demo-ftt-security --config firebase.security-test.json --only database,storage "node --test tests/security-rules-emulator.test.cjs && node --test tests/storage-rules-emulator.test.cjs"
+      - name: Verify teacher scopes and student management policies
+        run: node --test tests/chazara-teacher-scope.test.cjs tests/posuk-teacher-scope.test.cjs tests/shorashim-teacher-scope.test.cjs tests/student-management.test.cjs
+      - name: Run synthetic browser and emulator reliability suite
+        id: reliability
+        env:
+          CI: 'true'
+          B3_RUN_RTDB_EMULATOR_TESTS: '1'
+          B3_RUN_STORAGE_EMULATOR_TESTS: '1'
+          FIREBASE_DATABASE_EMULATOR_PORT: '19100'
+          FIREBASE_STORAGE_EMULATOR_PORT: '19199'
+          JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx2g'
+        run: npx firebase emulators:exec --project demo-ftt-readiness --config firebase.security-test.json --only auth,database,storage,functions "npx playwright test e2e/firebase-auth-emulator.spec.ts e2e/synthetic-multiteacher-classroom.spec.ts --project=chromium --workers=1"
+      - name: Write nightly status summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Overnight reliability result'
+            echo
+            echo "- Result: **${{ steps.reliability.outcome || 'not run' }}**"
+            echo "- Commit: `${GITHUB_SHA}`"
+            echo "- Run: [${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            echo '- Coverage: synthetic sign-in, class/teacher creation, student roster, Weekly Quiz, Rashi Letters, Posuk Practice, Chazara, Shorashim, progress persistence, teacher controls, permissions, and ET/WT isolation.'
+            echo '- All Firebase writes use the `demo-ftt-readiness` Auth, Realtime Database, Storage, and Functions emulators.'
+            echo '- Evidence (screenshots, traces, HTML report, and emulator logs) is attached as a 14-day workflow artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload screenshots, errors, reports, and emulator logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: overnight-reliability-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            test-results/
+            playwright-report/
+            firebase-debug.log
+            database-debug.log
+            storage-debug.log
