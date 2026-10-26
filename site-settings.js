@@ -481,12 +481,16 @@
   }
 
   let currentAccess = { authorized: false, role: "", classIds: [] };
+  // Popup completion and Firebase's auth-state callback can request the same
+  // authorization check at the same time. Share only in-flight work for this
+  // UID; once it settles, the next auth event performs fresh permission reads.
+  const accessChecksInFlight = new Map();
 
   function isBootstrapAdmin(user) {
     return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
-  function readUserAccess(user) {
+  function readUserAccessFromFirebase(user) {
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
@@ -535,6 +539,19 @@
         });
       });
     }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
+  }
+
+  function readUserAccess(user) {
+    const uid = user && String(user.uid || "");
+    if (!uid) return readUserAccessFromFirebase(user);
+    const pending = accessChecksInFlight.get(uid);
+    if (pending) return pending;
+    let request;
+    request = readUserAccessFromFirebase(user).finally(function () {
+      if (accessChecksInFlight.get(uid) === request) accessChecksInFlight.delete(uid);
+    });
+    accessChecksInFlight.set(uid, request);
+    return request;
   }
 
   function isAuthorizedUser(user) {
