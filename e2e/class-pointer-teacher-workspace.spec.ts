@@ -95,7 +95,9 @@ async function enterFullScreen(page: Page) {
   await expect(page.locator('#stage')).toHaveClass(/lesson-fullscreen/);
 }
 
-test('full-screen Students panel is larger, can be dragged by its heading and resized', async ({ browser }) => {
+// Commit 58095c86 ("Compact Students panel") replaced the large resizable drawer with a compact
+// 300px popover (resize:none). It must still float over the lesson and be draggable by its heading.
+test('full-screen Students panel is a compact popover that can be dragged by its heading', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
@@ -103,8 +105,9 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   const drawer = page.locator('#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open');
   await expect(drawer).toBeVisible();
   const before = (await drawer.boundingBox())!;
-  expect(before.width).toBeGreaterThanOrEqual(340);
-  expect(before.height).toBeGreaterThanOrEqual(400);
+  expect(Math.round(before.width)).toBe(300);
+  expect(before.height).toBeGreaterThanOrEqual(150);
+  expect(await drawer.evaluate((el: HTMLElement) => getComputedStyle(el).resize)).toBe('none');
 
   const head = drawer.locator('.cp-drawer-head');
   const h = (await head.boundingBox())!;
@@ -117,15 +120,8 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   expect(moved.x).toBeGreaterThan(before.x + 200);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
-  // The browser's resize corner writes plain inline sizes; the stylesheet must not override them.
-  await page.mouse.move(moved.x + moved.width - 3, moved.y + moved.height - 3);
-  await page.mouse.down();
-  await page.mouse.move(moved.x + moved.width + 80, moved.y + moved.height - 120, { steps: 8 });
-  await page.mouse.up();
-  const resized = (await drawer.boundingBox())!;
-  await shot(page, 'drawer-resized');
-  expect(resized.width).toBeGreaterThan(moved.width + 40);
-  expect(resized.height).toBeLessThan(moved.height - 60);
+  expect(Math.round(moved.width)).toBe(Math.round(before.width));
+  // Inline sizes (the drawer's own layout code) must still win over the compact stylesheet.
   await drawer.evaluate((el: HTMLElement) => { el.style.width = '420px'; el.style.height = '300px'; });
   expect(Math.round((await drawer.boundingBox())!.width)).toBe(420);
 
