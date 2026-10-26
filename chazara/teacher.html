@@ -38,7 +38,7 @@
 <div class="panel approval-panel" id="approvalPanel">
   <div class="approval-head">
     <div><h2>⭐ Student Activity Points Awaiting Approval</h2><div class="sub">Review Chazara and Posuk Practice milestone requests for your selected class.</div></div>
-    <div class="approval-actions"><span class="approval-count" id="approvalCount">0</span><button class="approve-all hidden" id="approveAllBtn">Approve All</button></div>
+    <div class="approval-actions"><button id="repairMissingRequestsBtn" class="hidden" type="button" title="Only use when expected Chazara point requests are missing. This checks saved class histories and may take time.">Recover Missing Requests</button><span class="approval-count" id="approvalCount">0</span><button class="approve-all hidden" id="approveAllBtn">Approve All</button></div>
   </div>
   <div id="approvalList" class="request-list"><div class="approval-empty">Loading student activity point requests…</div></div>
   <div id="approvalStatus" class="approval-status"></div><button id="approvalSignInBtn" class="approval-signin hidden" type="button">Sign in with Google to manage points</button>
@@ -296,6 +296,18 @@ async function rejectPointRequest(id,quiet=false){
 $("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject,oldText=b.textContent;b.disabled=true;b.textContent=a?"Approving…":"Rejecting…";try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false;b.textContent=oldText}};
 $("approveAllBtn").onclick=async()=>{const ids=Object.keys(pendingPointRequests||{});if(!ids.length)return;if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;$("approveAllBtn").disabled=true;let done=0;for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id});done++}catch(err){console.error(err)}}$("approveAllBtn").disabled=false;setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved.`);await loadApprovals()};
 $("recordingsApproveAllBtn").onclick=()=>{if(!$("approveAllBtn").disabled)$("approveAllBtn").click()};
+$("repairMissingRequestsBtn").onclick=async()=>{
+ const btn=$("repairMissingRequestsBtn");
+ if(!teacherScope?.selected){setApprovalStatus("Select one class before recovering missing requests.");return}
+ if(!confirm("Check saved Chazaras for this class and recover missing point requests? This can take some time and may update saved records."))return;
+ btn.disabled=true;setApprovalStatus("Checking saved Chazaras for missing requests…");
+ try{
+  await teacherApi("repair-chazara-pending");
+  await loadApprovals();
+  setApprovalStatus("Missing-request recovery finished.");
+ }catch(err){setApprovalStatus("Recovery failed: "+(err.message||err))}
+ finally{btn.disabled=false}
+};
 $("approvalSignInBtn").onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(provider)}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
 
 setInterval(()=>{if(!document.hidden&&auth.currentUser&&teacherScope)loadApprovals()},60000);
@@ -382,7 +394,7 @@ async function loadClassScope(user,access){
   }
   const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,new URLSearchParams(location.search).get('class')||'');
   if(generation!==scopeGeneration)return;
-  teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
+  teacherScope=scope;R=scope.students;$('repairMissingRequestsBtn').classList.toggle('hidden',!scope.selected);$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
   for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/attempts',P]]:[])){
    const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};target[id]=value;refreshScopedViews();};
