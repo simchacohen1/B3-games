@@ -71,3 +71,33 @@ test('principal invitation form validates real email addresses without accepting
  for(const email of ['bad name@example.com','principal@example','bad@@example.com'])
   assert.equal(emailPattern.test(email),false,'invalid principal email accepted: '+email);
 });
+
+
+test('principal re-claim clears class membership removed by supervision changes',async()=>{
+ const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
+ const root='b3Games/workspaces/b3-2026',writes={};
+ const existing={active:true,accountType:'principal',classIds:{et:true,wt:true}};
+ const invite={email:'principal@example.com',active:true,role:'principal',accountType:'principal',classIds:{wt:true}};
+ const store={
+  get:async key=>key===root+'/teacherInvites'?{principal_example_com:invite}:
+    key===root+'/teachers/principal-uid'?existing:null,
+  update:async updates=>Object.assign(writes,updates)
+ };
+ const identity={uid:'principal-uid',email:'principal@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ const result=await claimTeacher(store,identity);
+ assert.deepEqual(result.classIds,['wt']);
+ assert.deepEqual(writes[root+'/teachers/principal-uid'].classIds,{wt:true});
+ assert.equal(writes[root+'/classes/et/teacherIds/principal-uid'],null,'stale ET class grant must be removed');
+ assert.equal(writes[root+'/classes/wt/teacherIds/principal-uid'],true);
+});
+test('principal claim refuses invalid class keys before constructing database paths',async()=>{
+ const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
+ const root='b3Games/workspaces/b3-2026',writes={};
+ const invite={email:'principal@example.com',active:true,accountType:'principal',classIds:{wt:true,'../outside':true}};
+ const store={get:async key=>key===root+'/teacherInvites'?{principal_example_com:invite}:null,
+  update:async updates=>Object.assign(writes,updates)};
+ const identity={uid:'principal-uid',email:'principal@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ const result=await claimTeacher(store,identity);
+ assert.deepEqual(result.classIds,['wt']);
+ assert.deepEqual(Object.keys(writes).filter(key=>key.includes('/teacherIds/')), [root+'/classes/wt/teacherIds/principal-uid']);
+});
