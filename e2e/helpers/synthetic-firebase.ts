@@ -6,6 +6,7 @@ import path from 'node:path';
 const ROOT=path.resolve(__dirname,'../..');
 export const PROJECT='demo-ftt-readiness', WORKSPACE='b3-2026', CLASS_ID='pilot_room_alpha';
 export const DB_PORT=Number(process.env.FIREBASE_DATABASE_EMULATOR_PORT||19100);
+const STORAGE_PORT=Number(process.env.FIREBASE_STORAGE_EMULATOR_PORT||19199);
 const AUTH_PORT=19099, FUNCTIONS_PORT=15001;
 const OWNER='owner@example.test';
 const BOOTSTRAP='simcha5770@gmail.com';
@@ -52,6 +53,11 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
             sdk.initializeApp=function(options,name){
               var app=initialize.call(sdk,window.B3_FIREBASE_CONFIG,name);
               if(typeof app.auth==='function')configure(app.auth());
+              if(typeof app.storage==='function'&&!app.storage().__syntheticConfigured){
+                var storage=app.storage();
+                storage.useEmulator('127.0.0.1',${STORAGE_PORT});
+                storage.__syntheticConfigured=true;
+              }
               return app;
             };
             sdk.initializeApp.__syntheticConfigured=true;
@@ -83,6 +89,13 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
     }
     if(url.hostname==='us-central1-b3-games.cloudfunctions.net'){
       if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':origin(),'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization,content-type'}});
+      const syntheticFunctions:Record<string,unknown>={
+        generateTranslationChunks:{levels:[{chunks:[{hebrew:'וַיֵּרָ֤א אֵלָיו֙',english:['appeared to him'],posukNum:1}]}]},
+        generateComprehensionQuestions:{items:[{question:'What happened to Abraham?',expectedAnswer:'Hashem appeared to him.',answerHebrewPhrases:['וַיֵּרָ֤א אֵלָיו֙'],answerWordSets:[[0,1]]}]},
+        privateMediaUrl:{url:'data:audio/webm;base64,AA=='},
+      };
+      const functionName=path.basename(url.pathname);
+      if(functionName in syntheticFunctions)return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(syntheticFunctions[functionName]),headers:{'access-control-allow-origin':origin(),'access-control-allow-headers':'authorization,content-type'}});
       const response=await route.fetch({url:`http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/us-central1/${path.basename(url.pathname)}`,headers:{...req.headers(),origin:'https://funtorahtools.com'}});
       if(!response.ok())failed.push(`${response.status()} ${url.pathname}`);
       return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin(),vary:'Origin'}});
