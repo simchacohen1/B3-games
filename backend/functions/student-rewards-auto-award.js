@@ -121,7 +121,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','get-chazara-event','list-chazara-history','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','repair-chazara-pending','get-chazara-event','list-chazara-history','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
@@ -135,7 +135,7 @@ async function requireTeacher(req){
 async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
- if(action==='list-chazara-pending')return;
+ if(action==='list-chazara-pending'||action==='repair-chazara-pending')return;
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
@@ -838,10 +838,8 @@ async function repairMissingChazaraPointRequests(scope){
 
 async function listPendingChazaraRequests(scope){
   if(scope){
-    // Self-heal saved Chazaras whose client-side point request never reached
-    // the server. Loading the teacher approval panel now recreates any missing
-    // pending requests before returning the list.
-    await repairMissingChazaraPointRequests(scope);
+    // Pending queue reads must not scan complete Chazara histories or repair
+    // records on every teacher sign-in. Recovery is an explicit action.
     const rows=[];
     // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
@@ -850,13 +848,8 @@ async function listPendingChazaraRequests(scope){
     }
     return (await sweepPendingMilestones(rows)).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
-  // Owner viewing all classes has no class scope. Self-heal every student's
-  // saved Chazaras too, so the owner's "All classes" view also recovers
-  // missing point requests.
-  try{
-    const studentIds=Object.keys((await rtdb.ref('posukPractice/chazara/events').get()).val()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
-    await repairMissingChazaraPointRequests({owner:true,selected:'',students:Object.fromEntries(studentIds.map(id=>[id,{}]))});
-  }catch(err){console.error('Owner Chazara self-heal failed',err)}
+  // The owner All-classes queue must also avoid a full events-root scan.
+  // For recovery, select one class and explicitly request a scoped repair.
   const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).get();
   const rows=[];
   snap.forEach(child=>{
@@ -1512,6 +1505,13 @@ exports.studentRewardsAutoAward = onRequest(
           const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
           if(!result.ok)return res.status(409).json({error:result.error});
           return res.status(200).json(result);
+        }
+        if(action==="repair-chazara-pending"){
+          // Repair may scan class histories and write point requests. Require
+          // an explicit action and a single verified class, never All classes.
+          if(!teacher.scope?.selected)return res.status(400).json({error:"Select a class before recovering missing Chazara requests."});
+          await repairMissingChazaraPointRequests(teacher.scope);
+          return res.status(200).json({ok:true});
         }
         if(action==="list-chazara-pending"){
           const requests=await listPendingChazaraRequests(teacher.scope);
