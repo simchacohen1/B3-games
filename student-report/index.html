@@ -57,6 +57,21 @@ td.none{color:#cbd5e1}
 .good h3{margin:0 0 6px;font-size:16px}
 .attn ul,.good ul{margin:0;padding-left:18px}
 .he{direction:rtl;unicode-bidi:isolate}
+/* all quizzes */
+.qsec{margin:0 22px 22px;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px}
+.qhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.qhead h3{margin:0;font-size:18px}.qhead h3 small{font-weight:400;color:#64748b;font-size:13px;margin-left:6px}
+.qchips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px}
+.qchip{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:7px 11px;font-size:13px;color:#475569}.qchip b{font-size:16px;color:#1f2937;margin-right:3px}
+.qsec td{white-space:normal}.qsec th{cursor:default}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.g{background:#dcfce7}.pill.y{background:#fef3c7}.pill.r{background:#fee2e2}.pill.n{background:#f1f5f9;color:#64748b}
+.qdet>td{background:#f8fafc;padding:12px 14px}
+.att{margin:0 0 14px}.att:last-child{margin-bottom:0}.att h4{margin:0 0 6px;font-size:14px}
+.att table{background:#fff;border:1px solid #e2e8f0;font-size:13px}
+.linkbtn{background:none;border:0;color:#1d4ed8;font-weight:700;cursor:pointer;padding:0;font:inherit;white-space:nowrap}
+.linkbtn:hover{text-decoration:underline}
+.note{font-size:12px;color:#64748b;margin-top:3px;display:block}
 @media print{
  header,.bar,.stats,#classView,.noprint{display:none!important}
  body{background:#fff}.wrap{margin:0;max-width:none}
@@ -73,10 +88,11 @@ td.none{color:#cbd5e1}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
+<script src="quiz-history.js?v=20261026-quiz-history"></script>
 </head><body>
 <header>
  <div><h1>📈 Student Report</h1><div class="sub">Every tool, one place — by student or whole class</div></div>
- <div class="noprint" style="display:flex;gap:8px"><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="csv">⬇ Download CSV</button></div>
+ <div class="noprint" style="display:flex;gap:8px"><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="csv" title="One row per student in the selected class">⬇ Class CSV (whole class)</button></div>
 </header>
 <div class="wrap">
  <div id="gate" class="gate">Checking your teacher account…</div>
@@ -117,7 +133,8 @@ function ago(t){if(!t)return'never';const d=(Date.now()-t)/1000;if(d<3600)return
 function dotFor(t){if(!t)return'dn';const d=(Date.now()-t)/DAY;return d<=3?'dg':d<=7?'dy':'dr'}
 function tone(p){return p===null?'':p>=80?'g':p>=60?'y':'r'}
 
-let access=null,user=null,classes=[],current='',loaded={},sortKey='name',sortDir=1,openId='';
+let access=null,user=null,classes=[],current='',loaded={},extras={},sortKey='name',sortDir=1,openId='';
+const openQuiz=new Set();
 
 /* ---------- Tool summaries ---------- */
 const RASHI_UNITS=[['zayin','ז'],['bet','בּ/ב'],['tsadi','צ'],['alef','א'],['tsadisofit','ץ'],['memsofit','ם'],['shin','שׁ/שׂ'],['samech','ס'],['finalreview','שׁ/שׂ review']];
@@ -182,20 +199,11 @@ function sumYiddish(d){
  if(!vals.length&&!d.lastActive)return null;
  return {learned:vals.filter(x=>(+x.credits||0)>=2).length,practicing:vals.filter(x=>(+x.credits||0)<2).length,last:num(d.lastActive)||0};
 }
-function quizRows(root,studentId){
- root=obj(root);const launches=obj(root.launches),responses=obj(root.responses),completions=obj(root.completions),out=[];
- Object.entries(launches).forEach(([lid,l])=>{
-  const ans=Object.values(obj(obj(responses[lid])[studentId])).filter(x=>x&&typeof x==='object');if(!ans.length)return;
-  const qs=Array.isArray(l&&l.quizSnapshot&&l.quizSnapshot.questions)?l.quizSnapshot.questions:Object.values(obj(l&&l.quizSnapshot&&l.quizSnapshot.questions));
-  const total=qs.length||ans.length,correct=ans.filter(a=>a.correct===true).length;
-  out.push({title:String((l.quizSnapshot&&l.quizSnapshot.title)||'Quiz'),correct,total,done:!!(completions[lid]&&completions[lid][studentId]),pct:pctOf(correct,total),t:+(l.startedAt||l.createdAt||l.updatedAt||0)});
- });
- return out.sort((a,b)=>b.t-a.t);
-}
-function sumQuiz(rows,since){
- if(!rows.length)return null;const r=since?rows.filter(x=>x.t>=since):rows;
- const scored=r.filter(x=>x.pct!==null);
- return {count:r.length,all:rows.length,avg:scored.length?Math.round(scored.reduce((a,x)=>a+x.pct,0)/scored.length):null,recent:rows.slice(0,6),last:rows[0].t};
+/* Weekly Quiz: every quiz assigned to the student (built in quiz-history.js).
+   Unfinished or never-started quizzes never count as zero in the average. */
+function sumQuiz(hist){
+ const q=hist.summary;if(!q.assigned&&!hist.unavailable.length)return null;
+ return {...q,count:q.completed};
 }
 
 /* ---------- Loading ---------- */
@@ -228,20 +236,21 @@ async function loadClass(c){
    get('studentRewards/students/'+id)
   ]);
   const name=String(m.name||(profile&&profile.name)||(pinfo&&pinfo.name)||id);
-  return {id,name,raw:{att,pinfo,chz,chzEv,sh,rashi,hal,gem:obj(gem)[id],yid:yid?yid[id]:null,quiz:quizRows(quiz,id),rew}};
+  return {id,name,raw:{att,pinfo,chz,chzEv,sh,rashi,hal,gem:obj(gem)[id],yid:yid?yid[id]:null,rew}};
  }));
- return {students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
+ return {classId:c.id,quizRoot:quiz,students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
 }
-function summarize(s){
- const days=+$('period').value,since=days?Date.now()-days*DAY:0,r=s.raw;
+function summarize(s,d){
+ const days=+$('period').value,since=days?Date.now()-days*DAY:0,r=s.raw,x=extras[d.classId+'/'+s.id]||{};
+ const quizHist=B3QuizHistory.buildHistory({root:d.quizRoot,studentId:s.id,classId:d.classId,joinedAt:x.joinedAt||0,since});
  const t={
   posuk:sumPosuk(r.att,r.pinfo,since),chazara:sumChazara(r.chz,r.chzEv,since),shorashim:sumShorashim(r.sh,since),
-  rashi:sumRashi(r.rashi),gematria:sumGematria(r.gem),yiddish:sumYiddish(r.yid),halacha:sumHalacha(r.hal),quiz:sumQuiz(r.quiz,since)
+  rashi:sumRashi(r.rashi),gematria:sumGematria(r.gem),yiddish:sumYiddish(r.yid),halacha:sumHalacha(r.hal),quiz:sumQuiz(quizHist)
  };
  const rew=r.rew&&typeof r.rew==='object'?{balance:+(r.rew.rewardBalance||r.rew.currentBalance||0)}:null;
- const last=Math.max(0,...Object.values(t).map(x=>x&&x.last||0));
- const toolsUsed=Object.values(t).filter(Boolean).length;
- return {...s,t,rew,last,toolsUsed};
+ const last=Math.max(0,...Object.values(t).map(v=>v&&v.last||0));
+ const toolsUsed=Object.values(t).filter(v=>v&&(v!==t.quiz||v.attempts>0)).length;
+ return {...s,t,rew,last,toolsUsed,quizHist};
 }
 
 /* ---------- Class table ---------- */
@@ -268,14 +277,14 @@ function cell(k,s){
   case'gematria':return t.gematria?'<td>⭐ '+t.gematria.stars+' · level '+t.gematria.level+'<span class="m '+tone(t.gematria.acc)+'">'+(t.gematria.acc===null?'—':t.gematria.acc+'% correct')+'</span></td>':none;
   case'yiddish':return t.yiddish?'<td>'+t.yiddish.learned+' words learned<span class="m">'+t.yiddish.practicing+' practicing</span></td>':none;
   case'halacha':return t.halacha?'<td>'+t.halacha.done+' / '+t.halacha.of+' sections</td>':none;
-  case'quiz':return t.quiz&&t.quiz.count?'<td class="'+tone(t.quiz.avg)+'"><b>'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b> avg<span class="m">'+t.quiz.count+' quiz'+(t.quiz.count===1?'':'zes')+' '+esc(pl)+'</span></td>':none;
+  case'quiz':return t.quiz&&t.quiz.assigned?'<td class="'+tone(t.quiz.avg)+'"><b>'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b> avg<span class="m">'+t.quiz.completed+' of '+t.quiz.assigned+' completed '+esc(pl)+'</span></td>':none;
   case'rewards':return s.rew?'<td>'+s.rew.balance+'</td>':none;
  }
 }
 function visibleCols(){const d=loaded[current]||{};return COLS.filter(([k])=>(k!=='yiddish'||d.yiddishOk)&&(k!=='rewards'||d.rewardsOk))}
 function drawTable(){
  const d=loaded[current];if(!d)return;
- const rows=d.students.map(summarize);d.view=rows;
+ const rows=d.students.map(s=>summarize(s,d));d.view=rows;
  const cols=visibleCols();
  $('thead').innerHTML='<tr>'+cols.map(([k,l])=>'<th data-k="'+k+'">'+esc(l)+(sortKey===k?(sortDir>0?' ▲':' ▼'):'')+'</th>').join('')+'</tr>';
  $('thead').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortDir=sortKey===k?-sortDir:(k==='name'?1:-1);sortKey=k;drawTable()});
@@ -289,7 +298,7 @@ function drawTable(){
  $('summary').innerHTML=
   '<div class="stat"><div class="v">'+active+' / '+rows.length+'</div><div class="l">Active in the last 7 days</div></div>'+
   '<div class="stat"><div class="v">'+chz+'</div><div class="l">Chazaras '+esc(pl)+'</div></div>'+
-  '<div class="stat"><div class="v">'+(qa.length?Math.round(qa.reduce((a,b)=>a+b,0)/qa.length)+'%':'—')+'</div><div class="l">Class Weekly Quiz average ('+esc(pl)+')</div></div>'+
+  '<div class="stat"><div class="v">'+(qa.length?Math.round(qa.reduce((a,b)=>a+b,0)/qa.length)+'%':'—')+'</div><div class="l">Class Weekly Quiz average, completed quizzes ('+esc(pl)+')</div></div>'+
   '<div class="stat"><div class="v" style="font-size:16px">'+(quiet.length?quiet.slice(0,6).map(s=>esc(s.name.split(' ')[0])).join(', ')+(quiet.length>6?' +'+(quiet.length-6):''):'Everyone ✓')+'</div><div class="l">Not active this week</div></div>';
  if(openId)openReport(openId,true);
 }
@@ -303,7 +312,8 @@ function attention(s){
  if(t.chazara&&t.chazara.due)a.push('Chazara: '+t.chazara.due+(t.chazara.due===1?' posuk':' pesukim')+' not reviewed in 2+ weeks.');
  if(t.rashi&&t.rashi.weak.length)a.push('Rashi Letters: mixing up <span class="he">'+esc(t.rashi.weak.join(' '))+'</span>.');
  if(t.gematria&&t.gematria.tricky.length&&t.gematria.acc!==null&&t.gematria.acc<80)a.push('Gematria: often misses <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>.');
- if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg<70)a.push('Weekly Quiz average is '+t.quiz.avg+'%.');
+ if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg<70)a.push('Weekly Quiz average (completed quizzes) is '+t.quiz.avg+'%.');
+ if(t.quiz&&t.quiz.notStarted+t.quiz.inProgress)a.push('Weekly Quiz: '+[t.quiz.notStarted?t.quiz.notStarted+' not started':'',t.quiz.inProgress?t.quiz.inProgress+' not finished':''].filter(Boolean).join(', ')+'. See All Quizzes below.');
  if(t.posuk&&t.posuk.mastered)g.push(t.posuk.mastered+(t.posuk.mastered===1?' posuk':' pesukim')+' read at 100%.');
  if(t.chazara&&t.chazara.atGoal)g.push(t.chazara.atGoal+(t.chazara.atGoal===1?' posuk':' pesukim')+' reached the chazara goal ('+t.chazara.goal+'×).');
  if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg>=85)g.push('Strong Weekly Quiz average: '+t.quiz.avg+'%.');
@@ -319,7 +329,7 @@ function openReport(id,silent){
  const t=s.t,pl=$('period').selectedOptions[0].text.toLowerCase(),{a,g}=attention(s);
  const cls=classes.find(c=>c.id===current);
  let h='<div class="rhead"><div><h2>'+esc(s.name)+'</h2><div class="status">'+esc(cls?cls.name:'')+' · Report for '+esc(pl)+' · '+new Date().toLocaleDateString()+' · Last active '+esc(ago(s.last))+'</div></div>'+
-  '<div class="noprint" style="display:flex;gap:8px"><button class="btn blue" id="printBtn">🖨 Print / Save PDF</button><button class="btn light" id="closeBtn">✕ Back to class</button></div></div>';
+  '<div class="noprint" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn blue" id="printBtn">🖨 Print / Save PDF</button><button class="btn" id="studentCsv">⬇ Download This Student CSV</button><button class="btn light" id="closeBtn">✕ Back to class</button></div></div>';
  if(a.length)h+='<div class="attn" style="margin-top:16px"><h3>⚠️ Needs attention</h3><ul>'+a.map(li).join('')+'</ul></div>';
  if(g.length)h+='<div class="good" style="margin-top:10px"><h3>✅ Going well</h3><ul>'+g.map(li).join('')+'</ul></div>';
  h+='<div class="rgrid">';
@@ -330,21 +340,86 @@ function openReport(id,silent){
  h+=box('🔢 Gematria',t.gematria,t.gematria?'<ul>'+li('⭐ <b>'+t.gematria.stars+'</b> stars · level '+t.gematria.level)+li('Accuracy: <span class="'+tone(t.gematria.acc)+'">'+(t.gematria.acc===null?'—':t.gematria.acc+'%')+'</span>')+(t.gematria.tricky.length?li('Misses most: <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>'):'')+'</ul>':'');
  if(d.yiddishOk)h+=box('Yiddish',t.yiddish,t.yiddish?'<ul>'+li('<b>'+t.yiddish.learned+'</b> words learned')+li(t.yiddish.practicing+' words still practicing')+'</ul>':'');
  h+=box('📔 Halacha',t.halacha,t.halacha?'<ul>'+li('<b>'+t.halacha.done+'</b> of '+t.halacha.of+' scrapbook sections done')+'</ul>':'');
- h+=box('📝 Weekly Quiz',t.quiz,t.quiz?'<ul>'+li('Average '+esc(pl)+': <b class="'+tone(t.quiz.avg)+'">'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b> ('+t.quiz.count+' of '+t.quiz.all+' quizzes)')+t.quiz.recent.map(q=>li(esc(q.title)+': '+q.correct+'/'+q.total+(q.done?'':' <span class="m">(not finished)</span>')+' <span class="status">'+(q.t?new Date(q.t).toLocaleDateString():'')+'</span>')).join('')+'</ul>':'');
+ h+=box('📝 Weekly Quiz',t.quiz,t.quiz?'<ul>'+li('Average of completed quizzes '+esc(pl)+': <b class="'+tone(t.quiz.avg)+'">'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b>')+li(t.quiz.completed+' of '+t.quiz.assigned+' assigned quizzes completed')+li(t.quiz.inProgress+' in progress · '+t.quiz.notStarted+' not started')+li('Points on completed quizzes: '+t.quiz.pointsEarned+' of '+t.quiz.pointsPossible)+'</ul><div class="note">Every quiz is listed in All Quizzes below.</div>':'');
  if(d.rewardsOk)h+=box('🌟 Student Rewards',s.rew,s.rew?'<ul>'+li('Current points: <b>'+s.rew.balance+'</b>')+'</ul>':'');
  h+='</div>';
+ h+=quizSection(s,pl);
  $('report').innerHTML=h;$('report').style.display='block';$('classView').style.display='none';$('summary').style.display='none';
  $('printBtn').onclick=()=>window.print();
  $('closeBtn').onclick=closeReport;
+ $('studentCsv').onclick=()=>studentCsv(s);
+ $('report').querySelectorAll('[data-qk]').forEach(b=>b.onclick=()=>{const k=b.dataset.qk;openQuiz.has(k)?openQuiz.delete(k):openQuiz.add(k);openReport(id,true)});
+ const all=$('qAllTime');if(all)all.onclick=()=>{$('period').value='0';drawTable()};
  if(!silent)window.scrollTo(0,0);
+ loadExtras(s.id);
+}
+/* ---------- All Quizzes (one student) ---------- */
+// Two small reads, only for the student whose report is open: when his account
+// was created (to label older whole-class quizzes) and his own practice quizzes.
+async function loadExtras(id){
+ const k=current+'/'+id;if(extras[k])return;extras[k]={loading:true};
+ const [created,practice]=await Promise.all([get('b3Games/students/'+id+'/profile/createdAt'),get('b3Quiz/practiceAttempts/'+id)]);
+ extras[k]={joinedAt:num(created)||0,practice:practice===undefined?undefined:obj(practice)};
+ if(openId===id&&k===current+'/'+openId)drawTable();
+}
+const QSTAT={completed:['Completed','g'],in_progress:['In Progress','y'],not_started:['Not Started','r']};
+const pill=st=>'<span class="pill '+QSTAT[st][1]+'">'+QSTAT[st][0]+'</span>';
+const qday=t=>t?new Date(t).toLocaleDateString():'—';
+function attemptHtml(a){
+ let h='<div class="att"><h4>'+esc(a.kind)+' · '+esc(qday(a.date))+' · '+pill(a.status);
+ if(a.status==='completed')h+=' <b>'+a.correct+' / '+a.total+'</b> points ('+a.pct+'%)'+(a.completedHow==='submitted'?'':' <span class="status">— '+esc(a.completedHow)+'</span>');
+ else if(a.status==='in_progress')h+=' <span class="status">'+a.answered+' of '+a.total+' answered so far, '+a.correct+' correct — not a final score'+(a.closed?'; quiz closed before he finished':'')+'</span>';
+ else h+=' <span class="status">'+(a.closed?'quiz closed; he did not answer any questions':'no answers yet')+'</span>';
+ h+='</h4>';
+ if(a.beforeJoined)h+='<span class="note">This was given to the whole class before his account was created, so he may not have been in the class yet.</span>';
+ if(a.status!=='not_started'){
+  if(!a.questionsAvailable)h+='<span class="note">Question-by-question details are not available for this attempt.</span>';
+  else h+='<div class="tablebox"><table><thead><tr><th>#</th><th>Question</th><th>His answer</th><th>Correct answer</th><th>Result</th></tr></thead><tbody>'+a.questions.map(x=>'<tr><td>'+x.n+'</td><td>'+esc(x.q)+'</td><td>'+(x.result==='unanswered'?'<span class="status">Not answered</span>':esc(x.answer))+'</td><td>'+esc(x.key)+'</td><td>'+(x.result==='correct'?'<span class="g">✓ Correct</span>':x.result==='incorrect'?'<span class="r">✗ Incorrect</span>':'<span class="status">— Unanswered</span>')+(x.adjusted?'<span class="note">teacher adjusted</span>':'')+'</td></tr>').join('')+'</tbody></table></div>';
+ }
+ return h+'</div>';
+}
+function quizSection(s,pl){
+ const hist=s.quizHist,q=hist.summary,x=extras[current+'/'+s.id]||{},days=+$('period').value;
+ const practice=x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):null;
+ let h='<div class="qsec"><div class="qhead"><h3>📝 All Quizzes<small>'+esc(pl)+'</small></h3>'+(days?'<button class="btn light noprint" id="qAllTime">Show all time</button>':'')+'</div>';
+ h+='<div class="qchips"><span class="qchip"><b>'+q.assigned+'</b>assigned</span><span class="qchip"><b>'+q.completed+'</b>completed</span><span class="qchip"><b>'+q.inProgress+'</b>in progress</span><span class="qchip"><b>'+q.notStarted+'</b>not started</span>'+
+  '<span class="qchip"><b class="'+tone(q.avg)+'">'+(q.avg===null?'—':q.avg+'%')+'</b>average of completed quizzes</span><span class="qchip"><b>'+q.pointsEarned+' / '+q.pointsPossible+'</b>points on completed quizzes</span></div>';
+ if(!hist.quizzes.length&&!hist.unavailable.length)h+='<div class="empty">No Weekly Quizzes were given to him '+esc(pl)+'.</div>';
+ else{
+  h+='<div class="tablebox"><table><thead><tr><th>Quiz</th><th>Date</th><th>Status</th><th>Points</th><th>Percent</th><th>Attempts</th><th></th></tr></thead><tbody>';
+  hist.quizzes.forEach(z=>{
+   const k=z.key,open=openQuiz.has(k),tried=z.attempts.filter(a=>a.status!=='not_started').length;
+   let pts='—',pc='—';
+   if(z.status==='completed'){pts=z.correct+' / '+z.total;pc='<b class="'+tone(z.pct)+'">'+z.pct+'%</b>'}
+   else if(z.partial){pts='<span class="status">'+z.partial.correct+' correct, '+z.partial.answered+' of '+z.partial.total+' answered</span>';pc='<span class="status">in progress</span>'}
+   h+='<tr><td><b>'+esc(z.title)+'</b>'+(z.counted&&z.attempts.length>1?'<span class="note">Score shown is from '+esc(z.counted.kind)+'</span>':'')+'</td><td>'+esc(qday(z.date))+'</td><td>'+pill(z.status)+(z.status!=='completed'&&z.closed?'<span class="note">quiz closed</span>':'')+(z.beforeJoined&&z.status==='not_started'?'<span class="note">given before his account was created</span>':'')+'</td><td>'+pts+'</td><td>'+pc+'</td><td>'+tried+(z.attempts.length>tried?' <span class="status">('+z.attempts.length+' given)</span>':'')+'</td>'+
+    '<td class="noprint"><button class="linkbtn" data-qk="'+esc(k)+'">'+(open?'Hide details ▴':'Details ▾')+'</button></td></tr>';
+   if(open)h+='<tr class="qdet"><td colspan="7">'+z.attempts.map(attemptHtml).join('')+'</td></tr>';
+  });
+  hist.unavailable.forEach(u=>{h+='<tr><td><b>Quiz record no longer available</b><span class="note">He has saved answers, but the quiz itself was removed, so the score cannot be worked out.</span></td><td>'+esc(qday(u.date))+'</td><td><span class="pill n">Data unavailable</span></td><td>—</td><td>—</td><td>—</td><td></td></tr>'});
+  h+='</tbody></table></div>';
+ }
+ h+='<div class="note" style="margin-top:8px">Points = questions answered correctly (1 point per question). The average counts only completed quizzes; unfinished and not-started quizzes are not counted as zero. When a quiz was retaken, the newest completed attempt counts, as in the Weekly Quiz Results screen.</div>';
+ h+='<h3 style="font-size:15px;margin:18px 0 6px">🎯 Practice quizzes <small style="font-weight:400;color:#64748b;font-size:12px">he chose these himself; not assigned and not in the average</small></h3>';
+ if(x.loading||!('practice' in x))h+='<div class="empty">Loading practice quizzes…</div>';
+ else if(!practice)h+='<div class="empty">Practice quiz history could not be loaded.</div>';
+ else if(!practice.length)h+='<div class="empty">No practice quizzes '+esc(pl)+'.</div>';
+ else h+='<div class="tablebox"><table><thead><tr><th>Practice</th><th>Date</th><th>Points</th><th>Percent</th></tr></thead><tbody>'+practice.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(qday(p.date))+'</td><td>'+p.correct+' / '+p.total+'</td><td class="'+tone(p.pct)+'">'+(p.pct===null?'—':p.pct+'%')+'</td></tr>').join('')+'</tbody></table></div>';
+ return h+'</div>';
+}
+function studentCsv(s){
+ const cls=classes.find(c=>c.id===current),x=extras[current+'/'+s.id]||{},days=+$('period').value;
+ const rows=B3QuizHistory.studentCsvRows({name:s.name,className:cls?cls.name:current,periodLabel:$('period').selectedOptions[0].text,history:s.quizHist,practice:x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):[]});
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+B3QuizHistory.toCsv(rows)],{type:'text/csv'}));
+ a.download='quiz-history-'+s.name.replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 function closeReport(){openId='';$('report').style.display='none';$('classView').style.display='';$('summary').style.display=''}
 
 /* ---------- CSV ---------- */
 function csv(){
  const d=loaded[current];if(!d||!d.view)return;const pl=$('period').selectedOptions[0].text;
- const head=['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average % ('+pl+')','Quizzes ('+pl+')','Points'];
- const rows=d.view.map(s=>{const t=s.t;return [s.name,s.last?new Date(s.last).toLocaleDateString():'',s.toolsUsed,t.posuk?.mastered??'',t.posuk?.pesukim??'',t.posuk?.tries??'',t.chazara?.inPeriod??'',t.chazara?.reviewed??'',t.shorashim?.cards??'',t.rashi?.unit??'',t.rashi?.acc??'',t.gematria?.stars??'',t.gematria?.acc??'',t.yiddish?.learned??'',t.halacha?.done??'',t.quiz?.avg??'',t.quiz?.count??'',s.rew?.balance??'']});
+ const head=['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average %, completed quizzes only ('+pl+')','Quizzes completed ('+pl+')','Quizzes assigned ('+pl+')','Points'];
+ const rows=d.view.map(s=>{const t=s.t;return [s.name,s.last?new Date(s.last).toLocaleDateString():'',s.toolsUsed,t.posuk?.mastered??'',t.posuk?.pesukim??'',t.posuk?.tries??'',t.chazara?.inPeriod??'',t.chazara?.reviewed??'',t.shorashim?.cards??'',t.rashi?.unit??'',t.rashi?.acc??'',t.gematria?.stars??'',t.gematria?.acc??'',t.yiddish?.learned??'',t.halacha?.done??'',t.quiz?.avg??'',t.quiz?.completed??'',t.quiz?.assigned??'',s.rew?.balance??'']});
  const text=[head,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/csv'}));
  const cls=classes.find(c=>c.id===current);a.download='student-report-'+(cls?cls.name:current).replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
@@ -357,6 +432,7 @@ function drawTabs(){
 }
 async function show(force){
  const c=classes.find(x=>x.id===current);if(!c)return;
+ if(force)extras={};
  if(force||!loaded[current]){
   $('status').textContent='Loading '+c.name+' from all tools…';$('rows').innerHTML='';$('summary').innerHTML='';
   try{loaded[current]=await loadClass(c)}catch(e){console.error(e);$('status').textContent='Could not load: '+(e.message||e);return}
