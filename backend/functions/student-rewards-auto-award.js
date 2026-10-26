@@ -841,11 +841,18 @@ async function listPendingChazaraRequests(scope){
     // Pending queue reads must not scan complete Chazara histories or repair
     // records on every teacher sign-in. Recovery is an explicit action.
     const rows=[];
-    // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
+    // Until a secure indexed pending queue exists, one collection read is
+    // required. Filter it once rather than once per assigned student.
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-    for(const studentId of Object.keys(scope.students)){
-      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+    const rowsByStudent=new Map(Object.keys(scope.students||{}).map(id=>[id,[]]));
+    for(const [id,item] of Object.entries(allRequests)){
+      const studentId=item?.practiceStudentId;
+      const studentRows=rowsByStudent.get(studentId);
+      if(!studentRows||item.status!=='pending'||!isReviewableRequest(item))continue;
+      if(teacherClassScope.recordAllowed(scope,studentId,item))studentRows.push({id,...item});
     }
+    // Preserve the previous student-grouped tie order before sorting by time.
+    for(const studentRows of rowsByStudent.values())for(const row of studentRows)rows.push(row);
     return (await sweepPendingMilestones(rows)).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
   // The owner All-classes queue must also avoid a full events-root scan.
