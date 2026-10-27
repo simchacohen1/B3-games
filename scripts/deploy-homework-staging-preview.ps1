@@ -69,7 +69,7 @@ try {
   }
 
   if (-not $SkipFunction) {
-    Invoke-FirebaseDeploy @('deploy', '--only', 'functions:homeworkPortal', '--project', $projectId, '--non-interactive') 'Staging homework function deploy'
+    Invoke-FirebaseDeploy @('deploy', '--only', 'functions:homework-staging', '--project', $projectId, '--config', $firebaseConfig, '--non-interactive') 'Staging homework function deploy'
   }
 
   Invoke-FirebaseDeploy @('hosting:channel:deploy', $channelId, '--project', $projectId, '--config', $firebaseConfig, '--expires', '7d', '--non-interactive') 'Staging preview-channel deploy'

@@ -159,15 +159,25 @@ test('preview Firebase config proxies only the issue staging channel and deploy 
 
   const hosting = JSON.parse(fs.readFileSync(__dirname + '/../firebase.staging-preview.json', 'utf8'));
   assert.equal(hosting.hosting.site, 'fun-torah-tools-staging');
+  assert.equal(hosting.functions[0].codebase, 'homework-staging');
+  assert.equal(hosting.functions[0].source, 'backend/functions/homework-staging');
   const deploy = fs.readFileSync(__dirname + '/../scripts/deploy-homework-staging-preview.ps1', 'utf8');
   assert.match(deploy, /projects:list/);
   assert.match(deploy, /hosting:sites:list/);
   assert.match(deploy, /hosting:channel:deploy/);
-  assert.match(deploy, /functions:homeworkPortal/);
+  assert.match(deploy, /functions:homework-staging/);
+  assert.match(deploy, /FUNCTIONS_DISCOVERY_TIMEOUT = '30'/);
   assert.doesNotMatch(deploy, /--project\s+['"]?b3-games/i);
   assert.doesNotMatch(deploy, /deploy['"]?,\s*['"]--only['"],\s*['"]hosting['"]/);
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
   assert.match(fnSource, /homework-406-preview/);
+  for (const file of ['homework.js', 'homework-core.cjs', 'homework-policy.cjs', 'student-login-core.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
+    assert.equal(
+      fs.readFileSync(__dirname + '/../backend/functions/homework-staging/' + file, 'utf8'),
+      fs.readFileSync(__dirname + '/../backend/functions/' + file, 'utf8'),
+      `${file} staging copy must match the canonical function source`,
+    );
+  }
   const e2eSource = fs.readFileSync(__dirname + '/../e2e-staging/staging-common.ts', 'utf8');
   assert.match(e2eSource, /FTT_STAGING_SITE must be the staging live site/);
   assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);

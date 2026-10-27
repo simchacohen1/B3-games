@@ -47,9 +47,11 @@ preview guard and function CORS allow only this channel's hostname pattern.
 Deploy with `scripts/deploy-homework-staging-preview.ps1`. The script first
 verifies that the signed-in Firebase account can see project
 `fun-torah-tools-staging` and Hosting site `fun-torah-tools-staging`. It then
-deploys only `homeworkPortal` to that project and creates an expiring Hosting
-preview channel using `firebase.staging-preview.json`. It never runs a live
-Hosting deploy, publishes on the production project, or deploys database rules.
+deploys the Homework-only `homework-staging` functions codebase from
+`firebase.staging-preview.json` and creates an expiring Hosting preview channel.
+The isolated codebase prevents the staging deployment from inspecting unrelated
+functions or requiring their secrets. The script never runs a live Hosting
+deploy, publishes on the production project, or deploys database rules.
 
 Authenticated tests require existing fictional TEST-ALEF accounts. Point
 `FTT_STAGING_CREDENTIALS_FILE` at a local-only credentials JSON containing an
