@@ -35,6 +35,8 @@ export const TOOL_PAGES = [
   { name: 'Halacha', path: '/halacha/index.html' },
   { name: 'Teacher Home', path: '/teacher-home.html' },
   { name: 'Student Report', path: '/student-report/index.html' },
+  { name: 'Homework teacher center', path: '/assignment-center/teacher.html' },
+  { name: 'Homework student center', path: '/assignment-center/student.html' },
 ];
 
 export type StagingCredentials = {

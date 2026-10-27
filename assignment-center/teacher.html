@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Homework – Teacher</title>
+<script src="../guest-mode.js" data-guest="block"></script>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172b4d;background:#f2f6fb}*{box-sizing:border-box}body{margin:0}
+header{background:#123762;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}header strong{font-size:22px}
+main{max-width:980px;margin:20px auto;padding:0 14px 60px}
+.card{background:#fff;border:1px solid #dce5ee;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 3px 10px #102b4510}
+.muted{color:#5b6b7b}.badge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:13px;background:#eaf2fa;color:#174e7e;margin:2px 6px 2px 0}
+.badge.late{background:#fde8e8;color:#a31a1a}.badge.ok{background:#e1f6e5;color:#1c6b30}.badge.wait{background:#fff1d6;color:#8a5a00}
+label{display:block;font-weight:600;margin:12px 0 4px}input,select,textarea{font:inherit;width:100%;padding:10px;border:1px solid #bfcfdf;border-radius:8px}textarea{min-height:70px}
+button{font:inherit;border:0;border-radius:9px;padding:9px 15px;font-weight:600;cursor:pointer;background:#18588f;color:#fff;margin:6px 6px 0 0}button.sec{background:#fff;color:#18588f;border:1px solid #18588f}button.bad{background:#a31a1a}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;margin-top:8px;min-width:560px}td,th{text-align:left;padding:8px;border-bottom:1px solid #e1e8ef;vertical-align:top}
+.msg{min-height:20px;margin-top:6px;font-weight:600}.err{color:#a31a1a}.good{color:#1c6b30}.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:150px}
+.students{max-height:150px;overflow:auto;border:1px solid #bfcfdf;border-radius:8px;padding:8px}.students label{font-weight:400;margin:2px 0}
+.filters button.on{background:#18588f;color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #eea62b;outline-offset:2px}
+@media(max-width:600px){td,th{font-size:14px}}
+</style></head><body>
+<header><strong>📚 Homework – Teacher</strong><span><span id="who"></span> <button class="sec" id="signout" style="display:none">Sign out</button></span></header>
+<main>
+<div id="signin" class="card"><p>Sign in with your teacher Google account.</p><button id="go">Sign in with Google</button><div id="signinMsg" class="msg err"></div></div>
+<div id="app" style="display:none">
+  <div class="card"><label for="cls">Class</label><select id="cls"></select></div>
+  <div class="card"><h2 style="margin-top:0" id="formTitle">New homework</h2>
+    <p class="muted">New assignments are saved as drafts. Review the class, students, and dates below, then publish when ready.</p>
+    <div class="row"><div><label for="type">Activity</label><select id="type"></select></div>
+    <div><label for="assigned">Assigned date</label><input id="assigned" type="date" required></div>
+    <div><label for="due">Due date</label><input id="due" type="date"></div>
+    <div id="targetWrap"><label for="target">Target amount (optional)</label><div class="row"><input id="target" type="number" min="1" max="240"><select id="targetUnit" aria-label="Target unit"><option value="minutes">Minutes</option><option value="questions">Questions</option><option value="rounds">Rounds</option><option value="items">Items</option></select></div></div></div>
+    <label for="title">Title</label><input id="title" maxlength="120" placeholder="e.g. Shorashim practice">
+    <label for="details">Instructions</label><textarea id="details" maxlength="1200"></textarea>
+    <div id="audBox"><label>Who gets it?</label><label style="font-weight:400"><input type="radio" name="aud" value="all" checked style="width:auto"> The whole class</label>
+    <label style="font-weight:400"><input type="radio" name="aud" value="some" style="width:auto"> Only some students</label>
+    <div class="students" id="studentPick" style="display:none"></div></div>
+    <button id="save">Save draft</button><button class="sec" id="cancelEdit" style="display:none">Cancel edit</button><div id="formMsg" class="msg" role="status" aria-live="polite"></div></div>
+  <div class="card"><div class="filters" id="filters"></div><div id="summary" class="muted"></div></div>
+  <div id="list"></div>
+</div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="staging-guard.js" data-b3-staging-guard></script>
+<script src="homework-common.js"></script>
+<script>
+(function(){'use strict';
+var H=window.HomeworkCommon,el=H.el,$=function(i){return document.getElementById(i)};
+var WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026',OWNER='simcha5770@gmail.com';
+if(!H.isStagingRuntime()){$('signinMsg').textContent='This prototype only connects to the isolated staging Firebase project.';$('go').disabled=true;return}
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+var auth=firebase.auth(),db=firebase.database();
+var state={classId:'',data:null,editing:null,filter:'all'};
+function say(box,m,good){box.textContent=m;box.className='msg '+(good?'good':'err')}
+async function api(body){var t=await auth.currentUser.getIdToken();return H.call(Object.assign({classId:state.classId},body),t)}
+Object.keys(H.TYPES).forEach(function(k){var o=el('option',H.TYPES[k]);o.value=k;$('type').append(o)});
+function syncType(){var t=$('type').value;$('targetWrap').style.display='';$('targetUnit').value=t==='shorashim'?'minutes':t==='weeklyQuiz'?'questions':$('targetUnit').value;var aud=document.getElementById('audBox');if(aud)aud.style.display=state.editing?'none':''}
+$('type').onchange=syncType;syncType();
+
+$('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){say($('signinMsg'),e.message)})};
+$('signout').onclick=function(){auth.signOut()};
+auth.onAuthStateChanged(async function(u){
+  if(!u){$('signin').style.display='';$('app').style.display='none';$('signout').style.display='none';$('who').textContent='';return}
+  $('signin').style.display='none';$('signout').style.display='';$('who').textContent=u.email||'';
+  try{
+    var owner=String(u.email||'').toLowerCase()===OWNER,ids=[];
+    var all=(await db.ref('b3Games/workspaces/'+WS+'/classes').once('value')).val()||{};
+    if(owner)ids=Object.keys(all);
+    else{var t=(await db.ref('b3Games/workspaces/'+WS+'/teachers/'+u.uid).once('value')).val();
+      ids=Object.keys((t&&t.active!==false&&t.classIds)||{}).filter(function(k){return t.classIds[k]===true})}
+    ids=ids.filter(function(k){return all[k]&&all[k].active!==false});
+    if(!ids.length){$('signin').style.display='';$('app').style.display='none';say($('signinMsg'),'No classes are assigned to this account.');return}
+    $('cls').replaceChildren();
+    ids.forEach(function(k){var o=el('option',all[k].name||k);o.value=k;$('cls').append(o)});
+    var want=new URLSearchParams(location.search).get('class');
+    $('cls').value=ids.indexOf(want)>=0?want:ids[0];
+    state.classId=$('cls').value;$('app').style.display='';load();
+  }catch(e){$('signin').style.display='';say($('signinMsg'),e.message)}
+});
+$('cls').onchange=function(){state.classId=$('cls').value;resetForm();load()};
+document.querySelectorAll('input[name=aud]').forEach(function(r){r.onchange=function(){$('studentPick').style.display=r.value==='some'&&r.checked?'':'none'}});
+
+async function load(){
+  try{state.data=await api({action:'teacherList'});buildPick();renderList()}
+  catch(e){$('list').replaceChildren(el('div',e.message,'card msg err'))}
+}
+function buildPick(){
+  $('studentPick').replaceChildren();
+  Object.keys(state.data.students).forEach(function(id){
+    var l=el('label');var c=el('input');c.type='checkbox';c.value=id;c.style.width='auto';l.append(c,document.createTextNode(' '+state.data.students[id].name));$('studentPick').append(l)});
+}
+function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+function resetForm(){state.editing=null;$('formTitle').textContent='New assignment draft';$('save').textContent='Save draft';$('cancelEdit').style.display='none';
+  ['title','details','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;syncType()}
+$('cancelEdit').onclick=resetForm;
+$('save').onclick=async function(){
+  if(!$('assigned').value){say($('formMsg'),'Choose an assigned date.');return}
+  if($('due').value&&$('due').value<$('assigned').value){say($('formMsg'),'Due date must be on or after the assigned date.');return}
+  var b=$('save');b.disabled=true;
+  try{
+    if(state.editing){
+      await api({action:'edit',assignmentId:state.editing,title:$('title').value,details:$('details').value,
+        assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
+        targetAmount:$('target').value,targetUnit:$('targetUnit').value});
+      say($('formMsg'),'Changes saved ✓',true);
+    }else{
+      var body={action:'create',type:$('type').value,title:$('title').value,details:$('details').value,
+        assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
+        targetAmount:$('target').value,targetUnit:$('targetUnit').value};
+      if(document.querySelector('input[name=aud]:checked').value==='some'){
+        body.studentIds=Array.prototype.map.call($('studentPick').querySelectorAll('input:checked'),function(c){return c.value});
+        if(!body.studentIds.length){say($('formMsg'),'Pick at least one student.');return}
+      }
+      var created=await api(body);state.editing=created.id;say($('formMsg'),'Draft saved. Review it below, then publish to students when ready.',true);
+    }
+    resetForm();await load();
+  }catch(e){say($('formMsg'),e.message)}finally{b.disabled=false}
+};
+function counts(a){return a.counts}
+function renderList(){
+  var d=state.data,box=$('list');box.replaceChildren();
+  var needs=0;d.assignments.forEach(function(a){needs+=a.counts.submitted});
+  $('summary').textContent=needs?(needs+' handed in and waiting for you to look at.'):'Nothing is waiting for review.';
+  var f=$('filters');f.replaceChildren();
+  [['all','Everything'],['draft','Drafts'],['published','Published'],['review','Needs review'],['late','Overdue'],['archived','Archived']].forEach(function(p){var b=el('button',p[1],'sec'+(state.filter===p[0]?' on':''));b.onclick=function(){state.filter=p[0];renderList()};f.append(b)});
+  if(!d.assignments.length){box.append(el('div','No homework yet. Use the form above.','card muted'));return}
+  d.assignments.forEach(function(a){
+    var publication=a.publicationState||'published';
+    if(['draft','published','archived'].includes(state.filter)&&publication!==state.filter)return;
+    var rows=Object.keys(a.students).filter(function(id){var s=a.students[id];return ['all','draft','published','archived'].includes(state.filter)||(state.filter==='review'&&s.status==='submitted')||(state.filter==='late'&&s.late)});
+    if(['review','late'].includes(state.filter)&&!rows.length)return;
+    var c=el('div',null,'card');
+    c.append(el('h3',a.title));
+    var m=el('div');m.append(el('span',H.TYPES[a.type],'badge'));
+    m.append(el('span',publication==='published'?'Published':publication==='archived'?'Archived':'Draft — hidden from students','badge'+(publication==='published'?' ok':' wait')));
+    if(a.assignedAt!=null)m.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
+    if(a.dueAt!=null)m.append(el('span','Due '+H.when(a.dueAt),'badge'));
+    if(a.targetAmount)m.append(el('span','Target '+a.targetAmount+' '+a.targetUnit,'badge'));
+    m.append(el('span',a.counts.submitted+' to review','badge wait'),el('span',a.counts.approved+' approved','badge ok'),el('span',(a.counts.assigned+a.counts.in_progress+a.counts.returned)+' not handed in','badge'));
+    if(a.counts.missing)m.append(el('span',a.counts.missing+' late','badge late'));
+    c.append(m);if(a.details)c.append(el('p',a.details,'muted'));
+    var t=el('table'),h=el('tr');['Student','Status','Work','Review'].forEach(function(x){h.append(el('th',x))});t.append(h);
+    rows.forEach(function(id){
+      var s=a.students[id],r=el('tr');
+      r.append(el('td',s.name));
+      var st=el('td',H.STATUS[s.status]+(s.late?' (late)':''));r.append(st);
+      var w=el('td',(s.answer||'')+((a.targetUnit==='minutes'&&s.progress)?(s.answer?' · ':'')+s.progress+' min':''));r.append(w);
+      var rv=el('td');
+      if(s.status==='submitted'){
+        var fb=el('input');fb.placeholder='Note to student';fb.maxLength=500;
+        var stars=el('select');[['','No stars'],['5','★★★★★'],['4','★★★★'],['3','★★★'],['2','★★'],['1','★']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];stars.append(op)});
+        var ok=el('button','Approve'),back=el('button','Send back','sec');ok.setAttribute('aria-label','Approve work by '+s.name);back.setAttribute('aria-label','Send back work by '+s.name);fb.setAttribute('aria-label','Note to '+s.name);stars.setAttribute('aria-label','Stars for '+s.name);var em=el('div',null,'msg');em.setAttribute('aria-live','polite');
+        var go=async function(action,btn){btn.disabled=true;try{await api({action:action,assignmentId:a.id,studentId:id,feedback:fb.value,stars:stars.value});await load()}catch(e){say(em,e.message);btn.disabled=false}};
+        ok.onclick=function(){go('approve',ok)};back.onclick=function(){go('return',back)};
+        rv.append(fb,stars,ok,back,em);
+      }else if(s.feedback)rv.textContent=s.feedback+(s.stars?' '+'★'.repeat(s.stars):'');
+      r.append(rv);t.append(r);
+    });
+    c.append(t);
+    var ed=el('button','Edit','sec');ed.disabled=publication==='archived';
+    ed.onclick=function(){state.editing=a.id;$('formTitle').textContent='Edit assignment';$('save').textContent='Save changes';$('cancelEdit').style.display='';
+      $('title').value=a.title;$('details').value=a.details;$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);
+      $('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;syncType();window.scrollTo({top:0,behavior:'smooth'})};
+    var publish=el('button',publication==='published'?'Unpublish':'Publish to students',publication==='published'?'sec':'');
+    publish.disabled=publication==='archived';publish.onclick=async function(){publish.disabled=true;try{await api({action:publication==='published'?'unpublish':'publish',assignmentId:a.id});await load()}catch(e){alert(e.message);publish.disabled=false}};
+    var archive=el('button',publication==='archived'?'Archived':'Archive','sec');archive.disabled=publication==='archived';
+    archive.onclick=async function(){if(!confirm('Archive "'+a.title+'"? Student work will be kept.'))return;archive.disabled=true;try{await api({action:'archive',assignmentId:a.id});await load()}catch(e){alert(e.message);archive.disabled=false}};
+    c.append(ed,publish,archive);box.append(c);
+  });
+}
+})();
+</script>
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body></html>
