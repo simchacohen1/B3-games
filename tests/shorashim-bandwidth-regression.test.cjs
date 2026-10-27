@@ -36,6 +36,7 @@ test('Shorashim teacher refreshes one changed student instead of the full school
     const sample=makeStudents(count),fullBytes=Buffer.byteLength(JSON.stringify(sample));
     const changedBytes=Buffer.byteLength(JSON.stringify(sample['student-0']));
     t.diagnostic(`${count} students: synthetic full-tree payload ${fullBytes} bytes; one changed-student payload ${changedBytes} bytes (${(100*(1-changedBytes/fullBytes)).toFixed(2)}% smaller)`);
+    t.diagnostic(`${count} student writes/session: synthetic retransfers ${(fullBytes*count/1e6).toFixed(2)} MB before vs ${(changedBytes*count/1e6).toFixed(2)} MB after`);
   }
   const largeSchool=makeStudents(100);
   const changed=largeSchool['student-42'];

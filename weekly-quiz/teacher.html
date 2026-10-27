@@ -921,12 +921,14 @@ const SKILL_LABELS={general:'Any subject',shorashim:'Shoroshim',translation:'Chu
 // Quiz types whose questions each keep their own skill (shorashim/translation/comprehension).
 function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
-let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
+let roster={},quizzes={},allLaunches={},allResponses={},completions={};
+let quizHistoryLoadedAt=0,quizHistoryRequest=null;
+const QUIZ_HISTORY_REFRESH_MS=60*1000;
 let resultsStudentShowAll=false;
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
 let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
 let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
-let liveLaunchRef=null,liveResponseRef=null;
+let liveLaunchRef=null,liveResponseRef=null,liveCompletionRef=null;
 let resultsLaunchId='';
 let modalContext=null;
 let makeupSourceLaunchId='';
@@ -938,7 +940,44 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function fmtDate(ts){if(!ts)return'—';try{return new Date(Number(ts)).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return'—';}}
 function classLabel(id){return(CLASS_ROSTERS[id]||{}).label||id||'';}
 function skillLabel(id){return SKILL_LABELS[id]||id||'Comprehension';}
-function showTab(name){['live','setup','results','progress'].forEach(n=>{document.getElementById('panel'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);document.getElementById('tab'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);});if(name==='results')renderResults();if(name==='progress'){populateProgressStudents();renderStudentProgress();}}
+function showTab(name){
+  ['live','setup','results','progress'].forEach(n=>{
+    document.getElementById('panel'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);
+    document.getElementById('tab'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);
+  });
+  if(['setup','results','progress'].includes(name)){
+    loadQuizHistoryData().then(()=>{
+      if(!document.getElementById('panel'+name[0].toUpperCase()+name.slice(1)).classList.contains('active'))return;
+      renderPendingAssignments();
+      if(name==='results')renderResults();
+      if(name==='progress'){populateProgressStudents();renderStudentProgress();}
+    }).catch(error=>{
+      console.warn('Could not load quiz history data:',error);
+      setupMsg('Could not refresh saved quiz history. Please retry the tab.');
+    });
+    return;
+  }
+  if(name==='live')renderLive();
+}
+async function loadQuizHistoryData(){
+  if(quizHistoryRequest)return quizHistoryRequest;
+  if(Date.now()-quizHistoryLoadedAt<QUIZ_HISTORY_REFRESH_MS)return;
+  quizHistoryRequest=Promise.all([
+    db.ref(QROOT+'/responses').once('value'),
+    db.ref(QROOT+'/completions').once('value')
+  ]).then(([responsesSnap,completionsSnap])=>{
+    allResponses=responsesSnap.val()||{};completions=completionsSnap.val()||{};quizHistoryLoadedAt=Date.now();
+  }).finally(()=>{quizHistoryRequest=null;});
+  return quizHistoryRequest;
+}
+async function refreshQuizLaunch(lid){
+  const [responsesSnap,completionsSnap]=await Promise.all([
+    db.ref(QROOT+'/responses/'+lid).once('value'),
+    db.ref(QROOT+'/completions/'+lid).once('value')
+  ]);
+  allResponses[lid]=responsesSnap.val()||{};completions[lid]=completionsSnap.val()||{};
+  renderLaunchHistory();renderResults();renderStudentProgress();
+}
 function setupMsg(t){document.getElementById('setupMsg').textContent=t||'';}
 function launchMsg(t){document.getElementById('launchMsg').textContent=t||'';}
 
@@ -1021,6 +1060,9 @@ if(CLASS_SPACE){
 }
 // The shared quiz data is private to signed-in teachers, so these listeners start only after the
 // teacher is verified (starting them earlier would be refused and never retried).
+// Historical responses/completions are fetched on demand in Setup/Results/Progress.
+// Audit entries stay stored and are written as before, but are never bulk-downloaded.
+// Live class responses stay subscribed per launch.
 // Individual assignments: each student's queue, plus the old single pointer.
 var studentAssignmentQueue={},legacyStudentPointers={};
 var quizListenersAttached=false;
@@ -1873,13 +1915,14 @@ async function launchSelectedQuiz(){
 }
 // ---------- Live view ----------
 function changeLiveClass(){liveClassId=document.getElementById('liveClassSelect').value;attachLiveLaunch(activeLaunchByClass[liveClassId]||'');}
-function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)liveResponseRef.off();liveLaunchRef=liveResponseRef=null;}
+function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)liveResponseRef.off();if(liveCompletionRef)liveCompletionRef.off();liveLaunchRef=liveResponseRef=liveCompletionRef=null;}
 function attachLiveLaunch(id){
   if(id===activeLaunchId&&liveLaunchRef)return;detachLive();activeLaunchId=id;liveLaunch=null;liveResponses={};currentQ=0;
   if(!id){renderLive();renderLiveGrid();return;}
-  liveLaunchRef=db.ref(QROOT+'/launches/'+id);liveResponseRef=db.ref(QROOT+'/responses/'+id);
+  liveLaunchRef=db.ref(QROOT+'/launches/'+id);liveResponseRef=db.ref(QROOT+'/responses/'+id);liveCompletionRef=db.ref(QROOT+'/completions/'+id);
   liveLaunchRef.on('value',s=>{liveLaunch=s.val();if(liveLaunch&&liveLaunch.activeQuestion!==undefined)currentQ=Number(liveLaunch.activeQuestion)||0;renderLive();renderLiveGrid();});
-  liveResponseRef.on('value',s=>{liveResponses=s.val()||{};renderLiveGrid();});
+  liveResponseRef.on('value',s=>{liveResponses=s.val()||{};allResponses[id]=liveResponses;renderLiveGrid();if(document.getElementById('panelResults').classList.contains('active'))renderResults();if(document.getElementById('panelProgress').classList.contains('active'))renderStudentProgress();if(document.getElementById('panelSetup').classList.contains('active'))renderPendingAssignments();});
+  liveCompletionRef.on('value',s=>{completions[id]=s.val()||{};if(document.getElementById('panelResults').classList.contains('active'))renderResults();if(document.getElementById('panelProgress').classList.contains('active'))renderStudentProgress();if(document.getElementById('panelSetup').classList.contains('active'))renderPendingAssignments();});
 }
 function liveQuestions(){return liveLaunch&&liveLaunch.quizSnapshot?asArray(liveLaunch.quizSnapshot.questions):[];}
 function qState(i,launch=liveLaunch){const qs=(launch&&launch.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
@@ -1961,6 +2004,7 @@ async function adjustCurrentAnswer(markCorrect){
     }
     await syncCompletionScore(ctx.launchId,ctx.studentId);
   }catch(e){console.error(e);alert('Could not save the change. Please check your connection and try again.');return;}
+  await refreshQuizLaunch(ctx.launchId).catch(error=>console.warn('Could not refresh this quiz after grading:',error));
   closeAnswerModal();
 }
 async function clearCurrentAnswer(){
@@ -1971,6 +2015,7 @@ async function clearCurrentAnswer(){
     // A finished quiz blocks new answers, so reopen it for this student; they finish again after retrying.
     const cref=db.ref(QROOT+'/completions/'+ctx.launchId+'/'+ctx.studentId);if((await cref.once('value')).exists())await cref.remove();
   }catch(e){console.error(e);alert('Could not save the change. Please check your connection and try again.');return;}
+  await refreshQuizLaunch(ctx.launchId).catch(error=>console.warn('Could not refresh this quiz after clearing the answer:',error));
   closeAnswerModal();
 }
 
