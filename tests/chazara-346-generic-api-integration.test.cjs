@@ -114,7 +114,8 @@ test('revoked class grant, teacher assignment, and student membership block both
   const x=server(d);
   for(const action of ['approve-point-request','reject-point-request']){
    const response=await x.call(action,{requestId:'alpha_request'});
-   assert.notEqual(response.code,200,reason+' must deny '+action);
+   assert.ok([401,403].includes(response.code),reason+' must return an authorization denial for '+action+' (got '+response.code+')');
+   assert.equal(typeof response.body?.error,'string',reason+' must include a denial message');
    assert.equal(x.writes.length,0,reason+' must not write points or approvals');
    assert.equal(x.reads.some(path=>path.startsWith('posukPractice/chazara/events/')),false,
     reason+' must not read private recording events for a denied approval');
