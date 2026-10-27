@@ -16,3 +16,5 @@ playwright-report/
 test-results/
 staging-results/
 /staging/test-credentials.local.json
+/staging/firebase-config.generated.js
+/staging/staging-config.js

@@ -39,6 +39,54 @@ function Invoke-FirebaseDeploy([string[]]$Arguments, [string]$Description) {
   if ($exitCode -ne 0) { throw "$Description failed with Firebase CLI exit code $exitCode." }
 }
 
+function Prepare-StagingBootstrap {
+  $stagingDir = Join-Path $repoRoot 'staging'
+  $assets = @(
+    @{ Name = 'firebase-config.generated.js'; Url = "https://$siteId.web.app/staging/firebase-config.generated.js" },
+    @{ Name = 'staging-config.js'; Url = "https://$siteId.web.app/staging/staging-config.js" }
+  )
+  $downloaded = @{}
+  foreach ($asset in $assets) {
+    try {
+      $response = Invoke-WebRequest -Uri $asset.Url -UseBasicParsing -TimeoutSec 30
+    } catch {
+      throw "Could not fetch the required staging bootstrap asset '$($asset.Name)'; refusing to deploy."
+    }
+    if ([int]$response.StatusCode -ne 200) {
+      throw "Staging bootstrap asset '$($asset.Name)' returned HTTP $([int]$response.StatusCode); refusing to deploy."
+    }
+    $downloaded[$asset.Name] = [string]$response.Content
+  }
+
+  $generated = $downloaded['firebase-config.generated.js']
+  if ($generated -notmatch '"projectId"\s*:\s*"fun-torah-tools-staging"' -or
+      $generated -match '(?i)b3-games|posuk-scorer\.onrender\.com|nigrisync\.onrender\.com') {
+    throw 'The generated Firebase config is not isolated to fun-torah-tools-staging; refusing to deploy.'
+  }
+  $guard = $downloaded['staging-config.js']
+  if ($guard -notmatch "REQUIRED_PROJECT\s*=\s*'fun-torah-tools-staging'" -or
+      $guard -notmatch 'installNetworkGuards' -or $guard -notmatch 'installFirebaseGuard') {
+    throw 'The staging network guard is missing or targets an unexpected project; refusing to deploy.'
+  }
+
+  if (-not (Test-Path -LiteralPath $stagingDir)) {
+    New-Item -ItemType Directory -Path $stagingDir | Out-Null
+  }
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+  foreach ($asset in $assets) {
+    $path = Join-Path $stagingDir $asset.Name
+    $content = $downloaded[$asset.Name]
+    if (Test-Path -LiteralPath $path) {
+      $existing = [System.IO.File]::ReadAllText($path)
+      if ($existing -cne $content) {
+        throw "Refusing to overwrite existing local staging asset '$($asset.Name)'."
+      }
+    } else {
+      [System.IO.File]::WriteAllText($path, $content, $encoding)
+    }
+  }
+}
+
 Push-Location $repoRoot
 $previousUpdateCheck = $env:FIREBASE_CLI_DISABLE_UPDATE_CHECK
 $previousDiscoveryTimeout = $env:FUNCTIONS_DISCOVERY_TIMEOUT
@@ -67,6 +115,8 @@ try {
   if (-not (Test-Path -LiteralPath $firebaseConfig)) {
     throw "Missing staging-only Hosting config: $firebaseConfig"
   }
+
+  Prepare-StagingBootstrap
 
   if (-not $SkipFunction) {
     Invoke-FirebaseDeploy @('deploy', '--only', 'functions:homework-staging', '--project', $projectId, '--config', $firebaseConfig, '--non-interactive') 'Staging homework function deploy'

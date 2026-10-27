@@ -141,37 +141,58 @@ test('staging guard accepts only the staging host/project and provides local act
   assert.equal(production.window.HomeworkCommon.API, '');
 });
 
-test('preview Firebase config proxies only the issue staging channel and deploy config targets staging', () => {
+test('preview Firebase config and bootstrap stay isolated from production', () => {
   const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   assert.doesNotMatch(homeSource, /<script src="firebase-config\.js[^"]*" defer>/,
-    'the preview proxy must run while document.write can load the staging config');
+    'the home page must initialize with its staging config before app code');
   const proxyWrites = [];
   const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
   const previewDocument = { currentScript: null, write: value => proxyWrites.push(value) };
-  const previewConfig = { window: { location: { hostname: previewHost }, document: previewDocument }, location: { hostname: previewHost }, document: previewDocument };
+  const stageConfig = { projectId: 'fun-torah-tools-staging' };
+  const previewWindow = { location: { hostname: previewHost }, document: previewDocument, B3_STAGING_FIREBASE_CONFIG: stageConfig };
+  const previewConfig = { window: previewWindow, location: previewWindow.location, document: previewDocument };
   vm.runInNewContext(configSource, previewConfig);
-  assert.equal(previewConfig.window.B3_FIREBASE_CONFIG, undefined);
-  assert.match(proxyWrites[0], /https:\/\/fun-torah-tools-staging\.web\.app\/firebase-config\.js/);
+  assert.equal(previewWindow.B3_FIREBASE_CONFIG.projectId, 'fun-torah-tools-staging');
+  assert.equal(proxyWrites.length, 0);
+
+  const bootstrapSource = fs.readFileSync(__dirname + '/../staging/preview-bootstrap.js', 'utf8');
+  const bootstrapWrites = [];
+  const bootstrapDocument = { write: value => bootstrapWrites.push(value) };
+  vm.runInNewContext(bootstrapSource, { window: { location: { hostname: previewHost } }, document: bootstrapDocument });
+  assert.match(bootstrapWrites[0], /staging\/firebase-config\.generated\.js/);
+  assert.match(bootstrapWrites[1], /staging\/staging-config\.js/);
+  const productionWrites = [];
+  vm.runInNewContext(bootstrapSource, { window: { location: { hostname: 'funtorahtools.com' } }, document: { write: value => productionWrites.push(value) } });
+  assert.equal(productionWrites.length, 0);
 
   const productionDocument = { currentScript: null, write: value => proxyWrites.push(value) };
   const productionConfig = { window: { location: { hostname: 'funtorahtools.com' }, document: productionDocument }, location: { hostname: 'funtorahtools.com' }, document: productionDocument };
   vm.runInNewContext(configSource, productionConfig);
   assert.equal(productionConfig.window.B3_FIREBASE_CONFIG.projectId, 'b3-games');
-  assert.equal(proxyWrites.length, 1);
+  assert.equal(proxyWrites.length, 0);
 
   const hosting = JSON.parse(fs.readFileSync(__dirname + '/../firebase.staging-preview.json', 'utf8'));
   assert.equal(hosting.hosting.site, 'fun-torah-tools-staging');
+  assert(hosting.hosting.ignore.includes('**/staging/test-credentials.local.json'));
+  assert(!hosting.hosting.ignore.includes('**/staging/**'));
   assert.equal(hosting.functions[0].codebase, 'homework-staging');
   assert.equal(hosting.functions[0].source, 'backend/functions/homework-staging');
   const deploy = fs.readFileSync(__dirname + '/../scripts/deploy-homework-staging-preview.ps1', 'utf8');
   assert.match(deploy, /projects:list/);
   assert.match(deploy, /hosting:sites:list/);
   assert.match(deploy, /hosting:channel:deploy/);
+  assert.match(deploy, /firebase-config\.generated\.js/);
+  assert.match(deploy, /staging-config\.js/);
   assert.match(deploy, /functions:homework-staging/);
   assert.match(deploy, /FUNCTIONS_DISCOVERY_TIMEOUT = '30'/);
   assert.doesNotMatch(deploy, /--project\s+['"]?b3-games/i);
   assert.doesNotMatch(deploy, /deploy['"]?,\s*['"]--only['"],\s*['"]hosting['"]/);
+  const stagingPages = ['index.html', 'weekly-quiz/index.html', 'chazara/index.html', 'shorashim/index.html', 'record_pesukim/student.html', 'rashi-letters/student.html', 'yiddish/index.html', 'game-show/player.html', 'class-gallery/index.html', 'student-rewards/index.html', 'halacha/index.html', 'teacher-home.html', 'student-report/index.html', 'assignment-center/teacher.html', 'assignment-center/student.html'];
+  for (const file of stagingPages) {
+    const html = fs.readFileSync(__dirname + '/../' + file, 'utf8');
+    assert.match(html, /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} must load the staging guard before app scripts`);
+  }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
   assert.match(fnSource, /homework-406-preview/);
   for (const file of ['homework.js', 'homework-core.cjs', 'homework-policy.cjs', 'student-login-core.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
