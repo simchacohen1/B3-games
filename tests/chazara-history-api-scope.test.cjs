@@ -130,3 +130,27 @@ test('inline legacy audio is absent from pending/history metadata and available 
  assert.notEqual(revoked.code,200,'revoked teacher must not retrieve inline audio');
  assert.equal(x.writes.length,0);
 });
+
+
+test('legacy inline audioURL remains private when another non-audio URL field is present',async()=>{
+ const d=fixture(),event=d['posukPractice/chazara/events/shared/et_event'];
+ const inline='data:audio/ogg;base64,QUJDREVGRw==';
+ event.audioDataURL='https://example.test/obsolete-audio-link';
+ event.audioURL=inline;
+ const x=server(d);
+ const summary=await x.call('get-chazara-event',{studentId:'shared',eventId:'et_event'});
+ assert.equal(summary.code,200,JSON.stringify(summary.body));
+ assert.equal(summary.body.event.hasInlineAudio,true);
+ assert.equal(summary.body.event.audioDataURL,undefined);
+ assert.equal(summary.body.event.audioURL,undefined,'embedded audioURL must not appear in metadata');
+ assert.ok(!JSON.stringify(summary.body).includes(inline));
+ const history=await x.call('list-chazara-history',{studentId:'shared'});
+ assert.equal(history.code,200,JSON.stringify(history.body));
+ assert.equal(history.body.events.et_event.audioURL,undefined);
+ const clicked=await x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
+ assert.equal(clicked.code,200,JSON.stringify(clicked.body));
+ assert.equal(clicked.body.audioDataURL,inline,'select actual inline audio, not unrelated legacy field');
+ const foreign=await x.call('get-chazara-audio',{studentId:'shared',eventId:'wt_event'});
+ assert.equal(foreign.code,403);
+ assert.equal(x.writes.length,0);
+});
