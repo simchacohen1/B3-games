@@ -264,7 +264,7 @@ async function loadApprovals(){
     const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
     if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
     if(E[studentId]?.[eventId])return;
-    const key=studentId+'__'+eventId;
+    const key=JSON.stringify([studentId,eventId]);
     let fetchPromise=pendingEventFetches.get(key);
     if(!fetchPromise){
      fetchPromise=teacherApi('get-chazara-event',{studentId,eventId});
