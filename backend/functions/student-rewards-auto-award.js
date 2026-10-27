@@ -1558,8 +1558,12 @@ exports.studentRewardsAutoAward = onRequest(
             if(!event)return res.status(404).json({error:"Recording not found."});
             if(!eventAllowed(event))return res.status(403).json({error:"Recording belongs to another class."});
             if(action==="get-chazara-audio"){
-              const audioDataURL=String(event.audioDataURL||event.audioURL||'');
-              if(!audioDataURL.startsWith('data:audio/'))return res.status(404).json({error:"Inline recording audio is not available."});
+              // Some legacy events have both fields; use the first actual inline
+              // audio payload rather than letting a non-audio URL mask it.
+              const audioDataURL=[event.audioDataURL,event.audioURL]
+                .map(value=>String(value||''))
+                .find(value=>value.startsWith('data:audio/'))||'';
+              if(!audioDataURL)return res.status(404).json({error:"Inline recording audio is not available."});
               return res.status(200).json({ok:true,audioDataURL});
             }
             return res.status(200).json({ok:true,event:eventSummary(event)});
