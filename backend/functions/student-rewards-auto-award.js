@@ -121,7 +121,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','list-chazara-recordings','get-chazara-recording-audio','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
@@ -133,9 +133,18 @@ async function requireTeacher(req){
 }
 
 async function authorizeChazaraAction(teacher,body){
- if(!teacher.scope)return;
+ if(!teacher.scope){
+  if(body.action==='get-chazara-recording-audio'&&!teacher.owner)throw Object.assign(new Error('Teacher class scope is required.'),{code:403});
+  return;
+ }
  const scope=teacher.scope,action=body.action;
- if(action==='list-chazara-pending')return;
+ if(action==='list-chazara-pending'||action==='list-chazara-recordings')return;
+ if(action==='get-chazara-recording-audio'){
+  if(!teacherClassScope.validKey(String(body.studentId||''))||!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.eventId||''))||!scope.students?.[body.studentId])throw Object.assign(new Error('Invalid or out-of-scope Chazara recording.'),{code:403});
+  const event=(await rtdb.ref(`posukPractice/chazara/events/${body.studentId}/${body.eventId}`).get()).val();
+  if(!teacherClassScope.recordAllowed(scope,body.studentId,event))throw Object.assign(new Error('This Chazara does not belong to your selected class.'),{code:403});
+  return;
+ }
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
@@ -834,12 +843,12 @@ async function repairMissingChazaraPointRequests(scope){
   }
 }
 
-async function listPendingChazaraRequests(scope){
+async function listPendingChazaraRequests(scope,{repair=true}={}){
   if(scope){
     // Self-heal saved Chazaras whose client-side point request never reached
-    // the server. Loading the teacher approval panel now recreates any missing
-    // pending requests before returning the list.
-    await repairMissingChazaraPointRequests(scope);
+    // the server. The history view opts into this scan so the initial approvals
+    // view does not download every saved recording just to find pending items.
+    if(repair)await repairMissingChazaraPointRequests(scope);
     const rows=[];
     // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
@@ -851,7 +860,7 @@ async function listPendingChazaraRequests(scope){
   // Owner viewing all classes has no class scope. Self-heal every student's
   // saved Chazaras too, so the owner's "All classes" view also recovers
   // missing point requests.
-  try{
+  if(repair&&(!scope||scope.owner&&!scope.selected))try{
     const studentIds=Object.keys((await rtdb.ref('posukPractice/chazara/events').get()).val()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
     await repairMissingChazaraPointRequests({owner:true,selected:'',students:Object.fromEntries(studentIds.map(id=>[id,{}]))});
   }catch(err){console.error('Owner Chazara self-heal failed',err)}
@@ -864,6 +873,42 @@ async function listPendingChazaraRequests(scope){
   const manual=await sweepPendingMilestones(rows);
   manual.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
   return manual;
+}
+
+function chazaraRecordingSummary(studentId,eventId,event){
+  const summary={id:eventId,studentId,...(event||{})};
+  summary.storageFallback=summary.storageFallback===true||(!summary.storagePath&&String(summary.audioDataURL||'').startsWith('data:audio/'));
+  delete summary.audioDataURL;
+  if(String(summary.audioURL||'').startsWith('data:audio/'))delete summary.audioURL;
+  return summary;
+}
+async function pendingChazaraRecordingEvents(requests,scope){
+  const candidates=(requests||[]).filter(item=>item?.recorded===true&&item.practiceStudentId&&item.eventId);
+  const events=await Promise.all(candidates.map(async item=>{
+    const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
+    const event=(await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).get()).val();
+    if(!event||event.recorded!==true||event.reviewApplied!==true||event.removed===true)return null;
+    if(scope&&!teacherClassScope.recordAllowed(scope,studentId,event))return null;
+    return chazaraRecordingSummary(studentId,eventId,event);
+  }));
+  return events.filter(Boolean).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+}
+async function listChazaraRecordingHistory(scope){
+  const historyScope=scope||await teacherClassScope.roster(async path=>(await rtdb.ref(path).get()).val(),{authorized:true,role:'admin'},'');
+  const studentIds=Object.keys(historyScope.students||{});
+  // Reconcile missing point requests only after the teacher chooses a specific
+  // class. An unfiltered owner history stays read-only and avoids a global scan.
+  if(scope&&(!scope.owner||scope.selected))await repairMissingChazaraPointRequests(historyScope);
+  const rows=[];
+  for(const studentId of studentIds){
+    const events=(await rtdb.ref(`posukPractice/chazara/events/${studentId}`).get()).val()||{};
+    for(const [eventId,event] of Object.entries(events)){
+      if(event?.recorded!==true||event.reviewApplied!==true||event.removed===true)continue;
+      if(!teacherClassScope.recordAllowed(historyScope,studentId,event))continue;
+      rows.push(chazaraRecordingSummary(studentId,eventId,event));
+    }
+  }
+  return rows.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
 }
 
 const AUTOMATIC_MILESTONE_REVIEWER="Automatic: Posuk Practice milestone";
@@ -1512,8 +1557,21 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         if(action==="list-chazara-pending"){
-          const requests=await listPendingChazaraRequests(teacher.scope);
-          return res.status(200).json({ok:true,requests});
+          const requests=await listPendingChazaraRequests(teacher.scope,{repair:false});
+          const recordings=await pendingChazaraRecordingEvents(requests,teacher.scope);
+          return res.status(200).json({ok:true,requests,recordings});
+        }
+        if(action==="list-chazara-recordings"){
+          const recordings=await listChazaraRecordingHistory(teacher.scope);
+          return res.status(200).json({ok:true,recordings});
+        }
+        if(action==="get-chazara-recording-audio"){
+          const studentId=String(body.studentId||''),eventId=String(body.eventId||'');
+          if(!teacher.scope&&!teacher.owner)return res.status(403).json({error:'Teacher class scope is required.'});
+          const event=(await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).get()).val();
+          if(!event||event.recorded!==true||event.reviewApplied!==true||event.removed===true||!(event.storageFallback===true||(!event.storagePath&&String(event.audioDataURL||'').startsWith('data:audio/')))||!String(event.audioDataURL||'').startsWith('data:audio/'))return res.status(404).json({error:'Fallback recording audio is not available.'});
+          if(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,studentId,event))return res.status(403).json({error:'Recording belongs to another class.'});
+          return res.status(200).json({ok:true,audioDataURL:event.audioDataURL});
         }
         if(action==="repair-shorashim-recording"){
           const studentId=String(body.studentId||"").trim(),eventId=String(body.eventId||"").trim();
