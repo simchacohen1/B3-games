@@ -76,7 +76,7 @@
 </div>
 <script>
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const db=firebase.database(),auth=firebase.auth(),storage=firebase.storage(),$=x=>document.getElementById(x),ET=new Set(["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"]),WT=new Set(["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"]);let fullDashboardLoaded=false,D={},R={},E={},P={},teacherAccess=null,teacherScope=null,scopeGeneration=0,studentListeners=[];
-let pendingRecordingKeys=new Set(),historyStudentsLoaded=new Set(),historyLoading=false,historyGeneration=0,approvalGeneration=0;
+let pendingRecordingKeys=new Set(),historyStudentsLoaded=new Set(),historyLoading=false,historyGeneration=0,approvalGeneration=0,pendingEventFetches=new Map();
 function cls(id){let c=R[id]?.classId;return c?c:ET.has(id)?"et":WT.has(id)?"wt":""}function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}function fmt(t){return t?new Date(t).toLocaleDateString():"—"}
 function resultEntries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');if(v&&typeof v==='object')return Object.keys(v).filter(k=>/^\d+$/.test(k)).map(k=>[Number(k),v[k]]).filter(([,x])=>x&&typeof x==='object');return[]}
 function readingScore(a){return a&&typeof a.hebrewFinalScore==='number'?a.hebrewFinalScore:(a&&typeof a.hebrewScore==='number'?a.hebrewScore:null)}
@@ -264,14 +264,21 @@ async function loadApprovals(){
     const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
     if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
     if(E[studentId]?.[eventId])return;
+    const key=studentId+'__'+eventId;
+    let fetchPromise=pendingEventFetches.get(key);
+    if(!fetchPromise){
+     fetchPromise=teacherApi('get-chazara-event',{studentId,eventId});
+     pendingEventFetches.set(key,fetchPromise);
+    }
     try{
-     const data=await teacherApi('get-chazara-event',{studentId,eventId}),event=data.event||null;
+     const data=await fetchPromise,event=data.event||null;
      if(generation!==scopeGeneration||request!==approvalGeneration)return;
      if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
       if(!E[studentId])E[studentId]={};
       E[studentId][eventId]=event;
      }
     }catch(error){console.warn('Could not load pending Chazara recording',error)}
+    finally{if(pendingEventFetches.get(key)===fetchPromise)pendingEventFetches.delete(key)}
    }));
   }
   if(generation!==scopeGeneration||request!==approvalGeneration)return;
@@ -391,7 +398,7 @@ function refreshScopedViews(){
 // Normal teacher sessions must still reload their own live assignments.
 function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
 async function loadClassScope(user,access){
- const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();pendingEventFetches.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
  try{
   if(needsTeacherAssignmentRefresh(access)){
