@@ -369,6 +369,9 @@ testEmulator('transitional RTDB rules deny an assigned teacher reading a differe
       await set(ref(database,'b3Games/workspaces/b3-2026/teachers/teacher_alpha'),{
         active:true,classIds:{alpha:true}
       });
+      await set(ref(database,'b3Games/workspaces/b3-2026/teachers/teacher_beta'),{
+        active:true,classIds:{beta:true}
+      });
       await set(ref(database,'b3Games/workspaces/b3-2026/classes/alpha'),{
         active:true,members:{synthetic_one:{active:true}}
       });
@@ -390,6 +393,95 @@ testEmulator('transitional RTDB rules deny an assigned teacher reading a differe
     await succeeds(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
     // Must deny this read, even though the teacher is active in another class.
     await fails(get(ref(teacher,'b3Games/students/synthetic_two/profile')));
+    // The parallel Posuk Practice attempts path must obey the same class boundary.
+    await succeeds(get(ref(teacher,'posukPractice/attempts/synthetic_one')));
+    await fails(get(ref(teacher,'posukPractice/attempts/synthetic_two')));
+    const betaTeacher=transitional.authenticatedContext('teacher_beta',{
+      email:'beta@example.test',email_verified:true
+    }).database();
+    await succeeds(get(ref(betaTeacher,'b3Games/students/synthetic_two/profile')));
+    await fails(get(ref(betaTeacher,'b3Games/students/synthetic_one/profile')));
+    // A student retains access to their own record.
+    const student=transitional.authenticatedContext('student_one',{
+      b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'
+    }).database();
+    await succeeds(get(ref(student,'b3Games/students/synthetic_one/profile')));
+    await fails(get(ref(student,'b3Games/students/synthetic_two/profile')));
+    // Revocation is checked against current records, not stale browser grants.
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/classIds/alpha'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await fails(get(ref(teacher,'posukPractice/attempts/synthetic_one')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/classIds/alpha'),true);
+      await set(ref(context.database(),'b3Games/students/synthetic_one/memberships/b3-2026_alpha/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/students/synthetic_one/memberships/b3-2026_alpha/active'),true);
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/classes/alpha/members/synthetic_one/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/classes/alpha/members/synthetic_one/active'),true);
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+  }finally{
+    await transitional.cleanup();
+  }
+});
+
+
+// Release-blocking compatibility test: an active multi-class student must not
+// disappear from an assigned teacher's view solely because profile.classId
+// names the student's *other* class. Uses fictional data in the RTDB emulator.
+// The current #424 primary-class-only draft is expected to FAIL this test;
+// do not relax the assertion to make CI green.
+testEmulator('transitional rules preserve verified secondary-class membership and revoke it independently',async()=>{
+  const transitional=await initializeTestEnvironment({
+    projectId:'demo-b3-transitional-shared-membership',
+    database:{host:'127.0.0.1',port:emulatorPort,rules:fs.readFileSync('firebase-rules.json','utf8')}
+  });
+  try{
+    await transitional.clearDatabase();
+    await transitional.withSecurityRulesDisabled(async context=>{
+      const db=context.database();
+      await set(ref(db,'b3Games/workspaces/b3-2026/teachers/teacher_alpha'),{active:true,classIds:{alpha:true}});
+      await set(ref(db,'b3Games/workspaces/b3-2026/teachers/teacher_beta'),{active:true,classIds:{beta:true}});
+      await set(ref(db,'b3Games/workspaces/b3-2026/teachers/teacher_gamma'),{active:true,classIds:{gamma:true}});
+      await set(ref(db,'b3Games/workspaces/b3-2026/classes/alpha'),{active:true,members:{shared:{active:true}}});
+      await set(ref(db,'b3Games/workspaces/b3-2026/classes/beta'),{active:true,members:{shared:{active:true}}});
+      await set(ref(db,'b3Games/workspaces/b3-2026/classes/gamma'),{active:true,members:{}});
+      await set(ref(db,'b3Games/students/shared'),{
+        profile:{active:true,classId:'beta'},
+        memberships:{
+          'b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true},
+          'b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true}
+        }
+      });
+      await set(ref(db,'posukPractice/attempts/shared'),{fictional_attempt:{score:3}});
+    });
+    const auth=uid=>transitional.authenticatedContext(uid,{
+      email:uid+'@example.test',email_verified:true
+    }).database();
+    const alpha=auth('teacher_alpha'),beta=auth('teacher_beta'),gamma=auth('teacher_gamma');
+    // Both assigned teachers have independently verified active memberships.
+    await succeeds(get(ref(alpha,'b3Games/students/shared/profile')));
+    await succeeds(get(ref(alpha,'posukPractice/attempts/shared')));
+    await succeeds(get(ref(beta,'b3Games/students/shared/profile')));
+    await succeeds(get(ref(beta,'posukPractice/attempts/shared')));
+    await fails(get(ref(gamma,'b3Games/students/shared/profile')));
+    await fails(get(ref(gamma,'posukPractice/attempts/shared')));
+    // Revoking Alpha's membership must not revoke Beta's valid access.
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/students/shared/memberships/b3-2026_alpha/active'),false);
+    });
+    await fails(get(ref(alpha,'b3Games/students/shared/profile')));
+    await fails(get(ref(alpha,'posukPractice/attempts/shared')));
+    await succeeds(get(ref(beta,'b3Games/students/shared/profile')));
+    await succeeds(get(ref(beta,'posukPractice/attempts/shared')));
   }finally{
     await transitional.cleanup();
   }
