@@ -208,3 +208,38 @@ test('8. student page lists every assignment and never auto-opens a finished qui
   assert.ok(teacher.includes('WeeklyQuizAssignments.assignUpdates(QROOT,[studentId],id'));
   for(const source of [html,teacher])for(const m of source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 });
+
+test('9. one student\'s marks: a quiz given again is one row, not a missed quiz',()=>{
+  const html=fs.readFileSync('weekly-quiz/teacher.html','utf8');
+  assert.ok(html.includes('../student-report/quiz-history.js'));
+  // Copy each function out of the page by matching its braces.
+  const fn=name=>{const start=html.indexOf('function '+name+'(');let depth=0,i=html.indexOf('{',start);for(;i<html.length;i++){if(html[i]==='{')depth++;else if(html[i]==='}'&&--depth===0)break;}return html.slice(start,i+1);};
+  const source=['studentResultsQuizzes','launchQuestions','classForStudent'].map(fn).join('\n');
+  const qs=title=>({title,questions:[{q:title+' 1',choices:['a','b'],correctIndex:1},{q:title+' 2',choices:['a','b'],correctIndex:1}]});
+  const ctx={
+    B3QuizHistory:require('../student-report/quiz-history.js'),WeeklyQuizAssignments:WQA,
+    CLASS_SPACE:false,WQ_CLASS:'',CLASS_ROSTERS:{et:{students:['levi']}},
+    asArray:v=>Array.isArray(v)?v:Object.values(v||{}),
+    window:{B3QuizHistory:require('../student-report/quiz-history.js')},
+    document:{getElementById:id=>({resultsClassFilter:{value:'all'},resultsQuizSearch:{value:''}})[id]||null},
+    allLaunches:{
+      morning:{classId:'et',quizId:'q1',createdAt:100,startedAt:100,quizSnapshot:qs('Cheshvan')},
+      afternoon:{classId:'et',quizId:'q1',createdAt:200,startedAt:200,quizSnapshot:qs('Cheshvan')},
+      // Regenerated with no saved-quiz id: same name and same questions still match.
+      sh1:{classId:'et',createdAt:300,startedAt:300,quizSnapshot:qs('Shoroshim')},
+      sh2:{classId:'et',createdAt:400,startedAt:400,quizSnapshot:qs('Shoroshim')},
+      other:{classId:'et',createdAt:500,startedAt:500,quizSnapshot:qs('Different quiz')}
+    },
+    allResponses:{morning:{levi:{0:{correct:true},1:{correct:true}}},sh1:{levi:{0:{correct:false}}},sh2:{levi:{0:{correct:true}}}},
+    completions:{morning:{levi:{completedAt:150}}}
+  };
+  vm.runInNewContext(source+';this.rows=studentResultsQuizzes("levi");',ctx);
+  const rows=Object.fromEntries(ctx.rows.map(q=>[q.title,q]));
+  assert.deepEqual(Object.keys(rows).sort(),['Cheshvan','Different quiz','Shoroshim']);
+  assert.equal(rows.Cheshvan.attempts.length,2);
+  assert.equal(rows.Cheshvan.counted.launchId,'morning','his finished 100% counts, the unopened repeat does not');
+  assert.equal(rows.Cheshvan.pct,100);
+  assert.equal(rows.Shoroshim.counted,null);
+  assert.equal(rows.Shoroshim.partial.launchId,'sh2','newest started try is shown');
+  assert.equal(rows['Different quiz'].status,'not_started','a quiz he really has not done still shows');
+});

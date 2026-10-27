@@ -200,6 +200,17 @@ test('teacher assigns three retakes to one boy; each stays open until he finishe
 
   expect(failed.filter(f => !f.includes('favicon') && !f.startsWith('403 /weeklyQuizStudent'))).toEqual([]);
   expect(errors.filter(e => !/favicon|Failed to load resource|403|not assigned/i.test(e))).toEqual([]);
+  // ---- Teacher: "One student's marks only". Quiz B given again to the whole class
+  // (he has not opened the new copy) is still one row with his finished 100%. ----
+  await writeFixture(`${ROOT}/launches/${Date.now()}_${CLASS_ID}_quiz_b_again`, { quizId: '', classId: CLASS_ID, started: true, mode: 'test', deliveryType: 'live', showScore: true, createdAt: Date.now(), questionStates: {}, quizSnapshot: quiz('Quiz B') });
+  await teacher.locator('#resultsStudentFilter').selectOption(ARI);
+  const marks = teacher.locator('#resultsTable tbody tr');
+  await expect(marks.filter({ hasText: 'Quiz B' })).toHaveCount(1);
+  await expect(marks.filter({ hasText: 'Quiz B' })).toContainText('100%');
+  await expect(marks.filter({ hasText: 'Quiz B' })).toContainText('Given 3 times');
+  await expect(marks.filter({ hasText: 'Quiz A' })).toHaveCount(1);
+  await expect(marks.filter({ hasText: 'Quiz A' })).toContainText('100%');
+
   // Stop the pages' background polling before the emulators shut down.
   for (const context of [ari.context(), bina.context(), teacherContext]) {
     await context.unrouteAll({ behavior: 'ignoreErrors' });
