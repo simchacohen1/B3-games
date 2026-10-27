@@ -135,11 +135,11 @@ test('student CSV holds only that student and labels statuses',()=>{
  assert.ok(!/s_b|s_c|Only For B|West Track Quiz/.test(csv));
  const body=rows.slice(1).filter(r=>r.length);
  assert.ok(body.every(r=>r[0]==='Synthetic Student A'));
- const attempts=body.filter(r=>r[3]==='Attempt');
+ const attempts=body.filter(r=>r[3]==='Quiz');
  assert.ok(attempts.some(r=>r[4]==='Missed Quiz'&&r[6]==='Not Started'));
  assert.ok(attempts.some(r=>r[4]==='Half Done Quiz'&&r[6]==='In Progress'&&/1 of 3 answered/.test(r[11])));
  assert.equal(attempts.filter(r=>r[4]==='Retaken Quiz').length,2);
- assert.ok(body.some(r=>r[3]==='Question'&&r[18]==='Unanswered'));
+ assert.ok(body.every(r=>r.length===14),'no per-question columns');assert.ok(!body.some(r=>/Question/.test(r[3])));
  assert.ok(body.some(r=>r[3]==='Practice'&&r[12]==='No (practice)'));
  assert.ok(attempts.some(r=>r[4]==='Quiz record no longer available'&&r[6]==='Data unavailable'));
  const summary=body.find(r=>r[3]==='Summary');assert.equal(summary[11],'78%');
