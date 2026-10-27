@@ -9,7 +9,7 @@ function harness(identity,rows){
   const snap=value=>({exists:()=>value!=null,val:()=>value??null,child:key=>snap(key.split('/').reduce((v,k)=>v?.[k],value))});
   const admin={apps:[{}],auth:()=>({verifyIdToken:async(token,revoked)=>{assert.equal(token,'synthetic-token');assert.equal(revoked,true);return identity;}}),database:()=>({ref:key=>({get:async()=>{reads.push(key);return snap(rows[key]);}})})};
   const mod={exports:{}};
-  new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/class-gallery-read.js'),'utf8'))(name=>name==='firebase-admin'?admin:name==='node:crypto'?require('node:crypto'):{onRequest:(options,handler)=>handler},mod,mod.exports);
+  new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/class-gallery-read.js'),'utf8'))(name=>name==='node:crypto'?require('node:crypto'):name==='firebase-admin'?admin:{onRequest:(options,handler)=>handler},mod,mod.exports);
   return async(classId,authenticated=true,since='')=>{
     let code=200,body;
     const res={set(){},status(value){code=value;return this;},json(value){body=value;return this;}};

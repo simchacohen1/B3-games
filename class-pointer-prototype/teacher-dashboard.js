@@ -65,6 +65,9 @@ function init(){
  if(header){header.replaceChildren(topbar);header.classList.add('cp-header')}
 
  /* ---------- Students drawer (beside the lesson) ---------- */
+ const compactStyle=document.createElement('style');compactStyle.id='cpStudentsCompact';
+ compactStyle.textContent="/* Compact Students popover: smaller, floats over the lesson, colored levels. */\n@media (min-width:1000px){\n body.teacher-view.cp-compact-workspace main{padding-right:16px}\n body.teacher-view.cp-compact-workspace:not(.cp-drawer-closed) .app-header.cp-header{margin-right:0}\n body.teacher-view .cp-permissions-sidebar{bottom:auto;width:300px;max-height:calc(100dvh - var(--cp-drawer-top,12px) - 12px);z-index:50;box-shadow:0 12px 32px rgba(15,23,42,.18)}\n}\n.cp-permissions-sidebar{padding:10px 12px;border-radius:12px}\n.cp-drawer-head{margin-bottom:6px}\n.cp-drawer-head h2{font-size:16px}\n.cp-drawer-close{width:30px;height:30px;border-radius:8px}\n.cp-everyone{flex-direction:row;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border-radius:10px}\n.cp-everyone strong{font-size:13px;flex:1}\n.cp-everyone-row{flex-wrap:nowrap}\n.cp-everyone-row>span,.cp-everyone-help{display:none}\n.cp-everyone-row select{min-height:30px;font-size:13px;padding:2px 6px;width:150px}\n.cp-student-head,.cp-student-body{grid-template-columns:minmax(0,1fr) 112px;gap:4px 6px;font-size:13px}\n.cp-student-head{padding-bottom:4px;margin-bottom:4px}\n.cp-level{min-height:30px;font-size:13px;padding:2px 4px}\n.cp-more{margin-top:8px;padding-top:6px}\n.cp-more>summary{font-size:13px;min-height:26px}\n.cp-level[data-level=\"point\"],#cpEveryoneLevel[data-level=\"point\"]{background:#dbeafe;border-color:#3b82f6;color:#1e3a8a;font-weight:600}\n.cp-level[data-level=\"highlight\"],#cpEveryoneLevel[data-level=\"highlight\"]{background:#fef3c7;border-color:#f59e0b;color:#78350f;font-weight:600}\n.cp-level[data-level=\"pen\"],#cpEveryoneLevel[data-level=\"pen\"]{background:#dcfce7;border-color:#16a34a;color:#14532d;font-weight:600}\n#stage .cp-permissions-sidebar.cp-drawer-overlay{width:300px;height:auto;resize:none!important;min-height:0!important}\n#stage .cp-permissions-sidebar.cp-drawer-overlay select,#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-level{min-height:30px;font-size:13px}\n#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-drawer-close{min-height:30px}\n";
+ document.head.append(compactStyle);
  const sidebar=el('aside','cp-permissions-sidebar');sidebar.id='cpStudentsDrawer';
  sidebar.setAttribute('aria-label','Students');
  const drawerHead=el('div','cp-drawer-head');
@@ -85,13 +88,13 @@ function init(){
  for(const [v,t] of LEVEL_LONG){const o=el('option',null,t);o.value=v;everyoneSelect.append(o)}
  everyoneLabel.append(everyoneSelect);
  everyone.append(everyoneLabel,el('span','cp-everyone-help','Change one student below if needed.'));
- everyoneSelect.addEventListener('change',()=>window.ClassPointerRoster?.setAll(everyoneSelect.value));
+ everyoneSelect.addEventListener('change',()=>{everyoneSelect.dataset.level=everyoneSelect.value;window.ClassPointerRoster?.setAll(everyoneSelect.value)});
  sidebar.append(everyone);
 
  /* One table: name, level on my screen, screen sharing, whiteboard. */
  const table=el('div','cp-student-table');table.setAttribute('role','group');table.setAttribute('aria-label','Student permissions');
  const tableHead=el('div','cp-student-head');
- tableHead.append(el('span',null,'Name'),el('span',null,'On my screen'),el('span','cp-c','Screen'),el('span','cp-c','Board'));
+ tableHead.append(el('span',null,'Name'),el('span',null,'On my screen'));
  const tableBody=el('div','cp-student-body');
  table.append(tableHead,tableBody);
  sidebar.append(table);
@@ -129,7 +132,7 @@ function init(){
   writePref('cpStudentsDrawer',open);
   setTimeout(()=>window.dispatchEvent(new Event('resize')),60);
  }
- setDrawer(readPref('cpStudentsDrawer',window.innerWidth>=1000));
+ setDrawer(false);
  studentsBtn.addEventListener('click',()=>setDrawer(document.body.classList.contains('cp-drawer-closed')));
  closeDrawer.addEventListener('click',()=>setDrawer(false));
 
@@ -175,7 +178,7 @@ function init(){
   const list=rows();
   const focused=document.activeElement&&tableBody.contains(document.activeElement)?document.activeElement.dataset.key:null;
   tableBody.replaceChildren();
-  if(R())everyoneSelect.value=R().everyone();
+  if(R())everyoneSelect.value=R().everyone();everyoneSelect.dataset.level=everyoneSelect.value;
   if(!list.length){
    const empty=el('p','cp-student-empty',$('endClass')?.disabled?'Start a class to see your students here.':'No students yet. Use Invite students to send the join link.');
    tableBody.append(empty);
@@ -210,18 +213,9 @@ function init(){
    for(const [v,t] of LEVEL_SHORT){const o=el('option',null,t);o.value=v;level.append(o)}
    level.value=R()?.levelForName(row.name)||'none';
    level.disabled=!R();
-   level.addEventListener('change',()=>R()?.setLevelForName(row.name,level.value));
-   const checks=[];
-   for(const [kind,label] of [['screens','screen sharing'],['boards','whiteboard']]){
-    const c=el('input','cp-check');c.type='checkbox';c.dataset.key=kind+':'+row.name;
-    c.setAttribute('aria-label',row.name+' '+label);
-    c.checked=!!row.id&&!!S()?.allowed(row.id,kind);
-    c.disabled=!row.id||!S();
-    if(!row.id)c.title='Available once this student is matched to your class list';
-    c.addEventListener('change',()=>S()?.set(row.id,kind,c.checked));
-    checks.push(c);
-   }
-   tableBody.append(nameCell,level,...checks);
+   level.dataset.level=level.value;
+   level.addEventListener('change',()=>{level.dataset.level=level.value;R()?.setLevelForName(row.name,level.value)});
+   tableBody.append(nameCell,level);
   }
   if(focused){const again=tableBody.querySelector('[data-key="'+CSS.escape(focused)+'"]');again?.focus()}
   syncJoined(list);
@@ -250,7 +244,7 @@ function init(){
  const live=el('span','cp-live-chip','Live');
  const tabControls=$('tabControls');
  const switchWrap=el('div','cp-switch-wrap');
- const switchBtn=el('button','cp-switch-btn','Switch / stop');switchBtn.type='button';
+ const switchBtn=el('button','cp-switch-btn','Switch');switchBtn.type='button';
  switchBtn.setAttribute('aria-haspopup','true');switchBtn.setAttribute('aria-expanded','false');switchBtn.setAttribute('aria-controls','cpSwitchMenu');
  const switchMenu=el('div','cp-switch-menu');switchMenu.id='cpSwitchMenu';switchMenu.hidden=true;
  switchMenu.append(el('small',null,'Switch to'));
@@ -261,13 +255,12 @@ function init(){
   switchMenu.append(node);
  }
  const stopBtn=iconButton('cp-stop-btn','stop','Stop presenting');
- switchMenu.append(stopBtn);
  switchWrap.append(switchBtn,switchMenu);
  const fullBtn=$('fullScreenLesson');
  if(fullBtn){fullBtn.replaceChildren(icon('full'));fullBtn.setAttribute('aria-label','Full screen');fullBtn.title='Full screen';fullBtn.classList.add('cp-icon-btn')}
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
- liveWrap.append(switchWrap);
+ liveWrap.append(switchWrap,stopBtn);
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
@@ -344,7 +337,7 @@ function init(){
   const boards=document.body.classList.contains('boards-on');
   document.body.classList.toggle('cp-is-live',isLive);
   pickerCard.hidden=isLive||boards||panel.hidden;
-  liveWrap.hidden=!isLive||boards;
+  liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   if(!isLive)openSwitch(false);
@@ -415,6 +408,15 @@ function init(){
  for(const type of ['pointerup','pointercancel'])drawerHead.addEventListener(type,()=>{drawerDrag=null});
 
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open')){setOverlay(false);studentsDockBtn?.focus()}});
+
+ // Click anywhere outside the Students panel (or press Escape) to close it.
+ document.addEventListener('pointerdown',e=>{
+  const path=e.composedPath();
+  if(path.includes(sidebar)||path.includes(studentsBtn)||(studentsDockBtn&&path.includes(studentsDockBtn)))return;
+  if(!document.body.classList.contains('cp-drawer-closed'))setDrawer(false);
+  if(sidebar.classList.contains('cp-overlay-open'))setOverlay(false);
+ },true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.body.classList.contains('cp-drawer-closed'))setDrawer(false)});
 
  // Present menu rows get a stable name so full screen can show a clear icon beside each choice.
  const presentSources={'Show my screen to students':'shareScreen','Capture a tab, window or screen':'openBrowserTab','Show a PDF':'openPdf','Show a web page':'openWebpage','Show a whiteboard':'openWhiteboard','Stop presenting':'stopScreen'};

@@ -1,7 +1,7 @@
 'use strict';
 const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
-   if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
+   // The dashboard-entry check lives in classroom-gate.js, which runs first and stops the page when blocked.
 const members=new Map();
 // Students stay in Shorashim and other Fun Torah Tools pages. Their authenticated
 // presence connections can receive embedded whiteboard messages without navigating.
@@ -82,7 +82,19 @@ function drawPointers(){
   });
   for(const [id,node] of pointerNodes)if(!visible.has(id)){node.remove();pointerNodes.delete(id)}
 }
+// Pointer moves send only the pointers that changed, batched about 30 times a second,
+// instead of rebroadcasting the whole class state to every student on every move.
+const changedPoints=new Set();let pointFlushTimer=null;
+function queuePoint(id){changedPoints.add(id);if(!pointFlushTimer)pointFlushTimer=setTimeout(flushPoints,33)}
+function flushPoints(){
+  pointFlushTimer=null;if(!changedPoints.size)return;
+  const points={};for(const id of changedPoints)points[id]=state.points[id]||null;changedPoints.clear();
+  for(const member of members.values())if(member.admitted)send(member.connection,{type:'points',points});
+  for(const member of presence.values())if(member.admitted)send(member.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members});
+  drawPointers();
+}
 function publish(){
+  clearTimeout(pointFlushTimer);pointFlushTimer=null;changedPoints.clear();
   state.members=[...members.values(),...presence.values()].filter(member=>member.admitted).map(member=>({id:member.id,name:member.name,color:member.color||'#57b8ff',admitted:true,allowed:member.allowed,tools:memberTools(member)}));
   for(const member of members.values())if(member.admitted)send(member.connection,{type:'state',state});
   for(const member of presence.values())if(member.admitted){send(member.connection,{type:'lesson-tools',level:levelOf(member)});send(member.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})}
@@ -114,7 +126,7 @@ function clearStudentHover(member){clearTimeout(member.pointTimer);member.pointT
 function commitStudentHover(member){
   member.pointTimer=null;const point=member.pendingPoint;member.pendingPoint=null;
   if(!point||(member.presence?presence.get(member.id):members.get(member.id))!==member||!live()||!selected(member)||!memberTools(member)?.pointer)return;
-  member.lastPoint=Date.now();state.points[member.id]=point;publish();
+  member.lastPoint=Date.now();state.points[member.id]=point;queuePoint(member.id);
 }
 function favorTextDetail(call){
   const tune=()=>{
@@ -239,7 +251,7 @@ function receiveStudent(connection){
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
-    if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
+    if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;queuePoint(member.id)}
     if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){
       // Identity comes from this connection, never from a student-supplied name or ID.
       member.pendingPoint={x:message.point.x,y:message.point.y,...C.pointStyle(message.point)};
@@ -332,7 +344,7 @@ async function startClass(){
     if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     $('startClass').hidden=true;
     const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('dashboard','student');link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
     // An explicit Follow Teacher launch starts with the teacher's shared whiteboard.
     // This uses the existing classroom document viewer, not the student-board broadcast.
     if(new URL(location.href).searchParams.get('followTeacherWhiteboard')==='1')openFollowWhiteboard();
@@ -563,6 +575,11 @@ function joinClass(event){
       if(message.type==='highlights'){highlighter?.receive(message.strokes);return}
       if(message.type==='highlight-error'){fail('Could not add the highlight. Try a shorter stroke or clear some of your highlights.');return}
       if(message.type==='waiting'){clearTimeout(joinTimer);joining=false;$('joinForm').hidden=true;$('leaveClass').hidden=false;status('Connected. Waiting for your teacher to admit you.');pointerPermission()}
+      if(message.type==='points'&&admitted&&state&&message.points&&typeof message.points==='object'){
+        if(!state.points||typeof state.points!=='object')state.points={};
+        for(const [id,point] of Object.entries(message.points)){if(id==='__proto__')continue;if(point&&typeof point==='object'&&Number.isFinite(point.x)&&Number.isFinite(point.y))state.points[id]=point;else delete state.points[id]}
+        drawPointers();
+      }
       if(message.type==='state'){
         if(!admitted)joinSucceeded();
         clearTimeout(joinTimer);joining=false;admitted=true;$('joinForm').hidden=true;$('leaveClass').hidden=autoJoin;state=message.state;
@@ -589,12 +606,12 @@ function joinClass(event){
 function cancelHover(){clearTimeout(hoverTimer);hoverTimer=null;pendingPoint=null}
 function hideOwnPointer(){
   cancelHover();lastHover=0;
-  if(isTeacher){if(state.points.teacher){delete state.points.teacher;publish()}}else send(teacherConnection,{type:'pointer-hide'});
+  if(isTeacher){if(state.points.teacher){delete state.points.teacher;queuePoint('teacher')}}else send(teacherConnection,{type:'pointer-hide'});
 }
 function sendHover(){
   hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(navigating||!point||!live()||!allowed())return;
   lastHover=Date.now();
-  if(isTeacher){state.points.teacher=point;publish()}else send(teacherConnection,{type:'point',point});
+  if(isTeacher){state.points.teacher=point;queuePoint('teacher')}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
   if(isTeacher&&$('teacherTool').value==='eraser'){hideOwnPointer();return}

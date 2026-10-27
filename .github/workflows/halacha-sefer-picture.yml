@@ -7,6 +7,11 @@ on:
       - 'halacha/index.html'
       - 'e2e/halacha-sefer-style.spec.ts'
       - '.github/workflows/halacha-sefer-picture.yml'
+# Newer runs on the same PR/branch cancel superseded ones (including main,
+# where only the latest commit is what gets deployed).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   picture-regressions:
     runs-on: ubuntu-latest

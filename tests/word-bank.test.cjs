@@ -104,7 +104,7 @@ test('every existing Halacha lesson has at least three lesson-specific terms', (
   const html=fs.readFileSync(path.join(root,'halacha/index.html'),'utf8'),start=html.indexOf('const lessons=['),end=html.indexOf('\n// Seven original Siman Aleph',start);
   assert.ok(start>=0&&end>start);
   const lessonContext=vm.createContext({});vm.runInContext(html.slice(start,end)+';globalThis.out=lessons;',lessonContext);
-  assert.equal(lessonContext.out.length,34);
+  assert.equal(lessonContext.out.length,38);
   for(const lesson of lessonContext.out){
     const words=context.FTTHalachaVocabulary.get(lesson.id);
     assert.ok(words.length>=3,`missing words for ${lesson.id}`);

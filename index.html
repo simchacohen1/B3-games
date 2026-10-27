@@ -2,27 +2,7 @@
 <html lang="en">
 <head>
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fun Torah Tools</title>
@@ -30,6 +10,8 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <style>
@@ -408,17 +390,17 @@ body > .subtitle::after {
     if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
   });
 </script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="backend/functions/student-tool-policy.js"></script>
-<script src="student-tool-controls.js"></script>
-<script src="follow-teacher/core.js?v=20261020-follow-pointer1"></script>
-<script src="follow-teacher/student.js?v=20261020-follow-pointer1"></script>
-<script src="guest-mode.js?v=20261011-guest"></script>
-<script src="site-settings.js?v=20261020-demo-student"></script>
-<script src="approval-queue.js?v=20261021-approvals"></script>
+<script src="vendor/firebase/12.15.0/firebase-app-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
+<script src="firebase-config.js?v=20261001-teacherauth" defer></script>
+<script src="backend/functions/student-tool-policy.js" defer></script>
+<script src="student-tool-controls.js" defer></script>
+<script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
+<script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
+<script src="guest-mode.js?v=20261011-guest" defer></script>
+<script src="site-settings.js?v=20261020-demo-student" defer></script>
+<script src="approval-queue.js?v=20261021-approvals" defer></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -465,7 +447,7 @@ body > .subtitle::after {
             <section class="game-group island-place " data-game-group="skills">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" loading="lazy" decoding="async" width="74" height="74" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
 <a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
       </section>
             <section class="game-group island-place " data-game-group="more-learning">
@@ -631,6 +613,8 @@ body > .subtitle::after {
   </div>
 
 <script>
+// Runs after the deferred scripts above have loaded (faster first paint).
+document.addEventListener("DOMContentLoaded",function(){
 (function(){
   "use strict";
   const settingsApi=window.B3SiteSettings;
@@ -934,6 +918,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
     {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
@@ -1062,14 +1047,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
     // milestones never count as manual approvals.
     const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];
+    const rashiPending=data.pointRequests?Q.rashiQueue(data.pointRequests).map(function(x){return x.item;}):[];
     approvalClassCounts={
       chazara:Q.countByClass(chazaraPending,approvalClassFallback),
+      rashiRecordings:Q.countByClass(rashiPending,function(x){return x&&x.workspaceClassId||approvalClassFallback(x);}),
       gallery:Q.countByClass(galleryPending.map(function(x){return {classId:x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et"};}))
     };
     if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
       chazara:chazaraPending.length,
+      rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
       gallery:galleryPending.length,
@@ -1771,7 +1759,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Clear the student identity first so auth callbacks cannot restore the
     // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
-    resetPinForm();
     studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
@@ -2460,6 +2447,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     finishHomepageBootstrap();
   });
 })();
+},{once:true});
 </script>
 <script defer src="class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>

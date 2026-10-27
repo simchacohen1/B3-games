@@ -32,11 +32,11 @@ test('cycle rollover shows introductory lessons without selecting an unrelated c
 });
 test('date navigation selects daily cards, can return to Today, and makes every assigned mitzvah selectable',()=>{
  const els=new Map(),storage=new Map();
- function el(){return {style:{},dataset:{},classList:{toggle(){}},setAttribute(){},appendChild(child){this.children.push(child);},replaceChildren(){this.children=[];},children:[],addEventListener(){},getContext(){return {clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}}}};}
+ function el(){return {style:{},dataset:{},classList:{toggle(){},add(){},remove(){}},setAttribute(){},appendChild(child){this.children.push(child);},replaceChildren(){this.children=[];},children:[],addEventListener(){},getContext(){return {clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}}}};}
  const document={getElementById(id){if(!els.has(id))els.set(id,el());return els.get(id);},querySelectorAll(){return els.get('dayCards')?.children||[];},createElement:el};
  const storageApi={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-12T14:00:00Z']));}};
- const ctx={document,window:{addEventListener(){},FTTMitzvahCalendar:calendar,FTT_MITZVAH_DAYS:days,FTTSunTimes:sun,B3SiteSettings:{onAuthStateChanged(callback){callback({uid:"teacher"},true,{role:"teacher",authorized:true});}}},sessionStorage:storageApi,localStorage:storageApi,location:{search:''},URLSearchParams,Date:FixedDate,Intl,confirm:()=>false,setInterval(){}};
+ const ctx={document,window:{addEventListener(){},FTTMitzvahCalendar:calendar,FTT_MITZVAH_DAYS:days,FTTSunTimes:sun,B3SiteSettings:{onAuthStateChanged(callback){callback({uid:"teacher"},true,{role:"teacher",authorized:true});}}},sessionStorage:storageApi,localStorage:storageApi,location:{search:''},URLSearchParams,Date:FixedDate,Intl,confirm:()=>false,setInterval(){},setTimeout(fn){fn();return 1;},clearTimeout(){}};
  const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');const source=html.match(/<script>([\s\S]*?)<\/script>/)[1];vm.runInNewContext(source,ctx);
  assert.equal(els.get('outline').src,'coloring-v2/476.png?v=20261016-october');
  els.get('yesterday').onclick();assert.equal(els.get('outline').src,'coloring-v2/475.png?v=20261016-october');
@@ -88,12 +88,17 @@ test('October 19–23 cards map to their verified mitzvos and new coloring pages
 
 test('new October artwork has isolated coloring keys and cloud save paths',()=>{
  const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');
- assert.match(html,/newArt=new Set\(\[475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499\]\)/);
- assert.match(html,/versionedSaveArt=new Set\(\[482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499\]\)/);
+ assert.match(html,/newArt=new Set\(\[475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502,503\]\)/);
+ assert.match(html,/versionedSaveArt=new Set\(\[482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502,503\]\)/);
  const savePathSource=html.match(/function studentCardPath\(card\)\{[^}]+\}/)[0];
- const savePath=vm.runInNewContext('('+savePathSource+')',{sessionStorage:{getItem:key=>key==='b3Games_studentId'?'student-1':null},versionedSaveArt:new Set(Array.from({length:18},(_,i)=>i+482))});
+ const savePath=vm.runInNewContext('('+savePathSource+')',{sessionStorage:{getItem:key=>key==='b3Games_studentId'?'student-1':null},versionedSaveArt:new Set(Array.from({length:22},(_,i)=>i+482)),replacementArt:new Set([502,503])});
  assert.equal(savePath(481),'b3Games/students/student-1/seferHamitzvos/coloring/481');
  assert.equal(savePath(482),'b3Games/students/student-1/seferHamitzvos/coloring/482-v2');
  assert.equal(savePath(499),'b3Games/students/student-1/seferHamitzvos/coloring/499-v2');
- assert.match(html,/\?v=20261016-october/);
+ assert.equal(savePath(500),'b3Games/students/student-1/seferHamitzvos/coloring/500-approved-20261025');
+ assert.equal(savePath(501),'b3Games/students/student-1/seferHamitzvos/coloring/501-approved-20261025');
+ assert.equal(savePath(502),'b3Games/students/student-1/seferHamitzvos/coloring/502-replacement-20261026');
+ assert.equal(savePath(503),'b3Games/students/student-1/seferHamitzvos/coloring/503-replacement-20261026');
+ assert.match(html,/20261016-october/);
+ assert.match(html,/20261025-week/);
 });

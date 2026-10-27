@@ -9,16 +9,18 @@ const start=html.indexOf('let lastGalleryPostsSnapshot=null,galleryApplyRevision
 const end=html.indexOf('\nif(dbRef){',start);
 assert.ok(start!==-1&&end>start,'Gallery post updater exists');
 const updater=html.slice(start,end);
+// The scene signature uses the real project-card cache key from the page.
+const keyMatch=html.match(/function projectCardKey\(post\)\{[^\n]*\}/);
+assert.ok(keyMatch,'Gallery project card key exists');
 
 function setup(deferredMedia=false){
   const stats={builds:0,refreshes:0,mediaLoads:0,mediaResolvers:[]};
   const context={
     posts:[],scene:{},isTeacher:false,console,
-    projectCardKey:post=>[post.id,post.title,post.category,post.studentName,post.className,String(post.image||'').length].join('|'),
-    pruneProjectCardCache(){},
     updatePending(){},
     buildScene(){stats.builds++;},
     refreshRemoteAvatars(){stats.refreshes++;},
+    pruneProjectCardCache(){},
     resolveGalleryMedia(rows){
       stats.mediaLoads++;
       if(!deferredMedia)return Promise.resolve(rows);
@@ -27,7 +29,7 @@ function setup(deferredMedia=false){
     document:{getElementById:()=>({classList:{contains:()=>false},style:{display:'none'}})}
   };
   vm.createContext(context);
-  vm.runInContext(updater,context);
+  vm.runInContext(keyMatch[0]+'\n'+updater,context);
   return {context,stats};
 }
 
@@ -56,6 +58,7 @@ test('posts appear before private audio or video links resolve',async()=>{
 
 test('out-of-order media completion cannot rebuild or replace current posts',async()=>{
   const {context,stats}=setup(true);
+  // Only approved posts are drawn in the 3D scene, so only they trigger rebuilds.
   context.applyGalleryPosts({a:{title:'Old',status:'approved'}});
   context.applyGalleryPosts({a:{title:'New',status:'approved'}});
   assert.equal(stats.builds,2);

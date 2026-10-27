@@ -30,7 +30,7 @@ test('all 613 masks match native artwork, never include outline pixels, and reje
   assert.equal(sizes.size,m.regions);assert.ok([...sizes.values()].every(n=>n<=mask.width*mask.height*.18),card+' no page-size fill');
  }
 });
-for(const n of [1,475,476,484,487,499,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
+for(const n of [1,475,476,484,487,495,496,497,498,499,500,501,502,503,613])test(`real picture ${n}: adjacent, detailed and small sections stay isolated`,()=>{
  const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),seeds=new Map(),counts=new Map();
  for(let i=0;i<mask.width*mask.height;i++){const id=mask.labels[i];if(id){seeds.set(id,i);counts.set(id,(counts.get(id)||0)+1);}}
  const small=[...counts].filter(([,n])=>n>=3).sort((a,b)=>a[1]-b[1])[0],large=[...counts].sort((a,b)=>b[1]-a[1])[0];
@@ -47,6 +47,18 @@ for(const n of [1,475,476,484,487,499,613])test(`real picture ${n}: adjacent, de
   const cssX=(x+.5)*factor,cssY=(y+.5)*factor;
   assert.equal(regionFromMask(mask,mask.width,mask.height,cssX/factor,cssY/factor).region,small[0]);
  }
+});
+for(const n of [500,501,502,503])test(`new weekly picture ${n}: every engine region fills exactly once without leaks`,()=>{
+ const m=manifest[n],art=png(root+m.source),mask=createRegionMask(art,art.width,art.height),counts=new Map(),seeds=new Map();
+ for(let i=0;i<mask.labels.length;i++){const id=mask.labels[i];if(id){counts.set(id,(counts.get(id)||0)+1);if(!seeds.has(id))seeds.set(id,i);}}
+ assert.equal(counts.size,m.regions);
+ const target=new Uint32Array(mask.labels.length);
+ for(const [id,size] of counts){
+  const seed=seeds.get(id),result=regionFromMask(mask,mask.width,mask.height,seed%mask.width,Math.floor(seed/mask.width));
+  assert.equal(result.region,id,`seed resolves to region ${id}`);assert.equal(result.pixels.length,size,`region ${id} is complete`);
+  for(const pixel of result.pixels){assert.equal(mask.labels[pixel],id,`region ${id} cannot cross a boundary`);target[pixel]=id;}
+ }
+ for(let i=0;i<target.length;i++)assert.equal(target[i],mask.labels[i],`every fillable pixel belongs to exactly its source region`);
 });
 test('missing, mismatched or giant masks fail closed',()=>{
  assert.equal(regionFromMask(null,9,9,4,4).reason,'unavailable');
@@ -65,5 +77,41 @@ test('all 613 descriptions and vocabulary selections are explicit and preserve t
  const plain=s=>s.replace(/[\u0591-\u05c7]/g,'');
  for(const ref of ['P225','N296'])assert.ok(c.FTTSeferVocabulary.forRef(ref).some(w=>plain(w.hebrew)==='עיר מקלט'));
  assert.match(d.N154,/Do not.*wrong order/);assert.match(d.P105,/seminal discharge/);assert.ok(!d.P105.includes('<br>'));
+});
+test('off-thread segmentation matches unchanged artwork and repeat taps reuse one bounded region',()=>{
+ const art=png(root+manifest[484].source),direct=createRegionMask(art,art.width,art.height);
+ const context={Uint8ClampedArray,Uint32Array,ArrayBuffer,console};let response;
+ context.self=context;
+ context.importScripts=()=>vm.runInNewContext(fs.readFileSync(root+'fill.js','utf8'),context);
+ context.postMessage=(message,transfers)=>{response=message;assert.ok(transfers.includes(message.labels));};
+ vm.runInNewContext(fs.readFileSync(root+'mask-worker.js','utf8'),context);
+ const input=new Uint8ClampedArray(art.data).buffer;
+ context.onmessage({data:{revision:7,card:484,width:art.width,height:art.height,pixels:input}});
+ assert.equal(response.revision,7);assert.equal(response.card,484);
+ assert.equal(response.error,undefined);
+ assert.equal(crypto.createHash('sha256').update(Buffer.from(response.labels)).digest('hex'),manifest[484].labelsSha256);
+ const mask={width:art.width,height:art.height,labels:new Uint32Array(response.labels)};
+ const firstIndex=mask.labels.findIndex(Boolean),x=firstIndex%mask.width,y=Math.floor(firstIndex/mask.width);
+ const first=regionFromMask(mask,mask.width,mask.height,x,y),second=regionFromMask(mask,mask.width,mask.height,x,y);
+ assert.strictEqual(second.pixels,first.pixels,'same image region is cached, not scanned again');
+ assert.ok(mask.recentPixels.size<=4,'bounded pixel cache');
+});
+test('white fringe completion paints enclosed gaps without crossing ink or another section',()=>{
+ const {includeSafeWhiteFringe}=require('../sefer-hamitzvos/fill.js');
+ const width=20,height=16,total=width*height,labels=new Uint32Array(total),data=new Uint8ClampedArray(total*4);
+ for(let i=0;i<total;i++){data[i*4]=255;data[i*4+1]=255;data[i*4+2]=255;data[i*4+3]=255;}
+ for(let y=2;y<=9;y++)for(let x=2;x<=5;x++)labels[y*width+x]=1;
+ // An artificially closed white gap within one enclosed region.
+ labels[5*width+4]=0;
+ for(let y=2;y<=9;y++)for(let x=9;x<=11;x++)labels[y*width+x]=2;
+ // Genuine dark border must never get colored.
+ for(let y=1;y<=10;y++){const i=y*width+7;data[i*4]=data[i*4+1]=data[i*4+2]=0;}
+ const mask={width,height,labels},seed=regionFromMask(mask,width,height,3,5);
+ const complete=includeSafeWhiteFringe(mask,{data},seed);
+ assert.ok([...complete.pixels].includes(5*width+4),'white gap receives same color');
+ assert.ok(![...complete.pixels].includes(4*width+6),'a one-sided white gap never spills outside the outline');
+ assert.ok(complete.pixels.every(i=>data[i*4]>=232),'dark pixels untouched');
+ assert.ok(complete.pixels.every(i=>labels[i]===1||labels[i]===0),'other labeled region untouched');
+ assert.strictEqual(includeSafeWhiteFringe(mask,{data},seed).pixels,complete.pixels,'result cached');
 });
 module.exports={png};

@@ -40,14 +40,14 @@ function make(id){
  const index=IDs.indexOf(id);
  el.innerHTML=`<div class="ha-mast"><button type="button" class="ha-nav ha-prev" ${index===0?'disabled':''}>← Back</button><h2>סימן א - סעיף ${['א','ב','ג','ד','ה','ו','ז'][index]}<small>${esc(name)}</small></h2><button type="button" class="ha-nav ha-next" ${index===6?'disabled':''}>Next →</button></div>
  <div class="ha-layout"><div class="ha-art" aria-label="Coloring picture"><canvas aria-label="Color the picture" width="1000" height="750"></canvas><p class="ha-status" role="status">Choose a color, then click inside the picture to fill it.</p></div>
- <div class="ha-side"><section class="ha-card ha-halachacard"><h3>📖 The Halacha <button class="ha-speak" title="Hear the explanation" aria-label="Hear English explanation">🔊</button></h3><div class="ha-hebrew" dir="rtl" lang="he"></div><p class="ha-summary">${esc(meta.summary)}</p></section>
+ <div class="ha-side"><section class="ha-card ha-halachacard"><h3>📖 The Halacha <button class="ha-speak" title="Hear the explanation" aria-label="Hear English explanation">🔊</button></h3><div class="ha-hebrew" dir="rtl" lang="he"></div><button class="ha-text-toggle" type="button" aria-expanded="false">Show more text</button><p class="ha-summary">${esc(meta.summary)}</p></section>
  <section class="ha-card ha-vocabcard"><h3>📚 Learn the Words</h3><p class="ha-instruction">Click a highlighted Hebrew word to learn its meaning and practice.</p><div class="ha-wordchips"></div><div class="ha-wordcard"><div class="ha-emoji">📖</div><div class="ha-wordinfo"><div class="ha-wordhe" lang="he" dir="rtl"></div><div class="ha-worden"></div><div class="ha-miniactions"><button class="ha-listen">🔊 Listen</button><button class="ha-practice">🎮 Practice</button></div></div></div><div class="ha-quiz" hidden><strong>Choose the correct meaning:</strong><div class="ha-answers"></div><p class="ha-feedback" role="status"></p></div></section></div></div>
- <div class="ha-tools"><b>🎨 Color the Picture</b><div class="ha-palette"></div><div class="ha-buttons"><button class="ha-fill selected">🪣 Fill</button><button class="ha-brush">🖌 Brush</button><button class="ha-eraser">Eraser</button><button class="ha-undo">↶ Undo</button><button class="ha-clear">Clear</button><button class="ha-download">↓ Save PNG</button></div></div>
+ <div class="ha-tools"><b>🎨 Color the Picture</b><div class="ha-palette" role="group" aria-label="Choose a coloring color"></div><label class="ha-custom-color">Custom color <input class="ha-custom-input" type="color" value="#e53838" aria-label="Choose a custom coloring color"></label><span class="ha-current-color" aria-live="polite">Selected color: Red</span><div class="ha-buttons"><button class="ha-fill selected">🪣 Fill</button><button class="ha-brush">🖌 Brush</button><button class="ha-eraser">Eraser</button><button class="ha-undo">↶ Undo</button><button class="ha-clear">Clear</button><button class="ha-download">↓ Save PNG</button></div><label class="ha-brush-size-label">Brush size <input class="ha-brush-size" type="range" min="3" max="36" step="1" value="9" aria-label="Brush thickness"><output class="ha-brush-size-value" for="">9 px</output></label></div>
  <details class="ha-teachernotes" ${readonly()?'':'hidden'}><summary>Teacher notes and questions</summary><p>${esc(real&&real.objective||meta.summary)}</p><ol>${(real&&real.qs||[]).map(q=>'<li>'+esc(q)+'</li>').join('')}</ol></details>`;
  section.insertBefore(el,section.firstChild);
  section.classList.add('ha-new');
  const q=s=>el.querySelector(s),canvas=q('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
- let image=new Image(),base=null,actions=[],color=colors[0],tool='fill',activeWord=0,drawing=null,ready=false,loading=false;
+ let image=new Image(),cleanedArt=null,base=null,actions=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false,loading=false;
  function status(txt){q('.ha-status').textContent=txt}
  function commit(txt){if(!readonly()&&halachaCloudLoading){status('Please wait for your account to finish loading.');return}persist(id,actions);status(txt)}
  function recolor(x,y,hex){
@@ -68,8 +68,8 @@ function make(id){
   ctx.putImageData(im,0,0);
  }
  function redraw(){if(!base)return;ctx.putImageData(base,0,0);
-  for(const a of actions){if(a.t==='fill'){recolor(a.x,a.y,a.c)}else if(a.pts&&a.pts.length){ctx.lineWidth=a.t==='eraser'?20:9;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=a.t==='eraser'?'white':a.c;ctx.beginPath();a.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(a.pts.length===1)ctx.lineTo(a.pts[0][0]+.1,a.pts[0][1]+.1);ctx.stroke()}}
-  ctx.globalCompositeOperation='multiply';ctx.drawImage(image,0,0);ctx.globalCompositeOperation='source-over';
+  for(const a of actions){if(a.t==='fill'){recolor(a.x,a.y,a.c)}else if(a.pts&&a.pts.length){ctx.lineWidth=a.t==='eraser'?20:(a.size||9);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=a.t==='eraser'?'white':a.c;ctx.beginPath();a.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(a.pts.length===1)ctx.lineTo(a.pts[0][0]+.1,a.pts[0][1]+.1);ctx.stroke()}}
+  ctx.globalCompositeOperation='multiply';ctx.drawImage(cleanedArt||image,0,0);ctx.globalCompositeOperation='source-over';
  }
  function pointer(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(canvas.width-1,Math.round((e.clientX-r.left)*canvas.width/r.width))),Math.max(0,Math.min(canvas.height-1,Math.round((e.clientY-r.top)*canvas.height/r.height)))];}
  canvas.addEventListener('pointerdown',e=>{if(!ready||loading)return;e.preventDefault();
@@ -79,14 +79,17 @@ function make(id){
    if(base.data[(y*canvas.width+x)*4]<220){status('Tap inside a white section, not on an outline.');return}
    actions.push({t:'fill',x,y,c:color});redraw();commit('✓ Section colored.');return;
   }
-  drawing={t:tool,c:color,pts:[[x,y]]};actions.push(drawing);canvas.setPointerCapture(e.pointerId);redraw();
+  drawing={t:tool,c:color,size:brushSize,pts:[[x,y]]};actions.push(drawing);canvas.setPointerCapture(e.pointerId);redraw();
  });
  canvas.addEventListener('pointermove',e=>{if(!drawing)return;drawing.pts.push(pointer(e));redraw()});
  const done=()=>{if(drawing){drawing=null;commit('✓ Picture updated.')}};
  canvas.addEventListener('pointerup',done);canvas.addEventListener('pointercancel',done);
- for(const c of colors){const b=document.createElement('button');b.type='button';b.className='ha-color';b.style.background=c;b.setAttribute('aria-label','Choose '+c+' color');b.onclick=()=>{color=c;q('.ha-palette').querySelectorAll('button').forEach(n=>n.classList.toggle('selected',n===b))};q('.ha-palette').appendChild(b)}q('.ha-color').classList.add('selected');
+ const colorNames={'#e53838':'Red','#ff9216':'Orange','#fddd27':'Yellow','#40b85b':'Green','#248df0':'Blue','#9255d6':'Purple','#926044':'Brown','#252525':'Black','#ed81b1':'Pink','#ffffff':'White'};
+ function chooseColor(c,selected){color=c;q('.ha-palette').querySelectorAll('button').forEach(n=>{n.classList.toggle('selected',n===selected);n.setAttribute('aria-pressed',String(n===selected))});q('.ha-current-color').textContent='Selected color: '+(colorNames[c.toLowerCase()]||c.toUpperCase());q('.ha-custom-input').value=c}
+ for(const c of colors){const b=document.createElement('button');b.type='button';b.className='ha-color';b.style.background=c;b.setAttribute('aria-label','Choose '+(colorNames[c]||c)+' color');b.setAttribute('aria-pressed','false');b.onclick=()=>chooseColor(c,b);q('.ha-palette').appendChild(b)}q('.ha-custom-input').addEventListener('input',e=>chooseColor(e.target.value.toLowerCase(),null));chooseColor(colors[0],q('.ha-color'));
  function selectTool(t){tool=t;[['fill','.ha-fill'],['brush','.ha-brush'],['eraser','.ha-eraser']].forEach(([name,sel])=>q(sel).classList.toggle('selected',t===name));status(t==='fill'?'Click inside a picture section to fill it.':'Drag on the picture to '+(t==='brush'?'draw.':'erase.'))}
  q('.ha-fill').onclick=()=>selectTool('fill');q('.ha-brush').onclick=()=>selectTool('brush');q('.ha-eraser').onclick=()=>selectTool('eraser');
+ q('.ha-brush-size').addEventListener('input',e=>{brushSize=Number(e.target.value);q('.ha-brush-size-value').textContent=brushSize+' px'});
  q('.ha-undo').onclick=()=>{if(!ready||!actions.length)return;actions.pop();redraw();commit('Last coloring action undone.')};
  q('.ha-clear').onclick=()=>{if(!ready||!actions.length||!confirm('Clear this coloring picture?'))return;actions=[];redraw();commit('Picture cleared.')};
  q('.ha-download').onclick=()=>{if(!ready)return;const link=document.createElement('a');link.download='Halacha-Siman-Alef-'+id+'.png';link.href=canvas.toDataURL('image/png');link.click()};
@@ -102,7 +105,7 @@ function make(id){
  selectWord(0);
  const source=sourceFor(id),terms=meta.words.map((w,i)=>({word:strip(w[0]),i})).sort((a,b)=>b.word.length-a.word.length);
  // Highlight words in the exact seif, with no nekudos. Do not render source as HTML.
- const reading=q('.ha-hebrew');let pointerIndex=0,plainStart=0;while(pointerIndex<source.length){
+ const reading=q('.ha-hebrew'),textToggle=q('.ha-text-toggle');textToggle.addEventListener('click',()=>{const expanded=textToggle.getAttribute('aria-expanded')!=='true';textToggle.setAttribute('aria-expanded',String(expanded));reading.classList.toggle('expanded',expanded);textToggle.textContent=expanded?'Show less text':'Show more text';});let pointerIndex=0,plainStart=0;while(pointerIndex<source.length){
   const match=terms.find(t=>t.word&&source.startsWith(t.word,pointerIndex));
   if(match){
    if(pointerIndex>plainStart)reading.appendChild(document.createTextNode(source.slice(plainStart,pointerIndex)));
@@ -112,7 +115,24 @@ function make(id){
  }
  if(plainStart<source.length)reading.appendChild(document.createTextNode(source.slice(plainStart)));
  const artData=window.HALACHA_ALEF_ART&&window.HALACHA_ALEF_ART[id];if(!artData){status('Lesson artwork is missing.');return}
- image.onload=()=>{canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;ctx.drawImage(image,0,0);base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';restore();};
+ image.onload=()=>{
+  canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+  ctx.drawImage(image,0,0);
+  if(id==='a7'){
+    // Special Tefillah: leave the decorative wall frame, but remove its crown symbol.
+    // Update the base pixels so coloring, previews, undo and downloads all stay consistent.
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(649,94,72,110);
+  }
+  if(id==='a7'){
+    // Use the corrected picture for the outline overlay, too, or redraw would restore the crown.
+    cleanedArt=document.createElement('canvas');
+    cleanedArt.width=canvas.width;cleanedArt.height=canvas.height;
+    cleanedArt.getContext('2d').drawImage(canvas,0,0);
+  }
+  base=ctx.getImageData(0,0,canvas.width,canvas.height);
+  ready=true;canvas.dataset.ready='true';restore();
+ };
  image.onerror=()=>status('Could not load this lesson picture.');image.src=artData;
  function restore(){
   if(!ready)return;

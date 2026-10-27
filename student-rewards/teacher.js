@@ -355,7 +355,7 @@ function pointSourceGroup(source){
   return "activity";
 }
 function pointSourceLabel(source){
-  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'chazara-reject':"Chazara approval reversed",'shorashim-recording':"Shorashim · Recorded Chazara",'shorashim-no-hints':"Shorashim · No Hints Challenge",'teacher-adjustment':"Teacher adjustment"};
+  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'chazara-reject':"Chazara approval reversed",'shorashim-recording':"Shorashim · Recorded Chazara",'shorashim-no-hints':"Shorashim · No Hints Challenge",'rashi-recording':"Rashi Letters · Recorded reading",'teacher-adjustment':"Teacher adjustment"};
   return labels[source]||String(source||"Activity points");
 }
 function allPointLedger(includeGaps=true){

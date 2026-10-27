@@ -95,7 +95,9 @@ async function enterFullScreen(page: Page) {
   await expect(page.locator('#stage')).toHaveClass(/lesson-fullscreen/);
 }
 
-test('full-screen Students panel is larger, can be dragged by its heading and resized', async ({ browser }) => {
+// Commit 58095c86 ("Compact Students panel") replaced the large resizable drawer with a compact
+// 300px popover (resize:none). It must still float over the lesson and be draggable by its heading.
+test('full-screen Students panel is a compact popover that can be dragged by its heading', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
@@ -103,8 +105,9 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   const drawer = page.locator('#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open');
   await expect(drawer).toBeVisible();
   const before = (await drawer.boundingBox())!;
-  expect(before.width).toBeGreaterThanOrEqual(340);
-  expect(before.height).toBeGreaterThanOrEqual(400);
+  expect(Math.round(before.width)).toBe(300);
+  expect(before.height).toBeGreaterThanOrEqual(150);
+  expect(await drawer.evaluate((el: HTMLElement) => getComputedStyle(el).resize)).toBe('none');
 
   const head = drawer.locator('.cp-drawer-head');
   const h = (await head.boundingBox())!;
@@ -117,15 +120,8 @@ test('full-screen Students panel is larger, can be dragged by its heading and re
   expect(moved.x).toBeGreaterThan(before.x + 200);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
-  // The browser's resize corner writes plain inline sizes; the stylesheet must not override them.
-  await page.mouse.move(moved.x + moved.width - 3, moved.y + moved.height - 3);
-  await page.mouse.down();
-  await page.mouse.move(moved.x + moved.width + 80, moved.y + moved.height - 120, { steps: 8 });
-  await page.mouse.up();
-  const resized = (await drawer.boundingBox())!;
-  await shot(page, 'drawer-resized');
-  expect(resized.width).toBeGreaterThan(moved.width + 40);
-  expect(resized.height).toBeLessThan(moved.height - 60);
+  expect(Math.round(moved.width)).toBe(Math.round(before.width));
+  // Inline sizes (the drawer's own layout code) must still win over the compact stylesheet.
   await drawer.evaluate((el: HTMLElement) => { el.style.width = '420px'; el.style.height = '300px'; });
   expect(Math.round((await drawer.boundingBox())!.width)).toBe(420);
 
@@ -445,4 +441,50 @@ test('embedded Follow Teacher workspace keeps the parent-selected class authorit
   await expect(frame.locator('#pointerClassChoice')).toHaveValue('pointer_test');
   await expect(frame.locator('#pdfView')).toBeVisible({timeout:20000});
   expect(context.pages()).toHaveLength(1);await context.close();
+});
+
+test('Stop sharing stays on the Live bar on every tab and ends the share from one click or Chrome\'s own bar', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  await context.addInitScript(() => {
+    (window as any).__tracks = [];
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180; canvas.getContext('2d')!.fillRect(0, 0, 320, 180);
+      const stream = canvas.captureStream(5); const track = stream.getVideoTracks()[0];
+      const settings = track.getSettings.bind(track); (track as any).getSettings = () => ({ ...settings(), displaySurface: 'monitor' });
+      (window as any).__tracks.push(track);
+      return stream;
+    } });
+  });
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  const stop = page.locator('.cp-live-wrap > .cp-stop-btn');
+  const stopScreen = page.locator('#stopScreen');
+  const share = async () => { await page.evaluate(() => (document.getElementById('shareScreen') as HTMLButtonElement).click()); await expect(stopScreen).toBeEnabled(); };
+  const tab = (name: string) => page.getByRole('button', { name, exact: true }).click();
+
+  await share();
+  await expect(stop).toBeVisible(); await expect(stop).toContainText('Stop sharing my screen');
+  expect(await stop.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(220, 38, 38)');
+  await shot(page, 'stop-my-screen');
+  for (const name of ['Student screens', 'Student whiteboards']) {
+    await tab(name);
+    await expect(stop).toBeVisible(); await expect(page.locator('.cp-live-wrap')).toBeVisible();
+    await shot(page, 'stop-' + name.replace(/\s/g, '-'));
+  }
+  await tab('My screen');
+
+  // One click on Stop ends the share from any tab.
+  await tab('Student whiteboards');
+  await stop.click();
+  await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
+  await tab('My screen');
+  await expect(page.locator('#placeholder')).not.toHaveAttribute('hidden'); await expect(page.locator('#cpSourcePicker')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__tracks.every((t: MediaStreamTrack) => t.readyState === 'ended'))).toBe(true);
+
+  // Chrome's own "Stop sharing" bar fires 'ended' on the captured track.
+  await share(); await expect(stop).toBeVisible();
+  await page.evaluate(() => (window as any).__tracks.at(-1).dispatchEvent(new Event('ended')));
+  await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
+  await expect(page.locator('#placeholder')).not.toHaveAttribute('hidden'); await expect(page.locator('#cpSourcePicker')).toBeVisible();
+  expect(errors).toEqual([]);
+  await context.close();
 });
