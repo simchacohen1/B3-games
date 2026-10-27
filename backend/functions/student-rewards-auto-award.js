@@ -1,6 +1,8 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {assertNoProductionFirebaseTarget} = require('./firebase-resource-targets.cjs');
 if (!admin.apps.length) admin.initializeApp();
+assertNoProductionFirebaseTarget(admin.app());
 const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
@@ -158,7 +160,7 @@ async function authorizeChazaraAction(teacher,body){
 
 
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
-const RASHI_BUCKET='b3-games.firebasestorage.app';
+const RASHI_BUCKET=admin.storage().bucket().name;
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 async function rashiRequestStatus(requestId){
   const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();

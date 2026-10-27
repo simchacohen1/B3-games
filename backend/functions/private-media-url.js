@@ -1,7 +1,9 @@
 'use strict';
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
+const {assertNoProductionFirebaseTarget}=require('./firebase-resource-targets.cjs');
 if(!admin.apps.length)admin.initializeApp();
+assertNoProductionFirebaseTarget(admin.app());
 const SAFE_PATH=/^[^\x00-\x1f\x7f\\?#]{1,600}$/u; // Uploaded filenames may include spaces or Hebrew.
 
 async function canReadMedia(db,identity,path){
@@ -54,7 +56,7 @@ exports.privateMediaUrl=onRequest({region:'us-central1',cors:['https://funtoraht
     if(!SAFE_PATH.test(path)||path.includes('..')||path.startsWith('/'))return res.status(400).json({error:'Invalid media path.'});
     const db=admin.database();
     if(!await canReadMedia(db,identity,path))return res.status(403).json({error:'You do not have access to this recording.'});
-    const bucket=admin.storage().bucket('b3-games.firebasestorage.app'),file=bucket.file(path),[exists]=await file.exists();
+    const bucket=admin.storage().bucket(),file=bucket.file(path),[exists]=await file.exists();
     if(!exists)return res.status(404).json({error:'Recording not found.'});
     const [url]=await file.getSignedUrl({action:'read',expires:Date.now()+5*60*1000});
     return res.status(200).json({url,expiresInSeconds:300});

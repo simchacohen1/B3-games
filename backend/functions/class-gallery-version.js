@@ -9,7 +9,9 @@
 const {onValueWritten}=require('firebase-functions/v2/database');
 const admin=require('firebase-admin');
 const {changedClassIds,bumpVersions}=require('./class-gallery-meta');
+const {assertNoProductionFirebaseTarget,databaseInstanceFromUrl}=require('./firebase-resource-targets.cjs');
 if(!admin.apps.length)admin.initializeApp();
+assertNoProductionFirebaseTarget(admin.app());
 
 async function handleGalleryWrite(db,{before,after,pathClassId}){
   const classIds=changedClassIds(before,after,pathClassId);
@@ -19,7 +21,8 @@ async function handleGalleryWrite(db,{before,after,pathClassId}){
 }
 exports.handleGalleryWrite=handleGalleryWrite;
 
-const options={region:'us-central1',instance:'b3-games-default-rtdb',memory:'256MiB'};
+const app=admin.app();
+const options={region:'us-central1',instance:databaseInstanceFromUrl(app.options.databaseURL,app.options.projectId),memory:'256MiB'};
 
 // ET / WT keep their posts in the original shared list.
 exports.classGalleryVersionLegacy=onValueWritten(

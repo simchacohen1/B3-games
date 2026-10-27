@@ -15,7 +15,8 @@
     'b3-games-default-rtdb.firebaseio.com',
     'us-central1-b3-games.cloudfunctions.net',
     'posuk-scorer.onrender.com',
-    'nigrisync.onrender.com'
+    'nigrisync.onrender.com',
+    'docs.google.com/spreadsheets/d/'
   ];
 
   function fail(message) {

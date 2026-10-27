@@ -5,7 +5,9 @@ const crypto = require('node:crypto');
 const {onRequest} = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const {resolveStudent} = require('./student-login-core.cjs');
+const {assertNoProductionFirebaseTarget} = require('./firebase-resource-targets.cjs');
 if (!admin.apps.length) admin.initializeApp();
+assertNoProductionFirebaseTarget(admin.app());
 
 const ORIGINS = [
   'https://funtorahtools.com',
@@ -67,7 +69,7 @@ exports.classGallerySubmit = onRequest({
     const token = crypto.randomUUID();
     const suffix = jpeg ? 'jpg' : 'png';
     const imagePath = 'classGallery/verified/' + student.classId + '/' + postRef.key + '.' + suffix;
-    const bucket = admin.storage().bucket('b3-games.firebasestorage.app');
+    const bucket = admin.storage().bucket();
     imageFile = bucket.file(imagePath);
     await imageFile.save(bytes, {
       resumable:false,

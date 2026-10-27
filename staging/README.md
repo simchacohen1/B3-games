@@ -19,10 +19,13 @@ Provide these values through a protected, staging-only CI environment. Firebase 
 - `B3_STAGING_FIREBASE_STORAGE_BUCKET`
 - `B3_STAGING_FIREBASE_MESSAGING_SENDER_ID`
 - `B3_STAGING_FIREBASE_APP_ID`
-- `B3_STAGING_POSUK_SCORER_URL` — a distinct HTTPS staging/test service, if this dependency is included
-- `B3_STAGING_SYNC_URL` — a distinct HTTPS staging/test service, if this dependency is included
+- `B3_STAGING_POSUK_SCORER_URL` — optional distinct HTTPS staging/test service. If omitted, scorer calls are rewritten to the reserved inert host `staging-disabled.invalid`.
 
-The project ID, Auth domain, RTDB URL and Storage bucket are checked against `fun-torah-tools-staging`. External scoring/sync services must use a host labeled for staging, test or development. The generator refuses missing or production values.
+The project ID, Auth domain, RTDB URL and Storage bucket are checked against `fun-torah-tools-staging`. If a scorer URL is supplied, it must use a host labeled for staging, test or development. If omitted, scorer calls go to the reserved inert host `staging-disabled.invalid`. Nigri sync always stays disabled because its current browser protocol includes a shared key; the package removes that key and production origin. This allows safe packaging, while Posuk Practice scoring and Nigri sync must be reported as unavailable.
+
+The Firebase project currently has billing disabled. Hosting/Auth/default RTDB can support a limited no-billing phase, but the current student login and other privileged workflows depend on Cloud Functions. Cloud Storage for Firebase and Cloud Functions require the Blaze plan. Do not deploy this package as a working teacher/student test site until staging-only rules and Auth behavior have been verified; the production RTDB rules are not suitable for reuse.
+
+The complete static site package is prepared with `node staging/package-site.cjs <source-checkout> <empty-output-directory>`. It copies the app files from the same checkout, excludes backend/server/config files and common credentials, rewrites Firebase and function endpoints, removes embedded production roster/ledger/sync data, disables unsupported scorer/sync endpoints, and runs the fail-closed source audit. Use an output directory outside the checkout; do not commit or deploy generated output.
 
 ## Testing
 
