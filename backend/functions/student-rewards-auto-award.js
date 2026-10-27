@@ -121,7 +121,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','repair-chazara-pending','get-chazara-event','list-chazara-history','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','repair-chazara-pending','get-chazara-event','list-chazara-history','get-chazara-audio','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
@@ -1524,11 +1524,22 @@ exports.studentRewardsAutoAward = onRequest(
           const requests=await listPendingChazaraRequests(teacher.scope);
           return res.status(200).json({ok:true,requests});
         }
-        if(action==="get-chazara-event"||action==="list-chazara-history"){
+        if(action==="get-chazara-event"||action==="list-chazara-history"||action==="get-chazara-audio"){
           const studentId=String(body.studentId||"").trim();
           if(!teacherClassScope.validKey(studentId))return res.status(400).json({error:"Invalid student."});
           // The owner may view all classes; an assigned teacher can only receive
           // events whose class is verified by the server-side teacher roster.
+          // Metadata responses exclude embedded audio. The separate authorized
+          // get-chazara-audio action returns bytes only after a teacher click.
+          const eventSummary=event=>{
+            const summary={...event};
+            const inline=String(summary.audioDataURL||'').startsWith('data:audio/')||
+              String(summary.audioURL||'').startsWith('data:audio/');
+            delete summary.audioDataURL;
+            if(String(summary.audioURL||'').startsWith('data:audio/'))delete summary.audioURL;
+            if(inline)summary.hasInlineAudio=true;
+            return summary;
+          };
           const eventAllowed=event=>{
             if(!event)return false;
             if(!teacher.scope)return true;
@@ -1540,17 +1551,22 @@ exports.studentRewardsAutoAward = onRequest(
             if(!explicit && Array.isArray(member.membershipClassIds) && member.membershipClassIds.length!==1)return false;
             return teacherClassScope.recordAllowed(teacher.scope,studentId,event);
           };
-          if(action==="get-chazara-event"){
+          if(action==="get-chazara-event"||action==="get-chazara-audio"){
             const eventId=String(body.eventId||"").trim();
             if(!teacherClassScope.validKey(eventId))return res.status(400).json({error:"Invalid recording."});
             const event=(await rtdb.ref('posukPractice/chazara/events/'+studentId+'/'+eventId).get()).val();
             if(!event)return res.status(404).json({error:"Recording not found."});
             if(!eventAllowed(event))return res.status(403).json({error:"Recording belongs to another class."});
-            return res.status(200).json({ok:true,event});
+            if(action==="get-chazara-audio"){
+              const audioDataURL=String(event.audioDataURL||event.audioURL||'');
+              if(!audioDataURL.startsWith('data:audio/'))return res.status(404).json({error:"Inline recording audio is not available."});
+              return res.status(200).json({ok:true,audioDataURL});
+            }
+            return res.status(200).json({ok:true,event:eventSummary(event)});
           }
           const all=(await rtdb.ref('posukPractice/chazara/events/'+studentId).get()).val()||{};
           const events=Object.fromEntries(Object.entries(all).filter(([eventId,event])=>
-            teacherClassScope.validKey(eventId)&&eventAllowed(event)));
+            teacherClassScope.validKey(eventId)&&eventAllowed(event)).map(([eventId,event])=>[eventId,eventSummary(event)]));
           return res.status(200).json({ok:true,events});
         }
         if(action==="repair-shorashim-recording"){
