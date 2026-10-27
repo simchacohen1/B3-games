@@ -427,6 +427,7 @@
 
 // Show the team score summary on the Play screen, just above Contestants.
 (function moveTeamSummaryToPlay(){
+  if(typeof setInterval!=="function"||typeof document==="undefined"||!document||typeof document.getElementById!=="function")return;
   let tries=0;
   const timer=setInterval(()=>{
     const summary=document.getElementById('teamModeSummary');
