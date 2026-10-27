@@ -189,7 +189,7 @@
     installFirebaseGuard(root, config);
     const labelSignIn = function () {
       const button = root.document && root.document.getElementById('signInButton');
-      if (button) button.textContent = 'Sign in with a staging test account';
+      if (button) button.textContent = 'Sign in (Google or staging test account)';
       if (root.document && root.document.body && !root.document.querySelector('.b3-staging-notice')) {
         const notice = root.document.createElement('div');
         notice.className = 'b3-staging-notice';
