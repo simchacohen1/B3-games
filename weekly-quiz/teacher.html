@@ -139,6 +139,14 @@
   #resultsTable th.student-col{min-width:86px;vertical-align:bottom;font-size:12px}
   #resultsTable th.student-col a{color:var(--ink)}
   #resultsTable tr.totals-row td{border-top:2px solid var(--line2);background:#f7f9fc}
+  #resultsTable.all-students td:first-child,#resultsTable.all-students th:first-child{position:sticky;left:0;z-index:2;background:#fff;box-shadow:1px 0 0 var(--line)}
+  #resultsTable.all-students thead th:first-child{z-index:3;background:#f7f9fc}
+  #resultsCard.table-fullscreen{position:fixed;inset:0;z-index:5000;margin:0;border-radius:0;max-width:none;width:100vw;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;padding:12px 14px}
+  #resultsCard.table-fullscreen .grid-wrap{max-height:none;flex:1;min-height:0}
+  #resultsCard.table-fullscreen #resultsTable.all-students td,#resultsCard.table-fullscreen #resultsTable.all-students th{padding:4px 5px;font-size:12px}
+  #resultsCard.table-fullscreen #resultsTable.all-students td.cell{min-width:0;height:auto}
+  #resultsCard.table-fullscreen #resultsTable.all-students th.student-col{min-width:0;font-size:11px}
+  #resultsCard.table-fullscreen #resultsTable.all-students td:first-child,#resultsCard.table-fullscreen #resultsTable.all-students th:first-child{min-width:170px!important}
   td.blank{color:#b3bfcb}
   td.correct{background:var(--good-bg);color:#17683d}
   td.incorrect{background:var(--bad-bg);color:#a3333a}
@@ -823,9 +831,14 @@
         <div id="pendingAssignments" class="launch-list"></div>
       </div>
       <div>
-        <div class="card">
+        <div class="card" id="resultsCard">
           <div class="card-head">
             <div><h2 id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
+            <div id="allTableTools" class="controls hidden">
+              <select id="tableClassFilter" aria-label="Show one class" onchange="setTableClass(this.value)"></select>
+              <button id="tableFullscreenBtn" class="secondary" onclick="toggleTableFullscreen()">⛶ Full screen</button>
+              <button id="allTableCsvBtn" class="secondary" onclick="downloadAllStudentsCSV()">Download CSV</button>
+            </div>
             <div class="controls results-actions">
               <button id="assignMakeupBtn" class="secondary" onclick="openMakeupFromResults()">Assign make-up</button>
               <details class="menu" id="resultsMenu">
@@ -1997,14 +2010,58 @@ function allStudentsQuizRows(students){
   }));
   return rows.sort((a,b)=>(b.date||0)-(a.date||0));
 }
+// Each boy's totals: average of finished quizzes, and how many he finished.
+function allStudentsSums(students,all){
+  return Object.fromEntries(students.map(st=>{let pctSum=0,correct=0,total=0,done=0,given=0;all.forEach(r=>{const q=r.cells[st.id];if(!q)return;given++;if(q.counted){done++;pctSum+=q.pct||0;correct+=q.correct||0;total+=q.total||0;}});return [st.id,{avg:done?Math.round(pctSum/done):null,correct,total,done,given}];}));
+}
+// Every quiz (not just the ones on screen) for a spreadsheet. Scores are written
+// as "8 of 10" because spreadsheets turn "8/10" into a date.
+function allStudentsCsvRows(){
+  const students=resultsStudentRows(),all=allStudentsQuizRows(students),sums=allStudentsSums(students,all);
+  const rows=[['Quiz','Class','First given','Times given',...students.map(st=>st.name)]];
+  all.forEach(r=>{
+    const latest=[...r.launchIds].sort((a,b)=>(Number(allLaunches[b]?.createdAt)||0)-(Number(allLaunches[a]?.createdAt)||0))[0],l=allLaunches[latest]||{};
+    rows.push([r.title,classLabel(l.classId),fmtDate(r.date),r.launchIds.size,...students.map(st=>{const q=r.cells[st.id];if(!q)return '';if(q.counted)return q.pct+'%';if(q.partial)return 'not finished ('+q.partial.answered+' of '+q.partial.total+' answered)';return 'not started';})]);
+  });
+  rows.push([]);
+  rows.push(['Average (finished quizzes)','','','',...students.map(st=>sums[st.id].avg===null?'':sums[st.id].avg+'%')]);
+  rows.push(['Correct answers','','','',...students.map(st=>sums[st.id].correct+' of '+sums[st.id].total)]);
+  rows.push(['Quizzes finished','','','',...students.map(st=>sums[st.id].done+' of '+sums[st.id].given)]);
+  return rows;
+}
+function downloadAllStudentsCSV(){
+  const rows=allStudentsCsvRows();if(rows.length<2)return;
+  const filter=CLASS_SPACE?WQ_CLASS:(document.getElementById('resultsClassFilter')?.value||'all');
+  const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["﻿"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='Weekly_Quiz_all_students_'+String(filter).replace(/[^a-z0-9]+/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+// Full screen: the results card fills the whole window (and the screen, when the
+// browser allows it) so every boy and every quiz fit in one view. Escape exits.
+function toggleTableFullscreen(force){
+  const card=document.getElementById('resultsCard');if(!card)return;
+  const on=force===undefined?!card.classList.contains('table-fullscreen'):!!force;
+  if(on===card.classList.contains('table-fullscreen'))return;
+  card.classList.toggle('table-fullscreen',on);document.body.style.overflow=on?'hidden':'';
+  document.getElementById('tableFullscreenBtn').textContent=on?'✕ Exit full screen':'⛶ Full screen';
+  if(on){resultsStudentShowAll=true;renderResults();if(card.requestFullscreen&&!document.fullscreenElement)card.requestFullscreen().catch(()=>{});}
+  else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+}
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)toggleTableFullscreen(false);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleTableFullscreen(false);});
+// The table's own class picker mirrors the Quiz history class filter, so it still
+// works in full screen where the side panel is hidden.
+function setTableClass(value){const f=document.getElementById('resultsClassFilter');if(f)f.value=value;renderLaunchHistory();renderResults();}
 function renderAllStudentsTable(){
+  document.getElementById('allTableTools')?.classList.remove('hidden');
+  const side=document.getElementById('resultsClassFilter'),pick=document.getElementById('tableClassFilter');
+  if(side&&pick){pick.innerHTML=side.innerHTML;pick.value=side.value;pick.classList.toggle('hidden',side.options.length<2);}
   const table=document.getElementById('resultsTable'),students=resultsStudentRows(),all=allStudentsQuizRows(students),rows=resultsStudentShowAll?all:all.slice(0,15);
   document.getElementById('resultsQuizTitle').textContent='All students — every quiz';
   document.getElementById('resultsMeta').textContent='Newest first. '+(all.length>rows.length?'Showing the last '+rows.length+' of '+all.length+' quizzes. ':'')+'A quiz given more than once is one row; each boy\'s newest finished try counts. Click a boy\'s name for his details.';
   document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
   if(!rows.length||!students.length){table.innerHTML='<tr><td>No quizzes found.</td></tr>';return;}
-  // Each boy's totals: average of finished quizzes, and how many he finished.
-  const sums=Object.fromEntries(students.map(st=>{let pctSum=0,correct=0,total=0,done=0,given=0;all.forEach(r=>{const q=r.cells[st.id];if(!q)return;given++;if(q.counted){done++;pctSum+=q.pct||0;correct+=q.correct||0;total+=q.total||0;}});return [st.id,{avg:done?Math.round(pctSum/done):null,correct,total,done,given}];}));
+  document.getElementById('resultsTable').classList.add('all-students');
+  const sums=allStudentsSums(students,all);
   const head='<thead><tr><th style="text-align:left;min-width:220px">Quiz</th>'+students.map(st=>{const s=sums[st.id];return '<th class="student-col"><a href="#" onclick="event.preventDefault();showStudentMarks(\''+esc(st.id)+'\')">'+esc(st.name)+'</a><div class="small">'+(s.avg===null?'—':s.avg+'% avg')+'</div><div class="small">'+s.done+' of '+s.given+' done</div></th>';}).join('')+'</tr></thead>';
   let body='';
   rows.forEach(r=>{
@@ -2064,6 +2121,7 @@ function renderStudentResults(studentId){
 function renderResults(){
   populateResultsStudents();const studentId=document.getElementById('resultsStudentFilter')?.value||'';
   if(studentId===ALL_STUDENTS_TABLE){renderAllStudentsTable();return;}
+  document.getElementById('allTableTools')?.classList.add('hidden');document.getElementById('resultsTable')?.classList.remove('all-students');toggleTableFullscreen(false);
   if(studentId){renderStudentResults(studentId);return;}
   document.querySelector('#panelResults .results-actions')?.classList.remove('hidden');
   const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}

@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Browser } from '@playwright/test';
 import http from 'node:http';
+import fs from 'node:fs';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { ref, set, get, update } from 'firebase/database';
 import { PROJECT, WORKSPACE, CLASS_ID, DB_PORT, fictionalOwnerRules, serveSyntheticSite, closeSyntheticSite, configureBrowser } from './helpers/synthetic-firebase';
@@ -223,6 +224,25 @@ test('teacher assigns three retakes to one boy; each stays open until he finishe
   await expect(quizB.locator('td').nth(1)).toContainText('100%');
   await expect(quizB.locator('td').nth(2)).toContainText('—');
   await expect(table.filter({ hasText: 'Total (finished quizzes)' })).toHaveCount(1);
+  // Download CSV: every quiz, one column per boy, totals at the bottom.
+  const [download] = await Promise.all([teacher.waitForEvent('download'), teacher.locator('#allTableCsvBtn').click()]);
+  const csv = fs.readFileSync(await download.path(), 'utf8').replace(/^﻿/, '');
+  const csvLines = csv.split('\r\n');
+  expect(csvLines[0]).toBe('Quiz,Class,First given,Times given,Ari Example,Bina Example');
+  expect(csvLines.find(line => line.startsWith('Quiz B,'))).toMatch(/,3,100%,not started$/);
+  expect(csvLines.some(line => line.startsWith('Average (finished quizzes),'))).toBe(true);
+  // A single-class page has no class picker to show.
+  await expect(teacher.locator('#tableClassFilter')).toBeHidden();
+  // Full screen fills the window; Escape goes back.
+  await teacher.locator('#tableFullscreenBtn').click();
+  await expect(teacher.locator('#resultsCard')).toHaveClass(/table-fullscreen/);
+  const box = await teacher.locator('#resultsCard').boundingBox();
+  const viewport = teacher.viewportSize()!;
+  expect(Math.round(box!.width)).toBe(viewport.width);
+  expect(Math.round(box!.height)).toBe(viewport.height);
+  await expect(teacher.locator('#tableFullscreenBtn')).toHaveText(/Exit full screen/);
+  await teacher.keyboard.press('Escape');
+  await expect(teacher.locator('#resultsCard')).not.toHaveClass(/table-fullscreen/);
   // Clicking a boy's name opens his own marks.
   await header.filter({ hasText: 'Ari Example' }).getByRole('link').click();
   await expect(teacher.locator('#resultsQuizTitle')).toHaveText('Ari Example — his quizzes');

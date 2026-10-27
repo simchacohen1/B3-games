@@ -273,3 +273,39 @@ test('10. all students x all quizzes: one row per quiz, one cell per boy, repeat
   assert.equal(ctx.rows[0].cells.levi,undefined,'a make-up only for Yossi is blank for Levi');
   assert.equal(ctx.rows[0].cells.yossi.partial.answered,1);
 });
+
+test('11. all-students table: class filter and spreadsheet rows',()=>{
+  const html=fs.readFileSync('weekly-quiz/teacher.html','utf8');
+  const fn=name=>{const start=html.indexOf('function '+name+'(');let depth=0,i=html.indexOf('{',start);for(;i<html.length;i++){if(html[i]==='{')depth++;else if(html[i]==='}'&&--depth===0)break;}return html.slice(start,i+1);};
+  const source=['allStudentsCsvRows','allStudentsSums','allStudentsQuizRows','resultsStudentRows','studentResultsQuizzes','launchQuestions','classForStudent'].map(fn).join('\n');
+  const qs=title=>({title,questions:Array.from({length:10},(_,i)=>({q:title+' '+i,choices:['a','b'],correctIndex:1}))});
+  const answers=n=>Object.fromEntries(Array.from({length:10},(_,i)=>[i,{correct:i<n}]));
+  const filter={value:'et'};
+  const ctx={
+    B3QuizHistory:require('../student-report/quiz-history.js'),window:{B3QuizHistory:require('../student-report/quiz-history.js')},WeeklyQuizAssignments:WQA,
+    CLASS_SPACE:false,WQ_CLASS:'',CLASS_ROSTERS:{et:{students:['levi','yossi']},wt:{students:['ari']}},
+    roster:{levi:{name:'Levi'},yossi:{name:'Yossi'},ari:{name:'Ari'}},
+    asArray:v=>Array.isArray(v)?v:Object.values(v||{}),classLabel:c=>c.toUpperCase(),fmtDate:()=>'Oct 1',
+    document:{getElementById:id=>({resultsClassFilter:filter,resultsQuizSearch:{value:''}})[id]||null},
+    allLaunches:{
+      etq:{classId:'et',createdAt:100,startedAt:100,quizSnapshot:qs('ET quiz')},
+      wtq:{classId:'wt',createdAt:200,startedAt:200,quizSnapshot:qs('WT quiz')}
+    },
+    allResponses:{etq:{levi:answers(8),yossi:{0:{correct:true}}},wtq:{ari:answers(10)}},
+    completions:{etq:{levi:{completedAt:150}},wtq:{ari:{completedAt:250}}}
+  };
+  vm.runInNewContext(source+';this.et=allStudentsCsvRows();',ctx);
+  const et=JSON.parse(JSON.stringify(ctx.et));
+  assert.deepEqual(et[0],['Quiz','Class','First given','Times given','Levi','Yossi']);
+  assert.deepEqual(et[1],['ET quiz','ET','Oct 1',1,'80%','not finished (1 of 10 answered)']);
+  assert.equal(et.length,6,'one quiz, a blank line, three total rows');
+  assert.deepEqual(et[3],['Average (finished quizzes)','','','','80%','']);
+  assert.deepEqual(et[4],['Correct answers','','','','8 of 10','0 of 0'],'never "8/10", which spreadsheets read as a date');
+  assert.deepEqual(et[5],['Quizzes finished','','','','1 of 1','0 of 1']);
+  filter.value='all';
+  vm.runInNewContext('this.all=allStudentsCsvRows();',ctx);
+  const all=JSON.parse(JSON.stringify(ctx.all));
+  assert.deepEqual(all[0].slice(4),['Ari','Levi','Yossi']);
+  assert.deepEqual(all[1],['WT quiz','WT','Oct 1',1,'100%','','']);
+  assert.ok(html.includes('id="tableClassFilter"')&&html.includes('id="tableFullscreenBtn"')&&html.includes('id="allTableCsvBtn"'));
+});
