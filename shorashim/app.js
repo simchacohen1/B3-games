@@ -123,6 +123,9 @@ let cloudStudentName = '';
 let cloudEnabled = false;
 let teacherPreview = false;
 let cloudSaveTimer = null;
+let cloudSavePending = null;
+let cloudSaveChain = Promise.resolve();
+let cloudSaveOutstanding = 0;
 let appStarted = false;
 let classMatchLeaderboard = {};
 let matchLeaderboardRef = null;
@@ -195,23 +198,52 @@ function loadDB(){
 }
 function saveRaw(d){if(!teacherPreview)localStorage.setItem(DB_KEY,JSON.stringify(d));}
 function setCloudStatus(text,kind=''){const el=document.getElementById('cloudStatus');if(!el)return;el.textContent=text;el.classList.toggle('syncing',kind==='syncing');el.classList.toggle('error',kind==='error');}
-function scheduleCloudStudentSave(){
-  if(!cloudEnabled||!cloudStudentId||!db.students[currentStudent]) return;
-  clearTimeout(cloudSaveTimer);
-  setCloudStatus('☁️ Saving…','syncing');
-  cloudSaveTimer=setTimeout(async()=>{
+// Serialize complete-record writes so a slow older save cannot overwrite a newer one.
+// Keep each student's destination and a snapshot captured at the time of the save.
+function flushCloudStudentSave(){
+  clearTimeout(cloudSaveTimer);cloudSaveTimer=null;
+  const pending=cloudSavePending;
+  if(!pending)return cloudSaveChain;
+  cloudSavePending=null;
+  cloudSaveOutstanding++;
+  const run=cloudSaveChain.then(async()=>{
     try{
-      const payload=clone(db.students[currentStudent]);
-      payload.name=cloudStudentName||currentStudent;
-      await cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).set(payload);
-      setCloudStatus('☁️ Saved');
+      const payload=pending.payload;
+      await cloudDb.ref(pending.path).set(payload);
+      pending.waiters.forEach(resolve=>resolve(true));
+      if(!cloudSavePending&&cloudSaveChain===run)setCloudStatus('☁️ Saved');
     }catch(err){
       console.error('Cloud save failed',err);
-      setCloudStatus('☁️ Save problem','error');
-    }
-  },180);
+      pending.waiters.forEach(resolve=>resolve(false));
+      if(!cloudSavePending&&cloudSaveChain===run)setCloudStatus('☁️ Save problem','error');
+    }finally{cloudSaveOutstanding--;}
+  });
+  cloudSaveChain=run;
+  return run;
 }
-function saveDB(){db.currentStudent=currentStudent;saveRaw(db);scheduleCloudStudentSave();}
+function scheduleCloudStudentSave(immediate=false){
+  if(!cloudEnabled||!cloudStudentId||!db.students[currentStudent])return Promise.resolve(true);
+  const path=`${CLOUD_ROOT}/students/${cloudStudentId}`;
+  const payload=clone(db.students[currentStudent]);
+  payload.name=cloudStudentName||currentStudent;
+  // A student/class switch must not redirect a pending write to another child.
+  if(cloudSavePending&&cloudSavePending.path!==path)flushCloudStudentSave();
+  const result=new Promise(resolve=>{
+    if(cloudSavePending){
+      cloudSavePending.payload=payload;
+      cloudSavePending.waiters.push(resolve);
+    }else cloudSavePending={path,payload,waiters:[resolve]};
+  });
+  clearTimeout(cloudSaveTimer);
+  setCloudStatus('☁️ Saving…','syncing');
+  if(immediate)flushCloudStudentSave();
+  else cloudSaveTimer=setTimeout(flushCloudStudentSave,180);
+  return result;
+}
+function saveDB(immediate=false){
+  db.currentStudent=currentStudent;saveRaw(db);
+  return immediate?scheduleCloudStudentSave(true):scheduleCloudStudentSave();
+}
 async function saveGlobalConfig(){
   if(!cloudEnabled) return;
   try{await Promise.all([cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(db.catalog),cloudDb.ref(`${CLOUD_ROOT}/settings`).set(db.settings)]);setCloudStatus('☁️ Saved');}
@@ -435,6 +467,16 @@ function initializeFollowDestination(){
   window.FTTFollowActivities.shorashim={currentSection:currentFollowSection,applySection:applyFollowSection};
   applyFollowSection(new URL(location.href).searchParams.get('section'));
 }
+// Flush short-debounced progress when a tab is hidden. Browsers may still
+// terminate network requests on close; the card Save button waits for its ACK.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&cloudSavePending)flushCloudStudentSave();
+});
+window.addEventListener('beforeunload',event=>{
+  if(cloudEnabled&&(cloudSavePending||cloudSaveOutstanding>0)){
+    event.preventDefault();event.returnValue='';
+  }
+});
 window.addEventListener('ftt:before-follow-navigation',event=>{
   const cloudStatus=document.getElementById('cloudStatus');
   if((activeScreenId==='learnScreen'&&window.__shorashimEditorDirty) || shorashimRecorder ||
@@ -580,7 +622,15 @@ const drawingData=canvasHasInk()?canvas.toDataURL('image/png'):'';
 const drawing=await saveDrawingToCloud(selectedItemKey,drawingData);
 const d={hebrewSize:+document.getElementById('hebrewSize').value,hebrewFont:document.getElementById('hebrewFont').value,hebrewColor:document.getElementById('hebrewColor').value,englishSize:+document.getElementById('englishSize').value,englishFont:document.getElementById('englishFont').value,englishColor:document.getElementById('englishColor').value,backgroundColor:document.getElementById('backgroundColor').value,hebrewPos:stylePos(document.getElementById('hebrewText'),document.getElementById('frontCard')),englishPos:stylePos(document.getElementById('englishText'),document.getElementById('backCard')),arts:serializeArts(),drawing};
 s.cards[selectedItemKey]={itemKey:selectedItemKey,itemType:existing?.itemType||currentTrack,itemId:item.id,createdAt:existing?.createdAt||Date.now(),learnedAt:existing?.learnedAt||Date.now(),sessionId:existing?.sessionId||null,design:d};
-s.lastActive=Date.now();saveDB();renderWordList();renderStudentStats();window.__shorashimEditorDirty=false;
+s.lastActive=Date.now();
+const cloudSaved=await saveDB(true);
+if(!cloudSaved){
+  window.__shorashimEditorDirty=true;
+  const status=document.getElementById('sessionStatus');
+  if(status)status.textContent='Not saved to cloud. Keep this page open and press Save again.';
+  return;
+}
+renderWordList();renderStudentStats();window.__shorashimEditorDirty=false;
 if(isGuestPreview()&&!nextUncreated('shorashim')&&!nextUncreated('prefix')&&!nextUncreated('suffix'))setTimeout(()=>window.B3Guest.unlock('Sign in to unlock','You tried all the free sample cards. Sign in to learn the full list of shorashim.'),700);
 if(redesigning){document.getElementById('sessionStatus').textContent='Changes saved ✓';renderGallery();return;}
 const list=learningCatalog(currentTrack),index=list.findIndex(x=>x.id===item.id),following=[...list.slice(index+1),...list.slice(0,index+1)];const next=following.find(x=>!s.cards[keyFor(currentTrack,x.id)]);if(next)loadEditorItem(keyFor(currentTrack,next.id));else showNoMoreItems();
