@@ -11,7 +11,7 @@ const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
 const SR_ROOT = "studentRewards";
-const ADMIN_EMAIL = process.env.B3_STAGING_DEPLOYMENT === "true"
+const ADMIN_EMAIL = typeof process !== "undefined" && process.env.B3_STAGING_DEPLOYMENT === "true"
   ? "owner@funtorahtools-staging.test"
   : "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -27,7 +27,7 @@ const POINTS = Object.freeze({
 
 function cors(req, res) {
   const origin = String(req.headers.origin || "");
-  const allowedOrigin = process.env.B3_STAGING_DEPLOYMENT === "true"
+  const allowedOrigin = typeof process !== "undefined" && process.env.B3_STAGING_DEPLOYMENT === "true"
     ? "https://fun-torah-tools-staging.web.app"
     : "*";
   if (allowedOrigin === "*" || origin === allowedOrigin) {
