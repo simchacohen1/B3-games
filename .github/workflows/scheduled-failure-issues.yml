@@ -1,0 +1,40 @@
+name: Report scheduled workflow failures
+
+# Issue #390. When an existing scheduled workflow fails (Overnight
+# reliability, Live site smoke check), open or update one GitHub issue for
+# it, and close that issue when the next scheduled run passes. Uses only the
+# run's job list; it does not download logs or artifacts.
+on:
+  workflow_run:
+    workflows: ['Overnight reliability', 'Live site smoke check']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'schedule' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Open, update or close the issue for this workflow
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          suite=$(echo "$WORKFLOW_NAME" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/-*$//')
+          node scripts/staging-test-report.cjs --suite "scheduled-$suite" --title "$WORKFLOW_NAME (scheduled)" \
+            --workflow-run "$RUN_ID" \
+            --repro "1. Open the run link above and read the failed job and step.
+          2. Re-run it from the Actions tab (Run workflow) to see whether it fails again." \
+            --issues

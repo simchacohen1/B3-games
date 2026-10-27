@@ -7,6 +7,7 @@ const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
+const rashiCore=require('./rashi-recording-core.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -17,6 +18,7 @@ const POINTS = Object.freeze({
   "chazara-recording": 2,
   "shorashim-recording": 2,
   "shorashim-no-hints": 3,
+  [rashiCore.RASHI_SOURCE]: rashiCore.RASHI_POINTS,
 });
 
 function cors(req, res) {
@@ -99,6 +101,7 @@ function reasonFor(source,perek,posuk){
 
 function isShorashimRequest(item){return ["shorashim-recording","shorashim-no-hints"].includes(String(item?.source||""));}
 function isMilestoneRequest(item){return ['reading100','translation100','understand100'].includes(String(item?.source||''));}
+function isRashiRequest(item){return String(item?.source||"")===rashiCore.RASHI_SOURCE;}
 function isReviewableRequest(item){return isChazaraRequest(item)||isShorashimRequest(item)||isMilestoneRequest(item);}
 function isChazaraRequest(item){
   return ["chazara","chazara-recording"].includes(String(item?.source || ""));
@@ -118,10 +121,10 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId);
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -133,6 +136,7 @@ async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
+ if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
    return;
@@ -150,6 +154,121 @@ async function authorizeChazaraAction(teacher,body){
   if(!teacherClassScope.recordAllowed(scope,body.studentId,event))throw Object.assign(new Error('This Chazara does not belong to your selected class.'),{code:403});
  }
  body.classId=scope.selected;
+}
+
+
+// ---------- Rashi Letters reading recordings (2026-10-23) ----------
+const RASHI_BUCKET='b3-games.firebasestorage.app';
+const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
+async function rashiRequestStatus(requestId){
+  const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
+  return v?String(v.status||'pending'):null;
+}
+// Student sends one recording (raw audio in the body). Only the student's own
+// verified sign-in works; the points request is created here, by the server,
+// and is worth exactly 2 points once a teacher approves it.
+async function rashiStudentSubmit(req,res){
+  const student=await requirePracticeStudent(req,rashiCore.RASHI_SOURCE);
+  if(!student.ok)return res.status(student.status||401).json({error:student.error});
+  const {studentId,classId}=student;
+  const sectionId=String(req.query.section||'');
+  if(!rashiCore.isSection(sectionId))return res.status(400).json({error:'Unknown Rashi section.'});
+  const rewardStudentId=await resolveRewardStudentId(studentId);
+  if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  const words=rashiCore.cleanWords(req.query.words);
+  const durationMs=Math.max(0,Math.min(Number(req.query.durationMs)||0,60*60*1000));
+  const label=rashiCore.sectionLabel(sectionId);
+  const makeRequest=record=>createPendingRequest({requestId:record.requestId,rewardStudentId,studentId,source:rashiCore.RASHI_SOURCE,
+    amount:rashiCore.RASHI_POINTS,reason:`Rashi Letters reading — ${label}`,
+    record:{sectionId,attemptId:record.attemptId,recordingPath:record.storagePath,workspaceClassId:classId,words:record.words||[]}});
+  // 1. Already waiting or approved: never upload or create anything new.
+  const existing=(await rashiRecordRef(studentId,sectionId).get()).val();
+  if(existing&&existing.status!=='rejected'){
+    let status=String(existing.status||'pending');
+    if(status==='pending'){
+      const made=await makeRequest(existing); // repairs a request that never got saved
+      if(['approved','rejected'].includes(made.status)){
+        await mirrorRashiRecording({id:existing.requestId,practiceStudentId:studentId,sectionId,attemptId:existing.attemptId,workspaceClassId:classId,amount:rashiCore.RASHI_POINTS},made.status);
+        status=made.status;
+      }
+    }
+    if(status!=='rejected')return res.status(200).json({ok:true,alreadySubmitted:true,status,sectionId});
+  }
+  const audio=Buffer.isBuffer(req.rawBody)?req.rawBody:(Buffer.isBuffer(req.body)?req.body:null);
+  if(!audio||audio.length<rashiCore.MIN_BYTES)return res.status(400).json({error:'The recording was too short. Please record again.'});
+  if(audio.length>rashiCore.MAX_BYTES)return res.status(413).json({error:'The recording is too long. Please record a shorter one.'});
+  if(durationMs<rashiCore.MIN_DURATION_MS)return res.status(400).json({error:'The recording was too short. Please record again.'});
+  const type=String(req.headers['content-type']||'').split(';')[0].trim().toLowerCase();
+  if(!/^audio\/(webm|mp4|ogg|mpeg|wav|x-m4a|aac)$/.test(type))return res.status(415).json({error:'Unsupported audio type.'});
+  // 2. Save the audio privately (path is tied to class, student and section).
+  const attemptId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  const ext=type==='audio/mp4'||type==='audio/x-m4a'||type==='audio/aac'?'m4a':type==='audio/ogg'?'ogg':type==='audio/mpeg'?'mp3':type==='audio/wav'?'wav':'webm';
+  const storagePath=`rashi-recordings/${classId}/${studentId}/${sectionId}/${attemptId}.${ext}`;
+  const file=admin.storage().bucket(RASHI_BUCKET).file(storagePath);
+  await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
+  const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
+  const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
+  // 3. Claim the one slot for this student+section (only if nothing is
+  //    pending/approved). A double-click loses here and its upload is removed.
+  let claimed=null,blockedBy=null;
+  const tx=await rashiRecordRef(studentId,sectionId).transaction(cur=>{
+    const r=rashiCore.claim(cur,seed);
+    if(r.block){blockedBy=r.block;return;}
+    claimed=r.write;return r.write;
+  });
+  if(!tx.committed||!claimed||tx.snapshot.val()?.attemptId!==attemptId){
+    await file.delete().catch(()=>{});
+    const live=(await rashiRecordRef(studentId,sectionId).get()).val();
+    return res.status(200).json({ok:true,alreadySubmitted:true,status:String(live?.status||blockedBy||'pending'),sectionId});
+  }
+  if(claimed.previousAttemptId&&existing)await rtdb.ref(`rashiLetters/recordingHistory/${studentId}/${sectionId}/${existing.attemptId}`).set(existing).catch(()=>{});
+  // 4. The points request (deterministic id, so a retry never doubles it).
+  await makeRequest(claimed);
+  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt});
+}
+// Student asks for the status of every section (one call, no polling).
+async function rashiStudentStatus(req,res){
+  const student=await requirePracticeStudent(req,rashiCore.RASHI_SOURCE);
+  if(!student.ok)return res.status(student.status||401).json({error:student.error});
+  const rows=(await rtdb.ref(`rashiLetters/recordings/${student.studentId}`).get()).val()||{};
+  const sections={};
+  for(const [sectionId,record] of Object.entries(rows)){
+    if(!rashiCore.isSection(sectionId)||!record)continue;
+    let reqStatus=null;
+    if(record.status==='pending'&&record.requestId){
+      reqStatus=await rashiRequestStatus(record.requestId);
+      if(reqStatus==='approved'||reqStatus==='rejected')await mirrorRashiRecording({id:record.requestId,practiceStudentId:student.studentId,sectionId,attemptId:record.attemptId,workspaceClassId:record.classId,amount:rashiCore.RASHI_POINTS},reqStatus);
+    }
+    sections[sectionId]=rashiCore.publicStatus(record,reqStatus);
+  }
+  return res.status(200).json({ok:true,sections});
+}
+async function rashiTeacherList(teacher){
+  const scope=teacher.scope;
+  const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
+  const bucket=admin.storage().bucket(RASHI_BUCKET),rows=[];
+  for(const [id,item] of Object.entries(all)){
+    if(!isRashiRequest(item)||item.status!=='pending')continue;
+    if(scope&&!teacherClassScope.recordAllowed(scope,item.practiceStudentId,item))continue;
+    const record=(await rashiRecordRef(item.practiceStudentId,item.sectionId).get()).val();
+    if(!record||record.attemptId!==item.attemptId||!record.storagePath)continue;
+    let audioUrl=null;
+    try{[audioUrl]=await bucket.file(record.storagePath).getSignedUrl({action:'read',expires:Date.now()+60*60*1000});}catch(err){console.warn('Rashi recording URL failed',err);}
+    const info=scope?.students?.[item.practiceStudentId];
+    rows.push({id,studentId:item.practiceStudentId,studentName:item.studentName||info?.name||item.practiceStudentId,
+      classId:item.workspaceClassId||info?.classId||'',className:info?.className||item.workspaceClassId||'',sectionId:item.sectionId,
+      sectionLabel:rashiCore.sectionLabel(item.sectionId),words:record.words||[],attempt:record.attempt||1,createdAt:item.createdAt||record.createdAt||0,
+      durationMs:record.durationMs||0,amount:item.amount,audioUrl});
+  }
+  return rows.sort((a,b)=>Number(b.createdAt)-Number(a.createdAt));
+}
+// Teachers may only act on a Rashi recording from a class they manage.
+async function rashiAuthorizeRequest(teacher,requestId){
+  if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(requestId||'')))throw Object.assign(new Error('Invalid recording request.'),{code:403});
+  const item=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
+  if(!isRashiRequest(item))throw Object.assign(new Error('This is not a Rashi recording.'),{code:403});
+  if(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,item.practiceStudentId,item))throw Object.assign(new Error('This recording does not belong to your selected class.'),{code:403});
+  return item;
 }
 
 async function requireStudent(req){
@@ -614,7 +733,27 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
   return {ok:true,balance:balanceAfter,goal:latestGoal,winner};
 }
 
+// Keeps the Rashi recording record (and an audit line) in step with its point
+// request, whichever screen approved or rejected it. Only the attempt that
+// owns the request can change, and only while it is still pending.
+async function mirrorRashiRecording(item,status){
+  if(!item?.practiceStudentId||!rashiCore.isSection(item.sectionId))return;
+  const ref=rtdb.ref(`rashiLetters/recordings/${item.practiceStudentId}/${item.sectionId}`);
+  const tx=await ref.transaction(cur=>{
+    if(cur===null)return null;
+    if(cur.attemptId!==item.attemptId||cur.status!=='pending')return;
+    return {...cur,status,reviewedAt:Date.now()};
+  }).catch(()=>null);
+  if(!tx||!tx.committed)return;
+  const live=(await rtdb.ref(`${SR_ROOT}/pointRequests/${item.id}`).get().catch(()=>null))?.val()||{};
+  await rtdb.ref(`rashiLetters/recordingAudit/${item.id}`).update({
+    requestId:item.id,studentId:item.practiceStudentId,sectionId:item.sectionId,attemptId:item.attemptId,classId:item.workspaceClassId||null,
+    result:status,reviewedBy:live.reviewedBy||null,reviewedAt:live.reviewedAt||Date.now(),
+    points:status==='approved'?Number(live.actualAmount??item.amount??0):0,balanceAfter:live.balanceAfter??null
+  }).catch(()=>{});
+}
 async function mirrorChazaraPointStatus(item,status){
+  if(isRashiRequest(item)){await mirrorRashiRecording(item,status);return;}
   if(isShorashimRequest(item) && item.practiceStudentId && item.eventId){
     await rtdb.ref(`posukPractice/shorashimLearning/recordingEvents/${item.practiceStudentId}/${item.eventId}`).update({pointRequestStatus:status}).catch(()=>{});
     return;
@@ -752,7 +891,8 @@ async function approvePendingRequest(requestId,reviewedBy){
   const existing=await ref.get();
   if(!existing.exists()) return {ok:false,error:"Point request not found."};
   const before=existing.val() || {};
-  if(!isReviewableRequest(before)) return {ok:false,error:"This point request is not reviewable here."};
+  if(!isReviewableRequest(before)&&!isRashiRequest(before)) return {ok:false,error:"This point request is not reviewable here."};
+  if(isRashiRequest(before)&&Number(before.amount)!==rashiCore.RASHI_POINTS) return {ok:false,error:"This recording request has an unexpected point value."};
   if(before.status !== "pending") return {ok:true,alreadyHandled:true,status:before.status};
 
   // A Realtime Database transaction can call the updater first with null when
@@ -800,7 +940,7 @@ async function rejectPendingRequest(requestId,reviewedBy){
   const snap=await ref.get();
   if(!snap.exists()) return {ok:false,error:"Point request not found."};
   const item=snap.val() || {};
-  if(!isReviewableRequest(item)) return {ok:false,error:"This point request is not reviewable here."};
+  if(!isReviewableRequest(item)&&!isRashiRequest(item)) return {ok:false,error:"This point request is not reviewable here."};
   if(item.status !== "pending") return {ok:true,alreadyHandled:true,status:item.status};
   await ref.update({status:"rejected",reviewedBy,reviewedAt:Date.now()});
   await mirrorChazaraPointStatus(item,"rejected");
@@ -1333,8 +1473,10 @@ exports.studentRewardsAutoAward = onRequest(
     if(cors(req,res)) return;
     if(req.method!=="POST") return res.status(405).json({error:"Use POST"});
     try{
-      const body=req.body||{};
+      if(req.query&&req.query.rashi==="submit")return await rashiStudentSubmit(req,res);
+      const body=req.body&&typeof req.body==="object"&&!Buffer.isBuffer(req.body)?req.body:{};
       const action=String(body.action||"").trim();
+      if(action==="rashi-student-status")return await rashiStudentStatus(req,res);
       if(action){
         if(action==="student-point-history" || action==="class-reward-status" || action==="contribute-class-reward"){
           const student=await requireStudent(req);
@@ -1358,6 +1500,16 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});
+        }
+        if(action==="rashi-list-pending"){
+          const requests=await rashiTeacherList(teacher);
+          return res.status(200).json({ok:true,requests});
+        }
+        if(action==="rashi-approve"||action==="rashi-reject"){
+          await rashiAuthorizeRequest(teacher,body.requestId);
+          const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
+          if(!result.ok)return res.status(409).json({error:result.error});
+          return res.status(200).json(result);
         }
         if(action==="list-chazara-pending"){
           const requests=await listPendingChazaraRequests(teacher.scope);

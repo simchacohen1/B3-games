@@ -13,6 +13,8 @@ const imported=fs.readFileSync('shorashim/booklet-3rd-grade.js','utf8');
 const globals={window:{}};
 vm.runInNewContext(imported,globals);
 const cards=globals.window.FTT_BOOKLET_SHORASHIM;
+// app.js is cache-busted on every release; require a build label dated on or after this feature.
+const appBuildDate=()=>{const m=html.match(/<script src="app\.js\?v=(\d{8})[^"]*"><\/script>/);assert.ok(m,'app.js is loaded with a dated cache-bust label');return Number(m[1]);};
 const fn=name=>{const line=app.split(/\r?\n/).find(x=>x.startsWith('function '+name+'('));assert.ok(line,'missing '+name);return line;};
 const newContext=(overrides={})=>{
   const s={cards:{}};
@@ -88,8 +90,9 @@ test('three-choice UI, week dropdown, source load order and review filter are wi
   for(let n=1;n<=30;n++)assert.match(html,new RegExp('<option value="'+n+'">Week '+n+'</option>'));
   assert.match(html,/data-review-perek="booklet"/);
   assert.match(html,/Change List/);
-  assert.ok(html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
-  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v='));
+  assert.ok(html.indexOf('app.js?v=')>0&&html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
+  assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the booklet release');
+  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261019-booklet-1'));
   assert.match(review,/reviewPerekFilter === 'booklet'/);
   assert.match(teacher,/window\.FTT_BOOKLET_SHORASHIM\.find/);
   assert.doesNotMatch(app,/\`\$\{learningPerek/);

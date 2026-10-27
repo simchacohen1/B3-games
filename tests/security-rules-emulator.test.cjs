@@ -8,7 +8,7 @@ const {get,ref,set}=require('firebase/database');
 const projectId='demo-b3-security';
 const rules=fs.readFileSync('firebase-rules.hardened.json','utf8');
 const emulatorEnabled=process.env.B3_RUN_RTDB_EMULATOR_TESTS==='1';
-const emulatorPort=Number(process.env.FIREBASE_DATABASE_EMULATOR_PORT||9100);
+const emulatorPort=Number(process.env.FIREBASE_DATABASE_EMULATOR_PORT||19100);
 const testEmulator=emulatorEnabled?test:test.skip;
 let env;
 

@@ -12,12 +12,12 @@ const repo = path.resolve(__dirname, '..');
 const read = name => JSON.parse(fs.readFileSync(path.join(repo, name), 'utf8'));
 const reviewed = rules => ({ permissions: collectPermissionExpressions(rules.rules) });
 
-test('all 99 repository permission expressions match their reviewed baseline', () => {
+test('all 109 repository permission expressions match their reviewed baseline', () => {
   const result = compareReviewedPermissions(
     read('firebase-rules.json'),
     read('security/reviewed-permission-expressions.json')
   );
-  assert.equal(result.total, 99);
+  assert.equal(result.total, 109);
   assert.deepEqual(result.changed, []);
 });
 

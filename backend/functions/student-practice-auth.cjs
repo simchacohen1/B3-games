@@ -2,7 +2,7 @@
 
 const validKey=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
 const toolForSource=source=>['reading100','translation100','understand100'].includes(source)?'posuk-practice-scroll'
-  :String(source||'').startsWith('shorashim-')?'shorashim':'chazara';
+  :String(source||'').startsWith('shorashim-')?'shorashim':String(source||'').startsWith('rashi-')?'rashi-letters':'chazara';
 
 async function authorizePracticeStudent({authorization,verifyToken,get,source,studentTools}){
   if(!String(authorization||'').startsWith('Bearer '))return {ok:false,status:401,error:'Student sign-in required.'};

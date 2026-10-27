@@ -1,27 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -322,6 +302,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <h3>Choose any Rashi activity — all levels are open:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
+    <div class="mode-gate-section" id="recMenu"></div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
       <h3>What do you want to practice?</h3>
       <div class="mode-type-row">
@@ -405,6 +386,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 </div>
 
 <script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="recordings.js?v=20261023-rashi-rec"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
@@ -878,6 +860,7 @@ function goStep(idx){
     showModeGate(); return;
   }
   const st=STEPS[idx];
+  { const rs=document.getElementById('recordScreen'); if(rs) rs.style.display='none'; }
   if(st.k==='alphabet' || st.k==='confusion'){ window.openRashiAlphabetLab(st.k); return; }
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
@@ -920,6 +903,8 @@ function selectPracticeLetter(unitId, btnEl){
 
 function showModeGate(){
   clearTimeout(questionTimer); viewVersion++;
+  { const rs=document.getElementById('recordScreen'); if(rs) rs.style.display='none'; }
+  renderRecMenu();
   document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
   const cur = currentStep();
   document.getElementById('continueBtn').textContent = cur < 0 ? '★ Quest complete — practice any step below' : '▶ Continue my quest · Step ' + (cur+1) + ' of ' + STEPS.length + ': ' + stepName(STEPS[cur]);
@@ -1176,15 +1161,46 @@ async function handleAnswer(letter, btnEl){
     questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
   } else if(miniGamePending){
     const delay = stepComplete ? 1250 : 900;
-    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? goNextStep : renderQuestion),delay);
+    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? ()=>offerUnitRecording(unit) : renderQuestion),delay);
   } else if(stepComplete){
-    questionTimer=setTimeout(unitAdvanced ? goNextStep : renderQuestion,1400);
+    questionTimer=setTimeout(unitAdvanced ? ()=>offerUnitRecording(unit) : renderQuestion,1400);
   } else if(isCorrect){
     questionTimer=setTimeout(renderQuestion,1050);
   } else {
     document.getElementById('nextBtn').classList.remove('hidden');
   }
 }
+
+/* ---------- Record Reading (recordings.js) ---------- */
+function unitRecSection(i){
+  const u=UNITS[i];
+  return {id:u.id, label:u.id==='finalreview' ? 'Final review words' : 'Mission '+(i+1)+' ('+u.label+') words', words:u.words.map(w=>w.w)};
+}
+function wordsRecSection(n, words){
+  return {id:'words'+n, label:n+'-letter words', words:(words && words.length ? words : wordsFor(n).slice(0,6))};
+}
+// A finished mission offers its recording, then carries on to the next step.
+function offerUnitRecording(unit){
+  const i=UNITS.indexOf(unit);
+  if(i<0 || !window.RashiRecordings) return goNextStep();
+  window.RashiRecordings.offer(unitRecSection(i), goNextStep);
+}
+function renderRecMenu(){
+  const box=document.getElementById('recMenu'); if(!box || !window.RashiRecordings) return;
+  const sections=[];
+  UNITS.forEach((u,i)=>{ if(guidedIndex>i) sections.push(unitRecSection(i)); });
+  [2,3,4].forEach(n=>{ if(chainFlags['words'+n+'Done']) sections.push(wordsRecSection(n)); });
+  window.RashiRecordings.renderMenu(box, sections);
+}
+if(window.RashiRecordings) window.RashiRecordings.init({
+  isPreview:()=>teacherPreview,
+  onBack:()=>showModeGate(),
+  hideOthers:()=>{
+    ['app','modeGate','similarScreen','practiceCompleteScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+    const a=document.getElementById('alphabetLabScreen'); if(a) a.style.display='none';
+    document.getElementById('completeScreen').classList.remove('show');
+  }
+});
 
 /* ---------- Look-alike letters ---------- */
 const ALL_LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
@@ -1267,6 +1283,7 @@ function renderSimMatch(){
     const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'🏆':'💪'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'),
       el('p','sim-intro', passed ? 'Look-alike letters mastered! See? Rashi and regular letters are almost twins.' : 'Get '+MASTER_MATCH+' of '+m.order.length+' to unlock the next step. Try again!'));
     const again=el('button','btn','Play again'); again.onclick=startSimMatch; again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && window.RashiRecordings){ const rec=el('button','btn','🎤 Record Reading'); rec.style.margin='10px 6px 0'; rec.onclick=()=>window.RashiRecordings.open(wordsRecSection(g.level,g.order), ()=>showModeGate()); d.appendChild(rec); }
     if(passed && currentStep()>=0) d.appendChild(nextStepButton());
     area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
   }
@@ -1702,7 +1719,7 @@ async function logAttempt(unitId, ph, correct){
 }
 </script>
 <script src="alphabet-lab.js?v=20261022-auto-advance"></script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 

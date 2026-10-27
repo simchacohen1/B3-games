@@ -34,4 +34,4 @@
 @media print{.hal-sefer-buttons,.hal-sefer-palette,.hal-sefer-brushsize,.hal-sefer-vocab,.hal-sefer-status{display:none!important}.hal-sefer-layout{display:block}.hal-sefer-picture{max-width:100%}.hal-sefer-study{box-shadow:none;break-inside:avoid}}
 
 /* New guided Halacha is the only student-facing lesson workspace. Preserve legacy DOM and cloud data, but hide the old scrapbook, galleries and activities. Teacher notes remain available. */
-.section:not(.ha-new):has(> .hal-sefer-study) > :not(.hal-sefer-study):not(.hal-recovered):not(.teacherOnly){display:none!important}
+.section:not(.ha-new):has(> .hal-sefer-study) > :not(.hal-sefer-study):not(.hal-recovered):not(.teacherOnly):not(.fresh-siman-root){display:none!important}

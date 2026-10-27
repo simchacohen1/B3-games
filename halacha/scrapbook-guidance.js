@@ -241,6 +241,34 @@ const titles={
     "When the Chazzan Finishes",
     "Listening and Answering Correctly",
     "The Right Way to Answer Amen"
+  ],
+  "s2extra": [
+    "Clean and Simple Clothes",
+    "Not Too Fancy, Not Too Plain",
+    "Dressing with Dignity",
+    "Why Pride Is Not Good",
+    "Clothes That Honor Me"
+  ],
+  "s3f": [
+    "Why We Cover Our Heads",
+    "Four Amos Without a Kippah",
+    "The Story of Rav Nachman's Mother",
+    "Fear of Heaven on My Head",
+    "Teaching Children to Cover Their Heads"
+  ],
+  "s3g": [
+    "Walking with Humility",
+    "Not Too Stiff, Not Too Bent",
+    "How My Walk Shows Who I Am",
+    "Shlomo Hamelech on Walking",
+    "Walking the Middle Way"
+  ],
+  "s3h": [
+    "Walking Between Two",
+    "Staying Careful on the Way",
+    "Rules for Walking Between People",
+    "Giving Others Space",
+    "A Careful Path"
   ]
 };
 const cooldown=new Map();

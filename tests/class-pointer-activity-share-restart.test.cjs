@@ -15,7 +15,7 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
     setItem:(k,v)=>sessionStorageValues.set(k,v)
   };
   const element=tag=>({
-    tag,dataset:{},style:{cssText:''},children:[],listeners:{},textContent:'',hidden:false,disabled:false,
+    tag,style:{cssText:''},dataset:{},children:[],listeners:{},textContent:'',hidden:false,disabled:false,
     setAttribute(){},
     addEventListener(type,fn){this.listeners[type]=fn},
     append(...args){this.children.push(...args)}

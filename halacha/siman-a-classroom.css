@@ -15,3 +15,30 @@
 @media(max-width:1000px){.ha-layout{grid-template-columns:1fr}.ha-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.ha-classroom{margin:5px 0;padding:7px}.ha-side{grid-template-columns:1fr}.ha-mast{gap:4px}.ha-mast h2{font-size:20px}.ha-mast .ha-nav{min-width:0;font-size:15px;padding:8px}.ha-hebrew{font-size:22px}.ha-color{width:38px;height:38px}}
 @media print{.ha-classroom{background:#fff}.ha-tools,.ha-mast .ha-nav,.ha-teachernotes{display:none!important}.ha-layout{display:block}.ha-art{max-width:720px;margin:auto}.ha-side{display:block}.ha-vocabcard{display:none}}
+
+
+/* Match the established Seif Aleph lesson layout across all seven seifim.
+   Presentation-only: no changes to lesson content or persisted coloring. */
+@media (min-width: 850px) {
+  .ha-classroom { width:100%; max-width: 1200px; margin: 10px auto 18px; padding: 12px; }
+  .ha-layout { grid-template-columns: minmax(0, 1.8fr) minmax(310px, 1fr); align-items:start; gap:12px; }
+  .ha-side { grid-template-columns: minmax(0,1fr); }
+  .ha-art { min-width:0; }
+}
+.ha-classroom { display:flex; flex-direction:column; background:#dff2fa; }
+.ha-teachernotes:not([hidden]) { order:-1; margin:0 0 12px; background:#fff8dd; }
+.ha-teachernotes:not([hidden]) summary { font-size:16px; }
+.ha-mast { order:0; }
+.ha-layout { order:1; }
+.ha-tools { order:2; }
+.ha-mast h2 { background:#fff2c9; border:1px solid #e0bb72; border-radius:12px; }
+.ha-art { background:#fff; border:2px solid #23b4f7; border-radius:13px; padding:9px; }
+.ha-art canvas { aspect-ratio:auto; object-fit:contain; }
+.ha-card { border-radius:12px; }
+.ha-card h3 { font-size:clamp(19px,2vw,24px); }
+.ha-hebrew { font-size:clamp(20px,2vw,26px); }
+@media (max-width:849px) {
+  .ha-layout { grid-template-columns: 1fr; }
+  .ha-side { grid-template-columns:1fr; }
+  .ha-mast .ha-nav { min-width:0; }
+}
