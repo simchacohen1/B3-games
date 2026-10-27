@@ -29,7 +29,9 @@
   const pickMime=()=>MIMES.find(m=>root.MediaRecorder&&root.MediaRecorder.isTypeSupported&&root.MediaRecorder.isTypeSupported(m))||'';
 
   let cfg={isPreview:()=>false,onBack:()=>{},hideOthers:()=>{}};
-  let statusMap=null,statusAt=0,statusPromise=null;
+  let statusMap=null,statusAt=0,statusPromise=null,dailyCount=0,dailyLimit=3,dailyDate='';
+  const todayNY=()=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const dailyFull=()=>dailyCount>=dailyLimit;
   let ui=null;                       // screen elements
   let session=null;                  // the section currently on screen
 
@@ -41,6 +43,7 @@
   }
   async function loadStatus(force){
     if(cfg.isPreview())return {};
+    if(dailyDate&&dailyDate!==todayNY()){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
     if(!force&&statusMap&&Date.now()-statusAt<STATUS_CACHE_MS)return statusMap;
     if(statusPromise)return statusPromise;
     statusPromise=(async()=>{
@@ -48,7 +51,7 @@
         const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+await idToken()},body:JSON.stringify({action:'rashi-student-status'})});
         const data=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(data.error||'Could not check your recordings.');
-        statusMap=data.sections||{};statusAt=Date.now();
+        statusMap=data.sections||{};dailyCount=Number(data.dailyCount)||0;dailyLimit=Number(data.dailyLimit)||3;dailyDate=todayNY();statusAt=Date.now();
       }catch(err){console.warn('Rashi recording status unavailable',err);if(!statusMap)statusMap={};statusAt=0;}
       finally{statusPromise=null;}
       return statusMap;
@@ -82,11 +85,11 @@
     if(ui)return ui;
     const style=document.createElement('style');style.textContent=CSS;document.head.appendChild(style);
     const card=el('div','card');card.id='recordScreen';card.style.display='none';
-    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),words:el('div','rr-words'),banner:el('div','rr-banner'),
+    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),words:el('div','rr-words'),banner:el('div','rr-banner'),
       timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
       note:el('p','rr-note','Worth '+POINTS+' points after your teacher listens and approves.'),footer:el('div','rr-row')};
     ui.words.setAttribute('dir','rtl');ui.words.setAttribute('lang','he');ui.msg.setAttribute('role','status');ui.msg.setAttribute('aria-live','polite');
-    card.append(ui.title,ui.sub,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
+    card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
     const anchor=document.getElementById('closedScreen');
     (anchor&&anchor.parentNode?anchor.parentNode:document.body).insertBefore(card,anchor||null);
     return ui;
@@ -101,6 +104,7 @@
     const u=ensureScreen(),s=session;if(!s)return;
     const status=statusOf(s.id),b=bannerFor(status);
     u.sub.textContent=s.label||'';
+    u.quota.textContent='Readings today: '+dailyCount+' / '+dailyLimit;
     u.words.replaceChildren(...s.words.map(w=>el('span','rr-word',w)));
     u.banner.className='rr-banner '+b.cls;u.banner.textContent=b.icon+' '+b.text;
     u.controls.replaceChildren();u.footer.replaceChildren();
@@ -108,6 +112,8 @@
     u.note.classList.toggle('hidden',status==='approved');
     if(cfg.isPreview()){
       u.controls.append(el('p','rr-note','Preview only — students record here. Nothing is saved.'));
+    }else if(dailyFull()){
+      u.controls.append(el('p','rr-note','Great job! You completed your 3 readings today. Come back tomorrow!'));
     }else if(!canRecord(status)){
       // pending or approved: nothing more to do for this section
     }else if(s.state==='recording'){
@@ -126,7 +132,7 @@
   function setMsg(text,isErr){const u=ensureScreen();u.msg.textContent=text||'';u.msg.className='rr-msg'+(isErr?' rr-err':'');}
 
   async function startRecording(){
-    const s=session;if(!s||s.state==='recording')return;
+    const s=session;if(!s||s.state==='recording'||dailyFull())return;
     setMsg('');
     if(!(root.navigator&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||!root.MediaRecorder){setMsg('This device cannot record. Ask your teacher for help.',true);return;}
     try{
@@ -167,12 +173,17 @@
     s.sending=true;setMsg('Sending your recording…');render();
     try{
       const out=await sendRecording(s.id,s.words,s.blob,s.durationMs);
-      statusMap=statusMap||{};statusMap[s.id]={status:out.status||'pending'};statusAt=Date.now();
+      statusMap=statusMap||{};statusMap[s.id]={status:out.status||'pending'};
+      if(out.dailyCount!=null)dailyCount=Number(out.dailyCount);
+      else if(!out.alreadySubmitted)dailyCount=Math.min(dailyLimit,dailyCount+1);
+      dailyDate=todayNY();statusAt=Date.now();
       s.blob=null;dropAudio();s.playing=false;
       setMsg(out.alreadySubmitted?'This reading was already sent.':'Sent! Now your teacher will listen.');
     }catch(err){
       // keep the recording so he can simply press Submit again
-      setMsg((err&&err.message?err.message:'Could not send.')+' Your recording is still saved here — tap Submit to try again.',true);
+      const limitHit=err&&/3 Rashi readings/.test(err.message||'');
+      if(limitHit){dailyCount=dailyLimit;dailyDate=todayNY();}
+      setMsg((err&&err.message?err.message:'Could not send.')+(limitHit?'':' Your recording is still saved here — tap Submit to try again.'),true);
     }finally{s.sending=false;if(session===s)render();}
   }
   function leave(next){
@@ -196,7 +207,7 @@
   async function offer(section,onDone){
     if(cfg.isPreview()||(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest())){onDone&&onDone();return;}
     await loadStatus(false);
-    if(!canRecord(statusOf(section.id))){onDone&&onDone();return;}
+    if(dailyFull()||!canRecord(statusOf(section.id))){onDone&&onDone();return;}
     return open(section,onDone);
   }
   // Menu list: one row per finished section with its status.
@@ -206,10 +217,11 @@
     container.append(el('h3',null,'🎤 Record Reading — earn '+POINTS+' points each'));
     const rows=sections.map(sec=>{const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record Reading','',()=>open(sec,()=>{}));row.append(name,chip,go);container.append(row);return {sec,chip,go};});
     const map=await loadStatus(false);
-    rows.forEach(r=>{const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
+    container.append(el('p','rr-note','Readings today: '+dailyCount+' / '+dailyLimit));
+    rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
       if(st==='pending'||st==='approved')r.go.textContent='View';});
   }
   function init(options){cfg=Object.assign(cfg,options||{});}
-  function reset(){statusMap=null;statusAt=0;}
+  function reset(){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
   return {init,open,offer,renderMenu,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
 });
