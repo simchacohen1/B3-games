@@ -70,7 +70,12 @@ function loadModule(file,mocks){
   const mod={exports:{}};
   const requireShim=name=>{
     if(name in mocks)return mocks[name];
-    if(name.startsWith('./')){const m=loadModule(path.join(fnDir,name.replace(/^\.\//,'')+(name.endsWith('.js')?'':'.js')),mocks);return m;}
+    if(name.startsWith('./')){
+      const base=path.join(fnDir,name.replace(/^\.\//,''));
+      const file=path.extname(base)?base:['.js','.cjs','.json'].map(ext=>base+ext).find(candidate=>fs.existsSync(candidate));
+      if(!file)throw new Error('Cannot resolve local test module: '+name);
+      return loadModule(file,mocks);
+    }
     return require(name);
   };
   new Function('require','module','exports',fs.readFileSync(file,'utf8'))(requireShim,mod,mod.exports);
@@ -79,7 +84,7 @@ function loadModule(file,mocks){
 
 function setup({identity,seed={}}={}){
   const db=makeDb(seed);
-  const admin={apps:[{}],initializeApp(){},auth:()=>({verifyIdToken:async()=>identity}),database:()=>db};
+  const admin={apps:[{options:{databaseURL:'https://b3-games-default-rtdb.firebaseio.com'}}],initializeApp(){},auth:()=>({verifyIdToken:async()=>identity}),database:()=>db};
   const mocks={
     'firebase-admin':admin,
     'firebase-functions/v2/https':{onRequest:(options,handler)=>handler},
