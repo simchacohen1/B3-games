@@ -121,7 +121,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','repair-chazara-pending','get-chazara-event','list-chazara-history','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
@@ -135,7 +135,7 @@ async function requireTeacher(req){
 async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
- if(action==='list-chazara-pending')return;
+ if(action==='list-chazara-pending'||action==='repair-chazara-pending')return;
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
@@ -148,6 +148,8 @@ async function authorizeChazaraAction(teacher,body){
   return;
  }
  if(!scope.students[body.studentId])throw Object.assign(new Error('This student does not belong to your selected class.'),{code:403});
+ // History is read-only and class-filtered before any event leaves the server.
+ if(action==='list-chazara-history'){body.classId=scope.selected;return;}
  if(action!=='teacher-add-chazara'){
   if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.eventId||'')))throw Object.assign(new Error('Invalid Chazara event.'),{code:403});
   const event=(await rtdb.ref(`posukPractice/chazara/events/${body.studentId}/${body.eventId}`).get()).val();
@@ -836,25 +838,25 @@ async function repairMissingChazaraPointRequests(scope){
 
 async function listPendingChazaraRequests(scope){
   if(scope){
-    // Self-heal saved Chazaras whose client-side point request never reached
-    // the server. Loading the teacher approval panel now recreates any missing
-    // pending requests before returning the list.
-    await repairMissingChazaraPointRequests(scope);
+    // Pending queue reads must not scan complete Chazara histories or repair
+    // records on every teacher sign-in. Recovery is an explicit action.
     const rows=[];
-    // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
+    // Until a secure indexed pending queue exists, one collection read is
+    // required. Filter it once rather than once per assigned student.
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-    for(const studentId of Object.keys(scope.students)){
-      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+    const rowsByStudent=new Map(Object.keys(scope.students||{}).map(id=>[id,[]]));
+    for(const [id,item] of Object.entries(allRequests)){
+      const studentId=item?.practiceStudentId;
+      const studentRows=rowsByStudent.get(studentId);
+      if(!studentRows||item.status!=='pending'||!isReviewableRequest(item))continue;
+      if(teacherClassScope.recordAllowed(scope,studentId,item))studentRows.push({id,...item});
     }
+    // Preserve the previous student-grouped tie order before sorting by time.
+    for(const studentRows of rowsByStudent.values())for(const row of studentRows)rows.push(row);
     return (await sweepPendingMilestones(rows)).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
-  // Owner viewing all classes has no class scope. Self-heal every student's
-  // saved Chazaras too, so the owner's "All classes" view also recovers
-  // missing point requests.
-  try{
-    const studentIds=Object.keys((await rtdb.ref('posukPractice/chazara/events').get()).val()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
-    await repairMissingChazaraPointRequests({owner:true,selected:'',students:Object.fromEntries(studentIds.map(id=>[id,{}]))});
-  }catch(err){console.error('Owner Chazara self-heal failed',err)}
+  // The owner All-classes queue must also avoid a full events-root scan.
+  // For recovery, select one class and explicitly request a scoped repair.
   const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).get();
   const rows=[];
   snap.forEach(child=>{
@@ -1511,9 +1513,45 @@ exports.studentRewardsAutoAward = onRequest(
           if(!result.ok)return res.status(409).json({error:result.error});
           return res.status(200).json(result);
         }
+        if(action==="repair-chazara-pending"){
+          // Repair may scan class histories and write point requests. Require
+          // an explicit action and a single verified class, never All classes.
+          if(!teacher.scope?.selected)return res.status(400).json({error:"Select a class before recovering missing Chazara requests."});
+          await repairMissingChazaraPointRequests(teacher.scope);
+          return res.status(200).json({ok:true});
+        }
         if(action==="list-chazara-pending"){
           const requests=await listPendingChazaraRequests(teacher.scope);
           return res.status(200).json({ok:true,requests});
+        }
+        if(action==="get-chazara-event"||action==="list-chazara-history"){
+          const studentId=String(body.studentId||"").trim();
+          if(!teacherClassScope.validKey(studentId))return res.status(400).json({error:"Invalid student."});
+          // The owner may view all classes; an assigned teacher can only receive
+          // events whose class is verified by the server-side teacher roster.
+          const eventAllowed=event=>{
+            if(!event)return false;
+            if(!teacher.scope)return true;
+            const member=teacher.scope.students?.[studentId];
+            if(!member)return false;
+            // A shared student's classless legacy event cannot safely be
+            // attributed. Preserve it in storage but never expose it by guess.
+            const explicit=event.workspaceClassId||event.sourceClassId||event.classId;
+            if(!explicit && Array.isArray(member.membershipClassIds) && member.membershipClassIds.length!==1)return false;
+            return teacherClassScope.recordAllowed(teacher.scope,studentId,event);
+          };
+          if(action==="get-chazara-event"){
+            const eventId=String(body.eventId||"").trim();
+            if(!teacherClassScope.validKey(eventId))return res.status(400).json({error:"Invalid recording."});
+            const event=(await rtdb.ref('posukPractice/chazara/events/'+studentId+'/'+eventId).get()).val();
+            if(!event)return res.status(404).json({error:"Recording not found."});
+            if(!eventAllowed(event))return res.status(403).json({error:"Recording belongs to another class."});
+            return res.status(200).json({ok:true,event});
+          }
+          const all=(await rtdb.ref('posukPractice/chazara/events/'+studentId).get()).val()||{};
+          const events=Object.fromEntries(Object.entries(all).filter(([eventId,event])=>
+            teacherClassScope.validKey(eventId)&&eventAllowed(event)));
+          return res.status(200).json({ok:true,events});
         }
         if(action==="repair-shorashim-recording"){
           const studentId=String(body.studentId||"").trim(),eventId=String(body.eventId||"").trim();
