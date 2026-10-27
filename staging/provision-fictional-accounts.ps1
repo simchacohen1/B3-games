@@ -108,6 +108,7 @@ foreach ($class in $fixture.roles) {
   $invites[$inviteId] = @{ email = $class.email; name = $class.displayName; active = $true; classIds = @{ $class.classId = $true } }
   $launchId = 'staging_welcome'
   $quizClasses[$class.classId] = @{
+    settings = @{ activeLaunchByClass = @{ $class.classId = $launchId } }
     launches = @{
       $launchId = @{
         classId = $class.classId; started = $true; mode = 'test'; showScore = $false

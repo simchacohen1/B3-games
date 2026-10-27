@@ -103,7 +103,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     fs.mkdirSync(path.join(root, 'nested'), { recursive: true });
     fs.mkdirSync(path.join(root, 'assets'), { recursive: true });
     fs.writeFileSync(path.join(root, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
-    fs.writeFileSync(path.join(root, 'index.html'), '<html><head><script src="firebase-config.js"></script></head><body><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
+    fs.writeFileSync(path.join(root, 'index.html'), '<html><head><script src="firebase-config.js"></script></head><body><script src="backend/functions/student-tool-policy.js" defer></script><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
     fs.writeFileSync(path.join(root, 'nested', 'index.html'), '<html lang="en"><script src="../firebase-config.js"></script><body></body></html>');
     fs.writeFileSync(path.join(root, 'assets', 'calls.js'), [
       'apiKey: "production-api-key"',
@@ -130,6 +130,8 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     const result = stageSource(root, env);
     assert.equal(result.projectId, 'fun-torah-tools-staging');
     const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    assert.match(html, /<script src="backend\/functions\/student-tool-policy\.js"><\/script>/);
+    assert.doesNotMatch(html, /student-tool-policy\.js" defer/);
     const nestedHtml = fs.readFileSync(path.join(root, 'nested', 'index.html'), 'utf8');
     assert.ok(html.indexOf('data-b3-staging-guard') < html.indexOf('firebase-config.js'));
     assert.match(nestedHtml, /\.\.\/staging\/staging-config\.js/);
@@ -161,10 +163,13 @@ test('staging packager disables unavailable scorer and sync services without ret
     fs.writeFileSync(path.join(root, 'sync-to-nigri', 'school-marks.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
     fs.writeFileSync(path.join(root, 'weekly-quiz', 'B3SchoolMarksBridge.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
     fs.writeFileSync(path.join(root, 'comment-log', 'b3-comment-log.html'), '<html><head></head><body><script>const CSV_URL="https://docs.google.com/spreadsheets/d/e/production-sheet-id/pub?output=csv";</script></body></html>');
-    fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body><script>const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";\nconst LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
+    fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body><script src="backend/functions/student-tool-policy.js" defer></script><script>const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";\nconst LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
     const result = stageSource(root, envFrom(stage));
     assert.equal(result.projectId, 'fun-torah-tools-staging');
     const generated = fs.readFileSync(path.join(root, 'record_pesukim', 'student.html'), 'utf8');
+    const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    assert.match(index, /<script src="backend\/functions\/student-tool-policy\.js"><\/script>/);
+    assert.doesNotMatch(index, /student-tool-policy\.js" defer/);
     const app = fs.readFileSync(path.join(root, 'chossid-lamdan.html'), 'utf8');
     assert.match(generated, /staging-disabled\.invalid/);
     assert.match(app, /staging-disabled\.invalid/);
@@ -200,7 +205,7 @@ test('staging site builder copies the app, excludes server/secrets, and runs the
   try {
     fs.mkdirSync(path.join(source, 'backend', 'functions'), { recursive: true });
     fs.mkdirSync(path.join(source, 'assets'), { recursive: true });
-    fs.writeFileSync(path.join(source, 'index.html'), '<html><head></head><body><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set([]),\n wt:new Set([])\n  };</script>Staging</body></html>');
+    fs.writeFileSync(path.join(source, 'index.html'), '<html><head></head><body><script src="backend/functions/student-tool-policy.js" defer></script><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set([]),\n wt:new Set([])\n  };</script>Staging</body></html>');
     fs.writeFileSync(path.join(source, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
     fs.writeFileSync(path.join(source, 'firebase.json'), '{"functions":[]}');
     fs.writeFileSync(path.join(source, 'package.json'), '{"projectId":"b3-games"}');

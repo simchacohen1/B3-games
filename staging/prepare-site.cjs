@@ -118,6 +118,9 @@ function stageSource(siteRoot, env = process.env) {
         throw new Error('Cannot safely remove the embedded production student migration roster from index.html.');
       }
       content = content.replace(legacyRosterPattern, 'const LEGACY_MIGRATION_CLASSES={et:new Set(),wt:new Set()};');
+      const policyScript = '<script src="backend/functions/student-tool-policy.js" defer></script>';
+      if (!content.includes(policyScript)) throw new Error('Cannot find the student tool policy script in index.html.');
+      content = content.replace(policyScript, '<script src="backend/functions/student-tool-policy.js"></script>');
     }
     if (relative === 'site-settings.js') {
       const pattern = /const LEGACY_CLASS_MIGRATION\s*=\s*\{[\s\S]*?\n\s*\};/;

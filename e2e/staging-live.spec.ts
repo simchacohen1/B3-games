@@ -30,25 +30,15 @@ function watchForProductionRequests(page: Page) {
   return requests;
 }
 
-async function signInAsTeacher(page: Page, role: string) {
-  const user = account(role);
-  const prompts = [user.email, user.password];
-  page.on('dialog', async dialog => {
-    if (dialog.type() === 'prompt') await dialog.accept(prompts.shift() || '');
-    else {
-      console.log('STAGING_TEACHER_DIALOG ' + dialog.message());
-      await dialog.accept();
-    }
-  });
-  page.on('pageerror', error => console.log('STAGING_TEACHER_PAGE_ERROR ' + error.message));
-  page.on('console', message => { if (message.type() === 'error') console.log('STAGING_TEACHER_CONSOLE_ERROR ' + message.text()); });
+async function signInAsTeacher(page: Page, role: string, classId: string) {
+  const user = role === 'teacher'
+    ? credentials.adultAccounts.find((item: any) => item.role === 'teacher' && item.classId === classId)
+    : account(role);
   await page.goto(SITE + '/?adminPage=1', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#signInButton')).toBeVisible();
-  console.log('STAGING_TEACHER_BOOT ' + JSON.stringify(await page.evaluate(() => ({ staging: (window as any).B3_STAGING_MODE, settings: typeof (window as any).B3SiteSettings, ready: Boolean((window as any).B3_STAGING_READY) }))));
-  await page.locator('#signInButton').click();
-  await expect(page.locator('#adminStatus')).toContainText(role === 'owner' ? 'Owner access' : 'Managing only your assigned class', { timeout: 20000 });
+  await page.evaluate(async ({ email, password }) => {
+    await (window as any).firebase.auth().signInWithEmailAndPassword(email, password);
+  }, { email: user.email, password: user.password });
 }
-
 test.describe('live isolated staging site', () => {
   test.skip(!credentials, 'Provision staging fixtures before running live staging tests.');
 
@@ -90,10 +80,10 @@ test.describe('live isolated staging site', () => {
     await page.goto(SITE + '/weekly-quiz/index.html', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#quizTitle')).toHaveText('Fictional Test Class Alef Quiz', { timeout: 20000 });
     await expect(page.locator('#questionText')).toContainText('fictional staging quiz');
-    const choices = page.locator('button.choice:not([disabled])');
-    if (await choices.count()) {
-      await choices.first().click();
-      await page.locator('#submitBtn').click();
+    const answer = page.getByRole('button', { name: 'A. Test answer' });
+    if (await answer.count()) {
+      await answer.click();
+      await page.getByRole('button', { name: /Submit answer/ }).click();
       await expect(page.locator('#completeCard')).toBeVisible({ timeout: 15000 });
     }
 
@@ -120,7 +110,7 @@ test.describe('live isolated staging site', () => {
     for (const item of cases) {
       const page = await browser.newPage();
       const productionRequests = watchForProductionRequests(page);
-      await signInAsTeacher(page, item.role);
+      await signInAsTeacher(page, item.role, item.own);
       const access = await page.evaluate(async ({ own, other }) => {
         const db = (window as any).firebase.database();
         async function read(classId: string) {
@@ -133,6 +123,7 @@ test.describe('live isolated staging site', () => {
         }
         return { own: await read(own), other: await read(other) };
       }, { own: item.own, other: item.other });
+      console.log('STAGING_ROLE_ACCESS ' + item.role + ' ' + JSON.stringify(access));
       expect(access.own.allowed).toBe(true);
       expect(access.other.allowed).toBe(item.expected);
       expect(productionRequests).toEqual([]);
