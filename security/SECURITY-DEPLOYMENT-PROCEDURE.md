@@ -1,6 +1,6 @@
 # Firebase security change procedure
 
-This is a deployment checklist for the local security work. It has not been run against production. The default `firebase.json` now selects `firebase-rules.hardened.json`, and `firebase.security-deploy.json` explicitly selects the hardened Realtime Database and Storage rules. The legacy permissive rules remain available only for a controlled rollback. Before any deployment, verify the selected project, database instance, bucket, source revision, and target rules files; no production deployment has been performed.
+This is a deployment checklist for the local security work. It has not been run against production. The default `firebase.json` selects `firebase-rules.json`, the rules currently live in production, so an ordinary deploy cannot switch every rule at once. Only `firebase.security-deploy.json` selects the hardened Realtime Database and Storage rules; use it deliberately, one tested step at a time. Before any deployment, verify the selected project, database instance, bucket, source revision, and target rules files; no production deployment has been performed.
 
 ## Before any production change
 

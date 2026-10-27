@@ -63,6 +63,8 @@ test.before(async () => {
       'b3Quiz/completions/L1/kid_et': { score: 100 },
       'b3Quiz/settings/activeLaunchByClass/et': 'L1',
       'b3Quiz/settings/studentActiveLaunch/kid_et': 'L1',
+      'b3Quiz/settings/studentAssignments/kid_et/L1': { assignedAt: 1 },
+      'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha/A1': { assignedAt: 1 },
       'b3Quiz/practiceAttempts/kid_et/a1': { score: 5 },
       'b3Quiz/quizzes/Q1': { title: 'Synthetic quiz' },
       // per-class quiz data
@@ -214,4 +216,22 @@ testEmulator('students in the original space cannot read a teacher-only class qu
   await no(get(ref(who.kidEt(), 'b3Quiz/classes/alpha/launches/A1')));
   await no(get(ref(who.kidAlpha(), 'b3Quiz/classes/alpha/launches/A1')));
   await no(get(ref(who.kidAlpha(), 'b3Quiz/classes/alpha/responses/A1/kid_alpha')));
+});
+
+testEmulator('retake lists (studentAssignments): a student reads only his own list; teachers manage them', async () => {
+  await ok(get(ref(who.kidEt(), 'b3Quiz/settings/studentAssignments/kid_et')));
+  await no(get(ref(who.kidEt2(), 'b3Quiz/settings/studentAssignments/kid_et')));
+  await no(get(ref(who.kidEt(), 'b3Quiz/settings/studentAssignments')));
+  await no(set(ref(who.kidEt(), 'b3Quiz/settings/studentAssignments/kid_et/L9'), { assignedAt: 2 }));
+  await no(get(ref(who.anon(), 'b3Quiz/settings/studentAssignments/kid_et')));
+  await ok(get(ref(who.tEt(), 'b3Quiz/settings/studentAssignments')));
+  await ok(set(ref(who.tEt(), 'b3Quiz/settings/studentAssignments/kid_et/L2'), { assignedAt: 3 }));
+  await ok(remove(ref(who.tEt(), 'b3Quiz/settings/studentAssignments/kid_et/L2')));
+  await no(set(ref(who.tAlpha(), 'b3Quiz/settings/studentAssignments/kid_et/L3'), { assignedAt: 3 }));
+  // per-class space
+  await ok(get(ref(who.kidAlpha(), 'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha')));
+  await no(get(ref(who.kidBeta(), 'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha')));
+  await no(set(ref(who.kidAlpha(), 'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha/A9'), { assignedAt: 2 }));
+  await ok(set(ref(who.tAlpha(), 'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha/A2'), { assignedAt: 3 }));
+  await no(set(ref(who.tBeta(), 'b3Quiz/classes/alpha/settings/studentAssignments/kid_alpha/A3'), { assignedAt: 3 }));
 });

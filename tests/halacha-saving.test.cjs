@@ -9,7 +9,8 @@ const server=fs.readFileSync('backend/functions/student-auth.js','utf8');
 test('Halacha embedded scripts parse',()=>{
  const scripts=[...html.matchAll(/<script(?![^>]*\bsrc)[^>]*>([\s\S]*?)<\/script>/gi)]
   .map(m=>m[1]).filter(s=>s.trim());
- assert.ok(scripts.length>=2);
+ // The main lesson script; the early IndexedDB session scanner was removed.
+ assert.ok(scripts.length>=1);
  for(const script of scripts)new vm.Script(script);
 });
 test('student uses a separately authenticated Firebase app',()=>{

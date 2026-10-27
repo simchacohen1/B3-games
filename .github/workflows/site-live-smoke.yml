@@ -1,0 +1,34 @@
+name: Live site smoke check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'shorashim/**'
+      - 'sefer-hamitzvos/**'
+      - 'class-pointer-prototype/dashboard.html'
+      - 'scripts/site-live-smoke.cjs'
+      - '.github/workflows/site-live-smoke.yml'
+  # Sunday to Friday at 10:30 UTC, which is early morning in Pennsylvania,
+  # so a broken page is found before the first lesson rather than during it.
+  schedule:
+    - cron: '30 10 * * 0-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check the live site anonymously
+        run: node scripts/site-live-smoke.cjs

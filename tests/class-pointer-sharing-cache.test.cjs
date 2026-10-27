@@ -28,7 +28,7 @@ test('all student tools load the corrected activity screen-sharing script withou
     const html = fs.readFileSync(path.join(root, page), 'utf8');
     const refs = html.match(/activity-share[.]js[?]v=[^"']+/g) || [];
     assert.equal(refs.length, 1, page + ' must include exactly one activity-share script');
-    assert.ok(['activity-share.js?v=20261021-icons-only1','activity-share.js?v=20261020-pointer-lifecycle3'].includes(refs[0]), page + ' must use a released version (note: pages differ; see report)');
+    assert.equal(refs[0], 'activity-share.js?v=20261021-icons-only1', page + ' must use the release version');
   }
 });
 

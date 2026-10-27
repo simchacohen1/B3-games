@@ -22,8 +22,12 @@ test('hardened candidate has no public writes or student-data read grants',()=>{
     '/b3Games/siteSettings','/studentRewards/settings/studentWebsiteEnabled'
   ]);
 });
-test('default Firebase CLI configuration selects the hardened Realtime Database rules',()=>{
-  assert.equal(firebaseConfig.database.rules,'firebase-rules.hardened.json');
+// Production still runs firebase-rules.json. An ordinary deploy must not switch
+// every rule at once; the hardened rules go out only through the explicit config.
+test('default Firebase CLI configuration selects the live rules; hardened rules need the explicit config',()=>{
+  assert.equal(firebaseConfig.database.rules,'firebase-rules.json');
+  const securityDeploy=JSON.parse(fs.readFileSync('firebase.security-deploy.json','utf8'));
+  assert.equal(securityDeploy.database.rules,'firebase-rules.hardened.json');
 });
 test('Class Pointer sessions are class-scoped and reject unlisted student permission data',()=>{
   const sessions=rules.b3Games.workspaces.$workspaceId.classes.$classId.classPointerSessions;
