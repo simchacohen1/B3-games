@@ -101,3 +101,8 @@ test('principal claim refuses invalid class keys before constructing database pa
  assert.deepEqual(result.classIds,['wt']);
  assert.deepEqual(Object.keys(writes).filter(key=>key.includes('/teacherIds/')), [root+'/classes/wt/teacherIds/principal-uid']);
 });
+
+// Run the owner reconciliation/revocation cases in the focused Principal
+// account checks workflow as well as the broader migration suite. This
+// preserves existing workflow safeguards and uses only fictional RTDB data.
+require('./principal-reconciliation-revocation.test.cjs');
