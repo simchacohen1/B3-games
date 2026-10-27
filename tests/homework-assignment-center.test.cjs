@@ -176,6 +176,9 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   assert.equal(hosting.hosting.site, 'fun-torah-tools-staging');
   assert(hosting.hosting.ignore.includes('**/staging/test-credentials.local.json'));
   assert(!hosting.hosting.ignore.includes('**/staging/**'));
+  assert(hosting.hosting.ignore.includes('preview-pointer-repair/**'));
+  assert(hosting.hosting.ignore.includes('preview-pr234/**'));
+  assert(!hosting.hosting.ignore.includes('**/preview*/**'));
   assert.equal(hosting.functions[0].codebase, 'homework-staging');
   assert.equal(hosting.functions[0].source, 'backend/functions/homework-staging');
   const deploy = fs.readFileSync(__dirname + '/../scripts/deploy-homework-staging-preview.ps1', 'utf8');
