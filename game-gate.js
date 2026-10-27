@@ -651,7 +651,7 @@
     followActivityOpen = false;
 
     Promise.resolve().then(async function () {
-      if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
+      if(!window.B3StudentTools)await loadOneScript(new URL('shared/student-tool-policy.js',rootBase).href);
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();

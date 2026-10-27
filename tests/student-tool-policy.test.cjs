@@ -1,5 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const policy=require('../backend/functions/student-tool-policy.js');
+test('published helper stays identical to the backend copy and site loads only the public shared path',()=>{
+ const normalize=source=>source.replace(/\r\n/g,'\n');
+ const backend=normalize(fs.readFileSync('backend/functions/student-tool-policy.js','utf8'));
+ for(const file of ['shared/student-tool-policy.js','preview-pointer-repair/shared/student-tool-policy.js','preview-pr234/shared/student-tool-policy.js']){
+  assert.equal(normalize(fs.readFileSync(file,'utf8')),backend,`${file} must match the backend copy`);
+ }
+ for(const file of ['index.html','teacher-home.html','game-gate.js','preview-pointer-repair/index.html','preview-pointer-repair/game-gate.js','preview-pr234/teacher-home.html','preview-pr234/student-home.html','preview-pr234/game-gate.js','preview-pr234/class-pointer-prototype/student-view.html','preview-pr234/shorashim/index.html']){
+  const source=fs.readFileSync(file,'utf8');
+  assert.match(source,/shared\/student-tool-policy\.js/);
+  assert.doesNotMatch(source,/backend\/functions\/student-tool-policy\.js/);
+ }
+});
 test('existing students retain tools by default and restrictions stay within the selected membership',()=>{
  const cls={members:{one:{toolAccess:{yiddish:false}},two:{}}};
  assert.equal(policy.allowed(cls,'one','yiddish'),false);assert.equal(policy.allowed(cls,'two','yiddish'),true);assert.equal(policy.allowed(cls,'one','chazara'),true);

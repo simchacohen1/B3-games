@@ -1,4 +1,4 @@
-param([string]$ProjectDirectory = 'C:\B3-Games-Backend')
+param([string]$ProjectDirectory = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path $ProjectDirectory).Path
 $functions = Join-Path $project 'functions'

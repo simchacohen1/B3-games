@@ -1,0 +1,13 @@
+# The repository root is the GitHub Pages source. Keep backend deployment
+# files out of the public site while preserving Jekyll's standard exclusions.
+exclude:
+  - backend
+  - preview-pointer-repair/backend
+  - preview-pr234/backend
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
