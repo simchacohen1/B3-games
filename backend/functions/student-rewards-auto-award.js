@@ -160,6 +160,21 @@ async function authorizeChazaraAction(teacher,body){
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
 const RASHI_BUCKET='b3-games.firebasestorage.app';
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
+const RASHI_DAILY_LIMIT=3;
+const rashiDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const rashiDailyRef=(studentId,date)=>rtdb.ref(`rashiLetters/dailySubmissions/${studentId}/${date}`);
+async function rashiDailyCount(studentId,date){return Number((await rashiDailyRef(studentId,date).get()).val()?.count)||0;}
+async function rashiReserveDaily(studentId,date){
+  const tx=await rashiDailyRef(studentId,date).transaction(v=>{
+    const count=Number(v?.count)||0;
+    if(count>=RASHI_DAILY_LIMIT)return;
+    return {count:count+1};
+  });
+  return tx.committed;
+}
+async function rashiReleaseDaily(studentId,date){
+  await rashiDailyRef(studentId,date).transaction(v=>({count:Math.max(0,(Number(v?.count)||0)-1)}));
+}
 async function rashiRequestStatus(requestId){
   const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
   return v?String(v.status||'pending'):null;
@@ -204,8 +219,18 @@ async function rashiStudentSubmit(req,res){
   const attemptId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const ext=type==='audio/mp4'||type==='audio/x-m4a'||type==='audio/aac'?'m4a':type==='audio/ogg'?'ogg':type==='audio/mpeg'?'mp3':type==='audio/wav'?'wav':'webm';
   const storagePath=`rashi-recordings/${classId}/${studentId}/${sectionId}/${attemptId}.${ext}`;
+  // Reserve a student-wide daily slot atomically BEFORE uploading. Simultaneous
+  // submissions from different sections cannot exceed the same allowance.
+  const dailyDate=rashiDate();
+  if(!await rashiReserveDaily(studentId,dailyDate))
+    return res.status(429).json({error:'You have completed your 3 Rashi readings for today. Come back tomorrow!',dailyCount:RASHI_DAILY_LIMIT,dailyLimit:RASHI_DAILY_LIMIT});
   const file=admin.storage().bucket(RASHI_BUCKET).file(storagePath);
-  await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
+  try{
+    await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
+  }catch(err){
+    await rashiReleaseDaily(studentId,dailyDate);
+    throw err;
+  }
   const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
   const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
   // 3. Claim the one slot for this student+section (only if nothing is
@@ -218,13 +243,14 @@ async function rashiStudentSubmit(req,res){
   });
   if(!tx.committed||!claimed||tx.snapshot.val()?.attemptId!==attemptId){
     await file.delete().catch(()=>{});
+    await rashiReleaseDaily(studentId,dailyDate);
     const live=(await rashiRecordRef(studentId,sectionId).get()).val();
     return res.status(200).json({ok:true,alreadySubmitted:true,status:String(live?.status||blockedBy||'pending'),sectionId});
   }
   if(claimed.previousAttemptId&&existing)await rtdb.ref(`rashiLetters/recordingHistory/${studentId}/${sectionId}/${existing.attemptId}`).set(existing).catch(()=>{});
   // 4. The points request (deterministic id, so a retry never doubles it).
   await makeRequest(claimed);
-  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt});
+  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt,dailyCount:await rashiDailyCount(studentId,dailyDate),dailyLimit:RASHI_DAILY_LIMIT});
 }
 // Student asks for the status of every section (one call, no polling).
 async function rashiStudentStatus(req,res){
@@ -241,7 +267,7 @@ async function rashiStudentStatus(req,res){
     }
     sections[sectionId]=rashiCore.publicStatus(record,reqStatus);
   }
-  return res.status(200).json({ok:true,sections});
+  return res.status(200).json({ok:true,sections,dailyCount:await rashiDailyCount(student.studentId,rashiDate()),dailyLimit:RASHI_DAILY_LIMIT});
 }
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
