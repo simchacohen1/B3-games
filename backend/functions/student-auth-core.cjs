@@ -4,21 +4,68 @@
 // student's id and name.
 const crypto=require('node:crypto');
 const {PRIVATE,clean,key,equal,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
-const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
+const fail=(code,message,extra)=>{throw Object.assign(new Error(message),{code},extra);};
 const normalize=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
 
-async function rateLimit(store,ip,now){
- const path='b3Private/studentLoginLimits/'+hash(ip||'unknown');
- let blocked=false;
- await store.tx(path,p=>{blocked=false;if(!p||p.until<now)p={count:0,until:now+600000};if(p.count>=40){blocked=true;return undefined}return {...p,count:p.count+1}});
- if(blocked)fail(429,'Too many sign-in attempts. Try again in 10 minutes.');
+// ---- Abuse protection -------------------------------------------------------
+// Only WRONG passcodes use up the lockout allowance. Correct sign-ins and routine
+// "is my remembered sign-in still good?" checks never do, so a whole classroom
+// sharing one internet address cannot lock itself out (issue #421). Windows are
+// ten minutes. Every counter key is a hash, so no names, ids or passcodes are stored.
+const WINDOW_MS=600000;
+const LIMITS={
+ volumePerIp:1000,        // all calls from one address: stops runaway traffic only
+ wrongPerIp:100,          // wrong passcodes from one address, across every student
+ wrongPerStudentAndIp:8   // wrong passcodes for one name from one address
+};
+const TOO_MANY='Too many sign-in attempts. Try again in 10 minutes.';
+
+function limitPaths(action,body,ip){
+ const address=hash('ip:'+(ip||'unknown'));
+ const who=normalize(action==='verify'?body?.studentId:body?.name);
+ const kind=action==='verify'?'verify':'login';
+ return {
+  volume:'b3Private/studentLoginVolume/'+address,
+  wrongIp:'b3Private/studentLoginFailures/ip/'+address,
+  wrongPair:'b3Private/studentLoginFailures/pair/'+hash(kind+':'+who+'|'+(ip||'unknown'))
+ };
 }
 
+// Counts every call, but with a limit high enough that normal classrooms never reach it.
+async function countVolume(store,path,now){
+ let blocked=false;
+ await store.tx(path,p=>{blocked=false;if(!p||p.until<now)p={count:0,until:now+WINDOW_MS};if(p.count>=LIMITS.volumePerIp){blocked=true;return undefined}return {...p,count:p.count+1}});
+ if(blocked)fail(429,TOO_MANY);
+}
+
+// Read-only check: refuse if a wrong-passcode counter is already full.
+async function refuseIfLocked(store,checks,now){
+ const rows=await Promise.all(checks.map(([path])=>store.get(path)));
+ if(rows.some((row,i)=>row&&row.until>=now&&row.count>=checks[i][1]))fail(429,TOO_MANY);
+}
+
+const recordWrong=(store,path,now)=>store.tx(path,p=>{if(!p||p.until<now)p={count:0,until:now+WINDOW_MS};return {...p,count:p.count+1}});
+
 async function studentAuth(store,body,ip='unknown',now=Date.now()){
+ const action=String(body?.action||'');
+ if(action!=='login'&&action!=='choosePin'&&action!=='verify')return authenticate(store,body,now);
+ const paths=limitPaths(action,body,ip);
+ await countVolume(store,paths.volume,now);
+ await refuseIfLocked(store,[[paths.wrongIp,LIMITS.wrongPerIp],[paths.wrongPair,LIMITS.wrongPerStudentAndIp]],now);
+ try{
+  return await authenticate(store,body,now);
+ }catch(error){
+  // Only a real passcode check that did not match counts. Missing input, ambiguous
+  // names, turned-off accounts and server errors never use up the allowance.
+  if(error?.wrongCredentials)await Promise.all([recordWrong(store,paths.wrongIp,now),recordWrong(store,paths.wrongPair,now)]);
+  throw error;
+ }
+}
+
+async function authenticate(store,body,now){
  const get=store.get;
  const action=String(body?.action||'');
- if(action==='login'||action==='choosePin'||action==='verify')await rateLimit(store,ip,now);
  if(action==='login'||action==='choosePin'){
   const typed=clean(body.name),pin=clean(body.pin);
   if(!normalize(typed))fail(400,'Please type your name.');
@@ -31,7 +78,7 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
   const matches=[];
   for(const id of ids){const code=await readPasscode(get,id,{allowLegacyDefault:true});if(equal(code.passcode,pin))matches.push({id,code});}
   if(matches.length>1)fail(409,'More than one student has this name and passcode. Ask your teacher for a different passcode.');
-  if(!matches.length)fail(401,'Check your name and passcode.');
+  if(!matches.length)fail(401,'Check your name and passcode.',{wrongCredentials:true});
   const {id,code}=matches[0];
   const profile=central?.[id]?.profile||null,legacy=legacyRows?.[id]||null;
   if(profile?.active===false)fail(403,'Your access is turned off. Ask your teacher.');
@@ -87,7 +134,7 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
   const profile=await get('b3Games/students/'+id+'/profile');
   if(profile?.active===false)fail(403,'Your access is turned off. Ask your teacher.');
   const code=await readPasscode(get,id,{allowLegacyDefault:true});
-  if(!equal(code.passcode,pin))fail(401,'Your passcode changed. Please sign in again.');
+  if(!equal(code.passcode,pin))fail(401,'Your passcode changed. Please sign in again.',{wrongCredentials:true});
   const privateCode=await get(PRIVATE+id);
   return {ok:true,requiresPinChange:privateCode?.chosenPinVersion!==1};
  }
