@@ -69,3 +69,29 @@ test('overlapping refreshes share in-flight pending recording requests',async()=
  assert.equal(maxInFlight,4,'overlap does not double the simultaneous event load');
  assert.equal(f.pendingEventFetches.size,0,'settled requests leave no in-flight cache entries');
 });
+
+test('distinct student/event pairs cannot collide in the in-flight request cache',async()=>{
+ const requests=[
+  {practiceStudentId:'a__b',eventId:'c'},
+  {practiceStudentId:'a',eventId:'b__c'}
+ ];
+ const R={'a__b':{name:'Synthetic A'},a:{name:'Synthetic B'}};
+ const E={},pendingEventFetches=new Map();
+ const window={FunTorahTeacherScope:{
+  validKey:value=>/^[A-Za-z0-9_-]+$/.test(String(value)),
+  recordAllowed:(_scope,id,event)=>event.studentId===id&&event.classId==='synthetic_class'
+ }};
+ const teacherScope={selected:'synthetic_class'};
+ const calls=[];
+ const teacherApi=async(action,{studentId,eventId})=>{
+  assert.equal(action,'get-chazara-event');
+  calls.push([studentId,eventId]);
+  await new Promise(resolve=>setTimeout(resolve,8));
+  return {event:{studentId,classId:'synthetic_class',recorded:true}};
+ };
+ await fetchPending(requests,0,0,0,0,R,E,pendingEventFetches,window,teacherScope,teacherApi,console);
+ assert.deepEqual(calls, [['a__b','c'],['a','b__c']]);
+ assert.equal(E['a__b'].c.studentId,'a__b');
+ assert.equal(E.a['b__c'].studentId,'a');
+ assert.equal(pendingEventFetches.size,0);
+});
