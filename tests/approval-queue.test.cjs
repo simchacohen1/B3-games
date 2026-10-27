@@ -61,9 +61,11 @@ test('Approve All is wired for pending items on Chazara and Student Rewards',()=
   assert.match(rewards,/\$\("#approveAllActivity"\)\.onclick=approveAllActivityPoints/);
 });
 
-test('history stays deferred until the teacher asks for the full dashboard',()=>{
+test('recording history loads only when the teacher asks for it',()=>{
   const chazara=fs.readFileSync('chazara/teacher.html','utf8');
-  assert.match(chazara,/fullDashboardLoaded\?\[\['posukPractice\/chazara\/students',D\],\['posukPractice\/chazara\/events',E\],\['posukPractice\/attempts',P\]\]:\[\['posukPractice\/chazara\/events',E\]\]/);
+  assert.match(chazara,/fullDashboardLoaded\?\[\['posukPractice\/chazara\/students',D\],\['posukPractice\/chazara\/events',E\],\['posukPractice\/attempts',P\]\]:\[\]/);
+  assert.match(chazara,/id="loadPreviousRecordingsBtn"/);
+  assert.match(chazara,/teacherApi\('list-chazara-recordings'\)/);
   assert.match(chazara,/<option value="needs" selected>Needs full review<\/option>/);
 });
 
