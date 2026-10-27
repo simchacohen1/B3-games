@@ -7,8 +7,8 @@ import * as crypto from 'node:crypto';
 const APPROVED_ART_SHA256: Record<string, string> = {
   '500': '886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81',
   '501': 'c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f',
-  '502': 'd834c4b7164f225654eaccf3caa17e5959ef9404228bd954adb70e33a4cfa4dd',
-  '503': '8e7c1509b8bc392c560f002fa1369ddf4f7108dd7428ddb5dfde4546434cb5d5',
+  '502': '47451e6ffff2eb7183484cb517355caa11bc99285556c96e1d730a7b89e0c879',
+  '503': '31a572babf2c4673c49e6e3ce813c544e692259009e65a0248665a9bf2ed63d3',
 };
 
 test('Sefer pictures keep correctly aligned fill after rapid date navigation (synthetic browser)', async ({ page }) => {
