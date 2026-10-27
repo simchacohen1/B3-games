@@ -95,3 +95,30 @@ test('cross-class Chazara approval is rejected before any database write',async(
  assert.equal(denied.code,403,JSON.stringify(denied.body));
  assert.equal(x.writes.length,0,'no approval or points write');
 });
+
+
+test('revoked class grant, teacher assignment, and student membership block both approval and rejection before writes',async()=>{
+ const scenarios=[
+  ['class Chazara grant',d=>{d['b3Games/workspaces/b3-2026/classes/alpha'].toolGrants.chazara=false;}],
+  ['teacher class assignment',d=>{d['b3Games/workspaces/b3-2026/teachers/teacher'].classIds.alpha=false;}],
+  ['student class membership',d=>{d['b3Games/students/shared/memberships'].a.active=false;}],
+  ['student class roster entry',d=>{d['b3Games/workspaces/b3-2026/classes/alpha'].members.shared.active=false;}]
+ ];
+ for(const [reason,revoke] of scenarios){
+  const d=fixture();
+  d['studentRewards/pointRequests/alpha_request']={
+   source:'chazara-recording',practiceStudentId:'shared',
+   workspaceClassId:'alpha',status:'pending'
+  };
+  revoke(d);
+  const x=server(d);
+  for(const action of ['approve-point-request','reject-point-request']){
+   const response=await x.call(action,{requestId:'alpha_request'});
+   assert.ok([401,403].includes(response.code),reason+' must return an authorization denial for '+action+' (got '+response.code+')');
+   assert.equal(typeof response.body?.error,'string',reason+' must include a denial message');
+   assert.equal(x.writes.length,0,reason+' must not write points or approvals');
+   assert.equal(x.reads.some(path=>path.startsWith('posukPractice/chazara/events/')),false,
+    reason+' must not read private recording events for a denied approval');
+  }
+ }
+});
