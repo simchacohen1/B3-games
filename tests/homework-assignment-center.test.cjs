@@ -158,8 +158,18 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
 
   const bootstrapSource = fs.readFileSync(__dirname + '/../staging/preview-bootstrap.js', 'utf8');
   const bootstrapWrites = [];
-  const bootstrapDocument = { write: value => bootstrapWrites.push(value) };
-  vm.runInNewContext(bootstrapSource, { window: { location: { hostname: previewHost } }, document: bootstrapDocument });
+  const bootstrapAttributes = new Map();
+  const bootstrapDocument = {
+    documentElement: {
+      getAttribute: name => bootstrapAttributes.get(name) || null,
+      setAttribute: (name, value) => bootstrapAttributes.set(name, value),
+    },
+    write: value => bootstrapWrites.push(value),
+  };
+  const bootstrapWindow = { location: { hostname: previewHost } };
+  vm.runInNewContext(bootstrapSource, { window: bootstrapWindow, document: bootstrapDocument });
+  vm.runInNewContext(bootstrapSource, { window: bootstrapWindow, document: bootstrapDocument });
+  assert.equal(bootstrapWrites.length, 2, 'staging config scripts are inserted once if the loader runs twice');
   assert.match(bootstrapWrites[0], /staging\/firebase-config\.generated\.js/);
   assert.match(bootstrapWrites[1], /staging\/staging-config\.js/);
   const productionWrites = [];
