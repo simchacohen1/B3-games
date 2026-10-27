@@ -105,7 +105,7 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       expect(await page.evaluate(()=>key(500))).toContain('"approved-20261025"');
       expect(await page.evaluate(()=>JSON.parse(localStorage.getItem(key(500))||'[]'))).toHaveLength(3);
     }
-    if (card === 502 || card === 503) {
+    if ((date === '2026-10-29' && card === 502) || (date === '2026-10-31' && card === 503)) {
       const stale = await page.evaluate(card => {
         const oldKey = 'ftt-sefer-hamitzvos:' + JSON.stringify([
           'b3-2026', 'et', 'synthetic-sefer-week-20261025', card, 'approved-20261025'
