@@ -15,13 +15,15 @@ const config = {
 };
 const guardSource = fs.readFileSync(path.resolve(__dirname, '../staging/staging-config.js'), 'utf8');
 
+function guardScript(firebaseConfig: typeof config) {
+  return 'window.B3_STAGING_FIREBASE_CONFIG = ' + JSON.stringify(firebaseConfig) +
+    '; try { (0, eval)(' + JSON.stringify(guardSource) + '); } catch (_) {}';
+}
+
 test.describe('staging production isolation', () => {
   test('initializes only with the staging Firebase config and blocks production requests', async ({ page }) => {
-    await page.addInitScript(({ config, guardSource }) => {
-      (window as any).B3_STAGING_FIREBASE_CONFIG = config;
-      (0, eval)(guardSource);
-    }, { config, guardSource });
     await page.goto('about:blank');
+    await page.evaluate(guardScript(config));
     const result = await page.evaluate(async () => {
       let blocked = '';
       try { await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl'); }
@@ -36,11 +38,8 @@ test.describe('staging production isolation', () => {
   });
 
   test('refuses to start when the supplied Firebase project is production', async ({ page }) => {
-    await page.addInitScript(({ config, guardSource }) => {
-      (window as any).B3_STAGING_FIREBASE_CONFIG = { ...config, projectId: 'b3-games' };
-      (0, eval)(guardSource);
-    }, { config, guardSource });
     await page.goto('about:blank');
+    await page.evaluate(guardScript({ ...config, projectId: 'b3-games' }));
     expect(await page.evaluate(() => (window as any).__B3_STAGING_BLOCKED__ === true)).toBe(true);
     expect(await page.evaluate(() => (window as any).B3_STAGING_READY === true)).toBe(false);
   });
