@@ -9,13 +9,23 @@ function safeQuestion(q){
   return out;
 }
 
+// The two original classes (et, wt) predate per-class tool grants, so every
+// other student tool (Weekly Quiz, Rewards, Class Pointer) already treats them
+// as allowed when no grant is set. Game Show must match, or valid WT students are
+// refused. The class must still be active and the student an active member.
+const LEGACY_CLASS_IDS=['et','wt'];
+
 function isActiveStudentAccess(identity,classSnap,memberSnap){
+  const grant=classSnap?.child?.('toolGrants/game-show')?.val?.();
+  // Legacy classes: allowed when the grant is simply missing, but a teacher
+  // who explicitly turned Game Show off (false) is still respected.
+  const grantOk=grant===true||(LEGACY_CLASS_IDS.includes(String(identity?.b3ClassId||''))&&grant!==false);
   return identity?.b3StudentRole==='student'
     && Boolean(identity.b3StudentId)
     && Boolean(identity.b3ClassId)
     && classSnap?.exists?.()
     && classSnap.child('active').val()===true
-    && classSnap.child('toolGrants/game-show').val()===true
+    && grantOk
     && memberSnap?.exists?.()
     && memberSnap.child('active').val()===true;
 }
