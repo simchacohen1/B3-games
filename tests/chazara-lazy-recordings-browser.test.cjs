@@ -82,14 +82,21 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     // pending queue must not trigger one private-media fetch per recording.
     const beforeAudio=await page.evaluate(()=>({
       loads:window.__privateMediaLoads,
-      buttons:[...document.querySelectorAll('#recordingsList .recording-load-audio')].map(b=>b.textContent)
+      buttons:[...document.querySelectorAll('#recordingsList .recording-load-audio')].map(b=>b.textContent),
+      approvalButtons:[...document.querySelectorAll('#approvalList .recording-load-audio')].map(b=>b.textContent)
     }));
     assert.deepEqual(beforeAudio.loads,[],'pending-only startup must not download private audio');
     assert.deepEqual(beforeAudio.buttons,['Load audio'],'pending recording offers on-demand audio');
+    assert.deepEqual(beforeAudio.approvalButtons,['Load audio'],'approval queue also defers private audio');
     await page.click('#recordingsList .recording-load-audio');
     await page.waitForFunction(()=>window.__privateMediaLoads.length===1);
     assert.deepEqual(await page.evaluate(()=>window.__privateMediaLoads),['private/chazara/fictional-rec1.webm']);
     await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-load-audio').length===0);
+    assert.equal(await page.locator('#approvalList .recording-load-audio').count(),1,'approval queue still offers independent load button');
+    await page.click('#approvalList .recording-load-audio');
+    await page.waitForFunction(()=>window.__privateMediaLoads.length===2);
+    assert.deepEqual(await page.evaluate(()=>window.__privateMediaLoads),['private/chazara/fictional-rec1.webm','private/chazara/fictional-rec1.webm']);
+    await page.waitForFunction(()=>document.querySelectorAll('#approvalList .recording-load-audio').length===0);
 
     const historyStart=Date.now();
     await page.selectOption('#recordingReviewFilter','checked');
