@@ -14,3 +14,4 @@ firebase_idb.json
 auth.json
 playwright-report/
 test-results/
+staging-results/
