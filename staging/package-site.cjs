@@ -9,7 +9,7 @@ const SKIP_DIRS = new Set([
   'node_modules', 'backend', 'docs', 'e2e', 'tests', 'security', 'staging', 'staging-build',
   'test-results', 'playwright-report'
 ]);
-const SKIP_FILES = /^(?:firebase.*\.json|\.env(?:\..*)?|\.firebaserc|firebase-debug(?:\..*)?\.log|.*(?:service-account|firebase-adminsdk|credentials|secret).*\.json|.*\.(?:pem|key|p12|pfx|jks))$/i;
+const SKIP_FILES = /^(?:firebase.*\.json|package(?:-lock)?\.json|\.env(?:\..*)?|\.firebaserc|firebase-debug(?:\..*)?\.log|.*(?:service-account|firebase-adminsdk|credentials|secret).*\.json|.*\.(?:pem|key|p12|pfx|jks))$/i;
 
 function copyTree(source, output) {
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {

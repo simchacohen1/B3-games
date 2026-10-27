@@ -86,6 +86,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
       'authDomain: "b3-games.firebaseapp.com"',
       'databaseURL: "https://b3-games-default-rtdb.firebaseio.com"',
       'projectId: "b3-games"',
+      'window.firebaseConfig={projectId:"b3-games"}',
       'storageBucket: "b3-games.firebasestorage.app"',
       'https://us-central1-b3-games.cloudfunctions.net/ping',
       'https://posuk-scorer.onrender.com/score',
@@ -111,6 +112,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     assert.equal(fs.readFileSync(path.join(root, 'firebase-config.js'), 'utf8').includes('b3-games'), false);
     const calls = fs.readFileSync(path.join(root, 'assets', 'calls.js'), 'utf8');
     assert.match(calls, /fun-torah-tools-staging\.cloudfunctions\.net/);
+    assert.match(calls, /projectId:"fun-torah-tools-staging"/);
     assert.match(calls, /staging-posuk\.example\.test/);
     assert.match(calls, /staging-disabled\.invalid/);
   } finally {
@@ -123,11 +125,14 @@ test('staging packager disables unavailable scorer and sync services without ret
   try {
     fs.mkdirSync(path.join(root, 'record_pesukim'), { recursive: true });
     fs.mkdirSync(path.join(root, 'weekly-quiz'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'sync-to-nigri'), { recursive: true });
     fs.mkdirSync(path.join(root, 'comment-log'), { recursive: true });
     fs.writeFileSync(path.join(root, 'firebase-config.js'), 'apiKey: "production-api-key"');
     fs.writeFileSync(path.join(root, 'record_pesukim', 'student.html'), '<html><head></head><body>https://posuk-scorer.onrender.com/score</body></html>');
     fs.writeFileSync(path.join(root, 'chossid-lamdan.html'), '<html><head></head><body><script>const SYNC_URL="https://nigrisync.onrender.com/sync-marks",SYNC_KEY="production-secret";\nconst DEFAULT_DATA={date:"2026-10-26",classes:[{id:"et",label:"B3 ET",students:[["Chaikin Mayer Chaim",100,"real mark"]]}]\n};\nfunction esc(s){return s;}</script></body></html>');
     fs.writeFileSync(path.join(root, 'weekly-quiz', 'nigri-sync.js'), "const SYNC_KEY='production-secret'; const NIGRI_NAMES={person:'Chaikin Mayer Chaim'};");
+    fs.writeFileSync(path.join(root, 'sync-to-nigri', 'school-marks.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
+    fs.writeFileSync(path.join(root, 'weekly-quiz', 'B3SchoolMarksBridge.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
     fs.writeFileSync(path.join(root, 'comment-log', 'b3-comment-log.html'), '<html><head></head><body><script>const CSV_URL="https://docs.google.com/spreadsheets/d/e/production-sheet-id/pub?output=csv";</script></body></html>');
     fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body><script>const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";</script></body></html>');
     const result = stageSource(root, envFrom(stage));
@@ -145,6 +150,11 @@ test('staging packager disables unavailable scorer and sync services without ret
     const quizSync = fs.readFileSync(path.join(root, 'weekly-quiz', 'nigri-sync.js'), 'utf8');
     assert.doesNotMatch(quizSync, /Chaikin Mayer Chaim|production-secret/);
     assert.match(quizSync, /nigri-sync/);
+    for (const disabledPath of ['sync-to-nigri/school-marks.html', 'weekly-quiz/B3SchoolMarksBridge.html']) {
+      const disabled = fs.readFileSync(path.join(root, disabledPath), 'utf8');
+      assert.match(disabled, /Integration disabled in staging/);
+      assert.doesNotMatch(disabled, /Chaikin Mayer Chaim|production-secret/);
+    }
     const commentLog = fs.readFileSync(path.join(root, 'comment-log', 'b3-comment-log.html'), 'utf8');
     assert.match(commentLog, /staging-disabled\.invalid/);
     assert.doesNotMatch(commentLog, /docs\.google\.com\/spreadsheets/);
@@ -165,6 +175,8 @@ test('staging site builder copies the app, excludes server/secrets, and runs the
     fs.writeFileSync(path.join(source, 'index.html'), '<html><head></head><body>Staging</body></html>');
     fs.writeFileSync(path.join(source, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
     fs.writeFileSync(path.join(source, 'firebase.json'), '{"functions":[]}');
+    fs.writeFileSync(path.join(source, 'package.json'), '{"projectId":"b3-games"}');
+    fs.writeFileSync(path.join(source, 'package-lock.json'), '{"projectId":"b3-games"}');
     fs.writeFileSync(path.join(source, '.env'), 'PRODUCTION_SECRET=do-not-copy');
     fs.writeFileSync(path.join(source, 'backend', 'functions', 'index.js'), 'server code');
     fs.writeFileSync(path.join(source, 'assets', 'app.js'), 'https://us-central1-b3-games.cloudfunctions.net/example');
@@ -175,6 +187,8 @@ test('staging site builder copies the app, excludes server/secrets, and runs the
     assert.ok(fs.existsSync(path.join(output, 'assets', 'image.svg')));
     assert.equal(fs.existsSync(path.join(output, '.env')), false);
     assert.equal(fs.existsSync(path.join(output, 'firebase.json')), false);
+    assert.equal(fs.existsSync(path.join(output, 'package.json')), false);
+    assert.equal(fs.existsSync(path.join(output, 'package-lock.json')), false);
     assert.equal(fs.existsSync(path.join(output, 'backend')), false);
     assert.match(fs.readFileSync(path.join(output, 'assets', 'app.js'), 'utf8'), /fun-torah-tools-staging\.cloudfunctions\.net/);
     assert.throws(() => packageSite(source, output, envFrom(stage)), /must be empty/);

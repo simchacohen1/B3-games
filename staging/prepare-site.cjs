@@ -79,6 +79,10 @@ function stageSource(siteRoot, env = process.env) {
     let content = fs.readFileSync(file, 'utf8');
     for (const [from, to] of replacements) content = content.split(from).join(to);
     const relative = path.relative(root, file).replace(/\\/g, '/').toLowerCase();
+    content = content.replace(/(\bprojectId\s*:\s*)(["'])b3-games\2/gi, '$1"' + config.projectId + '"');
+    if (relative === 'sync-to-nigri/school-marks.html' || relative === 'weekly-quiz/b3schoolmarksbridge.html') {
+      content = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Staging integration disabled</title></head><body><main><h1>Integration disabled in staging</h1><p>Student mark syncing is unavailable in the staging site.</p><a href="../index.html">Return to Fun Torah Tools</a></main></body></html>';
+    }
     if (relative === 'weekly-quiz/nigri-sync.js') {
       content = "window.B3_STAGING_DISABLED_INTEGRATIONS = window.B3_STAGING_DISABLED_INTEGRATIONS || [];\n" +
         "window.B3_STAGING_DISABLED_INTEGRATIONS.push('nigri-sync');\n";
