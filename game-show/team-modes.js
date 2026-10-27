@@ -352,11 +352,18 @@
 
     function submitChoice(index){
       const q=questionAt(lastData);
-      if(!q||!Number.isInteger(q.correctIndex))return;
-      gameRef.transaction(current=>{
-        if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
-        return applyChoice(current,myName,index,q.correctIndex);
-      },(err,committed)=>{if(err)document.getElementById("answerFeedback").textContent="Could not submit. Try again.";});
+      if(!q)return;
+      const qi=Number(lastData&&lastData.qIndex)||0;
+      const feedback=document.getElementById("answerFeedback");
+      gameRef.parent.child('set/questions/'+qi+'/correctIndex').once('value').then(snap=>{
+        const raw=snap.val();
+        const correctIndex=Number.isInteger(q.correctIndex)?q.correctIndex:(raw===null?NaN:Number(raw));
+        if(!Number.isInteger(correctIndex)){feedback.textContent="Could not check the answer. Ask your teacher.";return;}
+        gameRef.transaction(current=>{
+          if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
+          return applyChoice(current,myName,index,correctIndex);
+        },(err,committed)=>{if(err)feedback.textContent="Could not submit. Try again.";});
+      }).catch(()=>{feedback.textContent="Could not submit. Try again.";});
     }
 
     function updateChoices(data){

@@ -7,7 +7,7 @@ exports.safeQuestion=safeQuestion;
 exports.isActiveStudentAccess=isActiveStudentAccess;
 exports.canAcceptStudentBuzz=canAcceptStudentBuzz;
 
-exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
+exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'});
   try{
@@ -17,6 +17,13 @@ exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://
     if(identity.b3StudentRole!=='student'||!sid||!classId)return res.status(403).json({error:'Student sign-in required.'});
     const rtdb=admin.database(),membership=await rtdb.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${sid}`).get(),cls=await rtdb.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get();
     if(!isActiveStudentAccess(identity,cls,membership))return res.status(403).json({error:'Active Game Show class membership required.'});
+    // Add this student to the teacher's contestant list (score 0) as soon as
+    // he opens the student page. An existing score is never changed.
+    const playerName=String(identity.b3StudentName||'').replace(/[.#$\[\]]/g,'_').slice(0,80);
+    if(playerName){
+      try{await rtdb.ref(`questionSets/classes/${classId}/live/scores/${playerName}`).transaction(v=>(v===null||v===undefined)?0:v);}
+      catch(joinError){console.warn('gameShowStudentQuestions join',joinError);}
+    }
     const snap=await rtdb.ref(`questionSets/classes/${classId}/set`).get(),set=snap.val();
     if(!set)return res.status(200).json({title:'Game Show',questions:[]});
     let questions=Array.isArray(set.questions)?set.questions:[];
@@ -29,7 +36,7 @@ exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://
   }
 });
 
-exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:30,memory:'256MiB'},async(req,res)=>{
+exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com'],maxInstances:30,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
   try{
@@ -42,6 +49,11 @@ exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://sim
     if(req.body?.action!=='buzz')return res.status(400).json({error:'Unknown Game Show action.'});
     const game=rtdb.ref(`questionSets/classes/${classId}/live`),now=Date.now();let accepted=false;
     const result=await game.transaction(current=>{
+      accepted=false;
+      // The first pass can run before the real game data has loaded
+      // (current is null). Return null so Firebase fetches the real value
+      // and runs this again, instead of rejecting the buzz.
+      if(current===null)return null;
       // Enforce the display/timing locks on the trusted writer as well as on
       // the read-only student client.
       if(!canAcceptStudentBuzz(current,now))return;
