@@ -154,3 +154,35 @@ test('legacy inline audioURL remains private when another non-audio URL field is
  assert.equal(foreign.code,403);
  assert.equal(x.writes.length,0);
 });
+
+test('inline audio access stops immediately after tool grant, teacher assignment, or student membership revocation',async()=>{
+ const d=fixture(),audio='data:audio/webm;base64,QUJD';
+ const eventPath='posukPractice/chazara/events/shared/et_event';
+ d[eventPath].audioDataURL=audio;
+ const x=server(d);
+ const request=()=>x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
+ const allowed=await request();
+ assert.equal(allowed.code,200,JSON.stringify(allowed.body));
+ assert.equal(allowed.body.audioDataURL,audio);
+ const countEventReads=()=>x.reads.filter(path=>path===eventPath).length;
+ const classRow=d['b3Games/workspaces/b3-2026/classes/et'];
+ classRow.toolGrants.chazara=false;
+ let before=countEventReads();
+ const grantRevoked=await request();
+ assert.notEqual(grantRevoked.code,200,'removed class Chazara grant must deny audio');
+ assert.equal(countEventReads(),before,'grant revocation must deny before event audio is read');
+ classRow.toolGrants.chazara=true;
+ const teacherRow=d['b3Games/workspaces/b3-2026/teachers/teacher'];
+ teacherRow.classIds.et=false;
+ before=countEventReads();
+ const assignmentRevoked=await request();
+ assert.notEqual(assignmentRevoked.code,200,'removed teacher assignment must deny audio');
+ assert.equal(countEventReads(),before,'teacher reassignment must deny before event audio is read');
+ teacherRow.classIds.et=true;
+ d['b3Games/students/shared/memberships'].a.active=false;
+ before=countEventReads();
+ const membershipRevoked=await request();
+ assert.notEqual(membershipRevoked.code,200,'removed student ET membership must deny audio');
+ assert.equal(countEventReads(),before,'student membership revocation must deny before event audio is read');
+ assert.equal(x.writes.length,0,'all revocation checks must remain read-only');
+});
