@@ -352,11 +352,11 @@
 
     function submitChoice(index){
       const q=questionAt(lastData);
-      if(!q||!Number.isInteger(q.correctIndex))return;
+      if(!q)return;const qi=Number(lastData&&lastData.qIndex)||0;gameRef.parent.child('set/questions/'+qi+'/correctIndex').once('valu
       gameRef.transaction(current=>{
         if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
-        return applyChoice(current,myName,index,q.correctIndex);
-      },(err,committed)=>{if(err)document.getElementById("answerFeedback").textContent="Could not submit. Try again.";});
+        return applyChoice(current,myName,index,correctIndex);
+      },(err,committed)=>{if(err)document.getElementById("answerFeedback").textContent="Could not submit. Try again.";});}).catch(()=>{document.getElementById("answerFeedback").textContent="Could not submit. Try ag
     }
 
     function updateChoices(data){
