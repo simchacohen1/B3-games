@@ -369,6 +369,9 @@ testEmulator('transitional RTDB rules deny an assigned teacher reading a differe
       await set(ref(database,'b3Games/workspaces/b3-2026/teachers/teacher_alpha'),{
         active:true,classIds:{alpha:true}
       });
+      await set(ref(database,'b3Games/workspaces/b3-2026/teachers/teacher_beta'),{
+        active:true,classIds:{beta:true}
+      });
       await set(ref(database,'b3Games/workspaces/b3-2026/classes/alpha'),{
         active:true,members:{synthetic_one:{active:true}}
       });
@@ -390,6 +393,41 @@ testEmulator('transitional RTDB rules deny an assigned teacher reading a differe
     await succeeds(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
     // Must deny this read, even though the teacher is active in another class.
     await fails(get(ref(teacher,'b3Games/students/synthetic_two/profile')));
+    // The parallel Posuk Practice attempts path must obey the same class boundary.
+    await succeeds(get(ref(teacher,'posukPractice/attempts/synthetic_one')));
+    await fails(get(ref(teacher,'posukPractice/attempts/synthetic_two')));
+    const betaTeacher=transitional.authenticatedContext('teacher_beta',{
+      email:'beta@example.test',email_verified:true
+    }).database();
+    await succeeds(get(ref(betaTeacher,'b3Games/students/synthetic_two/profile')));
+    await fails(get(ref(betaTeacher,'b3Games/students/synthetic_one/profile')));
+    // A student retains access to their own record.
+    const student=transitional.authenticatedContext('student_one',{
+      b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'
+    }).database();
+    await succeeds(get(ref(student,'b3Games/students/synthetic_one/profile')));
+    await fails(get(ref(student,'b3Games/students/synthetic_two/profile')));
+    // Revocation is checked against current records, not stale browser grants.
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/classIds/alpha'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await fails(get(ref(teacher,'posukPractice/attempts/synthetic_one')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/classIds/alpha'),true);
+      await set(ref(context.database(),'b3Games/students/synthetic_one/memberships/b3-2026_alpha/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/students/synthetic_one/memberships/b3-2026_alpha/active'),true);
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/classes/alpha/members/synthetic_one/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    await transitional.withSecurityRulesDisabled(async context=>{
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/classes/alpha/members/synthetic_one/active'),true);
+      await set(ref(context.database(),'b3Games/workspaces/b3-2026/teachers/teacher_alpha/active'),false);
+    });
+    await fails(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
   }finally{
     await transitional.cleanup();
   }
