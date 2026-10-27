@@ -211,6 +211,22 @@ test('teacher assigns three retakes to one boy; each stays open until he finishe
   await expect(marks.filter({ hasText: 'Quiz A' })).toHaveCount(1);
   await expect(marks.filter({ hasText: 'Quiz A' })).toContainText('100%');
 
+  // ---- Teacher: all students x all quizzes table ----
+  await teacher.locator('#resultsStudentFilter').selectOption('__all_table__');
+  await expect(teacher.locator('#resultsQuizTitle')).toHaveText('All students — every quiz');
+  const header = teacher.locator('#resultsTable thead th');
+  await expect(header).toHaveText([/Quiz/, /Ari Example/, /Bina Example/]);
+  const table = teacher.locator('#resultsTable tbody tr');
+  // Quiz B (given 3 times) is one row: Ari's finished retake 100%, Bina never did it.
+  const quizB = table.filter({ hasText: 'Quiz B' });
+  await expect(quizB).toHaveCount(1);
+  await expect(quizB.locator('td').nth(1)).toContainText('100%');
+  await expect(quizB.locator('td').nth(2)).toContainText('—');
+  await expect(table.filter({ hasText: 'Total (finished quizzes)' })).toHaveCount(1);
+  // Clicking a boy's name opens his own marks.
+  await header.filter({ hasText: 'Ari Example' }).getByRole('link').click();
+  await expect(teacher.locator('#resultsQuizTitle')).toHaveText('Ari Example — his quizzes');
+
   // Stop the pages' background polling before the emulators shut down.
   for (const context of [ari.context(), bina.context(), teacherContext]) {
     await context.unrouteAll({ behavior: 'ignoreErrors' });

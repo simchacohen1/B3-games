@@ -243,3 +243,33 @@ test('9. one student\'s marks: a quiz given again is one row, not a missed quiz'
   assert.equal(rows.Shoroshim.partial.launchId,'sh2','newest started try is shown');
   assert.equal(rows['Different quiz'].status,'not_started','a quiz he really has not done still shows');
 });
+
+test('10. all students x all quizzes: one row per quiz, one cell per boy, repeats folded',()=>{
+  const html=fs.readFileSync('weekly-quiz/teacher.html','utf8');
+  const fn=name=>{const start=html.indexOf('function '+name+'(');let depth=0,i=html.indexOf('{',start);for(;i<html.length;i++){if(html[i]==='{')depth++;else if(html[i]==='}'&&--depth===0)break;}return html.slice(start,i+1);};
+  const source=['allStudentsQuizRows','studentResultsQuizzes','launchQuestions','classForStudent'].map(fn).join('\n');
+  const qs=title=>({title,questions:[{q:title+' 1',choices:['a','b'],correctIndex:1},{q:title+' 2',choices:['a','b'],correctIndex:1}]});
+  const ctx={
+    B3QuizHistory:require('../student-report/quiz-history.js'),WeeklyQuizAssignments:WQA,
+    window:{B3QuizHistory:require('../student-report/quiz-history.js')},
+    CLASS_SPACE:false,WQ_CLASS:'',CLASS_ROSTERS:{et:{students:['levi','yossi']}},
+    asArray:v=>Array.isArray(v)?v:Object.values(v||{}),
+    document:{getElementById:id=>({resultsClassFilter:{value:'all'},resultsQuizSearch:{value:''}})[id]||null},
+    allLaunches:{
+      first:{classId:'et',createdAt:100,startedAt:100,quizSnapshot:qs('Cheshvan')},
+      again:{classId:'et',createdAt:200,startedAt:200,quizSnapshot:qs('Cheshvan')},
+      retake:{classId:'et',createdAt:300,startedAt:300,targetStudents:{levi:true},retakeOf:'again',attemptGroupId:'again',attemptNumber:2,quizSnapshot:qs('Cheshvan')},
+      makeup:{classId:'et',createdAt:400,startedAt:400,targetStudents:{yossi:true},deliveryType:'makeup',quizSnapshot:qs('Only Yossi')}
+    },
+    allResponses:{first:{levi:{0:{correct:false},1:{correct:true}}},again:{yossi:{0:{correct:true},1:{correct:true}}},retake:{levi:{0:{correct:true},1:{correct:true}}},makeup:{yossi:{0:{correct:true}}}},
+    completions:{first:{levi:{completedAt:150}},again:{yossi:{completedAt:250}},retake:{levi:{completedAt:350}}}
+  };
+  vm.runInNewContext(source+';this.rows=allStudentsQuizRows([{id:"levi",name:"Levi"},{id:"yossi",name:"Yossi"}]);',ctx);
+  assert.equal(ctx.rows.map(r=>r.title).join('|'),'Only Yossi|Cheshvan');
+  const cheshvan=ctx.rows[1];
+  assert.equal(cheshvan.launchIds.size,3);
+  assert.equal(cheshvan.cells.levi.pct,100,'his finished retake counts');
+  assert.equal(cheshvan.cells.yossi.pct,100,'the repeat he finished counts');
+  assert.equal(ctx.rows[0].cells.levi,undefined,'a make-up only for Yossi is blank for Levi');
+  assert.equal(ctx.rows[0].cells.yossi.partial.answered,1);
+});
