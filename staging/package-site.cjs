@@ -6,10 +6,10 @@ const { stageSource } = require('./prepare-site.cjs');
 
 const SKIP_DIRS = new Set([
   '.git', '.github', '.firebase', '.vscode', '.idea', '.claude', '.codex', '.agents', '.aws',
-  'node_modules', 'backend', 'docs', 'e2e', 'tests', 'security', 'staging', 'staging-build',
+  'node_modules', 'backend', 'docs', 'e2e', 'tests', 'security', 'scripts', 'staging', 'staging-build',
   'test-results', 'playwright-report'
 ]);
-const SKIP_FILES = /^(?:firebase.*\.json|package(?:-lock)?\.json|\.env(?:\..*)?|\.firebaserc|firebase-debug(?:\..*)?\.log|.*(?:service-account|firebase-adminsdk|credentials|secret).*\.json|.*\.(?:pem|key|p12|pfx|jks))$/i;
+const SKIP_FILES = /^(?:firebase.*\.json|package(?:-lock)?\.json|\.env(?:\..*)?|\.firebaserc|firebase-debug(?:\..*)?\.log|.*(?:service-account|firebase-adminsdk|credentials|secret).*\.json|.*\.(?:pem|key|p12|pfx|jks|md|markdown|ps1|cjs|rules|map|log))$/i;
 
 function copyTree(source, output) {
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
@@ -31,7 +31,8 @@ function copyTree(source, output) {
 function packageSite(sourceRoot, outputRoot, env = process.env) {
   const source = path.resolve(sourceRoot);
   const output = path.resolve(outputRoot);
-  if (source === output || output.startsWith(source + path.sep)) {
+  const inPlaceBuild = path.join(source, 'staging-build');
+  if (source === output || (output.startsWith(source + path.sep) && output !== inPlaceBuild)) {
     throw new Error('Staging output must be outside the source checkout.');
   }
   if (!fs.existsSync(path.join(source, 'index.html'))) throw new Error('Source checkout has no root index.html.');
@@ -40,6 +41,14 @@ function packageSite(sourceRoot, outputRoot, env = process.env) {
   }
   fs.mkdirSync(output, { recursive: true });
   copyTree(source, output);
+  // The homepage and teacher page use this dependency-free browser policy
+  // module from backend/functions/. Keep just that shared client file public;
+  // never copy the Functions source tree or server-side credentials.
+  const browserPolicy = path.join(source, 'backend', 'functions', 'student-tool-policy.js');
+  if (!fs.existsSync(browserPolicy)) throw new Error('Missing browser-safe student tool policy module.');
+  const policyOutput = path.join(output, 'backend', 'functions', 'student-tool-policy.js');
+  fs.mkdirSync(path.dirname(policyOutput), { recursive: true });
+  fs.copyFileSync(browserPolicy, policyOutput);
   const result = stageSource(output, env);
   if (!fs.existsSync(path.join(output, 'index.html'))) throw new Error('Packaged staging site has no root index.html.');
   return { ...result, output };

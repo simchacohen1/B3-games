@@ -8,6 +8,7 @@
   'use strict';
 
   const REQUIRED_PROJECT = 'fun-torah-tools-staging';
+  const STAGING_OWNER_EMAIL = 'owner@funtorahtools-staging.test';
   const BLOCKED_VALUES = [
     'b3-games',
     'b3-games.firebaseapp.com',
@@ -135,22 +136,41 @@
   }
 
   function installFirebaseGuard(target, config) {
-    const sdk = target.firebase;
-    if (!sdk || typeof sdk.initializeApp !== 'function') return;
-    if (sdk.__B3_STAGING_INITIALIZE_GUARD__) return;
-    const original = sdk.initializeApp.bind(sdk);
-    sdk.initializeApp = function (provided, name) {
-      const actual = provided || (sdk.apps && sdk.apps.length ? sdk.app().options : null);
-      if (!actual || actual.projectId !== config.projectId ||
-          actual.databaseURL !== config.databaseURL ||
-          actual.storageBucket !== config.storageBucket ||
-          actual.authDomain !== config.authDomain ||
-          actual.apiKey !== config.apiKey) {
-        fail('Firebase refused to initialize with anything except the configured staging project.');
-      }
-      return original(provided, name);
-    };
-    Object.defineProperty(sdk, '__B3_STAGING_INITIALIZE_GUARD__', { value: true });
+    function protect(sdk) {
+      if (!sdk || typeof sdk.initializeApp !== 'function' || sdk.__B3_STAGING_INITIALIZE_GUARD__) return;
+      const original = sdk.initializeApp.bind(sdk);
+      sdk.initializeApp = function (provided, name) {
+        const actual = provided || (sdk.apps && sdk.apps.length ? sdk.app().options : null);
+        if (!actual || actual.projectId !== config.projectId ||
+            actual.databaseURL !== config.databaseURL ||
+            actual.storageBucket !== config.storageBucket ||
+            actual.authDomain !== config.authDomain ||
+            actual.apiKey !== config.apiKey) {
+          fail('Firebase refused to initialize with anything except the configured staging project.');
+        }
+        return original(provided, name);
+      };
+      Object.defineProperty(sdk, '__B3_STAGING_INITIALIZE_GUARD__', { value: true });
+    }
+
+    if (target.firebase) {
+      protect(target.firebase);
+      return;
+    }
+    // Compat Firebase is loaded with `defer` on the app pages, after this
+    // fail-closed bootstrap runs. Intercept its global assignment so the
+    // initializeApp guard is active before any deferred app script executes.
+    let sdk;
+    try {
+      Object.defineProperty(target, 'firebase', {
+        configurable: true,
+        enumerable: true,
+        get() { return sdk; },
+        set(value) { sdk = value; protect(sdk); }
+      });
+    } catch (_) {
+      fail('Could not install the Firebase initialization guard before app code.');
+    }
   }
 
   const api = { REQUIRED_PROJECT, BLOCKED_VALUES, getConfig, isBlockedRequest, installNetworkGuards, installFirebaseGuard };
@@ -158,8 +178,29 @@
   if (root && root.window === root) {
     const config = getConfig();
     root.B3_FIREBASE_CONFIG = config;
+    root.B3_STAGING_MODE = true;
+    root.B3_STAGING_OWNER_EMAIL = STAGING_OWNER_EMAIL;
+    root.B3_STAGING_FEATURES = Object.freeze({ storage: false, posukScoring: false, nigriSync: false });
+    root.document.documentElement.dataset.b3Staging = 'true';
+    const featureStyle = root.document.createElement('style');
+    featureStyle.textContent = 'html[data-b3-staging="true"] .record-bar,html[data-b3-staging="true"] #shorashimRecordBtn,html[data-b3-staging="true"] #shorashimPauseBtn{display:none!important}.b3-staging-notice{margin:0 auto 10px;padding:8px 12px;background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;border-radius:10px;font:700 12px/1.4 Arial,sans-serif;text-align:center;max-width:1050px}';
+    root.document.head.appendChild(featureStyle);
     installNetworkGuards(root);
     installFirebaseGuard(root, config);
+    const labelSignIn = function () {
+      const button = root.document && root.document.getElementById('signInButton');
+      if (button) button.textContent = 'Sign in with a staging test account';
+      if (root.document && root.document.body && !root.document.querySelector('.b3-staging-notice')) {
+        const notice = root.document.createElement('div');
+        notice.className = 'b3-staging-notice';
+        notice.textContent = 'Staging test site · audio uploads, Posuk scoring, and Nigri syncing are disabled.';
+        root.document.body.prepend(notice);
+      }
+    };
+    if (root.document) {
+      if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', labelSignIn, { once: true });
+      else labelSignIn();
+    }
     root.B3_STAGING_READY = true;
   }
 })(typeof window !== 'undefined' ? window : globalThis);

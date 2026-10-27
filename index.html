@@ -1100,6 +1100,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
 
   function adminPasswordUnlocked(){
+    if(window.B3_STAGING_MODE===true)return true;
     try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
   }
 
@@ -1598,6 +1599,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       myClassRecord=Object.fromEntries(fields.map((field,i)=>[field,snapshots[i].val()]));
       myClassRecord.members={[myStudentId]:snapshots[fields.length].val()};
     }catch(e){}
+    if(myClassRecord&&myClassRecord.name)classLabels[myClassId]=String(myClassRecord.name);
     if(!isStudentPreview){
       sessionStorage.setItem("b3Games_studentId",myStudentId);
       sessionStorage.setItem("b3Games_studentName",myStudentName);

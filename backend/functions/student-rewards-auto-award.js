@@ -11,7 +11,9 @@ const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
 const SR_ROOT = "studentRewards";
-const ADMIN_EMAIL = "simcha5770@gmail.com";
+const ADMIN_EMAIL = process.env.B3_STAGING_DEPLOYMENT === "true"
+  ? "owner@funtorahtools-staging.test"
+  : "simcha5770@gmail.com";
 const POINTS = Object.freeze({
   reading100: 3,
   translation100: 5,
@@ -24,7 +26,13 @@ const POINTS = Object.freeze({
 });
 
 function cors(req, res) {
-  res.set("Access-Control-Allow-Origin", "*");
+  const origin = String(req.headers.origin || "");
+  const allowedOrigin = process.env.B3_STAGING_DEPLOYMENT === "true"
+    ? "https://fun-torah-tools-staging.web.app"
+    : "*";
+  if (allowedOrigin === "*" || origin === allowedOrigin) {
+    res.set("Access-Control-Allow-Origin", allowedOrigin);
+  }
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") { res.status(204).send(""); return true; }

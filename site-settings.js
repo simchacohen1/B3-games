@@ -961,6 +961,7 @@
   function signInWithGoogle() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
+    if (window.B3_STAGING_MODE === true) return signInWithStagingAccount(services);
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
@@ -993,6 +994,34 @@
         return result.user;
       });
     });
+  }
+
+  function signInWithStagingAccount(services) {
+    const email = window.prompt("Staging test account email:");
+    if (!email) return Promise.reject(Object.assign(new Error("Staging sign-in was cancelled."), { code: "auth/cancelled-popup-request" }));
+    const password = window.prompt("Staging test account password:");
+    if (!password) return Promise.reject(Object.assign(new Error("Staging sign-in was cancelled."), { code: "auth/cancelled-popup-request" }));
+    const savedAuth = getRememberedTeacherAuth();
+    return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
+      .then(function () { return savedAuth.signInWithEmailAndPassword(email.trim(), password); })
+      .then(function (result) {
+        return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+          .then(function () { return services.auth.updateCurrentUser(result.user); })
+          .then(function () { return readUserAccess(result.user); })
+          .then(function (access) {
+            currentAccess = access;
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { showToolVersions(access); }, { once: true });
+            else showToolVersions(access);
+            if (!access.authorized) {
+              return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
+                const error = new Error("This staging account has no assigned Fun Torah Tools role.");
+                error.code = "b3/unauthorized-user";
+                throw error;
+              });
+            }
+            return result.user;
+          });
+      });
   }
 
   function signOut() {

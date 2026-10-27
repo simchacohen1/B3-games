@@ -7,12 +7,25 @@ const { configFromEnvironment, renderConfigScript } = require('./generate-config
 const TEXT_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.cjs', '.css', '.json', '.txt', '.svg', '.xml', '.webmanifest', '.map', '.yaml', '.yml']);
 const FORBIDDEN = [
   'b3-games.firebaseapp.com',
+  'simcha5770@gmail.com',
   'b3-games.firebasestorage.app',
   'b3-games-default-rtdb.firebaseio.com',
   'us-central1-b3-games.cloudfunctions.net',
   'posuk-scorer.onrender.com',
   'nigrisync.onrender.com',
-  'docs.google.com/spreadsheets/d/'
+  'docs.google.com/spreadsheets/d/',
+  'chaim_chaikin', 'mayer_chaim_chaikin', 'yossi_gourarie', 'sholom_huebner',
+  'sholom_dovber_huebner', 'moshe_lapine', 'kehos_notik', 'yisroel_oirechman',
+  'moshe_raichman', 'moshe_tuvia_raichman', 'avrohom_rosenfeld', 'levi_rozmarin',
+  'arik_traxler', 'simcha_cohen', 'ari_greenberg', 'zev_rosenfeld', 'levi_schtroks',
+  'yisroel_aryeh_simmonds', 'leibel_vogel', 'leib_wolf'
+];
+const PRODUCTION_STUDENT_NAMES = [
+  'Mayer Chaim Chaikin', 'Chaim Chaikin', 'Yossi Gourarie', 'Sholom DovBer Huebner',
+  'Sholom Huebner', 'Moshe Lapine', 'Kehos Notik', 'Yisroel Oirechman',
+  'Moshe Tuvia Raichman', 'Moshe Raichman', 'Avrohom Rosenfeld', 'Levi Rozmarin',
+  'Arik Traxler', 'Ari Greenberg', 'Zev Rosenfeld', 'Levi Schtroks',
+  'Yisroel Aryeh Simmonds', 'Leibel Vogel', 'Yisroel Arye Leib Wolf', 'Rabbi Cohen'
 ];
 const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'tests', 'e2e', 'backend', 'docs', 'staging', 'staging-build']);
 
@@ -49,6 +62,7 @@ function stageSource(siteRoot, env = process.env) {
   const root = path.resolve(siteRoot);
   const config = configFromEnvironment(env);
   const functionsOrigin = 'https://us-central1-' + config.projectId + '.cloudfunctions.net';
+  const stagingOwnerEmail = 'owner@funtorahtools-staging.test';
   const scorerOrigin = optionalStagingUrl(env.B3_STAGING_POSUK_SCORER_URL, 'B3_STAGING_POSUK_SCORER_URL', 'posuk-scorer.onrender.com');
   // The legacy sync protocol requires a browser-embedded shared key, so it
   // stays disabled even when an endpoint is supplied. Move its auth behind a
@@ -67,6 +81,7 @@ function stageSource(siteRoot, env = process.env) {
     ['b3-games.firebasestorage.app', config.storageBucket],
     ['b3-games-default-rtdb.firebaseio.com', new URL(config.databaseURL).hostname],
     ['us-central1-b3-games.cloudfunctions.net', new URL(functionsOrigin).hostname],
+    ['simcha5770@gmail.com', stagingOwnerEmail],
     ['posuk-scorer.onrender.com', new URL(scorerOrigin).hostname],
     ['nigrisync.onrender.com', new URL(syncOrigin).hostname],
     ["projectId: \"b3-games\"", "projectId: \"" + config.projectId + "\""],
@@ -97,6 +112,39 @@ function stageSource(siteRoot, env = process.env) {
       }
       content = content.replace(rosterPattern, fictionalRoster);
     }
+    if (relative === 'index.html') {
+      const legacyRosterPattern = /const LEGACY_MIGRATION_CLASSES\s*=\s*\{[\s\S]*?\n\s*\};/;
+      if (!legacyRosterPattern.test(content)) {
+        throw new Error('Cannot safely remove the embedded production student migration roster from index.html.');
+      }
+      content = content.replace(legacyRosterPattern, 'const LEGACY_MIGRATION_CLASSES={et:new Set(),wt:new Set()};');
+    }
+    if (relative === 'site-settings.js') {
+      const pattern = /const LEGACY_CLASS_MIGRATION\s*=\s*\{[\s\S]*?\n\s*\};/;
+      if (!pattern.test(content)) throw new Error('Cannot safely remove the production roster migration from site-settings.js.');
+      content = content.replace(pattern, 'const LEGACY_CLASS_MIGRATION={et:[],wt:[]};');
+    }
+    if (relative === 'class-gallery/index.html') {
+      const pattern = /const PRESENCE_STUDENTS\s*=\s*\{[\s\S]*?\n\};/;
+      if (!pattern.test(content)) throw new Error('Cannot safely remove the embedded class-gallery student roster.');
+      content = content.replace(pattern, 'const PRESENCE_STUDENTS={};');
+    }
+    if (relative === 'chazara/teacher.html') {
+      const pattern = /ET=new Set\(\[[\s\S]*?\]\),WT=new Set\(\[[\s\S]*?\]\);/;
+      if (!pattern.test(content)) throw new Error('Cannot safely remove the Chazara teacher legacy rosters.');
+      content = content.replace(pattern, 'ET=new Set(),WT=new Set();');
+    }
+    if (relative === 'weekly-quiz/index.html' || relative === 'weekly-quiz/teacher.html') {
+      const pattern = /const CLASS_ROSTERS\s*=\s*\{[\s\S]*?\n\};/;
+      if (!pattern.test(content)) throw new Error('Cannot safely replace a Weekly Quiz legacy roster.');
+      content = content.replace(pattern,
+        "const CLASS_ROSTERS={'TEST-ALEF':{label:'Test Class Alef',students:['test_student_alef']},'TEST-BEIS':{label:'Test Class Beis',students:['test_student_beis']},'CUSTOM-PRINCIPAL':{label:'Principal Test Class',students:['test_student_principal']}};");
+      content = content.replace(/'simcha_cohen'/g, "'staging_owner_placeholder'");
+      if (relative === 'weekly-quiz/teacher.html') {
+        content = content.replace("(new URLSearchParams(location.search).get('class')||'').trim()", "(new URLSearchParams(location.search).get('class')||'TEST-ALEF').trim()");
+        content = content.replace("CLASS_SPACE?WQ_CLASS:'et'", "CLASS_SPACE?WQ_CLASS:'TEST-ALEF'");
+      }
+    }
     if (relative === 'comment-log/b3-comment-log.html') {
       const sheetPattern = /const CSV_URL\s*=\s*["'][^"']*docs\.google\.com\/spreadsheets\/[^"']*["'];/i;
       if (!sheetPattern.test(content) && /docs\.google\.com\/spreadsheets\/d\//i.test(content)) {
@@ -106,6 +154,7 @@ function stageSource(siteRoot, env = process.env) {
     }
     content = content.replace(/(\bSYNC_KEY\s*=\s*)['"][^'"]*['"]/g, '$1""');
     content = content.replace(/(\bADMIN_PASSWORD_HASH\s*=\s*)['"][a-f0-9]{64}['"]/gi, '$1"staging-disabled"');
+    for (const name of PRODUCTION_STUDENT_NAMES) content = content.split(name).join('Fictional Staging Student');
     if (/\.html$/i.test(file)) {
       const depth = path.dirname(relative) === '.' ? 0 : path.dirname(relative).split(/[\\/]/).length;
       const prefix = '../'.repeat(depth) || './';

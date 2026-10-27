@@ -8,6 +8,7 @@ const path = require('node:path');
 const { configFromEnvironment, renderConfigScript } = require('../staging/generate-config.cjs');
 const { stageSource } = require('../staging/prepare-site.cjs');
 const { packageSite } = require('../staging/package-site.cjs');
+const { prepareRules, OWNER_EMAIL } = require('../staging/prepare-rules.cjs');
 const { assertNoProductionFirebaseTarget, databaseInstanceFromUrl } = require('../backend/functions/firebase-resource-targets.cjs');
 const guard = require('../staging/staging-config.js');
 
@@ -32,6 +33,25 @@ function envFrom(config) {
     B3_STAGING_FIREBASE_APP_ID: config.appId
   };
 }
+
+test('staging deployment config and database rules are isolated and deny public access', () => {
+  const deploy = JSON.parse(fs.readFileSync(path.join(__dirname, '../firebase.staging.json'), 'utf8'));
+  assert.equal(deploy.hosting.site, 'fun-torah-tools-staging');
+  assert.equal(deploy.hosting.public, 'staging-build');
+  assert.equal(deploy.database.rules, 'staging/database.rules.json');
+  assert.equal(deploy.functions[0].source, 'backend/functions-staging');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ftt-stage-rules-'));
+  try {
+    const rules = prepareRules(path.join(__dirname, '../firebase-rules.hardened.json'), path.join(temp, 'rules.json'));
+    assert.equal(rules['.read'], false);
+    assert.equal(rules['.write'], false);
+    const serialized = JSON.stringify(rules);
+    assert.ok(serialized.includes(OWNER_EMAIL));
+    assert.doesNotMatch(serialized, /simcha5770@gmail\.com|b3-games/i);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
 
 test('staging config generator accepts complete isolated Firebase settings', () => {
   assert.deepEqual(configFromEnvironment(envFrom(stage)), stage);
@@ -63,6 +83,10 @@ test('Firebase initialization is rejected unless all options match staging', () 
   guard.installFirebaseGuard({ firebase: sdk }, stage);
   assert.throws(() => sdk.initializeApp({ ...stage, projectId: 'b3-games' }), /anything except the configured staging project/);
   assert.equal(sdk.initializeApp(stage).options.projectId, stage.projectId);
+  const deferredSdk = {};
+  guard.installFirebaseGuard(deferredSdk, stage);
+  deferredSdk.firebase = { apps: [], initializeApp(options) { return { options }; } };
+  assert.throws(() => deferredSdk.firebase.initializeApp({ ...stage, projectId: 'b3-games' }), /anything except the configured staging project/);
 });
 
 test('staging functions derive database instances from staging config and reject production targets', () => {
@@ -79,7 +103,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     fs.mkdirSync(path.join(root, 'nested'), { recursive: true });
     fs.mkdirSync(path.join(root, 'assets'), { recursive: true });
     fs.writeFileSync(path.join(root, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
-    fs.writeFileSync(path.join(root, 'index.html'), '<html><head><script src="firebase-config.js"></script></head><body></body></html>');
+    fs.writeFileSync(path.join(root, 'index.html'), '<html><head><script src="firebase-config.js"></script></head><body><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
     fs.writeFileSync(path.join(root, 'nested', 'index.html'), '<html lang="en"><script src="../firebase-config.js"></script><body></body></html>');
     fs.writeFileSync(path.join(root, 'assets', 'calls.js'), [
       'apiKey: "production-api-key"',
@@ -90,7 +114,8 @@ test('staging packager rewrites app endpoints and injects the guard before page 
       'storageBucket: "b3-games.firebasestorage.app"',
       'https://us-central1-b3-games.cloudfunctions.net/ping',
       'https://posuk-scorer.onrender.com/score',
-      'https://nigrisync.onrender.com/sync-marks'
+      'https://nigrisync.onrender.com/sync-marks',
+      'ownerEmail:"simcha5770@gmail.com"'
     ].join('\n'));
     const env = {
       B3_STAGING_FIREBASE_API_KEY: stage.apiKey,
@@ -115,6 +140,8 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     assert.match(calls, /projectId:"fun-torah-tools-staging"/);
     assert.match(calls, /staging-posuk\.example\.test/);
     assert.match(calls, /staging-disabled\.invalid/);
+    assert.match(calls, /owner@funtorahtools-staging\.test/);
+    assert.doesNotMatch(calls, /simcha5770@gmail\.com/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -134,7 +161,7 @@ test('staging packager disables unavailable scorer and sync services without ret
     fs.writeFileSync(path.join(root, 'sync-to-nigri', 'school-marks.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
     fs.writeFileSync(path.join(root, 'weekly-quiz', 'B3SchoolMarksBridge.html'), '<html><body>Chaikin Mayer Chaim SYNC_KEY="production-secret"</body></html>');
     fs.writeFileSync(path.join(root, 'comment-log', 'b3-comment-log.html'), '<html><head></head><body><script>const CSV_URL="https://docs.google.com/spreadsheets/d/e/production-sheet-id/pub?output=csv";</script></body></html>');
-    fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body><script>const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";</script></body></html>');
+    fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body><script>const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";\nconst LEGACY_MIGRATION_CLASSES={\n et:new Set(["chaim_chaikin"]),\n wt:new Set([])\n  };</script></body></html>');
     const result = stageSource(root, envFrom(stage));
     assert.equal(result.projectId, 'fun-torah-tools-staging');
     const generated = fs.readFileSync(path.join(root, 'record_pesukim', 'student.html'), 'utf8');
@@ -160,6 +187,7 @@ test('staging packager disables unavailable scorer and sync services without ret
     assert.doesNotMatch(commentLog, /docs\.google\.com\/spreadsheets/);
     const home = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     assert.match(home, /ADMIN_PASSWORD_HASH="staging-disabled"/);
+    assert.doesNotMatch(home, /chaim_chaikin/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -172,13 +200,14 @@ test('staging site builder copies the app, excludes server/secrets, and runs the
   try {
     fs.mkdirSync(path.join(source, 'backend', 'functions'), { recursive: true });
     fs.mkdirSync(path.join(source, 'assets'), { recursive: true });
-    fs.writeFileSync(path.join(source, 'index.html'), '<html><head></head><body>Staging</body></html>');
+    fs.writeFileSync(path.join(source, 'index.html'), '<html><head></head><body><script>const LEGACY_MIGRATION_CLASSES={\n et:new Set([]),\n wt:new Set([])\n  };</script>Staging</body></html>');
     fs.writeFileSync(path.join(source, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
     fs.writeFileSync(path.join(source, 'firebase.json'), '{"functions":[]}');
     fs.writeFileSync(path.join(source, 'package.json'), '{"projectId":"b3-games"}');
     fs.writeFileSync(path.join(source, 'package-lock.json'), '{"projectId":"b3-games"}');
     fs.writeFileSync(path.join(source, '.env'), 'PRODUCTION_SECRET=do-not-copy');
     fs.writeFileSync(path.join(source, 'backend', 'functions', 'index.js'), 'server code');
+    fs.writeFileSync(path.join(source, 'backend', 'functions', 'student-tool-policy.js'), 'window.B3StudentTools={allowed(){return true;}};');
     fs.writeFileSync(path.join(source, 'assets', 'app.js'), 'https://us-central1-b3-games.cloudfunctions.net/example');
     fs.writeFileSync(path.join(source, 'assets', 'image.svg'), '<svg></svg>');
     const result = packageSite(source, output, envFrom(stage));
@@ -189,7 +218,8 @@ test('staging site builder copies the app, excludes server/secrets, and runs the
     assert.equal(fs.existsSync(path.join(output, 'firebase.json')), false);
     assert.equal(fs.existsSync(path.join(output, 'package.json')), false);
     assert.equal(fs.existsSync(path.join(output, 'package-lock.json')), false);
-    assert.equal(fs.existsSync(path.join(output, 'backend')), false);
+    assert.equal(fs.existsSync(path.join(output, 'backend', 'functions', 'student-tool-policy.js')), true);
+    assert.equal(fs.existsSync(path.join(output, 'backend', 'functions', 'index.js')), false);
     assert.match(fs.readFileSync(path.join(output, 'assets', 'app.js'), 'utf8'), /fun-torah-tools-staging\.cloudfunctions\.net/);
     assert.throws(() => packageSite(source, output, envFrom(stage)), /must be empty/);
   } finally {

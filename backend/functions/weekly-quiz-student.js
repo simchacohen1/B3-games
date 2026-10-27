@@ -2,12 +2,13 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {weeklyQuizStudentAction}=require('./weekly-quiz-student-core.cjs');
+const {corsForProductionOrigins}=require('./staging-cors.cjs');
 
 if(!admin.apps.length)admin.initializeApp();
 
 exports.weeklyQuizStudent=onRequest({
   region:'us-central1',
-  cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'],
+  cors:corsForProductionOrigins(['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com']),
   maxInstances:10
 },async(req,res)=>{
   res.set('Cache-Control','no-store');
