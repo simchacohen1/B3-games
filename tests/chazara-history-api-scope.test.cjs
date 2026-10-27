@@ -103,3 +103,27 @@ test('explicit class-scoped recovery can read histories but never runs on unassi
    'no event histories may be read before authorization');
  assert.equal(y.writes.length,0);
 });
+
+test('inline legacy audio is absent from pending/history metadata and available only by authorized click',async()=>{
+ const d=fixture(),audio='data:audio/webm;base64,QUJDREVGRw==';
+ d['posukPractice/chazara/events/shared/et_event'].audioDataURL=audio;
+ d['posukPractice/chazara/events/shared/wt_event'].audioDataURL='data:audio/webm;base64,V1Q=';
+ const x=server(d);
+ const pending=await x.call('get-chazara-event',{studentId:'shared',eventId:'et_event'});
+ assert.equal(pending.code,200,JSON.stringify(pending.body));
+ assert.equal(pending.body.event.hasInlineAudio,true);
+ assert.equal(pending.body.event.audioDataURL,undefined,'pending metadata must not contain audio bytes');
+ const history=await x.call('list-chazara-history',{studentId:'shared'});
+ assert.equal(history.code,200,JSON.stringify(history.body));
+ assert.equal(history.body.events.et_event.hasInlineAudio,true);
+ assert.equal(history.body.events.et_event.audioDataURL,undefined,'history must not embed audio bytes');
+ const clicked=await x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
+ assert.equal(clicked.code,200,JSON.stringify(clicked.body));
+ assert.equal(clicked.body.audioDataURL,audio,'explicit audio action returns selected recording');
+ const foreign=await x.call('get-chazara-audio',{studentId:'shared',eventId:'wt_event'});
+ assert.equal(foreign.code,403,'another class audio must be denied');
+ d['b3Games/workspaces/b3-2026/teachers/teacher'].active=false;
+ const revoked=await x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
+ assert.notEqual(revoked.code,200,'revoked teacher must not retrieve inline audio');
+ assert.equal(x.writes.length,0);
+});
