@@ -216,3 +216,44 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
     assert.equal(await page.locator('#recordingsList .recording-row').getAttribute('data-event-key'),JSON.stringify(['simcha_cohen','etold']));
   }finally{await browser?.close();server.close()}
 });
+
+test('legacy inline audio remains metadata-only until explicit clicks in both teacher panels',{timeout:60000},async()=>{
+ const server=await serve(),port=server.address().port;
+ const inlineAudio='data:audio/webm;base64,QUJDREVGRw==';
+ const event={recorded:true,reviewApplied:true,pointRequestStatus:'pending',hasInlineAudio:true,perek:18,posuk:3,createdAt:9};
+ let browser;const audioCalls=[];
+ try{
+  browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
+  const page=await browser.newPage();
+  await page.route(/gstatic\.com\/firebasejs\//,r=>r.fulfill({contentType:'text/javascript',body:''}));
+  await page.route(/gstatic\.com\/firebasejs\/.*app-compat/,r=>r.fulfill({contentType:'text/javascript',body:FIREBASE_STUB}));
+  await page.route(/site-settings\.js/,r=>r.fulfill({contentType:'text/javascript',body:SITE_STUB}));
+  await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{throw Error("Unexpected private-media fetch")}}'}));
+  await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,r=>{
+   const body=JSON.parse(r.request().postData()||'{}');
+   if(body.action==='list-chazara-pending')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[{id:'inline-request',status:'pending',source:'chazara-recording',recorded:true,amount:2,practiceStudentId:'leib_wolf',eventId:'inline1',studentName:'Leib',classId:'wt',createdAt:9}]})});
+   if(body.action==='get-chazara-event')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,event})});
+   if(body.action==='get-chazara-audio'){audioCalls.push(body.studentId+'/'+body.eventId);return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,audioDataURL:inlineAudio})})}
+   return r.fulfill({contentType:'application/json',body:'{"ok":true}'});
+  });
+  await page.goto('http://127.0.0.1:'+port+'/chazara/teacher.html');
+  await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-load-audio').length===1&&document.querySelectorAll('#approvalList .recording-load-audio').length===1);
+  assert.deepEqual(audioCalls,[],'initial metadata requests must not fetch inline audio bytes');
+  const before=await page.evaluate(()=>[...document.querySelectorAll('#recordingsList audio,#approvalList audio')].map(a=>({src:a.getAttribute('src'),hidden:a.hidden})));
+  assert.equal(before.length,2,'both panels show audio controls');
+  assert.ok(before.every(a=>!a.src&&a.hidden),'no inline audio is attached on startup');
+  await page.click('#recordingsList .recording-load-audio');
+  await page.waitForFunction(()=>document.querySelector('#recordingsList audio')?.dataset.inlineReady==='true');
+  assert.deepEqual(audioCalls,['leib_wolf/inline1']);
+  assert.equal(await page.locator('#recordingsList audio').getAttribute('src'),inlineAudio);
+  await page.evaluate(()=>renderRecordings());
+  assert.equal(await page.locator('#recordingsList .recording-load-audio').count(),0,'rerender preserves loaded audio');
+  assert.equal(await page.locator('#recordingsList audio').getAttribute('src'),inlineAudio);
+  await page.click('#approvalList .recording-load-audio');
+  await page.waitForFunction(()=>document.querySelector('#approvalList audio')?.dataset.inlineReady==='true');
+  assert.deepEqual(audioCalls,['leib_wolf/inline1','leib_wolf/inline1']);
+  await page.evaluate(()=>renderApprovals());
+  assert.equal(await page.locator('#approvalList .recording-load-audio').count(),0,'approval rerender preserves loaded audio');
+  assert.equal(await page.locator('#approvalList audio').getAttribute('src'),inlineAudio);
+ }finally{await browser?.close();server.close()}
+});
