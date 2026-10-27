@@ -971,6 +971,7 @@ if (!CLASS_SPACE) {
       document.getElementById('lockOverlay').style.display = 'none';
       document.getElementById('mainContent').classList.remove('hidden');
       window.weeklyQuizOwnerUnlocked = true;
+      if (typeof attachQuizListeners === 'function') attachQuizListeners();
     } else if (window.weeklyQuizOwnerUnlocked) {
       document.getElementById('lockOverlay').style.display = '';
       document.getElementById('mainContent').classList.add('hidden');
@@ -1012,20 +1013,27 @@ if(CLASS_SPACE){
     document.getElementById('lockGoogle').style.display='none';
     document.getElementById('lockOverlay').style.display='none';
     document.getElementById('mainContent').classList.remove('hidden');
+    if(typeof attachQuizListeners==='function')attachQuizListeners();
   });
 }else{
   db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();});
 }
-db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
-db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderPendingAssignments();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
-db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+// The shared quiz data is private to signed-in teachers, so these listeners start only after the
+// teacher is verified (starting them earlier would be refused and never retried).
 // Individual assignments: each student's queue, plus the old single pointer.
 var studentAssignmentQueue={},legacyStudentPointers={};
-db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
-db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});
+var quizListenersAttached=false;
+function attachQuizListeners(){
+  if(quizListenersAttached)return;quizListenersAttached=true;
+  db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
+  db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderPendingAssignments();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+  db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
+  db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});
+}
 
 // ---------- Built-in generator ----------
 function generatorTypeChanged(){

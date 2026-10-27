@@ -267,12 +267,14 @@
           },
           "settings": {
             "activeLaunchByClass": {
+              ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
               "$targetClass": {
                 ".read": "auth != null && ((auth.token.b3ClassId == $targetClass && $targetClass == $classId) || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $targetClass).val() == true)",
                 ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $targetClass).val() == true)"
               }
             },
             "studentActiveLaunch": {
+              ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
               "$studentId": {
                 ".read": "auth != null && ((auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId) || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
                 ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"

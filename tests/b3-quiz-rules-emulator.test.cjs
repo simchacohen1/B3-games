@@ -199,6 +199,13 @@ testEmulator('per-class teachers manage only their own class quiz space', async 
   await no(get(ref(b, 'b3Quiz/classes/alpha/responses/A1')));
   await no(set(ref(b, 'b3Quiz/classes/alpha/launches/A3'), { classId: 'alpha' }));
   await no(set(ref(b, 'b3Quiz/classes/alpha/settings/activeLaunchByClass/alpha'), 'A3'));
+  // the teacher page listens to these three whole lists
+  for (const list of ['activeLaunchByClass', 'studentActiveLaunch', 'studentAssignments']) {
+    await ok(get(ref(a, 'b3Quiz/classes/alpha/settings/' + list)));
+    await ok(get(ref(who.owner(), 'b3Quiz/classes/alpha/settings/' + list)));
+    await no(get(ref(b, 'b3Quiz/classes/alpha/settings/' + list)));
+    await no(get(ref(who.kidAlpha(), 'b3Quiz/classes/alpha/settings/' + list)));
+  }
 });
 
 testEmulator('owner and admins can read every quiz collection (School Marks, reports)', async () => {

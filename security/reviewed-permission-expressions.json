@@ -227,6 +227,11 @@
       "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $targetClass).val() == true)"
     },
     {
+      "path": "/b3Quiz/classes/$classId/settings/activeLaunchByClass",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    {
       "path": "/b3Quiz/classes/$classId/settings/studentActiveLaunch/$studentId",
       "permission": ".read",
       "expression": "auth != null && ((auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId) || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
@@ -234,6 +239,11 @@
     {
       "path": "/b3Quiz/classes/$classId/settings/studentActiveLaunch/$studentId",
       "permission": ".write",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    {
+      "path": "/b3Quiz/classes/$classId/settings/studentActiveLaunch",
+      "permission": ".read",
       "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
     },
     {
