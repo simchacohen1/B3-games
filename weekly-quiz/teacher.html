@@ -805,9 +805,12 @@
       <div class="card sticky-side">
         <div class="card-head">
           <h2>Quiz history</h2>
-          <select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
+          <select id="resultsClassFilter" onchange="renderLaunchHistory();renderResults()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory()" style="min-width:160px;flex:1"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory();renderResults()" style="min-width:160px;flex:1"></div>
+        <label class="small" style="display:block;margin:0 0 12px">One student's marks only
+          <select id="resultsStudentFilter" aria-label="Show one student's marks on every quiz" onchange="resultsStudentShowAll=false;renderResults()" style="width:100%;margin-top:4px"><option value="">All students</option></select>
+        </label>
         <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
         <div id="launchHistory" class="launch-list"></div>
       </div>
@@ -897,6 +900,7 @@ const SKILL_LABELS={general:'Any subject',shorashim:'Shoroshim',translation:'Chu
 function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
 let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
+let resultsStudentShowAll=false;
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
 let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
 let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
@@ -1956,10 +1960,49 @@ function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(
 function renderLaunchHistory(){
   const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',dateFilter=document.getElementById('resultsDateFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();const now=new Date(),todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime();let ids=Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{},ts=Number(l.createdAt)||0;if(filter!=='all'&&l.classId!==filter)return false;if(dateFilter==='today'&&ts<todayStart)return false;if(dateFilter==='week'&&ts<weekStart)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;return true;}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
   if(!ids.length){box.innerHTML='<div class="small">No quizzes match these filters. Try All Dates or a different search.</div>';return;}
-  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
+  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>openResultsLaunch(id);box.appendChild(div);});
   if(!ids.includes(resultsLaunchId)&&ids[0]){resultsLaunchId=ids[0];renderLaunchHistory();renderResults();}
 }
+// ---------- One student's marks on every quiz ----------
+function openResultsLaunch(id){const sel=document.getElementById('resultsStudentFilter');if(sel)sel.value='';resultsLaunchId=id;renderLaunchHistory();renderResults();}
+function populateResultsStudents(){
+  const sel=document.getElementById('resultsStudentFilter');if(!sel)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',old=sel.value,seen=new Set(),rows=[];
+  const classes=CLASS_SPACE?[WQ_CLASS]:(filter==='all'?['et','wt']:[filter]);
+  classes.forEach(c=>((CLASS_ROSTERS[c]||{}).students||[]).forEach(id=>{if(id==='simcha_cohen'||seen.has(id))return;seen.add(id);rows.push({id,name:(roster[id]&&roster[id].name)||id});}));
+  rows.sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML='<option value="">All students</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+  sel.value=seen.has(old)?old:'';
+}
+// Every quiz this student was given (newest first), one row each. Retakes fold into
+// the quiz they belong to, using the same "newest finished attempt" rule as the class view.
+function studentResultsLaunchIds(studentId){
+  const filter=document.getElementById('resultsClassFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();
+  return Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{};if(l.retakeOf)return false;if(!CLASS_SPACE&&filter!=='all'&&l.classId!==filter)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;if(!launchQuestions(l).length)return false;return rosterRowsForLaunch(l).some(st=>st.id===studentId);}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));
+}
+function renderStudentResults(studentId){
+  const table=document.getElementById('resultsTable'),name=(roster[studentId]&&roster[studentId].name)||studentId,allIds=studentResultsLaunchIds(studentId),ids=resultsStudentShowAll?allIds:allIds.slice(0,10);
+  document.getElementById('resultsQuizTitle').textContent=name+' — his quizzes';
+  document.getElementById('resultsMeta').textContent='Newest first. '+(allIds.length>ids.length?'Showing his last '+ids.length+' of '+allIds.length+'. ':'')+'A finished retake replaces the earlier score.';
+  document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
+  if(!ids.length){table.innerHTML='<tr><td>No quizzes found for '+esc(name)+'.</td></tr>';return;}
+  const maxQ=Math.max(...ids.map(id=>launchQuestions(allLaunches[id]).length));
+  let html='<thead><tr><th>Quiz</th><th>Score</th><th>Percent</th><th>Completed</th>'+Array.from({length:maxQ},(_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'</tr></thead><tbody>';
+  ids.forEach(baseId=>{
+    const l=allLaunches[baseId],display=studentDisplayAttempt(baseId,studentId),dqs=launchQuestions(allLaunches[display.id]),dsr=(allResponses[display.id]||{})[studentId]||{},score=launchScore(display.id,studentId),comp=completions[display.id]&&completions[display.id][studentId];
+    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];const open='onclick="event.stopPropagation();openAnswerModal(\''+esc(studentId)+'\','+i+',\'results\',\''+esc(display.id)+'\')"';if(!r)return'<td class="cell blank" '+open+'>—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" '+open+'>'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('')+'<td></td>'.repeat(maxQ-dqs.length);
+    let note='';
+    if(display.pendingNewer.length)note='<div class="small" style="color:var(--gold);font-weight:700">Retake '+display.pendingNewer[display.pendingNewer.length-1].attempt+' assigned — not yet completed</div>';
+    else if(display.id!==baseId)note='<div class="small" style="color:var(--good);font-weight:700">Retake '+display.attempt+' score</div>';
+    const quizCell='<a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(baseId)+'\')">'+esc((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled')+'</a><div class="small">'+esc(classLabel(l.classId))+' • '+esc(fmtDate(l.createdAt))+'</div>'+note;
+    html+='<tr><td>'+quizCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'</tr>';
+  });
+  if(allIds.length>ids.length)html+='<tr><td colspan="'+(4+maxQ)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+allIds.length+' quizzes</button></td></tr>';
+  table.innerHTML=html+'</tbody>';
+}
 function renderResults(){
+  populateResultsStudents();const studentId=document.getElementById('resultsStudentFilter')?.value||'';
+  if(studentId){renderStudentResults(studentId);return;}
+  document.querySelector('#panelResults .results-actions')?.classList.remove('hidden');
   const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
   const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
   document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');

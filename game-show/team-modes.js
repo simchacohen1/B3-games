@@ -80,6 +80,7 @@
   if (isTeacher) {
     const setup=document.querySelector("#tabSetup .setup-grid");
     const buzzerCard=[...setup.querySelectorAll(".card")].find(el=>el.querySelector("#delayToggle"));
+    const teamModeMount=document.getElementById("teamModeMount");
     if (setup && buzzerCard) {
       const card=document.createElement("section");
       card.className="card";
@@ -90,7 +91,8 @@
         '<label class="setting"><span class="label"><b>Play a little music during announcements</b><span>Original gentle game-show jingle; off by default</span></span><span class="ctrl"><input type="checkbox" class="switch" id="regularJingleToggle" aria-label="Music during game show announcements"></span></label>'+
         '<button class="btn" type="button" id="stopNarrationBtn">Stop reading and open buzzers</button>'+
         '<div id="teamModeSummary" class="status-line" aria-live="polite"></div>';
-      buzzerCard.insertAdjacentElement("afterend",card);
+      if (teamModeMount && typeof teamModeMount.replaceWith === "function") teamModeMount.replaceWith(card);
+      else buzzerCard.insertAdjacentElement("afterend",card);
       const save=()=>gameRef.update({
         teamMode:document.getElementById("teamModeToggle").checked,
         multipleChoice:document.getElementById("multipleChoiceToggle").checked,
@@ -287,6 +289,8 @@
     };
     gameRef.on("value",snap=>{
       const data=snap.val()||{};
+      const setupStart=document.getElementById("setupStartGameBtn");
+      if(setupStart)setupStart.hidden=!!data.showStarted;
       const team=document.getElementById("teamModeToggle");
       const mc=document.getElementById("multipleChoiceToggle");
       if(team)team.checked=!!data.teamMode;if(mc)mc.checked=!!data.multipleChoice;
