@@ -70,7 +70,7 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simch
    if(!classChoices.some(c=>c.id===requestedClassId))return res.status(403).json({error:'This student is not active in the selected class.'});
    result.classId=requestedClassId;
    result.classChoices=classChoices;
-   result.customToken=await admin.auth().createCustomToken(uid,{b3StudentId:studentId,b3ClassId:requestedClassId,b3StudentRole:'student'});
+   result.customToken=await admin.auth().createCustomToken(uid,{b3StudentId:studentId,b3ClassId:requestedClassId,b3StudentRole:'student',b3StudentName:String(result.name||'')});
   }
   res.json(result);
  }catch(error){
