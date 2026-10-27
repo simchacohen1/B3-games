@@ -10,13 +10,12 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $firebaseConfig = Join-Path $repoRoot 'firebase.staging-preview.json'
 
 function Invoke-FirebaseJson([string[]]$Arguments, [string]$Description) {
-  $output = & firebase @Arguments 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    $message = ($output | Out-String).Trim()
-    if ($message -match 'credentials are no longer valid|Authentication Error') {
-      throw "Firebase sign-in is expired. Run 'firebase login --reauth' with an account allowed to deploy to $projectId, then rerun this script."
-    }
-    throw "$Description failed: $message"
+  # Keep stderr separate: merging Node's stderr into PowerShell's pipeline can
+  # trigger a libuv assertion on Windows even after the CLI returned valid JSON.
+  $output = & firebase @Arguments 2>$null
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0) {
+    throw "$Description failed with Firebase CLI exit code $exitCode; refusing to deploy. If this is an authentication error, run 'firebase login --reauth' and retry."
   }
   $raw = ($output | Out-String).Trim()
   # Firebase CLI can print progress lines before its JSON envelope. Parse only
@@ -34,16 +33,20 @@ function Invoke-FirebaseJson([string[]]$Arguments, [string]$Description) {
 }
 
 function Invoke-FirebaseDeploy([string[]]$Arguments, [string]$Description) {
-  $output = & firebase @Arguments 2>&1
-  $message = ($output | Out-String).Trim()
-  if ($LASTEXITCODE -ne 0) { throw "$Description failed: $message" }
-  Write-Output $message
+  Write-Output "Starting $Description..."
+  & firebase @Arguments
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0) { throw "$Description failed with Firebase CLI exit code $exitCode." }
 }
 
 Push-Location $repoRoot
 $previousUpdateCheck = $env:FIREBASE_CLI_DISABLE_UPDATE_CHECK
+$previousDiscoveryTimeout = $env:FUNCTIONS_DISCOVERY_TIMEOUT
 try {
   $env:FIREBASE_CLI_DISABLE_UPDATE_CHECK = '1'
+  # This codebase has a large shared functions entry point; allow the staging
+  # CLI analyzer more than its 10-second default to discover one named function.
+  $env:FUNCTIONS_DISCOVERY_TIMEOUT = '30'
   $projects = Invoke-FirebaseJson @('projects:list', '--json', '--non-interactive') 'Firebase project verification'
   $projectIds = @($projects.result | ForEach-Object { $_.projectId })
   if ($projectIds -notcontains $projectId) {
@@ -73,5 +76,7 @@ try {
 } finally {
   if ($null -eq $previousUpdateCheck) { Remove-Item Env:FIREBASE_CLI_DISABLE_UPDATE_CHECK -ErrorAction SilentlyContinue }
   else { $env:FIREBASE_CLI_DISABLE_UPDATE_CHECK = $previousUpdateCheck }
+  if ($null -eq $previousDiscoveryTimeout) { Remove-Item Env:FUNCTIONS_DISCOVERY_TIMEOUT -ErrorAction SilentlyContinue }
+  else { $env:FUNCTIONS_DISCOVERY_TIMEOUT = $previousDiscoveryTimeout }
   Pop-Location
 }
