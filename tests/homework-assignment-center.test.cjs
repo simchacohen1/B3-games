@@ -143,6 +143,9 @@ test('staging guard accepts only the staging host/project and provides local act
 
 test('preview Firebase config proxies only the issue staging channel and deploy config targets staging', () => {
   const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
+  const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
+  assert.doesNotMatch(homeSource, /<script src="firebase-config\.js[^"]*" defer>/,
+    'the preview proxy must run while document.write can load the staging config');
   const proxyWrites = [];
   const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
   const previewDocument = { currentScript: null, write: value => proxyWrites.push(value) };
