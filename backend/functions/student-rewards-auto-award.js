@@ -2,7 +2,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const {assertNoProductionFirebaseTarget} = require('./firebase-resource-targets.cjs');
 if (!admin.apps.length) admin.initializeApp();
-assertNoProductionFirebaseTarget(admin.app());
+assertNoProductionFirebaseTarget(admin.apps[0]);
 const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
@@ -160,7 +160,7 @@ async function authorizeChazaraAction(teacher,body){
 
 
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
-const RASHI_BUCKET=admin.storage().bucket().name;
+const rashiBucket=()=>admin.storage().bucket();
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 async function rashiRequestStatus(requestId){
   const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
@@ -206,7 +206,7 @@ async function rashiStudentSubmit(req,res){
   const attemptId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const ext=type==='audio/mp4'||type==='audio/x-m4a'||type==='audio/aac'?'m4a':type==='audio/ogg'?'ogg':type==='audio/mpeg'?'mp3':type==='audio/wav'?'wav':'webm';
   const storagePath=`rashi-recordings/${classId}/${studentId}/${sectionId}/${attemptId}.${ext}`;
-  const file=admin.storage().bucket(RASHI_BUCKET).file(storagePath);
+  const file=rashiBucket().file(storagePath);
   await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
   const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
   const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
@@ -248,7 +248,7 @@ async function rashiStudentStatus(req,res){
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
   const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-  const bucket=admin.storage().bucket(RASHI_BUCKET),rows=[];
+  const bucket=rashiBucket(),rows=[];
   for(const [id,item] of Object.entries(all)){
     if(!isRashiRequest(item)||item.status!=='pending')continue;
     if(scope&&!teacherClassScope.recordAllowed(scope,item.practiceStudentId,item))continue;

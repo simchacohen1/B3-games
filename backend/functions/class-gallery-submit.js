@@ -7,7 +7,7 @@ const admin = require('firebase-admin');
 const {resolveStudent} = require('./student-login-core.cjs');
 const {assertNoProductionFirebaseTarget} = require('./firebase-resource-targets.cjs');
 if (!admin.apps.length) admin.initializeApp();
-assertNoProductionFirebaseTarget(admin.app());
+assertNoProductionFirebaseTarget(admin.apps[0]);
 
 const ORIGINS = [
   'https://funtorahtools.com',

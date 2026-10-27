@@ -103,14 +103,21 @@ function stageSource(siteRoot, env = process.env) {
     content = content.replace(/(\bSYNC_KEY\s*=\s*)['"][^'"]*['"]/g, '$1""');
     content = content.replace(/(\bADMIN_PASSWORD_HASH\s*=\s*)['"][a-f0-9]{64}['"]/gi, '$1"staging-disabled"');
     if (/\.html$/i.test(file)) {
-      const depth = path.dirname(relative) === '.' ? 0 : path.dirname(relative).split(path.sep).length;
+      const depth = path.dirname(relative) === '.' ? 0 : path.dirname(relative).split(/[\\/]/).length;
       const prefix = '../'.repeat(depth) || './';
       const marker = 'data-b3-staging-guard';
       if (!content.includes(marker)) {
         const bootstrap = '<script ' + marker + ' src="' + prefix + 'staging/firebase-config.generated.js"></script>\n' +
           '<script src="' + prefix + 'staging/staging-config.js"></script>\n';
-        if (!/<head(?:\s[^>]*)?>/i.test(content)) throw new Error('Cannot inject staging guard into ' + relative + ': <head> not found.');
-        content = content.replace(/<head(?:\s[^>]*)?>/i, match => match + '\n' + bootstrap);
+        if (/<head(?:\s[^>]*)?>/i.test(content)) {
+          content = content.replace(/<head(?:\s[^>]*)?>/i, match => match + '\n' + bootstrap);
+        } else if (/<html(?:\s[^>]*)?>/i.test(content)) {
+          // Some standalone pages rely on the browser's implied <head>.
+          // Inject after <html>, before any scripts, so guard order stays safe.
+          content = content.replace(/<html(?:\s[^>]*)?>/i, match => match + '\n' + bootstrap);
+        } else {
+          throw new Error('Cannot inject staging guard into ' + relative + ': neither <head> nor <html> found.');
+        }
       }
     }
     fs.writeFileSync(file, content, 'utf8');

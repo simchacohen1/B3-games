@@ -80,7 +80,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     fs.mkdirSync(path.join(root, 'assets'), { recursive: true });
     fs.writeFileSync(path.join(root, 'firebase-config.js'), 'window.cfg={apiKey:"production-api-key"};');
     fs.writeFileSync(path.join(root, 'index.html'), '<html><head><script src="firebase-config.js"></script></head><body></body></html>');
-    fs.writeFileSync(path.join(root, 'nested', 'index.html'), '<html><head></head><body></body></html>');
+    fs.writeFileSync(path.join(root, 'nested', 'index.html'), '<html lang="en"><script src="../firebase-config.js"></script><body></body></html>');
     fs.writeFileSync(path.join(root, 'assets', 'calls.js'), [
       'apiKey: "production-api-key"',
       'authDomain: "b3-games.firebaseapp.com"',
@@ -107,6 +107,7 @@ test('staging packager rewrites app endpoints and injects the guard before page 
     const nestedHtml = fs.readFileSync(path.join(root, 'nested', 'index.html'), 'utf8');
     assert.ok(html.indexOf('data-b3-staging-guard') < html.indexOf('firebase-config.js'));
     assert.match(nestedHtml, /\.\.\/staging\/staging-config\.js/);
+    assert.ok(nestedHtml.indexOf('data-b3-staging-guard') < nestedHtml.indexOf('../firebase-config.js'));
     assert.equal(fs.readFileSync(path.join(root, 'firebase-config.js'), 'utf8').includes('b3-games'), false);
     const calls = fs.readFileSync(path.join(root, 'assets', 'calls.js'), 'utf8');
     assert.match(calls, /fun-torah-tools-staging\.cloudfunctions\.net/);

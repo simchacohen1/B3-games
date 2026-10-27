@@ -11,7 +11,7 @@ const admin=require('firebase-admin');
 const {changedClassIds,bumpVersions}=require('./class-gallery-meta');
 const {assertNoProductionFirebaseTarget,databaseInstanceFromUrl}=require('./firebase-resource-targets.cjs');
 if(!admin.apps.length)admin.initializeApp();
-assertNoProductionFirebaseTarget(admin.app());
+assertNoProductionFirebaseTarget(admin.apps[0]);
 
 async function handleGalleryWrite(db,{before,after,pathClassId}){
   const classIds=changedClassIds(before,after,pathClassId);
@@ -21,7 +21,7 @@ async function handleGalleryWrite(db,{before,after,pathClassId}){
 }
 exports.handleGalleryWrite=handleGalleryWrite;
 
-const app=admin.app();
+const app=admin.apps[0];
 const options={region:'us-central1',instance:databaseInstanceFromUrl(app.options.databaseURL,app.options.projectId),memory:'256MiB'};
 
 // ET / WT keep their posts in the original shared list.
