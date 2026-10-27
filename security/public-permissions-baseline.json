@@ -30,7 +30,7 @@
       "permission": ".read"
     },
     {
-      "path": "/b3Games/workspaces",
+      "path": "/b3Games/workspaces/$workspaceId/$other",
       "permission": ".read"
     },
     {

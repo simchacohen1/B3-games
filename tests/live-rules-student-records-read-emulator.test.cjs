@@ -66,7 +66,8 @@ testEmulator('strangers and plain Google accounts cannot read student records',a
 
 testEmulator('every other b3Games area stays publicly readable',async()=>{
   const anon=env.unauthenticatedContext().database();
-  for(const path of ['b3Games/siteSettings','b3Games/workspaces','b3Games/workspaces/b3-2026/classes/alpha',
+  // Class records under workspaces are covered by live-rules-class-records-read-emulator.
+  for(const path of ['b3Games/siteSettings','b3Games/workspaces/b3-2026/teachers',
     'b3Games/teachers','b3Games/admins','b3Games/classGalleryPresence','b3Games/classGalleryTag',
     'b3Games/classGalleryPresenceSettings','b3Games/someOtherArea']){
     await succeeds(get(ref(anon,path)));

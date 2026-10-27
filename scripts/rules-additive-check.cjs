@@ -25,12 +25,21 @@ const APPROVED_CHANGES = [
   // 2026-10-24: student records (b3Games/students) stop being public. The blanket b3Games read is
   // replaced by explicit public reads on every other b3Games child, so those stay exactly as open.
   [['b3Games', '$other'], { '.read': true }],
-  ...['admins', 'teachers', 'siteSettings', 'workspaces', 'classGalleryPresence', 'classGalleryTag', 'classGalleryPresenceSettings']
+  ...['admins', 'teachers', 'siteSettings', 'classGalleryPresence', 'classGalleryTag', 'classGalleryPresenceSettings']
     .map(k => [['b3Games', k, '.read'], true]),
   [['b3Games', 'students', '.read'],
     "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
   [['b3Games', 'students', '$studentId', '.read'],
     "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
+  // 2026-10-24: class records (member names, class PINs) stop being public. Other workspace
+  // children (teachers, invites, content grants) stay readable through $other.
+  [['b3Games', 'workspaces', '$workspaceId', '$other'], { '.read': true }],
+  [['b3Games', 'workspaces', '$workspaceId', '.read'],
+    "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
+  [['b3Games', 'workspaces', '$workspaceId', 'classes', '.read'],
+    "auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() != false"],
+  [['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', '.read'],
+    "auth != null && auth.token.b3StudentId != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false"],
 ];
 // Approved removals, each allowed only while its replacement is present in the candidate.
 const APPROVED_REMOVALS = [
