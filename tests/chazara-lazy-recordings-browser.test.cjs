@@ -184,7 +184,7 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
     assert.deepEqual(startup.approvals,['et-pending'],'foreign-class pending approvals must not appear');
     assert.deepEqual(startup.reads,[],'pending audio never bypasses scoped API');
     assert.deepEqual(pendingEventCalls,['simcha_cohen/etrec'],'only the assigned class pending event is fetched');
-    assert.deepEqual(startup.rows,['simcha_cohen__etrec'],'only ET recording is displayed');
+    assert.deepEqual(startup.rows,[JSON.stringify(['simcha_cohen','etrec'])],'only ET recording is displayed');
     assert.deepEqual(startup.classOptions,['','et'],'teacher has no WT class option');
     await page.selectOption('#recordingReviewFilter','checked');
     await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
@@ -192,6 +192,6 @@ test('Chazara pending and lazy-history reads stay within a teacher assigned to E
     assert.deepEqual(histories,[],'explicit history must never download a raw mixed-class student subtree');
     assert.deepEqual(historyCalls,['simcha_cohen'],'history API queried only the assigned student');
     assert.equal(await page.locator('#recordingsList .recording-row').count(),1,'only the ET checked event is displayed');
-    assert.equal(await page.locator('#recordingsList .recording-row').getAttribute('data-event-key'),'simcha_cohen__etold');
+    assert.equal(await page.locator('#recordingsList .recording-row').getAttribute('data-event-key'),JSON.stringify(['simcha_cohen','etold']));
   }finally{await browser?.close();server.close()}
 });
