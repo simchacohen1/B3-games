@@ -161,7 +161,7 @@ async function authorizeChazaraAction(teacher,body){
 const RASHI_BUCKET='b3-games.firebasestorage.app';
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 const RASHI_DAILY_LIMIT=3;
-const rashiDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const rashiDate=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const v=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${v.year}-${v.month}-${v.day}`;};
 const rashiDailyRef=(studentId,date)=>rtdb.ref(`rashiLetters/dailySubmissions/${studentId}/${date}`);
 async function rashiDailyCount(studentId,date){return Number((await rashiDailyRef(studentId,date).get()).val()?.count)||0;}
 async function rashiReserveDaily(studentId,date){
