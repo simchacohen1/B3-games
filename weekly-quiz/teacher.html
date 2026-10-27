@@ -136,6 +136,9 @@
   tbody tr:hover td{background:#fafcfe}
   tbody tr:hover td.correct{background:#d3efdf}tbody tr:hover td.incorrect{background:#f6d6d9}
   td.cell{min-width:40px;height:36px;cursor:pointer;font-weight:700}
+  #resultsTable th.student-col{min-width:86px;vertical-align:bottom;font-size:12px}
+  #resultsTable th.student-col a{color:var(--ink)}
+  #resultsTable tr.totals-row td{border-top:2px solid var(--line2);background:#f7f9fc}
   td.blank{color:#b3bfcb}
   td.correct{background:var(--good-bg);color:#17683d}
   td.incorrect{background:var(--bad-bg);color:#a3333a}
@@ -1963,13 +1966,61 @@ function renderLaunchHistory(){
 }
 // ---------- One student's marks on every quiz ----------
 function openResultsLaunch(id){const sel=document.getElementById('resultsStudentFilter');if(sel)sel.value='';resultsLaunchId=id;renderLaunchHistory();renderResults();}
-function populateResultsStudents(){
-  const sel=document.getElementById('resultsStudentFilter');if(!sel)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',old=sel.value,seen=new Set(),rows=[];
+var ALL_STUDENTS_TABLE='__all_table__';
+function resultsStudentRows(){
+  const filter=document.getElementById('resultsClassFilter')?.value||'all',seen=new Set(),rows=[];
   const classes=CLASS_SPACE?[WQ_CLASS]:(filter==='all'?['et','wt']:[filter]);
   classes.forEach(c=>((CLASS_ROSTERS[c]||{}).students||[]).forEach(id=>{if(id==='simcha_cohen'||seen.has(id))return;seen.add(id);rows.push({id,name:(roster[id]&&roster[id].name)||id});}));
-  rows.sort((a,b)=>a.name.localeCompare(b.name));
-  sel.innerHTML='<option value="">All students</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
-  sel.value=seen.has(old)?old:'';
+  return rows.sort((a,b)=>a.name.localeCompare(b.name));
+}
+function populateResultsStudents(){
+  const sel=document.getElementById('resultsStudentFilter');if(!sel)return;const old=sel.value,rows=resultsStudentRows();
+  sel.innerHTML='<option value="">All students</option><option value="'+ALL_STUDENTS_TABLE+'">📊 All students — every quiz (table)</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+  sel.value=old===ALL_STUDENTS_TABLE||rows.some(x=>x.id===old)?old:'';
+}
+function showStudentMarks(studentId){const sel=document.getElementById('resultsStudentFilter');if(sel)sel.value=studentId;resultsStudentShowAll=false;renderResults();}
+// ---------- All students × all quizzes ----------
+// One row per quiz (newest first), one column per boy. Each cell is that boy's
+// result with the same grouping as his own marks view: a quiz given again,
+// a make-up or a retake is one row, and his newest finished try counts.
+function allStudentsQuizRows(students){
+  const rows=[],rowByKey={};
+  const better=(a,b)=>{if(!!a.counted!==!!b.counted)return a.counted?a:b;return (b.lastDate||0)>(a.lastDate||0)?b:a;};
+  students.forEach(st=>studentResultsQuizzes(st.id).forEach(q=>{
+    const keys=[];q.attempts.forEach(a=>{keys.push('l:'+a.launchId,'qs:'+a.sameQuiz);if(a.quizId)keys.push('id:'+a.quizId);});
+    let row=keys.map(k=>rowByKey[k]).find(Boolean);
+    if(!row){row={title:q.title,date:q.date,launchIds:new Set(),cells:{}};rows.push(row);}
+    keys.forEach(k=>{rowByKey[k]=row;});
+    q.attempts.forEach(a=>row.launchIds.add(a.launchId));
+    if(q.date&&(!row.date||q.date<row.date))row.date=q.date;
+    row.cells[st.id]=row.cells[st.id]?better(row.cells[st.id],q):q;
+  }));
+  return rows.sort((a,b)=>(b.date||0)-(a.date||0));
+}
+function renderAllStudentsTable(){
+  const table=document.getElementById('resultsTable'),students=resultsStudentRows(),all=allStudentsQuizRows(students),rows=resultsStudentShowAll?all:all.slice(0,15);
+  document.getElementById('resultsQuizTitle').textContent='All students — every quiz';
+  document.getElementById('resultsMeta').textContent='Newest first. '+(all.length>rows.length?'Showing the last '+rows.length+' of '+all.length+' quizzes. ':'')+'A quiz given more than once is one row; each boy\'s newest finished try counts. Click a boy\'s name for his details.';
+  document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
+  if(!rows.length||!students.length){table.innerHTML='<tr><td>No quizzes found.</td></tr>';return;}
+  // Each boy's totals: average of finished quizzes, and how many he finished.
+  const sums=Object.fromEntries(students.map(st=>{let pctSum=0,correct=0,total=0,done=0,given=0;all.forEach(r=>{const q=r.cells[st.id];if(!q)return;given++;if(q.counted){done++;pctSum+=q.pct||0;correct+=q.correct||0;total+=q.total||0;}});return [st.id,{avg:done?Math.round(pctSum/done):null,correct,total,done,given}];}));
+  const head='<thead><tr><th style="text-align:left;min-width:220px">Quiz</th>'+students.map(st=>{const s=sums[st.id];return '<th class="student-col"><a href="#" onclick="event.preventDefault();showStudentMarks(\''+esc(st.id)+'\')">'+esc(st.name)+'</a><div class="small">'+(s.avg===null?'—':s.avg+'% avg')+'</div><div class="small">'+s.done+' of '+s.given+' done</div></th>';}).join('')+'</tr></thead>';
+  let body='';
+  rows.forEach(r=>{
+    const latest=[...r.launchIds].sort((a,b)=>(Number(allLaunches[b]?.createdAt)||0)-(Number(allLaunches[a]?.createdAt)||0))[0],l=allLaunches[latest]||{};
+    const quizCell='<td><a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(latest)+'\')">'+esc(r.title)+'</a><div class="small">'+esc(classLabel(l.classId))+' • '+esc(fmtDate(r.date))+(r.launchIds.size>1?' • given '+r.launchIds.size+' times':'')+'</div></td>';
+    body+='<tr>'+quizCell+students.map(st=>{
+      const q=r.cells[st.id],open=' onclick="showStudentMarks(\''+esc(st.id)+'\')"';
+      if(!q)return '<td class="cell" title="Not given to him" style="color:var(--muted);cursor:default">·</td>';
+      if(q.counted)return '<td class="cell '+(q.pct>=70?'correct':'incorrect')+'"'+open+' title="'+esc(q.correct+' of '+q.total+' correct')+'">'+q.pct+'%<div class="small">'+q.correct+'/'+q.total+'</div></td>';
+      if(q.partial)return '<td class="cell blank"'+open+' title="Started, not finished">'+q.partial.answered+'/'+q.partial.total+'<div class="small">not finished</div></td>';
+      return '<td class="cell blank"'+open+' title="Not started">—</td>';
+    }).join('')+'</tr>';
+  });
+  body+='<tr class="totals-row"><td><b>Total (finished quizzes)</b></td>'+students.map(st=>{const s=sums[st.id];return '<td class="cell" style="cursor:default"><b>'+(s.avg===null?'—':s.avg+'%')+'</b><div class="small">'+s.correct+'/'+s.total+'</div></td>';}).join('')+'</tr>';
+  if(all.length>rows.length)body+='<tr><td colspan="'+(1+students.length)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+all.length+' quizzes</button></td></tr>';
+  table.innerHTML=head+'<tbody>'+body+'</tbody>';
 }
 // Every quiz this student was given (newest first), one row each. Retakes, make-ups
 // AND the same quiz given again (same saved quiz, or same name and same questions)
@@ -2012,6 +2063,7 @@ function renderStudentResults(studentId){
 }
 function renderResults(){
   populateResultsStudents();const studentId=document.getElementById('resultsStudentFilter')?.value||'';
+  if(studentId===ALL_STUDENTS_TABLE){renderAllStudentsTable();return;}
   if(studentId){renderStudentResults(studentId);return;}
   document.querySelector('#panelResults .results-actions')?.classList.remove('hidden');
   const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
