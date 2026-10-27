@@ -105,7 +105,7 @@ test('explicit class-scoped recovery can read histories but never runs on unassi
 });
 
 test('inline legacy audio is absent from pending/history metadata and available only by authorized click',async()=>{
- const d=fixture(),audio='data:audio/webm;base64,QUJDREVGRw==';
+ const d=fixture(),audio='data:audio/webm;base64,'+'QUJD'.repeat(65536);
  d['posukPractice/chazara/events/shared/et_event'].audioDataURL=audio;
  d['posukPractice/chazara/events/shared/wt_event'].audioDataURL='data:audio/webm;base64,V1Q=';
  const x=server(d);
@@ -113,13 +113,16 @@ test('inline legacy audio is absent from pending/history metadata and available 
  assert.equal(pending.code,200,JSON.stringify(pending.body));
  assert.equal(pending.body.event.hasInlineAudio,true);
  assert.equal(pending.body.event.audioDataURL,undefined,'pending metadata must not contain audio bytes');
+ assert.ok(Buffer.byteLength(JSON.stringify(pending.body))<2000,'pending metadata response stays small with 256 KiB inline audio');
  const history=await x.call('list-chazara-history',{studentId:'shared'});
  assert.equal(history.code,200,JSON.stringify(history.body));
  assert.equal(history.body.events.et_event.hasInlineAudio,true);
  assert.equal(history.body.events.et_event.audioDataURL,undefined,'history must not embed audio bytes');
+ assert.ok(Buffer.byteLength(JSON.stringify(history.body))<3000,'history metadata response stays small with 256 KiB inline audio');
  const clicked=await x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
  assert.equal(clicked.code,200,JSON.stringify(clicked.body));
  assert.equal(clicked.body.audioDataURL,audio,'explicit audio action returns selected recording');
+ assert.ok(Buffer.byteLength(JSON.stringify(clicked.body))>200000,'large inline audio transfers only after explicit request');
  const foreign=await x.call('get-chazara-audio',{studentId:'shared',eventId:'wt_event'});
  assert.equal(foreign.code,403,'another class audio must be denied');
  d['b3Games/workspaces/b3-2026/teachers/teacher'].active=false;
