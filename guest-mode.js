@@ -118,6 +118,7 @@
     on = false;
     var b = document.getElementById("b3GuestBanner");
     if (b) b.remove();
+    document.documentElement.style.removeProperty("--b3-guest-banner-h");
   }
 
   var api = window.B3Guest = {
@@ -343,6 +344,20 @@
     bar.appendChild(signIn); bar.appendChild(exit);
     var body = document.body;
     body.insertBefore(bar, body.firstChild);
+    // The floating back button from back-nav.js sits at top:10px; keep it below this banner
+    // so the banner does not cover it (seen on the Class Gallery).
+    if (!document.getElementById("b3GuestBannerOffset")) {
+      var offset = el("style", "");
+      offset.id = "b3GuestBannerOffset";
+      offset.textContent = "#b3BackNav{top:calc(var(--b3-guest-banner-h,0px) + 10px)!important}" +
+        "#b3BackNavBar #b3BackNav{top:auto!important}";
+      document.head.appendChild(offset);
+      window.addEventListener("resize", function () {
+        var b = document.getElementById("b3GuestBanner");
+        document.documentElement.style.setProperty("--b3-guest-banner-h", (b ? b.offsetHeight : 0) + "px");
+      });
+    }
+    document.documentElement.style.setProperty("--b3-guest-banner-h", bar.offsetHeight + "px");
   }
   if (document.body) banner(); else document.addEventListener("DOMContentLoaded", banner);
   // Pages that rebuild the body get the banner back.

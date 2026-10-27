@@ -2,27 +2,7 @@
 <html lang="en">
 <head>
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fun Torah Tools</title>
@@ -938,6 +918,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
     {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
@@ -1066,14 +1047,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
     // milestones never count as manual approvals.
     const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];
+    const rashiPending=data.pointRequests?Q.rashiQueue(data.pointRequests).map(function(x){return x.item;}):[];
     approvalClassCounts={
       chazara:Q.countByClass(chazaraPending,approvalClassFallback),
+      rashiRecordings:Q.countByClass(rashiPending,function(x){return x&&x.workspaceClassId||approvalClassFallback(x);}),
       gallery:Q.countByClass(galleryPending.map(function(x){return {classId:x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et"};}))
     };
     if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
       chazara:chazaraPending.length,
+      rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
       gallery:galleryPending.length,
@@ -1775,7 +1759,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Clear the student identity first so auth callbacks cannot restore the
     // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
-    resetPinForm();
     studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();

@@ -81,6 +81,7 @@ function backend(tree){
   const ctx={rtdb,SR_ROOT:'studentRewards',console,Object,Number,String,Date,
     isMilestoneRequest:i=>['reading100','translation100','understand100'].includes(String(i?.source||'')),
     isShorashimRequest:i=>['shorashim-recording','shorashim-no-hints'].includes(String(i?.source||'')),
+    isRashiRequest:i=>String(i?.source||'')==='rashi-recording',rashiCore:{RASHI_POINTS:2},
     isReviewableRequest:i=>['chazara','chazara-recording','shorashim-recording','shorashim-no-hints','reading100','translation100','understand100'].includes(String(i?.source||''))};
   vm.createContext(ctx);vm.runInContext(code,ctx);return ctx;
 }

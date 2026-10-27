@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+
+// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25-31 2026.
+const APPROVED_ART_SHA256: Record<string, string> = {
+  '500': '886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81',
+  '501': 'c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f',
+  '502': '47451e6ffff2eb7183484cb517355caa11bc99285556c96e1d730a7b89e0c879',
+  '503': '31a572babf2c4673c49e6e3ce813c544e692259009e65a0248665a9bf2ed63d3',
+};
 
 test('Sefer pictures keep correctly aligned fill after rapid date navigation (synthetic browser)', async ({ page }) => {
   test.setTimeout(120000);
@@ -41,10 +50,23 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
       : 'text/plain';
     await route.fulfill({ status: 200, contentType: type, body: fs.readFileSync(filename) });
   });
+  const servedArt = new Map<string, string>();
+  page.on('response', async response => {
+    const match = new URL(response.url()).pathname.match(/\/coloring-v2\/(\d+)\.png$/);
+    if (match) servedArt.set(match[1], crypto.createHash('sha256').update(await response.body()).digest('hex'));
+  });
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
-  await expect(page.locator('#outline')).toHaveAttribute('src', /coloring-v2/);
   await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
   const firstCard = await page.locator('#card').inputValue();
+  // Today's picture must be the owner-approved artwork, byte for byte. When a new
+  // week's art is approved, add its SHA-256 here.
+  const todayArt = firstCard.padStart(3, '0');
+  expect(APPROVED_ART_SHA256[todayArt], `today's card ${firstCard} has no approved artwork registered`).toBeTruthy();
+  await expect(page.locator('#outline')).toHaveAttribute('src', new RegExp(`coloring-v2/${todayArt}\\.png(?:\\?|$)`));
+  await expect.poll(() => page.locator('#outline').evaluate(
+    (img: HTMLImageElement) => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
+  )).toBe(true);
+  await expect.poll(() => servedArt.get(todayArt)).toBe(APPROVED_ART_SHA256[todayArt]);
   const first = await page.evaluate(() => {
     const labels = regionMask.labels as Uint32Array;
     const counts = new Map<number, number>();

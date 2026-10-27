@@ -2,6 +2,8 @@ import { test, expect, Page } from '@playwright/test';
 
 // Runs against the checked-out source, without real students, Firebase, or a live site.
 async function startLab(page: Page) {
+  // Fake timers so the 900 ms auto-advance after a correct answer is driven deterministically.
+  await page.clock.install();
   await page.setContent([
     '<!doctype html><html><head><meta charset="utf-8"></head><body>',
     '<main class="wrap">',
@@ -45,9 +47,14 @@ async function answerRound(page: Page, count: number) {
   for(let i=0;i<count;i++) {
     const target=(await page.locator('.lab-target').textContent())?.trim();
     expect(target).toBeTruthy();
+    const stat=(await page.locator('.lab-stat',{hasText:' · '}).textContent())?.trim()||'';
+    expect(stat).toMatch(/ · \d+ \/ \d+$/);
     await page.getByRole('button',{name:'Letter '+target,exact:true}).click();
-    // A correct answer now moves on by itself after about a second (no Next button), so wait for the next question.
-    await page.waitForFunction((previous)=>{const t=document.querySelector('.lab-target');return !t||(t.textContent||'').trim()!==previous;},target,{timeout:5000});
+    // Correct answers auto-advance (commit decb8cfe); the manual Next button is only shown after mistakes.
+    await expect(page.locator('.lab-feedback')).toContainText('Correct! You found its match.');
+    await expect(page.getByRole('button',{name:'Next question →'})).toBeHidden();
+    await page.clock.runFor(900);
+    await expect(page.getByText(stat,{exact:true})).toHaveCount(0);
   }
 }
 

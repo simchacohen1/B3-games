@@ -1,0 +1,685 @@
+{
+ "475": [
+  {
+   "name": "Left man face and ear",
+   "sections": [
+    37,
+    314,
+    319,
+    349,
+    390,
+    47
+   ]
+  },
+  {
+   "name": "Left man kippah",
+   "sections": [
+    296,
+    297
+   ]
+  },
+  {
+   "name": "Left man hair",
+   "sections": [
+    33,
+    304
+   ]
+  },
+  {
+   "name": "Left man collar",
+   "sections": [
+    59,
+    65
+   ]
+  },
+  {
+   "name": "Left man shirt front",
+   "sections": [
+    52,
+    116,
+    427,
+    434
+   ]
+  },
+  {
+   "name": "Left man left sleeve",
+   "sections": [
+    58,
+    100,
+    104
+   ]
+  },
+  {
+   "name": "Left man right sleeve",
+   "sections": [
+    55,
+    94
+   ]
+  },
+  {
+   "name": "Left man left cuff",
+   "sections": [
+    105
+   ]
+  },
+  {
+   "name": "Left man right cuff",
+   "sections": [
+    102
+   ]
+  },
+  {
+   "name": "Left man right hand",
+   "sections": [
+    95,
+    461
+   ]
+  },
+  {
+   "name": "Left man belt",
+   "sections": [
+    489,
+    126,
+    487,
+    485,
+    482
+   ]
+  },
+  {
+   "name": "Wallet",
+   "sections": [
+    93,
+    430
+   ]
+  },
+  {
+   "name": "Left man right shoe",
+   "sections": [
+    169,
+    167,
+    172,
+    599
+   ]
+  },
+  {
+   "name": "Left man left shoe",
+   "sections": [
+    168,
+    166,
+    598,
+    587
+   ]
+  },
+  {
+   "name": "Right man face and ear",
+   "sections": [
+    40,
+    46,
+    50,
+    383,
+    380,
+    70
+   ]
+  },
+  {
+   "name": "Right man beard",
+   "sections": [
+    61,
+    386
+   ]
+  },
+  {
+   "name": "Right man hair",
+   "sections": [
+    36,
+    303
+   ]
+  },
+  {
+   "name": "Right man collar",
+   "sections": [
+    81,
+    71,
+    403
+   ]
+  },
+  {
+   "name": "Right man shirt front",
+   "sections": [
+    72,
+    109,
+    97,
+    73
+   ]
+  },
+  {
+   "name": "Right man left sleeve",
+   "sections": [
+    79
+   ]
+  },
+  {
+   "name": "Right man right sleeve",
+   "sections": [
+    90,
+    111
+   ]
+  },
+  {
+   "name": "Right man left hand",
+   "sections": [
+    96,
+    106,
+    466
+   ]
+  },
+  {
+   "name": "Right man right hand",
+   "sections": [
+    117,
+    121,
+    453,
+    483
+   ]
+  },
+  {
+   "name": "Right man belt",
+   "sections": [
+    132,
+    133,
+    503,
+    500,
+    498,
+    490
+   ]
+  },
+  {
+   "name": "Right man left shoe",
+   "sections": [
+    171,
+    608,
+    617
+   ]
+  },
+  {
+   "name": "Right man right shoe",
+   "sections": [
+    170,
+    165,
+    175,
+    589,
+    600
+   ]
+  },
+  {
+   "name": "Paint bucket",
+   "sections": [
+    156,
+    158,
+    164,
+    555
+   ]
+  },
+  {
+   "name": "Paint in bucket",
+   "sections": [
+    538,
+    537,
+    150,
+    535
+   ]
+  },
+  {
+   "name": "Left man pants",
+   "sections": [
+    131,
+    129,
+    134,
+    149,
+    161,
+    127
+   ]
+  },
+  {
+   "name": "Right man pants",
+   "sections": [
+    138,
+    137,
+    140
+   ]
+  }
+ ],
+ "478": [
+  {
+   "name": "Left boy pants",
+   "sections": [
+    151,
+    155,
+    145,
+    178,
+    199,
+    211,
+    206,
+    156,
+    248,
+    250
+   ]
+  },
+  {
+   "name": "Left boy shirt",
+   "sections": [
+    91,
+    95,
+    94,
+    93,
+    90,
+    88,
+    132,
+    108
+   ]
+  },
+  {
+   "name": "Left boy hand",
+   "sections": [
+    114,
+    620,
+    631,
+    605
+   ]
+  },
+  {
+   "name": "Left boy collar",
+   "sections": [
+    87,
+    545
+   ]
+  },
+  {
+   "name": "Left boy face",
+   "sections": [
+    49,
+    57,
+    518,
+    513
+   ]
+  },
+  {
+   "name": "Left boy hair",
+   "sections": [
+    43,
+    45
+   ]
+  },
+  {
+   "name": "Left boy kippah",
+   "sections": [
+    418,
+    455
+   ]
+  },
+  {
+   "name": "Left boy left shoe",
+   "sections": [
+    262,
+    267,
+    767,
+    727
+   ]
+  },
+  {
+   "name": "Left boy right shoe",
+   "sections": [
+    255,
+    256,
+    266,
+    754
+   ]
+  },
+  {
+   "name": "Left boy belt",
+   "sections": [
+    639,
+    640,
+    645,
+    654,
+    664,
+    148,
+    662
+   ]
+  },
+  {
+   "name": "Right boy pants",
+   "sections": [
+    175,
+    177,
+    216,
+    229,
+    694,
+    243,
+    705
+   ]
+  },
+  {
+   "name": "Right boy shirt",
+   "sections": [
+    110,
+    112,
+    113,
+    115,
+    144
+   ]
+  },
+  {
+   "name": "Right boy sleeve end",
+   "sections": [
+    122,
+    124
+   ]
+  },
+  {
+   "name": "Right boy collar",
+   "sections": [
+    99
+   ]
+  },
+  {
+   "name": "Right boy face and ear",
+   "sections": [
+    54,
+    64,
+    534,
+    558,
+    92
+   ]
+  },
+  {
+   "name": "Right boy hair",
+   "sections": [
+    51,
+    55
+   ]
+  },
+  {
+   "name": "Right boy near hand",
+   "sections": [
+    133,
+    136
+   ]
+  },
+  {
+   "name": "Right boy far hand",
+   "sections": [
+    127,
+    120,
+    655
+   ]
+  },
+  {
+   "name": "Right boy belt",
+   "sections": [
+    692,
+    693,
+    695,
+    689,
+    688,
+    685
+   ]
+  },
+  {
+   "name": "Right boy left shoe",
+   "sections": [
+    265,
+    264
+   ]
+  },
+  {
+   "name": "Right boy right shoe",
+   "sections": [
+    272,
+    268,
+    254,
+    259
+   ]
+  }
+ ],
+ "479": [
+  {
+   "name": "Boy face and ear",
+   "sections": [
+    51,
+    44,
+    43,
+    316
+   ]
+  },
+  {
+   "name": "Boy hair",
+   "sections": [
+    38,
+    34,
+    35
+   ]
+  },
+  {
+   "name": "Boy shirt",
+   "sections": [
+    48,
+    57,
+    52,
+    67,
+    61,
+    403,
+    415
+   ]
+  },
+  {
+   "name": "Boy collar",
+   "sections": [
+    47
+   ]
+  },
+  {
+   "name": "Boy left hand",
+   "sections": [
+    102,
+    471,
+    105
+   ]
+  },
+  {
+   "name": "Boy belt",
+   "sections": [
+    82,
+    83
+   ]
+  },
+  {
+   "name": "Boy pants",
+   "sections": [
+    85,
+    87,
+    131,
+    149,
+    143,
+    541,
+    504,
+    434,
+    467
+   ]
+  },
+  {
+   "name": "Boy left shoe",
+   "sections": [
+    155,
+    159
+   ]
+  },
+  {
+   "name": "Boy right shoe",
+   "sections": [
+    158,
+    157
+   ]
+  }
+ ],
+ "480": [
+  {
+   "name": "Left boy face and ear",
+   "sections": [
+    35,
+    47,
+    431,
+    50
+   ]
+  },
+  {
+   "name": "Left boy hair",
+   "sections": [
+    32,
+    37,
+    39,
+    482
+   ]
+  },
+  {
+   "name": "Left boy jacket",
+   "sections": [
+    66,
+    71,
+    91,
+    101,
+    58,
+    68,
+    59
+   ]
+  },
+  {
+   "name": "Left boy cuff",
+   "sections": [
+    89,
+    92
+   ]
+  },
+  {
+   "name": "Left boy waistband",
+   "sections": [
+    113,
+    115,
+    109
+   ]
+  },
+  {
+   "name": "Left boy pants",
+   "sections": [
+    126,
+    128,
+    186,
+    185,
+    642,
+    635
+   ]
+  },
+  {
+   "name": "Left boy left shoe",
+   "sections": [
+    224,
+    217,
+    236
+   ]
+  },
+  {
+   "name": "Left boy right shoe",
+   "sections": [
+    243,
+    234
+   ]
+  },
+  {
+   "name": "Right boy face and ear",
+   "sections": [
+    46,
+    57,
+    75,
+    52
+   ]
+  },
+  {
+   "name": "Right boy hair",
+   "sections": [
+    42,
+    43,
+    480
+   ]
+  },
+  {
+   "name": "Right boy kippah",
+   "sections": [
+    41,
+    487
+   ]
+  },
+  {
+   "name": "Right boy shirt",
+   "sections": [
+    78,
+    80,
+    84,
+    85,
+    82,
+    110,
+    81
+   ]
+  },
+  {
+   "name": "Right boy collar",
+   "sections": [
+    77,
+    79
+   ]
+  },
+  {
+   "name": "Right boy near hand",
+   "sections": [
+    94,
+    548,
+    557
+   ]
+  },
+  {
+   "name": "Right boy far hand",
+   "sections": [
+    72,
+    515,
+    520,
+    525,
+    534
+   ]
+  },
+  {
+   "name": "Right boy pants",
+   "sections": [
+    144,
+    204,
+    147,
+    143
+   ]
+  },
+  {
+   "name": "Right boy left shoe",
+   "sections": [
+    244,
+    239,
+    228
+   ]
+  },
+  {
+   "name": "Right boy right shoe",
+   "sections": [
+    245,
+    238,
+    223,
+    229
+   ]
+  }
+ ]
+}

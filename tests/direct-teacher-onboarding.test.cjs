@@ -67,7 +67,7 @@ test('custom Fun Torah Tools domains are allowed to call the teacher claim funct
 
 const vm=require('node:vm');
 function uiTeacherAccess(records,user){
- const begin=settings.indexOf('  function readUserAccess(user) {');
+ const begin=settings.indexOf('  const accessChecksInFlight = new Map();');
  const end=settings.indexOf('\n  function isAuthorizedUser(user)',begin);
  assert.ok(begin>=0&&end>begin,'teacher access code is present');
  const source=settings.slice(begin,end)+'\nreadUserAccess;';
@@ -75,6 +75,7 @@ function uiTeacherAccess(records,user){
    ensureFirebase:()=>({db:{ref:pathname=>({once:async()=>({val:()=>records[pathname]??null})})}}),
    isBootstrapAdmin:()=>false,
    WORKSPACE_ROOT_KEY:ROOT,
+   BOOTSTRAP_ADMIN_EMAIL:'owner@example.com',
    console
  };
  return vm.runInNewContext(source,ctx)(user);

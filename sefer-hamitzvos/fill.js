@@ -63,7 +63,7 @@
   }
   return out;
  }
- function createRegionMask(imageData,width,height){
+ function segmentRegions(imageData,width,height){
   const data=imageData?.data,total=width*height;
   if(!data||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||data.length!==total*4)return null;
   const ink=new Uint8Array(total);
@@ -71,7 +71,7 @@
   const radius=Math.max(2,Math.round(Math.min(width,height)/180));
   const barrier=morphology(morphology(ink,width,height,radius,true),width,height,radius,false);
   for(let i=0;i<total;i++)if(ink[i])barrier[i]=1;
-  const labels=new Uint32Array(total),queue=new Int32Array(total);let id=0;
+  const labels=new Uint32Array(total),queue=new Int32Array(total),open=new Uint8Array(total);let id=0;
   for(let start=0;start<total;start++){
    if(barrier[start]||labels[start])continue;
    id++;let head=0,tail=1,touchesEdge=false;queue[0]=start;labels[start]=id;
@@ -80,10 +80,14 @@
     if(!x||!y||x===width-1||y===height-1)touchesEdge=true;
     if(x)add(i-1);if(x<width-1)add(i+1);if(y)add(i-width);if(y<height-1)add(i+width);
    }
-   if(touchesEdge||tail>total*.18)for(let n=0;n<tail;n++)barrier[queue[n]]=1;
+   if(touchesEdge||tail>total*.18)for(let n=0;n<tail;n++){barrier[queue[n]]=1;open[queue[n]]=1;}
   }
   for(let i=0;i<total;i++)if(barrier[i])labels[i]=0;
-  return {width,height,labels};
+  return {width,height,labels,open,ink,radius};
+ }
+ function createRegionMask(imageData,width,height){
+  const seg=segmentRegions(imageData,width,height);
+  return seg?{width:seg.width,height:seg.height,labels:seg.labels}:null;
  }
  // New strokes use precomputed, immutable region labels. A missing or invalid
  // mask fails closed; never fall back to flood-filling an ambiguous picture.
@@ -166,6 +170,156 @@
   while(mask.fringeCache.size>4)mask.fringeCache.delete(mask.fringeCache.keys().next().value);
   return {pixels:expanded,region};
  }
- const api={traceRegion,createRegionMask,regionFromMask,includeSafeWhiteFringe};
+ // ---- Object-aware sections (objectVersion 2) -------------------------------
+ // The sections above stop at every ink line, so a thin fold line cuts one pair
+ // of pants into strips. Object masks start from those same sections and then:
+ //  1. let each section grow over the thin-line slivers around it (never over a
+ //     thick outline and never into the open background), so no white gaps stay;
+ //  2. join sections ONLY where region-groups.js names them. Image analysis
+ //     cannot tell a fold line from the edge of a hand, so nothing is guessed.
+ // Groups are written as seed points, so they survive any change in section numbering.
+ function thickRadius(width,height){return Math.max(1,Math.round(Math.min(width,height)/500));}
+ function growIntoSlivers(seg,thick,area){
+  const {labels,open,width,height,radius}=seg,total=width*height,out=Uint32Array.from(labels);
+  const reach=radius*8+24;let frontier=[];
+  for(let i=0;i<total;i++)if(labels[i])frontier.push(i);
+  for(let step=0;step<reach&&frontier.length;step++){
+   const next=[];
+   for(const i of frontier){
+    const x=i%width,y=(i/width)|0,id=out[i];
+    if(x&&!out[i-1]&&!thick[i-1]&&!open[i-1]&&area[i]===area[i-1]){out[i-1]=id;next.push(i-1);}
+    if(x<width-1&&!out[i+1]&&!thick[i+1]&&!open[i+1]&&area[i]===area[i+1]){out[i+1]=id;next.push(i+1);}
+    if(y&&!out[i-width]&&!thick[i-width]&&!open[i-width]&&area[i]===area[i-width]){out[i-width]=id;next.push(i-width);}
+    if(y<height-1&&!out[i+width]&&!thick[i+width]&&!open[i+width]&&area[i]===area[i+width]){out[i+width]=id;next.push(i+width);}
+   }
+   frontier=next;
+  }
+  return out;
+ }
+ // White pockets that were too narrow for a section of their own (e.g. a belt
+ // band) become small sections instead of unpaintable gaps.
+ function labelLeftoverPockets(seg,grown,thick){
+  const {width,height,ink,open}=seg,total=width*height,queue=new Int32Array(total);
+  let next=0;for(let i=0;i<total;i++)if(grown[i]>next)next=grown[i];
+  const seen=new Uint8Array(total),free=i=>!seen[i]&&!grown[i]&&!ink[i]&&!open[i]&&!thick[i];
+  for(let s=0;s<total;s++){
+   if(!free(s))continue;
+   let head=0,tail=1,edge=false;queue[0]=s;seen[s]=1;
+   while(head<tail){const i=queue[head++],x=i%width,y=(i/width)|0;
+    if(!x||!y||x===width-1||y===height-1)edge=true;
+    if(x&&free(i-1)){seen[i-1]=1;queue[tail++]=i-1;}
+    if(x<width-1&&free(i+1)){seen[i+1]=1;queue[tail++]=i+1;}
+    if(y&&free(i-width)){seen[i-width]=1;queue[tail++]=i-width;}
+    if(y<height-1&&free(i+width)){seen[i+width]=1;queue[tail++]=i+width;}
+   }
+   if(edge||tail<12||tail>total*.02)continue;
+   next++;for(let n=0;n<tail;n++)grown[queue[n]]=next;
+  }
+ }
+ // Specks too small for a finger (a few pixels wide) join the neighbouring
+ // section they share the longest border with; they never stay as dead spots.
+ function absorbSpecks(grown,width,height){
+  const total=width*height,minArea=Math.max(30,Math.round(total*6e-5)),area=new Map();
+  for(let i=0;i<total;i++)if(grown[i])area.set(grown[i],(area.get(grown[i])||0)+1);
+  const contact=new Map();
+  const touch=(a,b)=>{if(!a||!b||a===b)return;if(area.get(a)>=minArea&&area.get(b)>=minArea)return;
+   let m=contact.get(a);if(!m){m=new Map();contact.set(a,m);}m.set(b,(m.get(b)||0)+1);
+   m=contact.get(b);if(!m){m=new Map();contact.set(b,m);}m.set(a,(m.get(a)||0)+1);};
+  for(let i=0;i<total;i++){const l=grown[i];if(!l)continue;if(i%width<width-1)touch(l,grown[i+1]);if(i+width<total)touch(l,grown[i+width]);}
+  // Smallest first, so chains of specks collapse into the real section behind them.
+  const target=new Map(),root=a=>{while(target.has(a))a=target.get(a);return a;};
+  for(const [l,n] of [...area].filter(([,n])=>n<minArea).sort((a,b)=>a[1]-b[1])){
+   const m=contact.get(l);if(!m)continue;let best=0,bestN=0;
+   for(const [o,c] of m){const r=root(o);if(r===l)continue;if(c>bestN&&(area.get(r)||0)>n){best=r;bestN=c;}}
+   if(best)target.set(l,best);
+  }
+  if(!target.size)return;
+  for(let i=0;i<total;i++){const l=grown[i];if(l&&target.has(l))grown[i]=root(l);}
+ }
+ function outlineSections(seg,thick){
+  // Sections bounded only by THICK outlines (fold lines ignored), used by a
+  // group written as {seed, within:'outline'}.
+  const {width,height,radius}=seg,total=width*height;
+  const barrier=morphology(morphology(thick,width,height,radius,true),width,height,radius,false);
+  for(let i=0;i<total;i++)if(thick[i])barrier[i]=1;
+  const comp=new Uint32Array(total),queue=new Int32Array(total);let id=0;
+  for(let s=0;s<total;s++){
+   if(barrier[s]||comp[s])continue;
+   id++;let head=0,tail=1;queue[0]=s;comp[s]=id;
+   while(head<tail){const i=queue[head++],x=i%width,y=(i/width)|0;
+    if(x&&!barrier[i-1]&&!comp[i-1]){comp[i-1]=id;queue[tail++]=i-1;}
+    if(x<width-1&&!barrier[i+1]&&!comp[i+1]){comp[i+1]=id;queue[tail++]=i+1;}
+    if(y&&!barrier[i-width]&&!comp[i-width]){comp[i-width]=id;queue[tail++]=i-width;}
+    if(y<height-1&&!barrier[i+width]&&!comp[i+width]){comp[i+width]=id;queue[tail++]=i+width;}
+   }
+  }
+  return comp;
+ }
+ function createObjectMask(imageData,width,height,groups){
+  const seg=segmentRegions(imageData,width,height);
+  if(!seg)return null;
+  const total=width*height,rt=thickRadius(width,height);
+  const thick=morphology(morphology(seg.ink,width,height,rt,false),width,height,rt,true);
+  const area=outlineSections(seg,thick),grown=growIntoSlivers(seg,thick,area);labelLeftoverPockets(seg,grown,thick);absorbSpecks(grown,width,height);
+  const parent=new Map(),find=a=>{while(parent.has(a))a=parent.get(a);return a;};
+  const union=(a,b)=>{a=find(a);b=find(b);if(a!==b)parent.set(Math.max(a,b),Math.min(a,b));};
+  const labelAt=p=>{
+   if(!Array.isArray(p)||p.length!==2)return 0;
+   const x=Math.floor(p[0]),y=Math.floor(p[1]);
+   return x<0||y<0||x>=width||y>=height?0:grown[y*width+x];
+  };
+  const report=[];let outline=area;
+  for(const group of Array.isArray(groups)?groups:[]){
+   const entry={name:group&&group.name||'',merged:0,ok:false};report.push(entry);
+   const keep=new Set((group&&group.keep||[]).map(labelAt).filter(Boolean));
+   let members=[];
+   if(group&&Array.isArray(group.join)){
+    members=group.join.map(labelAt);
+    if(members.some(m=>!m)){entry.reason='seed-not-on-a-section';continue;}
+   }else if(group&&group.within==='outline'){
+    const base=labelAt(group.seed);if(!base){entry.reason='seed-not-on-a-section';continue;}
+    
+    // Any pixel of a section tells which outline-bounded area it lives in.
+    const first=new Map();for(let i=0;i<total;i++){const l=seg.labels[i];if(l&&!first.has(l))first.set(l,i);}
+    const wanted=outline[first.get(base)];
+    if(!wanted){entry.reason='seed-not-in-outline-area';continue;}
+    for(const [l,i] of first)if(outline[i]===wanted)members.push(l);
+   }else{entry.reason='unknown-group-type';continue;}
+   members=[...new Set(members.map(find))].filter(m=>!keep.has(m));
+   if(members.length<2){entry.ok=true;continue;}
+   // Safety: a group may not swallow a page-sized area.
+   let size=0;const set=new Set(members.map(find));
+   for(let i=0;i<total;i++)if(set.has(find(grown[i]||0))&&grown[i])size++;
+   if(size>total*.3){entry.reason='group-too-large';continue;}
+   for(const m of members.slice(1))union(members[0],m);
+   entry.merged=members.length;entry.ok=true;
+  }
+  const labels=new Uint32Array(total);
+  for(let i=0;i<total;i++){const l=grown[i];labels[i]=l?find(l):0;}
+  return {width,height,labels,fine:seg.labels,thick,groups:report};
+ }
+ // Counting-sort index: every section's pixel list is one slice, so a tap,
+ // undo, redo or full replay never rescans the whole picture.
+ function buildRegionIndex(labels){
+  let max=0;for(let i=0;i<labels.length;i++)if(labels[i]>max)max=labels[i];
+  const starts=new Uint32Array(max+2);
+  for(let i=0;i<labels.length;i++)if(labels[i])starts[labels[i]+1]++;
+  for(let l=1;l<starts.length;l++)starts[l]+=starts[l-1];
+  const items=new Uint32Array(starts[starts.length-1]),fill=starts.slice();
+  for(let i=0;i<labels.length;i++){const l=labels[i];if(l)items[fill[l]++]=i;}
+  return {starts,items};
+ }
+ function regionFromObjects(mask,startX,startY){
+  const labels=mask&&mask.labels;
+  if(!labels||!mask.width||!mask.height||labels.length!==mask.width*mask.height)return {reason:'unavailable'};
+  const x=Math.floor(startX),y=Math.floor(startY);
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=mask.width||y>=mask.height)return {reason:'outside'};
+  const label=labels[y*mask.width+x];
+  if(!label)return {reason:'border'};
+  if(!mask.index)mask.index=buildRegionIndex(labels);
+  const {starts,items}=mask.index;
+  return {pixels:items.subarray(starts[label],starts[label+1]),region:label};
+ }
+ const api={traceRegion,createRegionMask,regionFromMask,includeSafeWhiteFringe,createObjectMask,buildRegionIndex,regionFromObjects,morphology};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.FTTMitzvahFill=api;
 })(typeof window==='object'?window:globalThis);

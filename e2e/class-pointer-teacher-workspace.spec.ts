@@ -95,7 +95,9 @@ async function enterFullScreen(page: Page) {
   await expect(page.locator('#stage')).toHaveClass(/lesson-fullscreen/);
 }
 
-test('full-screen Students panel opens compact and can be dragged by its heading', async ({ browser }) => {
+// Commit 58095c86 ("Compact Students panel") replaced the large resizable drawer with a compact
+// 300px popover (resize:none). It must still float over the lesson and be draggable by its heading.
+test('full-screen Students panel is a compact popover that can be dragged by its heading', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
@@ -103,8 +105,9 @@ test('full-screen Students panel opens compact and can be dragged by its heading
   const drawer = page.locator('#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open');
   await expect(drawer).toBeVisible();
   const before = (await drawer.boundingBox())!;
-  expect(before.width).toBeGreaterThanOrEqual(300);
-  expect(before.height).toBeGreaterThanOrEqual(200);
+  expect(Math.round(before.width)).toBe(300);
+  expect(before.height).toBeGreaterThanOrEqual(150);
+  expect(await drawer.evaluate((el: HTMLElement) => getComputedStyle(el).resize)).toBe('none');
 
   const head = drawer.locator('.cp-drawer-head');
   const h = (await head.boundingBox())!;
@@ -117,8 +120,10 @@ test('full-screen Students panel opens compact and can be dragged by its heading
   expect(moved.x).toBeGreaterThan(before.x + 200);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
-  // The compact Students panel (teacher-dashboard.js) is intentionally not user-resizable (resize:none).
-  expect(await drawer.evaluate((el: HTMLElement) => getComputedStyle(el).resize)).toBe('none');
+  expect(Math.round(moved.width)).toBe(Math.round(before.width));
+  // Inline sizes (the drawer's own layout code) must still win over the compact stylesheet.
+  await drawer.evaluate((el: HTMLElement) => { el.style.width = '420px'; el.style.height = '300px'; });
+  expect(Math.round((await drawer.boundingBox())!.width)).toBe(420);
 
   // Permission rows still work inside the moved panel and leaving full screen restores the normal layout.
   await expect(drawer.getByText('Pointer Test Student One').first()).toBeVisible();

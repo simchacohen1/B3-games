@@ -74,3 +74,19 @@ test('teacher permission updates trigger immediate screen revocation after priva
   assert.match(session,/ClassPointerActivityShares\?\.revokeStudents\(denied\)/);
   assert.match(session,/if\(enabled!==true\)window\.ClassPointerActivityShares\?\.closeAll\(\)/);
 });
+
+test('teacher Pause in Student screens also revokes that student\'s screen-sharing permission',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','class-pointer-prototype','student-boards.js'),'utf8');
+  const begin=source.indexOf('function toggleBlock(');
+  const body=source.slice(begin,source.indexOf('\n  }',begin));
+  assert.ok(begin>=0,'toggleBlock exists');
+  assert.match(body,/mode==='screens'/,'only applies in Student screens mode');
+  assert.match(body,/updatePermission\(person,'screens',!blocked\.has\(key\)\)/,'pause denies and allow restores screen sharing');
+});
+
+test('allowing screen sharing from the Students panel lifts a tile Pause',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','class-pointer-prototype','student-boards.js'),'utf8');
+  const begin=source.indexOf('function updatePermission(');
+  const body=source.slice(begin,source.indexOf('\n  }',begin));
+  assert.match(body,/allowed&&kind==='screens'[\s\S]*blocked\.delete\(keyFor\(m\)\)/);
+});
