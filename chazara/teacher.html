@@ -255,18 +255,25 @@ async function loadApprovals(){
   renderApprovals();renderRecordings();setApprovalStatus('');
   // Pending queue identifies the exact events. Never download all students' history on startup.
   const requests=Object.values(pendingPointRequests).filter(item=>item.recorded===true&&item.practiceStudentId&&item.eventId);
-  await Promise.all(requests.map(async item=>{
-   const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
-   if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
-   try{
-    const data=await teacherApi('get-chazara-event',{studentId,eventId}),event=data.event||null;
-    if(generation!==scopeGeneration||request!==approvalGeneration)return;
-    if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
-     if(!E[studentId])E[studentId]={};
-     E[studentId][eventId]=event;
-    }
-   }catch(error){console.warn('Could not load pending Chazara recording',error)}
-  }));
+  // Keep pending audio requests bounded, even when many recordings await review.
+  // Reuse already-loaded events on refresh; the pending queue itself is always
+  // revalidated by the authenticated API. Old generations must not start new batches.
+  for(let i=0;i<requests.length;i+=4){
+   if(generation!==scopeGeneration||request!==approvalGeneration)return;
+   await Promise.all(requests.slice(i,i+4).map(async item=>{
+    const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
+    if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
+    if(E[studentId]?.[eventId])return;
+    try{
+     const data=await teacherApi('get-chazara-event',{studentId,eventId}),event=data.event||null;
+     if(generation!==scopeGeneration||request!==approvalGeneration)return;
+     if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
+      if(!E[studentId])E[studentId]={};
+      E[studentId][eventId]=event;
+     }
+    }catch(error){console.warn('Could not load pending Chazara recording',error)}
+   }));
+  }
   if(generation!==scopeGeneration||request!==approvalGeneration)return;
   renderApprovals();renderRecordings();
   if(automatic.length)sweepAutomaticPoints(automatic);
