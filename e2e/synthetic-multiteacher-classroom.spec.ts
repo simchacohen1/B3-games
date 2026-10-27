@@ -141,6 +141,11 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.locator('#submitBtn').click();
   await expect.poll(async()=> (await readFixture(`${quizRoot}/completions/quiz_one/${ariId}`))?.pct).toBe(100);
   await page.reload();
+  // A finished quiz never reopens by itself (issue #376); he opens it from his list.
+  const finishedRow=page.locator('#assignedList .assigned-row').filter({hasText:'Fictional Pilot Quiz'});
+  await expect(finishedRow).toContainText('Finished');
+  await expect(page.locator('#completeCard')).toBeHidden();
+  await finishedRow.getByRole('button',{name:'Review'}).click();
   await expect(page.locator('#completeCard')).toBeVisible();
   await expect(page.locator('#completeScore')).toContainText('100%');
   await expect(page.locator('#pastQuizList')).toContainText('Fictional Pilot Quiz');
