@@ -5,11 +5,14 @@ import fs from 'node:fs';
 // These tests only ever talk to the isolated staging project and its
 // fictional accounts. Nothing here may point at production.
 
-const requestedSite = (process.env.FTT_STAGING_SITE || 'https://fun-torah-tools-staging.web.app').replace(/\/$/, '');
+const BASE_SITE = 'https://fun-torah-tools-staging.web.app';
+const requestedSite = (process.env.FTT_STAGING_SITE || BASE_SITE).replace(/\/$/, '');
 if (!/^https:\/\/(?:fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app)$/.test(requestedSite)) {
   throw new Error('FTT_STAGING_SITE must be the staging live site or the exact issue #406 preview channel.');
 }
-export const SITE = requestedSite;
+const isHomeworkPreview = requestedSite !== BASE_SITE;
+export const SITE = isHomeworkPreview ? BASE_SITE : requestedSite;
+export const HOMEWORK_SITE = requestedSite;
 export const STAGING_PROJECT = 'fun-torah-tools-staging';
 
 export const FORBIDDEN_HOSTS = [
@@ -119,8 +122,8 @@ export async function stagingFunctionAvailable(name: string): Promise<boolean> {
   }
 }
 
-export async function signInStudent(page: Page, student: { name: string; passcode: string }) {
-  await page.goto(SITE + '/', { waitUntil: 'domcontentloaded' });
+export async function signInStudent(page: Page, student: { name: string; passcode: string }, site = SITE) {
+  await page.goto(site + '/', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#studentSignInBtn')).toBeVisible({ timeout: 30000 });
   await page.locator('#studentNameInput').fill(student.name);
   await page.locator('#classPinInput').fill(student.passcode);
@@ -129,8 +132,8 @@ export async function signInStudent(page: Page, student: { name: string; passcod
   await expect(page.locator('#studentBar')).toBeVisible({ timeout: 45000 });
 }
 
-export async function signInAdult(page: Page, adult: { email: string; password: string }) {
-  await page.goto(SITE + '/?adminPage=1', { waitUntil: 'domcontentloaded' });
+export async function signInAdult(page: Page, adult: { email: string; password: string }, site = SITE) {
+  await page.goto(site + '/?adminPage=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as any).firebase?.auth, null, { timeout: 30000 });
   await page.evaluate(async ({ email, password }) => {
     await (window as any).firebase.auth().signInWithEmailAndPassword(email, password);

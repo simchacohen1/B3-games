@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { SITE, TOOL_PAGES, watchPage, expectStagingIsolation } from './staging-common';
+import { SITE, HOMEWORK_SITE, TOOL_PAGES, watchPage, expectStagingIsolation } from './staging-common';
 
 // Anonymous checks: no credentials needed. Runs every 30 minutes.
 // A green result here says nothing about signed-in student or teacher flows.
@@ -10,7 +10,8 @@ test.describe('staging public smoke @smoke', () => {
       test.skip(Boolean(tool.previewOnly && process.env.GITHUB_EVENT_NAME === 'pull_request' && !process.env.FTT_STAGING_SITE),
         'Homework pages run against their expiring staging preview channel, not the older staging live release.');
       const watch = watchPage(page);
-      const response = await page.goto(SITE + tool.path, { waitUntil: 'load', timeout: 45000 });
+      const targetSite = tool.previewOnly ? HOMEWORK_SITE : SITE;
+      const response = await page.goto(targetSite + tool.path, { waitUntil: 'load', timeout: 45000 });
       expect(response?.status(), 'HTTP status').toBe(200);
       await expectStagingIsolation(page);
       // Give late scripts (Firebase, polling) a moment to make their first calls.

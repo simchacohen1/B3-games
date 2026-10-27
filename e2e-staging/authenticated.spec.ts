@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
 import {
-  SITE, loadCredentials, watchPage, expectStagingIsolation,
+  SITE, HOMEWORK_SITE, loadCredentials, watchPage, expectStagingIsolation,
   signInStudent, signInAdult, readClassRecord, stagingFunctionAvailable, type PageWatch,
 } from './staging-common';
 
@@ -160,8 +160,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
   };
 
   try {
-    await signInAdult(teacherPage, adult);
-    await teacherPage.goto(SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
+    await signInAdult(teacherPage, adult, HOMEWORK_SITE);
+    await teacherPage.goto(HOMEWORK_SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
     await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
     await expect(teacherPage.locator('#cls')).toHaveValue('TEST-ALEF');
@@ -178,8 +178,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
     await expect(teacherCard).toContainText('Draft — hidden from students');
 
-    await signInStudent(studentPage, student);
-    await studentPage.goto(SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
+    await signInStudent(studentPage, student, HOMEWORK_SITE);
+    await studentPage.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(studentPage);
     await expect(studentPage.locator('#list')).not.toContainText(title);
 
