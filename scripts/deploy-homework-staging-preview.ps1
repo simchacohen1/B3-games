@@ -19,7 +19,15 @@ function Invoke-FirebaseJson([string[]]$Arguments, [string]$Description) {
     throw "$Description failed: $message"
   }
   $raw = ($output | Out-String).Trim()
-  try { $json = $raw | ConvertFrom-Json }
+  # Firebase CLI can print progress lines before its JSON envelope. Parse only
+  # the envelope so harmless progress output does not block the safe preflight.
+  $jsonStart = $raw.IndexOf('{')
+  $jsonEnd = $raw.LastIndexOf('}')
+  if ($jsonStart -lt 0 -or $jsonEnd -lt $jsonStart) {
+    throw "$Description returned unreadable JSON; refusing to deploy."
+  }
+  $jsonText = $raw.Substring($jsonStart, $jsonEnd - $jsonStart + 1)
+  try { $json = $jsonText | ConvertFrom-Json }
   catch { throw "$Description returned unreadable JSON; refusing to deploy." }
   if ($json.status -ne 'success') { throw "$Description did not report success; refusing to deploy." }
   return $json
