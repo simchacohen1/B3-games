@@ -424,3 +424,21 @@
     };
   }
 })();
+
+// Show the team score summary on the Play screen, just above Contestants.
+(function moveTeamSummaryToPlay(){
+  if(typeof setInterval!=="function"||typeof document==="undefined"||!document||typeof document.getElementById!=="function")return;
+  let tries=0;
+  const timer=setInterval(()=>{
+    const summary=document.getElementById('teamModeSummary');
+    const board=document.getElementById('board');
+    if(summary&&board&&board.parentElement){
+      board.parentElement.insertBefore(summary,board);
+      summary.style.fontWeight='800';
+      summary.style.fontSize='20px';
+      summary.style.margin='8px 0 12px';
+      summary.style.color='#fff';
+      clearInterval(timer);
+    }else if(++tries>40){clearInterval(timer);}
+  },250);
+})();
