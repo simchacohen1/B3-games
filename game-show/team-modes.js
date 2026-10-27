@@ -442,3 +442,51 @@
     }else if(++tries>40){clearInterval(timer);}
   },250);
 })();
+
+// Early-buzz penalty (student screen only): pressing BUZZ before the round
+// opens locks that student out until 1.5 seconds AFTER the round opens.
+(function earlyBuzzPenalty(){
+  if(typeof window==="undefined"||typeof document==="undefined"||!document||typeof document.getElementById!=="function")return;
+  const btn=document.getElementById("buzzBtn");
+  if(!btn||typeof window.buzzIn!=="function")return;
+  const PENALTY_MS=1500;
+  let earlyAt=0, earlyRound=null;
+  const now=()=>(typeof serverNow==="function"?serverNow():Date.now());
+  const data=()=>{try{return lastData;}catch(e){return null;}};
+  const roundKey=d=>d&&d.roundActive===true?String(d.roundToken||((d.buzzOpenAt||0)+":"+(d.qIndex||0))):null;
+  const openAt=d=>Number(d&&d.buzzUnlockAt)||Number(d&&d.buzzOpenAt)||0;
+  const isOpen=(d,t)=>!!d&&d.roundActive===true&&!d.buzzedBy&&!d.narrationLocked&&t>=openAt(d);
+  function penaltyEndsAt(d){
+    if(!earlyAt||!d||d.roundActive!==true)return 0;
+    const key=roundKey(d);
+    const applies=(earlyRound!==null&&earlyRound===key)||(earlyRound===null&&openAt(d)>=earlyAt);
+    if(!applies)return 0;
+    if(d.narrationLocked||now()<openAt(d))return Infinity;
+    return openAt(d)+PENALTY_MS;
+  }
+  function say(text){const s=document.getElementById("status");if(s)s.textContent=text;}
+  // Keep the button clickable so an early press can be caught; show it dimmed instead.
+  const style=document.createElement("style");
+  style.textContent=".buzz-btn.buzz-locked{opacity:.45;filter:grayscale(.7);}";
+  document.head.appendChild(style);
+  Object.defineProperty(btn,"disabled",{configurable:true,get(){return false;},set(v){btn.classList.toggle("buzz-locked",!!v);}});
+  const inner=window.buzzIn;
+  window.buzzIn=function(){
+    const d=data(), t=now();
+    if(d&&d.buzzedBy)return inner();
+    const until=penaltyEndsAt(d);
+    if(t<until){say("Too early! You can buzz 1.5 seconds after it opens.");return;}
+    if(!isOpen(d,t)){
+      earlyAt=t; earlyRound=roundKey(d);
+      btn.classList.add("buzz-locked");
+      say("Too early! Wait until 1.5 seconds after the buzzer opens.");
+      return;
+    }
+    return inner();
+  };
+  setInterval(()=>{
+    const d=data(), until=penaltyEndsAt(d), t=now();
+    if(until&&t<until){btn.classList.add("buzz-locked");}
+    else if(earlyAt&&until&&t>=until){earlyAt=0;earlyRound=null;say("");}
+  },200);
+})();
