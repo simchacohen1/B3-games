@@ -357,6 +357,8 @@
   }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
+<script src="quiz-assignments.js?v=20261026-376"></script>
+<script src="../student-report/quiz-history.js?v=20261027-376"></script>
 <link rel="stylesheet" href="teacher-simple.css?v=20261020-1">
 </head>
 <body>
@@ -813,6 +815,9 @@
         </label>
         <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
         <div id="launchHistory" class="launch-list"></div>
+        <h2 style="margin-top:18px">Assigned, not finished yet</h2>
+        <div class="small" style="margin:0 0 10px">Each student can have several retakes or make-ups open at once. Revoke takes one off his list; his answers stay saved.</div>
+        <div id="pendingAssignments" class="launch-list"></div>
       </div>
       <div>
         <div class="card">
@@ -998,9 +1003,13 @@ if(CLASS_SPACE){
 db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
 db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
 db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderPendingAssignments();renderResults();renderStudentProgress();});
 db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
 db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+// Individual assignments: each student's queue, plus the old single pointer.
+var studentAssignmentQueue={},legacyStudentPointers={};
+db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
+db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});
 
 // ---------- Built-in generator ----------
 function generatorTypeChanged(){
@@ -1796,18 +1805,7 @@ async function launchSelectedQuiz(){
     targetLabel=classLabel(classId);
   }
 
-  if(delivery!=='live'){
-    const activeChecks=await Promise.all(studentIds.map(async sid=>{
-      const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');
-      return {sid,old:s.val()||''};
-    }));
-    const conflicts=activeChecks.filter(x=>x.old);
-    if(conflicts.length){
-      const names=conflicts.map(x=>(roster[x.sid]&&roster[x.sid].name)||x.sid).join(', ');
-      if(!confirm('These student(s) already have an individual quiz assigned: '+names+'. Replace their current assignment? Their old results will remain saved.'))return;
-    }
-  }
-
+  // Individual assignments are added to each student's list; earlier ones stay open.
   const mode=delivery==='live'?document.getElementById('launchMode').value:'test';
   const autoStart=delivery!=='live';
   const id=Date.now()+'_'+(delivery==='live'?classId:'assigned')+'_'+slugTitle(snapshot.title||'quiz');
@@ -1841,10 +1839,8 @@ async function launchSelectedQuiz(){
     showTab('live');
     attachLiveLaunch(id);
   }else{
-    const updates={};
-    studentIds.forEach(sid=>updates[QROOT+'/settings/studentActiveLaunch/'+sid]=id);
-    await db.ref().update(updates);
-    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
+    await db.ref().update(WeeklyQuizAssignments.assignUpdates(QROOT,studentIds,id,{kind:delivery,classId,assignedAt:firebase.database.ServerValue.TIMESTAMP}));
+    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'. Any other quizzes already assigned stay open too.');
     if(delivery==='makeup')makeupSourceLaunchId='';
     makeupPreselected.clear();
     document.getElementById('makeupSourceMsg').textContent='';document.getElementById('makeupSourceMsg').classList.add('hidden');
@@ -1889,6 +1885,7 @@ async function toggleScoreRelease(){
 }
 async function stopLaunch(){
   if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
+  if(targets.length)await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,activeLaunchId,targets,{}));
   await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});
   if(targets.length){for(const sid of targets){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
@@ -1958,6 +1955,7 @@ function launchQuestions(l){return l&&l.quizSnapshot?asArray(l.quizSnapshot.ques
 function launchStudentRows(l){return rosterRowsForLaunch(l);}
 function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(l),rr=allResponses[lid]||{},sr=rr[studentId]||{};let correct=0,answered=0;qs.forEach((_,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct)correct++;}});return{correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):0};}
 function renderLaunchHistory(){
+  renderPendingAssignments();
   const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',dateFilter=document.getElementById('resultsDateFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();const now=new Date(),todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime();let ids=Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{},ts=Number(l.createdAt)||0;if(filter!=='all'&&l.classId!==filter)return false;if(dateFilter==='today'&&ts<todayStart)return false;if(dateFilter==='week'&&ts<weekStart)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;return true;}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
   if(!ids.length){box.innerHTML='<div class="small">No quizzes match these filters. Try All Dates or a different search.</div>';return;}
   ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>openResultsLaunch(id);box.appendChild(div);});
@@ -1973,30 +1971,43 @@ function populateResultsStudents(){
   sel.innerHTML='<option value="">All students</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
   sel.value=seen.has(old)?old:'';
 }
-// Every quiz this student was given (newest first), one row each. Retakes fold into
-// the quiz they belong to, using the same "newest finished attempt" rule as the class view.
-function studentResultsLaunchIds(studentId){
+// Every quiz this student was given (newest first), one row each. Retakes, make-ups
+// AND the same quiz given again (same saved quiz, or same name and same questions)
+// fold into one row, so a repeat never looks like a quiz he missed. Same grouping
+// as the Student Report (student-report/quiz-history.js): the newest finished
+// attempt counts; with none finished, his newest started attempt is shown.
+function studentResultsQuizzes(studentId){
   const filter=document.getElementById('resultsClassFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();
-  return Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{};if(l.retakeOf)return false;if(!CLASS_SPACE&&filter!=='all'&&l.classId!==filter)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;if(!launchQuestions(l).length)return false;return rosterRowsForLaunch(l).some(st=>st.id===studentId);}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));
+  const classId=CLASS_SPACE?WQ_CLASS:classForStudent(studentId);if(!classId||!window.B3QuizHistory)return[];
+  return B3QuizHistory.buildHistory({root:{launches:allLaunches,responses:allResponses,completions},studentId,classId}).quizzes.filter(q=>{
+    const first=allLaunches[q.attempts[0].launchId]||{};
+    if(!CLASS_SPACE&&filter!=='all'&&first.classId!==filter)return false;
+    if(search&&!q.title.toLowerCase().includes(search))return false;
+    return q.attempts.some(a=>launchQuestions(allLaunches[a.launchId]).length);
+  });
 }
 function renderStudentResults(studentId){
-  const table=document.getElementById('resultsTable'),name=(roster[studentId]&&roster[studentId].name)||studentId,allIds=studentResultsLaunchIds(studentId),ids=resultsStudentShowAll?allIds:allIds.slice(0,10);
+  const table=document.getElementById('resultsTable'),name=(roster[studentId]&&roster[studentId].name)||studentId,all=studentResultsQuizzes(studentId),quizzes=resultsStudentShowAll?all:all.slice(0,10);
   document.getElementById('resultsQuizTitle').textContent=name+' — his quizzes';
-  document.getElementById('resultsMeta').textContent='Newest first. '+(allIds.length>ids.length?'Showing his last '+ids.length+' of '+allIds.length+'. ':'')+'A finished retake replaces the earlier score.';
+  document.getElementById('resultsMeta').textContent='Newest first. '+(all.length>quizzes.length?'Showing his last '+quizzes.length+' of '+all.length+'. ':'')+'A quiz given more than once is one row; his newest finished try counts.';
   document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
-  if(!ids.length){table.innerHTML='<tr><td>No quizzes found for '+esc(name)+'.</td></tr>';return;}
-  const maxQ=Math.max(...ids.map(id=>launchQuestions(allLaunches[id]).length));
+  if(!quizzes.length){table.innerHTML='<tr><td>No quizzes found for '+esc(name)+'.</td></tr>';return;}
+  const shownAttempt=q=>q.counted||q.partial||q.attempts[q.attempts.length-1];
+  const maxQ=Math.max(...quizzes.map(q=>launchQuestions(allLaunches[shownAttempt(q).launchId]).length));
   let html='<thead><tr><th>Quiz</th><th>Score</th><th>Percent</th><th>Completed</th>'+Array.from({length:maxQ},(_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'</tr></thead><tbody>';
-  ids.forEach(baseId=>{
-    const l=allLaunches[baseId],display=studentDisplayAttempt(baseId,studentId),dqs=launchQuestions(allLaunches[display.id]),dsr=(allResponses[display.id]||{})[studentId]||{},score=launchScore(display.id,studentId),comp=completions[display.id]&&completions[display.id][studentId];
-    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];const open='onclick="event.stopPropagation();openAnswerModal(\''+esc(studentId)+'\','+i+',\'results\',\''+esc(display.id)+'\')"';if(!r)return'<td class="cell blank" '+open+'>—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" '+open+'>'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('')+'<td></td>'.repeat(maxQ-dqs.length);
-    let note='';
-    if(display.pendingNewer.length)note='<div class="small" style="color:var(--gold);font-weight:700">Retake '+display.pendingNewer[display.pendingNewer.length-1].attempt+' assigned — not yet completed</div>';
-    else if(display.id!==baseId)note='<div class="small" style="color:var(--good);font-weight:700">Retake '+display.attempt+' score</div>';
-    const quizCell='<a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(baseId)+'\')">'+esc((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled')+'</a><div class="small">'+esc(classLabel(l.classId))+' • '+esc(fmtDate(l.createdAt))+'</div>'+note;
-    html+='<tr><td>'+quizCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'</tr>';
+  quizzes.forEach(q=>{
+    const shown=shownAttempt(q),displayId=shown.launchId,l=allLaunches[displayId]||{},first=allLaunches[q.attempts[0].launchId]||l,dqs=launchQuestions(l),dsr=(allResponses[displayId]||{})[studentId]||{},score=launchScore(displayId,studentId),comp=completions[displayId]&&completions[displayId][studentId];
+    const cells=dqs.map((_,i)=>{const r=dsr[i]||dsr[String(i)];const open='onclick="event.stopPropagation();openAnswerModal(\''+esc(studentId)+'\','+i+',\'results\',\''+esc(displayId)+'\')"';if(!r)return'<td class="cell blank" '+open+'>—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" '+open+'>'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('')+'<td></td>'.repeat(maxQ-dqs.length);
+    // Later tries he has not finished yet (and the teacher has not closed or revoked).
+    const pending=q.attempts.filter(a=>a.date>shown.date&&a.status!=='completed'&&!a.closed&&!WeeklyQuizAssignments.isRevoked(allLaunches[a.launchId],studentId));
+    const notes=[];
+    if(q.attempts.length>1)notes.push('<div class="small">Given '+q.attempts.length+' times'+(q.counted?' — showing his newest finished try ('+esc(fmtDate(shown.date))+')':' — not finished yet')+'</div>');
+    if(pending.length)notes.push('<div class="small" style="color:var(--gold);font-weight:700">'+esc(pending[pending.length-1].kind)+' assigned — not yet completed</div>');
+    else if(q.counted&&displayId!==q.attempts[0].launchId&&q.counted.kind.startsWith('Retake'))notes.push('<div class="small" style="color:var(--good);font-weight:700">'+esc(q.counted.kind)+' score</div>');
+    const quizCell='<a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(displayId)+'\')">'+esc(q.title)+'</a><div class="small">'+esc(classLabel(first.classId))+' • '+esc(fmtDate(q.attempts[0].date))+'</div>'+notes.join('');
+    html+='<tr data-quiz="'+esc(q.key)+'"><td>'+quizCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'</tr>';
   });
-  if(allIds.length>ids.length)html+='<tr><td colspan="'+(4+maxQ)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+allIds.length+' quizzes</button></td></tr>';
+  if(all.length>quizzes.length)html+='<tr><td colspan="'+(4+maxQ)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+all.length+' quizzes</button></td></tr>';
   table.innerHTML=html+'</tbody>';
 }
 function renderResults(){
@@ -2055,13 +2066,14 @@ function openMakeupFromResults(){
   showTab('setup');
   document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
 }
-async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
+async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});if(l.targetStudents){await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,resultsLaunchId,WeeklyQuizAssignments.targetsOf(l),{}));for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
 async function launchRetake(studentId){
   const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
   const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
-  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref(QROOT+'/settings/studentActiveLaunch/'+studentId).set(id);
+  // Added to his assignment list; any other retakes he already has stay open.
+  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref().update(WeeklyQuizAssignments.assignUpdates(QROOT,[studentId],id,{kind:'retake',classId:base.classId,assignedAt:firebase.database.ServerValue.TIMESTAMP}));
   const name=(roster[studentId]&&roster[studentId].name)||studentId,link=getLaunchLink(id);
-  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
+  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class or his other assigned quizzes.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
   catch(e){prompt('Retake '+attempt+' is now active for '+name+'. Copy this direct link to send:',link);}
 }
 async function deleteLaunch(id){
@@ -2074,9 +2086,30 @@ async function deleteLaunch(id){
   await db.ref(QROOT+'/audit/'+id).remove();
   // Clean up any dangling pointers so no student/class is left aimed at a deleted launch.
   if(activeLaunchByClass[l.classId]===id)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();
-  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
+  if(l.targetStudents){await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,id,WeeklyQuizAssignments.targetsOf(l),{}));for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   if(resultsLaunchId===id)resultsLaunchId='';
   renderLaunchHistory();renderResults();
+}
+// ---------- Pending individual assignments ----------
+// Every unfinished retake / make-up / take-anytime quiz, per student. Revoke
+// closes ONE student's assignment; his answers and all history stay saved.
+function renderPendingAssignments(){
+  const box=document.getElementById('pendingAssignments');if(!box)return;
+  const filter=document.getElementById('resultsClassFilter')?.value||'all';
+  const rows=WeeklyQuizAssignments.pendingRows({queue:studentAssignmentQueue,legacyPointers:legacyStudentPointers,launches:allLaunches,completions,responses:allResponses,classFilter:filter});
+  if(!rows.length){box.innerHTML='<div class="small">No unfinished individual assignments.</div>';return;}
+  box.innerHTML=rows.map(r=>{
+    const l=r.launch,name=(roster[r.studentId]&&roster[r.studentId].name)||r.studentId,kind=l.retakeOf?'Retake '+r.attempt:(l.deliveryType==='makeup'?'Make-up':'Take anytime');
+    const progress=r.answered?(r.answered+' of '+r.total+' answered'):'Not started';
+    return '<div class="launch-item pending-assignment" data-student="'+esc(r.studentId)+'" data-launch="'+esc(r.launchId)+'"><div class="launch-item-title">'+esc(name)+' — '+esc((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled')+'</div><div class="small">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+esc(progress)+(r.assignedAt?' • assigned '+esc(fmtDate(r.assignedAt)):'')+'</div><div class="controls" style="margin-top:6px"><button class="secondary" onclick="resultsLaunchId=\''+esc(r.launchId)+'\';renderLaunchHistory();renderResults();">Results</button><button class="secondary" onclick="copyLaunchLink(\''+esc(r.launchId)+'\')">Copy link</button><button class="danger" onclick="revokeAssignment(\''+esc(r.studentId)+'\',\''+esc(r.launchId)+'\')">Revoke</button></div></div>';
+  }).join('');
+}
+async function revokeAssignment(studentId,launchId){
+  const l=allLaunches[launchId];if(!l)return;
+  if(WeeklyQuizAssignments.isCompleted(completions,launchId,studentId)){alert('He already finished this quiz, so it stays in his history.');return;}
+  const name=(roster[studentId]&&roster[studentId].name)||studentId,title=(l.quizSnapshot&&l.quizSnapshot.title)||'this quiz';
+  if(!confirm('Take "'+title+'" off '+name+'\'s list? Any answers he already gave stay saved, and his other quizzes are not changed.'))return;
+  await db.ref().update(WeeklyQuizAssignments.revokeUpdates(QROOT,launchId,studentId,legacyStudentPointers[studentId]||'',firebase.database.ServerValue.TIMESTAMP));
 }
 // ---------- Retake chain helpers ----------
 // Finds every launch belonging to the same retake chain (attemptGroupId) as
@@ -2103,7 +2136,7 @@ function studentDisplayAttempt(baseId,studentId){
   const chain=studentAttemptChain(baseId,studentId);if(!chain.length)return{id:baseId,attempt:1,completed:false,pendingNewer:[]};
   const completedOnes=chain.filter(a=>a.completed);
   const display=completedOnes.length?completedOnes[completedOnes.length-1]:(chain.find(a=>a.id===baseId)||chain[chain.length-1]);
-  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed);
+  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed&&!WeeklyQuizAssignments.isRevoked(a.launch,studentId)&&!a.launch.endedAt);
   return{id:display.id,attempt:display.attempt,completed:display.completed,completedAt:display.completedAt,pendingNewer};
 }
 function resultsMatrix(){
