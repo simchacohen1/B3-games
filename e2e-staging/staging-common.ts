@@ -5,7 +5,11 @@ import fs from 'node:fs';
 // These tests only ever talk to the isolated staging project and its
 // fictional accounts. Nothing here may point at production.
 
-export const SITE = 'https://fun-torah-tools-staging.web.app';
+const requestedSite = (process.env.FTT_STAGING_SITE || 'https://fun-torah-tools-staging.web.app').replace(/\/$/, '');
+if (!/^https:\/\/(?:fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app)$/.test(requestedSite)) {
+  throw new Error('FTT_STAGING_SITE must be the staging live site or the exact issue #406 preview channel.');
+}
+export const SITE = requestedSite;
 export const STAGING_PROJECT = 'fun-torah-tools-staging';
 
 export const FORBIDDEN_HOSTS = [
@@ -21,7 +25,7 @@ export const FORBIDDEN_HOSTS = [
 ];
 
 // Student tool pages that must load on staging for an anonymous visitor.
-export const TOOL_PAGES = [
+export const TOOL_PAGES: { name: string; path: string; previewOnly?: boolean }[] = [
   { name: 'Home / sign-in', path: '/' },
   { name: 'Weekly Quiz', path: '/weekly-quiz/index.html' },
   { name: 'Chazara Chart', path: '/chazara/index.html' },
@@ -35,8 +39,8 @@ export const TOOL_PAGES = [
   { name: 'Halacha', path: '/halacha/index.html' },
   { name: 'Teacher Home', path: '/teacher-home.html' },
   { name: 'Student Report', path: '/student-report/index.html' },
-  { name: 'Homework teacher center', path: '/assignment-center/teacher.html' },
-  { name: 'Homework student center', path: '/assignment-center/student.html' },
+  { name: 'Homework teacher center', path: '/assignment-center/teacher.html', previewOnly: true },
+  { name: 'Homework student center', path: '/assignment-center/student.html', previewOnly: true },
 ];
 
 export type StagingCredentials = {

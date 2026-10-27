@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
 import {
   SITE, loadCredentials, watchPage, expectStagingIsolation,
   signInStudent, signInAdult, readClassRecord, stagingFunctionAvailable, type PageWatch,
@@ -133,5 +133,105 @@ test.describe('staging adult role boundaries @auth @permissions', () => {
       expect(other.allowed, `${item.role} reading ${item.other}`).toBe(item.otherAllowed);
       expect(watch.productionRequests).toEqual([]);
     });
+  }
+});
+
+test('fictional teacher publishes homework for a fictional student @auth @homework', async ({ browser }) => {
+  test.skip(!credentials, NOT_CONFIGURED);
+  const adult = credentials!.adultAccounts.find(row => row.role === 'teacher' && row.classId === 'TEST-ALEF');
+  const student = credentials!.studentAccounts.find(row => row.classId === 'TEST-ALEF');
+  if (!adult || !student) throw new Error('Fictional TEST-ALEF teacher and student credentials are required.');
+
+  const teacherContext = await browser.newContext();
+  const studentContext = await browser.newContext();
+  const teacherPage = await teacherContext.newPage();
+  const studentPage = await studentContext.newPage();
+  const teacherWatch = watchPage(teacherPage);
+  const studentWatch = watchPage(studentPage);
+  const title = 'Fictional Homework Preview ' + Date.now();
+  let created = false;
+  let archived = false;
+  let teacherCard: Locator | null = null;
+
+  const localDate = (daysFromNow: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  };
+
+  try {
+    await signInAdult(teacherPage, adult);
+    await teacherPage.goto(SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(teacherPage);
+    await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
+    await expect(teacherPage.locator('#cls')).toHaveValue('TEST-ALEF');
+    await teacherPage.locator('#type').selectOption('shorashim');
+    await teacherPage.locator('#assigned').fill(localDate(0));
+    await teacherPage.locator('#due').fill(localDate(1));
+    await teacherPage.locator('#target').fill('5');
+    await teacherPage.locator('#targetUnit').selectOption('minutes');
+    await teacherPage.locator('#title').fill(title);
+    await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
+    await teacherPage.getByRole('button', { name: 'Save draft' }).click();
+    await expect(teacherPage.locator('#formMsg')).toContainText('Draft saved.');
+    created = true;
+    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+    await expect(teacherCard).toContainText('Draft — hidden from students');
+
+    await signInStudent(studentPage, student);
+    await studentPage.goto(SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(studentPage);
+    await expect(studentPage.locator('#list')).not.toContainText(title);
+
+    await teacherCard.getByRole('button', { name: 'Publish to students' }).click();
+    await expect(teacherCard).toContainText('Published');
+    await studentPage.reload({ waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(studentPage);
+    let studentCard = studentPage.locator('#list .card').filter({ hasText: title });
+    await expect(studentCard).toContainText('Not started');
+
+    const [activityPage] = await Promise.all([
+      studentPage.waitForEvent('popup'),
+      studentCard.getByRole('link', { name: 'Open Shorashim practice' }).click()
+    ]);
+    await expect(activityPage).toHaveURL(/\/shorashim\/index\.html$/);
+    await activityPage.close();
+    await studentPage.reload({ waitUntil: 'domcontentloaded' });
+    studentCard = studentPage.locator('#list .card').filter({ hasText: title });
+    await expect(studentCard).toContainText('Not started');
+
+    await studentCard.locator('textarea').fill('Fictional student practiced five minutes.');
+    await studentCard.getByRole('button', { name: 'Hand in' }).click();
+    await expect(studentCard).toContainText('Handed in');
+
+    await teacherPage.reload({ waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(teacherPage);
+    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+    await expect(teacherCard).toContainText(student.name);
+    await teacherCard.getByRole('button', { name: 'Approve work by ' + student.name }).click();
+    await expect(teacherCard).toContainText('Completed');
+
+    await studentPage.reload({ waitUntil: 'domcontentloaded' });
+    studentCard = studentPage.locator('#list .card').filter({ hasText: title });
+    await expect(studentCard).toContainText('Completed');
+
+    teacherPage.once('dialog', dialog => dialog.accept());
+    await teacherCard.getByRole('button', { name: 'Archive' }).click();
+    await expect(teacherCard).toContainText('Archived');
+    archived = true;
+  } finally {
+    if (created && !archived) {
+      try {
+        if (!teacherCard) teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+        await teacherPage.reload({ waitUntil: 'domcontentloaded' });
+        teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+        teacherPage.once('dialog', dialog => dialog.accept());
+        await teacherCard.getByRole('button', { name: 'Archive' }).click({ timeout: 5000 });
+      } catch (_) { /* Preserve the original test failure; staging data is fictional and scoped to TEST-ALEF. */ }
+    }
+    expect(teacherWatch.productionRequests).toEqual([]);
+    expect(studentWatch.productionRequests).toEqual([]);
+    await teacherContext.close();
+    await studentContext.close();
   }
 });

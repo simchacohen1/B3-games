@@ -7,6 +7,8 @@ import { SITE, TOOL_PAGES, watchPage, expectStagingIsolation } from './staging-c
 test.describe('staging public smoke @smoke', () => {
   for (const tool of TOOL_PAGES) {
     test(`${tool.name} loads on staging without production calls @isolation`, async ({ page }) => {
+      test.skip(Boolean(tool.previewOnly && process.env.GITHUB_EVENT_NAME === 'pull_request' && !process.env.FTT_STAGING_SITE),
+        'Homework pages run against their expiring staging preview channel, not the older staging live release.');
       const watch = watchPage(page);
       const response = await page.goto(SITE + tool.path, { waitUntil: 'load', timeout: 45000 });
       expect(response?.status(), 'HTTP status').toBe(200);

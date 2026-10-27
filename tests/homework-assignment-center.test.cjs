@@ -110,6 +110,27 @@ test('staging guard accepts only the staging host/project and provides local act
   assert.equal(stage.window.HomeworkCommon.API, 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal');
   assert.equal(stage.window.HomeworkCommon.activityUrl('shorashim'), 'https://fun-torah-tools-staging.web.app/shorashim/index.html');
 
+  const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
+  const preview = { window: {
+    location: { hostname: previewHost, search: '', href: 'https://' + previewHost + '/assignment-center/student.html' },
+    B3_FIREBASE_CONFIG: { projectId: 'fun-torah-tools-staging' }
+  }, URL };
+  vm.runInNewContext(guard, preview);
+  vm.runInNewContext(common, preview);
+  assert.equal(preview.window.__B3_STAGING_BLOCKED__, false);
+  assert.equal(preview.window.HomeworkCommon.isStagingRuntime(), true);
+  assert.equal(preview.window.HomeworkCommon.API, 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal');
+  assert.equal(preview.window.HomeworkCommon.activityUrl('shorashim'), 'https://' + previewHost + '/shorashim/index.html');
+
+  const wrongChannel = { window: {
+    location: { hostname: 'fun-torah-tools-staging--other-channel-ab12cd34.web.app', search: '', href: 'https://fun-torah-tools-staging--other-channel-ab12cd34.web.app/' },
+    B3_FIREBASE_CONFIG: { projectId: 'fun-torah-tools-staging' }
+  }, URL };
+  vm.runInNewContext(guard, wrongChannel);
+  vm.runInNewContext(common, wrongChannel);
+  assert.equal(wrongChannel.window.__B3_STAGING_BLOCKED__, true);
+  assert.equal(wrongChannel.window.HomeworkCommon.API, '');
+
   const production = { window: {
     location: { hostname: 'simchacohen1.github.io', search: '', href: 'https://simchacohen1.github.io/B3-games/assignment-center/student.html' },
     B3_FIREBASE_CONFIG: { projectId: 'b3-games' }
@@ -118,4 +139,40 @@ test('staging guard accepts only the staging host/project and provides local act
   vm.runInNewContext(common, production);
   assert.equal(production.window.__B3_STAGING_BLOCKED__, true);
   assert.equal(production.window.HomeworkCommon.API, '');
+});
+
+test('preview Firebase config proxies only the issue staging channel and deploy config targets staging', () => {
+  const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
+  const proxyWrites = [];
+  const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
+  const previewDocument = { currentScript: null, write: value => proxyWrites.push(value) };
+  const previewConfig = { window: { location: { hostname: previewHost }, document: previewDocument }, location: { hostname: previewHost }, document: previewDocument };
+  vm.runInNewContext(configSource, previewConfig);
+  assert.equal(previewConfig.window.B3_FIREBASE_CONFIG, undefined);
+  assert.match(proxyWrites[0], /https:\/\/fun-torah-tools-staging\.web\.app\/firebase-config\.js/);
+
+  const productionDocument = { currentScript: null, write: value => proxyWrites.push(value) };
+  const productionConfig = { window: { location: { hostname: 'funtorahtools.com' }, document: productionDocument }, location: { hostname: 'funtorahtools.com' }, document: productionDocument };
+  vm.runInNewContext(configSource, productionConfig);
+  assert.equal(productionConfig.window.B3_FIREBASE_CONFIG.projectId, 'b3-games');
+  assert.equal(proxyWrites.length, 1);
+
+  const hosting = JSON.parse(fs.readFileSync(__dirname + '/../firebase.staging-preview.json', 'utf8'));
+  assert.equal(hosting.hosting.site, 'fun-torah-tools-staging');
+  const deploy = fs.readFileSync(__dirname + '/../scripts/deploy-homework-staging-preview.ps1', 'utf8');
+  assert.match(deploy, /projects:list/);
+  assert.match(deploy, /hosting:sites:list/);
+  assert.match(deploy, /hosting:channel:deploy/);
+  assert.match(deploy, /functions:homeworkPortal/);
+  assert.doesNotMatch(deploy, /--project\s+['"]?b3-games/i);
+  assert.doesNotMatch(deploy, /deploy['"]?,\s*['"]--only['"],\s*['"]hosting['"]/);
+  const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
+  assert.match(fnSource, /homework-406-preview/);
+  const e2eSource = fs.readFileSync(__dirname + '/../e2e-staging/staging-common.ts', 'utf8');
+  assert.match(e2eSource, /FTT_STAGING_SITE must be the staging live site/);
+  assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);
+  const smokeSource = fs.readFileSync(__dirname + '/../e2e-staging/public-smoke.spec.ts', 'utf8');
+  assert.match(smokeSource, /tool\.previewOnly && process\.env\.GITHUB_EVENT_NAME === 'pull_request'/);
+  const workflow = fs.readFileSync(__dirname + '/../.github/workflows/staging-unattended.yml', 'utf8');
+  assert.match(workflow, /Optional exact staging live or Homework preview URL/);
 });

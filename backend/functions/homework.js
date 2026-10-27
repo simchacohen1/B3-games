@@ -4,7 +4,10 @@ const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {homeworkApi}=require('./homework-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.homeworkPortal=onRequest({region:'us-central1',cors:['https://fun-torah-tools-staging.web.app'],maxInstances:5,timeoutSeconds:30,memory:'256MiB'},async(req,res)=>{
+exports.homeworkPortal=onRequest({region:'us-central1',cors:[
+ 'https://fun-torah-tools-staging.web.app',
+ /^https:\/\/fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/
+],maxInstances:5,timeoutSeconds:30,memory:'256MiB'},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method==='GET')return res.json({ok:true,ready:true,version:1});
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});

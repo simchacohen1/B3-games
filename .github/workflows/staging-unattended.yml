@@ -25,6 +25,11 @@ on:
         type: choice
         options: [smoke, auth, nightly]
         default: smoke
+      site:
+        description: 'Optional exact staging live or Homework preview URL'
+        type: string
+        required: false
+        default: ''
   pull_request:
     paths:
       - 'e2e-staging/**'
@@ -43,6 +48,7 @@ concurrency:
 
 env:
   TIER: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || github.event.schedule == '23 */2 * * *' && 'auth' || github.event.schedule == '41 4 * * *' && 'nightly' || 'smoke' }}
+  FTT_STAGING_SITE: ${{ github.event_name == 'workflow_dispatch' && inputs.site || '' }}
   # Issues are filed only for scheduled and manual runs on main, never from PRs.
   FILE_ISSUES: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 

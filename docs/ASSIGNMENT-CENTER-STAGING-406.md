@@ -38,6 +38,27 @@ Staging browser checks are in `e2e-staging/staging-common.ts` and
 npx playwright test -c playwright.staging.config.ts --grep @smoke
 ```
 
+For a preview channel, set `FTT_STAGING_SITE` to the returned preview URL before
+running smoke or authenticated checks. The issue #406 channel is named
+`homework-406-preview` and expires after seven days. Its Firebase config is
+loaded from the existing staging site's public `firebase-config.js`; the
+preview guard and function CORS allow only this channel's hostname pattern.
+
+Deploy with `scripts/deploy-homework-staging-preview.ps1`. The script first
+verifies that the signed-in Firebase account can see project
+`fun-torah-tools-staging` and Hosting site `fun-torah-tools-staging`. It then
+deploys only `homeworkPortal` to that project and creates an expiring Hosting
+preview channel using `firebase.staging-preview.json`. It never runs a live
+Hosting deploy, publishes on the production project, or deploys database rules.
+
+Authenticated tests require existing fictional TEST-ALEF accounts. Point
+`FTT_STAGING_CREDENTIALS_FILE` at a local-only credentials JSON containing an
+`adultAccounts` teacher for `TEST-ALEF` and a `studentAccounts` student for
+`TEST-ALEF`. Keep that file out of Git; `staging/test-credentials.local.json`
+is ignored. The new acceptance test creates, publishes, opens, submits,
+approves, and archives an assignment, then checks that opening the activity
+alone leaves the assignment incomplete.
+
 The callable `homeworkPortal` must be deployed to the staging project before
 the signed-in flow can run. Deploy the function only with the explicit project
 selector `--project fun-torah-tools-staging`; do not deploy backend changes to

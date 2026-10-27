@@ -5,7 +5,7 @@
   var host = root.location && root.location.hostname ? root.location.hostname.toLowerCase() : '';
   var cfg = root.B3_STAGING_FIREBASE_CONFIG || root.B3_FIREBASE_CONFIG || null;
   var hostOk = host === 'fun-torah-tools-staging.web.app' ||
-    host.endsWith('--fun-torah-tools-staging.web.app');
+    /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(host);
   var valid = hostOk && cfg && cfg.projectId === project;
   root.__B3_STAGING_BLOCKED__ = !valid;
   root.B3_STAGING_FIREBASE_CONFIG = valid ? cfg : null;

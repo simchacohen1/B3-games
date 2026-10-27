@@ -1,12 +1,18 @@
-window.B3_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
+// Only the exact issue #406 Firebase Hosting preview channel loads the
+// already-deployed staging configuration. Production keeps its existing config.
+if (/^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(location.hostname.toLowerCase())) {
+  document.write('<script src="https://fun-torah-tools-staging.web.app/firebase-config.js"><\/script>');
+} else {
+  window.B3_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+    authDomain: "b3-games.firebaseapp.com",
+    databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+    projectId: "b3-games",
+    storageBucket: "b3-games.firebasestorage.app",
+    messagingSenderId: "568530046190",
+    appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+  };
+}
 
 /*
  * Multi-teacher / multi-class foundation.

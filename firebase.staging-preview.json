@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "site": "fun-torah-tools-staging",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firebase.*.json",
+      ".firebaserc",
+      "**/node_modules/**",
+      "**/backend/**",
+      "**/tests/**",
+      "**/e2e/**",
+      "**/e2e-staging/**",
+      "**/scripts/**",
+      "**/docs/**",
+      "**/staging/**",
+      "**/preview*/**",
+      "**/backup-*/**",
+      "**/_worktrees/**",
+      "**/playwright-report/**",
+      "**/test-results/**",
+      "**/staging-results/**",
+      "**/.env*",
+      "**/*.local.*",
+      "package.json",
+      "package-lock.json",
+      "README.md"
+    ]
+  }
+}

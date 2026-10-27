@@ -3,12 +3,13 @@
   'use strict';
   var STAGING_PROJECT = 'fun-torah-tools-staging';
   var STAGING_HOST = 'fun-torah-tools-staging.web.app';
+  var STAGING_PREVIEW_HOST = /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/;
   var projectId = root.B3_FIREBASE_CONFIG && root.B3_FIREBASE_CONFIG.projectId;
   var host = root.location && root.location.hostname ? root.location.hostname.toLowerCase() : '';
   var localPreview = /^(localhost|127\.0\.0\.1)$/.test(host) &&
     root.location.search.indexOf('local-staging=1') !== -1;
   var isStagingRuntime = projectId === STAGING_PROJECT &&
-    (host === STAGING_HOST || host.endsWith('--' + STAGING_HOST) || localPreview);
+    (host === STAGING_HOST || STAGING_PREVIEW_HOST.test(host) || localPreview);
   var API = isStagingRuntime
     ? (localPreview && /^http:\/\/(localhost|127\.0\.0\.1):5001\//.test(root.B3_HOMEWORK_API_URL || '')
       ? root.B3_HOMEWORK_API_URL

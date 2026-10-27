@@ -6,7 +6,8 @@
   'use strict';
   var host = location.hostname.toLowerCase();
   var projectId = window.B3_FIREBASE_CONFIG && window.B3_FIREBASE_CONFIG.projectId;
-  if (host !== 'fun-torah-tools-staging.web.app' || projectId !== 'fun-torah-tools-staging') return;
+  var stagingPreview = /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(host);
+  if ((host !== 'fun-torah-tools-staging.web.app' && !stagingPreview) || projectId !== 'fun-torah-tools-staging') return;
   var API = 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal';
   var bar = document.getElementById('studentBar');
   if (!bar) return;
