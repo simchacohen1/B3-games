@@ -1,0 +1,23 @@
+name: School Marks PDF regression
+on:
+  pull_request:
+    paths:
+      - 'sync-to-nigri/school-marks.html'
+      - 'weekly-quiz/report-pdf.js'
+      - 'tests/nigri-school-marks-pdf.test.cjs'
+      - '.github/workflows/nigri-school-marks-pdf.yml'
+  push:
+    branches:
+      - 'fix/nigri-school-marks-pdf-20261026'
+jobs:
+  report-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test PDF attachments and safety
+        run: node --test tests/nigri-school-marks-pdf.test.cjs

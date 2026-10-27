@@ -20,19 +20,30 @@ function fixture(local=new Map(),remote=new Map()){
  c.firebase={apps:[{}],database:()=>({ref:key=>({once:async()=>({val:()=>remote.get(key)}),set:async value=>{remote.set(key,value)}})})};
  vm.createContext(c);for(const file of ['schedule.js','sun-times.js','calendar.js','descriptions.js','region-groups.js','fill.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),c);
  vm.runInContext(src,c);
- return {c,els,local,remote,scale:v=>scale=v,run:code=>vm.runInContext(code,c),tap(x,y,type='mouse'){const cv=els.get('paint'),r=cv.getBoundingClientRect();cv.events.pointerdown({clientX:r.left+(x+.5)*scale,clientY:r.top+(y+.5)*scale,pointerType:type,pointerId:1});cv.events.pointerup?.({pointerId:1})},async ready(n){if(n)this.run(`load(${n})`);for(let tries=0;tries<100;tries++){await new Promise(r=>setTimeout(r,10));if(this.run('!!regionMask && !paintLoading'))return}throw Error('picture/mask failed to load')},hash(){return Buffer.from(els.get('fillPaint').getContext('2d').getImageData(0,0,els.get('paint').width,els.get('paint').height).data)},pixel(x,y){return [...els.get('fillPaint').getContext('2d').getImageData(x,y,1,1).data]}};
+ return {c,els,local,remote,scale:v=>scale=v,run:code=>vm.runInContext(code,c),tap(x,y,type='mouse'){const cv=els.get('paint'),r=cv.getBoundingClientRect();cv.events.pointerdown({clientX:r.left+(x+.5)*scale,clientY:r.top+(y+.5)*scale,pointerType:type,pointerId:1});cv.events.pointerup?.({pointerId:1})},async ready(n){if(n)this.run(`load(${n})`);for(let tries=0;tries<100;tries++){await new Promise(r=>setTimeout(r,10));if(this.run('!!regionMask && !paintLoading'))return}throw Error('picture/mask failed to load')},hash(){return Buffer.from(els.get('fillPaint').getContext('2d').getImageData(0,0,els.get('paint').width,els.get('paint').height).data)},brushHash(){return Buffer.from(els.get('paint').getContext('2d').getImageData(0,0,els.get('paint').width,els.get('paint').height).data)},pixel(x,y){return [...els.get('fillPaint').getContext('2d').getImageData(x,y,1,1).data]}};
 }
 (async()=>{
  const f=fixture();
  const legacyLocalKey='ftt-sefer-hamitzvos:'+JSON.stringify(['b3-2026','synthetic-class','synthetic-only',500]);
  const legacyLocalValue=JSON.stringify([{type:'legacy-record-preserved'}]),legacyCloudPath='b3Games/students/synthetic-only/seferHamitzvos/coloring/500';
  f.local.set(legacyLocalKey,legacyLocalValue);f.remote.set(legacyCloudPath,{strokes:[{type:'legacy-record-preserved'}],updatedAt:1});
+ const replacedOldRecords=new Map();
+ for(const n of [502,503]){
+  const key='ftt-sefer-hamitzvos:'+JSON.stringify(['b3-2026','synthetic-class','synthetic-only',n,'approved-20261025']);
+  const path=`b3Games/students/synthetic-only/seferHamitzvos/coloring/${n}-approved-20261025`;
+  const value=JSON.stringify([{type:'fill',seed:[30,30],color:'#e53935'}]);
+  f.local.set(key,value);f.remote.set(path,{strokes:JSON.parse(value),updatedAt:1});replacedOldRecords.set(n,{key,path,value});
+ }
  await f.ready(484);
  for(const n of [1,475,484,487,495,496,497,498,499,500,501,502,503,613]){
-  await f.ready(n);const seeds=f.run(`(()=>{const d=regionMask.labels,w=cv.width,counts=new Map(),seeds=new Map();for(let i=0;i<d.length;i++){const id=d[i];if(id){counts.set(id,(counts.get(id)||0)+1);seeds.set(id,i)}}return [...counts].filter(([,n])=>n>=9).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([id])=>{const i=seeds.get(id);return[i%w,Math.floor(i/w)]})})()`);
+  await f.ready(n);
+  if(n===502||n===503){assert.equal(f.run('strokes.length'),0,`card ${n} does not replay old artwork strokes`);const old=replacedOldRecords.get(n);assert.equal(f.local.get(old.key),old.value,`card ${n} keeps its historical local coloring`);}
+  const seeds=f.run(`(()=>{const d=regionMask.labels,w=cv.width,counts=new Map(),seeds=new Map();for(let i=0;i<d.length;i++){const id=d[i];if(id){counts.set(id,(counts.get(id)||0)+1);seeds.set(id,i)}}return [...counts].filter(([,n])=>n>=9).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([id])=>{const i=seeds.get(id);return[i%w,Math.floor(i/w)]})})()`);
   f.run('strokes=[];rebuildFillLayer();selectedColor="#e53935";setTool("fill")');f.scale(.5);f.tap(...seeds[0]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);const first=f.hash();
   f.run('selectedColor="#1976d2"');f.scale(1.25);f.tap(...seeds[1],'touch');assert.deepEqual(f.pixel(...seeds[1]),[25,118,210,255]);assert.deepEqual(f.pixel(...seeds[0]),[229,57,53,255]);
+  const both=f.hash();f.els.get('undo').onclick();assert.deepEqual(f.pixel(...seeds[1]),[0,0,0,0],'undo removes the last fill');f.els.get('redo').onclick();assert.deepEqual(f.hash(),both,'redo restores the last fill exactly');
   f.els.get('undo').onclick();assert.deepEqual(f.hash(),first,'undo restores adjacent region exactly');
+  f.run('setTool("brush");selectedColor="#43a047"');const brushBefore=f.brushHash();f.tap(...seeds[0]);const brushAfter=f.brushHash();assert.notDeepEqual(brushAfter,brushBefore,'brush draws on the outline canvas');f.els.get('undo').onclick();assert.deepEqual(f.brushHash(),brushBefore,'undo removes a brush stroke');f.els.get('redo').onclick();assert.deepEqual(f.brushHash(),brushAfter,'redo restores a brush stroke');f.els.get('undo').onclick();f.run('setTool("fill");selectedColor="#e53935"');
   // Native destination-out verifies erasing bucket colors; undo restores them.
   f.run('setTool("eraser")');f.tap(...seeds[0]);assert.ok(f.pixel(...seeds[0])[3]<255);f.els.get('undo').onclick();assert.deepEqual(f.hash(),first,'undo restores erased fill');
   f.run('setTool("fill")');await new Promise(r=>setTimeout(r,400));const remoteBefore=JSON.stringify([...f.remote]);const reloaded=fixture(f.local,f.remote);await reloaded.ready(n);assert.deepEqual(reloaded.hash(),first,'saved fill survives reload');assert.equal(JSON.stringify([...f.remote]),remoteBefore,'load does not overwrite remote');
@@ -40,12 +51,14 @@ function fixture(local=new Map(),remote=new Map()){
   console.log(`PASS ${n}: native fill, adjacent preservation, mouse/touch scaling, erase, undo, save, reload, reset`);
  }
  for(const n of [500,501,502,503]){
-  const localKey=f.run(`key(${n})`),cloudPath=`b3Games/students/synthetic-only/seferHamitzvos/coloring/${n}-approved-20261025`;
-  assert.ok(localKey.endsWith('"approved-20261025"]'),'new art has isolated local save key');
+  const version=n>=502?'replacement-20261026':'approved-20261025';
+  const localKey=f.run(`key(${n})`),cloudPath=`b3Games/students/synthetic-only/seferHamitzvos/coloring/${n}-${version}`;
+  assert.ok(localKey.endsWith(`"${version}"]`),'new art has isolated local save key');
   assert.ok(f.local.has(localKey),'new art saves locally');assert.ok(f.remote.has(cloudPath),'new art saves to its versioned account path');
  }
  assert.equal(f.local.get(legacyLocalKey),legacyLocalValue,'preexisting local card 500 progress remains untouched');
  assert.deepEqual(f.remote.get(legacyCloudPath),{strokes:[{type:'legacy-record-preserved'}],updatedAt:1},'preexisting cloud card 500 progress remains untouched');
+ for(const [n,old] of replacedOldRecords){assert.deepEqual(f.remote.get(old.path),{strokes:JSON.parse(old.value),updatedAt:1},`preexisting cloud card ${n} progress remains untouched`);}
  console.log('PASS cards 500–503: versioned local/account progress is isolated and legacy records remain untouched');
  // Regression: switching dates before the 350ms debounce must not lose
  // the first card's account save or leave old pixels on the new picture.
@@ -73,7 +86,8 @@ function fixture(local=new Map(),remote=new Map()){
  }
  for(const sample of weekSamples.slice().reverse()){
   await week.ready(sample.n);assert.deepEqual(week.pixel(...sample.seed),sample.color,`card ${sample.n} reopens with its saved fill`);
-  assert.ok(week.remote.has(`b3Games/students/synthetic-only/seferHamitzvos/coloring/${sample.n}-approved-20261025`),`day card ${sample.n} save persisted separately`);
+  const version=sample.n>=502?'replacement-20261026':'approved-20261025';
+  assert.ok(week.remote.has(`b3Games/students/synthetic-only/seferHamitzvos/coloring/${sample.n}-${version}`),`day card ${sample.n} save persisted separately`);
  }
  assert.equal(week.run('regionMaskCache.size')<=3,true,'weekly navigation keeps the region cache bounded');
  console.log('PASS Oct 25–31 cards: repeat days restore saved colors and keep card data separate');
