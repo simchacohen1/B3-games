@@ -66,7 +66,8 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    await page.close();
   }
   {
-   const currentSettings=fs.readFileSync(path.join(ROOT,'site-settings.js'),'utf8');
+   // Windows checkouts use CRLF; the baseline rewrite below matches LF line breaks.
+   const currentSettings=fs.readFileSync(path.join(ROOT,'site-settings.js'),'utf8').replace(/\r\n/g,'\n');
    const baseSettings=currentSettings
     .replace(/  \/\/ Popup completion and Firebase's auth-state callback can request the same\n  \/\/ authorization check at the same time\. Share only in-flight work for this\n  \/\/ UID; once it settles, the next auth event performs fresh permission reads\.\n  const accessChecksInFlight = new Map\(\);\n\n/, '')
     .replace('function readUserAccessFromFirebase(user)', 'function readUserAccess(user)')
