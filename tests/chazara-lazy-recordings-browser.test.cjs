@@ -8,7 +8,7 @@ const ROOT=path.resolve(__dirname,'..');
 const tree={b3Games:{workspaces:{'b3-2026':{classes:{
   et:{name:'B3 ET',members:{simcha_cohen:{name:'Simcha'}}},
   wt:{name:'B3 WT',members:{leib_wolf:{name:'Leib'}}}}}},students:{}},
-  posukPractice:{chazara:{events:{simcha_cohen:{},leib_wolf:{rec1:{recorded:true,reviewApplied:true,pointRequestStatus:"pending",perek:18,posuk:1,createdAt:3},older:{recorded:true,reviewApplied:true,pointRequestStatus:"approved",teacherFullyChecked:true,perek:18,posuk:2,createdAt:1}}}}}};
+  posukPractice:{chazara:{events:{simcha_cohen:{},leib_wolf:{rec1:{recorded:true,reviewApplied:true,pointRequestStatus:"pending",perek:18,posuk:1,createdAt:3,storagePath:'private/chazara/fictional-rec1.webm'},older:{recorded:true,reviewApplied:true,pointRequestStatus:"approved",teacherFullyChecked:true,perek:18,posuk:2,createdAt:1}}}}}};
 const FIREBASE_STUB=`(function(){const T=${JSON.stringify(tree)};window.__reads=[];window.__unsubscribed=[];
 const at=p=>p.split('/').filter(Boolean).reduce((o,k)=>o==null?undefined:o[k],T);
 const snap=v=>({val:()=>v===undefined?null:v,exists:()=>v!=null});
@@ -32,7 +32,7 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
   await page.route(/gstatic\.com\/firebasejs\//,r=>r.fulfill({contentType:'text/javascript',body:''}));
   await page.route(/gstatic\.com\/firebasejs\/.*app-compat/,r=>r.fulfill({contentType:'text/javascript',body:FIREBASE_STUB}));
   await page.route(/site-settings\.js/,r=>r.fulfill({contentType:'text/javascript',body:SITE_STUB}));
-  await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{}}'}));
+  await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.__privateMediaLoads=[];window.B3PrivateMedia={setSource:async(_audio,path)=>{window.__privateMediaLoads.push(path)}}'}));
   await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,async r=>{
     const body=JSON.parse(r.request().postData()||'{}');
     if(body.action==='get-chazara-event'){
@@ -77,6 +77,20 @@ test('Chazara pending-only startup and lazy historical recording loads with perf
     assert.deepEqual(state.historyReads,[],'no full student recording history fetched on startup');
     assert.deepEqual(await page.evaluate(()=>window.__reads.filter(p=>p.startsWith('posukPractice/chazara/events/'))),[],'no direct event reads, including exact pending events');
     assert.deepEqual(pendingEventCalls,['leib_wolf/rec1'],'only the pending recording was fetched via scoped API');
+
+    // Private audio is deliberately loaded only on a teacher click. A bulk
+    // pending queue must not trigger one private-media fetch per recording.
+    const beforeAudio=await page.evaluate(()=>({
+      loads:window.__privateMediaLoads,
+      buttons:[...document.querySelectorAll('#recordingsList .recording-load-audio')].map(b=>b.textContent)
+    }));
+    assert.deepEqual(beforeAudio.loads,[],'pending-only startup must not download private audio');
+    assert.deepEqual(beforeAudio.buttons,['Load audio'],'pending recording offers on-demand audio');
+    await page.click('#recordingsList .recording-load-audio');
+    await page.waitForFunction(()=>window.__privateMediaLoads.length===1);
+    assert.deepEqual(await page.evaluate(()=>window.__privateMediaLoads),['private/chazara/fictional-rec1.webm']);
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-load-audio').length===0);
+
     const historyStart=Date.now();
     await page.selectOption('#recordingReviewFilter','checked');
     await page.waitForFunction(()=>document.querySelector('#recordingsList .recording-row [data-review-status]')?.textContent==='✓ Fully checked');
