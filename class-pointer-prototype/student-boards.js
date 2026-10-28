@@ -304,8 +304,9 @@
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
-    const shareBtn=button('🖥 Share My Screen','Open the persistent Share My Screen / Stop Sharing window; your screen continues to share as you visit other activities',()=>stream?stopShare(true):openShareWindow(),'board-share-btn');
-    sharePanel.append(shareText,shareBtn,preview,shareNote);
+    const shareBtn=button('🖥 Share My Screen','Share from this Class Pointer page',()=>stream?stopShare(true):startShare(),'board-share-btn');
+    const persistentBtn=button('Keep Sharing While Navigating','Open a separate window that can keep sharing while you visit other activities',openShareWindow,'board-share-btn');
+    sharePanel.append(shareText,shareBtn,persistentBtn,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
     surface.appendChild(canvas);focus.append(surface,sharePanel,pausedPanel);view.append(bar,focus);stage.appendChild(view);shield(view);
@@ -315,8 +316,9 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
-      shareBtn.textContent=stream?'⏹ Stop Sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share My Screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
+      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Choose a sharing method. Both require you to choose Entire Screen.';
+      shareBtn.textContent=stream?'⏹ Stop Sharing':'🖥 Share My Screen';shareBtn.classList.toggle('sharing',!!stream);
+      persistentBtn.textContent=shareWindow&&!shareWindow.closed?'↗ Sharing window open':'Keep Sharing While Navigating';
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
@@ -325,9 +327,8 @@
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
       shareWindow=window.open(url.href,'classPointerStudentShare');
-      if(shareWindow){shareNote.textContent='Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';shareWindow.focus?.();return}
-      shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
-      void startShare('screen');
+      if(shareWindow){shareNote.textContent='In the new window, click Share My Screen and choose Entire Screen. Leave it open while you visit activities.';shareWindow.focus?.();redraw();return}
+      shareNote.textContent='Your browser blocked the window. Allow pop-ups, then try again.';
     }
     function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
     drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});

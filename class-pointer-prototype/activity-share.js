@@ -62,6 +62,51 @@
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
     function sameStudent(){return sessionStorage.getItem('b3Games_studentId')===id &&
       (sessionStorage.getItem('b3Games_studentClass')||classId)===classId}
+    // A persistent window sends media only. The activity tab owns the class
+    // presence PeerJS connection, avoiding duplicate-session replacement.
+    if(persistentShareWindow){
+      const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
+      const ws='b3-2026';
+      let peer=null,call=null,stream=null,room=null,closed=false;
+      const panel=document.querySelector('#fttShareControlArea');
+      const button=document.createElement('button');button.type='button';
+      button.textContent='🖥 Share My Screen';button.style.cssText='padding:12px 18px;border:0;border-radius:10px;background:#1d4ed8;color:white;font:700 16px system-ui';
+      const status=document.createElement('p');status.setAttribute('role','status');
+      panel?.append(button,status);
+      const stop=()=>{const s=stream;stream=null;try{call?.close()}catch{}call=null;try{peer?.destroy()}catch{}peer=null;s?.getTracks().forEach(t=>t.stop());button.textContent='🖥 Share My Screen';button.disabled=false};
+      const finish=()=>{closed=true;stop()};
+      async function start(){
+        if(stream){stop();status.textContent='Sharing stopped.';return}
+        if(closed||!sameStudent())return;
+        button.disabled=true;
+        let captured=null;
+        try{
+          const capture=navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'monitor',frameRate:{ideal:5,max:8}},audio:false,selfBrowserSurface:'exclude',surfaceSwitching:'exclude',monitorTypeSurfaces:'include'});
+          captured=await capture;
+          if(!sameStudent())throw Error('Sign in again before sharing.');
+          const display=captured.getVideoTracks()[0]?.getSettings?.().displaySurface;
+          if(display&&display!=='monitor')throw Error('Please choose Entire Screen.');
+          const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
+          const snapshot=await sessions.once('value');
+          const now=Date.now();const lesson=Object.entries(snapshot.val()||{}).filter(([key,v])=>v?.roomId===key&&v.studentScreenSharing===true&&Number.isFinite(v.createdAt)&&now-v.createdAt<14400000).sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1];
+          if(!lesson)throw Error('Your teacher has not opened screen sharing.');room=lesson.roomId;
+          const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'issue',studentId:id,pin,classId,room})});
+          const ticket=await response.json();if(!response.ok||!ticket?.ok)throw Error(ticket?.error||'Sharing is not available.');
+          if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
+          const own=new Peer('class-pointer-activity-'+crypto.randomUUID());peer=own;
+          await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Connection timed out.')),15000);own.once('open',()=>{clearTimeout(timer);resolve()});own.once('error',e=>{clearTimeout(timer);reject(e)})});
+          if(!sameStudent())throw Error('Sign in again before sharing.');
+          const media=own.call(room,captured,{metadata:{kind:'activity-screen',token:ticket.token}});if(!media)throw Error('Teacher is not connected.');
+          stream=captured;call=media;captured.getVideoTracks()[0]?.addEventListener('ended',()=>{stop();status.textContent='Screen capture ended.'},{once:true});
+          media.on('close',stop);media.on('error',stop);button.textContent='⏹ Stop Sharing';status.textContent='Sharing with your teacher. Keep this window open.';
+        }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status.textContent=error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.'}
+        finally{button.disabled=false}
+      }
+      button.addEventListener('click',start);
+      window.addEventListener('pagehide',finish);
+      const timer=setInterval(()=>{if(!sameStudent()){status.textContent='Student account changed. Sharing stopped.';finish();clearInterval(timer)}},1000);
+      return;
+    }
     // Mount the existing student whiteboard on real browser pages. Synthetic
     // auth-only tests use deliberately minimal DOM mocks without append().
     if(typeof document.body?.append==='function'){
