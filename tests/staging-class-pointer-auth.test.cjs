@@ -216,6 +216,30 @@ test('new join ticket invalidates an older ticket for the same student',async()=
   assert.equal((await verify(second.body.token)).statusCode,200);
 });
 
+test('successful student join tickets are rate limited even with a correct PIN',async()=>{
+  const f=fixture(),request={action:'joinIssue',...params(f),peerId:'peer-test-alef-123'};
+  for(let i=0;i<25;i++)assert.equal((await f.post(request)).statusCode,200,'join ticket '+i);
+  const blocked=await f.post(request);
+  assert.equal(blocked.statusCode,429);
+  assert.match(blocked.body.error,/Too many connection attempts/);
+});
+
+test('a concurrently surviving old join ticket cannot bypass the latest-ticket index',async()=>{
+  const f=fixture(),peerId='peer-test-alef-123',request={action:'joinIssue',...params(f),peerId};
+  const first=await f.post(request);
+  assert.equal(first.statusCode,200);
+  const digest=crypto.createHash('sha256').update(first.body.token).digest('hex');
+  const oldPath='b3Private/classPointerJoinTickets/'+digest;
+  const oldTicket={...f.rows.get(oldPath)};
+  const second=await f.post(request);
+  assert.equal(second.statusCode,200);
+  // Simulate a race where the older ticket survives the normal cleanup.
+  f.rows.set(oldPath,oldTicket);
+  const verify=token=>f.post({action:'joinVerify',classId:f.classId,room:f.room,token,peerId},f.teacherUid);
+  assert.equal((await verify(first.body.token)).statusCode,403);
+  assert.equal((await verify(second.body.token)).statusCode,200);
+});
+
 test('join recheck immediately rejects revoked class membership and non-owner teachers',async()=>{
   const f=fixture(),body={action:'joinRecheck',classId:f.classId,room:f.room,studentIds:[f.studentId,'test_student_beis']};
   assert.equal((await f.post(body,'outsider')).statusCode,403);
