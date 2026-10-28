@@ -1,111 +1,132 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chabad Reading Demo — Modeh Ani</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#153e61">
+<title>Modeh Ani — Chabad Reading Demo v2</title>
 <style>
-:root{font-family:system-ui,Arial,sans-serif;background:#f2f7fa;color:#1a3e55}
-*{box-sizing:border-box}body{margin:0}header{background:#123d5b;color:white;padding:24px}main{max-width:900px;margin:24px auto;padding:0 16px 40px}
-.card{background:white;border:1px solid #dae6ed;border-radius:16px;margin:16px 0;padding:20px}
-h1{font-size:clamp(25px,5vw,34px);margin:0}h2{margin:0 0 12px;font-size:19px}
-.hebrew{font:32px/1.9 "Times New Roman",serif;direction:rtl;text-align:right;background:#f6fafc;border-radius:10px;padding:10px}
-.phonetic{font-size:19px;font-weight:750;line-height:1.8;color:#145c85}
-button{font:700 15px system-ui;padding:12px 16px;border:0;border-radius:10px;background:#15719e;color:white;margin:5px 5px 5px 0;cursor:pointer}button:disabled{opacity:.4}
-button.stop{background:#bb3347}button.secondary{background:#e4f1f7;color:#174b67}
-small,.muted{color:#587184}textarea{width:100%;height:90px;border:1px solid #bdcfda;padding:12px;font:inherit;border-radius:10px}
-.notice{background:#fff4df;border:1px solid #f1d59f;padding:15px;border-radius:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:9px;margin:13px 0}
-.word{border:1px solid #d3e2eb;border-radius:10px;padding:10px}.word strong,.word small{display:block}.word strong{font-size:18px}
-.word.good{background:#e9f8ee;border-color:#a7d7b8}.word.bad{background:#fff1e8;border-color:#e9be9a}
-.s{font-weight:800;font-size:30px}audio{width:100%;margin-top:12px}.hidden{display:none}
-</style></head>
-<body>
-<header><h1>Chabad Reading Lab</h1><div>Modeh Ani • Experimental standalone demonstration • No accounts or points</div></header>
+:root{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f4f7fb;color:#19344b;line-height:1.5}
+*{box-sizing:border-box}body{margin:0}header{background:#153e61;color:white;padding:24px max(16px,calc((100vw - 900px)/2))}header h1{margin:0;font-size:clamp(24px,4vw,34px)}header p{margin:5px 0;color:#e0edf7}
+main{max-width:930px;margin:auto;padding:18px 16px 50px}.card{background:white;padding:21px;border:1px solid #dce5ed;border-radius:17px;margin:17px 0;box-shadow:0 5px 17px #153e6108}h2{font-size:19px;margin:0 0 10px}p{margin:9px 0}.muted{color:#557084;font-size:14px}.note{background:#fff7e9;border:1px solid #f0d9a9;border-radius:12px;padding:13px 16px;color:#674811}
+.hebrew{font:clamp(25px,4vw,37px)/2.1 "Times New Roman",serif;direction:rtl;text-align:right;background:#f5f9fc;border:1px solid #d9e8f2;padding:11px 16px;border-radius:12px}
+.translit{font-size:18px;line-height:1.95;font-weight:700;color:#13577e}
+.buttons{display:flex;flex-wrap:wrap;gap:9px;margin:14px 0}button{cursor:pointer;background:#126f9f;color:white;border:1px solid #126f9f;border-radius:10px;padding:12px 17px;font:700 15px system-ui;min-height:45px}button.secondary{background:#e9f3f9;color:#175373;border-color:#bdd8e8}button.danger{background:#bc3450;border-color:#bc3450}button:disabled{opacity:.48;cursor:not-allowed}
+audio{display:block;width:100%;margin:13px 0}label{font-weight:700;display:block;margin:10px 0 6px}input[type=file]{display:block;max-width:100%;padding:12px;background:#f4f8fb;border:1px solid #d5e2eb;border-radius:9px}
+textarea{font:16px/1.4 system-ui;width:100%;height:95px;padding:12px;border:1px solid #bad0df;border-radius:10px;resize:vertical}
+.status{border-radius:9px;background:#eaf3f9;padding:10px 13px;margin:11px 0;font-weight:650}.status.error{background:#fff0e9;color:#9c3d1b}.status.good{background:#e6f6eb;color:#156138}
+.diagnostics{display:flex;flex-wrap:wrap;gap:9px}.chip{font-size:12px;border-radius:100px;background:#edf3f8;padding:6px 10px;color:#35586c}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px;margin-top:12px}.word{padding:10px;background:#f7f9fc;border:1px solid #d7e1eb;border-radius:12px}.word.good{background:#e6f6ed;border-color:#9acdab}.word.bad{background:#fff1e8;border-color:#dfb18f}
+.word strong{display:block;font-size:16px}.word .he{font:22px "Times New Roman",serif;display:block;text-align:left}.word small{color:#526779;display:block;overflow-wrap:anywhere;margin-top:3px}
+#score{font-size:24px;font-weight:800}footer{font-size:13px;color:#607a8e;margin-top:14px}.hidden{display:none!important}
+@media(max-width:600px){.card{padding:15px}.buttons button{flex:1 1 120px}.hebrew{font-size:27px}}
+</style>
+</head>
+<body><header><h1>Modeh Ani — Chabad Reading Demo</h1><p>Version 2 · microphone recording, playback, and experimental speech comparison</p></header>
 <main>
-<div class="notice"><strong>Important:</strong> This demo compares a browser-generated speech <em>transcript</em> with Chabad English transliteration, not raw audio phonemes. It is not validated for nekudos or student grades. Browsers may misrecognize Ashkenazic Hebrew. Browser speech recognition may use an external provider, but this page does not upload or save a recording to Fun Torah Tools.</div>
-<section class="card"><h2>1. Read the Hebrew aloud</h2>
-<div class="hebrew" lang="he">מוֹדֶה אֲנִי לְפָנֶיךָ מֶלֶךְ חַי וְקַיָּם שֶׁהֶחֱזַרְתָּ בִּי נִשְׁמָתִי בְּחֶמְלָה רַבָּה אֱמוּנָתֶךָ</div>
-<p class="phonetic">Moideh ani lefonecho, Melech chai v'kayom, Shehechezarto bi nishmosi, b'chemloh, Rabboh emunosecho.</p>
-<p class="muted">Expected sounds follow the classroom Chabad/Ashkenazic transliteration. Vowels are intentionally preserved.</p>
+<div class="note"><strong>This is a working recording and comparison prototype, not a validated AI pronunciation grader.</strong> It does not award points or change Fun Torah Tools. Browser speech recognition can mishear Chabad words or fail entirely; a matching transcript does not prove the nekudos were correct. Test with an adult first, not identifiable student audio.</div>
+<section class="card"><h2>1. Read Modeh Ani</h2><div id="hebrew" lang="he" class="hebrew"></div><p id="phonetic" class="translit"></p><p class="muted">The Hebrew is for the reader; the Chabad transliteration is the reference used by the text comparison.</p></section>
+<section class="card"><h2>2. Record and hear yourself</h2>
+<div id="diagnostics" class="diagnostics"></div>
+<div class="buttons"><button id="start" type="button">🎙 Start recording</button><button id="stop" class="danger" type="button" disabled>■ Stop recording</button><button id="reset" class="secondary" type="button">Clear</button></div>
+<div id="status" role="status" aria-live="polite" class="status">Ready. Press Start recording and allow microphone permission.</div>
+<audio id="playback" class="hidden" controls></audio>
+<button id="download" type="button" class="secondary hidden">Download my recording</button>
+<label for="upload">Or use a saved audio recording</label><input id="upload" type="file" accept="audio/*">
+<p class="muted">Recording and playback operate independently of speech recognition. No audio is uploaded by this page. Browser speech-recognition services may process audio separately if available.</p>
 </section>
-<section class="card"><h2>2. Record a reading</h2>
-<button id="start">🎙 Start</button><button id="stop" class="stop" disabled>■ Stop and check</button>
-<button id="clear" class="secondary">Clear</button>
-<p id="status" role="status">Ready. Use Chrome or Edge and grant microphone access.</p>
-<audio id="audio" controls class="hidden"></audio>
-<p><strong>What the browser recognized:</strong> <span id="heard">No reading yet</span></p>
+<section class="card"><h2>3. Experimental comparison</h2>
+<p>After recording, Chrome or Edge may provide a speech transcript. Because Chabad pronunciation is not a built-in speech-recognition language, you can correct the transcript below before comparison.</p>
+<label for="transcript">Recognized or manually entered phonetic words</label>
+<textarea id="transcript" placeholder="Moideh ani lefonecho Melech chai v'kayom..." spellcheck="false"></textarea>
+<div class="buttons"><button type="button" id="compare">Compare transcript</button><button type="button" class="secondary" id="sampleCorrect">Test: correct reading</button><button type="button" class="secondary" id="sampleVowel">Test: wrong vowel</button></div>
+<div id="compareStatus" class="muted">This is a text comparison only. You must listen to the recording to assess pronunciation.</div>
+<div id="score" class="hidden"></div><div id="words" class="grid"></div>
 </section>
-<section class="card"><h2>3. Review word comparison</h2>
-<p class="muted">Green means the speech transcript matched; orange means a mismatch, missing word, or uncertain transcription. A green mark is not proof that a child pronounced every nekudah correctly.</p>
-<div id="score" class="s">—</div><div id="grid" class="grid"></div>
-</section>
-<section class="card"><h2>Text-only examples (do not test audio)</h2>
-<button class="secondary" id="exampleGood">All words correct</button>
-<button class="secondary" id="exampleError">Modeh instead of Moideh</button>
-<label for="manual"><strong>Edit recognized phonetic text:</strong></label>
-<textarea id="manual" spellcheck="false" placeholder="What the browser heard, e.g. Moideh ani lefonecho..."></textarea>
-<button id="compare">Compare text</button>
-<p class="muted">No Firebase writes, Student Rewards, or student sign-in. Keep this experimental until recordings have been compared with teacher judgments.</p>
-</section>
+<footer>The actual phonetic sound of a word cannot be reconstructed reliably from an ordinary Hebrew transcript without nekudos. This version intentionally never labels a microphone recording as “correct” based on speech recognition alone. This standalone site has no Firebase integration, no student login and no student awards.</footer>
 </main>
 <script>
 'use strict';
-const parts=[
+const DATA=[
  ['מוֹדֶה','Moideh'],['אֲנִי','ani'],['לְפָנֶיךָ','lefonecho'],['מֶלֶךְ','Melech'],
  ['חַי','chai'],['וְקַיָּם',"v'kayom"],['שֶׁהֶחֱזַרְתָּ','Shehechezarto'],['בִּי','bi'],
  ['נִשְׁמָתִי','nishmosi'],['בְּחֶמְלָה',"b'chemloh"],['רַבָּה','Rabboh'],['אֱמוּנָתֶךָ','emunosecho']
 ];
 const $=id=>document.getElementById(id);
-function normalize(s){return String(s||'').toLowerCase().replace(/oy/g,'oi').replace(/kh/g,'ch').replace(/q/g,'k').replace(/[^a-z]/g,'')}
-function vowelPattern(s){return (normalize(s).match(/oi|ai|ee|oo|[aeiouy]/g)||[]).join('|')}
-function dist(a,b){const d=Array.from({length:a.length+1},(_,i)=>Array.from({length:b.length+1},(_,j)=>i===0?j:j===0?i:0));for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]!==b[j-1]));return d[a.length][b.length]}
-function grade(a,b){a=normalize(a);b=normalize(b);if(!b)return {ok:false,note:'Not detected'};if(a===b)return {ok:true,note:'Transcript match'};if(vowelPattern(a)===vowelPattern(b)&&dist(a,b)<=2)return {ok:false,note:'Similar — teacher review'};return {ok:false,note:'Mismatch / unclear'}}
-function compare(t){
- const heard=(t.match(/[A-Za-z]+(?:['’][A-Za-z]+)*/g)||[]).map(normalize).filter(Boolean);
- const n=parts.length,m=heard.length,d=Array.from({length:n+1},()=>Array(m+1).fill(Infinity)),prev=Array.from({length:n+1},()=>Array(m+1).fill(null));
- d[0][0]=0;
- function add(i,j,x,y,c,k){if(d[i][j]+c<d[x][y]){d[x][y]=d[i][j]+c;prev[x][y]={i,j,k}}}
- for(let i=0;i<=n;i++)for(let j=0;j<=m;j++){if(!Number.isFinite(d[i][j]))continue;
-  if(i<n)add(i,j,i+1,j,1.25,0);if(j<m)add(i,j,i,j+1,.9,1);
-  if(i<n&&j<m){const r=grade(parts[i][1],heard[j]);add(i,j,i+1,j+1,r.ok?0:.9,2)}
-  if(i<n&&j+1<m){const r=grade(parts[i][1],heard[j]+heard[j+1]);add(i,j,i+1,j+2,r.ok?.25:1.2,3)}
+const EXPECTED=DATA.map(p=>p[1]);
+$('hebrew').textContent=DATA.map(p=>p[0]).join(' ');
+$('phonetic').textContent='Moideh ani lefonecho, Melech chai v’kayom, Shehechezarto bi nishmosi, b’chemloh, Rabboh emunosecho.';
+function normalize(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/oy/g,'oi').replace(/kh/g,'ch').replace(/q/g,'k').replace(/[^a-z]/g,'')}
+function edit(a,b){const d=Array.from({length:a.length+1},(_,i)=>Array.from({length:b.length+1},(_,j)=>i===0?j:j===0?i:0));for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length]}
+function isSame(expected,observed){return normalize(expected)===normalize(observed)}
+function compareTranscript(text){
+ const seen=(String(text).match(/[A-Za-z]+(?:['’][A-Za-z]+)*/g)||[]).map(normalize).filter(Boolean),n=EXPECTED.length,m=seen.length;
+ const costs=Array.from({length:n+1},()=>Array(m+1).fill(Infinity)),steps=Array.from({length:n+1},()=>Array(m+1).fill(null));costs[0][0]=0;
+ function advance(i,j,ni,nj,c,k){if(costs[i][j]+c<costs[ni][nj]){costs[ni][nj]=costs[i][j]+c;steps[ni][nj]=[i,j,k]}}
+ for(let i=0;i<=n;i++)for(let j=0;j<=m;j++){
+  if(!Number.isFinite(costs[i][j]))continue;
+  if(i<n)advance(i,j,i+1,j,1.15,'missing');if(j<m)advance(i,j,i,j+1,.95,'extra');
+  if(i<n&&j<m){const exact=isSame(EXPECTED[i],seen[j]);const distance=edit(normalize(EXPECTED[i]),seen[j]);advance(i,j,i+1,j+1,exact?0:1+Math.min(.25,distance*.02),'word')}
+  if(i<n&&j+1<m){const exact=isSame(EXPECTED[i],seen[j]+seen[j+1]);advance(i,j,i+1,j+2,exact?.17:1.25,'two')}
  }
- let i=n,j=m;const aligned=Array(n).fill('');
- while(i||j){const p=prev[i][j];if(!p)break;if(p.k===2)aligned[i-1]=heard[p.j];if(p.k===3)aligned[i-1]=heard.slice(p.j,j).join('');i=p.i;j=p.j}
- const flags=parts.map((w,k)=>grade(w[1],aligned[k]));
- const count=flags.filter(x=>x.ok).length;
- $('score').textContent=Math.round(100*count/n)+'% provisional transcript match ('+count+'/'+n+' words)';
- $('grid').replaceChildren(...parts.map((w,k)=>{const e=document.createElement('div');e.className='word '+(flags[k].ok?'good':'bad');const a=document.createElement('strong');a.textContent=w[1];const b=document.createElement('small');b.textContent=flags[k].note;const c=document.createElement('small');c.textContent=aligned[k]?'Heard: '+aligned[k]:'Not heard';e.append(a,b,c);return e}))
+ const aligned=Array(n).fill('');let i=n,j=m;
+ while(i||j){const step=steps[i][j];if(!step)break;const [pi,pj,k]=step;if(k==='word')aligned[i-1]=seen[pj];if(k==='two')aligned[i-1]=seen.slice(pj,j).join('');i=pi;j=pj}
+ const matches=EXPECTED.map((v,k)=>isSame(v,aligned[k])),correct=matches.filter(Boolean).length;
+ $('score').classList.remove('hidden');$('score').textContent=correct+'/'+n+' words matched the typed/recognized transcript';
+ $('words').replaceChildren(...DATA.map(([he,ph],k)=>{
+  const box=document.createElement('div');box.className='word '+(matches[k]?'good':'bad');
+  const hb=document.createElement('span');hb.className='he';hb.lang='he';hb.textContent=he;
+  const expected=document.createElement('strong');expected.textContent=ph;
+  const flag=document.createElement('small');flag.textContent=matches[k]?'Transcript match':'Check word';
+  const heard=document.createElement('small');heard.textContent=aligned[k]?'Transcript: '+aligned[k]:'Not detected';
+  box.append(hb,expected,flag,heard);return box;
+ }));
+ $('compareStatus').textContent='Transcript matches are not acoustic/nekudos grades; manually listen to confirm vowels.';
+ return {correct,total:n,aligned};
 }
-const target=parts.map(x=>x[1]).join(' ');
-$('exampleGood').onclick=()=>{$('manual').value=target;compare(target)};
-$('exampleError').onclick=()=>{$('manual').value=target.replace('Moideh','Modeh');compare($('manual').value)};
-$('compare').onclick=()=>compare($('manual').value);
-let rec=null,stream=null,recognizer=null,blobURL=null,finalText='',interimText='',chunks=[],stopping=false;
-function done(){
- $('start').disabled=false;$('stop').disabled=true;
- const t=(finalText+' '+interimText).trim();$('heard').textContent=t||'(no recognized words)';
- if(t){$('manual').value=t;compare(t);$('status').textContent='Ready for teacher review. Recognition can be wrong.'}
- else $('status').textContent='Audio captured; recognition produced no words. Use playback or text-only comparison.';
+$('compare').onclick=()=>{if(!$('transcript').value.trim()){$('compareStatus').textContent='Enter a transcript first, or use one of the two sample buttons.';return}compareTranscript($('transcript').value)};
+$('sampleCorrect').onclick=()=>{$('transcript').value=EXPECTED.join(' ');compareTranscript($('transcript').value)};
+$('sampleVowel').onclick=()=>{$('transcript').value=EXPECTED.join(' ').replace('Moideh','Modeh');compareTranscript($('transcript').value)};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const secure=window.isSecureContext===true,hasMic=!!navigator.mediaDevices?.getUserMedia,hasRecorder=typeof MediaRecorder!=='undefined';
+const chips=[['Secure page',secure],['Microphone recording',hasMic&&hasRecorder],['Optional browser transcription',!!SR]];
+$('diagnostics').replaceChildren(...chips.map(([label,on])=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=(on?'✓ ':'⚠ ')+label;return chip}));
+if(!hasMic||!hasRecorder){$('status').className='status error';$('status').textContent='This page cannot use the microphone in this browser or location. Open the HTTPS link in Chrome or Edge. You can still upload an audio file or test the text examples.'}
+let recorder=null,stream=null,recognition=null,chunks=[],audioURL=null,audioBlob=null,finalText='',interimText='',isRecording=false,recordingError='';
+function setStatus(msg,isError=false){$('status').textContent=msg;$('status').className='status'+(isError?' error':'')}
+function disposeStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+function freeAudio(){if(audioURL){URL.revokeObjectURL(audioURL);audioURL=null}audioBlob=null;$('playback').pause();$('playback').removeAttribute('src');$('playback').classList.add('hidden');$('download').classList.add('hidden')}
+function showAudio(blob){if(!blob||!blob.size){setStatus('No audio was recorded. Please try again.',true);return}freeAudio();audioBlob=blob;audioURL=URL.createObjectURL(blob);$('playback').src=audioURL;$('playback').classList.remove('hidden');$('download').classList.remove('hidden')}
+function finish(){isRecording=false;$('start').disabled=false;$('stop').disabled=true;disposeStream();
+ const result=(finalText+' '+interimText).trim();if(result){$('transcript').value=result;setStatus('Recording saved. Play it back. Browser transcript was captured; click Compare to inspect it.');}
+ else setStatus('Recording saved. Press Play to listen. No reliable browser transcript was obtained; text-only comparison is still available.');
 }
-function cleanup(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
 $('start').onclick=async()=>{
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR||!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){$('status').textContent='Microphone or speech recognition unavailable. Use Chrome/Edge over HTTPS or the text-only examples.';return}
- $('start').disabled=true;$('stop').disabled=false;finalText='';interimText='';chunks=[];stopping=false;
- if(blobURL){URL.revokeObjectURL(blobURL);blobURL=null}$('audio').classList.add('hidden');
+ if(isRecording)return;if(!hasMic||!hasRecorder){setStatus('Microphone unavailable. Please use the HTTPS version in Chrome or Edge.',true);return}
+ $('start').disabled=true;setStatus('Requesting microphone permission…');
+ finalText='';interimText='';recordingError='';chunks=[];
  try{
   stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  rec=new MediaRecorder(stream);
-  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  rec.onstop=()=>{if(chunks.length){blobURL=URL.createObjectURL(new Blob(chunks,{type:rec.mimeType||'audio/webm'}));$('audio').src=blobURL;$('audio').classList.remove('hidden')}cleanup();done()};
-  recognizer=new SR();recognizer.lang='en-US';recognizer.continuous=true;recognizer.interimResults=true;
-  recognizer.onresult=e=>{finalText='';interimText='';for(let i=0;i<e.results.length;i++){if(e.results[i].isFinal)finalText+=' '+e.results[i][0].transcript;else interimText+=' '+e.results[i][0].transcript}$('heard').textContent=(finalText+' '+interimText).trim()};
-  recognizer.onerror=e=>{$('status').textContent='Recognition issue: '+e.error+'. Audio playback and manual comparison remain available.'};
-  rec.start();recognizer.start();$('status').textContent='Listening. Read the entire Modeh Ani, then click Stop.';
- }catch(e){try{recognizer?.abort()}catch(_){}cleanup();$('start').disabled=false;$('stop').disabled=true;$('status').textContent='Microphone unavailable: '+(e.message||e.name)}
+  recorder=new MediaRecorder(stream);isRecording=true;$('stop').disabled=false;
+  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  recorder.onerror=e=>{recordingError=e.error?.message||'Recording failed';setStatus(recordingError,true)};
+  recorder.onstop=()=>{
+   if(chunks.length)showAudio(new Blob(chunks,{type:recorder.mimeType||'audio/webm'}));
+   finish();
+  };
+  recorder.start();setStatus('Recording. Read Modeh Ani, then press Stop.');
+  // Speech-to-text is optional. Failure never blocks MediaRecorder or playback.
+  if(SR){try{recognition=new SR();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
+   recognition.onresult=event=>{finalText='';interimText='';for(let i=0;i<event.results.length;i++){const w=event.results[i][0].transcript;if(event.results[i].isFinal)finalText+=' '+w;else interimText+=' '+w}};
+   recognition.onerror=event=>{recordingError='Speech recognition unavailable ('+event.error+'). Your audio will still be saved.';setStatus(recordingError,true)};
+   recognition.start();}catch(e){setStatus('Recording works. Optional speech recognition could not start: '+(e.message||e.name),true)}}
+ }catch(e){disposeStream();isRecording=false;$('start').disabled=false;$('stop').disabled=true;
+  setStatus('Microphone permission/device problem: '+(e.message||e.name)+'. Use a different browser or upload an audio file.',true)}
 };
-$('stop').onclick=()=>{stopping=true;try{recognizer?.stop()}catch(_){}setTimeout(()=>{if(rec?.state==='recording')rec.stop()},400)};
-$('clear').onclick=()=>{try{recognizer?.abort()}catch(_){}if(rec?.state==='recording')rec.stop();cleanup();if(blobURL)URL.revokeObjectURL(blobURL);blobURL=null;$('audio').classList.add('hidden');$('heard').textContent='No reading yet';$('manual').value='';$('score').textContent='—';$('grid').replaceChildren();$('start').disabled=false;$('stop').disabled=true;$('status').textContent='Cleared.'};
-window.addEventListener('beforeunload',()=>{cleanup();if(blobURL)URL.revokeObjectURL(blobURL)});
+$('stop').onclick=()=>{if(!isRecording)return;$('stop').disabled=true;setStatus('Saving recording…');
+ try{recognition?.stop()}catch(_){}if(recorder?.state==='recording')recorder.stop();else finish()};
+$('reset').onclick=()=>{try{recognition?.abort()}catch(_){}if(recorder?.state==='recording')recorder.stop();isRecording=false;disposeStream();freeAudio();chunks=[];finalText='';interimText='';$('start').disabled=false;$('stop').disabled=true;$('transcript').value='';$('score').classList.add('hidden');$('words').replaceChildren();setStatus('Cleared. Ready to record.')};
+$('download').onclick=()=>{if(!audioBlob)return;const mime=audioBlob.type;const extension=mime.includes('mp4')?'mp4':mime.includes('ogg')?'ogg':'webm';const link=document.createElement('a');link.href=audioURL;link.download='modeh-ani-demo.'+extension;document.body.append(link);link.click();link.remove()};
+$('upload').onchange=()=>{const file=$('upload').files?.[0];if(!file)return;if(!file.type.startsWith('audio/')){setStatus('Choose an audio file.',true);return}showAudio(file);setStatus('Audio loaded. Press Play to hear it. Uploaded audio cannot be transcribed by browser speech recognition in this standalone demo.')};
+window.addEventListener('beforeunload',()=>{disposeStream();if(audioURL)URL.revokeObjectURL(audioURL)});
 </script></body></html>
