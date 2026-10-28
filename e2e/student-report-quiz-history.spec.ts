@@ -76,6 +76,7 @@ async function openReport(page: any, access: any, query = '') {
     const rel = new URL(route.request().url()).pathname;
     const stub: Record<string, string> = {
       '/firebase-config.js': 'window.B3_FIREBASE_CONFIG={};',
+      '/teacher-tool-gate.js': '', // this spec tests the report page itself; the gate has its own tests
       '/site-settings.js': `window.B3SiteSettings={workspaceId:'b3-2026',signInWithGoogle(){},onAuthStateChanged(cb){setTimeout(()=>cb({uid:'synthetic_teacher',getIdToken:async()=>'x'},true,${JSON.stringify(access)}),0)}};`,
       '/guest-mode.js': '', '/yiddish/api.js': '',
     };
