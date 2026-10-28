@@ -111,7 +111,7 @@ function applyRecordingFilters(rows){const f=recordingFilters(),box=$('recording
 function recordingStatus(e){return (e?.teacherRejected===true||e?.pointRequestStatus==='rejected')?'rejected':String(e?.pointRequestStatus||'pending')}
 function formatAudioLength(ms){const total=Math.max(0,Math.round(Number(ms||0)/1000)),m=Math.floor(total/60),sec=String(total%60).padStart(2,'0');return `${m}:${sec}`}
 function wireAudio(audio,lengthEl,fallbackMs){if(!audio)return;audio.preload='metadata';audio.addEventListener('play',()=>document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()}));const update=()=>{const seconds=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:Number(fallbackMs||0)/1000;if(lengthEl&&seconds>0)lengthEl.textContent='Length: '+formatAudioLength(seconds*1000);if(Number.isFinite(audio.duration)&&audio.duration>0)audio.setAttribute('data-duration-ready','true')};audio.addEventListener('loadedmetadata',update);audio.addEventListener('durationchange',update);update()}
-function recordingKey(e){return String(e.studentId||'')+'__'+String(e.id||'')}
+function recordingKey(e){return JSON.stringify([String(e.studentId||''),String(e.id||'')])}
 function updateRecordingRow(row,e){
   const status=recordingStatus(e),checked=e.teacherFullyChecked===true,name=row.querySelector('[data-name]'),reason=row.querySelector('[data-reason]'),meta=row.querySelector('[data-meta]'),statusEl=row.querySelector('[data-status]'),reviewEl=row.querySelector('[data-review-status]'),lengthEl=row.querySelector('[data-length]'),checkedBtn=row.querySelector('[data-recording-checked]'),rejectBtn=row.querySelector('[data-recording-reject]');
   if(name)name.textContent=e.studentName||R[e.studentId]?.name||e.studentId||'Student';
