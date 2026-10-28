@@ -92,7 +92,7 @@ const secure=window.isSecureContext===true,hasMic=!!navigator.mediaDevices?.getU
 const chips=[['Secure page',secure],['Microphone recording',hasMic&&hasRecorder],['Optional browser transcription',!!SR]];
 $('diagnostics').replaceChildren(...chips.map(([label,on])=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=(on?'✓ ':'⚠ ')+label;return chip}));
 if(!hasMic||!hasRecorder){$('status').className='status error';$('status').textContent='This page cannot use the microphone in this browser or location. Open the HTTPS link in Chrome or Edge. You can still upload an audio file or test the text examples.'}
-let recorder=null,stream=null,recognition=null,chunks=[],audioURL=null,audioBlob=null,finalText='',interimText='',isRecording=false,recordingError='';
+let recorder=null,stream=null,recognition=null,chunks=[],audioURL=null,audioBlob=null,finalText='',interimText='',isRecording=false,recordingError='',sessionNumber=0;
 function setStatus(msg,isError=false){$('status').textContent=msg;$('status').className='status'+(isError?' error':'')}
 function disposeStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
 function freeAudio(){if(audioURL){URL.revokeObjectURL(audioURL);audioURL=null}audioBlob=null;$('playback').pause();$('playback').removeAttribute('src');$('playback').classList.add('hidden');$('download').classList.add('hidden')}
@@ -104,13 +104,16 @@ function finish(){isRecording=false;$('start').disabled=false;$('stop').disabled
 $('start').onclick=async()=>{
  if(isRecording)return;if(!hasMic||!hasRecorder){setStatus('Microphone unavailable. Please use the HTTPS version in Chrome or Edge.',true);return}
  $('start').disabled=true;setStatus('Requesting microphone permission…');
+ const thisSession=++sessionNumber;
  finalText='';interimText='';recordingError='';chunks=[];
  try{
   stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  if(thisSession!==sessionNumber){disposeStream();return}
   recorder=new MediaRecorder(stream);isRecording=true;$('stop').disabled=false;
   recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   recorder.onerror=e=>{recordingError=e.error?.message||'Recording failed';setStatus(recordingError,true)};
   recorder.onstop=()=>{
+   if(thisSession!==sessionNumber)return;
    if(chunks.length)showAudio(new Blob(chunks,{type:recorder.mimeType||'audio/webm'}));
    finish();
   };
@@ -125,7 +128,7 @@ $('start').onclick=async()=>{
 };
 $('stop').onclick=()=>{if(!isRecording)return;$('stop').disabled=true;setStatus('Saving recording…');
  try{recognition?.stop()}catch(_){}if(recorder?.state==='recording')recorder.stop();else finish()};
-$('reset').onclick=()=>{try{recognition?.abort()}catch(_){}if(recorder?.state==='recording')recorder.stop();isRecording=false;disposeStream();freeAudio();chunks=[];finalText='';interimText='';$('start').disabled=false;$('stop').disabled=true;$('transcript').value='';$('score').classList.add('hidden');$('words').replaceChildren();setStatus('Cleared. Ready to record.')};
+$('reset').onclick=()=>{++sessionNumber;try{recognition?.abort()}catch(_){}if(recorder?.state==='recording')recorder.stop();isRecording=false;disposeStream();freeAudio();chunks=[];finalText='';interimText='';$('start').disabled=false;$('stop').disabled=true;$('transcript').value='';$('score').classList.add('hidden');$('words').replaceChildren();setStatus('Cleared. Ready to record.')};
 $('download').onclick=()=>{if(!audioBlob)return;const mime=audioBlob.type;const extension=mime.includes('mp4')?'mp4':mime.includes('ogg')?'ogg':'webm';const link=document.createElement('a');link.href=audioURL;link.download='modeh-ani-demo.'+extension;document.body.append(link);link.click();link.remove()};
 $('upload').onchange=()=>{const file=$('upload').files?.[0];if(!file)return;if(!file.type.startsWith('audio/')){setStatus('Choose an audio file.',true);return}showAudio(file);setStatus('Audio loaded. Press Play to hear it. Uploaded audio cannot be transcribed by browser speech recognition in this standalone demo.')};
 window.addEventListener('beforeunload',()=>{disposeStream();if(audioURL)URL.revokeObjectURL(audioURL)});
