@@ -19,7 +19,7 @@ function storyDetail(sd){
     card.append(node('p',`${answers} paragraph answer${answers===1?'':'s'} · ${pct}% first try · ${misses} miss${misses===1?'':'es'}`));
     card.append(node('p',`Last run position: ${Number(sec.lastPosition||0)}/${Number(sec.lastTotal||0)||'?'} · Completed rounds: ${Number(sec.completedRounds||0)}`));
     const paras=node('div','');paras.className='story-paragraph-stats';
-    Object.entries(sec.paragraphs||{}).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([p,x])=>{const a=Number(x.answers||0),m=Number(x.misses||0),f=Number(x.firstTryCorrect||0);paras.append(node('span',`¶${p}: ${a}×, ${f} first-try, ${m} miss${m===1?'':'es'}`))});
+    Object.entries(sec.paragraphs||{}).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([p,x])=>{const entry=x||{},a=Number(entry.answers||0),m=Number(entry.misses||0),f=Number(entry.firstTryCorrect||0);paras.append(node('span',`¶${p}: ${a}×, ${f} first-try, ${m} miss${m===1?'':'es'}`))});
     if(paras.childNodes.length)card.append(paras);wrap.append(card);
   }
   return wrap;

@@ -4159,7 +4159,7 @@ async function renderClassPosukGrid(val){
 
         if(doneList.length) perekStarted++;
 
-        const tiers = doneList.map(d => skillInfo(d.latest, classActiveSkill).tier);
+        const tiers = doneList.map(d => skillInfo(d.latest, classActiveSkill)?.tier).filter(tier => tier != null);
         const overallTier = majorityTier(tiers);
 
         classPosukData[posukKey] = { doneList, notDoneList, posukText };
