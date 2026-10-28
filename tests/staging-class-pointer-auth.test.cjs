@@ -64,6 +64,11 @@ test('staging handler refuses a production or missing project target',async()=>{
   f.env.GCLOUD_PROJECT='fun-torah-tools-staging';
   f.env.B3_STAGING_DEPLOYMENT='false';
   assert.equal((await f.post({action:'permissions',...params(f)})).statusCode,503);
+  f.env.B3_STAGING_DEPLOYMENT='true';
+  f.env.FIREBASE_CONFIG=JSON.stringify({projectId:'b3-games'});
+  assert.equal((await f.post({action:'permissions',...params(f)})).statusCode,503);
+  f.env.FIREBASE_CONFIG=JSON.stringify({projectId:'fun-torah-tools-staging',databaseURL:'https://b3-games-default-rtdb.firebaseio.com'});
+  assert.equal((await f.post({action:'permissions',...params(f)})).statusCode,503);
 });
 test('fictional class grant is required for sharing',async()=>{
   const f=fixture(),cls=f.rows.get(f.base);
