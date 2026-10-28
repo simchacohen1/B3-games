@@ -13,6 +13,8 @@ on:
       - 'firebase.staging*.json'
       - 'tests/staging-isolation.test.cjs'
       - 'e2e/staging-isolation.spec.ts'
+      - 'e2e/staging-persistent-share.spec.ts'
+      - 'class-pointer-prototype/activity-share.js'
       - '.github/workflows/ftt-staging-isolation.yml'
 
 permissions:
@@ -51,4 +53,4 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ftt-staging-site"
           node staging/package-site.cjs "$GITHUB_WORKSPACE" "$RUNNER_TEMP/ftt-staging-site"
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/staging-isolation.spec.ts --project=chromium
+      - run: npx playwright test e2e/staging-isolation.spec.ts e2e/staging-persistent-share.spec.ts --project=chromium
