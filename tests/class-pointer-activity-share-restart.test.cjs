@@ -86,7 +86,7 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
 }
 
 test('screen request shows only the existing Share My Screen button and requires a student click',async()=>{
-  const a=await activityFixture();
+  const a=await activityFixture({persistent:true});
   await a.emit('screens');
   assert.equal(a.navigation,null);
   assert.equal(a.shareButton.textContent,'🖥 Share My Screen');
@@ -104,20 +104,54 @@ test('screen request shows only the existing Share My Screen button and requires
   assert.equal(a.navigation,null,'the retired student Pointer page must never open');
 });
 
-test('student shares directly in the activity without opening a separate tab',async()=>{
+test('the dedicated sharing window captures, and stops when that window closes',async()=>{
   let opened=0;
-  const a=await activityFixture({validTicket:true,openWindow:()=>{opened++;return{closed:false}}});
+  const a=await activityFixture({persistent:true,validTicket:true,openWindow:()=>{opened++;return{closed:false}}});
   await a.emit('screens');
   await a.shareButton.listeners.click();
-  assert.equal(opened,0,'the extra sharing tab must not open');
+  assert.equal(opened,0,'the sharing window does not open another window');
   assert.equal(a.captureCount,1);
   assert.equal(a.peerCalls.length,1);
   assert.equal(a.peerCalls[0].target,room);
   assert.equal(a.peerCalls[0].options.metadata.token,'synthetic-ticket');
   assert.equal(a.shareButton.textContent,'⏹ Stop Sharing');
   a.pagehide();
-  assert.equal(a.stopCount,1,'leaving the activity stops this page capture');
+  assert.equal(a.stopCount,1,'closing the sharing window stops its capture');
   assert.equal(a.peerClosed,true);
+});
+test('on an activity page the button opens the sharing window and never captures there (issue 422)',async()=>{
+  const opens=[];
+  const win={location:{href:'about:blank'},focus(){this.focused=true}};
+  const a=await activityFixture({validTicket:true,openWindow:(...args)=>{opens.push(args);return win}});
+  await a.emit('screens');
+  await a.shareButton.listeners.click();
+  assert.equal(a.captureCount,0,'capture must not start on a page that can navigate away');
+  assert.equal(a.peerCalls.length,0);
+  assert.equal(opens[0][1],'classPointerStudentShare');
+  assert.ok(win.location.href.endsWith("student-share-window.html?pointerShare=1"));
+  assert.equal(win.focused,true);
+  a.pagehide();
+  assert.equal(a.stopCount,0);
+});
+test('an already-open sharing window is focused, not reloaded (reloading would end the share)',async()=>{
+  const win={location:{href:'https://funtorahtools.com/class-pointer-prototype/student-share-window.html?pointerShare=1'},focus(){this.focused=true}};
+  const a=await activityFixture({openWindow:()=>win});
+  await a.emit('screens');
+  await a.shareButton.listeners.click();
+  assert.equal(win.focused,true);
+  assert.match(win.location.href,/student-share-window/);
+  assert.equal(a.captureCount,0);
+  assert.match(a.label.textContent,/already open/);
+});
+test('blocked pop-up tells the student and does not capture in the activity',async()=>{
+  const a=await activityFixture({openWindow:()=>null});
+  await a.emit('screens');
+  await a.shareButton.listeners.click();
+  assert.equal(a.captureCount,0);
+  assert.match(a.label.textContent,/pop-ups/);
+});
+test('student-share-window.html is always the capturing window, even without the query flag',()=>{
+  assert.ok(read('class-pointer-prototype/activity-share.js').includes('student-share-window\\.html$/.test(location.pathname)'));
 });
 test('whiteboard request stays on the learning activity for embedded delivery',async()=>{
   const a=await activityFixture();
@@ -156,7 +190,7 @@ test('restart is gated on cleanup, never races with prior Firebase session remov
 
 test('permission revoked while browser picker is open stops capture before any ticket request',async()=>{
   let finish,stops=0;
-  const a=await activityFixture({capture:()=>new Promise(resolve=>finish=resolve)});
+  const a=await activityFixture({persistent:true,capture:()=>new Promise(resolve=>finish=resolve)});
   await a.emit('screens');
   const sharing=a.shareButton.listeners.click();
   await a.emit('screens',{screens:{'test-boy':true}});

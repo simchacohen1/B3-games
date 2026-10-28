@@ -62,7 +62,7 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
     issued=body;
     return {ok:true,json:async()=>({ok:true,token:'a'.repeat(64),studentName:'Arik'})};
   };
-  const studentContext={window:studentWindow,document:studentDocument,location:{href:'https://funtorahtools.com/shorashim/index.html',pathname:'/shorashim/index.html'},URL,sessionStorage:{getItem:key=>studentSession.get(key)||null,setItem:(key,value)=>studentSession.set(key,value)},firebase:studentFirebase,fetch:studentFetch,navigator:{mediaDevices:{getDisplayMedia:()=>Promise.resolve(captured)}},AbortSignal,Date,setTimeout,clearTimeout,setInterval,clearInterval,crypto:require('node:crypto').webcrypto,Peer,console};
+  const studentContext={window:studentWindow,document:studentDocument,location:{href:'https://funtorahtools.com/class-pointer-prototype/student-share-window.html?pointerShare=1',pathname:'/class-pointer-prototype/student-share-window.html'},URL,sessionStorage:{getItem:key=>studentSession.get(key)||null,setItem:(key,value)=>studentSession.set(key,value)},firebase:studentFirebase,fetch:studentFetch,navigator:{mediaDevices:{getDisplayMedia:()=>Promise.resolve(captured)}},AbortSignal,Date,setTimeout,clearTimeout,setInterval,clearInterval,crypto:require('node:crypto').webcrypto,Peer,console};
   vm.runInNewContext(read('class-pointer-prototype/activity-share.js'),studentContext);
   await waitFor(()=>sessionListener,'student Firebase session subscription did not start');
 
@@ -85,7 +85,7 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   const holder=studentDocument.body.children.find(node=>node.id==='fttActivityScreenShare');
   const overlay=studentDocument.body.children.find(node=>node.id==='fttShareRequestOverlay');
   assert.equal(overlay,undefined,'the old full-page share request is absent');
-  assert.equal(holder.style.display,'flex','the small Share My Screen button appears on Shorashim');
+  assert.equal(holder.style.display,'flex','the Share My Screen button appears in the dedicated sharing window');
   await holder.children[0].listeners.click();
   await waitFor(()=>answered,'teacher did not answer the authenticated PeerJS media call; student status: '+holder.children[1].textContent+'; authorization: '+JSON.stringify(verified));
   await waitFor(()=>{
