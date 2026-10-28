@@ -27,11 +27,13 @@ function fixture(){
   const students={mine:{},shared:{}};
   for(let i=0;i<200;i++)students['classmate_'+i]={};
   const scope={selected:'alpha',students};
+  let requestEnumerations=0;
+  const countedRequests=new Proxy(requests,{ownKeys(target){requestEnumerations++;return Reflect.ownKeys(target);}});
   const reads=[],writes=[],checked=[];
   const ctx={
     SR_ROOT:'studentRewards',
     rtdb:{ref:path=>({
-      get:async()=>{reads.push(path);return{val:()=>requests}},
+      get:async()=>{reads.push(path);return{val:()=>countedRequests}},
       update:async()=>{writes.push(path)}
     })},
     teacherClassScope:{recordAllowed:(current,id,row)=>{
@@ -43,7 +45,7 @@ function fixture(){
   };
   vm.createContext(ctx);
   vm.runInContext(implementation+'\nthis.listPending=listPendingChazaraRequests;',ctx);
-  return {scope,reads,writes,checked,run:()=>ctx.listPending(scope,{repair:false})};
+  return {scope,requests,reads,writes,checked,requestEnumerations:()=>requestEnumerations,run:()=>ctx.listPending(scope,{repair:false})};
 }
 
 test('pending scan returns only current-class requests and reads the queue once',async()=>{
@@ -59,4 +61,24 @@ test('pending filter uses one pass through requests, not a student-by-request ne
   assert.match(implementation,/for\(const \[id,item\] of Object\.entries\(allRequests\)\)/);
   assert.doesNotMatch(implementation,/for\(const studentId of Object\.keys\(scope\.students\)\)/);
   assert.match(implementation,/Object\.prototype\.hasOwnProperty\.call\(scope\.students,studentId\)/);
+});
+
+// Runtime assertion: no roster-size multiplier in enumerating the request collection.
+test('pending scan enumerates the request collection exactly once',async()=>{
+  const f=fixture();
+  await f.run();
+  assert.equal(f.requestEnumerations(),1,'each pending refresh must enumerate the RTDB result only once');
+  assert.deepEqual(f.reads,['studentRewards/pointRequests']);
+  assert.equal(f.writes.length,0);
+});
+
+test('inherited JavaScript property names cannot impersonate roster members',async()=>{
+  const f=fixture();
+  f.requests.inheritedConstructor={practiceStudentId:'constructor',workspaceClassId:'alpha',status:'pending',source:'chazara',createdAt:10};
+  f.requests.inheritedProto={practiceStudentId:'__proto__',workspaceClassId:'alpha',status:'pending',source:'chazara',createdAt:11};
+  const rows=await f.run();
+  assert.deepEqual(Array.from(rows,row=>row.id),['sharedOwn','own']);
+  assert.equal(f.checked.includes('constructor'),false);
+  assert.equal(f.checked.includes('__proto__'),false);
+  assert.equal(f.writes.length,0);
 });
