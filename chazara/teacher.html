@@ -211,13 +211,15 @@ async function loadRecordingAudio(audio,button,event){
     audio.dataset.privateReady='true';audio.hidden=false;button.remove();
   }catch(err){console.warn('Recording access failed:',err.message);button.disabled=false;button.textContent='Retry loading audio';setRecordingActionStatus(String(err?.message||err),true)}
 }
+let approvalLoadSequence=0;
 async function loadApprovals(){
   const generation=scopeGeneration;
+  const sequence=++approvalLoadSequence;
   const btn=$("approvalSignInBtn");
   if(!auth.currentUser){pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Sign in with your teacher Google account to load Chazara point requests.</div>';btn.classList.remove("hidden");setApprovalStatus("");return}
   btn.classList.add("hidden");setApprovalStatus("Loading…");
   try{const data=await teacherApi("list-chazara-pending"),Q=window.FunTorahApprovalQueue,automatic=[];
-    if(generation!==scopeGeneration||!teacherScope||!teacherAccess?.authorized)return;
+    if(sequence!==approvalLoadSequence||generation!==scopeGeneration||!teacherScope||!teacherAccess?.authorized)return;
     pendingPointRequests={};for(const item of (data.requests||[])){if(!window.FunTorahTeacherScope.recordAllowed(teacherScope,item.practiceStudentId,item))continue;
     // Posuk Practice milestones are automatic: never shown here, paid quietly.
     if(Q.isPendingAutomatic(item)){automatic.push(item.id);continue}
@@ -226,7 +228,7 @@ async function loadApprovals(){
     if(Q.needsManualApproval(item)&&Q.isChazaraApproval(item))pendingPointRequests[item.id]=item}
    for(const event of (data.recordings||[])){if(event.studentId&&event.id&&window.FunTorahTeacherScope.recordAllowed(teacherScope,event.studentId,event)){E[event.studentId]=E[event.studentId]||{};if(recordingHistoryLoaded||!E[event.studentId][event.id])E[event.studentId][event.id]=event}}
    renderApprovals();renderRecordings();setApprovalStatus("");if(automatic.length)sweepAutomaticPoints(automatic)}
-  catch(err){if(generation!==scopeGeneration)return;console.error(err);pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';setApprovalStatus(String(err?.message||err),true)}
+  catch(err){if(sequence!==approvalLoadSequence||generation!==scopeGeneration)return;console.error(err);pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';setApprovalStatus(String(err?.message||err),true)}
 }
 let automaticSweepRunning=false;
 async function sweepAutomaticPoints(ids){if(automaticSweepRunning)return;automaticSweepRunning=true;try{for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id})}catch(err){console.warn("Automatic Posuk point approval failed",id,err)}}}finally{automaticSweepRunning=false}}
