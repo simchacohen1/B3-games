@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { installStagingClassPointerRules } = require('./class-pointer-permission-rules.cjs');
 
 const OWNER_EMAIL = 'owner@funtorahtools-staging.test';
 const PRODUCTION_OWNER_EMAIL = 'simcha5770@gmail.com';
@@ -15,7 +16,7 @@ function prepareRules(sourcePath, outputPath) {
   if (serialized.includes(PRODUCTION_OWNER_EMAIL) || /b3-games|simcha5770@gmail\.com/i.test(serialized)) {
     throw new Error('Refusing to prepare staging rules containing production project or owner identifiers.');
   }
-  const rules = JSON.parse(serialized);
+  const rules = installStagingClassPointerRules(JSON.parse(serialized));
   fs.mkdirSync(path.dirname(path.resolve(outputPath)), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify({ rules }, null, 2) + '\n', 'utf8');
   return rules;
