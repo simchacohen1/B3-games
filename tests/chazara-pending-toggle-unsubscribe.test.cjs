@@ -51,7 +51,7 @@ test('scope reload unsubscribes full-history listeners before conditional subscr
   assert.ok(start >= 0 && end > start, 'scoped reload function must exist');
   const body = html.slice(start, end);
   assert.ok(body.indexOf('clearStudentListeners()') >= 0);
-  assert.ok(body.indexOf('clearStudentListeners()') < body.indexOf('if(fullDashboardLoaded?'),
+  assert.ok(body.indexOf('clearStudentListeners()') < body.indexOf('fullDashboardLoaded?'),
     'existing listeners must be removed before any full-history subscriptions');
   assert.ok(body.includes("fullDashboardLoaded?[['posukPractice/chazara/students'"),
     'history listeners must remain conditional on full-dashboard mode');
