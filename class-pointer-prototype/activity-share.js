@@ -10,7 +10,7 @@
   if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname))return;
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
-  const persistentShareWindow=new URL(location.href).searchParams.get('pointerShare')==='1';
+  const persistentShareWindow=new URL(location.href).searchParams.get('pointerShare')==='1'||/\/class-pointer-prototype\/student-share-window\.html$/.test(location.pathname);
   const presentationView=/\/class-pointer-prototype\/student-view\.html$/.test(location.pathname);
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
   const studentAuth='https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth';
@@ -516,7 +516,26 @@
       }
       finally{busy=false;btn.disabled=false}
     }
-    btn.addEventListener('click',beginShare);
+    // Browser screen capture ends when the page that started it unloads, so pressing Back
+    // in an activity would stop it. On activity pages this button opens the dedicated
+    // sharing window instead; the capture itself starts there, after the student's own
+    // click and the browser's own picker, and survives navigation in the other tab (#422).
+    const SHARE_WINDOW_NAME='classPointerStudentShare';
+    function openShareWindow(){
+      // An empty URL finds an already-open sharing window without reloading it (reloading would end its capture).
+      let existing=null;
+      try{existing=window.open('',SHARE_WINDOW_NAME)}catch{}
+      let isNew=false;
+      try{isNew=!existing||existing.location.href==='about:blank'}catch{}
+      if(existing&&!isNew){existing.focus?.();status('Your sharing window is already open. Use it to share or stop.');return true}
+      if(!existing){status('Your browser blocked the sharing window. Allow pop-ups for this site, then try again.');return false}
+      existing.location.href=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root).href;
+      existing.focus?.();
+      status('Sharing window opened. Choose Entire Screen there and keep it open.');
+      return true;
+    }
+    if(persistentShareWindow)btn.addEventListener('click',beginShare);
+    else btn.addEventListener('click',()=>{if(stream)return beginShare();openShareWindow()});
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();

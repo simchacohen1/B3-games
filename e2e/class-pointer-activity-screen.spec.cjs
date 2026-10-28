@@ -11,7 +11,7 @@ test('student shares directly from small activity button without an extra popup,
     if(url.pathname.endsWith('/activity-share.js'))return route.fulfill({status:200,contentType:'text/javascript',body:fs.readFileSync(path.join(__dirname,'..','class-pointer-prototype','activity-share.js'),'utf8')});
     return route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html><head></head><body><main id="stage"></main><input id="joinLink"><button id="endClass"></button></body></html>'});
   });
-  await page.goto('https://share.test/shorashim/index.html?dashboard=teacher&class=et');
+  await page.goto('https://share.test/shorashim/index.html?dashboard=teacher&class=et&pointerShare=1');
   await page.evaluate(()=>{
     const room='class-pointer-12345678-1234-1234-1234-123456789abc';
     sessionStorage.setItem('b3Games_studentId','arik');
