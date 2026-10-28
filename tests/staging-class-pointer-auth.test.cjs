@@ -11,6 +11,7 @@ function fixture() {
   const classId = 'TEST-ALEF', studentId = 'test_student_alef', teacherUid = 'teacher-alef';
   const base = 'b3Games/workspaces/b3-2026/classes/' + classId;
   const reads = [];
+  const hooks = {beforeTransaction:null};
   const rows = new Map([
     [base, {active:true,toolGrants:{'class-pointer':true},members:{[studentId]:{active:true}}}],
     [base + '/members/' + studentId, {active:true}],
@@ -22,6 +23,7 @@ function fixture() {
     once: async () => {reads.push(path);return {val:()=>rows.get(path)??null};},
     set: async value => {if(value===null)rows.delete(path);else rows.set(path,value);},
     transaction: async callback => {
+      if(hooks.beforeTransaction)await hooks.beforeTransaction(path);
       const before=rows.get(path)??null,after=callback(before);
       if(after===undefined)return {committed:false,snapshot:{val:()=>before}};
       if(after===null)rows.delete(path);else rows.set(path,after);
@@ -54,7 +56,7 @@ function fixture() {
     await handler({method:'POST',body,ip:'127.0.0.1',headers:identity?{authorization:'Bearer '+identity}:{}},response);
     return result;
   }
-  return {room,classId,studentId,teacherUid,base,rows,reads,env,post};
+  return {room,classId,studentId,teacherUid,base,rows,reads,hooks,env,post};
 }
 const params = f => ({studentId:f.studentId,pin:'123456',classId:f.classId,room:f.room});
 
@@ -257,4 +259,45 @@ test('repeated wrong join PINs trigger the student-specific rate limit',async()=
   for(let i=0;i<8;i++)assert.equal((await f.post(body)).statusCode,401);
   const blocked=await f.post({...body,pin:'123456'});
   assert.equal(blocked.statusCode,429);
+});
+
+test('delayed older join issuance cannot overwrite a newer ticket index',async()=>{
+  const f=fixture(),peerId='peer-test-alef-123';
+  const request={action:'joinIssue',...params(f),peerId};
+  const indexPath='b3Private/classPointerJoinTicketIndex/'+crypto.createHash('sha256').update(f.studentId).digest('hex').slice(0,32);
+  let releaseFirst,firstReachedIndex;
+  const held=new Promise(resolve=>{releaseFirst=resolve;});
+  const reached=new Promise(resolve=>{firstReachedIndex=resolve;});
+  let indexCalls=0;
+  f.hooks.beforeTransaction=async path=>{
+    if(path===indexPath&&++indexCalls===1){firstReachedIndex();await held;}
+  };
+  const oldRequest=f.post(request);
+  await reached;
+  await new Promise(resolve=>setTimeout(resolve,15));
+  const latest=await f.post(request);
+  assert.equal(latest.statusCode,200);
+  releaseFirst();
+  const superseded=await oldRequest;
+  assert.equal(superseded.statusCode,409,'older delayed request must fail closed');
+  assert.match(superseded.body.error,/newer connection/);
+  const index=f.rows.get(indexPath);
+  assert.equal(index.digest,crypto.createHash('sha256').update(latest.body.token).digest('hex'));
+  assert.ok(Number.isFinite(index.issuedAt));
+  const verify=await f.post({action:'joinVerify',classId:f.classId,room:f.room,token:latest.body.token,peerId},f.teacherUid);
+  assert.equal(verify.statusCode,200,'newest ticket must still work');
+});
+
+test('legacy string join index migrates safely to the timestamped index',async()=>{
+  const f=fixture(),peerId='peer-test-alef-123',request={action:'joinIssue',...params(f),peerId};
+  const first=await f.post(request);
+  assert.equal(first.statusCode,200);
+  const indexPath='b3Private/classPointerJoinTicketIndex/'+crypto.createHash('sha256').update(f.studentId).digest('hex').slice(0,32);
+  f.rows.set(indexPath,crypto.createHash('sha256').update(first.body.token).digest('hex'));
+  const second=await f.post(request);
+  assert.equal(second.statusCode,200);
+  assert.equal(typeof f.rows.get(indexPath),'object');
+  const verify=token=>f.post({action:'joinVerify',classId:f.classId,room:f.room,token,peerId},f.teacherUid);
+  assert.equal((await verify(first.body.token)).statusCode,403);
+  assert.equal((await verify(second.body.token)).statusCode,200);
 });
