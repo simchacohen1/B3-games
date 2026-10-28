@@ -117,8 +117,6 @@
     var d = decide(user, authorized, access);
     if (d.ok) {
       stage = "allowed";
-      // Signed in from this card: reload so the tool starts fresh with the verified teacher.
-      if (deniedSinceLoad && !allowedOnce) { allowedOnce = true; location.reload(); return; }
       allowedOnce = true; unlock(); markReady(); return;
     }
     deniedSinceLoad = true; stage = d.why; lock();
