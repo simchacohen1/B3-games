@@ -9,25 +9,26 @@ function safeQuestion(q){
   return out;
 }
 
-// The two original classes (et, wt) predate per-class tool grants, so every
-// other student tool (Weekly Quiz, Rewards, Class Pointer) already treats them
-// as allowed when no grant is set. Game Show must match, or valid WT students are
-// refused. The class must still be active and the student an active member.
+// The two original classes (et, wt) predate per-class tool grants and "active"
+// flags, so Weekly Quiz, Rewards and Class Pointer already treat them as allowed
+// when those fields are simply missing. Game Show must match, or valid WT students
+// are refused (issue #420). Only an explicit false turns a class, a membership or
+// a student's Game Show access off. Any other class still needs the tool grant.
 const LEGACY_CLASS_IDS=['et','wt'];
 
 function isActiveStudentAccess(identity,classSnap,memberSnap){
+  const classId=String(identity?.b3ClassId||'');
   const grant=classSnap?.child?.('toolGrants/game-show')?.val?.();
-  // Legacy classes: allowed when the grant is simply missing, but a teacher
-  // who explicitly turned Game Show off (false) is still respected.
-  const grantOk=grant===true||(LEGACY_CLASS_IDS.includes(String(identity?.b3ClassId||''))&&grant!==false);
+  const grantOk=grant===true||(LEGACY_CLASS_IDS.includes(classId)&&grant!==false);
   return identity?.b3StudentRole==='student'
     && Boolean(identity.b3StudentId)
-    && Boolean(identity.b3ClassId)
-    && classSnap?.exists?.()
-    && classSnap.child('active').val()===true
+    && Boolean(classId)
+    && Boolean(classSnap?.exists?.())
+    && classSnap.child('active').val()!==false
     && grantOk
-    && memberSnap?.exists?.()
-    && memberSnap.child('active').val()===true;
+    && Boolean(memberSnap?.exists?.())
+    && memberSnap.child('active').val()!==false
+    && memberSnap.child('toolAccess/game-show').val()!==false;
 }
 
 function canAcceptStudentBuzz(current,now){

@@ -46,3 +46,13 @@ test('Game Show server buzz action honors narration and timed reveal locks',()=>
   assert.equal(canAcceptStudentBuzz({roundActive:false},100),false);
   assert.equal(canAcceptStudentBuzz({roundActive:true,buzzedBy:'Synthetic Student'},100),false);
 });
+
+test('Game Show treats a missing active flag on legacy WT/ET records as active (issue #420)',()=>{
+  const wt={b3StudentRole:'student',b3StudentId:'synthetic_wt_student',b3ClassId:'wt'};
+  // Live WT records have no class-level "active" and a membership with no "active" or toolAccess.
+  assert.equal(isActiveStudentAccess(wt,snap({name:'WT'}),snap({name:'Synthetic Student'})),true);
+  // Explicit per-student switch-off is still honoured.
+  assert.equal(isActiveStudentAccess(wt,snap({name:'WT'}),snap({toolAccess:{'game-show':false}})),false);
+  // ET cannot use a WT room: the class is taken from the signed identity, never from the request.
+  assert.equal(isActiveStudentAccess({...wt,b3ClassId:'et'},snap(null),snap({active:true})),false);
+});
