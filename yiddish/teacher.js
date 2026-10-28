@@ -3,28 +3,8 @@ const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;r
 async function call(action,data={}){return YiddishAPI.call(action,{...data,classId:new URLSearchParams(location.search).get('class')||'',idToken:await user.getIdToken()})}
 function notice(t){$('notice').textContent=t}
 async function load(){const r=await call('teacherLoad');if(r.storyGranted===false){$('dashboard').hidden=true;notice('The admin has not given this class a Yiddish story yet.');return}config=r.config;roster=r.roster;students=r.students;dirty=false;editors();table();notice('Progress loaded.');$('dashboard').hidden=false}
-function storySummary(data){
-  const sd=data.storyDetective||{},g=Number(sd.lastGroup),sec=sd.sections?.[g];
-  if(!Number.isInteger(g)||!sec||!sec.answers)return 'Not started';
-  const pct=Math.round((Number(sec.firstTryCorrect||0)/Number(sec.answers||1))*100);
-  return `S${g+1}: ${Number(sec.lastPosition||0)}/${Number(sec.lastTotal||0)||'?'} · ${pct}% first try`;
-}
-function table(){const t=document.createElement('table'),h=document.createElement('tr');['Student','Track','Learned','Practicing','Story Detective','Last active'].forEach(s=>h.append(node('th',s)));t.append(h);Object.entries(roster).filter(([,v])=>!!v.classId&&($('track').value==='all'||$('track').value===v.classId)).sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,v])=>{const data=students[id]||{},p=data.words||{},learned=C.words.filter(w=>p[w.id]?.credits>=2).length,practicing=C.words.filter(w=>p[w.id]&&p[w.id].credits<2).length,tr=node('tr',''),name=node('button',v.name||id);name.className='student-name';name.onclick=()=>detail(id,v);const td=node('td','');td.append(name);tr.append(td);[v.classId.toUpperCase(),learned,practicing,storySummary(data),data.lastActive?new Date(data.lastActive).toLocaleString():'Not started'].forEach(x=>tr.append(node('td',x)));t.append(tr)});$('roster').replaceChildren(t)}
-function storyDetail(sd){
-  const wrap=node('section','');wrap.className='story-teacher-detail';wrap.append(node('h3','Story Detective'));
-  for(let g=0;g<4;g++){
-    const sec=sd?.sections?.[g]||{},card=node('div','');card.className='story-teacher-card';card.append(node('h4','Section '+(g+1)));
-    if(!sec.answers){card.append(node('p','Not started'));wrap.append(card);continue}
-    const answers=Number(sec.answers||0),first=Number(sec.firstTryCorrect||0),misses=Number(sec.misses||0),pct=answers?Math.round(first/answers*100):0;
-    card.append(node('p',`${answers} paragraph answer${answers===1?'':'s'} · ${pct}% first try · ${misses} miss${misses===1?'':'es'}`));
-    card.append(node('p',`Last run position: ${Number(sec.lastPosition||0)}/${Number(sec.lastTotal||0)||'?'} · Completed rounds: ${Number(sec.completedRounds||0)}`));
-    const paras=node('div','');paras.className='story-paragraph-stats';
-    Object.entries(sec.paragraphs||{}).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([p,x])=>{const a=Number(x.answers||0),m=Number(x.misses||0),f=Number(x.firstTryCorrect||0);paras.append(node('span',`¶${p}: ${a}×, ${f} first-try, ${m} miss${m===1?'':'es'}`))});
-    if(paras.childNodes.length)card.append(paras);wrap.append(card);
-  }
-  return wrap;
-}
-function detail(id,v){const data=students[id]||{},p=data.words||{};$('detail').replaceChildren(node('h2',v.name||id),storyDetail(data.storyDetective||{}));const grid=node('div','');grid.className='grid';for(const w of C.words){const card=node('div','');card.className='word';const yi=node('div',w.yi);yi.className='yi';yi.lang='yi';card.append(yi,node('p',w.en),node('span',!p[w.id]?'New':p[w.id].credits>=2?'Learned':'Practicing'));grid.append(card)}$('detail').append(grid)}
+function table(){const t=document.createElement('table'),h=document.createElement('tr');['Student','Track','Learned','Practicing','Last active'].forEach(s=>h.append(node('th',s)));t.append(h);Object.entries(roster).filter(([,v])=>!!v.classId&&($('track').value==='all'||$('track').value===v.classId)).sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,v])=>{const data=students[id]||{},p=data.words||{},learned=C.words.filter(w=>p[w.id]?.credits>=2).length,practicing=C.words.filter(w=>p[w.id]&&p[w.id].credits<2).length,tr=node('tr',''),name=node('button',v.name||id);name.className='student-name';name.onclick=()=>detail(id,v);const td=node('td','');td.append(name);tr.append(td);[v.classId.toUpperCase(),learned,practicing,data.lastActive?new Date(data.lastActive).toLocaleString():'Not started'].forEach(x=>tr.append(node('td',x)));t.append(tr)});$('roster').replaceChildren(t)}
+function detail(id,v){const data=students[id]||{},p=data.words||{};$('detail').replaceChildren(node('h2',v.name||id));const grid=node('div','');grid.className='grid';for(const w of C.words){const card=node('div','');card.className='word';const yi=node('div',w.yi);yi.className='yi';yi.lang='yi';card.append(yi,node('p',w.en),node('span',!p[w.id]?'New':p[w.id].credits>=2?'Learned':'Practicing'));grid.append(card)}$('detail').append(grid)}
 const stepsIn=s=>Math.max(1,Math.ceil((s.words||[]).length/4));
 function stepRange(i){let a=1;for(let k=0;k<i;k++)a+=stepsIn(config.sections[k]);const b=a+stepsIn(config.sections[i])-1;return a===b?'Step '+a:'Steps '+a+'–'+b}
 function stepsOpen(t,c=config){const n=c.unlockedSteps&&c.unlockedSteps[t];if(Number.isInteger(n))return n;let s=0;for(let k=0;k<Math.min(c.unlocked?.[t]||0,c.sections.length);k++)s+=stepsIn(c.sections[k]);return s}

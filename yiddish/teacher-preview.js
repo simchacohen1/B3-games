@@ -37,7 +37,6 @@
     await api.ready;
     if (!state) return liveCall(action, data);
     if (action === 'status') return {...state, round:snapshot()};
-    if (action === 'storyAnswer') return {ok:true};
     if (action === 'start') {
       if (state.noStory) throw Error('Your class does not have a Yiddish story yet.');
       const section = state.config.sections[data.group];

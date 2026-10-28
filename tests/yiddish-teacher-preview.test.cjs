@@ -14,7 +14,6 @@ test('teacher demonstrations use authorized content and never write student resu
  const wrong=round.question.choices.find(id=>id!==round.question.wordId);
  assert.equal((await api.call('answer',{roundId:round.id,index:0,answer:wrong})).correct,false);
  while(!round.finished){const result=await api.call('answer',{roundId:round.id,index:round.index,answer:round.question.wordId});round=result.round;}
- await api.call('storyAnswer',{correct:true});
  assert.equal(calls.length,1);assert.equal(calls[0].action,'teacherLoad');assert.equal(calls[0].data.classId,'mine');
  assert.ok(Object.keys((await api.call('status')).progress).length>0);
 });
