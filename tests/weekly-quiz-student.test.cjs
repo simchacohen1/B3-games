@@ -107,3 +107,19 @@ test('Weekly Quiz browser page uses the authenticated API for launches, answers,
   for(const actionName of ['launch','answer','history','review'])assert.ok(html.includes(`callStudentQuiz('${actionName}'`));
   assert.doesNotMatch(html,/db\.ref\(QROOT\+'\/(?:launches|responses|completions)/);
 });
+
+test('Weekly Quiz keeps an unsubmitted choice through repeated 2.5-second launch polls, but not a new question or launch',()=>{
+  const html=fs.readFileSync('weekly-quiz/index.html','utf8');
+  const source=html.match(/function preserveUnsubmittedChoice\([^)]*\)\{[^\n]*\}/)?.[0];
+  assert.ok(source,'Expected a testable selection preservation helper');
+  const preserve=vm.runInNewContext(source+'; preserveUnsubmittedChoice');
+  let selected=2;
+  // The real launch refreshes every 2.5s; 14 refreshes span 35 seconds.
+  for(let i=0;i<14;i++)selected=preserve(null,0,'launch_a',selected,0,'launch_a');
+  assert.equal(selected,2,'background polling must not erase the chosen answer');
+  assert.equal(preserve(null,1,'launch_a',selected,0,'launch_a'),null,'a different question starts without a selection');
+  assert.equal(preserve(null,0,'launch_b',selected,0,'launch_a'),null,'a new launch starts without an old answer');
+  assert.equal(preserve({choiceIndex:1},0,'launch_a',selected,0,'launch_a'),1,'server-confirmed answer takes precedence');
+  assert.match(html,/selectedChoice=preserveUnsubmittedChoice\(resp,displayedQuestion,activeLaunchId/);
+  assert.match(html,/launchPollTimer=setInterval\(refresh,2500\)/);
+});
