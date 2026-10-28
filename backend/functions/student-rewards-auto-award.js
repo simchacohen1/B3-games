@@ -852,8 +852,13 @@ async function listPendingChazaraRequests(scope,{repair=true}={}){
     const rows=[];
     // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-    for(const studentId of Object.keys(scope.students)){
-      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+    // Scan the request collection once, rather than once per class student.
+    // This reduces server-side filtering work without changing RTDB reads,
+    // class authorization, or the returned request shape.
+    for(const [id,item] of Object.entries(allRequests)){
+      const studentId=String(item?.practiceStudentId||'');
+      if(!Object.prototype.hasOwnProperty.call(scope.students,studentId))continue;
+      if(item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
     }
     return (await sweepPendingMilestones(rows)).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
