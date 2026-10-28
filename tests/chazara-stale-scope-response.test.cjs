@@ -166,6 +166,7 @@ test('late failure from an older same-class request cannot erase a newer queue',
 test('history refresh prefers latest authorized server status over stale cached event',async()=>{
   const f=fixture(historyCode,'loadPreviousRecordings');
   f.ctx.recordingHistoryLoaded=true;
+  f.ctx.pendingPointRequests={pending:{recorded:true,practiceStudentId:'shared',eventId:'localPending'}};
   f.ctx.E={shared:{
     same:{workspaceClassId:'et',fullReviewChecked:false,pointRequestStatus:'pending'},
     localPending:{workspaceClassId:'et',pointRequestStatus:'pending'}
@@ -180,5 +181,27 @@ test('history refresh prefers latest authorized server status over stale cached 
   assert.equal(f.ctx.E.shared.same.pointRequestStatus,'approved');
   assert.equal(f.ctx.E.shared.localPending.pointRequestStatus,'pending');
   assert.equal(f.ctx.recordingHistoryLoaded,true);
+  assert.equal(f.renderCount(),1);
+});
+
+
+test('history refresh discards cached recordings absent from server unless still pending and in class',async()=>{
+  const f=fixture(historyCode,'loadPreviousRecordings');
+  f.ctx.recordingHistoryLoaded=true;
+  f.ctx.pendingPointRequests={
+    live:{recorded:true,practiceStudentId:'shared',eventId:'livePending'},
+    foreign:{recorded:true,practiceStudentId:'shared',eventId:'foreignPending'}
+  };
+  f.ctx.E={shared:{
+    removed:{workspaceClassId:'et',recorded:true,reviewApplied:true},
+    livePending:{workspaceClassId:'et',recorded:true,reviewApplied:true},
+    foreignPending:{workspaceClassId:'wt',recorded:true,reviewApplied:true}
+  }};
+  const loading=f.ctx.run();
+  f.resolveResponse({recordings:[]});
+  await loading;
+  assert.equal(f.ctx.E.shared.removed,undefined,'removed server event must not survive as cached history');
+  assert.equal(f.ctx.E.shared.foreignPending,undefined,'foreign-class cache must not be restored');
+  assert.equal(f.ctx.E.shared.livePending.workspaceClassId,'et','current in-class pending recording remains visible');
   assert.equal(f.renderCount(),1);
 });
