@@ -10,8 +10,11 @@ if(!admin.apps.length)admin.initializeApp();
 const STAGING_PROJECT='fun-torah-tools-staging';
 const STAGING_DB='https://fun-torah-tools-staging-default-rtdb.firebaseio.com';
 function stagingDatabase(){
- const project=process.env.GCLOUD_PROJECT||process.env.GCP_PROJECT||process.env.GOOGLE_CLOUD_PROJECT;
- if(process.env.B3_STAGING_DEPLOYMENT!=='true'||project!==STAGING_PROJECT)error(503,'Staging authorization is unavailable.');
+ let firebaseConfig={};
+ try{firebaseConfig=JSON.parse(process.env.FIREBASE_CONFIG||'{}')}catch{error(503,'Invalid staging runtime configuration.')}
+ const projects=[process.env.GCLOUD_PROJECT,process.env.GCP_PROJECT,process.env.GOOGLE_CLOUD_PROJECT,firebaseConfig.projectId].filter(Boolean);
+ if(process.env.B3_STAGING_DEPLOYMENT!=='true'||!projects.length||projects.some(project=>project!==STAGING_PROJECT)||
+    (firebaseConfig.databaseURL&&firebaseConfig.databaseURL!==STAGING_DB))error(503,'Staging authorization is unavailable.');
  const options=admin.app().options||{};
  if((options.projectId&&options.projectId!==STAGING_PROJECT)||(options.databaseURL&&options.databaseURL!==STAGING_DB))error(503,'Staging database target mismatch.');
  return admin.database();
