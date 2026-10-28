@@ -37,7 +37,7 @@ exports.classPointerShareAuth=onRequest({
   const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
-  if(!cls||cls.active===false||!session||session.roomId!==room||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Class Pointer is not active for this class.');
+  if(!cls||cls.active!==true||!session||session.roomId!==room||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Class Pointer is not active for this class.');
   if(cls.toolGrants?.['class-pointer']!==true)error(403,'Class Pointer is disabled for this class.');
   const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
   const failurePaths=id=>({s:'b3Private/classPointerJoinLimits/s_'+sha(id).slice(0,32),i:'b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32)});
@@ -58,28 +58,28 @@ exports.classPointerShareAuth=onRequest({
   if(action==='permissions'){
    const request=session.destinationRequest;
    if(!(request&&['screens','boards'].includes(request.mode))&&session.studentScreenSharing!==true)error(403,'There is no active student activity request.');
-   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active!==true)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
    const [profile,code]=await Promise.all([
     db.ref('b3Games/students/'+studentId+'/profile').once('value'),
     readPasscode(p=>db.ref(p).once('value').then(s=>s.val()),studentId,{allowLegacyDefault:false})
    ]);
-   if(!profile.val()||profile.val().active===false)error(403,'Inactive student.');
+   if(!profile.val()||profile.val().active!==true)error(403,'Inactive student.');
    if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val()||{};
    return res.json({ok:true,screenSharingDenied:permission.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true,whiteboardDenied:permission.whiteboardDenied===true||session.whiteboardDenied?.[studentId]===true});
   }
   if(action==='issue'){
    if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
-   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active!==true)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
    // The website currently live still records a teacher's denial on the public session record; the new one uses the private record. Honor both.
    if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
-   if(!profile||profile.active===false)error(403,'Inactive student.');
+   if(!profile||profile.active!==true)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
    if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
    // A student's own allowance of successful tickets (25 per 10 minutes), independent of classmates.
@@ -138,7 +138,7 @@ exports.classPointerShareAuth=onRequest({
      db.ref(base+'/members/'+ticket.studentId).once('value')
    ]);
    const profile=profileSnap.val(),member=memberSnap.val();
-   if(!profile||profile.active===false||!member||member.active===false)error(403,'Student no longer belongs to this class.');
+   if(!profile||profile.active!==true||!member||member.active!==true)error(403,'Student no longer belongs to this class.');
    return res.json({ok:true,studentId:ticket.studentId,studentName:String(profile.name||'Student').slice(0,32)});
   }
   // ---- Join tickets: only a verified class member may connect to the teacher's room. ----
@@ -166,10 +166,10 @@ exports.classPointerShareAuth=onRequest({
    return claims;
   };
   const stillMember=async id=>{
-   if(!validId(id)||!cls.members?.[id]||cls.members[id].active===false)return null;
+   if(!validId(id)||!cls.members?.[id]||cls.members[id].active!==true)return null;
    const [profileSnap,memberSnap]=await Promise.all([db.ref('b3Games/students/'+id+'/profile').once('value'),db.ref(base+'/members/'+id).once('value')]);
    const profile=profileSnap.val(),member=memberSnap.val();
-   if(!profile||profile.active===false||!member||member.active===false)return null;
+   if(!profile||profile.active!==true||!member||member.active!==true)return null;
    return profile;
   };
   if(action==='joinIssue'){
