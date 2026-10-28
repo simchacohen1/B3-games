@@ -30,6 +30,9 @@ test('the no-action rewards path requires a verified practice-student token befo
   assert.ok(start>=0&&auth>start&&profileRead>auth);
   assert.match(source,/body\.studentId&&String\(body\.studentId\)!==studentId/);
   assert.match(source,/function isMilestoneRequest\(item\)/);
-  assert.match(source,/item\.status==='pending'&&isReviewableRequest\(item\)/);
+  // Both pending-list paths must gate on pending status AND reviewable source.
+  // Scoped path skips non-pending/unreviewable rows; owner path admits only both.
+  assert.match(source,/if\(!studentRows\|\|item\.status!=='pending'\|\|!isReviewableRequest\(item\)\)continue;/);
+  assert.match(source,/if\(item\.status\s*===\s*"pending"\s*&&\s*isReviewableRequest\(item\)\)/);
   assert.doesNotMatch(source,/awardMilestoneImmediately\(\{requestId,rewardStudentId,studentId,source,amount,reason,record\}\)/);
 });
