@@ -2,7 +2,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const page=fs.readFileSync(__dirname+'/../sync-to-nigri/school-marks.html','utf8');
 const helper=fs.readFileSync(__dirname+'/../weekly-quiz/report-pdf.js','utf8');
-const script=page.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadData\(\);\s*$/,'');
+// Drop the page's start-up code (either the plain loadData() call or the sign-in wrapper around it) so only the functions are tested.
+const script=page.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\n\(function startWithSignIn\(\)\{[\s\S]*$/,'\n').replace(/\nloadData\(\);\s*$/,'');
 test('PDF libraries load before the School Marks sync script',()=>{
   assert.ok(page.indexOf('jspdf.umd.min.js')<page.indexOf('../weekly-quiz/report-pdf.js'));
   assert.ok(page.indexOf('../weekly-quiz/report-pdf.js')<page.indexOf('async function syncMarks()'));
