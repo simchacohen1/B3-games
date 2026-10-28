@@ -1,0 +1,161 @@
+{
+  "description": "Static inventory of direct URL destinations exposed by the two teacher tool menus. NOT a security/access-control verification.",
+  "source": [
+    "index.html#teacherToolsSection",
+    "teacher-home.html#TOOLS"
+  ],
+  "capturedAt": "2026-10-28",
+  "routes": [
+    {
+      "path": "admin.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "chavrusa/index.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "chazara/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "class-dashboard/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "class-gallery/index.html",
+      "homepage": false,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "class-pointer-prototype/dashboard.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "davening_student_app/index.html",
+      "homepage": false,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "davening_student_app_et/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "davening_student_app_wt/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "follow-teacher/teacher.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "game-show/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "gematria/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "halacha/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "halacha/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "name-picker/index.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "rashi-letters/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "record_pesukim/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "sefer-hamitzvos/index.html",
+      "homepage": false,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "shorashim/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "student-report/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "student-rewards/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "sync-to-nigri/index.html",
+      "homepage": true,
+      "teacherCenter": false,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "weekly-quiz/teacher.html",
+      "homepage": true,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    },
+    {
+      "path": "yiddish/teacher.html",
+      "homepage": false,
+      "teacherCenter": true,
+      "authorization": "NOT_VERIFIED"
+    }
+  ],
+  "otherEntrypointsToAudit": [
+    "teacher-home.html",
+    "teacher-preview-tool.html",
+    "teacher-student-split.html",
+    "owner-admin.html",
+    "class-pointer-prototype/classroom.html"
+  ]
+}
