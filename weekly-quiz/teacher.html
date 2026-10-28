@@ -1852,7 +1852,14 @@ async function launchSelectedQuiz(){
     retakeOf:''
   };
   if(autoStart)launch.startedAt=firebase.database.ServerValue.TIMESTAMP;
-  if(makeupSourceLaunchId)launch.makeupOf=makeupSourceLaunchId;
+  if(makeupSourceLaunchId){
+    // A make-up belongs to the ORIGINAL quiz's group, so a boy's make-up score
+    // replaces his missing result there instead of becoming a separate quiz.
+    launch.makeupOf=makeupSourceLaunchId;
+    const srcL=allLaunches[makeupSourceLaunchId]||{},grp=srcL.attemptGroupId||makeupSourceLaunchId;
+    let maxA=1;Object.values(allLaunches).forEach(x=>{if((x.attemptGroupId||'')===grp)maxA=Math.max(maxA,Number(x.attemptNumber)||1);});
+    launch.attemptGroupId=grp;launch.attemptNumber=maxA+1;
+  }
 
   await db.ref(QROOT+'/launches/'+id).set(launch);
 

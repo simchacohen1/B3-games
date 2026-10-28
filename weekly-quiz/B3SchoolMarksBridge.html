@@ -392,7 +392,7 @@ const SYNC_KEY='1qaz2wsx';
 // sends the student straight to this exact quiz (bypassing whatever launch
 // would otherwise be chosen for them), the same way copyLaunchLink() does on
 // teacher.html.
-const QUIZ_BASE_URL='https://simchacohen1.github.io/B3-games/quiz/';
+const QUIZ_BASE_URL=window.location.href.replace(/[?#].*$/,'').replace(/B3SchoolMarksBridge\.html$/,''); // same folder as the quiz page
 function quizLinkFor(launchId){return QUIZ_BASE_URL+'?launch='+encodeURIComponent(launchId);}
 // Nigri's real "Type" radio buttons use these lowercase ids -- the
 // dropdown below shows the friendlier labels a teacher expects to see.
