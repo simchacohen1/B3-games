@@ -849,6 +849,7 @@
                   <hr>
                   <button onclick="downloadCSV()">Download CSV</button>
                   <button onclick="copyResultsTSV()">Copy for Google Sheets</button>
+                  <button onclick="openSyncToNigri(resultsLaunchId)">Sync to Nigri</button>
                   <hr>
                   <button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button>
                 </div>
@@ -2263,6 +2264,8 @@ function resultsMatrix(){
 }
 function csvEscape(v){const s=String(v??'');return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCSV(){const rows=resultsMatrix(),l=allLaunches[resultsLaunchId];if(!rows.length||!l)return;const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=((l.quizSnapshot&&l.quizSnapshot.title)||'B3_Quiz').replace(/[^a-z0-9]+/gi,'_')+'_'+l.classId+'_'+resultsLaunchId.slice(0,13)+'.csv';a.click();URL.revokeObjectURL(a.href);}
+// Opens School Marks with this quiz already chosen. Nothing is sent to Nigri from here.
+function openSyncToNigri(launchId){let id=launchId;if(!id)return;for(let i=0;i<10;i++){const l=(allLaunches||{})[id]||{},p=l.retakeOf||l.makeupOf;if(!p)break;id=p}window.open('../sync-to-nigri/school-marks.html?launch='+encodeURIComponent(id),'_blank')}
 async function copyResultsTSV(){const rows=resultsMatrix();if(!rows.length)return;const tsv=rows.map(r=>r.join('\t')).join('\n');try{await navigator.clipboard.writeText(tsv);alert('Copied. Paste directly into Google Sheets.');}catch(e){prompt('Copy this and paste into Google Sheets:',tsv);}}
 
 // ---------- Long-term student progress ----------
