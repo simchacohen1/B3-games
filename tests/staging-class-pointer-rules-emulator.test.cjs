@@ -66,6 +66,22 @@ run('private tickets, PINs and rate limits stay inaccessible even to class teach
     for(const path of ['b3Private','b3Private/classPointerShareTickets/secret','b3Private/classPointerJoinLimits/secret','b3Private/classPointerShareLimits/secret','b3Private/passcodes/test_student_alef'])await no(get(ref(db,path)));
   }
 });
+run('student permission reads require a fresh, numeric room timestamp',async()=>{
+  const db=student();
+  const timestamp=classPath+'/classPointerSessions/'+room+'/createdAt';
+  const update=async value=>env.withSecurityRulesDisabled(async c=>set(ref(c.database(),timestamp),value));
+  await yes(get(ref(db,policy+'/test_student_alef')));
+  await update(Date.now()-15000000);
+  await no(get(ref(db,policy+'/test_student_alef')));
+  await update(Date.now()+120000);
+  await no(get(ref(db,policy+'/test_student_alef')));
+  await update('not-a-timestamp');
+  await no(get(ref(db,policy+'/test_student_alef')));
+  await update(null);
+  await no(get(ref(db,policy+'/test_student_alef')));
+  await update(Date.now());
+  await yes(get(ref(db,policy+'/test_student_alef')));
+});
 run('revoked class grant and removed session immediately deny own-student policy reads',async()=>{
   const db=student();
   const admin=env.withSecurityRulesDisabled.bind(env);
