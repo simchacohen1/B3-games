@@ -6,6 +6,8 @@ on:
       - 'tests/shorashim-recording-repair.test.cjs'
       - 'tests/shorashim-picture-costs.test.cjs'
       - 'tests/shorashim-card-transition.test.cjs'
+      - 'tests/shorashim-cloud-save-queue.test.cjs'
+      - 'tests/shorashim-student-firebase-traffic.test.cjs'
       - 'tests/shorashim-teacher-screenshots.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
   push:
@@ -14,6 +16,8 @@ on:
       - 'tests/shorashim-recording-repair.test.cjs'
       - 'tests/shorashim-picture-costs.test.cjs'
       - 'tests/shorashim-card-transition.test.cjs'
+      - 'tests/shorashim-cloud-save-queue.test.cjs'
+      - 'tests/shorashim-student-firebase-traffic.test.cjs'
       - 'tests/shorashim-teacher-screenshots.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
 # Newer runs on the same PR/branch cancel superseded ones (including main,
@@ -30,4 +34,4 @@ jobs:
         with:
           node-version: '22'
       - name: Shorashim saving regression
-        run: node --test tests/shorashim-recording-repair.test.cjs tests/shorashim-picture-costs.test.cjs tests/shorashim-card-transition.test.cjs tests/shorashim-teacher-screenshots.test.cjs tests/shorashim-student-firebase-traffic.test.cjs
+        run: node --test tests/shorashim-recording-repair.test.cjs tests/shorashim-picture-costs.test.cjs tests/shorashim-card-transition.test.cjs tests/shorashim-teacher-screenshots.test.cjs tests/shorashim-student-firebase-traffic.test.cjs tests/shorashim-cloud-save-queue.test.cjs
