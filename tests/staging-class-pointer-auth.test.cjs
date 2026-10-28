@@ -113,6 +113,9 @@ test('staging rule file permits own-student reads and keeps private ticket/limit
   assert.match(room.$studentId['.read'],/auth.token.b3StudentId == \$studentId/);
   assert.match(room.$studentId['.read'],/auth.token.b3ClassId == \$classId/);
   assert.match(room.$studentId['.read'],/classPointerSessions/);
+  assert.match(room.$studentId['.read'],/createdAt/);
+  assert.match(room.$studentId['.read'],/now - 14400000/);
+  assert.match(room.$studentId['.read'],/now \+ 60000/);
   assert.match(room['.read'],/teachers/);
   assert.equal(privateRules.classPointerShareTickets['.read'],undefined);
   assert.equal(privateRules.classPointerJoinTickets['.read'],undefined);
