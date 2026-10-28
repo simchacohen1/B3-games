@@ -118,3 +118,14 @@ test('fictional account provisioner grants the correct Class Pointer tool',()=>{
   assert.match(provisioner,/\$allTools = @\([^\n]*'class-pointer'/);
   assert.doesNotMatch(source,/simcha5770@gmail.com|us-central1-b3-games/);
 });
+
+test('persistent-sharing option is staging-only and preserves the original direct share button',()=>{
+  const share=fs.readFileSync(__dirname+'/../class-pointer-prototype/activity-share.js','utf8');
+  const windowPage=fs.readFileSync(__dirname+'/../class-pointer-prototype/student-share-window.html','utf8');
+  assert.match(share,/window\.B3_STAGING_MODE===true&&!persistentShareWindow/);
+  assert.match(share,/Keep Sharing While Navigating/);
+  assert.match(share,/btn\.addEventListener\('click',beginShare\)/);
+  assert.match(share,/student-share-window\.html\?pointerShare=1/);
+  assert.match(windowPage,/window\.opener=null/);
+  assert.doesNotMatch(share,/student-share-window\.html\?[^'\x22]*pin=/i);
+});
