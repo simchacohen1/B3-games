@@ -162,3 +162,23 @@ test('late failure from an older same-class request cannot erase a newer queue',
   assert.equal(f.renderCount(),1);
   assert.equal(f.approvalCount(),1);
 });
+
+test('history refresh prefers latest authorized server status over stale cached event',async()=>{
+  const f=fixture(historyCode,'loadPreviousRecordings');
+  f.ctx.recordingHistoryLoaded=true;
+  f.ctx.E={shared:{
+    same:{workspaceClassId:'et',fullReviewChecked:false,pointRequestStatus:'pending'},
+    localPending:{workspaceClassId:'et',pointRequestStatus:'pending'}
+  }};
+  const loading=f.ctx.run();
+  f.resolveResponse({recordings:[{
+    studentId:'shared',id:'same',workspaceClassId:'et',
+    fullReviewChecked:true,pointRequestStatus:'approved'
+  }]});
+  await loading;
+  assert.equal(f.ctx.E.shared.same.fullReviewChecked,true);
+  assert.equal(f.ctx.E.shared.same.pointRequestStatus,'approved');
+  assert.equal(f.ctx.E.shared.localPending.pointRequestStatus,'pending');
+  assert.equal(f.ctx.recordingHistoryLoaded,true);
+  assert.equal(f.renderCount(),1);
+});
