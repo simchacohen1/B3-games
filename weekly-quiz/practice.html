@@ -264,11 +264,37 @@ function enterApp(){
   document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=studentName;renderPosukGrid();
 }
 async function restore(){
-const account=await window.B3TeacherAccountReady;
-if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
-  const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name){location.href='../index.html';return;}
-  try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
+  try{
+    const account=await window.B3TeacherAccountReady;
+    if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+      teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;
+    }
+    const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+    const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
+    if(!id||!name){location.href='../index.html';return;}
+    const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
+    let profile=profileSnap.val();
+    if(!profile){
+      const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
+      if(!legacySnap.exists()){setLoginMsg('Your student profile could not be found. Please sign in again.');return;}
+      profile=legacySnap.val()||{};
+    }
+    if(profile.active===false){setLoginMsg('This student account is not active. Please ask your teacher.');return;}
+    const workspaceId=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
+    const memberships=await db.ref('b3Games/students/'+id+'/memberships').once('value');
+    const rows=memberships.val()||{};
+    const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
+    const classId=membership?String(membership.classId).trim():String(sessionStorage.getItem('b3Games_studentClass')||profile.classId||sessionStorage.getItem('weeklyQuiz_classId')||(typeof studentClass==='function'?studentClass(id):'')||'').trim();
+    if(!classId){setLoginMsg('Your class could not be found. Please ask your teacher.');return;}
+    studentId=id;studentName=profile.name?String(profile.name):name;
+    sessionStorage.setItem('posukPractice_studentId',id);
+    sessionStorage.setItem('posukPractice_studentName',studentName);
+    sessionStorage.setItem('weeklyQuiz_classId',classId);
+    enterApp();
+  }catch(e){
+    console.error('Could not restore practice quiz sign-in:',e);
+    setLoginMsg('Could not check your sign-in. Please reload or return to Fun Torah Tools.');
+  }
 }
 function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}
 function renderPosukGrid(){
