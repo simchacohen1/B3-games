@@ -157,3 +157,62 @@ test('missing active class or membership flags fail closed',async()=>{
   delete cls.members[f.studentId].active;
   assert.equal((await f.post({action:'issue',...params(f)})).statusCode,403);
 });
+
+test('wrong student PIN never discloses a private screen-sharing denial',async()=>{
+  const f=fixture(),policy='b3Private/classPointerSharePermissions/b3-2026/'+f.classId+'/'+f.room+'/'+f.studentId;
+  f.rows.set(policy,{screenSharingDenied:true});
+  const wrong=await f.post({action:'issue',...params(f),pin:'wrong'});
+  assert.equal(wrong.statusCode,401);
+  assert.equal(wrong.body.error,'Please sign in again.');
+  const correct=await f.post({action:'issue',...params(f)});
+  assert.equal(correct.statusCode,403);
+  assert.match(correct.body.error,/teacher has turned off/);
+});
+
+test('join ticket is student-authenticated, peer-bound and verified by the owning teacher',async()=>{
+  const f=fixture(),peerId='peer-test-alef-123';
+  const wrong=await f.post({action:'joinIssue',...params(f),peerId,pin:'wrong'});
+  assert.equal(wrong.statusCode,401);
+  const issued=await f.post({action:'joinIssue',...params(f),peerId});
+  assert.equal(issued.statusCode,200);
+  assert.match(issued.body.token,/^[a-f0-9]{64}$/);
+  const verify={action:'joinVerify',classId:f.classId,room:f.room,token:issued.body.token,peerId};
+  assert.equal((await f.post(verify,'outsider')).statusCode,403);
+  assert.equal((await f.post({...verify,peerId:'peer-test-other-123'},f.teacherUid)).statusCode,403);
+  const admitted=await f.post(verify,f.teacherUid);
+  assert.equal(admitted.statusCode,200);
+  assert.equal(admitted.body.studentId,f.studentId);
+  assert.equal((await f.post(verify,f.teacherUid)).statusCode,200);
+  assert.equal((await f.post({...verify,classId:'TEST-BEIS'},f.teacherUid)).statusCode,403);
+});
+
+test('new join ticket invalidates an older ticket for the same student',async()=>{
+  const f=fixture(),peerId='peer-test-alef-123';
+  const first=await f.post({action:'joinIssue',...params(f),peerId});
+  const second=await f.post({action:'joinIssue',...params(f),peerId});
+  assert.equal(first.statusCode,200);
+  assert.equal(second.statusCode,200);
+  assert.notEqual(first.body.token,second.body.token);
+  const verify=token=>f.post({action:'joinVerify',classId:f.classId,room:f.room,token,peerId},f.teacherUid);
+  assert.equal((await verify(first.body.token)).statusCode,403);
+  assert.equal((await verify(second.body.token)).statusCode,200);
+});
+
+test('join recheck immediately rejects revoked class membership and non-owner teachers',async()=>{
+  const f=fixture(),body={action:'joinRecheck',classId:f.classId,room:f.room,studentIds:[f.studentId,'test_student_beis']};
+  assert.equal((await f.post(body,'outsider')).statusCode,403);
+  const before=await f.post(body,f.teacherUid);
+  assert.equal(before.statusCode,200);
+  assert.deepEqual(Array.from(before.body.allowed),[f.studentId]);
+  f.rows.get(f.base).members[f.studentId].active=false;
+  const after=await f.post(body,f.teacherUid);
+  assert.equal(after.statusCode,200);
+  assert.deepEqual(Array.from(after.body.allowed),[]);
+});
+
+test('repeated wrong join PINs trigger the student-specific rate limit',async()=>{
+  const f=fixture(),body={action:'joinIssue',...params(f),peerId:'peer-test-alef-123',pin:'wrong'};
+  for(let i=0;i<8;i++)assert.equal((await f.post(body)).statusCode,401);
+  const blocked=await f.post({...body,pin:'123456'});
+  assert.equal(blocked.statusCode,429);
+});
