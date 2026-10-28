@@ -272,7 +272,7 @@ async function studentActivity(browser: any, issue: (body: any) => { status: num
     return route.fulfill({ status: result.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(result.body) });
   });
   const page = await context.newPage();
-  await page.goto(BASE + '/activity-test.html');
+  await page.goto(BASE + '/activity-test.html?pointerShare=1');
   return { context, page, calls };
 }
 
@@ -391,7 +391,7 @@ test('the Share button disappears for a student as soon as the teacher turns him
     return route.fulfill({ status: result.ok ? 200 : 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(result) });
   });
   const page = await context.newPage();
-  await page.goto(BASE + '/activity-test.html');
+  await page.goto(BASE + '/activity-test.html?pointerShare=1');
   const share = page.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
   await expect(share).toBeVisible({ timeout: 15000 });
   denied = true;
