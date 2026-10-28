@@ -205,3 +205,23 @@ test('history refresh discards cached recordings absent from server unless still
   assert.equal(f.ctx.E.shared.livePending.workspaceClassId,'et','current in-class pending recording remains visible');
   assert.equal(f.renderCount(),1);
 });
+
+
+test('pending cache key must not match a different student and event containing separators',async()=>{
+  const f=fixture(historyCode,'loadPreviousRecordings');
+  f.ctx.teacherScope.students['shared__x']={};
+  f.ctx.pendingPointRequests={
+    live:{recorded:true,practiceStudentId:'shared__x',eventId:'y'}
+  };
+  f.ctx.E={
+    shared:{'x__y':{workspaceClassId:'et',recorded:true}},
+    'shared__x':{y:{workspaceClassId:'et',recorded:true}}
+  };
+  const loading=f.ctx.run();
+  f.resolveResponse({recordings:[]});
+  await loading;
+  assert.equal(f.ctx.E.shared?.['x__y'],undefined,
+    'a pending request for another student/event must not preserve a removed recording');
+  assert.equal(f.ctx.E['shared__x'].y.workspaceClassId,'et',
+    'the actual in-class pending recording remains cached');
+});
