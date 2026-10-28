@@ -92,7 +92,31 @@
     fallback.textContent='Try again';fallback.hidden=true;
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
     fallback.addEventListener('click',()=>void beginShare());
-    holder.append(btn,label,fallback);
+    // Experimental staging-only alternative: a separate, same-origin window owns
+    // the capture, so navigating the learning tab does not end screen sharing.
+    // The existing Share My Screen button and its click handler are unchanged.
+    if(window.B3_STAGING_MODE===true&&!persistentShareWindow){
+      const keep=document.createElement('button');keep.type='button';
+      keep.textContent='Keep Sharing While Navigating';
+      keep.style.cssText='background:white;color:#1d4ed8;border:1px solid #1d4ed8;border-radius:10px;padding:11px 14px;cursor:pointer;font:700 13px system-ui';
+      keep.addEventListener('click',()=>{
+        if(!active||!permissionReady||!sameStudent())return;
+        // No student PIN, token or classroom identifier is placed in the URL.
+        // The new same-origin window inherits this tab's sessionStorage once,
+        // and the server rechecks membership before issuing any sharing ticket.
+        const url=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root);
+        const popup=window.open('', 'fttPointerShare_'+id, 'width=560,height=520');
+        if(!popup){status('Please allow pop-ups for the staging site.');return}
+        try{
+          if(popup.location.pathname!==url.pathname||popup.location.search!==url.search)popup.location.replace(url.href);
+          popup.focus();
+          status('Start sharing in the separate window and keep it open while changing activities.');
+        }catch{
+          try{popup.location.href=url.href;popup.focus()}catch{status('Could not open the sharing window.')}
+        }
+      });
+      holder.append(btn,keep,label,fallback);
+    }else holder.append(btn,label,fallback);
     const shareArea=persistentShareWindow&&typeof document.querySelector==='function'?document.querySelector('#fttShareControlArea'):null;
     if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
     else document.body.appendChild(holder);
