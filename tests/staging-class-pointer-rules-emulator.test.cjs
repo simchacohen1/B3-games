@@ -63,7 +63,7 @@ run('teacher access is limited to assigned active class and valid policy schema'
 });
 run('private tickets, PINs and rate limits stay inaccessible even to class teacher',async()=>{
   for(const db of [student(),teacher('teacher-alef'),env.unauthenticatedContext().database()]){
-    for(const path of ['b3Private','b3Private/classPointerShareTickets/secret','b3Private/classPointerJoinLimits/secret','b3Private/classPointerShareLimits/secret','b3Private/passcodes/test_student_alef'])await no(get(ref(db,path)));
+    for(const path of ['b3Private','b3Private/classPointerShareTickets/secret','b3Private/classPointerJoinLimits/secret','b3Private/classPointerJoinLimits/ok_secret','b3Private/classPointerJoinTicketIndex/secret','b3Private/classPointerShareLimits/secret','b3Private/passcodes/test_student_alef'])await no(get(ref(db,path)));
   }
 });
 run('student permission reads require a fresh, numeric room timestamp',async()=>{
