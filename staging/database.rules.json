@@ -612,7 +612,21 @@
         "$workspaceId": {
           "$classId": {
             "$roomId": {
-              ".write": "auth != null && ((auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))"
+              ".read": "auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true && ((auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true))",
+              ".write": "auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true && ((auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true))",
+              "$studentId": {
+                ".read": "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId && $workspaceId == 'b3-2026' && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + $studentId + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/classPointerSessions/' + $roomId + '/roomId').val() == $roomId",
+                ".validate": "newData.hasChild('screenSharingDenied') || newData.hasChild('whiteboardDenied')",
+                "screenSharingDenied": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "whiteboardDenied": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
             }
           }
         }
