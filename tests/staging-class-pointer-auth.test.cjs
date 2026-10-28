@@ -148,3 +148,12 @@ test('regenerated staging rules retain exactly the checked-in private permission
     assert.deepEqual(generated,checkedIn);
   }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
+
+test('missing active class or membership flags fail closed',async()=>{
+  const f=fixture(),cls=f.rows.get(f.base);
+  delete cls.active;
+  assert.equal((await f.post({action:'issue',...params(f)})).statusCode,403);
+  cls.active=true;
+  delete cls.members[f.studentId].active;
+  assert.equal((await f.post({action:'issue',...params(f)})).statusCode,403);
+});
