@@ -130,3 +130,20 @@ test('deactivating the sole supervised teacher revokes principal access atomical
   assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], null);
   assert.equal(f.invites.principal.active, false);
 });
+
+
+test('principal gains one class without rewriting the already granted class', async () => {
+  const f = fixture({ supervisedTeacherIds: { teacherA: true }, classIds: { et: true } }, {
+    email: 'synthetic-principal@example.test', accountType: 'principal',
+    active: true, classIds: { et: true },
+    supervisedTeachers: { teacherA: { classIds: { et: true } } }
+  });
+  await f.reconcile(f.invites, f.classes);
+  assert.equal(f.writes.length, 1, 'class expansion must be one atomic update');
+  const u = f.writes[0];
+  assert.deepEqual(u[ROOT + '/teachers/principal-uid/classIds'], { et: true, wt: true });
+  assert.equal(u[ROOT + '/classes/et/teacherIds/principal-uid'], undefined,
+    'existing class grant must remain unchanged');
+  assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], true,
+    'newly supervised class must be granted');
+});
