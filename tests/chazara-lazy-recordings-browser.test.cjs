@@ -257,3 +257,63 @@ test('legacy inline audio remains metadata-only until explicit clicks in both te
   assert.equal(await page.locator('#approvalList audio').getAttribute('src'),inlineAudio);
  }finally{await browser?.close();server.close()}
 });
+
+
+test('late historical response cannot repopulate the pending-only Chazara view',{timeout:60000},async()=>{
+  // A slow history request can finish after the teacher switches back to
+  // pending approvals. The old response must not enter the active class view.
+  const server=await serve(),port=server.address().port;
+  let browser,releaseHistory,signalHistory;
+  const historyGate=new Promise(resolve=>{releaseHistory=resolve});
+  const historyStarted=new Promise(resolve=>{signalHistory=resolve});
+  const historyCalls=[];
+  try{
+    browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
+    const page=await browser.newPage();
+    await page.route(/gstatic\.com\/firebasejs\//,r=>r.fulfill({contentType:'text/javascript',body:''}));
+    await page.route(/gstatic\.com\/firebasejs\/.*app-compat/,r=>r.fulfill({contentType:'text/javascript',body:FIREBASE_STUB}));
+    await page.route(/site-settings\.js/,r=>r.fulfill({contentType:'text/javascript',body:SITE_STUB}));
+    await page.route(/private-media\.js/,r=>r.fulfill({contentType:'text/javascript',body:'window.B3PrivateMedia={setSource:async()=>{}}'}));
+    await page.route(/cloudfunctions\.net\/studentRewardsAutoAward/,async route=>{
+      const body=JSON.parse(route.request().postData()||'{}');
+      if(body.action==='list-chazara-pending')return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,requests:[
+        {id:'pending-wt',status:'pending',source:'chazara-recording',amount:2,recorded:true,practiceStudentId:'leib_wolf',eventId:'rec1',studentName:'Leib',classId:'wt',createdAt:3}
+      ]})});
+      if(body.action==='get-chazara-event')return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,event:tree.posukPractice.chazara.events[body.studentId]?.[body.eventId]||null})});
+      if(body.action==='list-chazara-history'){
+        historyCalls.push(body.studentId);
+        if(historyCalls.length===2)signalHistory();
+        await historyGate;
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,events:tree.posukPractice.chazara.events[body.studentId]||{}})});
+      }
+      return route.fulfill({contentType:'application/json',body:'{"ok":true}'});
+    });
+    await page.goto('http://127.0.0.1:'+port+'/chazara/teacher.html');
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1,null,{timeout:15000});
+    assert.equal(await page.locator('#recordingReviewFilter').inputValue(),'pending');
+    await page.selectOption('#recordingReviewFilter','checked');
+    await historyStarted;
+    assert.deepEqual(historyCalls.sort(),['leib_wolf','simcha_cohen']);
+    await page.selectOption('#recordingReviewFilter','pending');
+    await page.waitForFunction(()=>document.querySelectorAll('#recordingsList .recording-row').length===1);
+    releaseHistory();
+    await page.waitForTimeout(350);
+    const state=await page.evaluate(()=>({
+      filter:document.getElementById('recordingReviewFilter').value,
+      rows:[...document.querySelectorAll('#recordingsList .recording-row')].map(r=>r.dataset.eventKey),
+      loaded:[...historyStudentsLoaded],
+      staleEvent:Boolean(E.leib_wolf?.older),
+      rawHistoryReads:window.__reads.filter(p=>/^posukPractice\/chazara\/events\/[^/]+$/.test(p))
+    }));
+    assert.equal(state.filter,'pending');
+    assert.deepEqual(state.rows,[JSON.stringify(['leib_wolf','rec1'])],
+      'late history must not replace the pending recording');
+    assert.deepEqual(state.loaded,[],'cancelled history cannot mark students loaded');
+    assert.equal(state.staleEvent,false,'late history cannot be merged into the active recording map');
+    assert.deepEqual(state.rawHistoryReads,[],'history must still use the scoped API');
+  }finally{
+    releaseHistory();
+    await browser?.close();
+    server.close();
+  }
+});
