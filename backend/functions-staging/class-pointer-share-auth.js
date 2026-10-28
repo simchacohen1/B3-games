@@ -75,13 +75,16 @@ exports.classPointerShareAuth=onRequest({
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active!==true)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
-   const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
-   // The website currently live still records a teacher's denial on the public session record; the new one uses the private record. Honor both.
-   if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
+   // Authenticate the student before consulting private teacher denials.
+   // Otherwise an unauthenticated caller could distinguish a denied student
+   // from an allowed one using a wrong PIN, leaking classroom policy state.
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active!==true)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
    if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
+   const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
+   // Honor both the private teacher policy and legacy session denial.
+   if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    // A student's own allowance of successful tickets (25 per 10 minutes), independent of classmates.
    let busy=false;
    await db.ref('b3Private/classPointerShareLimits/ok_'+sha(studentId).slice(0,32)).transaction(previous=>{
