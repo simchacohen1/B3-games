@@ -95,7 +95,10 @@ test('teacher assigns three retakes to one boy; each stays open until he finishe
   await teacher.route('https://cdn.jsdelivr.net/npm/jspdf@*/**', route => route.fulfill({ contentType: 'text/javascript', body: '' }));
   teacher.on('dialog', dialog => dialog.type() === 'prompt' ? dialog.accept(dialog.defaultValue()) : dialog.accept());
   await teacher.goto(`${origin}/weekly-quiz/teacher.html?class=${CLASS_ID}`);
-  await teacher.locator('#lockGoogle').click();
+  // The Teacher Tools gate asks for sign-in first (reloading once the owner is confirmed); the page's own lock may follow.
+  await teacher.locator('#b3-teacher-gate').getByRole('button', { name: 'Sign in with Google' }).click();
+  await expect(teacher.locator('#mainContent').or(teacher.locator('#lockGoogle'))).toBeVisible({ timeout: 20000 });
+  if (await teacher.locator('#lockGoogle').isVisible()) await teacher.locator('#lockGoogle').click();
   await expect(teacher.locator('#mainContent')).toBeVisible({ timeout: 20000 });
   await teacher.locator('summary', { hasText: 'Reports' }).click();
   await teacher.locator('#tabResults').click();
