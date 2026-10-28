@@ -9,16 +9,14 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const {execFileSync}=require('node:child_process');
 
 const root=path.resolve(__dirname,'..');
 // Old copies and hidden preview folders are left alone on purpose.
 const skipDir=name=>name==='node_modules'||name==='vendor'||name.startsWith('.')||name.startsWith('backup-before-')||name.startsWith('preview-');
-function htmlPages(dir=root,out=[]){
- for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
-  if(entry.isDirectory()){if(!skipDir(entry.name))htmlPages(path.join(dir,entry.name),out);}
-  else if(entry.name.endsWith('.html'))out.push(path.join(dir,entry.name));
- }
- return out;
+function htmlPages(){
+ const tracked=execFileSync('git',['ls-files','-z'],{cwd:root,maxBuffer:8*1024*1024}).toString('utf8').split('\0').filter(Boolean);
+ return tracked.filter(file=>file.endsWith('.html')&&!file.split('/').some(skipDir)).map(file=>path.join(root,file));
 }
 const opensFirebaseAuthDb=source=>/indexedDB\s*\.\s*open\s*\(\s*['"]firebaseLocalStorageDb['"]/.test(source);
 

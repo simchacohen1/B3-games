@@ -14,7 +14,7 @@ firebase login
 firebase deploy --only functions:yiddishApi,functions:funTorahTeacherClaim,functions:funTorahManageStudents --project b3-games
 ```
 
-Alternatively copy `backend/functions/` into `C:\B3-Games-Backend\functions`, retaining other project files, and run the same targeted deployment from `C:\B3-Games-Backend`. The new function exports are already wired into `functions/index.js`. Existing deployed secrets remain in Firebase; no secret values belong in this repository.
+These installer copies default to the main repository's `backend` directory. To intentionally target this isolated preview backend, pass `-ProjectDirectory $PSScriptRoot`. Existing deployed secrets remain in Firebase; no secret values belong in this repository.
 
 Verify all three endpoints after deployment with a real invited Google teacher and real central student passcode. Do not change database rules as a shortcut. The Yiddish service uses the Admin SDK and never returns raw passcodes.
 

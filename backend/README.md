@@ -1,10 +1,10 @@
 # Firebase backend migration — deployment required
 
-The current project was supplied in `B3-Games-Backend.zip` on October 1, 2026. This directory now contains its active function entrypoint, dependencies, Firebase configuration, and supporting function modules, with the Fun Torah Tools changes integrated. Historical backups and `node_modules` are excluded. Existing grading, speech, rewards, Gallery powers, and parent-dashboard exports are preserved.
+This repository is the main Fun Torah Tools project. Its Firebase Functions source, dependencies, and Firebase configuration are in `backend/functions` and `backend`. The standalone `C:\B3-Games-Backend` directory is a legacy copy; do not use it for new work or deployments. It has not been archived or deleted, and its backups must be reviewed before retirement.
 
 These are source changes, **not evidence of a deployed fix**. GitHub Pages does not deploy Firebase functions.
 
-For the existing Windows project, [install-migration.ps1](install-migration.ps1) downloads the eight tested migration modules from a pinned commit, backs up replaced files, and adds missing exports without replacing the rest of `index.js`. Run it in PowerShell; it installs source only and prints the targeted deployment command.
+The [install-migration.ps1](install-migration.ps1), [install-login-fixes.ps1](install-login-fixes.ps1), and [install-chazara-scope.ps1](install-chazara-scope.ps1) scripts default to this `backend` directory (the directory containing each script). They install source only and print targeted deployment commands. Review the affected source and command before any deployment.
 
 To deploy from a checkout, open PowerShell in the repository's `backend` directory:
 
@@ -14,7 +14,7 @@ firebase login
 firebase deploy --only functions:yiddishApi,functions:funTorahTeacherClaim,functions:funTorahManageStudents --project b3-games
 ```
 
-Alternatively copy `backend/functions/` into `C:\B3-Games-Backend\functions`, retaining other project files, and run the same targeted deployment from `C:\B3-Games-Backend`. The new function exports are already wired into `functions/index.js`. Existing deployed secrets remain in Firebase; no secret values belong in this repository.
+Do not copy Functions source into the legacy directory. Existing deployed secrets remain in Firebase; no secret values belong in this repository.
 
 Verify all three endpoints after deployment with a real invited Google teacher and real central student passcode. Do not change database rules as a shortcut. The Yiddish service uses the Admin SDK and never returns raw passcodes.
 

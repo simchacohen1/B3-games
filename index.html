@@ -394,7 +394,7 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
-<script src="backend/functions/student-tool-policy.js" defer></script>
+<script src="shared/student-tool-policy.js" defer></script>
 <script src="student-tool-controls.js" defer></script>
 <script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
@@ -537,17 +537,9 @@ body > .subtitle::after {
   <button id="adminAccessButton" class="admin-button">Teacher Tools</button>
   <div id="adminPanel" class="admin-panel hidden">
     <h2>B3 Access Controls</h2>
-    <p id="adminStatus" class="admin-message">Enter the admin password to continue.</p>
-
-    <div id="adminPasswordGate">
-      <label for="adminPasswordInput" style="display:block;font-weight:800;margin:10px 0 6px;">Admin password</label>
-      <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Enter admin password"
-             style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;">
-      <button id="adminPasswordButton" class="admin-action" type="button">Continue</button>
-      <div id="adminPasswordMsg" class="admin-message" style="min-height:18px;margin-top:8px;color:#b91c1c;"></div>
-    </div>
-
-    <button id="signInButton" class="admin-action hidden">Sign in with Google</button>
+    <p id="adminStatus" class="admin-message">Sign in with your authorized Google account to continue.</p>
+    <p class="admin-message">Firebase verifies access before administrator settings can be changed.</p>
+    <button id="signInButton" class="admin-action">Sign in with Google</button>
     <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
 
     <div id="adminControls" class="hidden">
@@ -1092,46 +1084,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     approvalClassCounts={};
     approvalAttemptsCache=null;approvalAttemptsAt=0;
     approvalCenterAutoShown=false;
-  }
-
-  // Password gate only keeps students from reaching the Google sign-in screen.
-  // Google/Firebase authentication remains the real administrator security.
-  const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
-  const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
-
-  function adminPasswordUnlocked(){
-    try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
-  }
-
-  async function sha256Hex(value){
-    const bytes=new TextEncoder().encode(String(value||""));
-    const digest=await crypto.subtle.digest("SHA-256",bytes);
-    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
-  }
-
-  async function unlockAdminPassword(){
-    const input=el("adminPasswordInput");
-    const msg=el("adminPasswordMsg");
-    const btn=el("adminPasswordButton");
-    if(msg)msg.textContent="";
-    if(btn)btn.disabled=true;
-    try{
-      const hash=await sha256Hex(input?input.value:"");
-      if(hash!==ADMIN_PASSWORD_HASH){
-        if(msg)msg.textContent="Incorrect password.";
-        if(input){input.select();input.focus();}
-        return;
-      }
-      try{sessionStorage.setItem(ADMIN_PASSWORD_SESSION_KEY,"1");}catch(e){}
-      if(input)input.value="";
-      renderAdminPanel();
-      setTimeout(()=>el("signInButton")?.focus(),0);
-    }catch(e){
-      console.error("Admin password check failed:",e);
-      if(msg)msg.textContent="Could not check the password. Please try again.";
-    }finally{
-      if(btn)btn.disabled=false;
-    }
   }
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
@@ -1914,31 +1866,33 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     });
   }
 
+  function renderAdminAuthState(){
+    const signedIn=Boolean(currentUser);
+    el("signInButton").classList.toggle("hidden",signedIn);
+    el("signOutButton").classList.toggle("hidden",!signedIn);
+    el("adminControls").classList.toggle("hidden",!isAuthorizedTeacher);
+    if(!signedIn){
+      el("adminStatus").textContent="Sign in with your authorized Google account to manage settings.";
+      return false;
+    }
+    if(!isAuthorizedTeacher){
+      el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;
+      return false;
+    }
+    return true;
+  }
   function syncAdminPanelLayout(){
     document.body.classList.toggle("admin-panel-open",!el("adminPanel").classList.contains("hidden"));
   }
 
   function renderAdminPanel(){
     syncAdminPanelLayout();
-    const signedIn=Boolean(currentUser);
     const dedicatedAdminPage=new URLSearchParams(window.location.search).get("adminPage")==="1";
     if(!dedicatedAdminPage)el("adminPanel").classList.add("hidden");
     else el("adminPanel").classList.remove("hidden");
     syncAdminPanelLayout();
     el("adminAccessButton").textContent="Teacher Tools";
-
-    const passwordUnlocked=isAuthorizedTeacher||adminPasswordUnlocked();
-    el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
-    el("signInButton").classList.toggle("hidden",!passwordUnlocked||signedIn);
-    el("signOutButton").classList.toggle("hidden",!passwordUnlocked||!signedIn);
-    el("adminControls").classList.toggle("hidden",!isAuthorizedTeacher);
-
-    if(!passwordUnlocked){
-      el("adminStatus").textContent="Enter the admin password to continue.";
-      return;
-    }
-    if(!signedIn){el("adminStatus").textContent="Password accepted. Now sign in with simcha5770@gmail.com.";return;}
-    if(!isAuthorizedTeacher){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
+    if(!renderAdminAuthState())return;
     const ownerAccess=currentAccess.role==="admin";
     el("adminStatus").textContent=ownerAccess
       ? `Signed in as ${currentUser.email}. Owner access.`
@@ -2249,7 +2203,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     window.location.href=isAuthorizedTeacher?"admin.html":"teacher-home.html?signin=1";
   });
 
-  el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
   el("createManagedStudentButton").addEventListener("click",createManagedStudent);
@@ -2321,7 +2274,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       el("classManagementStatus").textContent=active?"Student access enabled.":"Student access blocked."; await loadClassManagement();
     }
   });
-  el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
   el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
     const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
     el("adminStatus").textContent="Google sign-in failed: "+detail;
@@ -2329,7 +2281,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     console.error(e);
   }));
   el("signOutButton").addEventListener("click",()=>{
-    try{sessionStorage.removeItem(ADMIN_PASSWORD_SESSION_KEY);}catch(e){}
     settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);});
   });
   el("siteEnabledToggle").addEventListener("change",async()=>{

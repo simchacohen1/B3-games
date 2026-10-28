@@ -1,26 +1,6 @@
 <!doctype html>
 <html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script><meta charset="utf-8">
+<meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -33,7 +13,7 @@
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261019-restore-fix"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
-<script src="backend/functions/student-tool-policy.js"></script>
+<script src="shared/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
 </head><body>
 <header><div><h1>Fun Torah Tools</h1><div class="sub">Your classes and teaching tools</div></div><div style="display:flex;gap:8px"><button id="actAsStudent" class="sign hidden" style="background:#15803d">👀 Sign in as a student</button><button id="signOut" class="sign hidden">Sign out</button></div></header>
