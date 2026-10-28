@@ -69,7 +69,7 @@ function fixture() {
   };
   vm.createContext(ctx);
   vm.runInContext(source.slice(start, end) +
-    '\nthis.api = {listPendingChazaraRequests, listChazaraRecordingHistory};', ctx);
+    '\nthis.api = {listPendingChazaraRequests, listChazaraRecordingHistory, pendingChazaraRecordingEvents};', ctx);
   return {ctx, events, requests, reads, writes, scope};
 }
 
@@ -96,4 +96,37 @@ test('pending startup avoids history scans but a missing request is recovered on
   const after = await f.ctx.api.listPendingChazaraRequests(f.scope, {repair: false});
   assert.deepEqual(Array.from(after, item => item.id), ['chazara_shared_et_event']);
   assert.equal(f.writes.filter(w => w.path.includes('wt_event')).length, 0);
+});
+
+test('pending and historical summaries exclude inline audio and foreign-class events', async () => {
+  const f = fixture();
+  // Synthetic large legacy fallback audio must never travel in a list response.
+  f.events.et_event.audioDataURL = 'data:audio/webm;base64,' + 'A'.repeat(4096);
+  f.events.et_event.audioURL = 'data:audio/webm;base64,' + 'B'.repeat(4096);
+  f.events.wt_event.audioDataURL = 'data:audio/webm;base64,' + 'C'.repeat(4096);
+  const pendingBefore = await f.ctx.api.listPendingChazaraRequests(f.scope, {repair: false});
+  const startupSummaries = await f.ctx.api.pendingChazaraRecordingEvents(pendingBefore, f.scope);
+  assert.equal(startupSummaries.length, 0, 'foreign WT pending must not be returned');
+  assert.deepEqual(f.reads, ['studentRewards/pointRequests'],
+    'empty ET pending view must not fetch WT audio or historical events');
+  assert.equal(f.writes.length, 0);
+
+  const history = await f.ctx.api.listChazaraRecordingHistory(f.scope);
+  assert.deepEqual(Array.from(history, item => item.id), ['et_event'],
+    'history must include ET only');
+  assert.equal(history[0].audioDataURL, undefined, 'never send fallback audio in history');
+  assert.equal(history[0].audioURL, undefined, 'never send inline audio URL in history');
+  assert.equal(history[0].storageFallback, true, 'retain a flag for explicit audio loading');
+
+  const pendingAfter = await f.ctx.api.listPendingChazaraRequests(f.scope, {repair: false});
+  const pendingSummaries = await f.ctx.api.pendingChazaraRecordingEvents(pendingAfter, f.scope);
+  assert.deepEqual(Array.from(pendingSummaries, item => item.id), ['et_event']);
+  assert.equal(pendingSummaries[0].audioDataURL, undefined,
+    'never send fallback audio in pending recording summary');
+  assert.equal(pendingSummaries[0].audioURL, undefined,
+    'never send inline audio URL in pending recording summary');
+  assert.ok(f.events.et_event.audioDataURL.startsWith('data:audio/'),
+    'the original saved audio must remain unchanged');
+  assert.equal(f.writes.some(write => write.path.includes('wt_event')), false,
+    'WT recording must never be modified');
 });
