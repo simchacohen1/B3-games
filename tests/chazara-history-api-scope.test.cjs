@@ -186,3 +186,25 @@ test('inline audio access stops immediately after tool grant, teacher assignment
  assert.equal(countEventReads(),before,'student membership revocation must deny before event audio is read');
  assert.equal(x.writes.length,0,'all revocation checks must remain read-only');
 });
+
+test('authorized Chazara metadata and inline-audio reads fetch each event only once',async()=>{
+ const d=fixture(),path='posukPractice/chazara/events/shared/et_event';
+ d[path].audioDataURL='data:audio/webm;base64,QUJDREVGRw==';
+ const x=server(d),reads=()=>x.reads.filter(p=>p===path).length;
+ let before=reads();
+ const metadata=await x.call('get-chazara-event',{studentId:'shared',eventId:'et_event'});
+ assert.equal(metadata.code,200,JSON.stringify(metadata.body));
+ assert.equal(metadata.body.event.hasInlineAudio,true);
+ assert.equal(metadata.body.event.audioDataURL,undefined);
+ assert.equal(reads()-before,1,'metadata request must not fetch large inline audio twice on the backend');
+ before=reads();
+ const clicked=await x.call('get-chazara-audio',{studentId:'shared',eventId:'et_event'});
+ assert.equal(clicked.code,200,JSON.stringify(clicked.body));
+ assert.equal(clicked.body.audioDataURL,d[path].audioDataURL);
+ assert.equal(reads()-before,1,'explicit audio click must fetch its authorized event only once');
+ const foreignPath='posukPractice/chazara/events/shared/wt_event';
+ const denied=await x.call('get-chazara-audio',{studentId:'shared',eventId:'wt_event'});
+ assert.equal(denied.code,403,'single-read optimization must not bypass class scope');
+ assert.equal(x.reads.filter(p=>p===foreignPath).length,1,'foreign event must be checked, never returned');
+ assert.equal(x.writes.length,0,'read-only optimization must not write student records');
+});
