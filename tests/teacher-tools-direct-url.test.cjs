@@ -55,6 +55,8 @@ test('Teacher Tools deny strangers, students, unverified/revoked teachers; allow
     for (const p of gated) {
       for (const who of DENIED) jobs.push({ p, who, url: p.path, expect: 'deny' });
       for (const who of ['teacherET', 'teacherWT']) jobs.push({ p, who, url: p.path, expect: p.scope === 'admin' ? 'deny' : 'allow' });
+      // A teacher of a brand-new class (not ET/WT) may use every general teacher page but not B3-only or admin pages.
+      jobs.push({ p, who: 'teacherNew', url: p.path, expect: p.scope === 'teacher' ? 'allow' : 'deny' });
       for (const who of ['admin', 'owner']) jobs.push({ p, who, url: p.path, expect: 'allow' });
       // Class-ID substitution: a teacher may only use ?class= for an assigned class.
       jobs.push({ p, who: 'teacherET', url: withParam(p.path, 'class', 'wt'), expect: 'deny' });

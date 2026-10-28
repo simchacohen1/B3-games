@@ -16,7 +16,7 @@
       "path": "admin.html",
       "name": "Admin",
       "gate": "gate",
-      "scope": "b3"
+      "scope": "teacher"
     },
     {
       "path": "halacha/teacher.html",

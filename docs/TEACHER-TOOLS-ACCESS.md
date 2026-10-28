@@ -14,7 +14,7 @@ GitHub Pages serves every `.html`/`.js` file publicly, so a browser gate can nev
 `security/teacher-tools-inventory.json` lists every Teacher Tools page (36 pages) and the gate scope:
 
 * `teacher` (default): any active teacher of at least one class, or an admin.
-* `b3`: admin, or a teacher of the B3 classes (`et` / `wt`) — Class Dashboard, Comment Log, Sync to Nigri, Chossid Lamdan marks, Hebrew Reading lab, admin.html.
+* `b3`: admin, or a teacher of the B3 classes (`et` / `wt`) — Class Dashboard, Comment Log, Sync to Nigri, Chossid Lamdan marks, Hebrew Reading lab. (admin.html is the Teacher Center shell used by every teacher, so it is `teacher`.)
 * `admin`: owner/admin only — `owner-admin.html`.
 * `teacher-home.html` has its own sign-in screen (checked by test, not given the gate).
 * `class-pointer-prototype/dashboard.html` and `classroom.html` are also the *student* Class Pointer screens, so they are gated only in teacher mode (`?teacher=1`, `?dashboard=teacher`).

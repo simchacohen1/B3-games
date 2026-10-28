@@ -9,6 +9,7 @@ const TREE = { b3Games: { admins: { admin_uid: { active: true } }, workspaces: {
   teachers: {
     teacher_et: { active: true, classIds: { et: true } },
     teacher_wt: { active: true, classIds: { wt: true } },
+    teacher_new: { active: true, classIds: { 'new-room': true } },
     revoked_uid: { active: false, classIds: { et: true } },
     no_class_uid: { active: true, classIds: {} }
   },
@@ -28,6 +29,7 @@ const IDENTITIES = {
   teacherNoClasses: google('no_class_uid', 'noclass@example.test'),
   teacherET: google('teacher_et', 'et@example.test'),
   teacherWT: google('teacher_wt', 'wt@example.test'),
+  teacherNew: google('teacher_new', 'new@example.test'),
   admin: google('admin_uid', 'admin@example.test'),
   owner: google('owner_uid', OWNER_EMAIL)
 };
