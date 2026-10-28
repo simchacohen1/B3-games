@@ -132,3 +132,14 @@ test('persistent-sharing option is staging-only and preserves the original direc
   assert.match(share,/firebase\.auth\.Auth\.Persistence\.SESSION/);
   assert.doesNotMatch(share,/student-share-window\.html\?[^'\x22]*pin=/i);
 });
+
+test('regenerated staging rules retain exactly the checked-in private permission policy',()=>{
+  const {prepareRules}=require('../staging/prepare-rules.cjs');
+  const os=require('node:os'),path=require('node:path');
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ftt-stage-pointer-'));
+  try{
+    const generated=prepareRules(path.join(__dirname,'../firebase-rules.hardened.json'),path.join(directory,'rules.json'));
+    const checkedIn=JSON.parse(fs.readFileSync(path.join(__dirname,'../staging/database.rules.json'),'utf8')).rules;
+    assert.deepEqual(generated,checkedIn);
+  }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
