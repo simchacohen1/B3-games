@@ -74,4 +74,4 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Browser navigation and painting on actual DOM
         if: steps.scope.outputs.run_coloring == 'true'
-        run: npx playwright test e2e/sefer-coloring-focus.spec.ts e2e/sefer-object-fill.spec.ts --project=chromium --reporter=line
+        run: npx playwright test e2e/sefer-coloring-focus.spec.ts e2e/sefer-object-fill.spec.ts e2e/sefer-week-20261025.spec.ts --project=chromium --reporter=line

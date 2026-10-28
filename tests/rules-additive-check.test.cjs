@@ -7,9 +7,11 @@ const { compare, parse, stripComments } = require('../scripts/rules-additive-che
 // Snapshot of the rules on main (the live baseline) before the Pointer release.
 const live = () => parse(fs.readFileSync('tests/fixtures/firebase-rules.main-20261017.json', 'utf8'));
 const candidate = () => JSON.parse(fs.readFileSync('firebase-rules.json', 'utf8'));
+// b3Quiz was tightened in its own reviewed step (see tests/b3-quiz-rules-emulator.test.cjs); the Pointer additive check ignores it.
+const additiveView = () => { const c = candidate(); c.rules.b3Quiz = live().rules.b3Quiz; return c; };
 
 test('firebase-rules.json is the main/live baseline plus only the approved Pointer additions', () => {
-  assert.deepEqual(compare(live(), candidate()), []);
+  assert.deepEqual(compare(live(), additiveView()), []);
 });
 test('the additive-step CLI config deploys firebase-rules.json, never the hardened file', () => {
   const cfg = JSON.parse(fs.readFileSync('firebase.pointer-additive.json', 'utf8'));
@@ -37,7 +39,7 @@ test('an unapproved new top-level node is caught', () => {
 test('live rules that predate the Halacha Siman rule are accepted: only Pointer + halachaAccess are added', () => {
   const l = live();
   delete l.rules.b3Games.workspaces.$workspaceId.classes.$classId.halachaAccess;
-  assert.deepEqual(compare(l, candidate()), []);
+  assert.deepEqual(compare(l, additiveView()), []);
 });
 test('another unapproved addition next to halachaAccess is still caught', () => {
   const l = live();

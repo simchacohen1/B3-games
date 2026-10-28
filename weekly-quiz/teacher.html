@@ -136,6 +136,17 @@
   tbody tr:hover td{background:#fafcfe}
   tbody tr:hover td.correct{background:#d3efdf}tbody tr:hover td.incorrect{background:#f6d6d9}
   td.cell{min-width:40px;height:36px;cursor:pointer;font-weight:700}
+  #resultsTable th.student-col{min-width:86px;vertical-align:bottom;font-size:12px}
+  #resultsTable th.student-col a{color:var(--ink)}
+  #resultsTable tr.totals-row td{border-top:2px solid var(--line2);background:#f7f9fc}
+  #resultsTable.all-students td:first-child,#resultsTable.all-students th:first-child{position:sticky;left:0;z-index:2;background:#fff;box-shadow:1px 0 0 var(--line)}
+  #resultsTable.all-students thead th:first-child{z-index:3;background:#f7f9fc}
+  #resultsCard.table-fullscreen{position:fixed;inset:0;z-index:5000;margin:0;border-radius:0;max-width:none;width:100vw;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;padding:12px 14px}
+  #resultsCard.table-fullscreen .grid-wrap{max-height:none;flex:1;min-height:0}
+  #resultsCard.table-fullscreen #resultsTable.all-students td,#resultsCard.table-fullscreen #resultsTable.all-students th{padding:4px 5px;font-size:12px}
+  #resultsCard.table-fullscreen #resultsTable.all-students td.cell{min-width:0;height:auto}
+  #resultsCard.table-fullscreen #resultsTable.all-students th.student-col{min-width:0;font-size:11px}
+  #resultsCard.table-fullscreen #resultsTable.all-students td:first-child,#resultsCard.table-fullscreen #resultsTable.all-students th:first-child{min-width:170px!important}
   td.blank{color:#b3bfcb}
   td.correct{background:var(--good-bg);color:#17683d}
   td.incorrect{background:var(--bad-bg);color:#a3333a}
@@ -357,6 +368,8 @@
   }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
+<script src="quiz-assignments.js?v=20261026-376"></script>
+<script src="../student-report/quiz-history.js?v=20261027-376"></script>
 <link rel="stylesheet" href="teacher-simple.css?v=20261020-1">
 </head>
 <body>
@@ -805,16 +818,27 @@
       <div class="card sticky-side">
         <div class="card-head">
           <h2>Quiz history</h2>
-          <select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
+          <select id="resultsClassFilter" onchange="renderLaunchHistory();renderResults()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory()" style="min-width:160px;flex:1"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory();renderResults()" style="min-width:160px;flex:1"></div>
+        <label class="small" style="display:block;margin:0 0 12px">One student's marks only
+          <select id="resultsStudentFilter" aria-label="Show one student's marks on every quiz" onchange="resultsStudentShowAll=false;renderResults()" style="width:100%;margin-top:4px"><option value="">All students</option></select>
+        </label>
         <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
         <div id="launchHistory" class="launch-list"></div>
+        <h2 style="margin-top:18px">Assigned, not finished yet</h2>
+        <div class="small" style="margin:0 0 10px">Each student can have several retakes or make-ups open at once. Revoke takes one off his list; his answers stay saved.</div>
+        <div id="pendingAssignments" class="launch-list"></div>
       </div>
       <div>
-        <div class="card">
+        <div class="card" id="resultsCard">
           <div class="card-head">
             <div><h2 id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
+            <div id="allTableTools" class="controls hidden">
+              <select id="tableClassFilter" aria-label="Show one class" onchange="setTableClass(this.value)"></select>
+              <button id="tableFullscreenBtn" class="secondary" onclick="toggleTableFullscreen()">⛶ Full screen</button>
+              <button id="allTableCsvBtn" class="secondary" onclick="downloadAllStudentsCSV()">Download CSV</button>
+            </div>
             <div class="controls results-actions">
               <button id="assignMakeupBtn" class="secondary" onclick="openMakeupFromResults()">Assign make-up</button>
               <details class="menu" id="resultsMenu">
@@ -825,6 +849,7 @@
                   <hr>
                   <button onclick="downloadCSV()">Download CSV</button>
                   <button onclick="copyResultsTSV()">Copy for Google Sheets</button>
+                  <button onclick="openSyncToNigri(resultsLaunchId)">Sync to Nigri</button>
                   <hr>
                   <button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button>
                 </div>
@@ -897,6 +922,7 @@ const SKILL_LABELS={general:'Any subject',shorashim:'Shoroshim',translation:'Chu
 function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
 let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
+let resultsStudentShowAll=false;
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
 let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
 let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
@@ -946,6 +972,7 @@ if (!CLASS_SPACE) {
       document.getElementById('lockOverlay').style.display = 'none';
       document.getElementById('mainContent').classList.remove('hidden');
       window.weeklyQuizOwnerUnlocked = true;
+      if (typeof attachQuizListeners === 'function') attachQuizListeners();
     } else if (window.weeklyQuizOwnerUnlocked) {
       document.getElementById('lockOverlay').style.display = '';
       document.getElementById('mainContent').classList.add('hidden');
@@ -987,16 +1014,27 @@ if(CLASS_SPACE){
     document.getElementById('lockGoogle').style.display='none';
     document.getElementById('lockOverlay').style.display='none';
     document.getElementById('mainContent').classList.remove('hidden');
+    if(typeof attachQuizListeners==='function')attachQuizListeners();
   });
 }else{
   db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();});
 }
-db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
-db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
-db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
-db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+// The shared quiz data is private to signed-in teachers, so these listeners start only after the
+// teacher is verified (starting them earlier would be refused and never retried).
+// Individual assignments: each student's queue, plus the old single pointer.
+var studentAssignmentQueue={},legacyStudentPointers={};
+var quizListenersAttached=false;
+function attachQuizListeners(){
+  if(quizListenersAttached)return;quizListenersAttached=true;
+  db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
+  db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderPendingAssignments();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+  db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
+  db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});
+}
 
 // ---------- Built-in generator ----------
 function generatorTypeChanged(){
@@ -1792,18 +1830,7 @@ async function launchSelectedQuiz(){
     targetLabel=classLabel(classId);
   }
 
-  if(delivery!=='live'){
-    const activeChecks=await Promise.all(studentIds.map(async sid=>{
-      const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');
-      return {sid,old:s.val()||''};
-    }));
-    const conflicts=activeChecks.filter(x=>x.old);
-    if(conflicts.length){
-      const names=conflicts.map(x=>(roster[x.sid]&&roster[x.sid].name)||x.sid).join(', ');
-      if(!confirm('These student(s) already have an individual quiz assigned: '+names+'. Replace their current assignment? Their old results will remain saved.'))return;
-    }
-  }
-
+  // Individual assignments are added to each student's list; earlier ones stay open.
   const mode=delivery==='live'?document.getElementById('launchMode').value:'test';
   const autoStart=delivery!=='live';
   const id=Date.now()+'_'+(delivery==='live'?classId:'assigned')+'_'+slugTitle(snapshot.title||'quiz');
@@ -1837,10 +1864,8 @@ async function launchSelectedQuiz(){
     showTab('live');
     attachLiveLaunch(id);
   }else{
-    const updates={};
-    studentIds.forEach(sid=>updates[QROOT+'/settings/studentActiveLaunch/'+sid]=id);
-    await db.ref().update(updates);
-    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
+    await db.ref().update(WeeklyQuizAssignments.assignUpdates(QROOT,studentIds,id,{kind:delivery,classId,assignedAt:firebase.database.ServerValue.TIMESTAMP}));
+    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'. Any other quizzes already assigned stay open too.');
     if(delivery==='makeup')makeupSourceLaunchId='';
     makeupPreselected.clear();
     document.getElementById('makeupSourceMsg').textContent='';document.getElementById('makeupSourceMsg').classList.add('hidden');
@@ -1885,6 +1910,7 @@ async function toggleScoreRelease(){
 }
 async function stopLaunch(){
   if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
+  if(targets.length)await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,activeLaunchId,targets,{}));
   await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});
   if(targets.length){for(const sid of targets){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
@@ -1954,12 +1980,159 @@ function launchQuestions(l){return l&&l.quizSnapshot?asArray(l.quizSnapshot.ques
 function launchStudentRows(l){return rosterRowsForLaunch(l);}
 function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(l),rr=allResponses[lid]||{},sr=rr[studentId]||{};let correct=0,answered=0;qs.forEach((_,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct)correct++;}});return{correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):0};}
 function renderLaunchHistory(){
+  renderPendingAssignments();
   const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?.value||'all',dateFilter=document.getElementById('resultsDateFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();const now=new Date(),todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-((now.getDay()+6)%7)).getTime();let ids=Object.keys(allLaunches).filter(id=>{const l=allLaunches[id]||{},ts=Number(l.createdAt)||0;if(filter!=='all'&&l.classId!==filter)return false;if(dateFilter==='today'&&ts<todayStart)return false;if(dateFilter==='week'&&ts<weekStart)return false;if(search&&!String(l.quizSnapshot?.title||'').toLowerCase().includes(search))return false;return true;}).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
   if(!ids.length){box.innerHTML='<div class="small">No quizzes match these filters. Try All Dates or a different search.</div>';return;}
-  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
+  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>openResultsLaunch(id);box.appendChild(div);});
   if(!ids.includes(resultsLaunchId)&&ids[0]){resultsLaunchId=ids[0];renderLaunchHistory();renderResults();}
 }
+// ---------- One student's marks on every quiz ----------
+function openResultsLaunch(id){const sel=document.getElementById('resultsStudentFilter');if(sel)sel.value='';resultsLaunchId=id;renderLaunchHistory();renderResults();}
+var ALL_STUDENTS_TABLE='__all_table__';
+function resultsStudentRows(){
+  const filter=document.getElementById('resultsClassFilter')?.value||'all',seen=new Set(),rows=[];
+  const classes=CLASS_SPACE?[WQ_CLASS]:(filter==='all'?['et','wt']:[filter]);
+  classes.forEach(c=>((CLASS_ROSTERS[c]||{}).students||[]).forEach(id=>{if(id==='simcha_cohen'||seen.has(id))return;seen.add(id);rows.push({id,name:(roster[id]&&roster[id].name)||id});}));
+  return rows.sort((a,b)=>a.name.localeCompare(b.name));
+}
+function populateResultsStudents(){
+  const sel=document.getElementById('resultsStudentFilter');if(!sel)return;const old=sel.value,rows=resultsStudentRows();
+  sel.innerHTML='<option value="">All students</option><option value="'+ALL_STUDENTS_TABLE+'">📊 All students — every quiz (table)</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+  sel.value=old===ALL_STUDENTS_TABLE||rows.some(x=>x.id===old)?old:'';
+}
+function showStudentMarks(studentId){const sel=document.getElementById('resultsStudentFilter');if(sel)sel.value=studentId;resultsStudentShowAll=false;renderResults();}
+// ---------- All students × all quizzes ----------
+// One row per quiz (newest first), one column per boy. Each cell is that boy's
+// result with the same grouping as his own marks view: a quiz given again,
+// a make-up or a retake is one row, and his newest finished try counts.
+function allStudentsQuizRows(students){
+  const rows=[],rowByKey={};
+  const better=(a,b)=>{if(!!a.counted!==!!b.counted)return a.counted?a:b;return (b.lastDate||0)>(a.lastDate||0)?b:a;};
+  students.forEach(st=>studentResultsQuizzes(st.id).forEach(q=>{
+    const keys=[];q.attempts.forEach(a=>{keys.push('l:'+a.launchId,'qs:'+a.sameQuiz);if(a.quizId)keys.push('id:'+a.quizId);});
+    let row=keys.map(k=>rowByKey[k]).find(Boolean);
+    if(!row){row={title:q.title,date:q.date,launchIds:new Set(),cells:{}};rows.push(row);}
+    keys.forEach(k=>{rowByKey[k]=row;});
+    q.attempts.forEach(a=>row.launchIds.add(a.launchId));
+    if(q.date&&(!row.date||q.date<row.date))row.date=q.date;
+    row.cells[st.id]=row.cells[st.id]?better(row.cells[st.id],q):q;
+  }));
+  return rows.sort((a,b)=>(b.date||0)-(a.date||0));
+}
+// Each boy's totals: average of finished quizzes, and how many he finished.
+function allStudentsSums(students,all){
+  return Object.fromEntries(students.map(st=>{let pctSum=0,correct=0,total=0,done=0,given=0;all.forEach(r=>{const q=r.cells[st.id];if(!q)return;given++;if(q.counted){done++;pctSum+=q.pct||0;correct+=q.correct||0;total+=q.total||0;}});return [st.id,{avg:done?Math.round(pctSum/done):null,correct,total,done,given}];}));
+}
+// Every quiz (not just the ones on screen) for a spreadsheet. Scores are written
+// as "8 of 10" because spreadsheets turn "8/10" into a date.
+function allStudentsCsvRows(){
+  const students=resultsStudentRows(),all=allStudentsQuizRows(students),sums=allStudentsSums(students,all);
+  const rows=[['Quiz','Class','First given','Times given',...students.map(st=>st.name)]];
+  all.forEach(r=>{
+    const latest=[...r.launchIds].sort((a,b)=>(Number(allLaunches[b]?.createdAt)||0)-(Number(allLaunches[a]?.createdAt)||0))[0],l=allLaunches[latest]||{};
+    rows.push([r.title,classLabel(l.classId),fmtDate(r.date),r.launchIds.size,...students.map(st=>{const q=r.cells[st.id];if(!q)return '';if(q.counted)return q.pct+'%';if(q.partial)return 'not finished ('+q.partial.answered+' of '+q.partial.total+' answered)';return 'not started';})]);
+  });
+  rows.push([]);
+  rows.push(['Average (finished quizzes)','','','',...students.map(st=>sums[st.id].avg===null?'':sums[st.id].avg+'%')]);
+  rows.push(['Correct answers','','','',...students.map(st=>sums[st.id].correct+' of '+sums[st.id].total)]);
+  rows.push(['Quizzes finished','','','',...students.map(st=>sums[st.id].done+' of '+sums[st.id].given)]);
+  return rows;
+}
+function downloadAllStudentsCSV(){
+  const rows=allStudentsCsvRows();if(rows.length<2)return;
+  const filter=CLASS_SPACE?WQ_CLASS:(document.getElementById('resultsClassFilter')?.value||'all');
+  const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["﻿"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='Weekly_Quiz_all_students_'+String(filter).replace(/[^a-z0-9]+/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+// Full screen: the results card fills the whole window (and the screen, when the
+// browser allows it) so every boy and every quiz fit in one view. Escape exits.
+function toggleTableFullscreen(force){
+  const card=document.getElementById('resultsCard');if(!card)return;
+  const on=force===undefined?!card.classList.contains('table-fullscreen'):!!force;
+  if(on===card.classList.contains('table-fullscreen'))return;
+  card.classList.toggle('table-fullscreen',on);document.body.style.overflow=on?'hidden':'';
+  document.getElementById('tableFullscreenBtn').textContent=on?'✕ Exit full screen':'⛶ Full screen';
+  if(on){resultsStudentShowAll=true;renderResults();if(card.requestFullscreen&&!document.fullscreenElement)card.requestFullscreen().catch(()=>{});}
+  else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+}
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)toggleTableFullscreen(false);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleTableFullscreen(false);});
+// The table's own class picker mirrors the Quiz history class filter, so it still
+// works in full screen where the side panel is hidden.
+function setTableClass(value){const f=document.getElementById('resultsClassFilter');if(f)f.value=value;renderLaunchHistory();renderResults();}
+function renderAllStudentsTable(){
+  document.getElementById('allTableTools')?.classList.remove('hidden');
+  const side=document.getElementById('resultsClassFilter'),pick=document.getElementById('tableClassFilter');
+  if(side&&pick){pick.innerHTML=side.innerHTML;pick.value=side.value;pick.classList.toggle('hidden',side.options.length<2);}
+  const table=document.getElementById('resultsTable'),students=resultsStudentRows(),all=allStudentsQuizRows(students),rows=resultsStudentShowAll?all:all.slice(0,15);
+  document.getElementById('resultsQuizTitle').textContent='All students — every quiz';
+  document.getElementById('resultsMeta').textContent='Newest first. '+(all.length>rows.length?'Showing the last '+rows.length+' of '+all.length+' quizzes. ':'')+'A quiz given more than once is one row; each boy\'s newest finished try counts. Click a boy\'s name for his details.';
+  document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
+  if(!rows.length||!students.length){table.innerHTML='<tr><td>No quizzes found.</td></tr>';return;}
+  document.getElementById('resultsTable').classList.add('all-students');
+  const sums=allStudentsSums(students,all);
+  const head='<thead><tr><th style="text-align:left;min-width:220px">Quiz</th>'+students.map(st=>{const s=sums[st.id];return '<th class="student-col"><a href="#" onclick="event.preventDefault();showStudentMarks(\''+esc(st.id)+'\')">'+esc(st.name)+'</a><div class="small">'+(s.avg===null?'—':s.avg+'% avg')+'</div><div class="small">'+s.done+' of '+s.given+' done</div></th>';}).join('')+'</tr></thead>';
+  let body='';
+  rows.forEach(r=>{
+    const latest=[...r.launchIds].sort((a,b)=>(Number(allLaunches[b]?.createdAt)||0)-(Number(allLaunches[a]?.createdAt)||0))[0],l=allLaunches[latest]||{};
+    const quizCell='<td><a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(latest)+'\')">'+esc(r.title)+'</a><div class="small">'+esc(classLabel(l.classId))+' • '+esc(fmtDate(r.date))+(r.launchIds.size>1?' • given '+r.launchIds.size+' times':'')+'</div></td>';
+    body+='<tr>'+quizCell+students.map(st=>{
+      const q=r.cells[st.id],open=' onclick="showStudentMarks(\''+esc(st.id)+'\')"';
+      if(!q)return '<td class="cell" title="Not given to him" style="color:var(--muted);cursor:default">·</td>';
+      if(q.counted)return '<td class="cell '+(q.pct>=70?'correct':'incorrect')+'"'+open+' title="'+esc(q.correct+' of '+q.total+' correct')+'">'+q.pct+'%<div class="small">'+q.correct+'/'+q.total+'</div></td>';
+      if(q.partial)return '<td class="cell blank"'+open+' title="Started, not finished">'+q.partial.answered+'/'+q.partial.total+'<div class="small">not finished</div></td>';
+      return '<td class="cell blank"'+open+' title="Not started">—</td>';
+    }).join('')+'</tr>';
+  });
+  body+='<tr class="totals-row"><td><b>Total (finished quizzes)</b></td>'+students.map(st=>{const s=sums[st.id];return '<td class="cell" style="cursor:default"><b>'+(s.avg===null?'—':s.avg+'%')+'</b><div class="small">'+s.correct+'/'+s.total+'</div></td>';}).join('')+'</tr>';
+  if(all.length>rows.length)body+='<tr><td colspan="'+(1+students.length)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+all.length+' quizzes</button></td></tr>';
+  table.innerHTML=head+'<tbody>'+body+'</tbody>';
+}
+// Every quiz this student was given (newest first), one row each. Retakes, make-ups
+// AND the same quiz given again (same saved quiz, or same name and same questions)
+// fold into one row, so a repeat never looks like a quiz he missed. Same grouping
+// as the Student Report (student-report/quiz-history.js): the newest finished
+// attempt counts; with none finished, his newest started attempt is shown.
+function studentResultsQuizzes(studentId){
+  const filter=document.getElementById('resultsClassFilter')?.value||'all',search=(document.getElementById('resultsQuizSearch')?.value||'').trim().toLowerCase();
+  const classId=CLASS_SPACE?WQ_CLASS:classForStudent(studentId);if(!classId||!window.B3QuizHistory)return[];
+  return B3QuizHistory.buildHistory({root:{launches:allLaunches,responses:allResponses,completions},studentId,classId}).quizzes.filter(q=>{
+    const first=allLaunches[q.attempts[0].launchId]||{};
+    if(!CLASS_SPACE&&filter!=='all'&&first.classId!==filter)return false;
+    if(search&&!q.title.toLowerCase().includes(search))return false;
+    return q.attempts.some(a=>launchQuestions(allLaunches[a.launchId]).length);
+  });
+}
+function renderStudentResults(studentId){
+  const table=document.getElementById('resultsTable'),name=(roster[studentId]&&roster[studentId].name)||studentId,all=studentResultsQuizzes(studentId),quizzes=resultsStudentShowAll?all:all.slice(0,10);
+  document.getElementById('resultsQuizTitle').textContent=name+' — his quizzes';
+  document.getElementById('resultsMeta').textContent='Newest first. '+(all.length>quizzes.length?'Showing his last '+quizzes.length+' of '+all.length+'. ':'')+'A quiz given more than once is one row; his newest finished try counts.';
+  document.querySelector('#panelResults .results-actions')?.classList.add('hidden');
+  if(!quizzes.length){table.innerHTML='<tr><td>No quizzes found for '+esc(name)+'.</td></tr>';return;}
+  const shownAttempt=q=>q.counted||q.partial||q.attempts[q.attempts.length-1];
+  const maxQ=Math.max(...quizzes.map(q=>launchQuestions(allLaunches[shownAttempt(q).launchId]).length));
+  let html='<thead><tr><th>Quiz</th><th>Score</th><th>Percent</th><th>Completed</th>'+Array.from({length:maxQ},(_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'</tr></thead><tbody>';
+  quizzes.forEach(q=>{
+    const shown=shownAttempt(q),displayId=shown.launchId,l=allLaunches[displayId]||{},first=allLaunches[q.attempts[0].launchId]||l,dqs=launchQuestions(l),dsr=(allResponses[displayId]||{})[studentId]||{},score=launchScore(displayId,studentId),comp=completions[displayId]&&completions[displayId][studentId];
+    const cells=dqs.map((_,i)=>{const r=dsr[i]||dsr[String(i)];const open='onclick="event.stopPropagation();openAnswerModal(\''+esc(studentId)+'\','+i+',\'results\',\''+esc(displayId)+'\')"';if(!r)return'<td class="cell blank" '+open+'>—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" '+open+'>'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('')+'<td></td>'.repeat(maxQ-dqs.length);
+    // Later tries he has not finished yet (and the teacher has not closed or revoked).
+    const pending=q.attempts.filter(a=>a.date>shown.date&&a.status!=='completed'&&!a.closed&&!WeeklyQuizAssignments.isRevoked(allLaunches[a.launchId],studentId));
+    const notes=[];
+    if(q.attempts.length>1)notes.push('<div class="small">Given '+q.attempts.length+' times'+(q.counted?' — showing his newest finished try ('+esc(fmtDate(shown.date))+')':' — not finished yet')+'</div>');
+    if(pending.length)notes.push('<div class="small" style="color:var(--gold);font-weight:700">'+esc(pending[pending.length-1].kind)+' assigned — not yet completed</div>');
+    else if(q.counted&&displayId!==q.attempts[0].launchId&&q.counted.kind.startsWith('Retake'))notes.push('<div class="small" style="color:var(--good);font-weight:700">'+esc(q.counted.kind)+' score</div>');
+    const quizCell='<a href="#" style="font-weight:700" title="Open this quiz for the whole class" onclick="event.preventDefault();openResultsLaunch(\''+esc(displayId)+'\')">'+esc(q.title)+'</a><div class="small">'+esc(classLabel(first.classId))+' • '+esc(fmtDate(q.attempts[0].date))+'</div>'+notes.join('');
+    html+='<tr data-quiz="'+esc(q.key)+'"><td>'+quizCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'</tr>';
+  });
+  if(all.length>quizzes.length)html+='<tr><td colspan="'+(4+maxQ)+'"><button class="secondary" onclick="resultsStudentShowAll=true;renderResults()">Show all '+all.length+' quizzes</button></td></tr>';
+  table.innerHTML=html+'</tbody>';
+}
 function renderResults(){
+  populateResultsStudents();const studentId=document.getElementById('resultsStudentFilter')?.value||'';
+  if(studentId===ALL_STUDENTS_TABLE){renderAllStudentsTable();return;}
+  document.getElementById('allTableTools')?.classList.add('hidden');document.getElementById('resultsTable')?.classList.remove('all-students');toggleTableFullscreen(false);
+  if(studentId){renderStudentResults(studentId);return;}
+  document.querySelector('#panelResults .results-actions')?.classList.remove('hidden');
   const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
   const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
   document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');
@@ -2012,13 +2185,14 @@ function openMakeupFromResults(){
   showTab('setup');
   document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
 }
-async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
+async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});if(l.targetStudents){await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,resultsLaunchId,WeeklyQuizAssignments.targetsOf(l),{}));for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
 async function launchRetake(studentId){
   const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
   const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
-  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref(QROOT+'/settings/studentActiveLaunch/'+studentId).set(id);
+  // Added to his assignment list; any other retakes he already has stay open.
+  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref().update(WeeklyQuizAssignments.assignUpdates(QROOT,[studentId],id,{kind:'retake',classId:base.classId,assignedAt:firebase.database.ServerValue.TIMESTAMP}));
   const name=(roster[studentId]&&roster[studentId].name)||studentId,link=getLaunchLink(id);
-  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
+  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class or his other assigned quizzes.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
   catch(e){prompt('Retake '+attempt+' is now active for '+name+'. Copy this direct link to send:',link);}
 }
 async function deleteLaunch(id){
@@ -2031,9 +2205,30 @@ async function deleteLaunch(id){
   await db.ref(QROOT+'/audit/'+id).remove();
   // Clean up any dangling pointers so no student/class is left aimed at a deleted launch.
   if(activeLaunchByClass[l.classId]===id)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();
-  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
+  if(l.targetStudents){await db.ref().update(WeeklyQuizAssignments.clearUpdates(QROOT,id,WeeklyQuizAssignments.targetsOf(l),{}));for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   if(resultsLaunchId===id)resultsLaunchId='';
   renderLaunchHistory();renderResults();
+}
+// ---------- Pending individual assignments ----------
+// Every unfinished retake / make-up / take-anytime quiz, per student. Revoke
+// closes ONE student's assignment; his answers and all history stay saved.
+function renderPendingAssignments(){
+  const box=document.getElementById('pendingAssignments');if(!box)return;
+  const filter=document.getElementById('resultsClassFilter')?.value||'all';
+  const rows=WeeklyQuizAssignments.pendingRows({queue:studentAssignmentQueue,legacyPointers:legacyStudentPointers,launches:allLaunches,completions,responses:allResponses,classFilter:filter});
+  if(!rows.length){box.innerHTML='<div class="small">No unfinished individual assignments.</div>';return;}
+  box.innerHTML=rows.map(r=>{
+    const l=r.launch,name=(roster[r.studentId]&&roster[r.studentId].name)||r.studentId,kind=l.retakeOf?'Retake '+r.attempt:(l.deliveryType==='makeup'?'Make-up':'Take anytime');
+    const progress=r.answered?(r.answered+' of '+r.total+' answered'):'Not started';
+    return '<div class="launch-item pending-assignment" data-student="'+esc(r.studentId)+'" data-launch="'+esc(r.launchId)+'"><div class="launch-item-title">'+esc(name)+' — '+esc((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled')+'</div><div class="small">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+esc(progress)+(r.assignedAt?' • assigned '+esc(fmtDate(r.assignedAt)):'')+'</div><div class="controls" style="margin-top:6px"><button class="secondary" onclick="resultsLaunchId=\''+esc(r.launchId)+'\';renderLaunchHistory();renderResults();">Results</button><button class="secondary" onclick="copyLaunchLink(\''+esc(r.launchId)+'\')">Copy link</button><button class="danger" onclick="revokeAssignment(\''+esc(r.studentId)+'\',\''+esc(r.launchId)+'\')">Revoke</button></div></div>';
+  }).join('');
+}
+async function revokeAssignment(studentId,launchId){
+  const l=allLaunches[launchId];if(!l)return;
+  if(WeeklyQuizAssignments.isCompleted(completions,launchId,studentId)){alert('He already finished this quiz, so it stays in his history.');return;}
+  const name=(roster[studentId]&&roster[studentId].name)||studentId,title=(l.quizSnapshot&&l.quizSnapshot.title)||'this quiz';
+  if(!confirm('Take "'+title+'" off '+name+'\'s list? Any answers he already gave stay saved, and his other quizzes are not changed.'))return;
+  await db.ref().update(WeeklyQuizAssignments.revokeUpdates(QROOT,launchId,studentId,legacyStudentPointers[studentId]||'',firebase.database.ServerValue.TIMESTAMP));
 }
 // ---------- Retake chain helpers ----------
 // Finds every launch belonging to the same retake chain (attemptGroupId) as
@@ -2060,7 +2255,7 @@ function studentDisplayAttempt(baseId,studentId){
   const chain=studentAttemptChain(baseId,studentId);if(!chain.length)return{id:baseId,attempt:1,completed:false,pendingNewer:[]};
   const completedOnes=chain.filter(a=>a.completed);
   const display=completedOnes.length?completedOnes[completedOnes.length-1]:(chain.find(a=>a.id===baseId)||chain[chain.length-1]);
-  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed);
+  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed&&!WeeklyQuizAssignments.isRevoked(a.launch,studentId)&&!a.launch.endedAt);
   return{id:display.id,attempt:display.attempt,completed:display.completed,completedAt:display.completedAt,pendingNewer};
 }
 function resultsMatrix(){
@@ -2069,6 +2264,8 @@ function resultsMatrix(){
 }
 function csvEscape(v){const s=String(v??'');return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCSV(){const rows=resultsMatrix(),l=allLaunches[resultsLaunchId];if(!rows.length||!l)return;const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=((l.quizSnapshot&&l.quizSnapshot.title)||'B3_Quiz').replace(/[^a-z0-9]+/gi,'_')+'_'+l.classId+'_'+resultsLaunchId.slice(0,13)+'.csv';a.click();URL.revokeObjectURL(a.href);}
+// Opens School Marks with this quiz already chosen. Nothing is sent to Nigri from here.
+function openSyncToNigri(launchId){let id=launchId;if(!id)return;for(let i=0;i<10;i++){const l=(allLaunches||{})[id]||{},p=l.retakeOf||l.makeupOf;if(!p)break;id=p}window.open('../sync-to-nigri/school-marks.html?launch='+encodeURIComponent(id),'_blank')}
 async function copyResultsTSV(){const rows=resultsMatrix();if(!rows.length)return;const tsv=rows.map(r=>r.join('\t')).join('\n');try{await navigator.clipboard.writeText(tsv);alert('Copied. Paste directly into Google Sheets.');}catch(e){prompt('Copy this and paste into Google Sheets:',tsv);}}
 
 // ---------- Long-term student progress ----------

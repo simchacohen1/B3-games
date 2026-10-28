@@ -18,3 +18,5 @@ test-results/
 # Live site monitor output
 /monitor-report/
 /monitor-results/
+
+staging-results/
