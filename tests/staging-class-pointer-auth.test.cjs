@@ -71,6 +71,19 @@ test('staging handler refuses a production or missing project target',async()=>{
   f.env.FIREBASE_CONFIG=JSON.stringify({projectId:'fun-torah-tools-staging',databaseURL:'https://b3-games-default-rtdb.firebaseio.com'});
   assert.equal((await f.post({action:'permissions',...params(f)})).statusCode,503);
 });
+test('session timestamp must be numeric, current and present before any ticket or policy read',async()=>{
+  const f=fixture(),session=f.rows.get(f.base+'/classPointerSessions/'+f.room);
+  const request={action:'issue',...params(f)};
+  for(const invalid of [undefined,null,'not-a-timestamp',Date.now()-15000000,Date.now()+120000]){
+    session.createdAt=invalid;
+    f.reads.length=0;
+    const result=await f.post(request);
+    assert.equal(result.statusCode,403,'invalid timestamp '+String(invalid));
+    assert.equal(f.reads.some(path=>path.startsWith('b3Private/')),false,'invalid session must not access private records');
+  }
+  session.createdAt=Date.now();
+  assert.equal((await f.post(request)).statusCode,200);
+});
 test('fictional class grant is required for sharing',async()=>{
   const f=fixture(),cls=f.rows.get(f.base);
   delete cls.toolGrants['class-pointer'];
