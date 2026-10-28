@@ -350,3 +350,47 @@ testEmulator('Student Rewards own paths work while peer data and direct awards s
   await succeeds(get(ref(owner,'studentRewards/students')));
   await fails(get(ref(owner,'studentRewards/privateAuth')));
 });
+
+
+// Release-blocking regression against the transitional rules used by the website.
+// This test intentionally expects DENIAL for an out-of-class student read.
+// It will be RED until the class-isolation gap in firebase-rules.json is fixed.
+// Keep the hardened-rules tests above intact; never change this to assertSucceeds.
+testEmulator('transitional RTDB rules deny an assigned teacher reading a different class student',async()=>{
+  const transitionalRules=fs.readFileSync('firebase-rules.json','utf8');
+  const transitional=await initializeTestEnvironment({
+    projectId:'demo-b3-transitional-student-isolation',
+    database:{host:'127.0.0.1',port:emulatorPort,rules:transitionalRules}
+  });
+  try{
+    await transitional.clearDatabase();
+    await transitional.withSecurityRulesDisabled(async context=>{
+      const database=context.database();
+      await set(ref(database,'b3Games/workspaces/b3-2026/teachers/teacher_alpha'),{
+        active:true,classIds:{alpha:true}
+      });
+      await set(ref(database,'b3Games/workspaces/b3-2026/classes/alpha'),{
+        active:true,members:{synthetic_one:{active:true}}
+      });
+      await set(ref(database,'b3Games/workspaces/b3-2026/classes/beta'),{
+        active:true,members:{synthetic_two:{active:true}}
+      });
+      await set(ref(database,'b3Games/students/synthetic_one'),{
+        profile:{active:true,classId:'alpha'},
+        memberships:{'b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true}}
+      });
+      await set(ref(database,'b3Games/students/synthetic_two'),{
+        profile:{active:true,classId:'beta'},
+        memberships:{'b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true}}
+      });
+    });
+    const teacher=transitional.authenticatedContext('teacher_alpha',{
+      email:'alpha@example.test',email_verified:true
+    }).database();
+    await succeeds(get(ref(teacher,'b3Games/students/synthetic_one/profile')));
+    // Must deny this read, even though the teacher is active in another class.
+    await fails(get(ref(teacher,'b3Games/students/synthetic_two/profile')));
+  }finally{
+    await transitional.cleanup();
+  }
+});
