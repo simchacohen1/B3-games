@@ -539,7 +539,19 @@ document.addEventListener('keydown', e => {
 
 function mustSitOut(data, name) { return false; }
 
+// Ignore clicks whose press started before the buzzer opened.
+let earlyPress = false;
+document.getElementById('buzzBtn').addEventListener('pointerdown', () => {
+  earlyPress = document.getElementById('buzzBtn').disabled ||
+    !lastData || lastData.narrationLocked || serverNow() < (lastData.buzzUnlockAt || 0);
+}, true);
+document.getElementById('buzzBtn').addEventListener('pointerup', () => {
+  // Keep the flag through the click event; reset after it has been dispatched.
+  setTimeout(() => { earlyPress = false; }, 0);
+}, true);
+
 function buzzIn() {
+  if (earlyPress) return;
   if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
   if (masterBlocked || !myName) return;
   if (!lastData || lastData.roundActive !== true) return;
@@ -570,17 +582,17 @@ function updateBuzzAvailability() {
   }
   if (lastData.narrationLocked) {
     buzzBtn.disabled = true;
-    countdownEl.textContent = 'Listen to the question and colored choices…';
+    countdownEl.textContent = 'WAIT! Listen to the question and colored choices…';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (lockedUntil && now < lockedUntil) {
     buzzBtn.disabled = true;
     const secsLeft = Math.ceil((lockedUntil - now) / 1000);
-    countdownEl.textContent = 'Get ready… ' + secsLeft;
+    countdownEl.textContent = 'GET READY… ' + secsLeft;
     if (!countdownInterval) {
       countdownInterval = setInterval(updateBuzzAvailability, 250);
     }
   } else {
-    countdownEl.textContent = '';
+    countdownEl.textContent = 'BUZZ NOW!';
     if (countdownInterval) {
       clearInterval(countdownInterval);
       countdownInterval = null;
