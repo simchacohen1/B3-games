@@ -73,7 +73,7 @@ foreach ($adult in $adults) {
   $credentials += [pscustomobject]@{ role = $adult.role; email = $adult.email; password = $password; uid = $uid; classId = $adult.classId }
 }
 
-$allTools = @('weekly-quiz', 'chazara', 'shorashim', 'rashi', 'class-gallery', 'halacha', 'student-rewards', 'pointer', 'game-show', 'yiddish')
+$allTools = @('weekly-quiz', 'chazara', 'shorashim', 'rashi', 'class-gallery', 'halacha', 'student-rewards', 'pointer', 'class-pointer', 'game-show', 'yiddish')
 $classes = @{}
 $teachers = @{}
 $invites = @{}
