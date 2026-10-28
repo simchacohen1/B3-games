@@ -91,3 +91,16 @@ test('unscoped non-owner cannot request Chazara audio', async () => {
   assert.equal(f.reads.length, 0);
   assert.equal(f.writes.length, 0);
 });
+
+test('authorized Chazara fallback audio uses a single scoped event read', async () => {
+  const f = fixture(), teacher = {owner: false, scope: f.scope};
+  const event = await f.authorize(teacher, {action: 'get-chazara-recording-audio', studentId: 'shared', eventId: 'et_event'});
+  assert.equal(event.audioDataURL, 'data:audio/webm;base64,ET', 'authorization returns the same checked event');
+  assert.deepEqual(f.reads, ['posukPractice/chazara/events/shared/et_event'], 'one event read for class-scoped authorization');
+  assert.equal(f.writes.length, 0);
+  const source = fs.readFileSync('backend/functions/student-rewards-auto-award.js', 'utf8');
+  assert.match(source, /const authorizedChazaraEvent=await authorizeChazaraAction\(teacher,body\)/,
+    'request handler must retain the authorized event');
+  assert.match(source, /const event=teacher\.scope\?authorizedChazaraEvent:/,
+    'scoped audio handler must reuse that event instead of downloading it again');
+});
