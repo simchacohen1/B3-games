@@ -1,0 +1,26 @@
+name: Quiz modes v2 tests
+on:
+  pull_request:
+    paths:
+      - 'weekly-quiz/question-modes-v2.js'
+      - 'weekly-quiz/question-modes-student.js'
+      - 'weekly-quiz/question-modes-draft.html'
+      - 'tests/quiz-question-modes-v2.test.js'
+      - '.github/workflows/quiz-question-modes-v2.yml'
+  push:
+    paths:
+      - 'weekly-quiz/question-modes-v2.js'
+      - 'weekly-quiz/question-modes-draft.html'
+      - 'tests/quiz-question-modes-v2.test.js'
+      - '.github/workflows/quiz-question-modes-v2.yml'
+jobs:
+  quiz-modes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check weekly-quiz/question-modes-v2.js
+      - run: node --check weekly-quiz/question-modes-student.js
+      - run: node --test tests/quiz-question-modes-v2.test.js
