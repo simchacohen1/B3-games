@@ -1,6 +1,8 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {assertNoProductionFirebaseTarget} = require('./firebase-resource-targets.cjs');
 if (!admin.apps.length) admin.initializeApp();
+assertNoProductionFirebaseTarget(admin.apps[0]);
 const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
@@ -9,7 +11,9 @@ const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
 const SR_ROOT = "studentRewards";
-const ADMIN_EMAIL = "simcha5770@gmail.com";
+const ADMIN_EMAIL = typeof process !== "undefined" && process.env.B3_STAGING_DEPLOYMENT === "true"
+  ? "owner@funtorahtools-staging.test"
+  : "simcha5770@gmail.com";
 const POINTS = Object.freeze({
   reading100: 3,
   translation100: 5,
@@ -22,7 +26,13 @@ const POINTS = Object.freeze({
 });
 
 function cors(req, res) {
-  res.set("Access-Control-Allow-Origin", "*");
+  const origin = String(req.headers.origin || "");
+  const allowedOrigin = typeof process !== "undefined" && process.env.B3_STAGING_DEPLOYMENT === "true"
+    ? "https://fun-torah-tools-staging.web.app"
+    : "*";
+  if (allowedOrigin === "*" || origin === allowedOrigin) {
+    res.set("Access-Control-Allow-Origin", allowedOrigin);
+  }
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") { res.status(204).send(""); return true; }
@@ -158,7 +168,7 @@ async function authorizeChazaraAction(teacher,body){
 
 
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
-const RASHI_BUCKET='b3-games.firebasestorage.app';
+const rashiBucket=()=>admin.storage().bucket();
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 async function rashiRequestStatus(requestId){
   const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
@@ -204,7 +214,7 @@ async function rashiStudentSubmit(req,res){
   const attemptId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const ext=type==='audio/mp4'||type==='audio/x-m4a'||type==='audio/aac'?'m4a':type==='audio/ogg'?'ogg':type==='audio/mpeg'?'mp3':type==='audio/wav'?'wav':'webm';
   const storagePath=`rashi-recordings/${classId}/${studentId}/${sectionId}/${attemptId}.${ext}`;
-  const file=admin.storage().bucket(RASHI_BUCKET).file(storagePath);
+  const file=rashiBucket().file(storagePath);
   await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
   const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
   const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
@@ -246,7 +256,7 @@ async function rashiStudentStatus(req,res){
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
   const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-  const bucket=admin.storage().bucket(RASHI_BUCKET),rows=[];
+  const bucket=rashiBucket(),rows=[];
   for(const [id,item] of Object.entries(all)){
     if(!isRashiRequest(item)||item.status!=='pending')continue;
     if(scope&&!teacherClassScope.recordAllowed(scope,item.practiceStudentId,item))continue;

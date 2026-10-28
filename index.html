@@ -1100,6 +1100,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
 
   function adminPasswordUnlocked(){
+    if(window.B3_STAGING_MODE===true)return true;
     try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
   }
 
@@ -1531,10 +1532,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
     catch(e){return{ok:false,reason:e.message,status:e.status}}
     let classId;
+    let classState=null;
     if(Array.isArray(r.classChoices)&&r.classChoices.length){
       studentClassChoices=r.classChoices;
       const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
-      classId=(studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0]).id;
+      const selected=studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0];
+      classId=selected.id;classState=selected.bootstrap||null;
     }else{
       // Older auth-function deployments return the selected class but not the
       // full classChoices list. Use that trusted server result so sign-in does
@@ -1544,12 +1547,13 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
     }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
+    return{ok:true,id:r.id,name:r.name,classId,classState,customToken:r.classId===classId?r.customToken:""};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
   async function enterStudent(r){
+    let classState=r.classState||null;
     if(!isStudentPreview){
       const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
       if(!pin)throw new Error("Please sign in again so your student access can be secured.");
@@ -1559,6 +1563,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(!customToken){
         const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
         customToken=credential.customToken;
+        classState=credential.classChoices?.find(choice=>choice.id===r.classId)?.bootstrap||null;
       }
       if(!customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
       try{
@@ -1585,13 +1590,16 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(studentMembershipWatch)studentMembershipWatch.off();
     studentAccessRevoked=false;
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
-    try{
+    if(classState){
+      myClassRecord=classState;
+    }else try{
       const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
       const fields=["name","active","siteEnabled","access","toolGrants"];
       const snapshots=await Promise.all([...fields.map(field=>readOnce(classPath+"/"+field,8000)),readOnce(classPath+"/members/"+myStudentId,8000)]);
       myClassRecord=Object.fromEntries(fields.map((field,i)=>[field,snapshots[i].val()]));
       myClassRecord.members={[myStudentId]:snapshots[fields.length].val()};
     }catch(e){}
+    if(myClassRecord&&myClassRecord.name)classLabels[myClassId]=String(myClassRecord.name);
     if(!isStudentPreview){
       sessionStorage.setItem("b3Games_studentId",myStudentId);
       sessionStorage.setItem("b3Games_studentName",myStudentName);
@@ -1609,7 +1617,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
     chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
     chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
-    chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
+    chooser.onchange=()=>{
+      const choice=studentClassChoices.find(item=>item.id===chooser.value);
+      enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value,classState:choice?.bootstrap||null});
+    };
     if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();
     const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
     const classRefs=[...(["name","active","siteEnabled","access","toolGrants"].map(field=>({field,ref:db.ref(classPath+"/"+field)}))),{field:"member",ref:db.ref(classPath+"/members/"+myStudentId)}];
@@ -1702,8 +1713,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         if(!identity?.customToken||identity.id!==id||identity.classId!==actingStudent.classId){
           throw new Error("This student no longer has access to the selected class.");
         }
-        studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
-        await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        studentClassChoices=Array.isArray(identity.classChoices)?identity.classChoices:[{id:actingStudent.classId,name:actingStudent.className}];
+        const classState=studentClassChoices.find(choice=>choice.id===actingStudent.classId)?.bootstrap||null;
+        await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,classState,customToken:identity.customToken});
         // "Student version" from a teacher page lands on that tool once signed in.
         const next=sessionStorage.getItem("b3ActAsNext");
         sessionStorage.removeItem("b3ActAsNext");
@@ -1751,7 +1763,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const restoredClassId=(studentClassChoices.find(c=>c.id===storedClassId)||studentClassChoices.find(c=>c.id===identity.classId)||studentClassChoices[0]||{}).id||await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
-      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+      const classState=studentClassChoices.find(choice=>choice.id===restoredClassId)?.bootstrap||null;
+      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId,classState});
     }catch(e){console.warn(e);showLogin();}
   }
 

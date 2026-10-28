@@ -3,3 +3,4 @@ firebase-debug*.log
 functions/*.local
 .env*
 *service-account*.json
+functions-staging/node_modules/

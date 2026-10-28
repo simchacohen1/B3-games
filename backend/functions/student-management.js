@@ -2,8 +2,9 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {manageStudents}=require('./student-management-core.cjs');
+const {corsForProductionOrigins}=require('./staging-cors.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.funTorahManageStudents=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'],maxInstances:5},async(req,res)=>{
+exports.funTorahManageStudents=onRequest({region:'us-central1',cors:corsForProductionOrigins(['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com']),maxInstances:5},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>3000)return res.status(413).json({error:'Request too large.'});
