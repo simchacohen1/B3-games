@@ -52,8 +52,22 @@
     }
     if(!window.B3_FIREBASE_CONFIG)await load(new URL('firebase-config.js',root).href);
     if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-    const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
-    if(!auth.ok||!(await auth.json()).ok)return;
+    if(persistentShareWindow){
+      // A new window inherits the student's sessionStorage but not necessarily
+      // Firebase Auth's tab-scoped session. Authenticate this exact student in
+      // the popup before reading the private class/session database paths.
+      if(!firebase.auth)await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js');
+      const chosenClass=sessionStorage.getItem('b3Games_studentClass')||'';
+      const login=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'login',name:id,pin,classId:chosenClass})});
+      const identity=await login.json().catch(()=>({}));
+      if(!login.ok||!identity.ok||identity.id!==id||!identity.customToken)return;
+      await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+      await firebase.auth().signInWithCustomToken(identity.customToken);
+    }else{
+      const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
+      if(!auth.ok||!(await auth.json()).ok)return;
+    }
     // Use the same class resolver as the existing student dashboard.
     // It respects a selected class and never revives a removed membership.
     if(!window.FunTorahStudentClass)await load(new URL('student-class.js',root).href);
