@@ -194,6 +194,15 @@ exports.classPointerShareAuth=onRequest({
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
    if(!code.passcode||!equal(code.passcode,body.pin))await fail(401,'Please sign in again.');
    if(sRow)await db.ref(sPath).set(null);
+   // Limit successful join-ticket creation as well as incorrect PIN attempts.
+   // A known student PIN must not permit unbounded ticket churn and database writes.
+   let joinBusy=false;
+   await db.ref('b3Private/classPointerJoinLimits/ok_'+sha(studentId).slice(0,32)).transaction(previous=>{
+    const current=Date.now(),row=previous&&previous.until>current?previous:{count:0,until:current+600000};
+    if(row.count>=25){joinBusy=true;return undefined}
+    return {count:row.count+1,until:row.until};
+   });
+   if(joinBusy)error(429,'Too many connection attempts. Try again in a few minutes.');
    const token=crypto.randomBytes(32).toString('hex'),digest=sha(token);
    // One outstanding join ticket per student: a new one replaces the old, so tickets never pile up.
    const indexRef=db.ref('b3Private/classPointerJoinTicketIndex/'+sha(studentId).slice(0,32));
@@ -221,6 +230,10 @@ exports.classPointerShareAuth=onRequest({
    });
    const ticket=used.committed?used.snapshot.val():null;
    if(!ticket)error(403,'Join ticket expired, already used, or not for this class and connection.');
+   // Concurrent join requests may both create tickets before the index is updated.
+   // Only the ticket currently indexed for this student is admissible.
+   const indexedDigest=(await db.ref('b3Private/classPointerJoinTicketIndex/'+sha(ticket.studentId).slice(0,32)).once('value')).val();
+   if(indexedDigest!==sha(token))error(403,'Join ticket has been replaced by a newer connection.');
    const profile=await stillMember(ticket.studentId);
    if(!profile)error(403,'Student no longer belongs to this class.');
    return res.json({ok:true,studentId:ticket.studentId,studentName:String(profile.name||'Student').slice(0,32)});
