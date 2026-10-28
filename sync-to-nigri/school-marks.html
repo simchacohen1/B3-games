@@ -9,6 +9,7 @@
 <title>School Marks → Nigri</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="../weekly-quiz/report-pdf.js"></script>
 <style>
@@ -81,5 +82,17 @@ async function syncMarks(){
       : 'Nigri did not save this: '+(data.detail||res.status);
   }catch(e){status.textContent=(requestStarted?'Nigri may have saved marks; check Nigri before retrying: ':'Not sent to Nigri: ')+e.message}finally{btn.disabled=false}
 }
-loadData();
+(function startWithSignIn(){
+  const auth=firebase.auth();
+  const status=document.getElementById('status');
+  function showError(msg){ if(status) status.textContent=msg; console.error(msg); }
+  auth.onAuthStateChanged(function(user){
+    if(user){
+      loadData().catch(function(e){ showError('Could not load quizzes: '+e.message); });
+    } else {
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+        .catch(function(e){ showError('Sign-in failed: '+e.message+'. Allow pop-ups for this site and refresh.'); });
+    }
+  });
+})();
 </script></body></html>
