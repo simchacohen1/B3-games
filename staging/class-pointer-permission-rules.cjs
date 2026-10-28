@@ -17,8 +17,12 @@ function installStagingClassPointerRules(rules) {
   const member = classValue(" + '/members/' + $studentId + '/active'") + ' == true';
   const profile = "root.child('b3Games/students/' + $studentId + '/profile/active').val() == true";
   const room = classValue(" + '/classPointerSessions/' + $roomId + '/roomId'") + ' == $roomId';
+  // A stale room must not expose a student's private permissions after the lesson ends.
+  // Match the four-hour session lifetime enforced by classPointerShareAuth.
+  const roomCreated = "root.child(" + base + " + '/classPointerSessions/' + $roomId + '/createdAt')";
+  const freshRoom = roomCreated + '.isNumber() && ' + roomCreated + '.val() >= now - 14400000 && ' + roomCreated + '.val() <= now + 60000';
   const studentAuthorized = "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId && $workspaceId == 'b3-2026' && " +
-    activeClass + ' && ' + grant + ' && ' + member + ' && ' + profile + ' && ' + room;
+    activeClass + ' && ' + grant + ' && ' + member + ' && ' + profile + ' && ' + room + ' && ' + freshRoom;
   rules.b3Private.classPointerSharePermissions = {
     '$workspaceId': {
       '$classId': {
