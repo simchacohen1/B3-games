@@ -127,5 +127,8 @@ test('persistent-sharing option is staging-only and preserves the original direc
   assert.match(share,/btn\.addEventListener\('click',beginShare\)/);
   assert.match(share,/student-share-window\.html\?pointerShare=1/);
   assert.match(windowPage,/window\.opener=null/);
+  assert.match(share,/if\(persistentShareWindow\)\{/);
+  assert.match(share,/firebase\.auth\(\)\.signInWithCustomToken\(identity\.customToken\)/);
+  assert.match(share,/firebase\.auth\.Auth\.Persistence\.SESSION/);
   assert.doesNotMatch(share,/student-share-window\.html\?[^'\x22]*pin=/i);
 });
