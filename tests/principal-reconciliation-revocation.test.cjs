@@ -91,3 +91,42 @@ test('unclaimed principal invitations never create a synthetic teacher record', 
   assert.ok(!Object.keys(u).some(k => k.includes('/teachers/') ||
     k.includes('/teacherIds/')), 'no claimed identity, no account grants');
 });
+
+
+test('principal loses a class when the same supervised teacher loses that class', async () => {
+  const f = fixture({ supervisedTeacherIds: { teacherA: true } }, {
+    email: 'synthetic-principal@example.test', accountType: 'principal',
+    active: true, classIds: { et: true, wt: true },
+    supervisedTeachers: { teacherA: { classIds: { et: true, wt: true } } }
+  });
+  f.invites.teacherA.classIds = { wt: true };
+  await f.reconcile(f.invites, f.classes);
+  assert.equal(f.writes.length, 1, 'revocation must be a single atomic update');
+  const u = f.writes[0];
+  assert.deepEqual(u[ROOT + '/teachers/principal-uid/classIds'], { wt: true });
+  assert.deepEqual(u[ROOT + '/teacherInvites/principal/classIds'], { wt: true });
+  assert.equal(u[ROOT + '/classes/et/teacherIds/principal-uid'], null,
+    'old class membership must be revoked even when supervision is unchanged');
+  assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], undefined,
+    'unaffected class membership should not be rewritten');
+  assert.equal(f.invites.principal.active, true);
+});
+
+test('deactivating the sole supervised teacher revokes principal access atomically', async () => {
+  const f = fixture({ supervisedTeacherIds: { teacherA: true } }, {
+    email: 'synthetic-principal@example.test', accountType: 'principal',
+    active: true, classIds: { et: true, wt: true },
+    supervisedTeachers: { teacherA: { classIds: { et: true, wt: true } } }
+  });
+  f.invites.teacherA.active = false;
+  await f.reconcile(f.invites, f.classes);
+  assert.equal(f.writes.length, 1);
+  const u = f.writes[0];
+  assert.equal(u[ROOT + '/teachers/principal-uid/active'], false);
+  assert.equal(u[ROOT + '/teacherInvites/principal/active'], false);
+  assert.equal(u[ROOT + '/teachers/principal-uid/classIds'], null);
+  assert.equal(u[ROOT + '/teacherInvites/principal/classIds'], null);
+  assert.equal(u[ROOT + '/classes/et/teacherIds/principal-uid'], null);
+  assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], null);
+  assert.equal(f.invites.principal.active, false);
+});
