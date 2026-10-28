@@ -154,6 +154,11 @@ async function authorizeChazaraAction(teacher,body){
   if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.eventId||'')))throw Object.assign(new Error('Invalid Chazara event.'),{code:403});
   const event=(await rtdb.ref(`posukPractice/chazara/events/${body.studentId}/${body.eventId}`).get()).val();
   if(!teacherClassScope.recordAllowed(scope,body.studentId,event))throw Object.assign(new Error('This Chazara does not belong to your selected class.'),{code:403});
+  // Reuse this already-authorized event only for read-only actions. Legacy
+  // inline audio can be large; reading it twice doubles backend RTDB transfer.
+  // This value is request-local, never cached across permission changes.
+  if(action==='get-chazara-event'||action==='get-chazara-audio')
+   teacher.authorizedChazaraRead={studentId:String(body.studentId),eventId:String(body.eventId),event};
  }
  body.classId=scope.selected;
 }
@@ -1554,7 +1559,10 @@ exports.studentRewardsAutoAward = onRequest(
           if(action==="get-chazara-event"||action==="get-chazara-audio"){
             const eventId=String(body.eventId||"").trim();
             if(!teacherClassScope.validKey(eventId))return res.status(400).json({error:"Invalid recording."});
-            const event=(await rtdb.ref('posukPractice/chazara/events/'+studentId+'/'+eventId).get()).val();
+            const verified=teacher.authorizedChazaraRead;
+            const event=verified?.studentId===studentId&&verified?.eventId===eventId
+              ?verified.event
+              :(await rtdb.ref('posukPractice/chazara/events/'+studentId+'/'+eventId).get()).val();
             if(!event)return res.status(404).json({error:"Recording not found."});
             if(!eventAllowed(event))return res.status(403).json({error:"Recording belongs to another class."});
             if(action==="get-chazara-audio"){
