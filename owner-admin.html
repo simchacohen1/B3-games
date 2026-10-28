@@ -131,7 +131,7 @@ async function reconcilePrincipals(invites,classes){
    if(!sameMap(record.classIds,scope.classIds)){
      for(const classId of new Set([...Object.keys(record.classIds||{}),...Object.keys(scope.classIds)])){
        if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId)||classId==="*")continue;
-       if((record.classIds||{})[classId]===true !== (scope.classIds[classId]===true))updates[root+"/classes/"+classId+"/teacherIds/"+uid]=scope.classIds[classId]===true?true:null;
+       if(((record.classIds||{})[classId]===true)!==(scope.classIds[classId]===true))updates[root+"/classes/"+classId+"/teacherIds/"+uid]=scope.classIds[classId]===true?true:null;
      }
    }
  }
