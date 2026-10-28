@@ -26,6 +26,7 @@ function fixture(code,fn){
   const elements={loadPreviousRecordingsBtn:button,recordingReviewFilter:review,approvalSignInBtn:signin,approvalList};
   const ctx={
     scopeGeneration:1,
+    approvalLoadSequence:0,
     teacherScope:{selected:'et',students:{shared:{}}},
     teacherAccess:{authorized:true},
     recordingHistoryLoading:false,recordingHistoryLoaded:false,
@@ -124,4 +125,40 @@ test('class-scope reset invalidates history state and restores the load button',
   assert.match(scopeCode,/const generation=\+\+scopeGeneration;/);
   assert.match(scopeCode,/recordingHistoryLoaded=false;recordingHistoryLoading=false;/);
   assert.match(scopeCode,/historyButton\.disabled=false/);
+});
+
+test('overlapping same-class pending responses apply only the newest result',async()=>{
+  const f=fixture(pendingCode,'loadApprovals');
+  const deferred=[];
+  f.ctx.teacherApi=()=>new Promise(resolve=>deferred.push(resolve));
+  const older=f.ctx.run();
+  const newer=f.ctx.run();
+  assert.equal(deferred.length,2);
+  deferred[1]({requests:[{id:'fresh',practiceStudentId:'shared',workspaceClassId:'et'}],
+    recordings:[{studentId:'shared',id:'fresh-event',workspaceClassId:'et'}]});
+  await newer;
+  deferred[0]({requests:[{id:'stale',practiceStudentId:'shared',workspaceClassId:'et'}],
+    recordings:[{studentId:'shared',id:'stale-event',workspaceClassId:'et'}]});
+  await older;
+  assert.deepEqual(Object.keys(f.ctx.pendingPointRequests),['fresh']);
+  assert.equal(f.ctx.E.shared['fresh-event'].workspaceClassId,'et');
+  assert.equal(f.ctx.E.shared['stale-event'],undefined);
+  assert.equal(f.renderCount(),1);
+  assert.equal(f.approvalCount(),1);
+});
+
+test('late failure from an older same-class request cannot erase a newer queue',async()=>{
+  const f=fixture(pendingCode,'loadApprovals');
+  const deferred=[];
+  f.ctx.teacherApi=()=>new Promise((resolve,reject)=>deferred.push({resolve,reject}));
+  const older=f.ctx.run();
+  const newer=f.ctx.run();
+  deferred[1].resolve({requests:[{id:'fresh',practiceStudentId:'shared',workspaceClassId:'et'}],
+    recordings:[]});
+  await newer;
+  deferred[0].reject(new Error('old network error'));
+  await older;
+  assert.deepEqual(Object.keys(f.ctx.pendingPointRequests),['fresh']);
+  assert.equal(f.renderCount(),1);
+  assert.equal(f.approvalCount(),1);
 });
