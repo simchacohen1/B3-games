@@ -1,0 +1,16 @@
+{
+  "database": {
+    "rules": "staging/database.rules.json"
+  },
+  "emulators": {
+    "hub": {
+      "host": "127.0.0.1",
+      "port": 14410
+    },
+    "database": {
+      "host": "127.0.0.1",
+      "port": 19110
+    },
+    "singleProjectMode": false
+  }
+}
