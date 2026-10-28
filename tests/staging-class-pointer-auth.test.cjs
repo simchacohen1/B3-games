@@ -261,6 +261,25 @@ test('repeated wrong join PINs trigger the student-specific rate limit',async()=
   assert.equal(blocked.statusCode,429);
 });
 
+test('wrong join PIN attempts retain their original rolling-window start',async()=>{
+  const f=fixture(),body={action:'joinIssue',...params(f),peerId:'peer-test-alef-123',pin:'wrong'};
+  const digest=crypto.createHash('sha256').update(f.studentId).digest('hex').slice(0,32);
+  const path='b3Private/classPointerJoinLimits/s_'+digest;
+  assert.equal((await f.post(body)).statusCode,401);
+  const row=f.rows.get(path);
+  // Simulate two minutes passing without waiting for a real timer.
+  row.start=Date.now()-120000;
+  const originalStart=row.start;
+  assert.equal((await f.post(body)).statusCode,401);
+  assert.equal(f.rows.get(path).start,originalStart,'a second failure must not restart the window');
+  assert.equal(f.rows.get(path).count,2);
+  // Once the original 15-minute window has expired, a new window starts.
+  f.rows.get(path).start=Date.now()-901000;
+  assert.equal((await f.post(body)).statusCode,401);
+  assert.equal(f.rows.get(path).count,1);
+  assert.ok(f.rows.get(path).start>originalStart);
+});
+
 test('delayed older join issuance cannot overwrite a newer ticket index',async()=>{
   const f=fixture(),peerId='peer-test-alef-123';
   const request={action:'joinIssue',...params(f),peerId};
