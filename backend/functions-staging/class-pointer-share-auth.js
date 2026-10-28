@@ -204,12 +204,27 @@ exports.classPointerShareAuth=onRequest({
    });
    if(joinBusy)error(429,'Too many connection attempts. Try again in a few minutes.');
    const token=crypto.randomBytes(32).toString('hex'),digest=sha(token);
-   // One outstanding join ticket per student: a new one replaces the old, so tickets never pile up.
+   const issuedAt=Date.now();
+   const ticketRef=db.ref('b3Private/classPointerJoinTickets/'+digest);
+   await ticketRef.set({studentId,classId,room,peerId:body.peerId,createdAt:issuedAt,expiresAt:issuedAt+90000});
+   // A transaction prevents an older, delayed request from restoring an obsolete
+   // ticket index after a newer request has completed. The legacy string index
+   // is accepted for a safe in-place transition to the timestamped format.
    const indexRef=db.ref('b3Private/classPointerJoinTicketIndex/'+sha(studentId).slice(0,32));
-   const previous=(await indexRef.once('value')).val();
-   if(typeof previous==='string'&&/^[a-f0-9]{64}$/.test(previous))await db.ref('b3Private/classPointerJoinTickets/'+previous).set(null);
-   await db.ref('b3Private/classPointerJoinTickets/'+digest).set({studentId,classId,room,peerId:body.peerId,createdAt:now,expiresAt:now+90000});
-   await indexRef.set(digest);
+   let replacedDigest=null;
+   const indexed=await indexRef.transaction(current=>{
+    const previous=typeof current==='string'?current:current?.digest;
+    const previousTime=Number.isFinite(current?.issuedAt)?current.issuedAt:0;
+    if(previousTime>issuedAt)return;
+    replacedDigest=previous;
+    return {digest,issuedAt};
+   });
+   if(!indexed.committed){
+    await ticketRef.set(null);
+    error(409,'A newer connection request is already active.');
+   }
+   if(typeof replacedDigest==='string'&&/^[a-f0-9]{64}$/.test(replacedDigest)&&replacedDigest!==digest)
+    await db.ref('b3Private/classPointerJoinTickets/'+replacedDigest).set(null);
    return res.json({ok:true,token,studentName:String(profile.name||'Student').slice(0,32)});
   }
   if(action==='joinVerify'){
@@ -232,7 +247,8 @@ exports.classPointerShareAuth=onRequest({
    if(!ticket)error(403,'Join ticket expired, already used, or not for this class and connection.');
    // Concurrent join requests may both create tickets before the index is updated.
    // Only the ticket currently indexed for this student is admissible.
-   const indexedDigest=(await db.ref('b3Private/classPointerJoinTicketIndex/'+sha(ticket.studentId).slice(0,32)).once('value')).val();
+   const index=(await db.ref('b3Private/classPointerJoinTicketIndex/'+sha(ticket.studentId).slice(0,32)).once('value')).val();
+   const indexedDigest=typeof index==='string'?index:index?.digest;
    if(indexedDigest!==sha(token))error(403,'Join ticket has been replaced by a newer connection.');
    const profile=await stillMember(ticket.studentId);
    if(!profile)error(403,'Student no longer belongs to this class.');
