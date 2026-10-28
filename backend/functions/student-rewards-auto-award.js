@@ -143,7 +143,7 @@ async function authorizeChazaraAction(teacher,body){
   if(!teacherClassScope.validKey(String(body.studentId||''))||!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.eventId||''))||!scope.students?.[body.studentId])throw Object.assign(new Error('Invalid or out-of-scope Chazara recording.'),{code:403});
   const event=(await rtdb.ref(`posukPractice/chazara/events/${body.studentId}/${body.eventId}`).get()).val();
   if(!teacherClassScope.recordAllowed(scope,body.studentId,event))throw Object.assign(new Error('This Chazara does not belong to your selected class.'),{code:403});
-  return;
+  return event; // Reuse the authorized snapshot for audio; do not download it twice.
  }
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='repair-shorashim-recording'){
@@ -1546,7 +1546,7 @@ exports.studentRewardsAutoAward = onRequest(
         }
         const teacher=await requireTeacher(req);
         if(!teacher.ok) return res.status(401).json({error:teacher.error});
-        await authorizeChazaraAction(teacher,body);
+        const authorizedChazaraEvent=await authorizeChazaraAction(teacher,body);
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});
@@ -1573,7 +1573,7 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="get-chazara-recording-audio"){
           const studentId=String(body.studentId||''),eventId=String(body.eventId||'');
           if(!teacher.scope&&!teacher.owner)return res.status(403).json({error:'Teacher class scope is required.'});
-          const event=(await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).get()).val();
+          const event=teacher.scope?authorizedChazaraEvent:(await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).get()).val();
           if(!event||event.recorded!==true||event.reviewApplied!==true||event.removed===true||!(event.storageFallback===true||(!event.storagePath&&String(event.audioDataURL||'').startsWith('data:audio/')))||!String(event.audioDataURL||'').startsWith('data:audio/'))return res.status(404).json({error:'Fallback recording audio is not available.'});
           if(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,studentId,event))return res.status(403).json({error:'Recording belongs to another class.'});
           return res.status(200).json({ok:true,audioDataURL:event.audioDataURL});
