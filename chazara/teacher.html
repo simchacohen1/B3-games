@@ -372,6 +372,6 @@ setInterval(quietScopeCheck,60000);
 $('teacherApp').classList.add('review-only');
 $('recordingsPanel').parentElement.insertBefore($('recordingsPanel'),$('teacherApp').querySelector('.stats'));
 $('showFullDashboard').onclick=()=>{fullDashboardLoaded=true;$('teacherApp').classList.remove('review-only');$('showFullDashboard').classList.add('hidden');$('showPendingOnly').classList.remove('hidden');if(auth.currentUser&&teacherAccess)loadClassScope(auth.currentUser,teacherAccess)};
-$('showPendingOnly').onclick=()=>{$('teacherApp').classList.add('review-only');$('showFullDashboard').classList.remove('hidden');$('showPendingOnly').classList.add('hidden');$('recordingReviewFilter').value='needs';renderRecordings()};
+$('showPendingOnly').onclick=()=>{fullDashboardLoaded=false;$('teacherApp').classList.add('review-only');$('showFullDashboard').classList.remove('hidden');$('showPendingOnly').classList.add('hidden');$('recordingReviewFilter').value='needs';if(auth.currentUser&&teacherAccess)loadClassScope(auth.currentUser,teacherAccess);else renderRecordings()};
 
 </script></body></html>
