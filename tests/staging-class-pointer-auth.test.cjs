@@ -10,6 +10,7 @@ function fixture() {
   const room = 'class-pointer-12345678-1234-1234-1234-123456789abc';
   const classId = 'TEST-ALEF', studentId = 'test_student_alef', teacherUid = 'teacher-alef';
   const base = 'b3Games/workspaces/b3-2026/classes/' + classId;
+  const reads = [];
   const rows = new Map([
     [base, {active:true,toolGrants:{'class-pointer':true},members:{[studentId]:{active:true}}}],
     [base + '/members/' + studentId, {active:true}],
@@ -18,7 +19,7 @@ function fixture() {
     ['b3Games/students/' + studentId + '/profile',{name:'Test Student A1',active:true}]
   ]);
   const ref = path => ({
-    once: async () => ({val:()=>rows.get(path)??null}),
+    once: async () => {reads.push(path);return {val:()=>rows.get(path)??null};},
     set: async value => {if(value===null)rows.delete(path);else rows.set(path,value);},
     transaction: async callback => {
       const before=rows.get(path)??null,after=callback(before);
@@ -53,7 +54,7 @@ function fixture() {
     await handler({method:'POST',body,ip:'127.0.0.1',headers:identity?{authorization:'Bearer '+identity}:{}},response);
     return result;
   }
-  return {room,classId,studentId,teacherUid,base,rows,env,post};
+  return {room,classId,studentId,teacherUid,base,rows,reads,env,post};
 }
 const params = f => ({studentId:f.studentId,pin:'123456',classId:f.classId,room:f.room});
 
@@ -164,6 +165,7 @@ test('wrong student PIN never discloses a private screen-sharing denial',async()
   const wrong=await f.post({action:'issue',...params(f),pin:'wrong'});
   assert.equal(wrong.statusCode,401);
   assert.equal(wrong.body.error,'Please sign in again.');
+  assert.equal(f.reads.includes(policy),false,'wrong PIN must not trigger a private policy read');
   const correct=await f.post({action:'issue',...params(f)});
   assert.equal(correct.statusCode,403);
   assert.match(correct.body.error,/teacher has turned off/);
