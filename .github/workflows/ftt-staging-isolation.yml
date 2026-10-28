@@ -1,10 +1,16 @@
 name: FTT staging isolation checks
 
 on:
+  push:
+    branches:
+      - codex/class-pointer-staging-isolated-20261028
   pull_request:
     paths:
       - 'staging/**'
       - 'backend/functions/**'
+      - 'backend/functions-staging/**'
+      - 'tests/staging-class-pointer-*.test.cjs'
+      - 'firebase.staging*.json'
       - 'tests/staging-isolation.test.cjs'
       - 'e2e/staging-isolation.spec.ts'
       - '.github/workflows/ftt-staging-isolation.yml'
@@ -23,7 +29,15 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: node --test tests/staging-isolation.test.cjs
+      - run: node --test tests/staging-isolation.test.cjs tests/staging-auth-claims.test.cjs tests/staging-class-pointer-auth.test.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Test private Class Pointer policies in RTDB emulator
+        env:
+          B3_RUN_STAGING_RTDB_EMULATOR_TESTS: '1'
+        run: npx firebase emulators:exec --only database --project demo-b3-staging --config firebase.staging-emulator.json 'node --test tests/staging-class-pointer-rules-emulator.test.cjs'
       - name: Build and audit the complete static staging package
         env:
           B3_STAGING_FIREBASE_API_KEY: synthetic-staging-key
