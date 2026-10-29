@@ -355,7 +355,9 @@ async function directStudentQuiz(action,payload={}){
     // student's own completion for the most recent launches, and download full
     // launch data only for quizzes this student actually finished.
     const user=firebase.auth().currentUser,token=user?await user.getIdToken().catch(()=>''):'';
-    const res=await fetch(firebaseConfig.databaseURL+'/'+root+'/launches.json?shallow=true'+(token?'&auth='+encodeURIComponent(token):''),{cache:'no-store'});
+    const launchListUrl=new URL(root+'/launches.json',firebaseConfig.databaseURL);
+    launchListUrl.searchParams.set('shallow','true');if(token)launchListUrl.searchParams.set('auth',token);
+    const res=await fetch(launchListUrl.href,{cache:'no-store'});
     if(!res.ok)throw quizError(res.status,'Could not load your past quizzes.');
     const ids=Object.keys(await res.json()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id))
       .sort((a,b)=>(Number(String(b).split('_')[0])||0)-(Number(String(a).split('_')[0])||0)).slice(0,HISTORY_LAUNCH_LIMIT);

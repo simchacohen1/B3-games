@@ -2365,7 +2365,8 @@ async function studentRecord(path){
     const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
     const idToken=user?await user.getIdToken():'';
     const headers=idToken?{Authorization:'Bearer '+idToken}:{};
-    const response=await fetch(firebaseConfig.databaseURL+'/'+path+'.json',{signal:controller.signal,cache:'no-store',headers});
+    const recordUrl=new URL(path+'.json',firebaseConfig.databaseURL);
+    const response=await fetch(recordUrl.href,{signal:controller.signal,cache:'no-store',headers});
     if(!response.ok)throw new Error('Student account could not be checked.');
     return await response.json();
   }finally{clearTimeout(timer);}
