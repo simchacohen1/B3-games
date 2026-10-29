@@ -53,6 +53,24 @@ function init(){
  topbar.append(el('span','cp-topbar-spacer'));
  const joined=el('span','cp-joined','No students yet');joined.setAttribute('role','status');
  topbar.append(joined);
+ /* Always-visible Student sharing switch; it mirrors and clicks the real #cpShareEnabled button. */
+ const shareState=el("button","cp-share-state","Student sharing");shareState.type="button";shareState.id="cpShareStateBtn";
+ function syncShareState(){
+  const real=$("cpShareEnabled");
+  if(!real){shareState.hidden=true;return}
+  shareState.hidden=false;
+  const on=real.getAttribute("aria-pressed")==="true";
+  shareState.disabled=real.disabled;
+  shareState.classList.toggle("cp-share-on",on&&!real.disabled);
+  shareState.classList.toggle("cp-share-off",!on&&!real.disabled);
+  shareState.textContent=real.disabled?"Student sharing: waiting for class":on?"Student sharing: ON · click to turn off":"Student sharing: OFF · click to turn on";
+  shareState.setAttribute("aria-pressed",String(on));
+ }
+ shareState.addEventListener("click",()=>{const real=$("cpShareEnabled");if(real&&!real.disabled)real.click();setTimeout(syncShareState,0)});
+ topbar.append(shareState);
+ {const real=$("cpShareEnabled");if(real)new MutationObserver(syncShareState).observe(real,{attributes:true,attributeFilter:["aria-pressed","disabled","class"]});}
+ document.addEventListener("classpointer:sharing-state",syncShareState);
+ syncShareState();
  const invite=iconButton('cp-topbar-btn','link','Invite students');invite.id='cpInviteBtn';
  invite.title='Copy the student join link';
  const inviteText=invite.querySelector('span');
