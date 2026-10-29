@@ -23,7 +23,6 @@ export const FORBIDDEN_HOSTS = [
 // Student tool pages that must load on staging for an anonymous visitor.
 export const TOOL_PAGES = [
   { name: 'Home / sign-in', path: '/' },
-  { name: 'Multiplayer Center', path: '/multiplayer/index.html' },
   { name: 'Weekly Quiz', path: '/weekly-quiz/index.html' },
   { name: 'Chazara Chart', path: '/chazara/index.html' },
   { name: 'Shorashim', path: '/shorashim/index.html' },
