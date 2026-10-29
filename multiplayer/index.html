@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f3f7fe">
-<title>Multiplayer Center — Fun Torah Tools</title>
+<meta name="theme-color" content="#f0f5ff">
+<title>Multiplayer Arcade — Fun Torah Tools</title>
 <link rel="stylesheet" href="center.css">
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
@@ -26,12 +26,14 @@
   <p class="intro">Choose a game, invite your friends, and play together! Pick a category or explore all 17 games.</p>
   <section id="accountStatus" class="notice" role="status" aria-live="polite">Checking your student sign-in…</section>
   <section id="invitationSection" aria-labelledby="invitationHeading" hidden>
-    <h2 id="invitationHeading">Games waiting for you</h2>
+    <h2 id="invitationHeading">Friends waiting to play</h2>
+    <p id="invitationSummary" class="invitation-summary" aria-live="polite"></p>
     <div id="invitations" class="invitations"></div>
   </section>
   <section aria-labelledby="gamesHeading">
     <h2 id="gamesHeading">Choose a game</h2>
     <div id="gameCategories" class="game-categories" role="group" aria-label="Filter games by category"></div>
+    <p id="gameResultsSummary" class="visually-hidden" role="status" aria-live="polite"></p>
     <div id="games" class="games"></div>
   </section>
   <footer>Use your existing Fun Torah Tools student sign-in. Games keep their original rules and progress.</footer>

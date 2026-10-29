@@ -6,12 +6,12 @@
     { key: "gematria", name: "Gematria Race", icon: "🔢", description: "Race friends in the existing Gematria game.", url: "../gematria/index.html", mode: "start" },
     { key: "weekly-quiz", name: "Weekly Quiz Race", icon: "📘", description: "Choose a quiz, then invite classmates to race.", url: "../weekly-quiz/practice.html", mode: "configure" },
     { key: "rashi-letters", name: "Rashi Letters Match", icon: "✍️", description: "Match Rashi letters in the live class game.", url: "../rashi-letters/student.html", mode: "start" },
-    { key: "connect-four", name: "Connect 4", icon: "🔴", description: "Drop colored discs and connect four in a row.", url: "game.html?game=connect-four", mode: "start" },
+    { key: "connect-four", name: "Connect 4", icon: "🟡", description: "Drop colored discs and connect four in a row.", url: "game.html?game=connect-four", mode: "start" },
     { key: "tic-tac-toe", name: "Tic Tac Toe", icon: "⭕", description: "Take turns and make three in a row.", url: "game.html?game=tic-tac-toe", mode: "start" },
     { key: "memory-match", name: "Memory Match", icon: "🧠", description: "Flip cards and find matching pairs with your class.", url: "game.html?game=memory-match", mode: "start" },
-    { key: "checkers", name: "Checkers", icon: "🔴", description: "Jump opposing checkers and crown your kings.", url: "game.html?game=checkers", mode: "start" },
+    { key: "checkers", name: "Checkers", icon: "♟️", description: "Jump opposing checkers and crown your kings.", url: "game.html?game=checkers", mode: "start" },
     { key: "reversi", name: "Reversi", icon: "⚫", description: "Flip discs and finish with the most of your color.", url: "game.html?game=reversi", mode: "start" },
-    { key: "bingo", name: "Bingo", icon: "🎯", description: "Mark called numbers and complete a line.", url: "game.html?game=bingo", mode: "start" },
+    { key: "bingo", name: "Bingo", icon: "🎱", description: "Mark called numbers and complete a line.", url: "game.html?game=bingo", mode: "start" },
     { key: "math-race", name: "Math Race", icon: "➕", description: "Solve the same friendly math problems for points.", url: "game.html?game=math-race", mode: "start" },
     { key: "set", name: "Set", icon: "🟣", description: "Spot groups of three cards with matching patterns.", url: "game.html?game=set", mode: "start" },
     { key: "ludo", name: "Ludo", icon: "🎲", description: "Roll the die and race four tokens home.", url: "game.html?game=ludo", mode: "start" },
@@ -23,6 +23,7 @@
   var statusBox = document.getElementById("accountStatus");
   var cards = document.getElementById("games"), invitations = document.getElementById("invitations");
   var invitationSection = document.getElementById("invitationSection");
+  var invitationSummary = document.getElementById("invitationSummary");
 
   function make(tag, className, text) {
     var node = document.createElement(tag);
@@ -52,22 +53,39 @@
     bingo: "challenges", "math-race": "challenges"
   };
   var selectedCategory = "all";
+  var readyToPlay = false;
   var categoriesEl = document.getElementById("gameCategories");
-  function drawCategories(ready) {
-    categoriesEl.replaceChildren();
+  var categoryButtons = Object.create(null);
+  var gameResultsSummary = document.getElementById("gameResultsSummary");
+  function updateCategoryButtons() {
     CATEGORIES.forEach(function (category) {
-      var count = category.key === "all" ? GAMES.length : GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
-      var tab = make("button", "category-tab" + (selectedCategory === category.key ? " is-selected" : ""), category.icon + " " + category.label + " · " + count);
-      tab.type = "button";
-      tab.setAttribute("aria-pressed", String(selectedCategory === category.key));
-      tab.addEventListener("click", function () { selectedCategory = category.key; drawGames(ready); });
-      categoriesEl.appendChild(tab);
+      var tab = categoryButtons[category.key];
+      if (!tab) {
+        var count = category.key === "all" ? GAMES.length : GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
+        tab = make("button", "category-tab", category.icon + " " + category.label + " · " + count);
+        tab.type = "button";
+        tab.setAttribute("aria-controls", "games");
+        tab.setAttribute("aria-label", category.label + ", " + count + " games");
+        tab.addEventListener("click", function () {
+          selectedCategory = category.key;
+          drawGames();
+        });
+        categoryButtons[category.key] = tab;
+        categoriesEl.appendChild(tab);
+      }
+      var selected = selectedCategory === category.key;
+      tab.classList.toggle("is-selected", selected);
+      tab.setAttribute("aria-pressed", String(selected));
     });
   }
-  function drawGames(ready) {
+  function drawGames() {
     cards.replaceChildren();
-    drawCategories(ready);
-    GAMES.filter(function (game) { return selectedCategory === "all" || GAME_CATEGORIES[game.key] === selectedCategory; }).forEach(function (game) {
+    updateCategoryButtons();
+    var visibleGames = GAMES.filter(function (game) { return selectedCategory === "all" || GAME_CATEGORIES[game.key] === selectedCategory; });
+    gameResultsSummary.textContent = selectedCategory === "all"
+      ? "Showing all " + visibleGames.length + " games."
+      : "Showing " + visibleGames.length + " games in " + CATEGORIES.find(function (category) { return category.key === selectedCategory; }).label + ".";
+    visibleGames.forEach(function (game) {
       var category = GAME_CATEGORIES[game.key];
       var card = make("article", "game game-" + category + " game-" + game.key);
       var button = make("button", "game-launch");
@@ -80,8 +98,8 @@
       footer.append(make("span", "game-type", CATEGORIES.find(function (c) { return c.key === category; }).label), make("span", "game-play-label", "Play  ›"));
       button.append(picture, details, footer);
       button.type = "button";
-      button.disabled = !ready;
-      button.setAttribute("aria-label", "Start " + game.name);
+      button.disabled = !readyToPlay;
+      button.setAttribute("aria-label", "Start Game: " + game.name);
       button.addEventListener("click", function () { route(game, game.mode); });
       card.appendChild(button);
       cards.appendChild(card);
@@ -111,6 +129,9 @@
     var saved = savedRejoin();
     invitations.replaceChildren();
     invitationSection.hidden = !visible.length && !saved;
+    invitationSummary.textContent = visible.length
+      ? visible.length + (visible.length === 1 ? " classmate game is" : " classmate games are") + " ready to join."
+      : "Pick up where you left off.";
     if (saved) {
       var savedGame = gameFor(saved.gameKey), resume = make("article", "invite");
       resume.append(make("h3", "", "Resume your game"),
@@ -141,7 +162,7 @@
     });
   }
   function start() {
-    drawGames(false);
+    drawGames();
     try {
       sessionId = String(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "").trim();
       sessionName = String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student");
@@ -187,7 +208,8 @@
         roomsRef = db.ref(path);
         statusBox.className = "notice good";
         statusBox.textContent = "Signed in as " + sessionName + ". Showing games for your class.";
-        drawGames(true);
+        readyToPlay = true;
+        drawGames();
         if (roomsListener) roomsRef.off("value", roomsListener);
         roomsListener = roomsRef.on("value", function (snapshot) { renderRooms(snapshot.val() || {}); }, function () {
           statusBox.className = "notice error"; statusBox.textContent = "Could not load your class's waiting games. Refresh to try again.";
