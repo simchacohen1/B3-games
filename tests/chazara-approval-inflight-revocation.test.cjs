@@ -12,7 +12,7 @@ const REQUEST='studentRewards/pointRequests/fictional_request';
 const BALANCE='studentRewards/students/fictional_rewards/rewardBalance';
 const MIRROR='posukPractice/chazara/events/fictional_child/fictional_event/pointRequestStatus';
 
-function fixture(revocation){
+function fixture(revocation,revokeAt='second-read'){
   const values={
     [ROOT+'/teachers/teacher']:{active:true,classIds:{alpha:true}},
     [ROOT+'/classes/alpha']:{active:true,toolGrants:{chazara:true},
@@ -29,16 +29,20 @@ function fixture(revocation){
   };
   const transactions=[],writes=[];
   let requestReads=0;
+  const revoke=()=>{
+    if(revocation==='teacher') values[ROOT+'/teachers/teacher']={active:false,classIds:{alpha:true}};
+    if(revocation==='tool') values[ROOT+'/classes/alpha']={...values[ROOT+'/classes/alpha'],toolGrants:{chazara:false}};
+  };
   const snap=v=>({val:()=>v===undefined?null:v,exists:()=>v!=null});
   const db={ref:path=>({
     get:async()=>{
-      if(path===REQUEST && ++requestReads===2){
-        if(revocation==='teacher') values[ROOT+'/teachers/teacher']={active:false,classIds:{alpha:true}};
-        if(revocation==='tool') values[ROOT+'/classes/alpha']={...values[ROOT+'/classes/alpha'],toolGrants:{chazara:false}};
-      }
+      if(path===REQUEST && ++requestReads===2 && revokeAt==='second-read')revoke();
       return snap(values[path]);
     },
     transaction:async updater=>{
+      // RED follow-up: revoke after the second grant read, immediately before
+      // the point-request transaction. A cross-path recheck is not atomic.
+      if(path===REQUEST && revokeAt==='transaction')revoke();
       const prior=values[path]===undefined?null:values[path];
       const next=updater(prior);
       transactions.push({path,committed:next!==undefined});
@@ -94,6 +98,25 @@ for(const revocation of ['teacher','tool']){
       assert.equal(x.values[MIRROR],undefined,'no event status may be mirrored');
       assert.equal(x.transactions.filter(t=>t.committed).length,0,'no transactions may commit');
       assert.equal(x.writes.length,0,'no writes may be made');
+    });
+  }
+}
+
+// Intentionally RED: a grant revoked after the fresh preflight read but
+// immediately before the point-request transaction can still permit a write.
+// This is the remaining cross-path atomicity blocker, not a production exploit.
+for(const revocation of ['teacher','tool']){
+  for(const action of ['approve-point-request','reject-point-request']){
+    test(action+' must not commit after '+revocation+' revocation at transaction boundary',async()=>{
+      const x=fixture(revocation,'transaction');
+      const response=await x.call(action);
+      assert.ok(x.requestReads>=2,'initial authorization and review read must run');
+      assert.equal(response.code,403,'grant revoked at transaction boundary must deny');
+      assert.equal(x.values[REQUEST].status,'pending');
+      assert.equal(x.values[BALANCE],5);
+      assert.equal(x.values[MIRROR],undefined);
+      assert.equal(x.transactions.filter(t=>t.committed).length,0);
+      assert.equal(x.writes.length,0);
     });
   }
 }
