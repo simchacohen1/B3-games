@@ -36,7 +36,11 @@ async function openFictionalStudentPage(
       toDataURL: () => 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD'
     });
   }, mode === 'teacher');
+  const readiness = mode === 'student'
+    ? page.waitForResponse(response => response.url() === endpoint && response.request().method() === 'GET')
+    : null;
   await page.addScriptTag({content: galleryScript});
+  if (readiness) await readiness;
   return page.locator('#fttGalleryShareButton');
 }
 
