@@ -71,7 +71,7 @@ jobs:
             echo '## Overnight reliability result'
             echo
             echo "- Result: **${{ steps.reliability.outcome || 'not run' }}**"
-            echo "- Commit: `${GITHUB_SHA}`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: [${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
             echo '- Coverage: synthetic sign-in, class/teacher creation, student roster, Weekly Quiz, Rashi Letters, Posuk Practice, Chazara, Shorashim, progress persistence, teacher controls, permissions, and ET/WT isolation.'
             echo '- All Firebase writes use the `demo-ftt-readiness` Auth, Realtime Database, Storage, and Functions emulators.'
