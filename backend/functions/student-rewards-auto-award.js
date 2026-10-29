@@ -888,11 +888,20 @@ async function sweepPendingMilestones(rows){
   return manual;
 }
 
-async function approvePendingRequest(requestId,reviewedBy){
+// Revalidate the exact request before any teacher review, and again in the
+// RTDB claim transaction. A class reassignment between those reads must not
+// allow an approval or rejection to cross the teacher's class boundary.
+function pointRequestInScope(scope,item){
+  return !scope || ((isReviewableRequest(item)||isRashiRequest(item)) &&
+    teacherClassScope.recordAllowed(scope,item?.practiceStudentId,item));
+}
+const outOfScopePointRequest=()=>({ok:false,code:403,error:"This request does not belong to your selected class."});
+async function approvePendingRequest(requestId,reviewedBy,scope=null){
   const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
   const existing=await ref.get();
   if(!existing.exists()) return {ok:false,error:"Point request not found."};
   const before=existing.val() || {};
+  if(!pointRequestInScope(scope,before))return outOfScopePointRequest();
   if(!isReviewableRequest(before)&&!isRashiRequest(before)) return {ok:false,error:"This point request is not reviewable here."};
   if(isRashiRequest(before)&&Number(before.amount)!==rashiCore.RASHI_POINTS) return {ok:false,error:"This recording request has an unexpected point value."};
   if(before.status !== "pending") return {ok:true,alreadyHandled:true,status:before.status};
@@ -902,13 +911,17 @@ async function approvePendingRequest(requestId,reviewedBy){
   // aborts the transaction, which made the teacher's Approve button appear to
   // do nothing. Returning null lets RTDB compare with the server and retry with
   // the actual request before we claim it.
+  let deniedDuringClaim=false;
   const lock=await ref.transaction(cur=>{
     if(cur === null) return null;
+    if(!pointRequestInScope(scope,cur)){deniedDuringClaim=true;return;}
     if(cur.status !== "pending") return;
     return {...cur,status:"processing",reviewedBy,reviewStartedAt:Date.now()};
   });
   if(!lock.committed){
+    if(deniedDuringClaim)return outOfScopePointRequest();
     const live=(await ref.get()).val() || {};
+    if(!pointRequestInScope(scope,live))return outOfScopePointRequest();
     if(live.status === "pending") return {ok:false,error:"Approval did not complete. Please try again."};
     return {ok:true,alreadyHandled:true,status:live.status || "unknown"};
   }
@@ -937,13 +950,35 @@ async function approvePendingRequest(requestId,reviewedBy){
   return {ok:true,status:"approved",actualAmount:applied,balanceAfter,studentName:item.studentName || rewardStudentId};
 }
 
-async function rejectPendingRequest(requestId,reviewedBy){
+async function rejectPendingRequest(requestId,reviewedBy,scope=null){
   const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
   const snap=await ref.get();
   if(!snap.exists()) return {ok:false,error:"Point request not found."};
   const item=snap.val() || {};
+  if(!pointRequestInScope(scope,item))return outOfScopePointRequest();
   if(!isReviewableRequest(item)&&!isRashiRequest(item)) return {ok:false,error:"This point request is not reviewable here."};
   if(item.status !== "pending") return {ok:true,alreadyHandled:true,status:item.status};
+  if(scope){
+    // An unconditional update could reject a request moved to another class
+    // after the first read. Only commit when the transaction's live value
+    // remains in this teacher's verified scope.
+    let deniedDuringReject=false;
+    const tx=await ref.transaction(cur=>{
+      if(cur===null)return null;
+      if(!pointRequestInScope(scope,cur)){deniedDuringReject=true;return;}
+      if(cur.status!=="pending")return;
+      return {...cur,status:"rejected",reviewedBy,reviewedAt:Date.now()};
+    });
+    if(!tx.committed){
+      if(deniedDuringReject)return outOfScopePointRequest();
+      const latest=(await ref.get()).val()||{};
+      if(!pointRequestInScope(scope,latest))return outOfScopePointRequest();
+      if(latest.status!=="pending")return {ok:true,alreadyHandled:true,status:latest.status||"unknown"};
+      return {ok:false,error:"Rejection did not complete. Please try again."};
+    }
+    await mirrorChazaraPointStatus({...tx.snapshot.val(),id:requestId},"rejected");
+    return {ok:true,status:"rejected"};
+  }
   await ref.update({status:"rejected",reviewedBy,reviewedAt:Date.now()});
   await mirrorChazaraPointStatus(item,"rejected");
   return {ok:true,status:"rejected"};
@@ -1509,8 +1544,8 @@ exports.studentRewardsAutoAward = onRequest(
         }
         if(action==="rashi-approve"||action==="rashi-reject"){
           await rashiAuthorizeRequest(teacher,body.requestId);
-          const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
-          if(!result.ok)return res.status(409).json({error:result.error});
+          const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email,teacher.scope):await rejectPendingRequest(String(body.requestId),teacher.email,teacher.scope);
+          if(!result.ok)return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
         if(action==="repair-chazara-pending"){
@@ -1574,13 +1609,13 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json({ok:true,requestId,status:result.status});
         }
         if(action==="approve-point-request"){
-          const result=await approvePendingRequest(String(body.requestId||""),teacher.email);
-          if(!result.ok) return res.status(409).json({error:result.error});
+          const result=await approvePendingRequest(String(body.requestId||""),teacher.email,teacher.scope);
+          if(!result.ok) return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
         if(action==="reject-point-request"){
-          const result=await rejectPendingRequest(String(body.requestId||""),teacher.email);
-          if(!result.ok) return res.status(409).json({error:result.error});
+          const result=await rejectPendingRequest(String(body.requestId||""),teacher.email,teacher.scope);
+          if(!result.ok) return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
         if(action==="teacher-add-chazara"){
