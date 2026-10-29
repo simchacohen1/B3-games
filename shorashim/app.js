@@ -8,8 +8,7 @@ const ILLUSTRATIONS = {"1-raah":[{"src":"assets/illustrations/seeing-binoculars.
 
 /* ===== Firebase classroom connection; firebase-config.js selects the environment. ===== */
 const FIREBASE_CONFIG = window.B3_FIREBASE_CONFIG;
-if(!FIREBASE_CONFIG) throw new Error('Firebase configuration is missing.');
-if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+if(FIREBASE_CONFIG && !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
 const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
