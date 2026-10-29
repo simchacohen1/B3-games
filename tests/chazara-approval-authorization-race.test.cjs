@@ -10,7 +10,7 @@ const scope=require('../backend/functions/teacher-class-scope');
 
 const ROOT='b3Games/workspaces/b3-2026';
 const REQUEST='studentRewards/pointRequests/fictional_request';
-function fixture(){
+function fixture(moveAt='second-read'){
   const own={source:'chazara-recording',status:'pending',practiceStudentId:'fictional_child',
     workspaceClassId:'alpha',rewardStudentId:'fictional_rewards',amount:2};
   const moved={...own,workspaceClassId:'beta'};
@@ -29,7 +29,7 @@ function fixture(){
   const snap=value=>({val:()=>value===undefined?null:value,exists:()=>value!=null});
   const db={ref:path=>({
     get:async()=>{
-      if(path===REQUEST)return snap(++requestReads===1?own:moved);
+      if(path===REQUEST){requestReads++;return snap(moveAt==='second-read'&&requestReads>=2?moved:own);}
       return snap(data[path]);
     },
     transaction:async updater=>{
@@ -77,5 +77,16 @@ for(const action of ['approve-point-request','reject-point-request']){
       'no transaction may claim a request whose current class is outside teacher scope');
     assert.deepEqual(x.writes.filter(w=>w.path===REQUEST),[],
       'no status update may be written to a newly foreign-class request');
+  });
+}
+
+for(const action of ['approve-point-request','reject-point-request']){
+  test(action+' must abort transaction if ownership changes after the second read',async()=>{
+    const x=fixture('transaction');
+    const response=await x.call(action);
+    assert.ok(x.requestReads>=2,'both authorization and action must read the request');
+    assert.equal(response.code,403,'transaction must reject a request reassigned to beta');
+    assert.equal(x.requestTransactions,1,'transaction must validate the current request value');
+    assert.deepEqual(x.writes,[],'no reward balance or request writes after a denied transaction');
   });
 }
