@@ -44,7 +44,8 @@ const gameCategory: Record<string, { label: string; count: number }> = {
 
 async function openGame(page: Page, gameName: string) {
   const category = gameCategory[gameName];
-  await page.getByRole('button', { name: `${category.label}, ${category.count} games`, exact: true }).click();
+  const categoryKey: Record<string, string> = { 'Torah & Jewish': 'torah', 'Board & Strategy': 'strategy', 'Cards & Matching': 'cards', 'Quick Challenges': 'challenges' };
+  await page.locator(`.category-group.category-${categoryKey[category.label]} .category-heading`).click();
   await page.getByRole('button', { name: `Start Game: ${gameName}`, exact: true }).click();
 }
 
@@ -95,7 +96,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await Promise.all([hostContext?.close(), guestContext?.close()]);
   });
 
-  test('category tiles open their game lists on desktop and tablet', async ({ browser }) => {
+  test('all 17 compact game apps stay visible and categories expand in place on desktop, tablet, and phone', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     const watch = await watchPage(page);
@@ -103,35 +104,55 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(page);
 
-    await expect(page.getByRole('heading', { name: 'Choose a category' })).toBeVisible();
-    await expect(page.locator('.category-card')).toHaveCount(4);
-    await expect(page.locator('.game')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'All 17 games, ready to play' })).toBeVisible();
+    await expect(page.locator('.category-group')).toHaveCount(4);
+    await expect(page.locator('.game')).toHaveCount(17);
+    await expect(page.locator('.game-mini')).toHaveCount(17);
+    await expect(page.locator('.game-illustration')).toHaveCount(17);
+    await expect(page.getByRole('button', { name: /^Start Game:/ })).toHaveCount(17);
 
     const categories = [
-      { label: 'All Games, 17 games', count: 17, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match', 'Connect 4', 'Tic Tac Toe', 'Memory Match', 'Checkers', 'Reversi', 'Bingo', 'Math Race', 'Set', 'Ludo', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
-      { label: 'Torah & Jewish, 5 games', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
-      { label: 'Board & Strategy, 5 games', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
-      { label: 'Cards & Matching, 5 games', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
-      { label: 'Quick Challenges, 2 games', count: 2, games: ['Bingo', 'Math Race'] },
+      { key: 'torah', label: 'Torah & Jewish', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
+      { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
+      { key: 'cards', label: 'Cards & Matching', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
+      { key: 'challenges', label: 'Quick Challenges', count: 2, games: ['Bingo', 'Math Race'] },
     ];
-    for (const category of categories.slice(1)) {
-      await page.getByRole('button', { name: category.label, exact: true }).click();
-      await expect(page.locator('.game')).toHaveCount(category.count);
-      await expect(page.locator('.game-name')).toHaveText(category.games);
-      await expect(page.getByRole('button', { name: '← All categories' })).toBeVisible();
-      await page.getByRole('button', { name: '← All categories' }).click();
-      await expect(page.locator('.category-card')).toHaveCount(4);
+    for (const category of categories) {
+      const group = page.locator(`.category-group.category-${category.key}`);
+      const toggle = group.locator('.category-heading');
+      await expect(toggle).toContainText(category.label);
+      await expect(group.locator('.game')).toHaveCount(category.count);
+      await expect(group.locator('.game-name')).toHaveText(category.games);
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.click();
+      const expandedGroup = page.locator(`.category-group.category-${category.key}`);
+      await expect(expandedGroup.locator('.category-heading')).toHaveAttribute('aria-expanded', 'true');
+      await expect(expandedGroup.locator('.category-game-grid')).toHaveClass(/is-expanded/);
+      await expect(expandedGroup.locator('.game-mini')).toHaveCount(0);
+      await expect(page.locator('.game')).toHaveCount(17);
+      await expandedGroup.locator('.category-heading').click();
+      await expect(page.locator(`.category-group.category-${category.key} .category-heading`)).toHaveAttribute('aria-expanded', 'false');
     }
 
+    await expect(page.locator('.game-connect-four .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-tic-tac-toe .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-checkers .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-reversi .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-shorashim .game-illustration')).toBeVisible();
+    expect(await page.locator('.game-uno-style .game-illustration').innerHTML()).not.toContain('🃏');
+
+    await page.getByRole('button', { name: '🎮 Make all 17 games bigger' }).click();
+    await expect(page.locator('.category-group.is-expanded')).toHaveCount(4);
+    await expect(page.locator('.game-mini')).toHaveCount(0);
+    await page.getByRole('button', { name: '🎮 Make all games smaller' }).click();
+    await expect(page.locator('.game-mini')).toHaveCount(17);
+
     await page.setViewportSize({ width: 820, height: 1180 });
-    await page.getByRole('button', { name: '🎮 Browse all 17 games', exact: true }).click();
     await expect(page.locator('.game')).toHaveCount(17);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'tablet layout has no horizontal page overflow').toBe(true);
-    await page.getByRole('button', { name: '← All categories' }).click();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'phone layout has no horizontal page overflow').toBe(true);
-    await page.getByRole('button', { name: 'Cards & Matching, 5 games', exact: true }).click();
-    await expect(page.locator('.game')).toHaveCount(5);
+    await expect(page.locator('.game')).toHaveCount(17);
     expect(watch.productionRequests).toEqual([]);
     expect(watch.pageErrors).toEqual([]);
     } finally {
@@ -157,8 +178,8 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
       await expect(page).toHaveURL(/multiplayer\/index\.html$/, { timeout: 45000 });
       await expectStagingIsolation(page);
       await expect(page.locator('#accountStatus')).toContainText(classAccounts[0].name, { timeout: 30000 });
-      await expect(page.locator('.category-card')).toHaveCount(4);
-      await expect(page.locator('.game')).toHaveCount(0);
+      await expect(page.locator('.category-group')).toHaveCount(4);
+      await expect(page.locator('.game')).toHaveCount(17);
       expect(pageWatch.productionRequests, 'sign-in journey requests to production').toEqual([]);
       expect(pageWatch.pageErrors, 'sign-in journey browser errors').toEqual([]);
     } finally {
@@ -221,7 +242,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     const inviteCount = await matchingInvites.count();
     await invite.getByRole('button', { name: 'Not Now' }).click();
     await expect(matchingInvites).toHaveCount(inviteCount - 1);
-    await expect(guest.locator('.category-card')).toHaveCount(4);
+    await expect(guest.locator('.category-group')).toHaveCount(4);
     expect(guestWatch.pageErrors).toEqual([]);
   });
 
@@ -315,6 +336,6 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await expect(guest.locator('#simArea')).toContainText('The host left. This waiting room has closed.', { timeout: 30000 });
     await guest.locator('#simArea').getByRole('button', { name: 'Browse other games' }).click();
     await expect(guest).toHaveURL(/multiplayer\/index\.html/);
-    await expect(guest.locator('.category-card')).toHaveCount(4);
+    await expect(guest.locator('.category-group')).toHaveCount(4);
   });
 });
