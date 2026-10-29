@@ -1069,7 +1069,20 @@ var quizListenersAttached=false;
 function attachQuizListeners(){
   if(quizListenersAttached)return;quizListenersAttached=true;
   db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
-  db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+  db.ref(QROOT+'/launches').on('value',snap=>{
+    allLaunches=snap.val()||{};
+    // A new launch changes which history attempts belong together. Refresh the
+    // on-demand response/completion snapshot when a history view is open so a
+    // just-finished attempt cannot be hidden by the 60-second session cache.
+    quizHistoryLoadedAt=0;
+    const historyOpen=['panelSetup','panelResults','panelProgress'].some(id=>document.getElementById(id)?.classList.contains('active'));
+    if(historyOpen)loadQuizHistoryData().then(()=>{
+      if(document.getElementById('panelSetup').classList.contains('active'))renderPendingAssignments();
+      if(document.getElementById('panelResults').classList.contains('active'))renderResults();
+      if(document.getElementById('panelProgress').classList.contains('active'))renderStudentProgress();
+    }).catch(error=>console.warn('Could not refresh quiz history after launch change:',error));
+    renderLaunchHistory();renderResults();renderStudentProgress();
+  });
   db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
   db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
   db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});

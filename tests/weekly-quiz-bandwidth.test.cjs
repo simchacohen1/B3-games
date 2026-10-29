@@ -12,6 +12,8 @@ test('Weekly Quiz history loads on demand while active classroom answers stay li
   assert.doesNotThrow(()=>new vm.Script(script),'teacher page JavaScript must parse');
   assert.match(script,/function showTab\(name\)[\s\S]*?loadQuizHistoryData\(\)/);
   assert.match(script,/async function loadQuizHistoryData\(\)[\s\S]*?QROOT\+'\/responses'\)\.once\('value'\)[\s\S]*?QROOT\+'\/completions'\)\.once\('value'/);
+  assert.match(script,/db\.ref\(QROOT\+'\/launches'\)\.on\('value',[\s\S]*?quizHistoryLoadedAt=0[\s\S]*?loadQuizHistoryData\(\)/,
+    'a launch change must invalidate cached completion data while a history view is open');
   assert.doesNotMatch(script,/db\.ref\(QROOT\+'\/(?:responses|completions|audit)'\)\.on\('value'/,
     'historical trees must not stay subscribed across every student update');
   assert.doesNotMatch(script,/db\.ref\(QROOT\+'\/audit'\)\.once\('value'/,
