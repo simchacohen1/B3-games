@@ -8,6 +8,7 @@
     { key: "rashi-letters", name: "Rashi Letters Match", icon: "✍️", description: "Match Rashi letters in the live class game.", url: "../rashi-letters/student.html", mode: "start" }
   ];
   var sessionId = "", sessionName = "", db = null, roomsRef = null, roomsListener = null, scopeKey = "";
+  var authGeneration = 0;
   var statusBox = document.getElementById("accountStatus");
   var cards = document.getElementById("games"), invitations = document.getElementById("invitations");
   var invitationSection = document.getElementById("invitationSection");
@@ -63,6 +64,21 @@
       actions.append(join, later); card.appendChild(actions); invitations.appendChild(card);
     });
   }
+  function detachRooms() {
+    // Detach from the *previous* class ref before changing identity or scope.
+    if (roomsRef && roomsListener) roomsRef.off("value", roomsListener);
+    roomsRef = null; roomsListener = null; scopeKey = "";
+    invitations.replaceChildren(); invitationSection.hidden = true;
+    drawGames(false);
+  }
+  function readSession() {
+    try {
+      return {
+        id: String(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "").trim(),
+        name: String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student")
+      };
+    } catch (e) { return {id:"", name:"Student"}; }
+  }
   function start() {
     drawGames(false);
     try {
@@ -81,28 +97,45 @@
       statusBox.className = "notice error"; statusBox.textContent = "Could not connect to multiplayer right now. Try again in a moment."; return;
     }
     firebase.auth().onAuthStateChanged(async function (user) {
+      var generation = ++authGeneration;
+      detachRooms();
       if (!user) {
-        statusBox.className = "notice error"; statusBox.textContent = "Your saved sign-in has expired. Please sign in on Fun Torah Tools again."; return;
+        statusBox.className = "notice error";
+        statusBox.textContent = "Your saved sign-in has expired. Please sign in on Fun Torah Tools again.";
+        return;
+      }
+      var current = readSession();
+      if (!current.id) {
+        statusBox.className = "notice error";
+        statusBox.textContent = "Sign in as a student from Fun Torah Tools again.";
+        return;
       }
       try {
-        var path = await window.B3Race.classCenterRoomsPath(db, sessionId);
+        var path = await window.B3Race.classCenterRoomsPath(db, current.id);
+        // An older class lookup must never reconnect after a newer sign-in.
+        if (generation !== authGeneration) return;
         if (!path) throw new Error("class scope unavailable");
-        scopeKey = path;
-        roomsRef = db.ref(path);
+        sessionId = current.id; sessionName = current.name; scopeKey = path;
+        var nextRef = db.ref(path);
+        roomsRef = nextRef;
         statusBox.className = "notice good";
         statusBox.textContent = "Signed in as " + sessionName + ". Showing games for your class.";
         drawGames(true);
-        if (roomsListener) roomsRef.off("value", roomsListener);
-        roomsListener = roomsRef.on("value", function (snapshot) { renderRooms(snapshot.val() || {}); }, function () {
-          statusBox.className = "notice error"; statusBox.textContent = "Could not load your class's waiting games. Refresh to try again.";
+        roomsListener = nextRef.on("value", function (snapshot) {
+          if (generation === authGeneration) renderRooms(snapshot.val() || {});
+        }, function () {
+          if (generation !== authGeneration) return;
+          statusBox.className = "notice error";
+          statusBox.textContent = "Could not load your class's waiting games. Refresh to try again.";
         });
       } catch (e) {
+        if (generation !== authGeneration) return;
         console.warn("Multiplayer Center: class access check failed", e);
         statusBox.className = "notice error";
         statusBox.textContent = "A class sign-in is required to use the Multiplayer Center. Please sign in again or ask your teacher to check your class access.";
       }
     });
   }
-  window.addEventListener("pagehide", function () { if (roomsRef && roomsListener) roomsRef.off("value", roomsListener); });
+  window.addEventListener("pagehide", function () { ++authGeneration; detachRooms(); });
   start();
 })();
