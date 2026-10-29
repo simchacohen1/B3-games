@@ -114,7 +114,9 @@ async function publishRoom(db, gameKey, room, state, p, beforeRoom) {
   };
   const ids = new Set([...Object.keys(beforeRoom?.players || {}), ...Object.keys(room.players || {})]);
   for (const studentId of ids) {
-    const previous = core.privateView(gameKey, beforeRoom?.game || {}, studentId);
+    const previous = beforeRoom?.players?.[studentId]?.active === false
+      ? {}
+      : core.privateView(gameKey, beforeRoom?.game || {}, studentId);
     const next = room.players?.[studentId]?.active === false || ['closed', 'finished'].includes(room.state)
       ? {} : core.privateView(gameKey, state, studentId);
     if (JSON.stringify(previous) !== JSON.stringify(next)) {
@@ -148,7 +150,7 @@ async function newRoom(db, actor, gameKey) {
     [p.invite]: inviteSummary(gameKey, room, state, timestamp),
   };
   const secret = core.privateView(gameKey, state, actor.studentId);
-  if (secret.hand?.length) multi[p.privateHands + '/' + actor.studentId] = secret;
+  if (secret.hand?.length || secret.card?.board?.length) multi[p.privateHands + '/' + actor.studentId] = secret;
   await db.ref().update(multi);
   return { roomCode, public: roomPublic(gameKey, room, state, timestamp) };
 }
@@ -167,15 +169,25 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
     if (room.state === 'closed' || (now() - Number(room.createdAt || 0) > 6 * 60 * 60 * 1000)) { operationError = 'That game room has closed.'; return; }
     const game = room.game = core.hydrateGameState(gameKey, room.game);
     if (action === 'join') {
-      if (room.players?.[actor.studentId]?.active !== false && room.players?.[actor.studentId]) return room;
+      const previousPlayer = room.players?.[actor.studentId];
+      if (previousPlayer && previousPlayer.active !== false) return room;
+      const returningPlayer = Boolean(previousPlayer);
       const config = core.gameConfig(gameKey), ids = core.participantIds(room.players);
-      if (room.state !== 'lobby' || ids.length >= config.maxPlayers) { operationError = 'This game is full or has already started.'; return; }
+      if (!(room.state === 'lobby' || returningPlayer && room.state === 'playing') ||
+          !returningPlayer && ids.length >= config.maxPlayers) {
+        operationError = 'This game is full or has already started.'; return;
+      }
       room.players ||= {};
-      room.players[actor.studentId] = { name: actor.name, active: true, joinedAt: now() };
-      if (gameKey === 'memory-match') game.scores[actor.studentId] = 0;
-      if (gameKey === 'bingo') {
-        game.cards[actor.studentId] = core.makeBingoCard ? core.makeBingoCard(Date.now(), actor.studentId) : null;
-        game.scores[actor.studentId] = 0;
+      room.players[actor.studentId] = {
+        ...(previousPlayer || {}), name: actor.name, active: true,
+        joinedAt: previousPlayer?.joinedAt || now(),
+      };
+      if (!returningPlayer) {
+        if (gameKey === 'memory-match') game.scores[actor.studentId] = 0;
+        if (gameKey === 'bingo') {
+          game.cards[actor.studentId] = core.makeBingoCard ? core.makeBingoCard(Date.now(), actor.studentId) : null;
+          game.scores[actor.studentId] = 0;
+        }
       }
     } else if (action === 'start') {
       if (actor.studentId !== room.host) { operationError = 'Only the host can start this game.'; return; }
@@ -189,9 +201,12 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
       catch (error) { operationError = error.message; return; }
       if (game.finished) { room.state = 'finished'; room.finishedAt = now(); }
     } else if (action === 'leave') {
-      if (room.players?.[actor.studentId]) room.players[actor.studentId].active = false;
-      room.state = 'closed';
-      room.closedAt = now();
+      if (!room.players?.[actor.studentId]) { operationError = 'Join this room before leaving it.'; return; }
+      room.players[actor.studentId].active = false;
+      if (room.host === actor.studentId) {
+        room.state = 'closed';
+        room.closedAt = now();
+      }
     } else { operationError = 'Unknown game action.'; return; }
     room.updatedAt = now();
     return room;

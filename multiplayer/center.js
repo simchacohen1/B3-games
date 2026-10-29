@@ -55,14 +55,39 @@
     var ids = declinedRooms(); ids.add(id);
     try { sessionStorage.setItem("fttMultiplayerDeclined:" + scopeKey, JSON.stringify(Array.from(ids))); } catch (e) {}
   }
+  function savedRejoin() {
+    try {
+      var saved = JSON.parse(sessionStorage.getItem("fttMultiplayerRejoin:" + sessionId) || "null");
+      return saved && /^\d{6}$/.test(saved.roomCode || "") && gameFor(String(saved.gameKey || ""))
+        ? { roomCode: saved.roomCode, gameKey: saved.gameKey } : null;
+    } catch (e) { return null; }
+  }
   function renderRooms(all) {
     var ignored = declinedRooms(), visible = Object.entries(all || {}).filter(function (entry) {
       var id = entry[0], room = entry[1];
       return room && room.host !== sessionId && room.state === "lobby" && room.roomCode && gameFor(room.gameKey) && !ignored.has(id) &&
         room.createdAt && Date.now() - Number(room.createdAt) < 20 * 60 * 1000;
     });
+    var saved = savedRejoin();
     invitations.replaceChildren();
-    invitationSection.hidden = !visible.length;
+    invitationSection.hidden = !visible.length && !saved;
+    if (saved) {
+      var savedGame = gameFor(saved.gameKey), resume = make("article", "invite");
+      resume.append(make("h3", "", "Resume your game"),
+        make("p", "", savedGame.icon + " " + savedGame.name),
+        make("small", "", "You left this game. Rejoin to continue."));
+      var resumeActions = make("div", "invite-actions");
+      var rejoin = make("button", "btn", "Rejoin game");
+      rejoin.type = "button";
+      rejoin.addEventListener("click", function () { route(savedGame, "join", saved.roomCode); });
+      var dismiss = make("button", "quiet", "Dismiss");
+      dismiss.type = "button";
+      dismiss.addEventListener("click", function () {
+        try { sessionStorage.removeItem("fttMultiplayerRejoin:" + sessionId); } catch (e) {}
+        renderRooms(all);
+      });
+      resumeActions.append(rejoin, dismiss); resume.appendChild(resumeActions); invitations.appendChild(resume);
+    }
     visible.sort(function (a, b) { return Number(a[1].createdAt) - Number(b[1].createdAt); }).forEach(function (entry) {
       var id = entry[0], room = entry[1], game = gameFor(room.gameKey), card = make("article", "invite");
       card.append(make("h3", "", (room.hostName || "A classmate") + " wants to play"),
