@@ -135,3 +135,42 @@ test('revoked teacher or Chazara grant cannot fetch the indexed pending queue',a
     assert.equal(x.writes.length,0);
   }
 });
+
+test('indexed status query still reads foreign-class pending requests: synthetic scaling diagnostic',async()=>{
+  // Status is indexed globally, not by class. The API must never return foreign
+  // requests, but a large school-wide pending backlog still costs server reads.
+  // This is a passing diagnostic, NOT evidence of production bandwidth or latency.
+  const results=[];
+  for(const foreignPendingCount of [0,100,1000]){
+    const data=fixture(0),requests=data['studentRewards/pointRequests'];
+    for(let i=0;i<foreignPendingCount;i++){
+      requests['foreign_pending_'+i]={
+        source:'chazara-recording',status:'pending',
+        practiceStudentId:'foreign_student_'+i,workspaceClassId:'beta',
+        eventId:'foreign_event_'+i,amount:2,createdAt:i,
+        reason:'Synthetic other-class pending request for read-volume measurement.'
+      };
+    }
+    const x=server(data);
+    const response=await x.call();
+    assert.equal(response.code,200,JSON.stringify(response.body));
+    assert.deepEqual(Array.from(response.body.requests,row=>row.id),['synthetic_pending'],
+      'foreign-class requests must never appear in the teacher response');
+    const indexed=x.reads.filter(row=>row.path==='studentRewards/pointRequests');
+    assert.equal(indexed.length,1);
+    assert.equal(indexed[0].query,'status=pending');
+    assert.equal(x.reads.some(row=>row.path.startsWith('posukPractice/chazara/events')),false);
+    assert.equal(x.writes.length,0);
+    results.push({
+      foreignPendingCount,
+      indexedQueryBytes:indexed[0].bytes,
+      responseBytes:Buffer.byteLength(JSON.stringify(response.body),'utf8')
+    });
+  }
+  assert.ok(results[0].indexedQueryBytes<results[1].indexedQueryBytes);
+  assert.ok(results[1].indexedQueryBytes<results[2].indexedQueryBytes,
+    'the status-only index still transfers other classes pending requests');
+  assert.equal(results[0].responseBytes,results[1].responseBytes);
+  assert.equal(results[1].responseBytes,results[2].responseBytes);
+  console.log('Synthetic cross-class Chazara pending-query amplification (not production measurements):',JSON.stringify(results));
+});
