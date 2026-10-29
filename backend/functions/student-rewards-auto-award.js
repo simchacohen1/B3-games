@@ -896,12 +896,25 @@ function pointRequestInScope(scope,item){
     teacherClassScope.recordAllowed(scope,item?.practiceStudentId,item));
 }
 const outOfScopePointRequest=()=>({ok:false,code:403,error:"This request does not belong to your selected class."});
-async function approvePendingRequest(requestId,reviewedBy,scope=null){
+async function reviewGrantStillActive(req,teacher,item){
+  if(teacher.owner)return true;
+  // requireTeacher checks the active account, assigned class, class tool grant,
+  // and current roster again rather than trusting the cached handler scope.
+  const fresh=await requireTeacher(req);
+  return fresh.ok && !fresh.owner && fresh.scope?.selected===teacher.scope?.selected &&
+    pointRequestInScope(fresh.scope,item);
+}
+async function approvePendingRequest(requestId,reviewedBy,scope=null,verifyGrant=null){
   const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
   const existing=await ref.get();
   if(!existing.exists()) return {ok:false,error:"Point request not found."};
   const before=existing.val() || {};
   if(!pointRequestInScope(scope,before))return outOfScopePointRequest();
+  // The initial handler authorization can become stale while a request is read.
+  // Re-read the live teacher account, class grant, and student membership before
+  // attempting any mutation. This narrows, but does not eliminate, the race
+  // between a grant revocation and a cross-path RTDB transaction.
+  if(verifyGrant && !(await verifyGrant(before)))return outOfScopePointRequest();
   if(!isReviewableRequest(before)&&!isRashiRequest(before)) return {ok:false,error:"This point request is not reviewable here."};
   if(isRashiRequest(before)&&Number(before.amount)!==rashiCore.RASHI_POINTS) return {ok:false,error:"This recording request has an unexpected point value."};
   if(before.status !== "pending") return {ok:true,alreadyHandled:true,status:before.status};
@@ -950,12 +963,13 @@ async function approvePendingRequest(requestId,reviewedBy,scope=null){
   return {ok:true,status:"approved",actualAmount:applied,balanceAfter,studentName:item.studentName || rewardStudentId};
 }
 
-async function rejectPendingRequest(requestId,reviewedBy,scope=null){
+async function rejectPendingRequest(requestId,reviewedBy,scope=null,verifyGrant=null){
   const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
   const snap=await ref.get();
   if(!snap.exists()) return {ok:false,error:"Point request not found."};
   const item=snap.val() || {};
   if(!pointRequestInScope(scope,item))return outOfScopePointRequest();
+  if(verifyGrant && !(await verifyGrant(item)))return outOfScopePointRequest();
   if(!isReviewableRequest(item)&&!isRashiRequest(item)) return {ok:false,error:"This point request is not reviewable here."};
   if(item.status !== "pending") return {ok:true,alreadyHandled:true,status:item.status};
   if(scope){
@@ -1544,7 +1558,7 @@ exports.studentRewardsAutoAward = onRequest(
         }
         if(action==="rashi-approve"||action==="rashi-reject"){
           await rashiAuthorizeRequest(teacher,body.requestId);
-          const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email,teacher.scope):await rejectPendingRequest(String(body.requestId),teacher.email,teacher.scope);
+          const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email,teacher.scope,item=>reviewGrantStillActive(req,teacher,item)):await rejectPendingRequest(String(body.requestId),teacher.email,teacher.scope,item=>reviewGrantStillActive(req,teacher,item));
           if(!result.ok)return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
@@ -1609,12 +1623,12 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json({ok:true,requestId,status:result.status});
         }
         if(action==="approve-point-request"){
-          const result=await approvePendingRequest(String(body.requestId||""),teacher.email,teacher.scope);
+          const result=await approvePendingRequest(String(body.requestId||""),teacher.email,teacher.scope,item=>reviewGrantStillActive(req,teacher,item));
           if(!result.ok) return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
         if(action==="reject-point-request"){
-          const result=await rejectPendingRequest(String(body.requestId||""),teacher.email,teacher.scope);
+          const result=await rejectPendingRequest(String(body.requestId||""),teacher.email,teacher.scope,item=>reviewGrantStillActive(req,teacher,item));
           if(!result.ok) return res.status(result.code||409).json({error:result.error});
           return res.status(200).json(result);
         }
