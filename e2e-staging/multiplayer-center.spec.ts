@@ -22,6 +22,21 @@ async function finishRashiRace(page: Page) {
   await expect(page.locator('#simArea')).toContainText(/wins!|You won the race!/, { timeout: 30000 });
 }
 
+const gameJourneys: Array<{ name: string; card: number; hostBox: string; guestBox: string; status: string; nextStatus: string; choices: string; configureWeeklyQuiz?: boolean }> = [
+  { name: 'Shorashim Race', card: 0, hostBox: '#shFriendsBox', guestBox: '#shFriendsBox', status: 'Question 1 of', nextStatus: 'Question 2 of', choices: '.b3r-choices button' },
+  { name: 'Yiddish Race', card: 1, hostBox: '#yiFriendsBox', guestBox: '#yiFriendsBox', status: 'Question 1 of', nextStatus: 'Question 2 of', choices: '.b3r-choices button' },
+  { name: 'Gematria Race', card: 2, hostBox: '#raceBox', guestBox: '#raceBox', status: 'Question 1 of', nextStatus: 'Question 2 of', choices: '.b3r-choices button' },
+  { name: 'Weekly Quiz Race', card: 3, hostBox: '#raceBox', guestBox: '#raceBox', status: 'Question 1 of', nextStatus: 'Question 2 of', choices: '.b3r-choices button', configureWeeklyQuiz: true },
+  { name: 'Rashi Letters Match', card: 4, hostBox: '#simArea', guestBox: '#simArea', status: 'Letter 1 of', nextStatus: 'Letter 2 of', choices: '.choice-btn' },
+];
+
+async function answerOneQuestion(page: Page, game: typeof gameJourneys[number]) {
+  const box = page.locator(game.guestBox);
+  await expect(box).toContainText(game.status, { timeout: 30000 });
+  await box.locator(game.choices).first().click();
+  await expect(box).toContainText(game.nextStatus, { timeout: 15000 });
+}
+
 test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   test.skip(!credentials, NOT_CONFIGURED);
   test.skip(classAccounts.length < 2, 'NOT VERIFIED: two fictional TEST-ALEF students are required');
@@ -159,4 +174,34 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await expect(guest).toHaveURL(/multiplayer\/index\.html/);
     await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(5);
   });
+
+  for (const game of gameJourneys) {
+    test(`${game.name} starts, joins, and accepts live answers`, async () => {
+      await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+      await expectStagingIsolation(host);
+      await host.getByRole('button', { name: 'Start Game' }).nth(game.card).click();
+      if (game.configureWeeklyQuiz) {
+        await expect(host.locator('#posukGrid button').first()).toBeVisible({ timeout: 45000 });
+        await host.getByRole('button', { name: 'Select All' }).click();
+        await host.getByRole('button', { name: /Race My Friends/ }).click();
+      }
+      await expect(host.locator(game.hostBox)).toContainText('Waiting for friends to join', { timeout: 60000 });
+
+      await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+      await expectStagingIsolation(guest);
+      const invite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+      await expect(invite).toContainText(game.name, { timeout: 30000 });
+      await invite.getByRole('button', { name: 'Join Game' }).click();
+      await expect(guest.locator(game.guestBox)).toContainText('Waiting for', { timeout: 30000 });
+
+      const start = host.locator(game.hostBox).getByRole('button', { name: /Start the race/ });
+      await expect(start).toBeEnabled({ timeout: 15000 });
+      await start.click();
+      await expect(host.locator(game.hostBox)).toContainText('Get ready', { timeout: 10000 });
+      await expect(guest.locator(game.guestBox)).toContainText('Get ready', { timeout: 10000 });
+      await Promise.all([answerOneQuestion(host, game), answerOneQuestion(guest, game)]);
+      expect(hostWatch.pageErrors).toEqual([]);
+      expect(guestWatch.pageErrors).toEqual([]);
+    });
+  }
 });
