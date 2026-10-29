@@ -152,10 +152,38 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         await expect(host.locator('#board')).toContainText(': 1 sets'); await expect(guest.locator('#board')).toContainText(': 1 sets');
       } else if (game.key === 'ludo') {
         let movedPage: Page | null = null;
-        for(let i=0;i<30&&!movedPage;i++){
-          const active=await host.locator('#actions').getByRole('button',{name:'Roll die'}).count()?host:guest;
-          const roll=active.locator('#actions').getByRole('button',{name:'Roll die'}); await expect(roll).toBeVisible({timeout:15000}); await roll.click(); await active.waitForTimeout(150);
-          const tokens=active.locator('#board .ludo-token:not([disabled])'); if(await tokens.count()){await tokens.first().click();movedPage=active;}
+        const [hostId, guestId] = await Promise.all([host, guest].map(page => page.evaluate(() =>
+          sessionStorage.getItem('b3Games_studentId') || sessionStorage.getItem('posukPractice_studentId') || ''
+        )));
+        const readLudoState = () => host.evaluate(async () => {
+          const code = new URLSearchParams(location.search).get('b3MultiplayerRoom');
+          const ref = (window as any).firebase.database().ref(`multiplayerCenter/workspaces/b3-2026/classes/TEST-ALEF/strategyRooms/${code}`);
+          return (await ref.once('value')).val();
+        });
+        for (let i = 0; i < 60 && !movedPage; i += 1) {
+          const state = await readLudoState();
+          const activeId = state?.turn;
+          const active = activeId === hostId ? host : activeId === guestId ? guest : null;
+          expect(active, 'the public room turn belongs to one of the two authenticated students').not.toBeNull();
+
+          if (state.lastRoll == null) {
+            const roll = active!.locator('#actions').getByRole('button', { name: 'Roll die' });
+            await expect(roll).toBeEnabled({ timeout: 15000 });
+            await roll.click();
+            await expect.poll(async () => {
+              const next = await readLudoState();
+              return next?.lastRoll != null || next?.turn !== activeId;
+            }, { timeout: 15000 }).toBe(true);
+          } else {
+            const token = active!.locator('#board .ludo-token:not([disabled])').first();
+            await expect(token).toBeEnabled({ timeout: 15000 });
+            await token.click();
+            await expect.poll(async () => {
+              const next = await readLudoState();
+              return Number(next?.tokens?.[activeId]?.[0]) >= 0;
+            }, { timeout: 15000 }).toBe(true);
+            movedPage = active;
+          }
         }
         expect(movedPage,'one of the seeded rolls permits a token move').not.toBeNull();
         await expect(movedPage!.locator('#board')).toContainText(/Token 1: Track \d+/);
