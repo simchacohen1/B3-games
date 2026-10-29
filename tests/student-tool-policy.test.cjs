@@ -15,6 +15,19 @@ test('Rashi Letters recognizes the legacy rashi class grant',()=>{
  assert.equal(policy.allowed(cls,'one','rashi-letters'),false);
  assert.deepEqual(policy.aliases('rashi-letters'),['rashi','rashi-letters']);
 });
+test('Multiplayer Center is teacher-managed as a student activity',()=>{
+ assert.ok(policy.studentActivities.includes('multiplayer-center'));
+ const cls={toolGrants:{'multiplayer-center':true},members:{one:{toolAccess:{'multiplayer-center':false}},two:{}}};
+ assert.equal(policy.granted(cls,'multiplayer-center'),true);
+ assert.equal(policy.allowed(cls,'one','multiplayer-center'),false);
+ assert.equal(policy.allowed(cls,'two','multiplayer-center'),true);
+});
+test('owner admin activity list keeps existing tools and adds Multiplayer Center',()=>{
+ const source=fs.readFileSync('owner-admin.html','utf8');
+ const catalog=source.match(/const PLATFORM_TOOLS=\[([\s\S]*?)\n\];/);
+ assert.ok(catalog,'owner admin activity catalog is present');
+ for(const id of ['weekly-quiz','multiplayer-center','gallery','tag'])assert.match(catalog[1],new RegExp('\\["'+id+'"'));
+});
 test('teacher controls show granted student activities with current per-student selections',()=>{
  const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});
  const html=window.B3StudentToolControls.render('mine',{toolGrants:{yiddish:true,chazara:false,'name-picker':true},members:{one:{name:'One <script>',toolAccess:{yiddish:false}},two:{name:'Two'}}},{yiddish:['Yiddish'],chazara:['Chazara'],'name-picker':['Name Picker']});

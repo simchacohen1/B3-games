@@ -20,3 +20,7 @@ test-results/
 /monitor-results/
 
 staging-results/
+/staging-build/
+/\.firebase/
+/staging/test-credentials.local.json
+/staging/*.local.json

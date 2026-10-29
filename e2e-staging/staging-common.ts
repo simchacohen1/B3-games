@@ -57,10 +57,15 @@ export function loadCredentials(): StagingCredentials | null {
   return parsed;
 }
 
-export type PageWatch = { productionRequests: string[]; pageErrors: string[] };
+export type PageWatch = { productionRequests: string[]; pageErrors: string[]; firebaseBytesSent: number; firebaseBytesReceived: number };
 
 export async function watchPage(page: Page): Promise<PageWatch> {
-  const watch: PageWatch = { productionRequests: [], pageErrors: [] };
+  const watch: PageWatch = { productionRequests: [], pageErrors: [], firebaseBytesSent: 0, firebaseBytesReceived: 0 };
+  page.on('websocket', socket => {
+    if (!/firebaseio\.com|firebasedatabase\.app/i.test(socket.url())) return;
+    socket.on('framesent', frame => { watch.firebaseBytesSent += Buffer.byteLength(String(frame.payload)); });
+    socket.on('framereceived', frame => { watch.firebaseBytesReceived += Buffer.byteLength(String(frame.payload)); });
+  });
   await page.route('**/*', route => {
     const url = route.request().url().toLowerCase();
     return FORBIDDEN_HOSTS.some(host => url.includes(host)) ? route.abort('blockedbyclient') : route.continue();
@@ -74,6 +79,11 @@ export async function watchPage(page: Page): Promise<PageWatch> {
   });
   page.on('pageerror', error => watch.pageErrors.push(String(error.message).slice(0, 200)));
   return watch;
+}
+
+export function resetFirebaseTraffic(watch: PageWatch) {
+  watch.firebaseBytesSent = 0;
+  watch.firebaseBytesReceived = 0;
 }
 
 // The staging guard, banner and Firebase target that every page must show.

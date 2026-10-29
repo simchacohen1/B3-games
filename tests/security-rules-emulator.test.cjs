@@ -23,7 +23,7 @@ test.before(async()=>{
       'b3Games/students/synthetic_one/memberships/b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true},
       'b3Games/students/synthetic_two/profile':{name:'Synthetic Two',active:true,classId:'beta'},
       'b3Games/students/synthetic_two/memberships/b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true},
-      'b3Games/workspaces/b3-2026/classes/alpha':{name:'Synthetic Alpha',active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-alpha':{roomId:'class-pointer-alpha',teacherUid:'teacher_alpha',createdAt:1700000000000,studentScreenSharing:true}}},
+      'b3Games/workspaces/b3-2026/classes/alpha':{name:'Synthetic Alpha',active:true,members:{synthetic_one:{active:true,toolAccess:{'multiplayer-center':true}},synthetic_friend:{active:true,toolAccess:{'multiplayer-center':true}}},toolGrants:{chazara:true,'class-pointer':true,'multiplayer-center':true},classPointerSessions:{'class-pointer-alpha':{roomId:'class-pointer-alpha',teacherUid:'teacher_alpha',createdAt:1700000000000,studentScreenSharing:true}}},
       'b3Games/workspaces/b3-2026/classes/beta':{name:'Synthetic Beta',active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-beta':{roomId:'class-pointer-beta',teacherUid:'teacher_beta',createdAt:1700000000000,studentScreenSharing:true}}},
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha':{active:true,classIds:{alpha:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_beta':{active:true,classIds:{beta:true}},
@@ -52,6 +52,9 @@ test.before(async()=>{
       'classGallery/posts/post_beta':{studentId:'synthetic_two',classId:'beta',status:'pending',title:'Synthetic beta'},
       'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/modern_pending':{studentId:'synthetic_friend',classId:'alpha',status:'pending',title:'Synthetic private post'},
       'rashiLetters/matchRooms/1234':{host:'synthetic_one',hostName:'Synthetic One',classId:'alpha',state:'lobby',createdAt:1,questions:[],players:{synthetic_one:{name:'Synthetic One',score:0,q:0}}},
+      'multiplayerCenter/workspaces/b3-2026/classes/alpha/strategyRooms/777777':{roomCode:'777777',gameKey:'memory-match',state:'playing',players:[{studentId:'synthetic_one'},{studentId:'synthetic_friend'}]},
+      'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/777777/hands/synthetic_one':{hand:['private-one']},
+      'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/777777/hands/synthetic_friend':{hand:['private-friend']},
       'questionSets/vayeira18':{title:'Synthetic legacy',questions:[{q:'Synthetic question',ans:'private answer'}]},
       'questionSets/classes/alpha/set':{title:'Synthetic alpha',questions:[{q:'Synthetic alpha question',ans:'private answer'}]},
       'questionSets/classes/beta/set':{title:'Synthetic beta',questions:[{q:'Synthetic beta question',ans:'private answer'}]},
@@ -333,6 +336,7 @@ testEmulator('Multiplayer Center invites and Rashi rooms are private to an activ
   await succeeds(get(ref(friend,lobby+'/shorashim-1234')));
   await fails(get(ref(beta,lobby+'/shorashim-1234')));
   await fails(set(ref(friend,lobby+'/shorashim-1234/playerCount'),2));
+  await fails(set(ref(one,lobby+'/arcade-forged'),{host:'synthetic_one',gameKey:'connect-four',roomCode:'forged',state:'lobby'}));
   await fails(set(ref(one,lobby+'/forged'),{host:'synthetic_friend',gameKey:'shorashim',roomCode:'forged',state:'lobby'}));
   await succeeds(set(ref(one,lobby+'/shorashim-1234'),null));
   const gameRoom='multiplayerCenter/workspaces/b3-2026/classes/alpha/games/shorashim/rooms/1234';
@@ -350,6 +354,16 @@ testEmulator('Multiplayer Center invites and Rashi rooms are private to an activ
   await succeeds(set(ref(friend,rashi+'/room_alpha/players/synthetic_friend'),{name:'Synthetic Friend',score:0,q:0}));
   await fails(set(ref(friend,rashi+'/room_alpha/players/synthetic_one/score'),99));
   await fails(set(ref(beta,rashi+'/room_alpha/players/synthetic_two'),{name:'Synthetic Two'}));
+  const publicGame='multiplayerCenter/workspaces/b3-2026/classes/alpha/strategyRooms/777777';
+  await succeeds(get(ref(one,publicGame)));
+  await fails(set(ref(one,publicGame+'/state'),'finished'));
+  const ownSecret='b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/777777/hands/synthetic_one';
+  const friendSecret='b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/777777/hands/synthetic_friend';
+  await fails(get(ref(one,'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/777777/players/synthetic_one')));
+  await succeeds(get(ref(one,ownSecret)));
+  await fails(get(ref(one,friendSecret)));
+  await fails(set(ref(one,ownSecret+'/hand/0'),'forged'));
+  await fails(get(ref(beta,ownSecret)));
 });
 
 testEmulator('Game Show answer keys stay teacher only and students cannot alter live scores',async()=>{

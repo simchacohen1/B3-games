@@ -95,7 +95,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await expect(host.locator('#simArea .mp-panel > button')).toBeDisabled();
 
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
-    const returnInvite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+    const returnInvite = latestInvite(guest, classAccounts[0].name, 'Rashi Letters Match');
     await returnInvite.getByRole('button', { name: 'Join Game' }).click();
     await expect(host.locator('#simArea').getByRole('button', { name: /Start the race/ })).toBeEnabled({ timeout: 15000 });
     await host.locator('#simArea').getByRole('button', { name: /Start the race/ }).click();
@@ -120,7 +120,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     const inviteCount = await matchingInvites.count();
     await invite.getByRole('button', { name: 'Not Now' }).click();
     await expect(matchingInvites).toHaveCount(inviteCount - 1);
-    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(5);
+    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(17);
     await expect(guest.getByRole('button', { name: 'Start Game' }).nth(4)).toBeVisible();
     expect(guestWatch.pageErrors).toEqual([]);
   });
@@ -179,7 +179,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await expect(guest.locator('#simArea')).toContainText('The host left. This waiting room has closed.', { timeout: 30000 });
     await guest.locator('#simArea').getByRole('button', { name: 'Browse other games' }).click();
     await expect(guest).toHaveURL(/multiplayer\/index\.html/);
-    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(5);
+    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(17);
   });
 
   for (const game of gameJourneys) {
