@@ -114,7 +114,7 @@ test('indexed pending queue excludes foreign-class and ambiguous shared-student 
   const x=server(data);
   const response=await x.call();
   assert.equal(response.code,200,JSON.stringify(response.body));
-  const ids=response.body.requests.map(row=>row.id);
+  const ids=Array.from(response.body.requests,row=>row.id);
   assert.deepEqual(ids.slice().sort(),['alpha_shared','synthetic_pending'],
     'only own-class pending requests may reach the teacher, even after the status query');
   assert.equal(x.reads.filter(row=>row.path==='studentRewards/pointRequests'&&row.query==='status=pending').length,1);
