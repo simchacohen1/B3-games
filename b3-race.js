@@ -55,6 +55,7 @@
     injectCss();
     var db = opts.db, path = opts.roomsPath, me = String(opts.studentId || ""), myName = String(opts.studentName || "Player");
     var box = opts.container, room = null, watch = null, view = 0, creating = false;
+    var centerSummarySignatures = Object.create(null);
     var firebase = root.firebase;
     function centerRoomRef(code) {
       if (!opts.centerPath || !opts.gameKey) return null;
@@ -74,10 +75,17 @@
     function publishCenterRoom(data, code) {
       if (!opts.centerPath || !opts.gameKey || !data || data.host !== me) return;
       var players = active(data);
-      centerRoomRef(code).set({ host: me, hostName: data.hostName || myName, gameKey: opts.gameKey,
+      var summary = { host: me, hostName: data.hostName || myName, gameKey: opts.gameKey,
         gameName: opts.gameName || opts.gameKey, gameUrl: opts.gameUrl || "", roomCode: code,
-        state: data.state, playerCount: players.length, createdAt: data.createdAt || now(),
-        updatedAt: firebase.database.ServerValue.TIMESTAMP }).catch(function (e) { console.warn("B3Race: lobby invite update failed", e); });
+        state: data.state, playerCount: players.length, createdAt: data.createdAt || now() };
+      var key = opts.gameKey + "-" + code, signature = JSON.stringify(summary);
+      if (centerSummarySignatures[key] === signature) return;
+      centerSummarySignatures[key] = signature;
+      centerRoomRef(code).set(Object.assign({}, summary, { updatedAt: firebase.database.ServerValue.TIMESTAMP }))
+        .catch(function (e) {
+          if (centerSummarySignatures[key] === signature) delete centerSummarySignatures[key];
+          console.warn("B3Race: lobby invite update failed", e);
+        });
     }
 
     function draw() { var w = el("div", "b3r"); box.replaceChildren(w); return w; }

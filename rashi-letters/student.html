@@ -1364,9 +1364,10 @@ let simRoom = null;                  // the game I'm in
 let mpWatch = null;                  // listener on all games while I'm in multiplayer
 let mpClass = null;                  // my class id ('' if none)
 let mpCenterPath = '';
+let mpCenterSummarySignatures = Object.create(null);
 function saveRashiHostRoom(code){const url=new URL(location.href);url.searchParams.set('b3Multiplayer','host');url.searchParams.set('b3MultiplayerRoom',code);history.replaceState(null,'',url.href);}
 function clearRashiRoomUrl(){const url=new URL(location.href);url.searchParams.delete('b3Multiplayer');url.searchParams.delete('b3MultiplayerRoom');history.replaceState(null,'',url.href);}
-function publishRashiCenterRoom(room,code){if(!mpCenterPath||!room||room.host!==studentId)return;db.ref(mpCenterPath+'/'+('rashi-letters-'+code)).set({host:studentId,hostName:room.hostName||studentName,gameKey:'rashi-letters',gameName:'Rashi Letters Match',gameUrl:'../rashi-letters/student.html',roomCode:code,state:room.state,playerCount:activePlayers(room).length,createdAt:room.createdAt||Date.now(),updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(e=>console.warn('Rashi center invite update failed',e));}
+function publishRashiCenterRoom(room,code){if(!mpCenterPath||!room||room.host!==studentId)return;const summary={host:studentId,hostName:room.hostName||studentName,gameKey:'rashi-letters',gameName:'Rashi Letters Match',gameUrl:'../rashi-letters/student.html',roomCode:code,state:room.state,playerCount:activePlayers(room).length,createdAt:room.createdAt||Date.now()},key='rashi-letters-'+code,signature=JSON.stringify(summary);if(mpCenterSummarySignatures[key]===signature)return;mpCenterSummarySignatures[key]=signature;db.ref(mpCenterPath+'/'+key).set({...summary,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(e=>{if(mpCenterSummarySignatures[key]===signature)delete mpCenterSummarySignatures[key];console.warn('Rashi center invite update failed',e);});}
 
 function renderMatchMenu(){
   leaveRoom();
