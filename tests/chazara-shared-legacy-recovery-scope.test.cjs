@@ -39,6 +39,7 @@ function server(data) {
   });
   const db={ref:path=>({
     get:async()=>{reads.push(path);return snap(data[path]);},
+    orderByChild(field){assert.equal(field,'status');return {equalTo(status){return {get:async()=>{reads.push(path);return snap(Object.fromEntries(Object.entries(data[path]||{}).filter(([,row])=>row?.status===status)))}}}}},
     set:async value=>{writes.push([path,value]);},
     update:async value=>{writes.push([path,value]);}
   })};

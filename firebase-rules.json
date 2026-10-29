@@ -166,6 +166,9 @@
       ".write": true
     },
     "studentRewards": {
+      "pointRequests": {
+        ".indexOn": ["status"]
+      },
       ".read": "auth != null && auth.token.email == 'simcha5770@gmail.com'",
       ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com'",
       "meta": {

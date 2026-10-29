@@ -42,6 +42,11 @@ function server(data){
       reads.push({path,bytes:Buffer.byteLength(JSON.stringify(value??null),'utf8')});
       return snap(value);
     },
+    orderByChild(field){assert.equal(field,'status');return {equalTo(status){return {get:async()=>{
+      const pending=Object.fromEntries(Object.entries(data[path]||{}).filter(([,row])=>row?.status===status));
+      reads.push({path,query:'status='+status,bytes:Buffer.byteLength(JSON.stringify(pending),'utf8')});
+      return snap(pending);
+    }}}}},
     set:async value=>{writes.push([path,value]);},
     update:async value=>{writes.push([path,value]);}
   })};
@@ -66,7 +71,7 @@ function server(data){
   return {call,reads,writes};
 }
 
-test('pending-only API has constant response but still downloads all archived point requests',async()=>{
+test('pending-only API uses indexed status query with archive-independent read volume',async()=>{
   const results=[];
   for(const archivedCount of [0,100,1000]){
     const x=server(fixture(archivedCount));
@@ -75,7 +80,8 @@ test('pending-only API has constant response but still downloads all archived po
     assert.equal(response.body.requests.length,1,'one selected-class pending request');
     assert.equal(response.body.requests[0].id,'synthetic_pending');
     assert.equal(x.reads.filter(r=>r.path==='studentRewards/pointRequests').length,1,
-      'the current backend fetches the entire request collection once');
+      'one indexed pending-status query per teacher queue load');
+    assert.equal(x.reads.find(r=>r.path==='studentRewards/pointRequests').query,'status=pending');
     assert.equal(x.reads.some(r=>r.path.startsWith('posukPractice/chazara/events')),false,
       'pending-only must not scan Chazara history');
     assert.equal(x.writes.length,0,'pending-only must not write or repair');
@@ -83,9 +89,10 @@ test('pending-only API has constant response but still downloads all archived po
     const responseBytes=Buffer.byteLength(JSON.stringify(response.body),'utf8');
     results.push({archivedCount,collectionBytes,responseBytes});
   }
-  assert.ok(results[2].collectionBytes>results[1].collectionBytes*5,
-    'full collection read must expose archive-size growth until indexed queue is implemented');
+  assert.equal(results[0].collectionBytes,results[1].collectionBytes,
+    'archived requests must not increase indexed pending-query bytes');
+  assert.equal(results[1].collectionBytes,results[2].collectionBytes);
   assert.equal(results[0].responseBytes,results[1].responseBytes);
   assert.equal(results[1].responseBytes,results[2].responseBytes);
-  console.log('Synthetic Chazara pending queue read-volume (not production measurements):',JSON.stringify(results));
+  console.log('Synthetic indexed Chazara pending queue read-volume (not production measurements):',JSON.stringify(results));
 });

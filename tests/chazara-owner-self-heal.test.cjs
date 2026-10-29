@@ -6,7 +6,7 @@ function setup(){
  const tree={posukPractice:{chazara:{events:{simcha_cohen:{e1:{reviewApplied:true,recorded:true,perek:1,posuk:2,workspaceClassId:'et'},e2:{reviewApplied:true,pointRequestStatus:'approved'}}}},allowedStudents:{}},studentRewards:{students:{rw1:{name:'Simcha',b3StudentId:'simcha_cohen'}},pointRequests:{}}};
  const at=p=>p.split('/').reduce((o,k)=>o?.[k],tree),created=[],updates=[];
  const snap=v=>({val:()=>v??null,exists:()=>v!=null,forEach(f){Object.entries(v||{}).forEach(([key,x])=>f({key,val:()=>x}))}});
- const rtdb={ref:p=>({get:async()=>snap(at(p)),update:async v=>{updates.push([p,v])},orderByChild(){throw new Error('Index not defined')}})};
+ const rtdb={ref:p=>({get:async()=>snap(at(p)),update:async v=>{updates.push([p,v])},orderByChild(field){assert.equal(field,'status');return {equalTo(status){return {get:async()=>snap(Object.fromEntries(Object.entries(at(p)||{}).filter(([,row])=>row?.status===status)))}}}}})};
  const ctx={rtdb,SR_ROOT:'studentRewards',POINTS:{chazara:1,'chazara-recording':2},safeKey:v=>String(v).replace(/[^A-Za-z0-9_-]/g,'-'),reasonFor:()=>'r',normalizeName:v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''),
   teacherClassScope:{recordAllowed:(s,id,r)=>s.owner&&!s.selected?!!s.students[id]:s.students[id]&&(r.workspaceClassId||'et')===s.students[id].classId},verifyChazara:async()=>({ok:true}),
   createPendingRequest:async r=>{created.push(r);tree.studentRewards.pointRequests[r.requestId]={status:'pending',practiceStudentId:r.studentId,source:r.source};return {status:'pending'}},
@@ -25,7 +25,7 @@ test('class pending view never repairs saved Chazaras during ordinary startup',a
  const x=setup();const rows=await x.ctx.listPendingChazaraRequests({owner:false,selected:'et',students:{simcha_cohen:{classId:'et'}}});
  assert.equal(rows.length,0);assert.equal(x.created.length,0);assert.equal(x.updates.length,0);
 });
-test('pending queue scans request collection once for a large synthetic class, preserving scope and tie order',async()=>{
+test('pending queue queries pending requests once for a large synthetic class, preserving scope and tie order',async()=>{
  const x=setup(),students={},requests={};
  for(let i=0;i<75;i++)students['student_'+i]={classId:'et'};
  for(let i=0;i<1200;i++)requests['request_'+i]={

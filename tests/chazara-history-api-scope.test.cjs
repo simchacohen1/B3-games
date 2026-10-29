@@ -31,6 +31,7 @@ function server(data){
  const snap=value=>({val:()=>value===undefined?null:value,exists:()=>value!=null});
  const db={ref:p=>({
   get:async()=>{reads.push(p);return snap(data[p])},
+  orderByChild(field){assert.equal(field,'status');return {equalTo(status){return {get:async()=>{reads.push(p);return snap(Object.fromEntries(Object.entries(data[p]||{}).filter(([,row])=>row?.status===status)))}}}}},
   set:async value=>{writes.push([p,value])},
   update:async value=>{writes.push([p,value])}
  })};

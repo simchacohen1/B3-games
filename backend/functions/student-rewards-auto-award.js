@@ -846,9 +846,9 @@ async function listPendingChazaraRequests(scope){
     // Pending queue reads must not scan complete Chazara histories or repair
     // records on every teacher sign-in. Recovery is an explicit action.
     const rows=[];
-    // Until a secure indexed pending queue exists, one collection read is
-    // required. Filter it once rather than once per assigned student.
-    const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
+    // The indexed status query excludes approved/rejected archive entries before
+    // transferring data to this function. Class authorization still filters each row.
+    const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByChild('status').equalTo('pending').get()).val()||{};
     const rowsByStudent=new Map(Object.keys(scope.students||{}).map(id=>[id,[]]));
     for(const [id,item] of Object.entries(allRequests)){
       const studentId=item?.practiceStudentId;
@@ -862,7 +862,7 @@ async function listPendingChazaraRequests(scope){
   }
   // The owner All-classes queue must also avoid a full events-root scan.
   // For recovery, select one class and explicitly request a scoped repair.
-  const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).get();
+  const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByChild('status').equalTo('pending').get();
   const rows=[];
   snap.forEach(child=>{
     const item=child.val() || {};
