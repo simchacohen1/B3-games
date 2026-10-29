@@ -156,6 +156,8 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     'the staging bootstrap loads before the home page Firebase config');
   assert.doesNotMatch(homeSource, /<script[^>]*preview-bootstrap[^>]*defer/,
     'the staging bootstrap must not be deferred');
+  assert.match(homeSource, /<script src="backend\/functions\/student-tool-policy\.js"><\/script>/,
+    'the shared student access policy must load before inline dashboard code uses it');
   const proxyWrites = [];
   const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
   const previewDocument = { currentScript: null, write: value => proxyWrites.push(value) };

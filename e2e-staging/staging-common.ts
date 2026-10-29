@@ -97,7 +97,7 @@ export function resetFirebaseTraffic(watch: PageWatch) {
 
 // The staging guard, banner and Firebase target that every page must show.
 export async function expectStagingIsolation(page: Page) {
-  await expect(page.locator('script[data-b3-staging-guard]')).toHaveCount(1);
+  await expect(page.locator('script[data-b3-staging-guard], script[data-b3-homework-guard]')).toHaveCount(1);
   await expect(page.locator('.b3-staging-notice')).toBeVisible({ timeout: 15000 });
   const state = await page.evaluate(() => {
     const w = window as any;
