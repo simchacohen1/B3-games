@@ -147,3 +147,49 @@ test('principal gains one class without rewriting the already granted class', as
   assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], true,
     'newly supervised class must be granted');
 });
+
+
+test('inactive class revokes only that class while supervised teacher remains active', async () => {
+  const f = fixture({ supervisedTeacherIds: { teacherA: true } }, {
+    email: 'synthetic-principal@example.test', accountType: 'principal',
+    active: true, classIds: { et: true, wt: true },
+    supervisedTeachers: { teacherA: { classIds: { et: true, wt: true } } }
+  });
+  f.classes.wt.active = false;
+  await f.reconcile(f.invites, f.classes);
+  assert.equal(f.writes.length, 1, 'class deactivation must reconcile atomically');
+  const u = f.writes[0];
+  assert.deepEqual(u[ROOT + '/teachers/principal-uid/classIds'], { et: true });
+  assert.deepEqual(u[ROOT + '/teacherInvites/principal/classIds'], { et: true });
+  assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], null,
+    'inactive class grant must be removed');
+  assert.equal(u[ROOT + '/classes/et/teacherIds/principal-uid'], undefined,
+    'active class grant must not be rewritten');
+  assert.equal(f.invites.principal.active, true);
+});
+
+test('overlapping supervisors preserve shared class when one supervisor is removed', async () => {
+  const f = fixture({ supervisedTeacherIds: { teacherB: true } }, {
+    email: 'synthetic-principal@example.test', accountType: 'principal',
+    active: true, classIds: { et: true, wt: true, pilot: true },
+    supervisedTeachers: {
+      teacherA: { classIds: { et: true, wt: true } },
+      teacherB: { classIds: { et: true, pilot: true } }
+    }
+  });
+  f.invites.teacherB.classIds = { et: true, pilot: true };
+  await f.reconcile(f.invites, f.classes);
+  assert.equal(f.writes.length, 1, 'supervisor removal must be one atomic update');
+  const u = f.writes[0];
+  assert.deepEqual(u[ROOT + '/teachers/principal-uid/classIds'], { et: true, pilot: true });
+  assert.deepEqual(u[ROOT + '/teacherInvites/principal/classIds'], { et: true, pilot: true });
+  assert.equal(u[ROOT + '/classes/wt/teacherIds/principal-uid'], null,
+    'class granted only through removed supervisor must be revoked');
+  assert.equal(u[ROOT + '/classes/et/teacherIds/principal-uid'], undefined,
+    'overlapping class must remain granted without a rewrite');
+  assert.equal(u[ROOT + '/classes/pilot/teacherIds/principal-uid'], undefined,
+    'unaffected class must remain granted');
+  assert.deepEqual(Object.keys(f.invites.principal.supervisedTeachers), ['teacherB']);
+  assert.ok(Object.keys(u).every(k => !k.includes('/teacherIds/teacherA') &&
+    !k.includes('/teacherIds/teacherB')), 'ordinary teacher grants must not change');
+});
