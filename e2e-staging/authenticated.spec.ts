@@ -146,8 +146,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
   const studentContext = await browser.newContext();
   const teacherPage = await teacherContext.newPage();
   const studentPage = await studentContext.newPage();
-  const teacherWatch = watchPage(teacherPage);
-  const studentWatch = watchPage(studentPage);
+  const teacherWatch = await watchPage(teacherPage);
+  const studentWatch = await watchPage(studentPage);
   const title = 'Fictional Homework Preview ' + Date.now();
   let created = false;
   let archived = false;
@@ -265,5 +265,33 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     expect(studentWatch.productionRequests).toEqual([]);
     await teacherContext.close();
     await studentContext.close();
+  }
+});
+
+test('fictional TEST-ALEF student sees To Do, Handed In, and Finished @auth @homework', async ({ browser }, testInfo) => {
+  test.skip(!credentials, NOT_CONFIGURED);
+  const student = credentials!.studentAccounts.find(row => row.classId === 'TEST-ALEF');
+  if (!student) throw new Error('A fictional TEST-ALEF student credential is required.');
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const watch = await watchPage(page);
+  try {
+    await signInStudent(page, student, HOMEWORK_SITE);
+    await page.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(page);
+    await expect(page.locator('#list')).toContainText('Hi, ' + student.name, { timeout: 30000 });
+    await expect(page.getByRole('tab', { name: /To Do/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Handed In/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Finished/ })).toBeVisible();
+    await page.getByRole('tab', { name: /Handed In/ }).click();
+    await expect(page.locator('#section-handed')).toBeVisible();
+    await page.getByRole('tab', { name: /Finished/ }).click();
+    await expect(page.locator('#section-finished')).toBeVisible();
+    await page.getByRole('tab', { name: /To Do/ }).click();
+    await page.screenshot({ path: testInfo.outputPath('homework-student.png'), fullPage: true });
+    expect(watch.productionRequests).toEqual([]);
+    expect(watch.pageErrors).toEqual([]);
+  } finally {
+    await context.close();
   }
 });
