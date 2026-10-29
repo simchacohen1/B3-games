@@ -146,10 +146,16 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   assert.match(homeSource, /fun-torah-tools-staging--homework-406-preview/,
     'the signed-in student auth route recognizes only the staging Homework preview host');
-  assert.match(homeSource, /stagingStudentAuthHost\?"fun-torah-tools-staging":"b3-games"/,
+  assert.match(homeSource, /return "https:\/\/us-central1-b3-games\.cloudfunctions\.net\/funTorahStudentAuth"/,
     'student auth keeps the production function target on production hosts');
-  assert.doesNotMatch(homeSource, /<script src="firebase-config\.js[^"]*" defer>/,
-    'the home page must initialize with its staging config before app code');
+  // firebase-config.js stays deferred (it must run after the deferred Firebase SDK so test and
+  // preview wrappers can patch it); the staging bootstrap is a parser-blocking script, so it
+  // always runs first.
+  assert.ok(homeSource.indexOf('/staging/preview-bootstrap.js') >= 0 &&
+    homeSource.indexOf('/staging/preview-bootstrap.js') < homeSource.indexOf('firebase-config.js'),
+    'the staging bootstrap loads before the home page Firebase config');
+  assert.doesNotMatch(homeSource, /<script[^>]*preview-bootstrap[^>]*defer/,
+    'the staging bootstrap must not be deferred');
   const proxyWrites = [];
   const previewHost = 'fun-torah-tools-staging--homework-406-preview-ab12cd34.web.app';
   const previewDocument = { currentScript: null, write: value => proxyWrites.push(value) };
