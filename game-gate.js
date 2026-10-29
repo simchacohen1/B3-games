@@ -14,6 +14,7 @@
 (function () {
   "use strict";
 
+  var databaseNamespace = "";
   function databaseUrl() {
     var stagingHost = location.hostname === "fun-torah-tools-staging.web.app" ||
       location.hostname === "fun-torah-tools-staging.firebaseapp.com";
@@ -23,8 +24,20 @@
         window.B3_FIREBASE_CONFIG?.databaseURL ||
         "https://fun-torah-tools-staging-default-rtdb.firebaseio.com").replace(/\/+$/, "");
     }
-    return String(window.B3_FIREBASE_CONFIG?.databaseURL ||
-      "https://b3-games-default-rtdb.firebaseio.com").replace(/\/+$/, "");
+    var configured = String(window.B3_FIREBASE_CONFIG?.databaseURL ||
+      "https://b3-games-default-rtdb.firebaseio.com");
+    try {
+      var parsed = new URL(configured);
+      // Firebase's RTDB emulator accepts its namespace as a query parameter.
+      // Keep the base URL path-only because callers append REST paths to it;
+      // fetchJson adds the namespace alongside auth/cache-busting parameters.
+      databaseNamespace = parsed.searchParams.get("ns") || "";
+      parsed.search = "";
+      return parsed.href.replace(/\/+$/, "");
+    } catch (_) {
+      databaseNamespace = "";
+      return configured.replace(/\/+$/, "");
+    }
   }
   var SETTINGS_PATH = "b3Games/siteSettings";
   // Phase 1: identify the whole B3 classroom without changing the live
@@ -345,6 +358,7 @@
   async function fetchJson(url) {
     var params = new URLSearchParams();
     params.set("_", String(Date.now()));
+    if (databaseNamespace) params.set("ns", databaseNamespace);
     // Firebase's REST API accepts Firebase ID tokens using the `auth` query
     // parameter. Use the current signed-in user's token so private rules can
     // authorize this gate's narrow reads. Public settings continue to work
