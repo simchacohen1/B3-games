@@ -932,10 +932,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       approvalValues(posukMap).forEach(function(attemptMap){
         approvalValues(attemptMap).forEach(function(a){
           if(!a||typeof a!=="object")return;
-          if(a.hebrewAudioURL&&a.hebrewDisputeStatus==="pending")count++;
-          if(a.comprehensionAudioURL&&a.comprehensionDisputeStatus==="pending")count++;
-          approvalValues(a.questionResults).forEach(function(q){if(q&&q.audioURL&&q.disputeStatus==="pending")count++;});
-          approvalValues(a.translationChunkResults).forEach(function(x){if(x&&x.audioURL&&x.disputeStatus==="pending")count++;});
+          if((a.hebrewAudioURL||a.hebrewAudioStoragePath)&&a.hebrewDisputeStatus==="pending")count++;
+          if((a.comprehensionAudioURL||a.comprehensionAudioStoragePath)&&a.comprehensionDisputeStatus==="pending")count++;
+          approvalValues(a.questionResults).forEach(function(q){if(q&&(q.audioURL||q.audioStoragePath)&&q.disputeStatus==="pending")count++;});
+          approvalValues(a.translationChunkResults).forEach(function(x){if(x&&(x.audioURL||x.audioStoragePath)&&x.disputeStatus==="pending")count++;});
         });
       });
     });
