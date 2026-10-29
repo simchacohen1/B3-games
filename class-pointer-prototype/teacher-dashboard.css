@@ -254,3 +254,9 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 .cp-share-state.cp-share-off{background:#dc2626;border-color:#fecaca}
 .cp-share-state:disabled{opacity:.6;cursor:not-allowed}
 .cp-share-state[hidden]{display:none}
+
+/* Fullscreen toolbar: red Stop button for the live PDF / whiteboard / webpage / shared screen */
+#teacherDock .cp-dock-stop{background:#dc2626;color:#fff;font-weight:700;border:1px solid #b91c1c;justify-content:center}
+#teacherDock .cp-dock-stop:hover:enabled{background:#b91c1c}
+#teacherDock .cp-dock-stop svg{stroke:currentColor}
+#teacherDock .cp-dock-stop[hidden]{display:none}
