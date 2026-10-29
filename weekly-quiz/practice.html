@@ -1,27 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -33,6 +12,7 @@
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="weekly-quiz"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="../firebase-config.js?v=20261029-staging-config"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007b"></script>
 <style>
@@ -204,19 +184,12 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 </div>
 
 <script>
-const GENERATE_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
-const firebaseConfig={
-  apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain:"b3-games.firebaseapp.com",
-  databaseURL:"https://b3-games-default-rtdb.firebaseio.com",
-  projectId:"b3-games",
-  storageBucket:"b3-games.firebasestorage.app",
-  messagingSenderId:"568530046190",
-  appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);const db=firebase.database();
+const GENERATE_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'': 'https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
+const firebaseConfig=window.B3_FIREBASE_CONFIG;
+if(!firebaseConfig) throw new Error('Firebase configuration is missing.');
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);const db=firebase.database();
 
-const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const SYNTHESIZE_SPEECH_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
 const ttsAudioCache=new Map();
 let ttsAudioEl=null;
 
@@ -287,9 +260,18 @@ function enterApp(){
 async function restore(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
-  const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name){location.href='../index.html';return;}
-  try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
+  if(!id||!name){location.href='../index.html';return false;}
+  try{
+    const profile=await db.ref('b3Games/students/'+id+'/profile').once('value');
+    let record=profile.val();
+    if(!profile.exists())record=(await db.ref('posukPractice/allowedStudents/'+id).once('value')).val();
+    if(!record||record.active===false)return false;
+    studentId=id;studentName=record.name||name;
+    sessionStorage.setItem('posukPractice_studentId',studentId);sessionStorage.setItem('posukPractice_studentName',studentName);
+    enterApp();return true;
+  }catch(e){return false;}
 }
 function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}
 function renderPosukGrid(){
@@ -368,6 +350,14 @@ async function finish(){
 let race=null;
 async function raceQuestions(){
   if(!selected.size)throw new Error('Pick at least one posuk first, then tap Race My Friends.');
+  if(window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'&&window.B3_STAGING_TEST_FIXTURES===true){
+    return [
+      {prompt:'What does וַיֵּרָא mean?',big:'',choices:['And he appeared','And he traveled','And he spoke'],answer:'And he appeared',explain:'The answer is: And he appeared'},
+      {prompt:'How many visitors came to Avraham?',big:'',choices:['Three','Two','Four'],answer:'Three',explain:'The answer is: Three'},
+      {prompt:'Where was Avraham sitting?',big:'',choices:['At the tent entrance','By the river','On a mountain'],answer:'At the tent entrance',explain:'The answer is: At the tent entrance'}
+    ];
+  }
+  if(!GENERATE_URL)throw new Error('Weekly Quiz generation is not enabled on staging.');
   const body={sourceText:sourceText(),references:selectedSefariaRefs(),quizType,difficulty,choiceCount:3,count:questionCount,mixedCounts:quizType==='mixed'?mixedCounts(questionCount):{shorashim:0,translation:0,comprehension:0}};
   const r=await B3PaidApi.fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await r.json().catch(()=>({}));
@@ -384,17 +374,26 @@ async function startFriendsRace(){
   const box=document.getElementById('raceBox');box.innerHTML='<p style="text-align:center;font-weight:900">Loading…</p>';
   if(teacherPreview){box.textContent='Class races require a student account. Use solo practice in teacher preview.';return;}
   const path=await B3Race.classRoomsPath(db,studentId,'weekly-quiz');
+  const centerPath=await B3Race.classCenterRoomsPath(db,studentId);
   if(race)race.leave();
-  race=B3Race.create({container:box,db,roomsPath:path,studentId,studentName:studentName||studentId,
+  race=B3Race.create({container:box,db,roomsPath:path,centerPath,studentId,studentName:studentName||studentId,
+    gameKey:'weekly-quiz',gameName:'Weekly Quiz Race',gameUrl:'../weekly-quiz/practice.html',centerUrl:'../multiplayer/index.html',onRoomCreated:B3Race.saveHostRoomCode,
     makeQuestions:raceQuestions,
     roomInfo:()=>({label:typeLabel(quizType)+' • '+difficultyLabel(difficulty)+' • '+selected.size+' posuk'+(selected.size===1?'':'im')}),
     onExit:closeRace});
-  race.start();window.scrollTo({top:0,behavior:'smooth'});
+  if(!B3Race.launchFromUrl(race))race.start();window.scrollTo({top:0,behavior:'smooth'});
 }
-window.addEventListener('pagehide',()=>{if(race)race.leave()});
 function sameAgain(){document.getElementById('resultCard').classList.add('hidden');generatePractice();}
 function backToBuilder(){items=[];document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
-renderPosukGrid();restore();
+renderPosukGrid();
+restore().then(()=>{
+  const params=new URLSearchParams(location.search);
+  if(params.get('b3MultiplayerRoom'))startFriendsRace();
+  if(params.get('b3Multiplayer')==='configure'){
+    document.getElementById('builderMsg').textContent='Choose the pesukim and quiz style, then tap Race My Friends to open your waiting room.';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+});
 </script>
 </body>
 </html>

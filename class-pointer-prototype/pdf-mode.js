@@ -209,6 +209,7 @@
     quietUntil=Date.now()+150;relayout();
     scroller.scrollTop=lay.tops[anchor]*W;scroller.scrollLeft=0;
     B.resetMarks();afterMove(true);
+    window.PointerPdfLibrary?.onLayoutChanged?.();
   }
   let lastRememberedPage=0;
   function afterMove(forceSend){
@@ -831,6 +832,8 @@
   window.ClassPointerPdf={
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,
     openFile,currentPage,goToPage,
+    getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
+    setLayout:opts=>changeLayout(opts),
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,

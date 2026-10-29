@@ -5,7 +5,9 @@ const {studentAuth}=require('./student-auth-core.cjs');
 const crypto=require('node:crypto');
 const studentTools=require('./student-tool-policy.js');
 if(!admin.apps.length)admin.initializeApp();
-exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'],maxInstances:10},async(req,res)=>{
+const authOrigins=['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'];
+if((process.env.GCLOUD_PROJECT||admin.app().options.projectId)==='fun-torah-tools-staging')authOrigins.push('https://fun-torah-tools-staging.web.app');
+exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:authOrigins,maxInstances:10},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>2000)return res.status(413).json({error:'Request too large.'});
@@ -70,7 +72,7 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simch
    if(!classChoices.some(c=>c.id===requestedClassId))return res.status(403).json({error:'This student is not active in the selected class.'});
    result.classId=requestedClassId;
    result.classChoices=classChoices;
-   result.customToken=await admin.auth().createCustomToken(uid,{b3StudentId:studentId,b3ClassId:requestedClassId,b3StudentRole:'student'});
+   result.customToken=await admin.auth().createCustomToken(uid,{b3StudentId:studentId,b3ClassId:requestedClassId,b3StudentRole:'student',b3StudentName:String(result.name||'')});
   }
   res.json(result);
  }catch(error){

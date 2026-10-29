@@ -7,6 +7,8 @@ const vm=require('node:vm');
 const app=fs.readFileSync('shorashim/app.js','utf8');
 const categories=fs.readFileSync('shorashim/review-categories.js','utf8');
 const html=fs.readFileSync('shorashim/index.html','utf8');
+// app.js is cache-busted on every release; require a build label dated on or after this feature.
+const appBuildDate=()=>{const m=html.match(/<script src="app\.js\?v=(\d{8})[^"]*"><\/script>/);assert.ok(m,'app.js is loaded with a dated cache-bust label');return Number(m[1]);};
 const sample=[
   {itemKey:'shorashim:old',itemType:'shorashim',learnedAt:100,reviewOrder:2},
   {itemKey:'shorashim:new',itemType:'shorashim',learnedAt:300,reviewOrder:1},
@@ -60,5 +62,5 @@ test('review remains in selected-card order unless Shuffle is chosen',()=>{
   assert.match(categories,/value === 'shuffle'/);
   assert.match(html,/<input type="radio" name="reviewOrderMode" value="order" checked>/);
   assert.match(html,/review-categories\.js\?v=20261019-newest-review/);
-  assert.match(html,/app\.js\?v=20261019-newest-review/);
+  assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the newest-review release');
 });

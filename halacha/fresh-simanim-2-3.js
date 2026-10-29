@@ -111,6 +111,23 @@ function go(entry){
  const card=activate(entry.lesson,entry.seif);
  if(card)card.scrollIntoView({block:'start'});
 }
+// Siman Gimmel, Seif 6: extend the mother's teichel across the exposed hair.
+// Use identical corrected artwork for the baseline and redraw overlay so coloring
+// and teacher preview never restore the original fringe after undo or save.
+function fullyCoverMotherHair(ctx,width,height){
+ ctx.save();ctx.scale(width/1100,height/825);
+ ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=5;
+ ctx.fillStyle='#fff';ctx.strokeStyle='#111';
+ ctx.beginPath();
+ ctx.moveTo(203,180);
+ ctx.bezierCurveTo(220,116,291,60,345,74);
+ ctx.bezierCurveTo(369,80,384,117,373,154);
+ ctx.bezierCurveTo(356,133,330,119,302,123);
+ ctx.bezierCurveTo(267,132,238,160,203,180);
+ ctx.closePath();ctx.fill();ctx.stroke();
+ ctx.beginPath();ctx.moveTo(218,169);ctx.bezierCurveTo(272,122,334,91,370,137);ctx.stroke();
+ ctx.restore();
+}
 function make(sectionId,number,seif){
  const section=document.getElementById(sectionId);
  const source=number===2?window.HalachaSimanBSource:window.HalachaSimanCSource;
@@ -135,7 +152,7 @@ function make(sectionId,number,seif){
  if(section.querySelectorAll('.ha-classroom').length>1)el.classList.add('ha-slide-off');
  const $=s=>el.querySelector(s),canvas=$('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
  let key=keyFor(sectionId,seif);
- let image=new Image(),base=null,actions=[],redoStack=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false;
+ let image=new Image(),correctedArt=null,base=null,actions=[],redoStack=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false;
  const status=t=>{$('.ha-status').textContent=t};
  const commit=t=>{if(!readonly()&&typeof halachaCloudLoading!=='undefined'&&halachaCloudLoading){status('Please wait for your account to finish loading.');return}persist(key,actions);status(t)};
  const SCALE=3;
@@ -157,7 +174,7 @@ function make(sectionId,number,seif){
  }
  function redraw(){if(!base)return;ctx.putImageData(base,0,0);
   for(const a of actions){if(a.t==='fill'){recolor(a.x,a.y,a.c)}else if(a.pts&&a.pts.length){ctx.lineWidth=a.t==='eraser'?20:(a.size||9);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=a.t==='eraser'?'white':a.c;ctx.beginPath();a.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(a.pts.length===1)ctx.lineTo(a.pts[0][0]+.1,a.pts[0][1]+.1);ctx.stroke()}}
-  ctx.globalCompositeOperation='multiply';{const sx=Number(image.dataset.sx||0);ctx.drawImage(image,sx,0,image.naturalWidth-sx,image.naturalHeight,0,0,canvas.width,canvas.height)}ctx.globalCompositeOperation='source-over';
+  ctx.globalCompositeOperation='multiply';{const sx=Number(image.dataset.sx||0);if(correctedArt)ctx.drawImage(correctedArt,0,0);else ctx.drawImage(image,sx,0,image.naturalWidth-sx,image.naturalHeight,0,0,canvas.width,canvas.height)}ctx.globalCompositeOperation='source-over';
  }
  const pointer=e=>{const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(canvas.width-1,Math.round((e.clientX-r.left)*canvas.width/r.width))),Math.max(0,Math.min(canvas.height-1,Math.round((e.clientY-r.top)*canvas.height/r.height)))]};
  canvas.addEventListener('pointerdown',e=>{if(!ready)return;e.preventDefault();
@@ -228,6 +245,11 @@ function make(sectionId,number,seif){
   key=keyFor(sectionId,seif)+(large?'_large':'');
   canvas.width=Math.round(sw*scale);canvas.height=Math.round(image.naturalHeight*scale);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingQuality='high';ctx.drawImage(image,sx,0,sw,image.naturalHeight,0,0,canvas.width,canvas.height);
+  if(number===3&&seif===6&&large){
+   fullyCoverMotherHair(ctx,canvas.width,canvas.height);
+   correctedArt=document.createElement('canvas');correctedArt.width=canvas.width;correctedArt.height=canvas.height;
+   correctedArt.getContext('2d').drawImage(canvas,0,0);
+  }
   base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';
   image.dataset.sx=String(sx);restore();
  };

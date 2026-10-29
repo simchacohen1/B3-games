@@ -9,6 +9,7 @@
   else root.RashiRecordings=api;
 })(typeof self!=='undefined'?self:this,function(root){
   'use strict';
+  const STAGING=()=>root.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging';
   const API_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
   const POINTS=2;
   const MAX_MS=5*60*1000;       // generous: eight words never need this long
@@ -40,6 +41,7 @@
     return user.getIdToken();
   }
   async function loadStatus(force){
+    if(STAGING())return {};
     if(cfg.isPreview())return {};
     if(!force&&statusMap&&Date.now()-statusAt<STATUS_CACHE_MS)return statusMap;
     if(statusPromise)return statusPromise;
@@ -58,6 +60,7 @@
   const statusOf=id=>(statusMap&&statusMap[id]&&statusMap[id].status)||'none';
 
   async function sendRecording(sectionId,words,blob,durationMs){
+    if(STAGING())throw new Error('Recording rewards are disabled on staging.');
     const qs='rashi=submit&section='+encodeURIComponent(sectionId)+'&durationMs='+Math.round(durationMs)+'&words='+encodeURIComponent((words||[]).join('|'));
     const res=await fetch(API_URL+'?'+qs,{method:'POST',headers:{'Content-Type':(blob.type||'audio/webm').split(';')[0],'Authorization':'Bearer '+await idToken()},body:blob});
     const data=await res.json().catch(()=>({}));

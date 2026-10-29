@@ -1,0 +1,101 @@
+name: Live site monitor
+
+# Checks the LIVE website (https://funtorahtools.com) with Playwright.
+# No AI is involved. Read-only for visitors; see docs/SITE-MONITOR.md.
+on:
+  schedule:
+    # Every day at 10:30 UTC (6:30 AM New York in summer, 5:30 AM in winter).
+    - cron: '30 10 * * *'
+  # After each successful GitHub Pages deployment of the website.
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+  # "Run workflow" button on the Actions tab.
+  workflow_dispatch:
+  # When the monitor itself is changed in a pull request, run it once to
+  # prove it works. Pull request runs never open or close issues.
+  pull_request:
+    paths:
+      - '.github/workflows/site-monitor.yml'
+      - 'e2e-monitor/**'
+      - 'playwright.monitor.config.ts'
+      - 'scripts/site-monitor-summary.cjs'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: live-site-monitor-${{ github.event.pull_request.number || 'live' }}
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    # Skip deployments that failed; those already show as failed on GitHub.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SITE_URL: https://funtorahtools.com/
+      # Optional dedicated test-only student. If these secrets are not set,
+      # the signed-in check is skipped (shown as "skipped" in the report).
+      FTT_TEST_STUDENT_NAME: ${{ secrets.FTT_TEST_STUDENT_NAME }}
+      FTT_TEST_STUDENT_PASSCODE: ${{ secrets.FTT_TEST_STUDENT_PASSCODE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Live checks use the monitor code from main; a pull request tests its own version.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Wait for GitHub Pages cache
+        if: github.event_name == 'workflow_run'
+        # Pages can serve the old copy for a minute or two after deploying.
+        run: sleep 120
+      - name: Check the live site
+        id: tests
+        run: npx playwright test --config playwright.monitor.config.ts
+      - name: Write summary
+        if: ${{ !cancelled() }}
+        run: node scripts/site-monitor-summary.cjs monitor-report/results.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload report and failure screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-monitor-report-${{ github.run_id }}
+          path: |
+            monitor-report/
+            monitor-results/
+          retention-days: 30
+      - name: Open or update the "Live site check failed" issue
+        if: ${{ failure() && github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/site-monitor-summary.cjs monitor-report/results.json > failure.md
+          printf '\n\n**Run:** %s (trigger: %s)\nScreenshots, videos and traces: open the run, scroll to **Artifacts**, download `site-monitor-report-%s`, then open `monitor-report/index.html`.\n' \
+            "$RUN_URL" "${{ github.event_name }}" "${{ github.run_id }}" >> failure.md
+          gh label create site-monitor --color B60205 --description "Live site check failed" 2>/dev/null || true
+          existing=$(gh issue list --label site-monitor --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file failure.md
+          else
+            # Assigning the owner makes GitHub notify him by email and in the app.
+            gh issue create --title "Live site check failed" --label site-monitor --assignee "${{ github.repository_owner }}" --body-file failure.md
+          fi
+      - name: Close the issue once the site passes again
+        if: ${{ success() && github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --label site-monitor --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "All live site checks pass again: $RUN_URL"
+          fi

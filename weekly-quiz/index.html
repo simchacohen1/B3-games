@@ -2,27 +2,7 @@
 <!-- BUILD: 2026-10-08 UI-REDESIGN -->
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -37,6 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="../firebase-config.js?v=20261029-staging-config"></script>
 <style>
   /* ===== B3 Weekly Quiz — Student (2026-10 redesign) ===== */
   :root{
@@ -215,7 +196,7 @@
     <div id="previewBar" class="card preview-bar hidden"></div>
 
     <div id="assignedCard" class="card assigned-card hidden">
-      <div class="assigned-head"><span class="assigned-badge">📝 Teacher Assigned Quiz</span></div>
+      <div class="assigned-head"><span class="assigned-badge">📝 My Quizzes to Complete</span></div>
       <div id="assignedList" class="assigned-list"></div>
     </div>
 
@@ -291,16 +272,9 @@
 </div>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);
+const firebaseConfig = window.B3_FIREBASE_CONFIG;
+if(!firebaseConfig) throw new Error('Firebase configuration is missing.');
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let masterBlocked=false;
@@ -316,7 +290,8 @@ let launchData=null;
 let myResponses={};
 let selectedChoice=null;
 let displayedQuestion=0;
-let classLaunchRef=null, personalLaunchRef=null, launchPollTimer=null, refreshActiveLaunch=null;
+let classLaunchRef=null, personalLaunchRef=null, assignmentQueueRef=null, launchPollTimer=null, refreshActiveLaunch=null;
+let assignmentQueueIds=[];
 let allLaunches={}, allCompletions={};
 let markingComplete=false;
 window.addEventListener('ftt:before-follow-navigation',e=>{if(markingComplete||(selectedChoice!==null&&!responseFor(displayedQuestion)))e.preventDefault();});
@@ -335,33 +310,30 @@ function waitForStudentAuth(){
   return new Promise(resolve=>{let stop=()=>{};stop=auth.onAuthStateChanged(user=>{stop();resolve(user);},()=>{stop();resolve(null);});});
 }
 // ---- Weekly Quiz data access ----
-// Preferred path: the secure weeklyQuizStudent Cloud Function. If that function
-// is not reachable (not deployed: 404 without CORS, network failure) or the
-// student has no function-ready token, fall back to the Realtime Database
-// paths the teacher dashboard writes to (b3Quiz/...). Both paths enforce the
-// same assignment rules: the launch's classId must be the student's class and,
-// when the launch targets specific students, this student must be one of them.
-let quizBackendMode=''; // '' (unknown) | 'function' | 'direct'
+// Students load quizzes, answers, history and reviews only through the secure
+// weeklyQuizStudent Cloud Function. They still listen directly to the small
+// settings pointers (QROOT/settings/activeLaunchByClass, studentActiveLaunch and
+// the student's own studentAssignments list, see listenForLaunches), so
+// tightening b3Quiz read rules must keep those readable to that student. Only teacher preview reads launches through directStudentQuiz. Both enforce the same
+// assignment rules: the launch's classId must be the student's class and, when
+// the launch targets specific students, this student must be one of them.
 const HISTORY_LAUNCH_LIMIT=60;
 const quizError=(status,message)=>Object.assign(new Error(message),{status});
 async function callStudentQuizFunction(action,payload){
   const user=await waitForStudentAuth();
-  if(!user)throw Object.assign(new Error('No student token.'),{backendUnavailable:true});
+  if(!user)throw quizError(401,'Please sign in again to open your quiz.');
   const token=await user.getIdToken();
   let response;
+  // 503 is a temporary problem, so the quiz keeps retrying quietly.
   try{response=await fetch(STUDENT_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});}
-  catch(e){throw Object.assign(new Error('Quiz service unreachable.'),{backendUnavailable:true});}
+  catch(e){throw quizError(503,'The quiz could not connect. Check your internet and try again.');}
   const data=await response.json().catch(()=>({}));
-  if(response.status===404||response.status===401)throw Object.assign(new Error(data.error||'Quiz service unavailable.'),{backendUnavailable:true});
-  if(!response.ok)throw quizError(response.status,data.error||'Could not load this quiz. Try again.');
+  if(response.status===401)throw quizError(401,'Please sign in again to open your quiz.');
+  if(!response.ok)throw quizError(response.status>=500?503:response.status,data.error||'Could not load this quiz. Try again.');
   return data;
 }
 async function callStudentQuiz(action,payload={}){
-  if(!teacherPreview&&quizBackendMode!=='direct'){
-    try{const data=await callStudentQuizFunction(action,payload);quizBackendMode='function';return data;}
-    catch(e){if(!e.backendUnavailable||quizBackendMode==='function')throw e;quizBackendMode='direct';}
-  }
-  return directStudentQuiz(action,payload);
+  return teacherPreview?directStudentQuiz(action,payload):callStudentQuizFunction(action,payload);
 }
 function launchAssignedTo(launch,studentId,classId){
   if(!launch||typeof launch!=='object')return false;
@@ -383,7 +355,9 @@ async function directStudentQuiz(action,payload={}){
     // student's own completion for the most recent launches, and download full
     // launch data only for quizzes this student actually finished.
     const user=firebase.auth().currentUser,token=user?await user.getIdToken().catch(()=>''):'';
-    const res=await fetch(firebaseConfig.databaseURL+'/'+root+'/launches.json?shallow=true'+(token?'&auth='+encodeURIComponent(token):''),{cache:'no-store'});
+    const launchListUrl=new URL(root+'/launches.json',firebaseConfig.databaseURL);
+    launchListUrl.searchParams.set('shallow','true');if(token)launchListUrl.searchParams.set('auth',token);
+    const res=await fetch(launchListUrl.href,{cache:'no-store'});
     if(!res.ok)throw quizError(res.status,'Could not load your past quizzes.');
     const ids=Object.keys(await res.json()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id))
       .sort((a,b)=>(Number(String(b).split('_')[0])||0)-(Number(String(a).split('_')[0])||0)).slice(0,HISTORY_LAUNCH_LIMIT);
@@ -394,6 +368,8 @@ async function directStudentQuiz(action,payload={}){
     done.forEach((id,i)=>{const l=launches[i];if(l&&launchAssignedTo(l,sid,cid)){out.launches[id]={id,...l};out.completions[id]=comps[ids.indexOf(id)];}});
     return out;
   }
+  // Teacher preview has no assignment list; loadAssignments then opens the class pointer directly.
+  if(action==='assignments')throw quizError(400,'Unknown Weekly Quiz action.');
   const launchId=String(payload.launchId||'');
   if(!/^[A-Za-z0-9_-]{1,100}$/.test(launchId))throw quizError(400,'This quiz link is not valid. Ask your teacher for a new link.');
   const launch=await dbGet(root+'/launches/'+launchId);
@@ -436,7 +412,7 @@ const CLASS_ROSTERS={
 };
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
-const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const SYNTHESIZE_SPEECH_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
 const ttsAudioCache=new Map();
 let ttsAudioEl=null;
 function splitAudioSegments(text){
@@ -641,20 +617,30 @@ function switchStudent(reload=true){
 }
 
 function detachLaunchListeners(){
-  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(launchPollTimer)clearInterval(launchPollTimer);
-  classLaunchRef=personalLaunchRef=null;launchPollTimer=null;refreshActiveLaunch=null;
+  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(assignmentQueueRef)assignmentQueueRef.off();if(launchPollTimer)clearInterval(launchPollTimer);
+  classLaunchRef=personalLaunchRef=assignmentQueueRef=null;launchPollTimer=null;refreshActiveLaunch=null;
 }
 
 function listenForLaunches(){
   detachLaunchListeners();
   classLaunchRef=db.ref(QROOT+'/settings/activeLaunchByClass/'+myClassId);
   personalLaunchRef=db.ref(QROOT+'/settings/studentActiveLaunch/'+myStudentId);
+  // This student's own list of individual assignments (several retakes can be open).
+  // Only the IDs are read here; the quizzes themselves come from the secure function.
+  assignmentQueueRef=db.ref(QROOT+'/settings/studentAssignments/'+myStudentId);
   // personalLaunchRef is null for teacher preview (no personal assignment).
-  let classReady=false,personalReady=teacherPreview;
-  const changed=()=>{if(classReady&&personalReady)loadAssignments();};
+  let classReady=false,personalReady=teacherPreview,queueReady=teacherPreview;
+  const changed=()=>{if(classReady&&personalReady&&queueReady)loadAssignments();};
   classLaunchRef.on('value',s=>{classLaunchId=s.val()||'';classReady=true;changed();},e=>{console.warn('Class quiz pointer unavailable:',e);classReady=true;changed();});
-  if(teacherPreview){personalLaunchRef=null;}
-  else personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';personalReady=true;changed();},e=>{console.warn('Personal quiz pointer unavailable:',e);personalReady=true;changed();});
+  if(teacherPreview){personalLaunchRef=assignmentQueueRef=null;}
+  else{
+    personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';personalReady=true;changed();},e=>{console.warn('Personal quiz pointer unavailable:',e);personalReady=true;changed();});
+    assignmentQueueRef.on('value',s=>{
+      const rows=s.val()||{};
+      assignmentQueueIds=Object.keys(rows).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)).sort((a,b)=>(Number(rows[b]&&rows[b].assignedAt)||0)-(Number(rows[a]&&rows[a].assignedAt)||0));
+      queueReady=true;changed();
+    },e=>{console.warn('Assignment list unavailable:',e);queueReady=true;changed();});
+  }
 }
 
 let historyState='loading';
@@ -671,35 +657,58 @@ async function listenForHistory(){
 
 // ---- Teacher-assigned quizzes ----
 // Every quiz the teacher currently points this student to: a direct ?launch=
-// link, an individual assignment (Take Anytime / Make-Up / retake), and the
-// class's live test. All of them are listed; none hides another.
-let assignedInfo={},userPickedLaunchId='',assignmentsLoaded=false;
+// link, each individual assignment on his list (Take Anytime / Make-Up /
+// retakes, several at once), the old single pointer, and the class's live
+// test. All of them are listed; none hides another.
+let assignedInfo={},userPickedLaunchId='',assignmentsLoaded=false,serverAssignmentIds=null;
 function assignedIds(){
-  return [...new Set([forcedLaunchId,personalLaunchId,classLaunchId].filter(Boolean))];
+  const listed=serverAssignmentIds||[...assignmentQueueIds,personalLaunchId,classLaunchId];
+  return [...new Set([forcedLaunchId,...listed].filter(Boolean))];
 }
 function launchCreatedAt(id,info){return Number((info&&info.launch&&info.launch.createdAt)||String(id).split('_')[0])||0;}
 function isLaunchCompleted(id){return !!(allCompletions[id]&&allCompletions[id][myStudentId]);}
+async function loadOneAssignment(id){
+  try{const r=await callStudentQuiz('launch',{launchId:id});assignedInfo[id]={launch:r.launch||null,error:'',answered:Object.keys(r.responses||{}).length};if(r.completion)allCompletions[id]={[myStudentId]:r.completion};}
+  catch(e){assignedInfo[id]={launch:null,error:e.message||'Could not open this quiz.',status:e.status||0};}
+}
 async function loadAssignments(){
-  const ids=assignedIds(),seq=(loadAssignments.seq=(loadAssignments.seq||0)+1);
-  await Promise.all(ids.map(async id=>{
-    try{const r=await callStudentQuiz('launch',{launchId:id});assignedInfo[id]={launch:r.launch||null,error:''};if(r.completion)allCompletions[id]={[myStudentId]:r.completion};}
-    catch(e){assignedInfo[id]={launch:null,error:e.message||'Could not open this quiz.',status:e.status||0};}
-  }));
+  const seq=(loadAssignments.seq=(loadAssignments.seq||0)+1);
+  let listed=null;
+  // The secure function checks every assignment is really his before listing it.
+  // An older function without the list falls back to opening each ID one by one.
+  try{
+    const result=await callStudentQuiz('assignments');
+    listed=[];
+    for(const row of result.assignments||[]){
+      if(!row||!row.id||!row.launch)continue;
+      listed.push(row.id);
+      assignedInfo[row.id]={launch:row.launch,error:'',answered:Number(row.answered)||0};
+      if(row.completion)allCompletions[row.id]={[myStudentId]:row.completion};
+    }
+  }catch(e){if(!(e.status===400&&/Unknown/i.test(e.message||'')))console.warn('Could not load the assignment list:',e);listed=null;}
+  if(seq!==loadAssignments.seq)return;
+  serverAssignmentIds=listed;
+  await Promise.all(assignedIds().filter(id=>!listed||!listed.includes(id)).map(loadOneAssignment));
   if(seq!==loadAssignments.seq)return;
   assignmentsLoaded=true;
   pickActiveLaunch();renderAssigned();
 }
 function pickActiveLaunch(){
   const ids=assignedIds();let id='';
+  const usable=ids.filter(x=>assignedInfo[x]&&assignedInfo[x].launch);
+  const newest=(a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]);
+  const open=usable.filter(x=>!isLaunchCompleted(x)).sort(newest);
   if(forcedLaunchId)id=forcedLaunchId;
   else if(userPickedLaunchId&&ids.includes(userPickedLaunchId))id=userPickedLaunchId;
+  // Never pull a boy off a quiz he is still working on.
+  else if(open.includes(activeLaunchId))id=activeLaunchId;
   else{
-    const usable=ids.filter(x=>assignedInfo[x]&&assignedInfo[x].launch);
-    const open=usable.filter(x=>!isLaunchCompleted(x)).sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]));
+    // Only an unfinished quiz opens by itself. A finished one stays where he
+    // left it (or opens when he picks it); it never opens automatically.
     // A stale pointer to another class's quiz (403/404) is skipped rather than shown as an error;
     // a temporary failure is still shown so the student can retry.
-    id=open[0]||usable.sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]))[0]
-      ||ids.find(x=>assignedInfo[x]&&![400,403,404].includes(assignedInfo[x].status))||'';
+    id=open[0]||(usable.includes(activeLaunchId)?activeLaunchId:'')
+      ||ids.find(x=>assignedInfo[x]&&!assignedInfo[x].launch&&![400,403,404].includes(assignedInfo[x].status))||'';
   }
   chooseActiveLaunch(id);
 }
@@ -710,16 +719,19 @@ function openAssignedQuiz(id){
 function retryAssignedQuiz(){quizLoadError='';assignmentsLoaded=false;render();loadAssignments();listenForHistory();}
 function renderAssigned(){
   const card=document.getElementById('assignedCard'),list=document.getElementById('assignedList');if(!card||!list)return;
-  const rows=assignedIds().map(id=>({id,info:assignedInfo[id]})).filter(r=>r.info&&r.info.launch);
+  // Unfinished quizzes first (newest first), then finished ones.
+  const rows=assignedIds().map(id=>({id,info:assignedInfo[id]})).filter(r=>r.info&&r.info.launch)
+    .sort((a,b)=>(isLaunchCompleted(a.id)-isLaunchCompleted(b.id))||(launchCreatedAt(b.id,b.info)-launchCreatedAt(a.id,a.info)));
   if(!rows.length){card.classList.add('hidden');return;}
   card.classList.remove('hidden');
   list.innerHTML=rows.map(({id,info})=>{
     const l=info.launch,snap=l.quizSnapshot||{},n=asArray(snap.questions).length,done=isLaunchCompleted(id);
-    const status=done?'✅ Finished':(l.started?'Ready to take':'Waiting for your teacher to start');
+    const answered=id===activeLaunchId&&launchData?Object.keys(myResponses||{}).length:(Number(info.answered)||0);
+    const status=done?'✅ Finished':(!l.started?'Waiting for your teacher to start':(answered?'In progress — '+answered+' of '+n+' answered':'Not started'));
     const kind=l.retakeOf?'Retake':(l.deliveryType==='live'?'Class test':(l.deliveryType==='makeup'?'Make-up test':'Assigned quiz'));
     const current=id===activeLaunchId;
     const label=current?(done?'Showing':'Open now'):(done?'Review':'Open quiz');
-    return '<div class="assigned-row'+(current?' current':'')+'"><div><div class="assigned-title">'+esc(snap.title||'Weekly Quiz')+'</div><div class="assigned-meta">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+n+' question'+(n===1?'':'s')+' • '+esc(status)+'</div></div><button class="'+(current?'secondary':'primary')+'" '+(current?'disabled':'')+' onclick="openAssignedQuiz(\''+esc(id)+'\')">'+esc(label)+'</button></div>';
+    return '<div class="assigned-row'+(current?' current':'')+'" data-launch="'+esc(id)+'" data-status="'+(done?'completed':(answered?'in-progress':'not-started'))+'"><div><div class="assigned-title">'+esc(snap.title||'Weekly Quiz')+'</div><div class="assigned-meta">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+n+' question'+(n===1?'':'s')+' • '+esc(status)+'</div></div><button class="'+(current?'secondary':'primary')+'" '+(current?'disabled':'')+' onclick="openAssignedQuiz(\''+esc(id)+'\')">'+esc(label)+'</button></div>';
   }).join('');
 }
 function renderPreviewBar(){
@@ -730,31 +742,11 @@ function renderPreviewBar(){
   bar.classList.remove('hidden');
 }
 
-let quizLoadError='',activeLaunchListeners=[];
-function detachActiveLaunchListeners(){activeLaunchListeners.forEach(ref=>ref.off());activeLaunchListeners=[];}
-// Database mode: follow the open quiz with realtime listeners (data is sent
-// only when it changes) instead of re-downloading it every few seconds.
-function attachDirectLaunchListeners(id){
-  detachActiveLaunchListeners();
-  const onError=error=>{console.warn('Quiz listener error:',error);if(activeLaunchId===id&&!launchData){quizLoadError='Could not load this quiz.';render();}};
-  const launchRef=db.ref(QROOT+'/launches/'+id);
-  launchRef.on('value',snap=>{
-    if(activeLaunchId!==id)return;const value=snap.val();
-    if(!value){launchData=null;quizLoadError='This quiz could not be found. Ask your teacher for a new link.';render();return;}
-    quizLoadError='';launchData={id,...value};assignedInfo[id]={launch:launchData,error:''};render();renderAssigned();
-  },onError);
-  activeLaunchListeners.push(launchRef);
-  if(teacherPreview)return;
-  const responseRef=db.ref(QROOT+'/responses/'+id+'/'+myStudentId);
-  responseRef.on('value',snap=>{if(activeLaunchId!==id)return;myResponses=snap.val()||{};render();},onError);
-  const completionRef=db.ref(QROOT+'/completions/'+id+'/'+myStudentId);
-  completionRef.on('value',snap=>{if(activeLaunchId!==id)return;const value=snap.val();if(value){allCompletions[id]={[myStudentId]:value};render();renderAssigned();}},onError);
-  activeLaunchListeners.push(responseRef,completionRef);
-}
+let quizLoadError='';
 function chooseActiveLaunch(id){
   id=id||'';
-  if(id===activeLaunchId&&(launchData||launchPollTimer||activeLaunchListeners.length))return;
-  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;detachActiveLaunchListeners();
+  if(id===activeLaunchId&&(launchData||launchPollTimer))return;
+  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
   activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;quizLoadError='';
   if(!id){render();return;}
   const cached=assignedInfo[id];
@@ -767,15 +759,11 @@ function chooseActiveLaunch(id){
       const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;
       failures=0;quizLoadError='';launchData=result.launch||null;
       if(!teacherPreview)myResponses=result.responses||{};
-      assignedInfo[id]={launch:launchData,error:''};
+      assignedInfo[id]={launch:launchData,error:'',answered:Object.keys(myResponses||{}).length};
       if(result.completion)allCompletions[id]={[myStudentId]:result.completion};
       if(allLaunches[id])allLaunches[id]=launchData;
       render();renderAssigned();
-      if(quizBackendMode==='direct'){
-        // Switch from polling to realtime listeners once we know the database path is in use.
-        if(launchPollTimer){clearInterval(launchPollTimer);launchPollTimer=null;}
-        if(!activeLaunchListeners.length)attachDirectLaunchListeners(id);
-      }else if(++refreshCount%12===0)await listenForHistory();
+      if(++refreshCount%12===0)await listenForHistory();
     }catch(error){
       console.warn('Could not refresh quiz:',error);if(activeLaunchId!==id)return;
       // A permanent answer (not assigned / not found) is shown right away; a
@@ -809,8 +797,7 @@ function launchAllowsStudent(){
   if(!launchData)return false;
   if(teacherPreview)return true;
   // The secure function already filters; the safe launch it returns omits the roster.
-  if(quizBackendMode==='function')return launchData.classId===myClassId;
-  return launchAssignedTo(launchData,myStudentId,myClassId);
+  return launchData.classId===myClassId;
 }
 
 function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard','loadingQuizCard','quizErrorCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
@@ -829,7 +816,8 @@ function render(){
   }
   if(activeLaunchId&&!launchData){document.getElementById('loadingQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   if(!activeLaunchId){
-    document.querySelector('#noQuizCard .sub').textContent=teacherPreview?'No class quiz is active for '+classLabel(myClassId)+' right now.':'When your teacher gives a quiz, it will show up here.';
+    const finishedAll=assignedIds().some(id=>isLaunchCompleted(id));
+    document.querySelector('#noQuizCard .sub').textContent=teacherPreview?'No class quiz is active for '+classLabel(myClassId)+' right now.':(finishedAll?'You finished all your assigned quizzes. Great job! Tap one above to see it again.':'When your teacher gives a quiz, it will show up here.');
     document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;
   }
   if(!launchAllowsStudent()){showQuizError('This quiz is for a different class','This quiz was not assigned to '+classLabel(myClassId)+'. Ask your teacher which quiz to take.');renderPastQuizzes();return;}
@@ -1013,7 +1001,7 @@ restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error
   applyMasterBlocked();
 });
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 

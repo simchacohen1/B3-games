@@ -9,6 +9,12 @@ test('Gallery aliases cannot bypass a restriction or an administrator grant',()=
  for(const tool of ['gallery','tag','class-gallery']){assert.equal(policy.granted(cls,tool),true);assert.equal(policy.allowed(cls,'one',tool),false);}
  assert.equal(policy.granted(cls,'yiddish'),false);
 });
+test('Rashi Letters recognizes the legacy rashi class grant',()=>{
+ const cls={toolGrants:{rashi:true},members:{one:{toolAccess:{'rashi-letters':false}}}};
+ assert.equal(policy.granted(cls,'rashi-letters'),true);
+ assert.equal(policy.allowed(cls,'one','rashi-letters'),false);
+ assert.deepEqual(policy.aliases('rashi-letters'),['rashi','rashi-letters']);
+});
 test('teacher controls show granted student activities with current per-student selections',()=>{
  const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});
  const html=window.B3StudentToolControls.render('mine',{toolGrants:{yiddish:true,chazara:false,'name-picker':true},members:{one:{name:'One <script>',toolAccess:{yiddish:false}},two:{name:'Two'}}},{yiddish:['Yiddish'],chazara:['Chazara'],'name-picker':['Name Picker']});
@@ -18,4 +24,17 @@ test('teacher controls show granted student activities with current per-student 
 test('class-wide teacher writes cannot override administrator tool grants',()=>{
  const rule=JSON.parse(fs.readFileSync('firebase-rules.json','utf8')).rules.b3Games.workspaces.$workspaceId.classes.$classId;
  assert.doesNotMatch(rule['.write'],/teachers/);assert.match(rule.access['.write'],/teachers/);assert.equal(rule.members,undefined);
+});
+
+test('owner and teacher see the same granted tools for any class, including ET and WT',()=>{
+ const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});
+ const cls={toolGrants:{yiddish:true,chazara:false},members:{pupil:{name:'Pupil'}}};
+ const catalog={yiddish:['Yiddish'],chazara:['Chazara']};
+ for(const id of ['et','wt','roomC']){
+  const owner=window.B3StudentToolControls.render(id,cls,catalog,true);
+  const teacher=window.B3StudentToolControls.render(id,cls,catalog,false);
+  assert.equal(owner,teacher);
+  assert.match(owner,/Yiddish/);
+  assert.doesNotMatch(owner,/Chazara/);
+ }
 });

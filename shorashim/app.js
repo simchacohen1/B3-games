@@ -6,17 +6,9 @@ const DEFAULT_CATALOG = {
 
 const ILLUSTRATIONS = {"1-raah":[{"src":"assets/illustrations/seeing-binoculars.svg","label":"Looking through binoculars"}],"1-eilon":[{"src":"assets/illustrations/grove.svg","label":"A grove of trees"}],"1-yashav":[{"src":"assets/illustrations/sitting.svg","label":"A person sitting"}],"1-petach":[{"src":"assets/illustrations/entrance.svg","label":"A doorway entrance"}],"1-ohel":[{"src":"assets/illustrations/tent.svg","label":"A tent"}],"1-chom":[{"src":"assets/illustrations/heat.svg","label":"Hot sun and thermometer"}],"1-yom":[{"src":"assets/illustrations/day.svg","label":"A bright daytime scene"}],"2-nasa":[{"src":"assets/illustrations/carrying.svg","label":"A person carrying a box"}],"2-ayin":[{"src":"assets/illustrations/eye.svg","label":"A close-up eye"}],"2-shalosh":[{"src":"assets/illustrations/three-people.svg","label":"Three people"}]};
 
-/* ===== Firebase classroom connection (same b3-games project as Posuk Practice) ===== */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+/* ===== Firebase classroom connection; firebase-config.js selects the environment. ===== */
+const FIREBASE_CONFIG = window.B3_FIREBASE_CONFIG;
+if(FIREBASE_CONFIG && !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
 const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
@@ -43,7 +35,7 @@ async function resolveStudentSpace(studentId){
   classSpaceId=isClassSpace?classId:'';
   if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
 }
-const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+const STUDENT_REWARDS_AUTO_AWARD_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 let studentSiteOpen=true;
 function applyStudentSiteOpen(open){
   studentSiteOpen=teacherPreview||open!==false;
@@ -125,6 +117,8 @@ let teacherPreview = false;
 let cloudSaveTimer = null;
 let appStarted = false;
 let classMatchLeaderboard = {};
+let matchLeaderboardRef = null;
+let matchLeaderboardHandler = null;
 let cloudListenersStarted = false;
 
 const DB_KEY = 'shorashimLearningLabV2';
@@ -268,17 +262,32 @@ async function checkStudentAccess(name,pin){
   return {ok:true,slug,displayName:String(profile.name||name)};
 }
 
-async function loadClassLeaderboard(){
-  try{const snap=await cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).once('value');classMatchLeaderboard=snap.val()||{};}catch(err){console.warn('Could not load leaderboard',err);classMatchLeaderboard={};}
+// Only subscribe to the leaderboard for the Match game being played.
+function stopMatchLeaderboard(){
+  if(matchLeaderboardRef && matchLeaderboardHandler)matchLeaderboardRef.off('value',matchLeaderboardHandler);
+  matchLeaderboardRef=null;matchLeaderboardHandler=null;
+}
+function startMatchLeaderboard(pairCount){
+  stopMatchLeaderboard();
+  if(!cloudEnabled||!cloudStudentId)return;
+  const key=String(pairCount),ref=cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${key}`);
+  matchLeaderboardRef=ref;
+  matchLeaderboardHandler=snap=>{
+    if(matchLeaderboardRef!==ref)return;
+    classMatchLeaderboard[key]=snap.val()||{};
+    const panel=document.getElementById('matchLeaderboard');
+    if(panel&&activeScreenId==='gamesScreen'&&matchState?.pairCount===pairCount)panel.innerHTML=matchLeaderboardHTML(pairCount);
+  };
+  ref.on('value',matchLeaderboardHandler,err=>console.warn('Could not load Match leaderboard',err));
 }
 function startCloudListeners(){
   if(cloudListenersStarted)return;cloudListenersStarted=true;
   cloudDb.ref(`${CLOUD_ROOT}/catalog`).on('value',snap=>{const v=snap.val();if(!v)return;db.catalog=normalizeCatalogUnits(v);saveRaw(db);if(appStarted)renderAll();});
   cloudDb.ref(`${CLOUD_ROOT}/settings`).on('value',snap=>{const v=snap.val();if(!v)return;db.settings={minReviewMs:500,studentSiteOpen:true,...v};saveRaw(db);const sel=document.getElementById('minReviewTime');if(sel)sel.value=String(db.settings.minReviewMs||500);if(appStarted)renderAll();});
-  cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).on('value',snap=>{classMatchLeaderboard=snap.val()||{};if(matchState&&document.getElementById('matchLeaderboard'))document.getElementById('matchLeaderboard').innerHTML=matchLeaderboardHTML(matchState.pairCount);});
 }
 async function enterCloudStudent(name,studentId){
   setLoginMsg('Opening your cards…');setCloudStatus('☁️ Connecting…','syncing');
+  stopMatchLeaderboard();classMatchLeaderboard={};
   await resolveStudentSpace(studentId);
   // A class with its own lists must never fall back to B3's built-in words or this browser's cached copy.
   const cachedCatalog=classSpaceId?emptyCatalog():clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(classSpaceId?{}:(db.settings||{}))},cachedStudent=!classSpaceId&&db.students?.[name]?clone(db.students[name]):null;
@@ -293,7 +302,17 @@ async function enterCloudStudent(name,studentId){
   if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
   document.getElementById('loginGate').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('signedInStudentName').textContent=name;
   if(!appStarted){init();appStarted=true;}else{populateStudents();renderAll();goScreen('studentHome');}
-  showMode('student');setCloudStatus('☁️ Saved');scheduleCloudStudentSave();startCloudListeners();await loadClassLeaderboard();renderGamesLock();
+  showMode('student');startCloudListeners();renderGamesLock();
+  // Do not rewrite a student's entire cards/history just to mark a sign-in.
+  try{
+    const studentRef=cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`);
+    if(studentSnap.exists())await studentRef.update({name:s.name,lastActive:s.lastActive});
+    else await studentRef.set(s); // First login initializes a complete record once.
+    setCloudStatus('☁️ Saved');
+  }catch(err){
+    console.warn('Could not update Shorashim sign-in activity',err);
+    setCloudStatus('☁️ Save problem','error');
+  }
 }
 async function trySavedStudent(){
   const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
@@ -727,12 +746,12 @@ function bindGames(){document.querySelectorAll('.game-choice').forEach(b=>b.oncl
 function renderGamesLock(){const unlocked=gamesUnlocked();document.getElementById('gamesLockedPanel').classList.toggle('hidden',unlocked);document.getElementById('gamesUnlockedPanel').classList.toggle('hidden',!unlocked);if(!unlocked){cleanupGameRuntime();document.getElementById('gameStage').classList.add('hidden');}}
 function focusGameStage(){requestAnimationFrame(()=>document.getElementById('gameStage')?.scrollIntoView({block:'start'}));}
 function renderHomeGameState(){const card=document.getElementById('gamesHomeCard'),msg=document.getElementById('gamesHomeMessage');if(card)card.classList.remove('locked');if(msg)msg.textContent='Choose a practice game.';}
-function cleanupGameRuntime(){if(gameTimer){clearInterval(gameTimer);gameTimer=null;}if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}if(whackState?.moleTimer){clearTimeout(whackState.moleTimer);whackState.moleTimer=null;}if(gameAnimationFrame){cancelAnimationFrame(gameAnimationFrame);gameAnimationFrame=null;}const stage=document.getElementById('gameStage');if(stage){stage.onpointermove=null;stage.onpointerdown=null;}}
+function cleanupGameRuntime(){stopMatchLeaderboard();if(gameTimer){clearInterval(gameTimer);gameTimer=null;}if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}if(whackState?.moleTimer){clearTimeout(whackState.moleTimer);whackState.moleTimer=null;}if(gameAnimationFrame){cancelAnimationFrame(gameAnimationFrame);gameAnimationFrame=null;}const stage=document.getElementById('gameStage');if(stage){stage.onpointermove=null;stage.onpointerdown=null;}}
 function formatGameTime(ms){const sec=Math.max(0,ms)/1000;return sec<60?`${sec.toFixed(1)}s`:`${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}.${Math.floor((sec%1)*10)}`;}
 function finishGame(){student().gamesPlayed++;student().lastActive=Date.now();saveDB();renderStudentStats();}
 
 const MATCH_PAIR_COUNT=8;
-function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};renderMatchGame();focusGameStage();startMatchClock();}
+function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};startMatchLeaderboard(pairCount);renderMatchGame();focusGameStage();startMatchClock();}
 function startMatchClock(){if(gameTimer)clearInterval(gameTimer);gameTimer=setInterval(()=>{const el=document.getElementById('matchTimer');if(el&&matchState&&!matchState.finished)el.textContent=formatGameTime(performance.now()-matchState.startedAt);},100);}
 function matchLeaderboardHTML(pairCount){const rows=classMatchLeaderboard[String(pairCount)]||{};const entries=Object.entries(rows).map(([id,x])=>({id,name:x.name||id,time:Number(x.time)})).filter(x=>Number.isFinite(x.time)).sort((a,b)=>a.time-b.time).slice(0,8);if(!entries.length)return '<div class="mini-note">No leaderboard times yet. Finish a round to set the first time!</div>';return `<div class="leaderboard"><div class="leaderboard-title">🏆 ${pairCount}-pair class leaderboard</div>${entries.map((x,i)=>`<div class="leaderboard-row${x.id===cloudStudentId?' current':''}"><span>${i+1}. ${escapeHTML(x.name)}</span><b>${formatGameTime(x.time)}</b></div>`).join('')}</div>`;}
 function saveMatchBest(pairCount,time){const s=student(),k=String(pairCount),old=s.gameBests.match[k],improved=!Number.isFinite(old)||time<old;if(improved)s.gameBests.match[k]=time;if(improved&&cloudEnabled&&cloudStudentId){classMatchLeaderboard[k]=classMatchLeaderboard[k]||{};classMatchLeaderboard[k][cloudStudentId]={name:cloudStudentName||currentStudent,time,updatedAt:Date.now()};cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${k}/${cloudStudentId}`).set(classMatchLeaderboard[k][cloudStudentId]).catch(err=>console.warn('Leaderboard save failed',err));}}

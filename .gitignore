@@ -6,9 +6,17 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+firebase-debug.log*
+database-debug.log
 /playwright/.auth/
 
 firebase_idb.json
 auth.json
 playwright-report/
 test-results/
+
+# Live site monitor output
+/monitor-report/
+/monitor-results/
+
+staging-results/

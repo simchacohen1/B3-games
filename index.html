@@ -2,27 +2,7 @@
 <html lang="en">
 <head>
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fun Torah Tools</title>
@@ -1456,7 +1436,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1523,12 +1503,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
-  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  function studentAuthUrl(){
+    const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname);
+    if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
+    return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  }
   async function studentAuthCall(body){
     // Retry temporary function failures, never rejected credentials.
     for(let attempt=0;attempt<2;attempt++){
       try{
-        const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const response=await fetch(studentAuthUrl(),{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
         const data=await response.json().catch(()=>({}));
         if(!response.ok){
           const error=Object.assign(new Error(data.error||(response.status>=500?"Sign-in service is temporarily unavailable. Please try again.":"Could not check your login. Try again.")),{status:response.status});
@@ -1779,7 +1764,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Clear the student identity first so auth callbacks cannot restore the
     // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
-    resetPinForm();
     studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();

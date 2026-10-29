@@ -2,27 +2,6 @@
 <!-- Posuk Practice individual-delete fix v2 — 2026-09-22 -->
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -1466,6 +1445,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="../firebase-config.js?v=20261029-staging-config"></script>
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 
@@ -1474,16 +1454,9 @@
    FIREBASE CONFIG — paste the SAME config object you use in
    your other Fun Torah Tools files (Tent Trail Trivia, etc.)
    ========================================================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);
+const firebaseConfig = window.B3_FIREBASE_CONFIG;
+if(!firebaseConfig) throw new Error('Firebase configuration is missing.');
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 let db = firebase.database();
 let storage = firebase.storage();
 let teacherPreview = false;
@@ -1561,16 +1534,16 @@ function wakeScorer(){
    Until this is set, the 🔊 buttons fall back to the browser's built-in
    (robotic-sounding) voice automatically — nothing breaks either way.
    ========================================================= */
-const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech";
+const SYNTHESIZE_SPEECH_URL = window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging' ? '' : "https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech";
 
 /* =========================================================
    STUDENT REWARDS — verified Posuk Practice rewards
    Reaching 100% in Reading, Translation, or Understanding creates a
    teacher-reviewed request. Each request is recorded once per Posuk.
    ========================================================= */
-const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
+const STUDENT_REWARDS_AUTO_AWARD_URL = window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging' ? '' : "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 // Wake the point service on page load so the reward popup is not delayed by a cold start.
-fetch(STUDENT_REWARDS_AUTO_AWARD_URL, { mode: 'no-cors' }).catch(() => {});
+if(STUDENT_REWARDS_AUTO_AWARD_URL)fetch(STUDENT_REWARDS_AUTO_AWARD_URL, { mode: 'no-cors' }).catch(() => {});
 
 function showRewardToast(points,pending=false){
   if(!points) return;
@@ -1590,6 +1563,7 @@ function showRewardToast(points,pending=false){
 }
 
 async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
+  if(!STUDENT_REWARDS_AUTO_AWARD_URL)return 0;
   if(teacherPreview)return 0;
   if(!studentId || !awardPosukKey || !evidencePosukKey) return 0;
   try{
@@ -2391,7 +2365,8 @@ async function studentRecord(path){
     const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
     const idToken=user?await user.getIdToken():'';
     const headers=idToken?{Authorization:'Bearer '+idToken}:{};
-    const response=await fetch(firebaseConfig.databaseURL+'/'+path+'.json',{signal:controller.signal,cache:'no-store',headers});
+    const recordUrl=new URL(path+'.json',firebaseConfig.databaseURL);
+    const response=await fetch(recordUrl.href,{signal:controller.signal,cache:'no-store',headers});
     if(!response.ok)throw new Error('Student account could not be checked.');
     return await response.json();
   }finally{clearTimeout(timer);}
@@ -4978,17 +4953,48 @@ function promiseWithTimeout(promise, ms, label){
 }
 
 const translationPieceCache = new Map();
-async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
-  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
-  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
+const translationPieceRequests = new Map();
+function translationPieceKey(part){
+  return JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+}
+function cachedTranslationPieces(part){
+  const key = translationPieceKey(part);
+  if(translationPieceCache.has(key)) return translationPieceCache.get(key);
+  try{
+    const levels = JSON.parse(localStorage.getItem('posukPractice_translationPieces_v1_' + key));
+    if(Array.isArray(levels) && levels.length){
+      translationPieceCache.set(key, levels);
+      return levels;
+    }
+  }catch(err){ /* Storage may be unavailable. */ }
+  return null;
+}
+function rememberTranslationPieces(key, levels){
+  translationPieceCache.set(key, levels);
+  try{
+    localStorage.setItem('posukPractice_translationPieces_v1_' + key, JSON.stringify(levels));
+  }catch(err){ /* Retain the memory cache if storage is full or disabled. */ }
+}
+// Simultaneous requests for the same piece share one database read. Stale
+// results are discarded by loadOrGenerateTranslationChunks' own token check.
+function fetchOrGenerateTranslationLevelsForPart(part){
+  const cached = cachedTranslationPieces(part);
+  if(cached) return Promise.resolve(cached);
+  const key = translationPieceKey(part);
+  if(translationPieceRequests.has(key)) return translationPieceRequests.get(key);
+  const request = fetchTranslationLevelsForPart(part, key)
+    .finally(() => translationPieceRequests.delete(key));
+  translationPieceRequests.set(key, request);
+  return request;
+}
+async function fetchTranslationLevelsForPart(part, cacheKey){
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
-    if(myToken !== translationLoadToken) return null;
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      translationPieceCache.set(cacheKey, snap.val().levels);
+      rememberTranslationPieces(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -5015,13 +5021,12 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
         })
       });
     }finally{ clearTimeout(timeout); }
-    if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     // Keep successful pieces for this visit too, including when returning
     // to a posuk. Failed requests remain retryable.
-    translationPieceCache.set(cacheKey, data.levels);
+    rememberTranslationPieces(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
@@ -6607,7 +6612,7 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
 </body>
 </html>
 
