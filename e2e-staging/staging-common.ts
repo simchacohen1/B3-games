@@ -59,8 +59,12 @@ export function loadCredentials(): StagingCredentials | null {
 
 export type PageWatch = { productionRequests: string[]; pageErrors: string[] };
 
-export function watchPage(page: Page): PageWatch {
+export async function watchPage(page: Page): Promise<PageWatch> {
   const watch: PageWatch = { productionRequests: [], pageErrors: [] };
+  await page.route('**/*', route => {
+    const url = route.request().url().toLowerCase();
+    return FORBIDDEN_HOSTS.some(host => url.includes(host)) ? route.abort('blockedbyclient') : route.continue();
+  });
   page.on('request', request => {
     const url = request.url().toLowerCase();
     if (FORBIDDEN_HOSTS.some(host => url.includes(host))) {

@@ -37,6 +37,10 @@ async function answerOneQuestion(page: Page, game: typeof gameJourneys[number]) 
   await expect(box).toContainText(game.nextStatus, { timeout: 15000 });
 }
 
+function latestInvite(page: Page, studentName: string, gameName: string) {
+  return page.locator('.invite').filter({ hasText: studentName }).filter({ hasText: gameName }).last();
+}
+
 test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   test.skip(!credentials, NOT_CONFIGURED);
   test.skip(classAccounts.length < 2, 'NOT VERIFIED: two fictional TEST-ALEF students are required');
@@ -50,8 +54,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     const browserClient = browser as Browser;
     host = await browserClient.newPage({ viewport: { width: 1280, height: 900 } });
     guest = await browserClient.newPage({ viewport: { width: 390, height: 844 } });
-    hostWatch = watchPage(host);
-    guestWatch = watchPage(guest);
+    [hostWatch, guestWatch] = await Promise.all([watchPage(host), watchPage(guest)]);
     await Promise.all([
       signInStudent(host, classAccounts[0]),
       signInStudent(guest, classAccounts[1]),
@@ -75,7 +78,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(guest);
     await expect(guest.locator('#accountStatus')).toContainText(classAccounts[1].name, { timeout: 30000 });
-    const invite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+    const invite = latestInvite(guest, classAccounts[0].name, 'Rashi Letters Match');
     await expect(invite).toContainText('Rashi Letters Match', { timeout: 30000 });
     await expect(invite).toContainText('1 player waiting');
     await invite.getByRole('button', { name: 'Join Game' }).click();
@@ -89,7 +92,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     // Leaving removes the guest from the host's roster and keeps the host in control.
     await guest.getByRole('button', { name: '← Leave' }).click();
     await expect(host.locator('#simArea')).toContainText('1 player here', { timeout: 15000 });
-    await expect(host.locator('#simArea').getByRole('button', { name: /Start the race/ })).toBeDisabled();
+    await expect(host.locator('#simArea .mp-panel > button')).toBeDisabled();
 
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     const returnInvite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
@@ -111,10 +114,12 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
 
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(guest);
-    const invite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+    const matchingInvites = guest.locator('.invite').filter({ hasText: classAccounts[0].name }).filter({ hasText: 'Rashi Letters Match' });
+    const invite = matchingInvites.last();
     await expect(invite).toBeVisible({ timeout: 30000 });
+    const inviteCount = await matchingInvites.count();
     await invite.getByRole('button', { name: 'Not Now' }).click();
-    await expect(guest.locator('.invite')).toHaveCount(0);
+    await expect(matchingInvites).toHaveCount(inviteCount - 1);
     await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(5);
     await expect(guest.getByRole('button', { name: 'Start Game' }).nth(4)).toBeVisible();
     expect(guestWatch.pageErrors).toEqual([]);
@@ -123,7 +128,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   test('three classmates can run different games and join the one they choose', async ({ browser }) => {
     test.skip(classAccounts.length < 3, 'NOT VERIFIED: three fictional TEST-ALEF students are required');
     const secondHost = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    const secondHostWatch = watchPage(secondHost);
+    const secondHostWatch = await watchPage(secondHost);
     try {
       await signInStudent(secondHost, classAccounts[2]);
       await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
@@ -138,12 +143,14 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
 
       await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
       await expectStagingIsolation(guest);
-      const rashi = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
-      const gematria = guest.locator('.invite').filter({ hasText: classAccounts[2].name });
+      const rashiInvites = guest.locator('.invite').filter({ hasText: classAccounts[0].name }).filter({ hasText: 'Rashi Letters Match' });
+      const rashi = rashiInvites.last();
+      const gematria = latestInvite(guest, classAccounts[2].name, 'Gematria Race');
       await expect(rashi).toContainText('Rashi Letters Match', { timeout: 30000 });
       await expect(gematria).toContainText('Gematria Race', { timeout: 30000 });
+      const rashiCount = await rashiInvites.count();
       await rashi.getByRole('button', { name: 'Not Now' }).click();
-      await expect(guest.locator('.invite').filter({ hasText: classAccounts[0].name })).toHaveCount(0);
+      await expect(rashiInvites).toHaveCount(rashiCount - 1);
       await expect(gematria).toBeVisible();
       await gematria.getByRole('button', { name: 'Join Game' }).click();
       await expect(guest).toHaveURL(/gematria\/index\.html\?b3Multiplayer=join/);
@@ -165,7 +172,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
 
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(guest);
-    const invite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+    const invite = latestInvite(guest, classAccounts[0].name, 'Rashi Letters Match');
     await invite.getByRole('button', { name: 'Join Game' }).click();
     await expect(guest.locator('#simArea')).toContainText('Waiting for', { timeout: 30000 });
     await host.close();
@@ -185,13 +192,15 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
         await host.getByRole('button', { name: 'Select All' }).click();
         await host.getByRole('button', { name: /Race My Friends/ }).click();
       }
+      await expect(host.locator(game.hostBox)).toBeVisible();
       await expect(host.locator(game.hostBox)).toContainText('Waiting for friends to join', { timeout: 60000 });
 
       await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
       await expectStagingIsolation(guest);
-      const invite = guest.locator('.invite').filter({ hasText: classAccounts[0].name });
+      const invite = latestInvite(guest, classAccounts[0].name, game.name);
       await expect(invite).toContainText(game.name, { timeout: 30000 });
       await invite.getByRole('button', { name: 'Join Game' }).click();
+      await expect(guest.locator(game.guestBox)).toBeVisible();
       await expect(guest.locator(game.guestBox)).toContainText('Waiting for', { timeout: 30000 });
 
       const start = host.locator(game.hostBox).getByRole('button', { name: /Start the race/ });

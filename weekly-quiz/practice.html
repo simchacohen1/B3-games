@@ -260,9 +260,18 @@ function enterApp(){
 async function restore(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
-  const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name){location.href='../index.html';return;}
-  try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
+  if(!id||!name){location.href='../index.html';return false;}
+  try{
+    const profile=await db.ref('b3Games/students/'+id+'/profile').once('value');
+    let record=profile.val();
+    if(!profile.exists())record=(await db.ref('posukPractice/allowedStudents/'+id).once('value')).val();
+    if(!record||record.active===false)return false;
+    studentId=id;studentName=record.name||name;
+    sessionStorage.setItem('posukPractice_studentId',studentId);sessionStorage.setItem('posukPractice_studentName',studentName);
+    enterApp();return true;
+  }catch(e){return false;}
 }
 function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}
 function renderPosukGrid(){
@@ -376,12 +385,15 @@ async function startFriendsRace(){
 }
 function sameAgain(){document.getElementById('resultCard').classList.add('hidden');generatePractice();}
 function backToBuilder(){items=[];document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
-renderPosukGrid();restore();
-if(new URLSearchParams(location.search).get('b3MultiplayerRoom'))startFriendsRace();
-if(new URLSearchParams(location.search).get('b3Multiplayer')==='configure'){
-  document.getElementById('builderMsg').textContent='Choose the pesukim and quiz style, then tap Race My Friends to open your waiting room.';
-  window.scrollTo({top:0,behavior:'smooth'});
-}
+renderPosukGrid();
+restore().then(()=>{
+  const params=new URLSearchParams(location.search);
+  if(params.get('b3MultiplayerRoom'))startFriendsRace();
+  if(params.get('b3Multiplayer')==='configure'){
+    document.getElementById('builderMsg').textContent='Choose the pesukim and quiz style, then tap Race My Friends to open your waiting room.';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+});
 </script>
 </body>
 </html>

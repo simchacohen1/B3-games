@@ -1436,7 +1436,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1505,7 +1505,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   // Student sign-in is checked on the server; passcodes never reach the browser.
   function studentAuthUrl(){
     const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
-    if(stagingProject==='fun-torah-tools-staging')return `https://us-central1-${stagingProject}.cloudfunctions.net/funTorahStudentAuth`;
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname);
+    if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
     return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
   }
   async function studentAuthCall(body){

@@ -914,7 +914,16 @@ function showModeGate(){
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
   const launchParams=new URLSearchParams(location.search);
-  if(studentId&&(launchParams.get('b3Multiplayer')==='start'||launchParams.get('b3Multiplayer')==='host'||launchParams.get('b3MultiplayerRoom')))setTimeout(()=>enterMultiplayer(),0);
+  if(studentId&&(launchParams.get('b3Multiplayer')==='start'||launchParams.get('b3Multiplayer')==='host'||launchParams.get('b3MultiplayerRoom'))){
+    setTimeout(()=>{
+      // simArea lives inside the normally hidden look-alike activity screen.
+      // Direct Multiplayer Center launches must open that screen before
+      // rendering the room, including when a guest reloads to rejoin.
+      openSimilar();
+      setSimTab('match');
+      enterMultiplayer();
+    },0);
+  }
 }
 
 document.getElementById('continueBtn').onclick = () => goNextStep();
