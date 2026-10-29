@@ -215,13 +215,10 @@
       if (!data) {
         if (r.shown !== "results") {
           room = null;
-          if (r.isHost) start("");
-          else {
-            var closed = draw(); closed.append(el("p", "b3r-prompt", "The host left. This waiting room has closed."));
-            var browse = el("button", "b3r-btn", "Browse other games"); browse.type = "button";
-            browse.onclick = function () { clearRoomRoute(); if (opts.centerUrl) root.location.href = opts.centerUrl; else if (opts.onExit) opts.onExit(); };
-            closed.append(browse);
-          }
+          var closed = draw(); closed.append(el("p", "b3r-prompt", r.isHost ? "This waiting room has closed." : "The host left. This waiting room has closed."));
+          var browse = el("button", "b3r-btn", "Browse other games"); browse.type = "button";
+          browse.onclick = function () { clearRoomRoute(); if (opts.centerUrl) root.location.href = opts.centerUrl; else if (opts.onExit) opts.onExit(); };
+          closed.append(browse);
         }
         return;
       }

@@ -1517,11 +1517,8 @@ function onRoomUpdate(room, all){
   const r=simRoom; if(!r) return;
   if(!room){ if(r.shown!=='results'){
     simRoom=null; stopWatching();
-    if(r.isHost){ enterMultiplayer(); }
-    else {
-      const area=document.getElementById('simArea'); area.replaceChildren(el('p','prompt','The host left. This waiting room has closed.'));
-      const browse=el('button','sim-small-btn','Browse other games'); browse.onclick=()=>{clearRashiRoomUrl();location.href='../multiplayer/index.html';}; area.appendChild(browse);
-    }
+    const area=document.getElementById('simArea'); area.replaceChildren(el('p','prompt',r.isHost?'This waiting room has closed.':'The host left. This waiting room has closed.'));
+    const browse=el('button','sim-small-btn','Browse other games'); browse.onclick=()=>{clearRashiRoomUrl();location.href='../multiplayer/index.html';}; area.appendChild(browse);
   } return; }
   r.data=room;
   publishRashiCenterRoom(room,r.code);
