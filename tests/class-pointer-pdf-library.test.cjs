@@ -47,7 +47,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   const auth={currentUser:{uid,async getIdToken(){return 'signed-in-ID-token'}}};
   const w={ClassPointerBridge:{isTeacher:teacher},ClassPointerDashboard:{ready:authorized?Promise.resolve({user:{uid}}):Promise.reject(Error('Teacher class access denied'))},
     firebase:{auth:()=>auth,storage:()=>storage},
-    ClassPointerPdf:{async openFile(file){loaded.push(file);return true},goToPage(i){page.push(i)},currentPage(){return 3}}};
+    ClassPointerPdf:{async openFile(file){loaded.push(file);return true},goToPage(i){page.push(i)},currentPage(){return 3},getLayout(){return {spread:false,rtl:true,shift:false}},setLayout(){}}};
   const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:id==='teacherDock'&&dockAvailable?dock:null,
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
