@@ -152,7 +152,7 @@ test('teacher assigns three retakes to one boy; each stays open until he finishe
   await teacher.locator('#pendingAssignments .pending-assignment').filter({ hasText: 'Quiz C' }).getByRole('button', { name: 'Revoke' }).click();
   await expect.poll(async () => Object.keys(await readFixture(`${ROOT}/settings/studentAssignments/${ARI}`) || {}).sort()).toEqual([idFor('A'), idFor('B')].sort());
   expect(await readFixture(`${ROOT}/launches/${idFor('C')}/revokedStudents/${ARI}`)).toBeTruthy();
-  await expect(teacher.locator('#pendingAssignments .pending-assignment')).toHaveCount(1);
+  await expect(teacher.locator('#pendingAssignments .pending-assignment')).toHaveCount(2);
   await expect(row(ari, 'Quiz C')).toHaveCount(0, { timeout: 15000 });
   await expect(row(ari, 'Quiz A')).toContainText('In progress');
   expect((await readFixture(`${ROOT}/responses/${idFor('A')}/${ARI}/0`)).choiceIndex).toBe(1);
