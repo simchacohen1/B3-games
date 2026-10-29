@@ -95,7 +95,7 @@ if(new URLSearchParams(location.search).get('embedded')==='1'){
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
 const PLATFORM_TOOLS=[
- ["sefer-hamitzvos","Sefer HaMitzvos","dual"],["halacha","Halacha","dual"],["yiddish","Yiddish","dual"],["posuk-practice-scroll","Posuk Practice","dual"],["rashi-letters","Rashi Letters","dual"],["gematria","Gematria","dual"],["shorashim","Shorashim","dual"],["chazara","Chazara","dual"],["game-show","Game Show","dual"],["student-rewards","Student Rewards","dual"],["weekly-quiz","Weekly Quiz","dual"],["gallery","Gallery","dual"],["tag","Tag Game","dual"],
+
  ["davening","Davening Player","teacher"],["chavrusa","Chavrusa of the Day","teacher"],["name-picker","Name Picker","teacher"],
  ["class-pointer","Class Pointer","unsorted"]
 ];

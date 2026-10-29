@@ -15,6 +15,13 @@ test('Rashi Letters recognizes the legacy rashi class grant',()=>{
  assert.equal(policy.allowed(cls,'one','rashi-letters'),false);
  assert.deepEqual(policy.aliases('rashi-letters'),['rashi','rashi-letters']);
 });
+test('Multiplayer Center is teacher-managed as a student activity',()=>{
+ assert.ok(policy.studentActivities.includes('multiplayer-center'));
+ const cls={toolGrants:{'multiplayer-center':true},members:{one:{toolAccess:{'multiplayer-center':false}},two:{}}};
+ assert.equal(policy.granted(cls,'multiplayer-center'),true);
+ assert.equal(policy.allowed(cls,'one','multiplayer-center'),false);
+ assert.equal(policy.allowed(cls,'two','multiplayer-center'),true);
+});
 test('teacher controls show granted student activities with current per-student selections',()=>{
  const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});
  const html=window.B3StudentToolControls.render('mine',{toolGrants:{yiddish:true,chazara:false,'name-picker':true},members:{one:{name:'One <script>',toolAccess:{yiddish:false}},two:{name:'Two'}}},{yiddish:['Yiddish'],chazara:['Chazara'],'name-picker':['Name Picker']});
