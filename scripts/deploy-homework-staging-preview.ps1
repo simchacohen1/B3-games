@@ -84,7 +84,9 @@ function Prepare-StagingBootstrap {
     $content = $downloaded[$asset.Name]
     if (Test-Path -LiteralPath $path) {
       $existing = [System.IO.File]::ReadAllText($path)
-      if ($existing -cne $content) {
+      $normalizedExisting = ($existing -replace "`r`n", "`n").TrimEnd("`n")
+      $normalizedContent = ($content -replace "`r`n", "`n").TrimEnd("`n")
+      if ($normalizedExisting -cne $normalizedContent) {
         throw "Refusing to overwrite existing local staging asset '$($asset.Name)'."
       }
     } else {
