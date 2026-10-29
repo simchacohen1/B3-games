@@ -21,6 +21,37 @@ test('owner All-classes pending view never scans histories or silently repairs s
  const x=setup();const rows=await x.ctx.listPendingChazaraRequests(null);
  assert.equal(rows.length,0);assert.equal(x.created.length,0);assert.equal(x.updates.length,0);
 });
+test('owner All-classes pending queue uses indexed status query and excludes the archive',async()=>{
+ const x=setup(),requests=x.tree.studentRewards.pointRequests;
+ for(let i=0;i<1000;i++)requests['archived_'+i]={source:'chazara',status:'approved',createdAt:i};
+ requests.newer={source:'chazara-recording',status:'pending',practiceStudentId:'fictional_a',createdAt:2001};
+ requests.older={source:'chazara',status:'pending',practiceStudentId:'fictional_b',createdAt:2000};
+ requests.unreviewable={source:'unrelated',status:'pending',createdAt:3000};
+ let indexedReads=0,fullReads=0;
+ const originalRef=x.ctx.rtdb.ref;
+ x.ctx.rtdb.ref=path=>{
+  const ref=originalRef(path);
+  if(path!=='studentRewards/pointRequests')return ref;
+  return {...ref,
+   get:async()=>{fullReads++;throw new Error('Owner pending startup must not download the full archive');},
+   orderByChild:field=>{
+    assert.equal(field,'status');
+    const query=ref.orderByChild(field);
+    return {equalTo:status=>{
+     assert.equal(status,'pending');
+     const filtered=query.equalTo(status);
+     return {get:async()=>{indexedReads++;return filtered.get()}};
+    }};
+   }
+  };
+ };
+ const rows=await x.ctx.listPendingChazaraRequests(null);
+ assert.deepEqual(Array.from(rows,row=>row.id),['newer','older']);
+ assert.equal(indexedReads,1,'owner queue makes one indexed pending query');
+ assert.equal(fullReads,0,'owner queue never reads all historical requests');
+ assert.equal(x.created.length,0,'owner startup must not silently recover missing requests');
+ assert.equal(x.updates.length,0,'owner startup must not modify recordings');
+});
 test('class pending view never repairs saved Chazaras during ordinary startup',async()=>{
  const x=setup();const rows=await x.ctx.listPendingChazaraRequests({owner:false,selected:'et',students:{simcha_cohen:{classId:'et'}}});
  assert.equal(rows.length,0);assert.equal(x.created.length,0);assert.equal(x.updates.length,0);
