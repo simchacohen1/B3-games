@@ -104,3 +104,54 @@ test('failed history request is not cached and succeeds on retry',async()=>{
   assert.deepEqual(Object.keys(x.events().fictional_a),['recovered']);
   assert.equal(x.state.calls.length,2);
 });
+
+
+test('switching selected students mid-fetch drops stale history and permits a fresh reload',async()=>{
+  let resolveFirst,firstA=true;
+  const x=fixture({
+    studentIds:['fictional_a','fictional_b'],selected:'fictional_a',
+    api:async id=>{
+      if(id==='fictional_a'&&firstA){
+        firstA=false;
+        return new Promise(resolve=>{resolveFirst=resolve});
+      }
+      return {events:{['own_'+id]:{workspaceClassId:'alpha'}}};
+    }
+  });
+  const oldLoad=x.loadRecordingHistory();
+  assert.deepEqual(x.state.calls,['fictional_a']);
+  x.state.selected='fictional_b';
+  await x.loadRecordingHistory();
+  resolveFirst({events:{stale_a:{workspaceClassId:'alpha'}}});
+  await oldLoad;
+  assert.deepEqual(Object.keys(x.events()),['fictional_b'],
+    'late response for the previous student must not enter the selected view');
+  assert.deepEqual(x.loaded(),['fictional_b'],
+    'stale response must not be cached as authorized/current history');
+  x.state.selected='fictional_a';
+  await x.loadRecordingHistory();
+  assert.deepEqual(x.state.calls,['fictional_a','fictional_b','fictional_a']);
+  assert.deepEqual(Object.keys(x.events().fictional_a),['own_fictional_a']);
+});
+
+test('partial batch failure retains successful histories and retries only the failed student',async()=>{
+  const ids=Array.from({length:6},(_,i)=>'fictional_'+i);
+  let failOnce=true;
+  const x=fixture({studentIds:ids,api:async id=>{
+    if(id==='fictional_2'&&failOnce){
+      failOnce=false;
+      throw Error('Synthetic one-student transient failure');
+    }
+    return {events:{['own_'+id]:{workspaceClassId:'alpha'}}};
+  }});
+  await x.loadRecordingHistory();
+  assert.equal(x.state.calls.length,6);
+  assert.equal(x.loaded().length,5,'five successful histories remain cached');
+  assert.equal(x.state.errors.length,1,'partial failure is visible to teacher');
+  assert.ok(!x.loaded().includes('fictional_2'));
+  await x.loadRecordingHistory();
+  assert.equal(x.state.calls.length,7,'retry must not re-download successful students');
+  assert.equal(x.state.calls.filter(id=>id==='fictional_2').length,2);
+  assert.deepEqual(x.loaded().sort(),[...ids].sort());
+  assert.ok(x.state.peak<=4,'retry must preserve bounded concurrent reads');
+});
