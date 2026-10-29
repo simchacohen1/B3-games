@@ -490,6 +490,10 @@
     return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
+  function isBootstrapAdmin(user) {
+    return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+  }
+
   function readUserAccessFromFirebase(user) {
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
@@ -509,7 +513,7 @@
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
         if (!classIds.length) return { authorized:false, role:"", classIds:[] };
-        return { authorized:true, role:"teacher", classIds:classIds };
+        return { authorized:true, role:"teacher", accountType:teacher.accountType==="principal"?"principal":"teacher", supervisedTeachers:teacher.accountType==="principal"?(teacher.supervisedTeachers||{}):{}, classIds:classIds };
       }
 
       // Read only this verified user's invitation; never enumerate other teachers.
@@ -531,7 +535,7 @@
           const claimed=await response.json();
           const verifiedClassIds = Array.isArray(claimed.classIds) ? claimed.classIds.filter(id=>id!=="*" && typeof id==="string" && id.length>0) : [];
           if(claimed.authorized!==true || !verifiedClassIds.length) return {authorized:false,role:"",classIds:[]};
-          return {authorized:true,role:"teacher",classIds:verifiedClassIds,inviteId:claimed.inviteId||inviteId};
+          return {authorized:true,role:"teacher",accountType:claimed.accountType==="principal"?"principal":"teacher",supervisedTeachers:claimed.supervisedTeachers||{},classIds:verifiedClassIds,inviteId:claimed.inviteId||inviteId};
         }).catch(function(error){
           // A failed or unavailable verifier must never authorize a new teacher.
           console.warn("Teacher verification unavailable; access denied.",error);
@@ -1430,7 +1434,7 @@
     signOut: signOut,
     onAuthStateChanged: onAuthStateChanged,
     isAuthorizedUser: isAuthorizedUser,
-    getCurrentAccess: function(){ return {authorized:currentAccess.authorized,role:currentAccess.role,classIds:currentAccess.classIds.slice()}; },
+    getCurrentAccess: function(){ return {authorized:currentAccess.authorized,role:currentAccess.role,accountType:currentAccess.accountType||"teacher",supervisedTeachers:currentAccess.supervisedTeachers||{},classIds:currentAccess.classIds.slice()}; },
     workspaceId: WORKSPACE_ID,
     timeZone: TIME_ZONE,
     dayKeys: DAY_KEYS.slice(),
