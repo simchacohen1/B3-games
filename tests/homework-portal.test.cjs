@@ -133,9 +133,8 @@ test('edit published work and delete drafts without erasing published work', asy
 test('access: other classes, other students, switched-off class', async () => {
   const store = await setup();
   const id = defId(store);
-  // student claims a class they are not in, or someone else's id with own passcode
-  // asking for another class just returns their own class (never wt's data)
-  assert.equal((await homeworkApi(store, {}, { action: 'studentList', studentId: 's1', studentName: 'Sam One', pin: '1111', classId: 'wt' }, 1)).assignments[0].id, id);
+  // A class claimed by the browser must match the student's active membership.
+  await assert.rejects(homeworkApi(store, {}, { action: 'studentList', studentId: 's1', studentName: 'Sam One', pin: '1111', classId: 'wt' }, 1), { code: 403 });
   await assert.rejects(homeworkApi(store, {}, { action: 'studentList', ...stu('s2', 'Dan Two', '1111') }, 1), { code: 401 });
   await assert.rejects(homeworkApi(store, {}, { action: 'studentList', ...stu('s1', 'Dan Two', '1111') }, 1), { code: 401 });
   // removed (inactive) student has no passcode access

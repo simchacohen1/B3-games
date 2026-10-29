@@ -3,10 +3,10 @@
 <script src="/staging/preview-bootstrap.js"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Homework</title>
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172b4d;background:#f2f6fb}*{box-sizing:border-box}body{margin:0}
-header{background:#123762;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}header strong{font-size:22px}
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18324b;background:#eef7ff}*{box-sizing:border-box}body{margin:0}
+header{background:#23558b;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}header strong{font-size:22px}
 header a{color:#fff}main{max-width:760px;margin:20px auto;padding:0 14px 60px}
-.card{background:#fff;border:1px solid #dce5ee;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 3px 10px #102b4510}
+.card{background:#fff;border:1px solid #dce5ee;border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px #102b4510}
 .card h3{margin:0 0 4px}.muted{color:#5b6b7b}.badge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:13px;background:#eaf2fa;color:#174e7e;margin-right:6px}
 .badge.late{background:#fde8e8;color:#a31a1a}.badge.ok{background:#e1f6e5;color:#1c6b30}.badge.retry{background:#fff1d6;color:#8a5a00}
 textarea,input{font:inherit;width:100%;padding:10px;border:1px solid #bfcfdf;border-radius:8px;margin-top:6px}textarea{min-height:80px}
@@ -15,6 +15,7 @@ button{font:inherit;border:0;border-radius:9px;padding:10px 16px;font-weight:600
 .msg{min-height:20px;margin-top:6px;font-weight:600}.err{color:#a31a1a}.good{color:#1c6b30}
 .button-link{display:inline-block;padding:10px 16px;margin:8px 8px 0 0;border-radius:9px;background:#18588f;color:#fff;font-weight:700;text-decoration:none}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #eea62b;outline-offset:2px}
+.home-intro{background:#fff;border-radius:20px;padding:18px;margin-bottom:16px}.home-intro h1{margin:0 0 6px;font-size:30px}.home-intro p{margin:0}.home-tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px}.home-tabs button{white-space:nowrap;border:2px solid #c8d8e8;background:#fff;color:#23558b;padding:11px 14px}.home-tabs button[aria-selected=true]{background:#23558b;color:#fff;border-color:#23558b}.home-tabs .count{display:inline-block;margin-left:5px;border-radius:12px;padding:1px 7px;background:#fff;color:#23558b}.home-section[hidden]{display:none}.home-section h2{font-size:22px}.home-card.todo{border-left:6px solid #5592d2}.home-card.handed{border-left:6px solid #e2a436}.home-card.finished{border-left:6px solid #56aa68}.note{font-size:17px;line-height:1.5}
 </style></head><body>
 <header><strong>📚 My Homework</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
 <main>
@@ -49,15 +50,16 @@ function render(data){
   listBox.replaceChildren();
   statusBox.style.display='none';
   if(!data.assignments.length){statusBox.style.display='';statusBox.textContent='No homework right now. Enjoy! 🎉';return}
-  var intro=el('div',data.openCount?('You have '+data.openCount+' to finish.'):'All caught up! 🎉','card');
-  listBox.append(intro);
-  data.assignments.forEach(function(a){listBox.append(card(a))});
+  var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'!'),el('p',data.openCount?'Here is your homework. You can do it!':'You are all caught up. Great job! 🎉'));listBox.append(intro);
+  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
+  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div');groups.forEach(function(g,i){var b=el('button',g.name+' '+g.items.length);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===0?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=i!==0;pane.append(el('h2',g.name));if(!g.items.length)pane.append(el('div',g.id==='todo'?'Nothing to do right now. Enjoy your free time!':'Nothing here yet.','card muted'));g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
 }
 function card(a){
-  var c=el('div',null,'card');
+  var bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';var c=el('article',null,'card home-card '+bucket);
   c.append(el('h3',a.title));
   var meta=el('div');
-  var b=el('span',H.STATUS[a.status]||a.status,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
+  var stateLabel=a.status==='approved'?'Finished ✓':a.status==='submitted'?'Handed in — waiting for teacher':a.status==='returned'?'Returned — please fix it':a.status==='in_progress'?'Started — keep going':'Ready to start';
+  var b=el('span',stateLabel,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
   meta.append(b,el('span',H.TYPES[a.type]||a.type,'badge'));
   if(a.dueAt!=null)meta.append(el('span',(a.late?'Late – was due ':'Due ')+H.when(a.dueAt),'badge'+(a.late?' late':'')));
   if(a.assignedAt!=null)meta.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
@@ -65,14 +67,14 @@ function card(a){
   if(a.details)c.append(el('p',a.details));
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
   var activityUrl=H.activityUrl(a.type);
-  if(activityUrl){var launch=el('a','Open '+(H.TYPES[a.type]||'activity'),'button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='noopener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','Opening the activity does not mark this assignment complete. Your activity progress stays in that tool; return here to submit your work.','muted'))}
-  if(a.status==='returned'&&a.feedback)c.append(el('div','Teacher says: '+a.feedback,'note'));
+  if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='noopener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
+  if(a.status==='returned'&&a.feedback)c.append(el('div','Your teacher says: '+a.feedback,'note'));
   if(a.status==='approved'){
     if(a.stars)c.append(el('p','★'.repeat(a.stars)+'☆'.repeat(5-a.stars)));
-    if(a.feedback)c.append(el('p','Teacher says: '+a.feedback,'note'));
+    if(a.feedback)c.append(el('div','Teacher says: '+a.feedback,'note'));
     return c;
   }
-  if(a.status==='submitted'){c.append(el('p','Handed in. Your teacher will look at it.','muted'));if(a.answer)c.append(el('p','You wrote: '+a.answer,'muted'));return c}
+  if(a.status==='submitted'){c.append(el('p','You handed it in! Your teacher will look at it.','muted'));if(a.answer)c.append(el('p','Your answer: '+a.answer,'muted'));return c}
   var mins=null;
   if(a.targetUnit==='minutes'){
     c.append(el('label','Minutes I practiced'));
@@ -82,7 +84,7 @@ function card(a){
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
-  var save=el('button','Save for later','sec'),sub=el('button','Hand in');
+  var save=el('button','Save for later','sec'),sub=el('button',a.status==='returned'?'Fix and Hand In Again':'Hand In');
   save.type=sub.type='button';
   var mv=function(){return mins?Math.max(0,parseInt(mins.value,10)||0):undefined};
   save.onclick=async function(){

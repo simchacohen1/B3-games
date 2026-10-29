@@ -5,7 +5,7 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 process.env.GCLOUD_PROJECT = 'demo-homework';
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const req = require('node:module').createRequire(path.join(__dirname, '..', 'backend', 'functions', 'package.json'));
+const req = require('node:module').createRequire(path.join(__dirname, '..', 'backend', 'functions', 'homework-staging', 'package.json'));
 const admin = req('firebase-admin');
 admin.initializeApp({ projectId: 'demo-homework' });
 
@@ -55,9 +55,13 @@ async function call(body, token, method = 'POST') {
   data.b3Games.workspaces['b3-2026'].teachers[t1.uid] = { active: true, classIds: { c1: true } };
   data.b3Games.workspaces['b3-2026'].teachers[t2.uid] = { active: true, classIds: { c2: true } };
   const log = (n, r) => console.log(String(r.code).padEnd(4), n, r.body.error ? '-> ' + r.body.error : '');
+  let r;
+  r = await call({ action: 'authorizedClasses' }, t1.token); log('teacher1 authorized classes', r); assert.deepEqual(r.body.classes.map(c => c.id), ['c1']);
+  const emailOnly = await googleLogin('simcha5770@gmail.com'); r = await call({ action: 'authorizedClasses' }, emailOnly.token); log('owner email without UID grant', r); assert.equal(r.code, 403);
 
-  let r = await call({}, null, 'GET'); log('GET health', r); assert.equal(r.code, 200);
+  r = await call({}, null, 'GET'); log('GET health', r); assert.equal(r.code, 200);
   r = await call({ action: 'create', classId: 'c1', type: 'audio', title: 'Real-token test' }, t1.token); log('teacher1 creates in c1', r); assert.equal(r.code, 200);
+  r = await call({ action: 'publish', classId: 'c1', assignmentId: r.body.id }, t1.token); log('teacher1 publishes in c1', r); assert.equal(r.code, 200);
   r = await call({ action: 'teacherList', classId: 'c1' }, t1.token); assert.equal(r.body.assignments.length, 1);
   r = await call({ action: 'teacherList', classId: 'c2' }, t1.token); log('teacher1 reads c2 (not hers)', r); assert.equal(r.code, 403);
   r = await call({ action: 'teacherList', classId: 'c1' }, t2.token); log('teacher2 reads c1 (not hers)', r); assert.equal(r.code, 403);
@@ -69,7 +73,14 @@ async function call(body, token, method = 'POST') {
   r = await call({ action: 'studentList', ...s }); log('student s1 lists', r); assert.equal(r.body.assignments.length, 1);
   r = await call({ action: 'studentList', ...s, pin: '9999' }); log('student wrong passcode', r); assert.equal(r.code, 401);
   r = await call({ action: 'studentList', studentId: 's2', studentName: 'Dan Test', pin: '2222', classId: 'c2' }); log('student s2 (other class) lists', r); assert.equal(r.body.assignments.length, 0);
-  r = await call({ action: 'studentList', ...s, classId: 'c2' }); log('s1 asks for c2', r); assert.equal(r.body.assignments.length, 1);
+  r = await call({ action: 'studentList', ...s, classId: 'c2' }); log('student s1 requests c2', r); assert.equal(r.code, 403);
+  const created = await call({ action: 'create', classId: 'c1', type: 'workbook', title: 'Correction cycle' }, t1.token); assert.equal(created.code, 200); const secondId = created.body.id;
+  r = await call({ action: 'publish', classId: 'c1', assignmentId: secondId }, t1.token); assert.equal(r.code, 200);
+  r = await call({ action: 'submit', ...s, assignmentId: secondId, answer: 'First attempt' }); log('student submits work', r); assert.equal(r.code, 200);
+  r = await call({ action: 'return', classId: 'c1', assignmentId: secondId, studentId: 's1', feedback: 'Please add one more detail.' }, t1.token); log('teacher returns work', r); assert.equal(r.code, 200);
+  r = await call({ action: 'studentList', ...s }); assert.equal(r.body.assignments.find(a => a.id === secondId).status, 'returned');
+  r = await call({ action: 'submit', ...s, assignmentId: secondId, answer: 'Revised work with more detail' }); log('student resubmits corrections', r); assert.equal(r.code, 200);
+  r = await call({ action: 'approve', classId: 'c1', assignmentId: secondId, studentId: 's1', stars: 5 }, t1.token); log('teacher approves resubmission', r); assert.equal(r.code, 200);
   await new Promise(x => setTimeout(x, 1200));
   await admin.auth().revokeRefreshTokens(t1.uid);
   await new Promise(x => setTimeout(x, 1500));

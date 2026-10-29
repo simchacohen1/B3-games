@@ -90,7 +90,7 @@ test('preview runtime refuses production Firebase and activity links never submi
 
   const html = fs.readFileSync(__dirname + '/../assignment-center/student.html', 'utf8');
   assert.match(html, /data-assignment-launch/);
-  assert.match(html, /Opening the activity does not mark this assignment complete/);
+  assert.match(html, /press Hand In\. The activity does not send your homework/);
   const cardCode = html.slice(html.indexOf('function card(a)'), html.indexOf('async function refresh()'));
   const launchCode = cardCode.slice(cardCode.indexOf('var activityUrl'), cardCode.indexOf("if(a.status==='returned'"));
   assert.match(launchCode, /target='_blank'/);
@@ -144,6 +144,10 @@ test('staging guard accepts only the staging host/project and provides local act
 test('preview Firebase config and bootstrap stay isolated from production', () => {
   const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
+  assert.match(homeSource, /fun-torah-tools-staging--homework-406-preview/,
+    'the signed-in student auth route recognizes only the staging Homework preview host');
+  assert.match(homeSource, /stagingStudentAuthHost\?"fun-torah-tools-staging":"b3-games"/,
+    'student auth keeps the production function target on production hosts');
   assert.doesNotMatch(homeSource, /<script src="firebase-config\.js[^"]*" defer>/,
     'the home page must initialize with its staging config before app code');
   const proxyWrites = [];
@@ -208,13 +212,20 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
   assert.match(fnSource, /homework-406-preview/);
-  for (const file of ['homework.js', 'homework-core.cjs', 'homework-policy.cjs', 'student-login-core.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
+  for (const file of ['homework.js', 'homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(
       fs.readFileSync(__dirname + '/../backend/functions/homework-staging/' + file, 'utf8'),
       fs.readFileSync(__dirname + '/../backend/functions/' + file, 'utf8'),
       `${file} staging copy must match the canonical function source`,
     );
   }
+  const stagingCore = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/homework-core.cjs', 'utf8');
+  assert.doesNotMatch(stagingCore, /OWNER_EMAIL/, 'staging owner authorization is UID based');
+  assert.match(stagingCore, /async function authorizedClasses\(store, identity\)/,
+    'staging class listing is server authorized');
+  const stagingLogin = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/student-login-core.cjs', 'utf8');
+  assert.match(stagingLogin, /requestedClass\?valid\.find\(v=>v\.classId===requestedClass\)/,
+    'staging student login honors and validates the requested class');
   const e2eSource = fs.readFileSync(__dirname + '/../e2e-staging/staging-common.ts', 'utf8');
   assert.match(e2eSource, /FTT_STAGING_SITE must be the staging live site/);
   assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);

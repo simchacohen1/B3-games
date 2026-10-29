@@ -1506,7 +1506,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
-  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  const stagingStudentAuthHost=/^(fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app)$/i.test(location.hostname);
+  const STUDENT_AUTH_PROJECT=stagingStudentAuthHost?"fun-torah-tools-staging":"b3-games";
+  const STUDENT_AUTH_URL="https://us-central1-"+STUDENT_AUTH_PROJECT+".cloudfunctions.net/funTorahStudentAuth";
   async function studentAuthCall(body){
     // Retry temporary function failures, never rejected credentials.
     for(let attempt=0;attempt<2;attempt++){

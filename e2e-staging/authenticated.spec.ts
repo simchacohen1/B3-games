@@ -136,7 +136,7 @@ test.describe('staging adult role boundaries @auth @permissions', () => {
   }
 });
 
-test('fictional teacher publishes homework for a fictional student @auth @homework', async ({ browser }) => {
+test('fictional teacher publishes homework for a fictional student @auth @homework', async ({ browser }, testInfo) => {
   test.skip(!credentials, NOT_CONFIGURED);
   const adult = credentials!.adultAccounts.find(row => row.role === 'teacher' && row.classId === 'TEST-ALEF');
   const student = credentials!.studentAccounts.find(row => row.classId === 'TEST-ALEF');
@@ -165,34 +165,51 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expectStagingIsolation(teacherPage);
     await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
     await expect(teacherPage.locator('#cls')).toHaveValue('TEST-ALEF');
+    await teacherPage.screenshot({ path: testInfo.outputPath('homework-teacher.png'), fullPage: true });
+    await expect(teacherPage.getByRole('button', { name: /Create Homework/ })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: /Check Homework/ })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: /My Assignments/ })).toBeVisible();
+    await teacherPage.getByRole('button', { name: /Preview Student View/ }).click();
+    await expect(teacherPage.locator('#screenPreview')).toContainText('Fictional sample');
+    await expect(teacherPage.locator('#screenPreview button')).toHaveCount(2);
+    await expect(teacherPage.locator('#screenPreview button').first()).toBeDisabled();
+    await teacherPage.locator('#screenPreview .backHome').click();
+    await teacherPage.getByRole('button', { name: /Create Homework/ }).click();
     await teacherPage.locator('#type').selectOption('shorashim');
+    await teacherPage.locator('#title').fill(title);
+    await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
+    await teacherPage.getByRole('button', { name: /Next: choose students/ }).click();
+    await teacherPage.getByRole('button', { name: /Next: dates & preview/ }).click();
     await teacherPage.locator('#assigned').fill(localDate(0));
     await teacherPage.locator('#due').fill(localDate(1));
     await teacherPage.locator('#target').fill('5');
     await teacherPage.locator('#targetUnit').selectOption('minutes');
-    await teacherPage.locator('#title').fill(title);
-    await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
-    await teacherPage.getByRole('button', { name: 'Save draft' }).click();
+    await expect(teacherPage.locator('#createPreview')).toContainText(title);
+    await teacherPage.getByRole('button', { name: 'Save Draft' }).click();
     await expect(teacherPage.locator('#formMsg')).toContainText('Draft saved.');
     created = true;
     teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
-    await expect(teacherCard).toContainText('Draft — hidden from students');
+    await expect(teacherCard).toContainText('Draft — students cannot see this');
 
     await signInStudent(studentPage, student, HOMEWORK_SITE);
     await studentPage.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(studentPage);
     await expect(studentPage.locator('#list')).not.toContainText(title);
 
-    await teacherCard.getByRole('button', { name: 'Publish to students' }).click();
+    await teacherCard.getByRole('button', { name: 'Publish to Students' }).click();
     await expect(teacherCard).toContainText('Published');
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(studentPage);
     let studentCard = studentPage.locator('#list .card').filter({ hasText: title });
-    await expect(studentCard).toContainText('Not started');
+    await expect(studentCard).toContainText('Ready to start');
+    await expect(studentPage.getByRole('tab', { name: /To Do/ })).toBeVisible();
+    await expect(studentPage.getByRole('tab', { name: /Handed In/ })).toBeVisible();
+    await expect(studentPage.getByRole('tab', { name: /Finished/ })).toBeVisible();
+    await studentPage.screenshot({ path: testInfo.outputPath('homework-student.png'), fullPage: true });
 
     const [activityPage] = await Promise.all([
       studentPage.waitForEvent('popup'),
-      studentCard.getByRole('link', { name: 'Open Shorashim practice' }).click()
+      studentCard.getByRole('link', { name: 'Start Activity' }).click()
     ]);
     await expect(activityPage).toHaveURL(/\/shorashim\/index\.html$/);
     await activityPage.close();
@@ -206,15 +223,29 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
 
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
-    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+    await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
+    teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
+    await expect(teacherCard).toContainText(student.name);
+    await teacherCard.getByLabel('Feedback for the student').fill('Please add one more example.');
+    await teacherCard.getByRole('button', { name: 'Return for Corrections' }).click();
+    await studentPage.reload({ waitUntil: 'domcontentloaded' });
+    studentCard = studentPage.locator('#section-todo .card').filter({ hasText: title });
+    await expect(studentCard).toContainText('Please add one more example.');
+    await studentCard.locator('textarea').fill('Fictional student practiced five minutes and added one more example.');
+    await studentCard.getByRole('button', { name: 'Fix and Hand In Again' }).click();
+    await teacherPage.reload({ waitUntil: 'domcontentloaded' });
+    await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
+    teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     await teacherCard.getByRole('button', { name: 'Approve work by ' + student.name }).click();
     await expect(teacherCard).toContainText('Completed');
 
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     studentCard = studentPage.locator('#list .card').filter({ hasText: title });
-    await expect(studentCard).toContainText('Completed');
+    await expect(studentCard).toContainText('Finished');
 
+    await teacherPage.getByRole('button', { name: /My Assignments/ }).click();
+    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
     teacherPage.once('dialog', dialog => dialog.accept());
     await teacherCard.getByRole('button', { name: 'Archive' }).click();
     await expect(teacherCard).toContainText('Archived');
@@ -224,6 +255,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
       try {
         if (!teacherCard) teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
         await teacherPage.reload({ waitUntil: 'domcontentloaded' });
+        await teacherPage.getByRole('button', { name: /My Assignments/ }).click();
         teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
         teacherPage.once('dialog', dialog => dialog.accept());
         await teacherCard.getByRole('button', { name: 'Archive' }).click({ timeout: 5000 });

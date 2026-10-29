@@ -11,7 +11,6 @@ const { resolveStudent } = require('./student-login-core.cjs');
 const { guarded } = require('./auth-attempts.cjs');
 
 const WS = 'b3-2026';
-const OWNER_EMAIL = 'simcha5770@gmail.com';
 const key = s => typeof s === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(s);
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }); };
 const text = (s, n) => String(s == null ? '' : s).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f<>]/g, '').trim().slice(0, n);
@@ -27,7 +26,7 @@ async function teacherAccess(store, identity, classId) {
   if (!cls || cls.active === false) fail(403, 'This class is not available.');
   if (cls.toolGrants?.homework !== true) fail(403, 'Homework is not turned on for this class.');
   const admin = await store.get('b3Games/admins/' + identity.uid);
-  const owner = String(identity.email || '').toLowerCase() === OWNER_EMAIL || !!(admin && admin.active !== false);
+  const owner = !!(admin && admin.active !== false);
   if (!owner) {
     const row = await store.get('b3Games/workspaces/' + WS + '/teachers/' + identity.uid);
     if (!row || row.active === false || row.classIds?.[classId] !== true)
@@ -36,6 +35,25 @@ async function teacherAccess(store, identity, classId) {
   return { cls, id: identity.uid };
 }
 
+async function authorizedClasses(store, identity) {
+  if (!identity || !identity.uid || identity.email_verified !== true ||
+      !identity.firebase || identity.firebase.sign_in_provider !== 'google.com')
+    fail(403, 'Verified Google teacher sign-in required.');
+  const admin = await store.get('b3Games/admins/' + identity.uid);
+  let rows = {};
+  if (admin && admin.active !== false) {
+    rows = await store.get('b3Games/workspaces/' + WS + '/classes') || {};
+  } else {
+    const teacher = await store.get('b3Games/workspaces/' + WS + '/teachers/' + identity.uid);
+    if (!teacher || teacher.active === false) fail(403, 'No classes are assigned to this teacher account.');
+    const ids = Object.keys(teacher.classIds || {}).filter(id => key(id) && teacher.classIds[id] === true);
+    const values = await Promise.all(ids.map(id => store.get('b3Games/workspaces/' + WS + '/classes/' + id)));
+    ids.forEach((id, i) => { if (values[i]) rows[id] = values[i]; });
+  }
+  const classes = Object.keys(rows).filter(id => key(id) && rows[id] && rows[id].active !== false && rows[id].toolGrants?.homework === true)
+    .map(id => ({ id, name: String(rows[id].name || id) }));
+  return { ok: true, classes };
+}
 async function activeMembers(store, cls) {
   const out = {};
   for (const [sid, m] of Object.entries(cls.members || {})) {
@@ -283,6 +301,10 @@ async function studentDo(store, body, now, ip) {
 async function homeworkApi(store, auth, body, now = Date.now(), newId = () => crypto.randomBytes(9).toString('base64url')) {
   if (!body || typeof body !== 'object') fail(400, 'Bad request.');
   const a = body.action;
+  if (a === 'authorizedClasses') {
+    if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
+    return authorizedClasses(store, auth.identity);
+  }
   if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return'].includes(a)) {
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);

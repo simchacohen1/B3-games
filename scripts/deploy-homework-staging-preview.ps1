@@ -12,7 +12,13 @@ $firebaseConfig = Join-Path $repoRoot 'firebase.staging-preview.json'
 function Invoke-FirebaseJson([string[]]$Arguments, [string]$Description) {
   # Keep stderr separate: merging Node's stderr into PowerShell's pipeline can
   # trigger a libuv assertion on Windows even after the CLI returned valid JSON.
-  $output = & firebase @Arguments 2>$null
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & firebase @Arguments 2>$null
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
   $exitCode = $LASTEXITCODE
   if ($exitCode -ne 0) {
     throw "$Description failed with Firebase CLI exit code $exitCode; refusing to deploy. If this is an authentication error, run 'firebase login --reauth' and retry."

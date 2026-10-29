@@ -121,6 +121,15 @@ jobs:
           3. Locally: set FTT_STAGING_CREDENTIALS_FILE to staging/test-credentials.local.json and run npx playwright test -c playwright.staging.config.ts --grep @auth" \
             ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
 
+      - name: Upload fictional Homework Center screenshots
+        if: always() && (env.TIER == 'auth' || env.TIER == 'nightly')
+        uses: actions/upload-artifact@v4
+        with:
+          name: homework-center-preview-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: staging-results/evidence/**/*.png
+
       - name: Nightly regression suite and rules audit
         if: env.TIER == 'nightly'
         continue-on-error: true
