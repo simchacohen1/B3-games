@@ -14,7 +14,15 @@ firebase_idb.json
 auth.json
 playwright-report/
 test-results/
+
+# Live site monitor output
+/monitor-report/
+/monitor-results/
+
 staging-results/
 /staging/test-credentials.local.json
 /staging/firebase-config.generated.js
 /staging/staging-config.js
+/staging-build/
+/\.firebase/
+/staging/*.local.json

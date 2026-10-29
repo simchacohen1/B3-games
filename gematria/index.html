@@ -627,24 +627,26 @@ function raceQuestions(){
  return qs;
 }
 let race=null;
-function startRace(){
+async function startRace(){
  if(isGuest()){$("raceBox").textContent="Playing with friends needs a signed-in student account.";window.B3Guest.unlock("Sign in to unlock","Racing classmates needs a signed-in student account.");return;}
  if(teacherPreview){$("raceBox").textContent="Class races require student accounts. Use solo games for demonstrations.";return;}
  if(!race){
-  race=B3Race.create({container:$("raceBox"),db,roomsPath:classBase?classBase+"/rooms":"",studentId,studentName:studentName||studentId,
+  const centerPath=await B3Race.classCenterRoomsPath(db,studentId);
+  const roomsPath=await B3Race.classRoomsPath(db,studentId,"gematria");
+  race=B3Race.create({container:$("raceBox"),db,roomsPath,centerPath,studentId,studentName:studentName||studentId,
+   gameKey:"gematria",gameName:"Gematria Race",gameUrl:"../gematria/index.html",centerUrl:"../multiplayer/index.html",onRoomCreated:B3Race.saveHostRoomCode,
    makeQuestions:raceQuestions,roomInfo:()=>({label:"Level "+level+" ("+["","א–י","א–צ","א–ת"][level]+")"}),
    onCorrect:()=>{star();save()},
    onWrong:q=>{const h=VAL[q.big]?q.big:VAL[q.answer]?q.answer:"";if(h){P.missed[h]=num(P.missed[h])+1;save()}},
    onFinish:({won})=>{P.race=P.race||{plays:0,wins:0};P.race.plays=num(P.race.plays)+1;if(won)P.race.wins=num(P.race.wins)+1;save()},
    onExit:()=>show("menu")});
  }
- race.start();
+ if(!B3Race.launchFromUrl(race))race.start();
  stopCurrent=()=>race.leave();
 }
-window.addEventListener("pagehide",()=>{if(race)race.leave()});
 
 $("starCount").textContent=P.stars;
-connect();
+connect().then(()=>{const p=new URLSearchParams(location.search);if(p.get("b3Multiplayer")==="start"||p.get("b3MultiplayerRoom")){show("race");startRace();}});
 window.__gematria={toLetters,withMarks,wordValue,WORDS,wordLevel,raceQuestions};
 })();
 </script>

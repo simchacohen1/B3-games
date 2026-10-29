@@ -80,11 +80,13 @@
         const row=document.createElement('div');row.className='pointer-library-row';
         const name=document.createElement('strong');name.textContent=meta.customMetadata?.displayName||meta.name.replace(/\.pdf$/i,'');
         const page=Number.parseInt(meta.customMetadata?.lastPage||'1',10);
+        let savedLayout=null;try{const l=JSON.parse(meta.customMetadata?.layout||'null');if(l&&typeof l==='object')savedLayout={spread:!!l.spread,rtl:l.rtl!==false,shift:!!l.shift}}catch(_){}
         const open=document.createElement('button');open.textContent='Open';open.type='button';
         open.onclick=async()=>{setStatus('Opening '+name.textContent+'…');open.disabled=true;try{
           const blob=await privateDownload(ref);
           const file=new File([blob],name.textContent+'.pdf',{type:'application/pdf'});
           const opened=await window.ClassPointerPdf.openFile(file);if(!opened)throw Error('PDF could not be opened');activeId=meta.name;openedPage=Number.isFinite(page)&&page>0?page:1;
+          if(savedLayout&&savedLayout.spread)window.ClassPointerPdf.setLayout(savedLayout);
           window.ClassPointerPdf.goToPage(openedPage-1);dialog.close();
         }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
         const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
@@ -110,7 +112,7 @@
     try{
       const id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)) + '.pdf';
       const ref=(await teacherPrefix()).child(id);
-      const upload=ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1))}});
+      const upload=ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1)),layout:JSON.stringify(window.ClassPointerPdf.getLayout())}});
       await new Promise((resolve,reject)=>upload.on('state_changed',snapshot=>{
         const total=snapshot.totalBytes||currentFile.size;
         const percent=total?Math.min(100,Math.floor(snapshot.bytesTransferred*100/total)):0;
@@ -123,17 +125,22 @@
     }catch(e){setStatus(errorText(e));progressLabel.textContent='Upload not completed';}finally{save.disabled=false}
   };
   let pageTimer;
+  // Remember where the teacher is (page) and how it is laid out (one or two pages) for the next time.
+  function scheduleSave(page){
+    if(!activeId)return;
+    clearTimeout(pageTimer);const id=activeId;
+    pageTimer=setTimeout(async()=>{
+      if(activeId!==id)return;
+      try{
+        const ref=(await teacherPrefix()).child(id);const m=await ref.getMetadata();
+        await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(page||openedPage||1),layout:JSON.stringify(window.ClassPointerPdf.getLayout())}});
+      }catch(_){}
+    },2500);
+  }
   window.PointerPdfLibrary={
     onOpened(file){currentFile=file;activeId=null;clearTimeout(pageTimer)},
     onClosed(){currentFile=null;activeId=null;clearTimeout(pageTimer)},
-    onPageChanged(page){
-      openedPage=page;
-      if(!activeId)return;
-      clearTimeout(pageTimer);const id=activeId;
-      pageTimer=setTimeout(async()=>{
-        if(activeId!==id)return;
-        try{const ref=(await teacherPrefix()).child(id);const m=await ref.getMetadata();await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(page)}})}catch(_){}
-      },2500);
-    }
+    onPageChanged(page){openedPage=page;scheduleSave(page)},
+    onLayoutChanged(){scheduleSave(window.ClassPointerPdf.currentPage()+1)}
   };
 })();

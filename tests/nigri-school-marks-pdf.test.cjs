@@ -2,20 +2,21 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const page=fs.readFileSync(__dirname+'/../sync-to-nigri/school-marks.html','utf8');
 const helper=fs.readFileSync(__dirname+'/../weekly-quiz/report-pdf.js','utf8');
-const script=page.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadData\(\);\s*$/,'');
+// Drop the page's start-up code (either the plain loadData() call or the sign-in wrapper around it) so only the functions are tested.
+const script=page.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\n\(function startWithSignIn\(\)\{[\s\S]*$/,'\n').replace(/\nloadData\(\);\s*$/,'');
 test('PDF libraries load before the School Marks sync script',()=>{
   assert.ok(page.indexOf('jspdf.umd.min.js')<page.indexOf('../weekly-quiz/report-pdf.js'));
   assert.ok(page.indexOf('../weekly-quiz/report-pdf.js')<page.indexOf('async function syncMarks()'));
   new vm.Script(helper);new vm.Script(script);
 });
-function fixture({builder,fetchImpl}={}){
+function fixture({builder,fetchImpl,comments=[],search=''}={}){
   const elements={
     grade:{value:'B3 ET'},topic:{value:'Chumash Comprehension'},name:{value:'Weekly Quiz'},
     type:{value:'Quiz'},date:{value:'2026-10-26'},status:{textContent:''},sync:{disabled:false}
   };
   const rows=[
-    {dataset:{sid:'chaim_chaikin',mark:'100',missing:'0',lid:'retake',attempt:'Retake'},querySelector:()=>({value:'present'})},
-    {dataset:{sid:'yossi_gourarie',mark:'0',missing:'1',lid:'',attempt:'Missing'},querySelector:()=>({value:'review'})}
+    {dataset:{sid:'chaim_chaikin',mark:'100',missing:'0',lid:'retake',attempt:'Retake'},querySelector:(sel)=>sel==='.comment'?{value:comments[0]||''}:{value:'present'}},
+    {dataset:{sid:'yossi_gourarie',mark:'0',missing:'1',lid:'',attempt:'Missing'},querySelector:(sel)=>sel==='.comment'?{value:comments[1]||''}:{value:'review'}}
   ];
   const calls=[],pdfCalls=[];
   const window={jspdf:{},B3QuizReportPDF:{buildStudentReportPDF:(...a)=>{
@@ -24,9 +25,9 @@ function fixture({builder,fetchImpl}={}){
   const document={getElementById:(id)=>elements[id],querySelectorAll:()=>rows};
   const firebase={initializeApp:()=>{},database:()=>({})};
   const fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return fetchImpl?fetchImpl(url,options):{ok:true,json:async()=>({status:'success',test_id:17})}};
-  const context={window,document,firebase,fetch,alert:()=>{}};
+  const context={window,document,firebase,fetch,alert:()=>{},location:{search},URLSearchParams};
   vm.createContext(context);
-  vm.runInContext(script+';this.logic={best,syncMarks,setData:(a,b,c,s)=>{launches=a;responses=b;completions=c;sel=s}};',context);
+  vm.runInContext(script+';this.logic={best,syncMarks,selectFromUrl,stubShow:()=>{showQuiz=()=>{};renderHistory=()=>{}},getSel:()=>sel,getLaunches:()=>launches,setData:(a,b,c,s)=>{launches=a;responses=b;completions=c;sel=s}};',context);
   const launches={
     orig:{classId:'et',createdAt:1,quizSnapshot:{questions:[{q:'Old question',choices:['A','B'],correctIndex:1}]}},
     retake:{classId:'et',retakeOf:'orig',createdAt:2,attemptNumber:2,quizSnapshot:{questions:[{q:'Retake question',choices:['A','B'],correctIndex:1}]}}
@@ -82,4 +83,31 @@ test('network interruption after sending warns that Nigri might already have sav
   await f.logic.syncMarks();
   assert.equal(f.calls.length,1);
   assert.match(f.elements.status.textContent,/Nigri may have saved marks; check Nigri before retrying/);
+});
+
+test('the comment for each boy is sent to Nigri; blank means no comment',async()=>{
+  const f=fixture({comments:['  Great effort this week  ','']});
+  await f.logic.syncMarks();
+  const sent=f.calls[0].body.students;
+  assert.equal(sent[0].comment,'Great effort this week');
+  assert.equal('comment' in sent[1],false);
+});
+test('a comment on a boy with no completed quiz is still sent, and a PDF failure still blocks everything',async()=>{
+  const f=fixture({comments:['','Please take it Sunday']});
+  await f.logic.syncMarks();
+  assert.equal(f.calls[0].body.students[1].comment,'Please take it Sunday');
+  const g=fixture({comments:['Nice'],builder:()=>{throw Error('PDF failed')}});
+  await g.logic.syncMarks();
+  assert.equal(g.calls.length,0);
+});
+test('?launch=<id> selects that quiz; a retake maps to its original; a wrong or missing id does nothing',()=>{
+  const f=fixture({search:'?launch=retake'});f.logic.stubShow();f.logic.setData(f.logic.getLaunches(),{},{},'');
+  f.logic.selectFromUrl();assert.equal(f.logic.getSel(),'orig');
+  const g=fixture({search:'?launch=nope'});g.logic.stubShow();g.logic.selectFromUrl();assert.equal(g.logic.getSel(),'orig');
+  const h=fixture({search:''});h.logic.stubShow();h.logic.setData(g.logic.getLaunches(),{},{},'');h.logic.selectFromUrl();assert.equal(h.logic.getSel(),'');
+});
+test('the Weekly Quiz teacher page links to School Marks with the launch id',()=>{
+  const t=fs.readFileSync(__dirname+'/../weekly-quiz/teacher.html','utf8');
+  assert.ok(t.includes('openSyncToNigri(resultsLaunchId)">Sync to Nigri</button>'));
+  assert.ok(t.includes('../sync-to-nigri/school-marks.html?launch='));
 });

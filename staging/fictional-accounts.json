@@ -1,0 +1,52 @@
+{
+  "workspaceId": "b3-2026",
+  "owner": {
+    "email": "owner@funtorahtools-staging.test",
+    "displayName": "Test Staging Owner"
+  },
+  "roles": [
+    {
+      "role": "principal",
+      "email": "principal@funtorahtools-staging.test",
+      "displayName": "Test Principal",
+      "classId": "CUSTOM-PRINCIPAL",
+      "className": "Principal Test Class"
+    },
+    {
+      "role": "teacher",
+      "email": "teacher.alef@funtorahtools-staging.test",
+      "displayName": "Test Teacher Alef",
+      "classId": "TEST-ALEF",
+      "className": "Test Class Alef"
+    },
+    {
+      "role": "teacher",
+      "email": "teacher.beis@funtorahtools-staging.test",
+      "displayName": "Test Teacher Beis",
+      "classId": "TEST-BEIS",
+      "className": "Test Class Beis"
+    }
+  ],
+  "students": [
+    {
+      "id": "test_student_alef",
+      "name": "Test Student A1",
+      "classId": "TEST-ALEF"
+    },
+    {
+      "id": "test_student_alef2",
+      "name": "Test Student A2",
+      "classId": "TEST-ALEF"
+    },
+    {
+      "id": "test_student_beis",
+      "name": "Test Student B1",
+      "classId": "TEST-BEIS"
+    },
+    {
+      "id": "test_student_principal",
+      "name": "Test Student P1",
+      "classId": "CUSTOM-PRINCIPAL"
+    }
+  ]
+}

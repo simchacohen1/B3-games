@@ -19,6 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="../firebase-config.js?v=20261029-staging-config"></script>
 <style>
   /* ===== B3 Weekly Quiz — Student (2026-10 redesign) ===== */
   :root{
@@ -273,16 +274,9 @@
 </div>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);
+const firebaseConfig = window.B3_FIREBASE_CONFIG;
+if(!firebaseConfig) throw new Error('Firebase configuration is missing.');
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let masterBlocked=false;
@@ -363,7 +357,9 @@ async function directStudentQuiz(action,payload={}){
     // student's own completion for the most recent launches, and download full
     // launch data only for quizzes this student actually finished.
     const user=firebase.auth().currentUser,token=user?await user.getIdToken().catch(()=>''):'';
-    const res=await fetch(firebaseConfig.databaseURL+'/'+root+'/launches.json?shallow=true'+(token?'&auth='+encodeURIComponent(token):''),{cache:'no-store'});
+    const launchListUrl=new URL(root+'/launches.json',firebaseConfig.databaseURL);
+    launchListUrl.searchParams.set('shallow','true');if(token)launchListUrl.searchParams.set('auth',token);
+    const res=await fetch(launchListUrl.href,{cache:'no-store'});
     if(!res.ok)throw quizError(res.status,'Could not load your past quizzes.');
     const ids=Object.keys(await res.json()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id))
       .sort((a,b)=>(Number(String(b).split('_')[0])||0)-(Number(String(a).split('_')[0])||0)).slice(0,HISTORY_LAUNCH_LIMIT);
@@ -418,7 +414,7 @@ const CLASS_ROSTERS={
 };
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
-const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const SYNTHESIZE_SPEECH_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
 const ttsAudioCache=new Map();
 let ttsAudioEl=null;
 function splitAudioSegments(text){

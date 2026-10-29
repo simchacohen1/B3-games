@@ -248,3 +248,15 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 .board-picture-bar .board-picture-done{min-height:44px;padding:0 18px;border:0;border-radius:11px;background:#16a34a;color:#fff;font:800 16px system-ui;cursor:pointer;white-space:nowrap}
 .board-picture-bar .board-picture-done:hover{background:#15803d}
 @media(max-width:640px){.board-picture-bar .board-picture-help{display:none}}
+
+.cp-share-state{min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #6b7894;background:#2a3a5c;color:#fff;font-weight:800;font-size:15px;margin:0;cursor:pointer}
+.cp-share-state.cp-share-on{background:#16a34a;border-color:#bbf7d0}
+.cp-share-state.cp-share-off{background:#dc2626;border-color:#fecaca}
+.cp-share-state:disabled{opacity:.6;cursor:not-allowed}
+.cp-share-state[hidden]{display:none}
+
+/* Fullscreen toolbar: red Stop button for the live PDF / whiteboard / webpage / shared screen */
+#teacherDock .cp-dock-stop{background:#dc2626;color:#fff;font-weight:700;border:1px solid #b91c1c;justify-content:center}
+#teacherDock .cp-dock-stop:hover:enabled{background:#b91c1c}
+#teacherDock .cp-dock-stop svg{stroke:currentColor}
+#teacherDock .cp-dock-stop[hidden]{display:none}

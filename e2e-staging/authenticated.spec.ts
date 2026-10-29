@@ -22,7 +22,7 @@ test.describe('staging student journeys @auth', () => {
     student = credentials!.studentAccounts.find(row => row.classId === 'TEST-ALEF')!;
     if (!student) throw new Error('Fictional TEST-ALEF student is missing from the credentials.');
     page = await (browser as Browser).newPage();
-    watch = watchPage(page);
+    watch = await watchPage(page);
     await signInStudent(page, student);
   });
 
@@ -125,7 +125,7 @@ test.describe('staging adult role boundaries @auth @permissions', () => {
       const adult = credentials!.adultAccounts.find(row =>
         row.role === item.role && (item.role === 'owner' || row.classId === item.own));
       if (!adult) throw new Error(`Fictional ${item.role} account for ${item.own} is missing from the credentials.`);
-      const watch = watchPage(page);
+      const watch = await watchPage(page);
       await signInAdult(page, adult);
       const own = await readClassRecord(page, item.own);
       const other = await readClassRecord(page, item.other);

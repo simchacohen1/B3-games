@@ -9,7 +9,7 @@ test.describe('staging public smoke @smoke', () => {
     test(`${tool.name} loads on staging without production calls @isolation`, async ({ page }) => {
       test.skip(Boolean(tool.previewOnly && process.env.GITHUB_EVENT_NAME === 'pull_request' && !process.env.FTT_STAGING_SITE),
         'Homework pages run against their expiring staging preview channel, not the older staging live release.');
-      const watch = watchPage(page);
+      const watch = await watchPage(page);
       const targetSite = tool.previewOnly ? HOMEWORK_SITE : SITE;
       const response = await page.goto(targetSite + tool.path, { waitUntil: 'load', timeout: 45000 });
       expect(response?.status(), 'HTTP status').toBe(200);
@@ -22,7 +22,7 @@ test.describe('staging public smoke @smoke', () => {
   }
 
   test('home page shows the student sign-in form @signin', async ({ page }) => {
-    const watch = watchPage(page);
+    const watch = await watchPage(page);
     await page.goto(SITE + '/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#studentNameInput')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('#classPinInput')).toHaveAttribute('type', 'password');

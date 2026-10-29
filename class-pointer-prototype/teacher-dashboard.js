@@ -53,6 +53,24 @@ function init(){
  topbar.append(el('span','cp-topbar-spacer'));
  const joined=el('span','cp-joined','No students yet');joined.setAttribute('role','status');
  topbar.append(joined);
+ /* Always-visible Student sharing switch; it mirrors and clicks the real #cpShareEnabled button. */
+ const shareState=el("button","cp-share-state","Student sharing");shareState.type="button";shareState.id="cpShareStateBtn";
+ function syncShareState(){
+  const real=$("cpShareEnabled");
+  if(!real){shareState.hidden=true;return}
+  shareState.hidden=false;
+  const on=real.getAttribute("aria-pressed")==="true";
+  shareState.disabled=real.disabled;
+  shareState.classList.toggle("cp-share-on",on&&!real.disabled);
+  shareState.classList.toggle("cp-share-off",!on&&!real.disabled);
+  shareState.textContent=real.disabled?"Student sharing: waiting for class":on?"Student sharing: ON · click to turn off":"Student sharing: OFF · click to turn on";
+  shareState.setAttribute("aria-pressed",String(on));
+ }
+ shareState.addEventListener("click",()=>{const real=$("cpShareEnabled");if(real&&!real.disabled)real.click();setTimeout(syncShareState,0)});
+ topbar.append(shareState);
+ {const real=$("cpShareEnabled");if(real)new MutationObserver(syncShareState).observe(real,{attributes:true,attributeFilter:["aria-pressed","disabled","class"]});}
+ document.addEventListener("classpointer:sharing-state",syncShareState);
+ syncShareState();
  const invite=iconButton('cp-topbar-btn','link','Invite students');invite.id='cpInviteBtn';
  invite.title='Copy the student join link';
  const inviteText=invite.querySelector('span');
@@ -261,6 +279,11 @@ function init(){
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
  liveWrap.append(switchWrap,stopBtn);
+ /* Full screen: the tabs row is hidden, so the floating toolbar gets its own red Stop button. */
+ const dockStop=iconButton('tb-btn cp-dock-stop','stop','Stop');dockStop.id='cpDockStop';dockStop.hidden=true;
+ dockStop.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
+ dockStop.addEventListener('click',()=>stopBtn.click());
+ {const fsBtn=$('tbFullscreen');if(fsBtn)fsBtn.before(dockStop);else $('teacherDock')?.append(dockStop)}
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
@@ -340,6 +363,8 @@ function init(){
   liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
+  const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
+  dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
   if(!isLive)openSwitch(false);
   syncLibrary();
  }

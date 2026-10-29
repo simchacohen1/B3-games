@@ -63,6 +63,7 @@
     "class-gallery": true,
     "game-show": true,
     "weekly-quiz": true,
+    "multiplayer-center": true,
     "work-timer": true,
     "elul-yom-kippur-slides": true,
     "dvarim-game": true
