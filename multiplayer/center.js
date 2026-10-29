@@ -37,13 +37,53 @@
     if (code) url.searchParams.set("b3MultiplayerRoom", code);
     location.assign(url.href);
   }
+  // Presentation-only category grouping: existing multiplayer routing and permissions remain unchanged.
+  var CATEGORIES = [
+    { key: "all", label: "All Games", icon: "🎮" },
+    { key: "torah", label: "Torah & Jewish", icon: "📖" },
+    { key: "strategy", label: "Board & Strategy", icon: "♟️" },
+    { key: "cards", label: "Cards & Matching", icon: "🃏" },
+    { key: "challenges", label: "Quick Challenges", icon: "⚡" }
+  ];
+  var GAME_CATEGORIES = {
+    shorashim: "torah", yiddish: "torah", gematria: "torah", "weekly-quiz": "torah", "rashi-letters": "torah",
+    "connect-four": "strategy", "tic-tac-toe": "strategy", checkers: "strategy", reversi: "strategy", ludo: "strategy",
+    "memory-match": "cards", set: "cards", dominoes: "cards", "go-fish": "cards", "uno-style": "cards",
+    bingo: "challenges", "math-race": "challenges"
+  };
+  var selectedCategory = "all";
+  var categoriesEl = document.getElementById("gameCategories");
+  function drawCategories(ready) {
+    categoriesEl.replaceChildren();
+    CATEGORIES.forEach(function (category) {
+      var count = category.key === "all" ? GAMES.length : GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
+      var tab = make("button", "category-tab" + (selectedCategory === category.key ? " is-selected" : ""), category.icon + " " + category.label + " · " + count);
+      tab.type = "button";
+      tab.setAttribute("aria-pressed", String(selectedCategory === category.key));
+      tab.addEventListener("click", function () { selectedCategory = category.key; drawGames(ready); });
+      categoriesEl.appendChild(tab);
+    });
+  }
   function drawGames(ready) {
     cards.replaceChildren();
-    GAMES.forEach(function (game) {
-      var card = make("article", "game"), button = make("button", "btn", "Start Game");
-      card.append(make("h3", "", game.icon + " " + game.name), make("p", "", game.description), button);
-      button.type = "button"; button.disabled = !ready;
+    drawCategories(ready);
+    GAMES.filter(function (game) { return selectedCategory === "all" || GAME_CATEGORIES[game.key] === selectedCategory; }).forEach(function (game) {
+      var category = GAME_CATEGORIES[game.key];
+      var card = make("article", "game game-" + category + " game-" + game.key);
+      var button = make("button", "game-launch");
+      var picture = make("span", "game-art");
+      picture.setAttribute("aria-hidden", "true");
+      picture.appendChild(make("span", "game-art-symbol", game.icon));
+      var details = make("span", "game-details");
+      details.append(make("span", "game-name", game.name), make("span", "game-description", game.description));
+      var footer = make("span", "game-launch-footer");
+      footer.append(make("span", "game-type", CATEGORIES.find(function (c) { return c.key === category; }).label), make("span", "game-play-label", "Play  ›"));
+      button.append(picture, details, footer);
+      button.type = "button";
+      button.disabled = !ready;
+      button.setAttribute("aria-label", "Start " + game.name);
       button.addEventListener("click", function () { route(game, game.mode); });
+      card.appendChild(button);
       cards.appendChild(card);
     });
   }
