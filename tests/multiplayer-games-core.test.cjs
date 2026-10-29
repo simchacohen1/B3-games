@@ -180,6 +180,27 @@ test('Bingo deals different cards, marks called numbers, and declares a line win
   assert.equal(core.hasBingo([0, 1, 2, 3, 4]), true);
 });
 
+test('Bingo boards are private to each student and omitted from the public room', () => {
+  const { group, state } = start('bingo', ['a', 'b'], 56);
+  const publicRoom = core.publicView('bingo', state, {
+    roomCode: '123456',
+    host: 'a',
+    hostName: 'Student A',
+    state: 'playing',
+    players: group,
+  });
+
+  assert.equal(Object.hasOwn(publicRoom, 'cards'), false);
+  assert.deepEqual(core.privateView('bingo', state, 'a').card, state.cards.a);
+  assert.deepEqual(core.privateView('bingo', state, 'b').card, state.cards.b);
+  assert.notDeepEqual(core.privateView('bingo', state, 'a').card, core.privateView('bingo', state, 'b').card);
+});
+
+test('Bingo private cards hydrate RTDB-omitted empty marked arrays', () => {
+  const state = core.hydrateGameState('bingo', { cards: { a: { board: [1, 2, 3], marked: undefined } } });
+  assert.deepEqual(core.privateView('bingo', state, 'a').card, { board: [1, 2, 3], marked: [] });
+});
+
 test('Math Race keeps answers private, rejects duplicates, and scores a full round', () => {
   const { group, state } = start('math-race', ['a', 'b'], 71);
   const view = core.publicView('math-race', state, { roomCode: '246810', state: 'playing', players: group });

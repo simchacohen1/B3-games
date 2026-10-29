@@ -48,7 +48,14 @@ function hydrateGameState(gameKey, input) {
   }
   if (gameKey === 'memory-match') { state.deck = asList(state.deck); state.matched = asList(state.matched); state.flipped = asList(state.flipped); state.scores ||= {}; }
   if (gameKey === 'reversi') state.passes ||= 0;
-  if (gameKey === 'bingo') { state.sequence = asList(state.sequence); state.called = asList(state.called); state.cards ||= {}; state.scores ||= {}; }
+  if (gameKey === 'bingo') {
+    state.sequence = asList(state.sequence); state.called = asList(state.called); state.cards ||= {}; state.scores ||= {};
+    for (const card of Object.values(state.cards)) {
+      if (!card || typeof card !== 'object') continue;
+      card.board = asList(card.board);
+      card.marked = asList(card.marked);
+    }
+  }
   if (gameKey === 'math-race') { state.questions = asList(state.questions); state.answers ||= {}; state.scores ||= {}; }
   if (gameKey === 'set') { state.deck = asList(state.deck); state.cards = asList(state.cards); state.scores ||= {}; }
   if (gameKey === 'ludo') { state.dice = asList(state.dice); state.tokens ||= {}; state.starts ||= {}; state.lastRoll ??= null; }
@@ -602,7 +609,6 @@ function publicView(gameKey, state, room, now = Date.now()) {
     if (gameKey === 'reversi') view.scores = Object.assign({}, state.scores || {});
   } else if (gameKey === 'bingo') {
     view.called = state.called.slice(); view.scores = Object.assign({}, state.scores);
-    view.cards = Object.fromEntries(Object.entries(state.cards).map(([id, card]) => [id, { board: card.board.slice(), marked: card.marked.slice() }]));
   } else if (gameKey === 'math-race') {
     const question = state.questions[state.questionIndex];
     view.question = question ? { prompt: question.prompt, index: state.questionIndex + 1, total: state.questions.length, answered: Object.keys(state.answers?.[String(state.questionIndex)] || {}).length } : null;
@@ -622,6 +628,10 @@ function publicView(gameKey, state, room, now = Date.now()) {
 }
 
 function privateView(gameKey, state, studentId) {
+  if (gameKey === 'bingo') {
+    const card = state.cards?.[studentId];
+    return card ? { card: { board: asList(card.board), marked: asList(card.marked) } } : {};
+  }
   if (gameKey === 'dominoes' || gameKey === 'go-fish' || gameKey === 'uno-style') return { hand: (state.hands?.[studentId] || []).map(card => ({ ...card })) };
   return {};
 }

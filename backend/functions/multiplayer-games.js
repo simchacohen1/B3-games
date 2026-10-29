@@ -150,7 +150,7 @@ async function newRoom(db, actor, gameKey) {
     [p.invite]: inviteSummary(gameKey, room, state, timestamp),
   };
   const secret = core.privateView(gameKey, state, actor.studentId);
-  if (secret.hand?.length) multi[p.privateHands + '/' + actor.studentId] = secret;
+  if (secret.hand?.length || secret.card?.board?.length) multi[p.privateHands + '/' + actor.studentId] = secret;
   await db.ref().update(multi);
   return { roomCode, public: roomPublic(gameKey, room, state, timestamp) };
 }

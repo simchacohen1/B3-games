@@ -20,7 +20,7 @@
   const el = id => document.getElementById(id);
   const title = el('gameTitle'), hint = el('gameHint'), message = el('message'), roomSection = el('room');
   const board = el('board'), actions = el('actions');
-  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '';
+  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '';
 
   function text(tag, className, value) {
     const node = document.createElement(tag);
@@ -60,9 +60,14 @@
       el('roomCode').textContent = 'Room code ' + roomCode;
       draw();
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
-    if (['dominoes', 'go-fish', 'uno-style'].includes(gameKey)) {
+    if (['bingo', 'dominoes', 'go-fish', 'uno-style'].includes(gameKey)) {
       privateRef = db.ref(`b3Private/multiplayerGames/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/rooms/${roomCode}/hands/${studentId}`);
-      privateListener = privateRef.on('value', snapshot => { privateHand = snapshot.val()?.hand || []; draw(); }, () => notice('Your private cards could not be loaded. Refresh to reconnect.', true));
+      privateListener = privateRef.on('value', snapshot => {
+        const privateData = snapshot.val() || {};
+        privateHand = privateData.hand || [];
+        privateCard = privateData.card || null;
+        draw();
+      }, () => notice('Your private game information could not be loaded. Refresh to reconnect.', true));
     }
   }
   function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); ref = listener = privateRef = privateListener = null; }
@@ -181,7 +186,7 @@
       });
       board.append(grid);
     } else if (gameKey === 'bingo') {
-      const card = room.cards?.[studentId];
+      const card = privateCard;
       if (room.called?.length) board.appendChild(text('div', 'player-turn', 'Called: ' + room.called[room.called.length - 1] + ' · ' + room.called.length + ' numbers'));
       const grid = text('div', 'board bingo-board');
       if (card?.board) card.board.forEach((number, index) => {
