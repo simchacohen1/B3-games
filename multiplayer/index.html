@@ -3,34 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f3f7fe">
 <title>Multiplayer Center — Fun Torah Tools</title>
-<style>
-:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#172b4d;background:#f3f7fe}
-*{box-sizing:border-box}body{margin:0;padding:20px}main{max-width:860px;margin:auto}
-header{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
-a{color:#184a9b}h1{font-size:clamp(28px,5vw,42px);margin:24px 0 4px}p{line-height:1.5}
-.status{background:#fff5dc;border:1px solid #f3d28a;padding:12px 16px;border-radius:12px}
-.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:15px;margin:20px 0}
-.game{background:white;border:1px solid #d9e5f4;border-radius:18px;padding:20px;box-shadow:0 4px 12px #132d4a0a}
-.game h2{font-size:20px;margin:0 0 6px}.game p{font-size:14px;color:#526279;min-height:42px}
-.game a{display:inline-block;background:#2359a8;color:white;border-radius:10px;padding:10px 14px;font-weight:700;text-decoration:none}
-footer{color:#526279;font-size:13px;margin-top:30px}
-</style>
+<link rel="stylesheet" href="center.css">
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="../student-class.js"></script>
+<script src="../b3-race.js"></script>
+<script defer src="center.js"></script>
 </head>
 <body>
 <main>
-<header><strong>🎲 Fun Torah Tools</strong><a href="../index.html">← Back to Fun Torah Tools</a></header>
-<h1>Multiplayer Center</h1>
-<p>Play with classmates! Choose an existing game below.</p>
-<p class="status" role="status"><strong>Early integration preview:</strong> Games still use their existing multiplayer rooms. Automatic invitations and the shared waiting-room lobby are being developed and are not available on this page yet.</p>
-<div class="games">
-<section class="game"><h2>🔤 Shorashim Race</h2><p>Compete with classmates on shorashim.</p><a href="../shorashim/index.html">Open Shorashim</a></section>
-<section class="game"><h2>🗣️ Yiddish Race</h2><p>Race friends to match Yiddish words.</p><a href="../yiddish/index.html">Open Yiddish</a></section>
-<section class="game"><h2>🔢 Gematria Race</h2><p>Compete in the existing Play with Friends mode.</p><a href="../gematria/index.html">Open Gematria</a></section>
-<section class="game"><h2>📘 Weekly Quiz Race</h2><p>Play the practice quiz with friends.</p><a href="../weekly-quiz/practice.html">Open Practice Quiz</a></section>
-<section class="game"><h2>✍️ Rashi Letters Match</h2><p>Challenge a classmate in the existing multiplayer match.</p><a href="../rashi-letters/student.html">Open Rashi Letters</a></section>
-</div>
-<footer>Use your existing Fun Torah Tools student sign-in. Existing game access settings remain in effect.</footer>
+  <header><strong>🎲 Fun Torah Tools</strong><a href="../index.html">← Back to Fun Torah Tools</a></header>
+  <h1>Multiplayer Center</h1>
+  <p class="intro">Choose a game and invite your classmates. The host starts the game when everyone is ready.</p>
+  <section id="accountStatus" class="notice" role="status" aria-live="polite">Checking your student sign-in…</section>
+  <section id="invitationSection" aria-labelledby="invitationHeading" hidden>
+    <h2 id="invitationHeading">Games waiting for you</h2>
+    <div id="invitations" class="invitations"></div>
+  </section>
+  <section aria-labelledby="gamesHeading">
+    <h2 id="gamesHeading">Choose a game</h2>
+    <div id="games" class="games"></div>
+  </section>
+  <footer>Use your existing Fun Torah Tools student sign-in. Games keep their original rules and progress.</footer>
 </main>
 </body>
 </html>

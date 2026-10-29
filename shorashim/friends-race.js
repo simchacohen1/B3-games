@@ -34,8 +34,7 @@
   async function roomsPath() {
     var id = (typeof cloudStudentId !== "undefined" && cloudStudentId) || "";
     if (!id || !window.FunTorahStudentClass) return "";
-    var info = await window.FunTorahStudentClass.resolve(cloudDb, id);
-    return info.classId ? "b3Games/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/resources/shorashim/rooms" : "";
+    return window.B3Race.classRoomsPath(cloudDb, id, "shorashim");
   }
   async function open() {
     if (typeof cleanupGameRuntime === "function") cleanupGameRuntime();
@@ -45,17 +44,20 @@
     if (typeof focusGameStage === "function") focusGameStage();
     var box = document.getElementById("shFriendsBox");
     if (pool().length < 4) { box.innerHTML = '<p class="muted">Your class needs at least 4 words in the list before you can race.</p>'; return; }
-    var path = "";
+    var path = "", centerPath = "";
     try { path = await roomsPath(); } catch (e) { console.warn("Shorashim race: could not find class", e); }
+    try { centerPath = await window.B3Race.classCenterRoomsPath(cloudDb, (typeof cloudStudentId !== "undefined" && cloudStudentId) || ""); } catch (e) { console.warn("Shorashim center: could not find class", e); }
     if (race) race.leave();
     race = window.B3Race.create({
-      container: box, db: cloudDb, roomsPath: path,
+      container: box, db: cloudDb, roomsPath: path, centerPath: centerPath,
+      gameKey: "shorashim", gameName: "Shorashim Race", gameUrl: "../shorashim/index.html", centerUrl: "../multiplayer/index.html",
+      onRoomCreated: window.B3Race.saveHostRoomCode,
       studentId: (typeof cloudStudentId !== "undefined" && cloudStudentId) || "", studentName: (typeof cloudStudentName !== "undefined" && cloudStudentName) || "Player",
       makeQuestions: makeQuestions,
       onFinish: function () { try { if (typeof finishGame === "function") finishGame(); } catch (e) {} },
       onExit: function () { stage.classList.add("hidden"); stage.innerHTML = ""; }
     });
-    race.start();
+    if (!window.B3Race.launchFromUrl(race)) race.start();
   }
   function install() {
     var grid = document.querySelector("#gamesUnlockedPanel .game-menu-grid");
@@ -69,8 +71,9 @@
     }
     // Leave the race if the boy starts a different game or leaves the page.
     grid.querySelectorAll(".game-choice").forEach(function (g) { g.addEventListener("click", function () { if (race) race.leave(); }); });
-    window.addEventListener("pagehide", function () { if (race) race.leave(); });
     document.addEventListener("click", function (e) { if (race && e.target.closest && e.target.closest(".backBtn,[data-screen],.nav-btn")) race.leave(); }, true);
+    var params = new URLSearchParams(location.search);
+    if (params.get("b3Multiplayer") === "start" || params.get("b3Multiplayer") === "host" || params.get("b3MultiplayerRoom")) open();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install); else install();
 })();

@@ -319,6 +319,39 @@ testEmulator('Rashi progress and match rooms remain inside the authenticated cla
   await fails(set(ref(friend,'rashiLetters/matchRooms/new_room/state'),'ended'));
 });
 
+testEmulator('Multiplayer Center invites and Rashi rooms are private to an active class and owned by their host',async()=>{
+  const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const friend=db('student-friend',{b3StudentId:'synthetic_friend',b3ClassId:'alpha',b3StudentRole:'student'});
+  const beta=db('student-two',{b3StudentId:'synthetic_two',b3ClassId:'beta',b3StudentRole:'student'});
+  const anon=env.unauthenticatedContext().database();
+  const lobby='multiplayerCenter/workspaces/b3-2026/classes/alpha/rooms';
+  const rashi='multiplayerCenter/workspaces/b3-2026/classes/alpha/rashiRooms';
+  await succeeds(get(ref(one,lobby)));
+  await fails(get(ref(beta,lobby)));
+  await fails(get(ref(anon,lobby)));
+  await succeeds(set(ref(one,lobby+'/shorashim-1234'),{host:'synthetic_one',hostName:'Synthetic One',gameKey:'shorashim',gameName:'Shorashim Race',roomCode:'1234',state:'lobby',playerCount:1,createdAt:1700000000000}));
+  await succeeds(get(ref(friend,lobby+'/shorashim-1234')));
+  await fails(get(ref(beta,lobby+'/shorashim-1234')));
+  await fails(set(ref(friend,lobby+'/shorashim-1234/playerCount'),2));
+  await fails(set(ref(one,lobby+'/forged'),{host:'synthetic_friend',gameKey:'shorashim',roomCode:'forged',state:'lobby'}));
+  await succeeds(set(ref(one,lobby+'/shorashim-1234'),null));
+  const gameRoom='multiplayerCenter/workspaces/b3-2026/classes/alpha/games/shorashim/rooms/1234';
+  await succeeds(set(ref(one,gameRoom),{host:'synthetic_one',hostName:'Synthetic One',state:'lobby',createdAt:1700000000000,questions:[],players:{synthetic_one:{name:'Synthetic One',score:0,q:0}}}));
+  await succeeds(get(ref(friend,gameRoom)));
+  await fails(get(ref(beta,gameRoom)));
+  await succeeds(set(ref(friend,gameRoom+'/players/synthetic_friend'),{name:'Synthetic Friend',score:0,q:0}));
+  await fails(set(ref(friend,gameRoom+'/state'),'playing'));
+  await fails(set(ref(friend,gameRoom+'/players/synthetic_one/score'),99));
+  await fails(set(ref(beta,gameRoom+'/players/synthetic_two'),{name:'Synthetic Two'}));
+  await succeeds(set(ref(one,gameRoom),null));
+  await succeeds(set(ref(one,rashi+'/room_alpha'),{host:'synthetic_one',hostName:'Synthetic One',classId:'alpha',state:'lobby',createdAt:1700000000000,questions:[],players:{synthetic_one:{name:'Synthetic One',score:0,q:0}}}));
+  await succeeds(get(ref(friend,rashi+'/room_alpha')));
+  await fails(get(ref(beta,rashi+'/room_alpha')));
+  await succeeds(set(ref(friend,rashi+'/room_alpha/players/synthetic_friend'),{name:'Synthetic Friend',score:0,q:0}));
+  await fails(set(ref(friend,rashi+'/room_alpha/players/synthetic_one/score'),99));
+  await fails(set(ref(beta,rashi+'/room_alpha/players/synthetic_two'),{name:'Synthetic Two'}));
+});
+
 testEmulator('Game Show answer keys stay teacher only and students cannot alter live scores',async()=>{
   const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
   const teacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});

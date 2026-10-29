@@ -363,17 +363,23 @@ async function startFriendsRace(){
   const box=document.getElementById('raceBox');box.innerHTML='<p style="text-align:center;font-weight:900">Loading…</p>';
   if(teacherPreview){box.textContent='Class races require a student account. Use solo practice in teacher preview.';return;}
   const path=await B3Race.classRoomsPath(db,studentId,'weekly-quiz');
+  const centerPath=await B3Race.classCenterRoomsPath(db,studentId);
   if(race)race.leave();
-  race=B3Race.create({container:box,db,roomsPath:path,studentId,studentName:studentName||studentId,
+  race=B3Race.create({container:box,db,roomsPath:path,centerPath,studentId,studentName:studentName||studentId,
+    gameKey:'weekly-quiz',gameName:'Weekly Quiz Race',gameUrl:'../weekly-quiz/practice.html',centerUrl:'../multiplayer/index.html',onRoomCreated:B3Race.saveHostRoomCode,
     makeQuestions:raceQuestions,
     roomInfo:()=>({label:typeLabel(quizType)+' • '+difficultyLabel(difficulty)+' • '+selected.size+' posuk'+(selected.size===1?'':'im')}),
     onExit:closeRace});
-  race.start();window.scrollTo({top:0,behavior:'smooth'});
+  if(!B3Race.launchFromUrl(race))race.start();window.scrollTo({top:0,behavior:'smooth'});
 }
-window.addEventListener('pagehide',()=>{if(race)race.leave()});
 function sameAgain(){document.getElementById('resultCard').classList.add('hidden');generatePractice();}
 function backToBuilder(){items=[];document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
 renderPosukGrid();restore();
+if(new URLSearchParams(location.search).get('b3MultiplayerRoom'))startFriendsRace();
+if(new URLSearchParams(location.search).get('b3Multiplayer')==='configure'){
+  document.getElementById('builderMsg').textContent='Choose the pesukim and quiz style, then tap Race My Friends to open your waiting room.';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 </script>
 </body>
 </html>

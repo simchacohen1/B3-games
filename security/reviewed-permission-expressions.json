@@ -1,5 +1,5 @@
 {
-  "description": "Exact reviewed permission expressions in the October 16, 2026 repository rules. This is a drift tripwire, not a security clearance: existing public grants are unsafe and must be removed in a separate verified migration. Any rules change must update this baseline in the same reviewed PR.",
+  "description": "Exact reviewed permission expressions for the repository Firebase rules, including the class-scoped Multiplayer Center. This is a drift tripwire, not a security clearance: existing public grants remain unsafe and must be removed in a separate verified migration. Any rules change must update this baseline in the same reviewed PR.",
   "permissions": [
     {
       "path": "/",
@@ -405,6 +405,41 @@
       "path": "/classGallery",
       "permission": ".write",
       "expression": true
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/games/$gameKey/rooms/$roomId/players/$studentId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId && (root.child('multiplayerCenter/workspaces/' + $workspaceId + '/classes/' + $classId + '/games/' + $gameKey + '/rooms/' + $roomId + '/state').val() == 'lobby' || root.child('multiplayerCenter/workspaces/' + $workspaceId + '/classes/' + $classId + '/games/' + $gameKey + '/rooms/' + $roomId + '/state').val() == 'playing') && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + $studentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + $studentId + '/active').val() != false"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/games/$gameKey/rooms/$roomId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false && ((!newData.exists() && data.child('host').val() == auth.token.b3StudentId) || (newData.exists() && newData.child('host').val() == auth.token.b3StudentId && (!data.exists() || data.child('host').val() == auth.token.b3StudentId)))"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/rashiRooms/$roomId/players/$studentId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId && root.child('multiplayerCenter/workspaces/' + $workspaceId + '/classes/' + $classId + '/rashiRooms/' + $roomId + '/classId').val() == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + $studentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + $studentId + '/active').val() != false"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/rashiRooms/$roomId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false && ((!newData.exists() && data.child('host').val() == auth.token.b3StudentId) || (newData.exists() && newData.child('host').val() == auth.token.b3StudentId && newData.child('classId').val() == $classId && (!data.exists() || data.child('host').val() == auth.token.b3StudentId)))"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/rashiRooms",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId/rooms/$roomId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false && ((!newData.exists() && data.child('host').val() == auth.token.b3StudentId) || (newData.exists() && newData.child('host').val() == auth.token.b3StudentId && (!data.exists() || data.child('host').val() == auth.token.b3StudentId)))"
+    },
+    {
+      "path": "/multiplayerCenter/workspaces/$workspaceId/classes/$classId",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false"
     },
     {
       "path": "/posukPractice/allowedStudents/$studentId",
