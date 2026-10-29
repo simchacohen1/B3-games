@@ -74,13 +74,16 @@
     if (student && student.name) name = student.name;
     if (window.YiddishAPI.preview) { box.textContent = 'Class races require student accounts. Use solo activities for demonstrations.'; return; }
     var path = await window.B3Race.classRoomsPath(d, id, "yiddish");
+    var centerPath = await window.B3Race.classCenterRoomsPath(d, id);
     if (race) race.leave();
     race = window.B3Race.create({
-      container: box, db: d, roomsPath: path, studentId: id, studentName: name || "Player",
+      container: box, db: d, roomsPath: path, centerPath: centerPath, studentId: id, studentName: name || "Player",
+      gameKey: "yiddish", gameName: "Yiddish Race", gameUrl: "../yiddish/index.html", centerUrl: "../multiplayer/index.html",
+      onRoomCreated: window.B3Race.saveHostRoomCode,
       makeQuestions: makeQuestions,
       onExit: backToWords
     });
-    race.start();
+    if (!window.B3Race.launchFromUrl(race)) race.start();
   }
   function install() {
     css();
@@ -97,7 +100,8 @@
       var el = $(x); if (el) el.addEventListener("click", close, true);
     });
     $("segments").addEventListener("click", close, true);
-    window.addEventListener("pagehide", close);
+    var params = new URLSearchParams(location.search);
+    if (params.get("b3Multiplayer") === "start" || params.get("b3Multiplayer") === "host" || params.get("b3MultiplayerRoom")) open();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install); else install();
 })();

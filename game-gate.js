@@ -14,7 +14,31 @@
 (function () {
   "use strict";
 
-  var DATABASE_URL = "https://b3-games-default-rtdb.firebaseio.com";
+  var databaseNamespace = "";
+  function databaseUrl() {
+    var stagingHost = location.hostname === "fun-torah-tools-staging.web.app" ||
+      location.hostname === "fun-torah-tools-staging.firebaseapp.com";
+    var stagingProject = window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    if (stagingProject === "fun-torah-tools-staging" || stagingHost) {
+      return String(window.B3_STAGING_FIREBASE_CONFIG?.databaseURL ||
+        window.B3_FIREBASE_CONFIG?.databaseURL ||
+        "https://fun-torah-tools-staging-default-rtdb.firebaseio.com").replace(/\/+$/, "");
+    }
+    var configured = String(window.B3_FIREBASE_CONFIG?.databaseURL ||
+      "https://b3-games-default-rtdb.firebaseio.com");
+    try {
+      var parsed = new URL(configured);
+      // Firebase's RTDB emulator accepts its namespace as a query parameter.
+      // Keep the base URL path-only because callers append REST paths to it;
+      // fetchJson adds the namespace alongside auth/cache-busting parameters.
+      databaseNamespace = parsed.searchParams.get("ns") || "";
+      parsed.search = "";
+      return parsed.href.replace(/\/+$/, "");
+    } catch (_) {
+      databaseNamespace = "";
+      return configured.replace(/\/+$/, "");
+    }
+  }
   var SETTINGS_PATH = "b3Games/siteSettings";
   // Phase 1: identify the whole B3 classroom without changing the live
   // settings path yet. Existing ET/WT values remain the within-class tracks.
@@ -334,6 +358,7 @@
   async function fetchJson(url) {
     var params = new URLSearchParams();
     params.set("_", String(Date.now()));
+    if (databaseNamespace) params.set("ns", databaseNamespace);
     // Firebase's REST API accepts Firebase ID tokens using the `auth` query
     // parameter. Use the current signed-in user's token so private rules can
     // authorize this gate's narrow reads. Public settings continue to work
@@ -406,8 +431,8 @@
     studentActive=false;assignedClass=null;studentClassId="";
     if(!studentId)return "";
     var rows=await Promise.all([
-      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
-      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
+      fetchJson(databaseUrl()+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
+      fetchJson(databaseUrl()+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
     ]);
     var profile=rows[0],memberships=rows[1]||{};
     if(profile && profile.active===false)return "";
@@ -415,11 +440,11 @@
     var match=valid.find(function(m){return m.classId===storedClass;})||(valid.length===1?valid[0]:null);
     if(match)studentClassId=String(match.classId);
     else if(!Object.keys(memberships).length){
-      var legacy=await fetchJson(DATABASE_URL+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
+      var legacy=await fetchJson(databaseUrl()+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
       if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
     if(!studentClassId)return "";
-    var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    var classPath=databaseUrl()+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
     // The display name is not used to authorize tool access. Avoid a
     // redundant, occasionally slow Firebase read on every gate refresh.
     // Keep every permission-critical field and the student membership check.
@@ -556,7 +581,7 @@
       }
       // Tool grants are checked against the selected class, never another teacher's class.
       var teacherGrantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!teacherClassRecord||teacherClassRecord.active===false||(teacherClassRecord.toolGrants?.[teacherGrantId]!==true&&!(gameId==="class-gallery"&&(teacherClassRecord.toolGrants?.tag===true||teacherClassRecord.toolGrants?.["class-gallery"]===true)))){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
+      if(!teacherClassRecord||teacherClassRecord.active===false||!window.B3StudentTools.granted(teacherClassRecord,teacherGrantId)){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
       showOpen();return;
     }
     if(!studentActive){
@@ -575,7 +600,7 @@
         showClosed("Fun Torah Tools is closed", "The administrator has activated the emergency lock.");return;
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
+      if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
       if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
@@ -655,7 +680,7 @@
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
-        var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
+        var teacherClassPath=databaseUrl()+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
         teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
           active:await fetchJson(teacherClassPath+"/active.json"),
           siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
@@ -669,7 +694,7 @@
       if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
       followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
-      return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
+      return fetchJson(databaseUrl() + "/" + SETTINGS_PATH + ".json");
     }).then(function (settings) {
       // When teacher auth finishes during a student-first check, ignore that
       // stale decision; the queued pass will load the teacher's class record.

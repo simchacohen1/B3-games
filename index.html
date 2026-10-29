@@ -1436,7 +1436,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1503,12 +1503,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
-  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  function studentAuthUrl(){
+    const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname);
+    if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
+    return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  }
   async function studentAuthCall(body){
     // Retry temporary function failures, never rejected credentials.
     for(let attempt=0;attempt<2;attempt++){
       try{
-        const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const response=await fetch(studentAuthUrl(),{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
         const data=await response.json().catch(()=>({}));
         if(!response.ok){
           const error=Object.assign(new Error(data.error||(response.status>=500?"Sign-in service is temporarily unavailable. Please try again.":"Could not check your login. Try again.")),{status:response.status});
