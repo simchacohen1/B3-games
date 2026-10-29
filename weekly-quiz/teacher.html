@@ -1070,9 +1070,6 @@ function attachQuizListeners(){
   if(quizListenersAttached)return;quizListenersAttached=true;
   db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
   db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-  db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-  db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderPendingAssignments();renderResults();renderStudentProgress();});
-  db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
   db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
   db.ref(QROOT+'/settings/studentAssignments').on('value',snap=>{studentAssignmentQueue=snap.val()||{};renderPendingAssignments();renderResults();});
   db.ref(QROOT+'/settings/studentActiveLaunch').on('value',snap=>{legacyStudentPointers=snap.val()||{};renderPendingAssignments();});
