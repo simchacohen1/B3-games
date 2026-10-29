@@ -1,7 +1,7 @@
 // Local-only: needs the Firebase Auth emulator running (see RELEASE-PLAN.md) and `npm ci` in backend/functions.
 // Runs the REAL homework.js handler with REAL firebase-admin token verification against the
 // local Auth emulator. The database is an in-memory fake (Java 21 needed for the DB emulator).
-process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
 process.env.GCLOUD_PROJECT = 'demo-homework';
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -29,13 +29,13 @@ const { homeworkPortal } = req('./homework.js');
 
 async function googleLogin(email, verified = true) {
   const idp = JSON.stringify({ sub: 'g-' + email, email, email_verified: verified, provider_id: 'google.com' });
-  const r = await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake', {
+  const r = await fetch('http://' + process.env.FIREBASE_AUTH_EMULATOR_HOST + '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ postBody: 'id_token=' + encodeURIComponent(idp) + '&providerId=google.com', requestUri: 'http://localhost', returnIdpCredential: true, returnSecureToken: true }) });
   const j = await r.json(); return { token: j.idToken, uid: j.localId };
 }
 async function emailLogin(email) {
-  const r = await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', {
+  const r = await fetch('http://' + process.env.FIREBASE_AUTH_EMULATOR_HOST + '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'not-a-real-password', returnSecureToken: true }) });
   return (await r.json()).idToken;
 }
