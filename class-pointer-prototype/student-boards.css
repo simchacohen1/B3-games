@@ -29,7 +29,7 @@
 .board-tile{aspect-ratio:16/9;min-width:60px}
 .board-tile:hover:enabled{border-color:#3268e8;background:#fff;box-shadow:0 4px 14px #3268e833}
 .board-tile canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
-.board-name{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border-radius:7px;background:#172033d9;color:#fff;font-size:12px;font-weight:700;pointer-events:none}
+.board-name{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);overflow:hidden;white-space:normal;overflow-wrap:anywhere;line-height:1.2;max-height:calc(100% - 12px);padding:3px 8px;border-radius:7px;background:#172033d9;color:#fff;font-size:12px;font-weight:700;pointer-events:none}
 .board-tile.drawing{border-color:#2e9d57}
 .board-tile.drawing .board-name::after{content:' ✏️'}
 .boards-empty{margin:auto;padding:20px;color:#5d6b82;font-weight:650;text-align:center}

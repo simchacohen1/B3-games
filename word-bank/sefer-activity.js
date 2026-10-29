@@ -1,6 +1,6 @@
 (function(root){
  'use strict';
- const host=document.getElementById('vocabMatches'),status=document.getElementById('vocabStatus'),celebrate=document.getElementById('vocabCelebrate');let activeRef='',pairs=[],matched=new Set(),selected='';
+ const host=document.getElementById('vocabMatches'),status=document.getElementById('vocabStatus'),celebrate=document.getElementById('vocabCelebrate');let activeRef='',pairs=[],matchTotal=0,matched=new Set(),selected='';
  const norm=x=>String(x||'').replace(/[^\p{L}\p{N}]/gu,'');
  function collectDay(iso,refs){
   if(!root.FTTWordBank||!Array.isArray(refs))return;
@@ -14,8 +14,15 @@
   host.replaceChildren();
   if(!pairs.length){announce(activeRef?'Vocabulary is being reviewed for this mitzvah.':'Choose a mitzvah card to see its words.',false);return}
   root.FTTWordBank&&root.FTTWordBank.collect({id:'sefer:'+activeRef,title:root.FTTSeferVocabulary.title(activeRef)},pairs);
-  const shuffled=pairs.slice().sort(()=>Math.random()-.5);
-  const shuffledEnglish=pairs.slice().sort(()=>Math.random()-.5);
+  // Never show a lone pair: pad with other real words (this student's bank first, then the catalog).
+  let board=pairs;
+  if(root.FTTWordBank&&root.FTTWordBank.matchSet){
+   const own=new Set(pairs.map(w=>w.id)),bank=(root.FTTWordBank.list('all')||[]).filter(w=>!own.has(w.id)),catalog=(root.FTTSeferVocabulary.all?root.FTTSeferVocabulary.all():[]).filter(w=>!own.has(w.id));
+   board=root.FTTWordBank.matchSet(pairs,bank.concat(catalog));
+  }
+  const shuffled=board.slice().sort(()=>Math.random()-.5);
+  const shuffledEnglish=board.slice().sort(()=>Math.random()-.5);
+  matchTotal=board.length;
   const englishById=new Map(shuffledEnglish.map(w=>[w.id,w]));
   for(const word of shuffled){
    const he=document.createElement('button');he.type='button';he.className='vocab-he';he.lang='he';he.dir='rtl';he.textContent=word.hebrew;he.dataset.word=word.id;he.setAttribute('aria-label','Hebrew word '+word.hebrew+'; choose its English meaning');
@@ -31,7 +38,7 @@
   const right=englishId===hebrewId,button=host.querySelector('.vocab-en[data-word="'+CSS.escape(englishId)+'"]');
   if(!right){if(button){button.classList.add('bad');setTimeout(()=>button.classList.remove('bad'),500)}announce('Not quite. Try another word.',false);return}
   matched.add(hebrewId);target.classList.add('good');target.disabled=true;if(button){button.classList.add('good');button.classList.remove('selected');button.disabled=true}selected='';
-  if(matched.size===pairs.length){announce('Fantastic! You matched every word! 🎉',true);celebrate.textContent='🌟 ⭐ 🎉 ⭐ 🌟';}
+  if(matched.size===matchTotal){announce('Fantastic! You matched every word! 🎉',true);celebrate.textContent='🌟 ⭐ 🎉 ⭐ 🌟';}
   else announce('That’s right! Keep going! ✓',true);
  }
  root.FTTSeferWordActivity={open,collectDay};

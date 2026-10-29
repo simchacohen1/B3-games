@@ -12,7 +12,7 @@
     if(view==='practice'){if(mode==='quiz')startPractice();else startMatching();}
   }
   function startPractice(){queue=words().slice().sort(()=>Math.random()-.5);queueIndex=0;answered=false;showQuestion()}
-  function startMatching(){matchRows=words().slice().sort(()=>Math.random()-.5);matchDone=new Set();selectedHe='';selectedEn='';drawMatching()}
+  function startMatching(){const own=words(),ownIds=new Set(own.map(w=>w.id)),extra=bank.list('all').filter(w=>!ownIds.has(w.id));matchRows=(bank.matchSet?bank.matchSet(own,extra,4,Math.max(6,own.length)):own).slice().sort(()=>Math.random()-.5);matchDone=new Set();selectedHe='';selectedEn='';drawMatching()}
   function drawMatching(){const he=$('matchHebrew'),en=$('matchEnglish');he.replaceChildren();en.replaceChildren();const fb=$('matchFeedback');fb.textContent='';fb.className='';if(!matchRows.length){fb.textContent='Open a lesson first to collect words to practice.';return}if(matchDone.size===matchRows.length){fb.textContent='🎉 Amazing! You matched every word!';fb.className='good';return}
     const left=matchRows.filter(w=>!matchDone.has(w.id)).slice().sort(()=>Math.random()-.5),right=left.slice().sort(()=>Math.random()-.5);
     for(const w of left){const b=document.createElement('button');b.className='word-choice hebrew-choice';b.lang='he';b.dir='rtl';b.textContent=w.hebrew;b.onclick=()=>{selectedHe=w.id;he.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));tryPair()};he.append(b)}

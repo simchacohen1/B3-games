@@ -113,6 +113,29 @@
     });
     if (typeof window.html2canvas !== 'function') throw Error('The picture tool could not start.');
   }
+  // Large pictures (for example a full-size Sefer HaMitzvos coloring page) used to
+  // fail here and never reach the gallery. Shrink the picture until it fits the
+  // limit the server accepts instead of giving up.
+  const MAX_IMAGE_CHARS = 1150000;
+  function encodeUnderLimit(canvas) {
+    let current = canvas;
+    for (let round = 0; round < 8; round++) {
+      for (const quality of [.72, .45]) {
+        const data = current.toDataURL('image/jpeg', quality);
+        if (data.length <= MAX_IMAGE_CHARS) return data;
+      }
+      const smaller = document.createElement('canvas');
+      smaller.width = Math.max(1, Math.floor(current.width * .75));
+      smaller.height = Math.max(1, Math.floor(current.height * .75));
+      const ctx = smaller.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, smaller.width, smaller.height);
+      ctx.drawImage(current, 0, 0, smaller.width, smaller.height);
+      current = smaller;
+    }
+    throw Error('This picture is too large to send. Please tell your Rebbi.');
+  }
+  window.__fttGalleryEncode = encodeUnderLimit;
   async function capture() {
     const button = document.getElementById('fttGalleryShareButton');
     if (busy || !button) return;
@@ -143,9 +166,7 @@
           ignoreElements:el => !!el.closest?.('#fttGalleryShareButton,#fttGalleryShareDialog')
         });
       }
-      image = canvas.toDataURL('image/jpeg', .72);
-      if (image.length > 1150000) image = canvas.toDataURL('image/jpeg', .45);
-      if (image.length > 1150000) throw Error('This picture is too large. Try making your browser window smaller.');
+      image = encodeUnderLimit(canvas);
       const box = ensureDialog();
       box.querySelector('img').src = image;
       box.querySelector('input').value = (document.title || 'My Learning').slice(0,70);
