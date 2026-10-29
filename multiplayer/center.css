@@ -45,3 +45,20 @@ button:focus-visible,a:focus-visible{outline:4px solid #ffbd33;outline-offset:3p
 footer{color:#526279;font-size:13px;margin:30px 0 8px}[hidden]{display:none!important}
 @media(max-width:480px){body{padding:14px}.game-art{height:126px}.invite-actions>*{flex:1}.category-tab{font-size:12px;padding:10px}}
 @media(prefers-reduced-motion:reduce){.game,.game-art-symbol,.category-tab{transition:none}}
+
+/* Category folder landing page */
+.category-shelf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:10px 0 16px}
+.category-card{--tile-a:#149a70;--tile-b:#70d6a6;display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:relative;overflow:hidden;min-height:205px;padding:18px;border:0;border-radius:24px;background:linear-gradient(135deg,var(--tile-a),var(--tile-b));color:white;text-align:left;cursor:pointer;box-shadow:0 8px 20px #153c6824;transition:transform .15s,box-shadow .15s}
+.category-card:before{content:"";position:absolute;width:175px;height:175px;right:-42px;top:-60px;border:18px solid #ffffff2c;border-radius:38%;transform:rotate(28deg)}
+.category-card:hover{transform:translateY(-4px);box-shadow:0 13px 25px #153c6833}
+.category-card:focus-visible,.all-games-link:focus-visible,.back-to-categories:focus-visible{outline:4px solid #ffbd33;outline-offset:3px}
+.category-torah{--tile-a:#087c68;--tile-b:#39c996}.category-strategy{--tile-a:#3159c8;--tile-b:#60a9ef}.category-cards{--tile-a:#8b36b5;--tile-b:#e26cc4}.category-challenges{--tile-a:#db6a1e;--tile-b:#f7c84f}
+.category-art{z-index:1;display:grid;place-items:center;width:74px;height:74px;border-radius:20px;background:#ffffff3d;font-size:47px;box-shadow:0 5px 10px #10234a22}
+.category-name{z-index:1;font-size:clamp(19px,2.6vw,25px);font-weight:950;line-height:1.15;text-shadow:0 1px 2px #15305044}
+.category-count{z-index:1;font-size:14px;font-weight:700;color:#ffffffed}
+.category-open{z-index:1;align-self:flex-end;margin-top:auto;padding:7px 11px;border-radius:999px;background:#ffffffed;color:#173563;font-size:13px;font-weight:900}
+.all-games-link{grid-column:1/-1;justify-self:center;border:2px solid #cbdaf2;border-radius:999px;padding:11px 18px;background:#fff;color:#274878;font:inherit;font-weight:850;cursor:pointer;box-shadow:0 3px 9px #173c6a12}
+.back-to-categories{flex:0 0 auto;border:0;border-radius:999px;padding:11px 14px;background:#fff;color:#244779;font:inherit;font-weight:850;cursor:pointer;box-shadow:0 3px 8px #12315b12}
+#gamesHeading:focus{outline:0}
+@media(max-width:560px){.category-shelf{gap:12px}.category-card{min-height:175px;padding:14px;border-radius:20px}.category-art{width:62px;height:62px;font-size:40px}.category-count{font-size:12px}.category-open{font-size:12px;padding:6px 9px}}
+@media(prefers-reduced-motion:reduce){.category-card{transition:none}}

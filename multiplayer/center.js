@@ -52,39 +52,75 @@
     "memory-match": "cards", set: "cards", dominoes: "cards", "go-fish": "cards", "uno-style": "cards",
     bingo: "challenges", "math-race": "challenges"
   };
-  var selectedCategory = "all";
+  // Open with a simple category shelf; students can still jump to the full game list.
+  var selectedCategory = null;
   var readyToPlay = false;
   var categoriesEl = document.getElementById("gameCategories");
-  var categoryButtons = Object.create(null);
   var gameResultsSummary = document.getElementById("gameResultsSummary");
-  function updateCategoryButtons() {
-    CATEGORIES.forEach(function (category) {
-      var tab = categoryButtons[category.key];
-      if (!tab) {
-        var count = category.key === "all" ? GAMES.length : GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
-        tab = make("button", "category-tab", category.icon + " " + category.label + " · " + count);
-        tab.type = "button";
-        tab.setAttribute("aria-controls", "games");
-        tab.setAttribute("aria-label", category.label + ", " + count + " games");
-        tab.addEventListener("click", function () {
-          selectedCategory = category.key;
-          drawGames();
-        });
-        categoryButtons[category.key] = tab;
-        categoriesEl.appendChild(tab);
-      }
-      var selected = selectedCategory === category.key;
-      tab.classList.toggle("is-selected", selected);
-      tab.setAttribute("aria-pressed", String(selected));
+  function chooseCategory(key) {
+    selectedCategory = key;
+    drawGames();
+    document.getElementById("gamesHeading").focus();
+  }
+  function drawCategoryHome() {
+    document.getElementById("gamesHeading").textContent = "Choose a category";
+    categoriesEl.replaceChildren();
+    categoriesEl.className = "category-shelf";
+    CATEGORIES.filter(function (category) { return category.key !== "all"; }).forEach(function (category) {
+      var count = GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
+      var tile = make("button", "category-card category-" + category.key);
+      tile.type = "button";
+      tile.setAttribute("aria-controls", "games");
+      tile.setAttribute("aria-label", category.label + ", " + count + " games");
+      tile.append(make("span", "category-art", category.icon),
+        make("span", "category-name", category.label),
+        make("span", "category-count", count + " games inside"),
+        make("span", "category-open", "Open category  ›"));
+      tile.addEventListener("click", function () { chooseCategory(category.key); });
+      categoriesEl.appendChild(tile);
     });
+    var allGames = make("button", "all-games-link", "🎮 Browse all 17 games");
+    allGames.type = "button";
+    allGames.addEventListener("click", function () { chooseCategory("all"); });
+    categoriesEl.appendChild(allGames);
+    cards.hidden = true;
+    gameResultsSummary.textContent = "Choose a category to see its games, or browse all 17 games.";
   }
   function drawGames() {
     cards.replaceChildren();
-    updateCategoryButtons();
+    categoriesEl.replaceChildren();
+    categoriesEl.className = "game-categories";
+    categoriesEl.setAttribute("aria-label", "Category navigation");
+    var selected = CATEGORIES.find(function (category) { return category.key === selectedCategory; });
+    document.getElementById("gamesHeading").textContent = selectedCategory === "all" ? "All 17 games" : selected.label;
+    var back = make("button", "back-to-categories", "← All categories");
+    back.type = "button";
+    back.addEventListener("click", function () { selectedCategory = null; drawCategoryHome(); document.getElementById("gamesHeading").focus(); });
+    categoriesEl.appendChild(back);
+    CATEGORIES.filter(function (category) { return category.key !== "all"; }).forEach(function (category) {
+      var count = GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; }).length;
+      var tab = make("button", "category-tab", category.icon + " " + category.label + " · " + count);
+      tab.type = "button";
+      tab.setAttribute("aria-controls", "games");
+      tab.setAttribute("aria-label", category.label + ", " + count + " games");
+      tab.setAttribute("aria-pressed", String(category.key === selectedCategory));
+      tab.classList.toggle("is-selected", category.key === selectedCategory);
+      tab.addEventListener("click", function () { chooseCategory(category.key); });
+      categoriesEl.appendChild(tab);
+    });
+    if (selectedCategory !== "all") {
+      var allTab = make("button", "category-tab", "🎮 All Games · 17");
+      allTab.type = "button";
+      allTab.setAttribute("aria-label", "All Games, 17 games");
+      allTab.setAttribute("aria-pressed", "false");
+      allTab.addEventListener("click", function () { chooseCategory("all"); });
+      categoriesEl.appendChild(allTab);
+    }
     var visibleGames = GAMES.filter(function (game) { return selectedCategory === "all" || GAME_CATEGORIES[game.key] === selectedCategory; });
     gameResultsSummary.textContent = selectedCategory === "all"
       ? "Showing all " + visibleGames.length + " games."
-      : "Showing " + visibleGames.length + " games in " + CATEGORIES.find(function (category) { return category.key === selectedCategory; }).label + ".";
+      : "Showing " + visibleGames.length + " games in " + selected.label + ".";
+    cards.hidden = false;
     visibleGames.forEach(function (game) {
       var category = GAME_CATEGORIES[game.key];
       var card = make("article", "game game-" + category + " game-" + game.key);
@@ -162,7 +198,7 @@
     });
   }
   function start() {
-    drawGames();
+    drawCategoryHome();
     try {
       sessionId = String(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "").trim();
       sessionName = String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student");
@@ -170,7 +206,12 @@
     if (!sessionId || !window.firebase || !window.B3_FIREBASE_CONFIG) {
       statusBox.className = "notice error";
       statusBox.replaceChildren(document.createTextNode("Sign in on Fun Torah Tools first. "));
-      var link = make("a", "", "Go to sign in"); link.href = "../index.html"; statusBox.appendChild(link); return;
+      var link = make("a", "", "Go to sign in");
+      link.href = "../index.html";
+      link.addEventListener("click", function () {
+        try { sessionStorage.setItem("b3StudentReturnTo", "multiplayer/index.html"); } catch (e) {}
+      });
+      statusBox.appendChild(link); return;
     }
     try {
       if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
