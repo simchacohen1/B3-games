@@ -279,6 +279,11 @@ function init(){
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
  liveWrap.append(switchWrap,stopBtn);
+ /* Full screen: the tabs row is hidden, so the floating toolbar gets its own red Stop button. */
+ const dockStop=iconButton('tb-btn cp-dock-stop','stop','Stop');dockStop.id='cpDockStop';dockStop.hidden=true;
+ dockStop.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
+ dockStop.addEventListener('click',()=>stopBtn.click());
+ {const fsBtn=$('tbFullscreen');if(fsBtn)fsBtn.before(dockStop);else $('teacherDock')?.append(dockStop)}
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
@@ -358,6 +363,8 @@ function init(){
   liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
+  const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
+  dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
   if(!isLive)openSwitch(false);
   syncLibrary();
  }
