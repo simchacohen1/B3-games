@@ -96,3 +96,42 @@ test('pending-only API uses indexed status query with archive-independent read v
   assert.equal(results[1].responseBytes,results[2].responseBytes);
   console.log('Synthetic indexed Chazara pending queue read-volume (not production measurements):',JSON.stringify(results));
 });
+
+test('indexed pending queue excludes foreign-class and ambiguous shared-student requests',async()=>{
+  const data=fixture(100);
+  data['b3Games/workspaces/b3-2026/classes/alpha'].members.shared={active:true};
+  data['b3Games/students/shared/profile']={name:'Fictional Shared Student',active:true};
+  data['b3Games/students/shared/memberships']={
+    a:{workspaceId:'b3-2026',classId:'alpha',active:true},
+    b:{workspaceId:'b3-2026',classId:'beta',active:true}
+  };
+  const requests=data['studentRewards/pointRequests'];
+  const common={source:'chazara-recording',status:'pending',practiceStudentId:'shared',amount:2};
+  requests.alpha_shared={...common,workspaceClassId:'alpha',eventId:'alpha_event'};
+  requests.beta_shared={...common,workspaceClassId:'beta',eventId:'beta_event'};
+  requests.ambiguous_shared={...common,eventId:'legacy_event'};
+  requests.outsider={source:'chazara-recording',status:'pending',practiceStudentId:'unassigned',workspaceClassId:'alpha',amount:2};
+  const x=server(data);
+  const response=await x.call();
+  assert.equal(response.code,200,JSON.stringify(response.body));
+  const ids=response.body.requests.map(row=>row.id);
+  assert.deepEqual(ids.slice().sort(),['alpha_shared','synthetic_pending'],
+    'only own-class pending requests may reach the teacher, even after the status query');
+  assert.equal(x.reads.filter(row=>row.path==='studentRewards/pointRequests'&&row.query==='status=pending').length,1);
+  assert.equal(x.reads.some(row=>row.path.startsWith('posukPractice/chazara/events')),false);
+  assert.equal(x.writes.length,0);
+});
+
+test('revoked teacher or Chazara grant cannot fetch the indexed pending queue',async()=>{
+  for(const revoke of ['teacher','tool']){
+    const data=fixture(100);
+    if(revoke==='teacher')data['b3Games/workspaces/b3-2026/teachers/teacher'].active=false;
+    else data['b3Games/workspaces/b3-2026/classes/alpha'].toolGrants.chazara=false;
+    const x=server(data);
+    const response=await x.call();
+    assert.notEqual(response.code,200,'revoked '+revoke+' must fail closed');
+    assert.equal(x.reads.some(row=>row.path==='studentRewards/pointRequests'),false,
+      'authorization must reject '+revoke+' before the indexed query');
+    assert.equal(x.writes.length,0);
+  }
+});
