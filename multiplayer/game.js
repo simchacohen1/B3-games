@@ -71,6 +71,12 @@
     }
   }
   function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); ref = listener = privateRef = privateListener = null; }
+  function clearSavedRejoin(code) {
+    try {
+      const key = 'fttMultiplayerRejoin:' + studentId, saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (saved?.roomCode === code) sessionStorage.removeItem(key);
+    } catch (e) {}
+  }
   function statusText() {
     if (!room) return 'Connecting…';
     if (room.state === 'lobby') return room.host === studentId ? 'Waiting for classmates. You start the game when everyone is ready.' : 'Waiting for the host to start.';
@@ -281,7 +287,14 @@
   function showError(error) { notice(String(error?.message || error || 'The game action could not be saved.'), true); }
   async function leaveRoom() {
     if (pending) return;
-    try { if (roomCode) await call('leave'); } catch (error) { console.warn('Game leave failed:', error); }
+    try {
+      if (roomCode) {
+        await call('leave');
+        if (room && room.host !== studentId && ['lobby', 'playing'].includes(room.state)) {
+          sessionStorage.setItem('fttMultiplayerRejoin:' + studentId, JSON.stringify({ gameKey, roomCode }));
+        }
+      }
+    } catch (error) { console.warn('Game leave failed:', error); }
     unlisten(); backToCenter();
   }
   function showBrowse() {
@@ -324,6 +337,7 @@
           if (code) {
             roomCode = code;
             const result = await call('join');
+            clearSavedRejoin(code);
             if (result.public?.state === 'closed') throw new Error('That room has closed.');
             const mode = result.public?.host === studentId ? 'host' : 'join';
             params.set('b3Multiplayer', mode);
