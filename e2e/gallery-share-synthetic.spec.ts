@@ -64,7 +64,7 @@ test('Gallery screenshot button sends fictional work once with the correct class
     classId:'et', pin:'fictional-passcode', source:'shorashim',
     title:'Fictional Chumash work'
   });
-  expect(submitted[0].image).toMatch(/^data:image\\/jpeg;base64,/);
+  expect(submitted[0].image.startsWith('data:image/jpeg;base64,')).toBe(true);
 });
 
 test('Gallery screenshot refuses to submit another student\'s captured work after Switch Student', async ({page}) => {
