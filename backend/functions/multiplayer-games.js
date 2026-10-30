@@ -48,7 +48,12 @@ async function authorizeActor(request, db, requestedWorkspace, requestedClassId)
       db.ref(`b3Games/workspaces/${requestedWorkspace}/classes/${classId}`).get(),
     ]);
     const teacher = teacherSnap?.val();
-    if (!teacher || teacher.active !== true || teacher.role !== 'teacher' || teacher.classIds?.[classId] !== true) {
+    const ownerMode = teacher?.role === 'owner';
+    const admin = ownerMode ? (await db.ref(`b3Games/admins/${uid}`).get()).val() : null;
+    const assignedTeacher = teacher?.role === 'teacher' && teacher.classIds?.[classId] === true;
+    const authorizedOwner = ownerMode && admin && admin.active !== false;
+    if (!teacher || teacher.active !== true ||
+        !(assignedTeacher || authorizedOwner)) {
       throw new HttpsError('permission-denied', 'An active teacher assignment for this class is required.');
     }
     participantId = `teacher_${uid}`;
@@ -59,7 +64,7 @@ async function authorizeActor(request, db, requestedWorkspace, requestedClassId)
   }
   const legacySettingsSnap = ['et', 'wt'].includes(classId) ? await db.ref('b3Games/siteSettings').get() : null;
   if (!cls || cls.active === false) throw new HttpsError('permission-denied', 'Your active class membership is required.');
-  if (actorRole === 'teacher' && cls.teacherIds?.[request.auth.uid] !== true) {
+  if (actorRole === 'teacher' && cls?.teacherIds?.[request.auth.uid] !== true) {
     throw new HttpsError('permission-denied', 'This teacher is not assigned to the selected class.');
   }
   const legacySettings = legacySettingsSnap?.val() || {};
