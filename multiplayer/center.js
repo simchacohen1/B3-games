@@ -145,14 +145,16 @@
   function renderRooms(all) {
     var ignored = declinedRooms(), visible = Object.entries(all || {}).filter(function (entry) {
       var id = entry[0], room = entry[1];
-      return room && room.host !== sessionId && room.state === "lobby" && room.roomCode && gameFor(room.gameKey) && !ignored.has(id) &&
+      return room && room.host !== sessionId && room.roomCode && gameFor(room.gameKey) && !ignored.has(id) &&
+        (room.state === "lobby" || (room.allowSpectators && ["playing", "finished"].includes(room.state))) &&
+        (!room.invitedStudentId || room.invitedStudentId === sessionId || room.allowSpectators || room.playerCount >= room.maxPlayers) &&
         room.createdAt && Date.now() - Number(room.createdAt) < 20 * 60 * 1000;
     });
     var saved = savedRejoin();
     invitations.replaceChildren();
     invitationSection.hidden = !visible.length && !saved;
     invitationSummary.textContent = visible.length
-      ? visible.length + (visible.length === 1 ? " classmate game is" : " classmate games are") + " ready to join."
+      ? visible.length + (visible.length === 1 ? " class game" : " class games") + " to join, watch, or start your own match."
       : "Pick up where you left off.";
     if (saved) {
       var savedGame = gameFor(saved.gameKey), resume = make("article", "invite");
@@ -171,16 +173,54 @@
       });
       resumeActions.append(rejoin, dismiss); resume.appendChild(resumeActions); invitations.appendChild(resume);
     }
-    visible.sort(function (a, b) { return Number(a[1].createdAt) - Number(b[1].createdAt); }).forEach(function (entry) {
+    visible.sort(function (a, b) {
+      var aDirect = a[1].invitedStudentId === sessionId ? 1 : 0;
+      var bDirect = b[1].invitedStudentId === sessionId ? 1 : 0;
+      return bDirect - aDirect || Number(a[1].createdAt) - Number(b[1].createdAt);
+    }).forEach(function (entry) {
       var id = entry[0], room = entry[1], game = gameFor(room.gameKey), card = make("article", "invite");
-      card.append(make("h3", "", (room.hostName || "A classmate") + " wants to play"),
-        make("p", "", game.icon + " " + game.name),
-        make("small", "", Math.max(1, Number(room.playerCount) || 1) + " player" + (Number(room.playerCount) === 1 ? "" : "s") + " waiting"));
-      var actions = make("div", "invite-actions"), join = make("button", "btn", "Join Game"), later = make("button", "quiet", "Not Now");
-      join.type = later.type = "button";
-      join.addEventListener("click", function () { join.disabled = true; route(game, "join", String(room.roomCode)); });
+      var count = Math.max(1, Number(room.playerCount) || 1);
+      var max = Number(room.maxPlayers) || 0;
+      var full = max > 0 && count >= max;
+      var reserved = !!room.invitedStudentId && room.invitedStudentId !== sessionId;
+      var direct = room.invitedStudentId === sessionId;
+      var canJoin = room.state === "lobby" && !full && !reserved;
+      var canWatch = max === 2 && room.allowSpectators === true;
+      var label = direct ? "⭐ A personal invitation for you!" :
+        (room.hostName || "A classmate") + (room.state === "lobby" ? " wants to play" : " is playing");
+      card.append(make("h3", "", label), make("p", "", game.icon + " " + game.name));
+      var status = full ? count + "/" + max + " Players — Full" :
+        count + (max ? "/" + max : "") + " players waiting";
+      if (room.state === "playing") status = "Game in progress" + (full ? " · " + count + "/" + max + " Players — Full" : "");
+      if (room.state === "finished") status = "Match finished";
+      card.appendChild(make("small", "", status));
+      if (direct) card.appendChild(make("small", "", (room.hostName || "A classmate") + " invited you to this match."));
+      else if (reserved && room.state === "lobby") card.appendChild(make("small", "", "Reserved for " + (room.invitedStudentName || "an invited classmate") + "."));
+      var actions = make("div", "invite-actions");
+      if (canJoin) {
+        var join = make("button", "btn", "Join Game");
+        join.type = "button";
+        join.addEventListener("click", function () { join.disabled = true; route(game, "join", String(room.roomCode)); });
+        actions.appendChild(join);
+      }
+      if (canWatch) {
+        var watch = make("button", "quiet", "👀 Join as spectator");
+        watch.type = "button";
+        watch.addEventListener("click", function () { route(game, "spectate", String(room.roomCode)); });
+        actions.appendChild(watch);
+      }
+      if (max === 2 && !canJoin) {
+        var another = make("button", "btn", "Start another " + game.name + " match");
+        another.type = "button";
+        another.addEventListener("click", function () { route(game, "start"); });
+        actions.appendChild(another);
+      }
+      var later = make("button", "quiet", "Not Now");
+      later.type = "button";
       later.addEventListener("click", function () { decline(id); renderRooms(all); });
-      actions.append(join, later); card.appendChild(actions); invitations.appendChild(card);
+      actions.appendChild(later);
+      card.appendChild(actions);
+      invitations.appendChild(card);
     });
   }
   function start() {

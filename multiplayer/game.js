@@ -20,7 +20,7 @@
   const el = id => document.getElementById(id);
   const title = el('gameTitle'), hint = el('gameHint'), message = el('message'), roomSection = el('room');
   const board = el('board'), actions = el('actions');
-  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '';
+  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', classmates = null, invitePickerOpen = false;
 
   function text(tag, className, value) {
     const node = document.createElement(tag);
@@ -53,10 +53,23 @@
     ref = db.ref(roomPath);
     listener = ref.on('value', snapshot => {
       room = snapshot.val();
+      if (params.get('b3Multiplayer') === 'spectate' && room && !room.allowSpectators &&
+          !(room.players || []).some(player => player.studentId === studentId)) {
+        unlisten(); notice('The host turned off spectator mode. Choose another game.', true);
+        roomSection.hidden = true; showBrowse(); return;
+      }
       if (!room || ['closed'].includes(room.state)) {
         unlisten(); notice('This game room has closed. You can choose another game.'); roomSection.hidden = true; showBrowse(); return;
       }
       roomSection.hidden = false;
+      // Keep the saved URL's role in sync after winner/challenger rotation.
+      // A former player becomes a spectator; a queued spectator becomes a player.
+      const currentPlayer = (room.players || []).some(player => player.studentId === studentId);
+      const desiredMode = currentPlayer ? (room.host === studentId ? 'host' : 'join') : 'spectate';
+      if (params.get('b3Multiplayer') !== desiredMode) {
+        params.set('b3Multiplayer', desiredMode);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+      }
       el('roomCode').textContent = 'Room code ' + roomCode;
       draw();
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
@@ -79,6 +92,14 @@
   }
   function statusText() {
     if (!room) return 'Connecting…';
+    const watching = !(room.players || []).some(player => player.studentId === studentId);
+    if (watching) {
+      if (!room.allowSpectators) return 'The host has ended spectator access.';
+      if (room.state === 'lobby') return 'Watching the room. The players are getting ready.';
+      if (room.state === 'finished') return room.draw ? 'The match ended in a draw.' :
+        ((room.players || []).find(player => player.studentId === room.winner)?.name || 'A player') + ' won!';
+      return 'Spectator mode — you can watch the game and request to play the winner.';
+    }
     if (room.state === 'lobby') return room.host === studentId ? 'Waiting for classmates. You start the game when everyone is ready.' : 'Waiting for the host to start.';
     if (room.finished || room.state === 'finished') return room.draw ? 'It’s a draw!' : (room.winner === studentId ? 'You won! Great game.' : ((room.players || []).find(p => p.studentId === room.winner)?.name || 'A classmate') + ' won this game.');
     if (gameKey === 'math-race') return 'Solve the question with your classmates.';
@@ -97,25 +118,88 @@
       parent.appendChild(chip);
     });
   }
+  async function loadClassmates() {
+    invitePickerOpen = true;
+    if (classmates === null) {
+      try { classmates = (await call('classmates')).classmates || []; }
+      catch (error) { invitePickerOpen = false; showError(error); }
+    }
+    draw();
+  }
+  function spectatorControls() {
+    const watching = !(room.players || []).some(player => player.studentId === studentId);
+    const queue = room.winnerQueue || [];
+    if (!watching) return false;
+    actions.append(text('div', 'player-turn', statusText()));
+    if (room.allowSpectators && (room.players || []).length >= 2) {
+      const index = queue.indexOf(studentId);
+      if (index >= 0) {
+        actions.append(text('span', 'spectator-queue-status', 'Play-winner queue: #' + (index + 1)));
+        actions.append(button('Leave winner queue', () => call('unqueue-winner').catch(showError), 'quiet', pending));
+      } else {
+        actions.append(button('🏆 Play the winner next', () => call('queue-winner').catch(showError), 'btn', pending));
+      }
+    }
+    actions.append(button('Leave spectator mode', leaveRoom, 'quiet', pending));
+    return true;
+  }
   function drawActions() {
     actions.replaceChildren();
     if (!room) return;
     const ids = (room.players || []).map(player => player.studentId);
+    if (spectatorControls()) return;
+    const isTwoPlayer = room.maxPlayers === 2;
+    if (isTwoPlayer && room.host === studentId && ['lobby', 'playing', 'finished'].includes(room.state)) {
+      actions.append(button(room.allowSpectators ? '👀 Spectators: On (turn off)' : '👀 Allow spectators: Off (turn on)',
+        () => call('spectators', { move: { allow: !room.allowSpectators } }).catch(showError), 'quiet', pending));
+    }
     if (room.state === 'lobby') {
       if (room.host === studentId) {
         actions.append(button('Start game', () => call('start').catch(showError), 'btn', pending || ids.length < game.minPlayers));
+        if (isTwoPlayer && ids.length === 1) {
+          actions.append(button('Invite a specific classmate', loadClassmates, 'quiet', pending));
+          if (room.invitedStudentName) actions.append(text('span', 'invite-status', 'Invitation reserved for ' + room.invitedStudentName));
+          if (invitePickerOpen) {
+            const chooser = text('select', 'invite-classmate-select');
+            chooser.setAttribute('aria-label', 'Choose a classmate to invite');
+            chooser.appendChild(new Option('Choose a classmate…', ''));
+            (classmates || []).forEach(person => {
+              const option = new Option(person.name, person.studentId);
+              if (person.studentId === room.invitedStudentId) option.selected = true;
+              chooser.appendChild(option);
+            });
+            actions.appendChild(chooser);
+            actions.append(button('Send direct invitation', () => {
+              if (!chooser.value) return notice('Choose a classmate first.', true);
+              call('invite-target', { move: { studentId: chooser.value } })
+                .then(() => { invitePickerOpen = false; notice('Personal invitation sent to that classmate’s Multiplayer Arcade.'); })
+                .catch(showError);
+            }, 'btn', pending || !classmates?.length));
+            if (room.invitedStudentId) actions.append(button('Open spot to everyone', () =>
+              call('invite-target', { move: { studentId: '' } }).then(() => { invitePickerOpen = false; }).catch(showError),
+              'quiet', pending));
+          }
+        }
         actions.append(button('Close room', leaveRoom, 'quiet', pending));
       } else actions.append(button('Leave game', leaveRoom, 'quiet', pending));
-      actions.append(button('Browse other games', leaveRoom, 'quiet'));
+      actions.append(button('Browse other games', leaveRoom, 'quiet', pending));
       return;
     }
     if (room.finished || room.state === 'finished') {
-      actions.append(button('Play again', () => { unlisten(); location.assign(`game.html?game=${encodeURIComponent(gameKey)}&b3Multiplayer=start`); }, 'btn'));
-      actions.append(button('Browse other games', leaveRoom, 'quiet'));
+      if (isTwoPlayer && room.winner === studentId && (room.winnerQueue || []).length && room.allowSpectators) {
+        actions.append(button('🏆 Play the next challenger', () => call('next-round').catch(showError), 'btn', pending));
+      }
+      if (isTwoPlayer && room.draw) {
+        actions.append(button('Rematch after the draw', () => call('rematch-draw').catch(showError), 'btn', pending));
+      }
+      actions.append(button('Play again in a new room', () => { unlisten(); location.assign(`game.html?game=${encodeURIComponent(gameKey)}&b3Multiplayer=start`); }, 'btn'));
+      actions.append(button('Browse other games', leaveRoom, 'quiet', pending));
       return;
     }
     if (room.state === 'playing') {
       actions.append(text('div', 'player-turn', statusText()));
+      if (isTwoPlayer && room.allowSpectators && room.winnerQueue?.length)
+        actions.append(text('span', 'spectator-queue-status', room.winnerQueue.length + ' spectator(s) waiting to play the winner'));
       if (gameKey === 'bingo' && room.host === studentId) actions.append(button('Draw next number', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
       if (gameKey === 'dominoes' && room.turn === studentId) actions.append(button('Draw a tile', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
       if (gameKey === 'uno-style' && room.turn === studentId) {
@@ -128,7 +212,7 @@
         else actions.append(text('div', 'player-turn', 'You rolled ' + room.lastRoll + '. Choose a token.'));
       }
       actions.append(button('Leave game', leaveRoom, 'quiet', pending));
-      actions.append(button('Browse other games', leaveRoom, 'quiet'));
+      actions.append(button('Browse other games', leaveRoom, 'quiet', pending));
     }
   }
   function cell(label, className, onClick, disabled) {
@@ -336,13 +420,14 @@
           const code = params.get('b3MultiplayerRoom');
           if (code) {
             roomCode = code;
-            const result = await call('join');
+            const isWatching = params.get('b3Multiplayer') === 'spectate';
+            const result = await call(isWatching ? 'spectate' : 'join');
             clearSavedRejoin(code);
             if (result.public?.state === 'closed') throw new Error('That room has closed.');
-            const mode = result.public?.host === studentId ? 'host' : 'join';
+            const mode = isWatching ? 'spectate' : (result.public?.host === studentId ? 'host' : 'join');
             params.set('b3Multiplayer', mode);
             history.replaceState(null, '', location.pathname + '?' + params.toString());
-            listen(code); notice('Connected to your class game.');
+            listen(code); notice(isWatching ? 'You are watching this match as a spectator.' : 'Connected to your class game.');
           } else if (params.get('b3Multiplayer') === 'start' || !params.has('b3Multiplayer')) {
             const result = await call('create');
             const next = new URL(location.href); next.searchParams.set('b3Multiplayer', 'host'); next.searchParams.set('b3MultiplayerRoom', result.roomCode);

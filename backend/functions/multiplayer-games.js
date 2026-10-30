@@ -9,6 +9,10 @@ if (!admin.apps.length) admin.initializeApp();
 
 const OPTIONS = { region: 'us-central1', memory: '256MiB', maxInstances: 20 };
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_SPECTATORS = 12;
+const twoPlayerGame = gameKey => core.gameConfig(gameKey)?.maxPlayers === 2;
+const activeQueue = room => (Array.isArray(room.winnerQueue) ? room.winnerQueue : [])
+  .filter(id => room.spectators?.[id]);
 const now = () => Date.now();
 const safeName = value => String(value || 'Classmate').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 32) || 'Classmate';
 const paths = (workspaceId, classId, roomCode) => ({
@@ -49,7 +53,15 @@ async function authorizeStudent(request, db, requestedWorkspace) {
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
-  return core.publicView(gameKey, state, room, timestamp);
+  const view = core.publicView(gameKey, state, room, timestamp);
+  view.maxPlayers = core.gameConfig(gameKey).maxPlayers;
+  view.allowSpectators = !!room.allowSpectators;
+  view.spectatorCount = Object.keys(room.spectators || {}).length;
+  view.winnerQueue = activeQueue(room);
+  view.invitedStudentId = room.invitedStudentId || null;
+  view.invitedStudentName = room.invitedStudentName || null;
+  view.round = room.round || 1;
+  return view;
 }
 
 function inviteSummary(gameKey, room, state, timestamp) {
@@ -58,6 +70,9 @@ function inviteSummary(gameKey, room, state, timestamp) {
     host: room.host, hostName: room.hostName, gameKey,
     gameName: config.name, gameUrl: '../multiplayer/game.html?game=' + encodeURIComponent(gameKey),
     roomCode: room.roomCode, state: room.state, playerCount: core.participantIds(room.players).length,
+    maxPlayers: config.maxPlayers, allowSpectators: !!room.allowSpectators,
+    spectatorCount: Object.keys(room.spectators || {}).length, queueCount: activeQueue(room).length,
+    invitedStudentId: room.invitedStudentId || null, invitedStudentName: room.invitedStudentName || null,
     createdAt: room.createdAt, updatedAt: timestamp,
   };
 }
@@ -110,7 +125,8 @@ async function publishRoom(db, gameKey, room, state, p, beforeRoom) {
   const timestamp = now();
   const writes = {
     [p.publicRoom]: roomPublic(gameKey, room, state, timestamp),
-    [p.invite]: room.state === 'lobby' ? inviteSummary(gameKey, room, state, timestamp) : null,
+    [p.invite]: room.state === 'lobby' || (room.allowSpectators && ['playing', 'finished'].includes(room.state))
+      ? inviteSummary(gameKey, room, state, timestamp) : null,
   };
   const ids = new Set([...Object.keys(beforeRoom?.players || {}), ...Object.keys(room.players || {})]);
   for (const studentId of ids) {
@@ -141,7 +157,8 @@ async function newRoom(db, actor, gameKey) {
   if (!roomCode) throw new HttpsError('resource-exhausted', 'Could not open a game room. Try again.');
   const room = {
     roomCode, gameKey, host: actor.studentId, hostName: actor.name, state: 'lobby', createdAt: timestamp,
-    updatedAt: timestamp, players: { [actor.studentId]: { name: actor.name, active: true, joinedAt: timestamp } },
+    updatedAt: timestamp, allowSpectators: false, round: 1,
+    players: { [actor.studentId]: { name: actor.name, active: true, joinedAt: timestamp } },
   };
   const state = core.createGameState(gameKey, room.players, { seed: crypto.randomInt(1, 0x7fffffff) });
   const multi = {
@@ -155,7 +172,7 @@ async function newRoom(db, actor, gameKey) {
   return { roomCode, public: roomPublic(gameKey, room, state, timestamp) };
 }
 
-async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
+async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedInvite = null) {
   if (!SAFE_ID.test(roomCode || '') || !core.gameConfig(gameKey)) throw new HttpsError('invalid-argument', 'Invalid room or game.');
   const p = paths(actor.workspaceId, actor.classId, roomCode);
   let operationError = '';
@@ -173,6 +190,9 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
       if (previousPlayer && previousPlayer.active !== false) return room;
       const returningPlayer = Boolean(previousPlayer);
       const config = core.gameConfig(gameKey), ids = core.participantIds(room.players);
+      if (!returningPlayer && room.invitedStudentId && room.invitedStudentId !== actor.studentId) {
+        operationError = 'This playing spot is reserved for an invited classmate.'; return;
+      }
       if (!(room.state === 'lobby' || returningPlayer && room.state === 'playing') ||
           !returningPlayer && ids.length >= config.maxPlayers) {
         operationError = 'This game is full or has already started.'; return;
@@ -182,6 +202,11 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
         ...(previousPlayer || {}), name: actor.name, active: true,
         joinedAt: previousPlayer?.joinedAt || now(),
       };
+      if (room.spectators?.[actor.studentId]) delete room.spectators[actor.studentId];
+      room.winnerQueue = activeQueue(room);
+      if (room.invitedStudentId === actor.studentId) {
+        delete room.invitedStudentId; delete room.invitedStudentName;
+      }
       if (!returningPlayer) {
         if (gameKey === 'memory-match') game.scores[actor.studentId] = 0;
         if (gameKey === 'bingo') {
@@ -189,6 +214,80 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
           game.scores[actor.studentId] = 0;
         }
       }
+    } else if (action === 'invite-target') {
+      if (!twoPlayerGame(gameKey) || room.host !== actor.studentId || room.state !== 'lobby' ||
+          core.participantIds(room.players).length !== 1) {
+        operationError = 'Only the host can invite a classmate while waiting for an opponent.'; return;
+      }
+      // Target validity is checked before the transaction, not trusted from client-side names.
+      const target = String(move?.studentId || '');
+      if (!target) { delete room.invitedStudentId; delete room.invitedStudentName; }
+      else if (target === actor.studentId || target !== validatedInvite?.studentId) {
+        operationError = 'Choose an eligible classmate.'; return;
+      } else {
+        room.invitedStudentId = validatedInvite.studentId;
+        room.invitedStudentName = validatedInvite.name;
+      }
+    } else if (action === 'spectators') {
+      if (!twoPlayerGame(gameKey) || actor.studentId !== room.host) {
+        operationError = 'Only the host can change spectator access.'; return;
+      }
+      room.allowSpectators = move?.allow === true;
+      if (!room.allowSpectators) { room.spectators = {}; room.winnerQueue = []; }
+    } else if (action === 'spectate') {
+      if (!twoPlayerGame(gameKey) || !room.allowSpectators || !['lobby', 'playing', 'finished'].includes(room.state)) {
+        operationError = 'Spectators are not allowed in this room.'; return;
+      }
+      if (room.players?.[actor.studentId]?.active !== false && room.players?.[actor.studentId]) return room;
+      room.spectators ||= {};
+      if (!room.spectators[actor.studentId] && Object.keys(room.spectators).length >= MAX_SPECTATORS) {
+        operationError = 'Spectator spots are full.'; return;
+      }
+      room.spectators[actor.studentId] ||= { name: actor.name, joinedAt: now() };
+    } else if (action === 'queue-winner') {
+      if (!twoPlayerGame(gameKey) || !room.allowSpectators || !room.spectators?.[actor.studentId]) {
+        operationError = 'Join as a spectator to play the winner next.'; return;
+      }
+      if (core.participantIds(room.players).length < 2) {
+        operationError = 'Wait until both players have joined.'; return;
+      }
+      room.winnerQueue = activeQueue(room);
+      if (!room.winnerQueue.includes(actor.studentId)) room.winnerQueue.push(actor.studentId);
+    } else if (action === 'unqueue-winner') {
+      room.winnerQueue = activeQueue(room).filter(id => id !== actor.studentId);
+    } else if (action === 'next-round') {
+      const queue = activeQueue(room), winnerId = String(room.game?.winner || '');
+      if (!twoPlayerGame(gameKey) || !room.allowSpectators || room.state !== 'finished' ||
+          !winnerId || actor.studentId !== winnerId || !room.players?.[winnerId] ||
+          room.players[winnerId].active === false || !queue.length) {
+        operationError = 'The winner must choose to play the next waiting challenger.'; return;
+      }
+      const challengerId = queue[0], challenger = room.spectators[challengerId];
+      const winner = room.players[winnerId], formerPlayers = room.players;
+      room.players = {
+        [winnerId]: { ...winner, joinedAt: now() - 1 },
+        [challengerId]: { name: challenger.name, active: true, joinedAt: now() },
+      };
+      delete room.spectators[challengerId];
+      for (const [id, player] of Object.entries(formerPlayers)) {
+        if (id !== winnerId) room.spectators[id] = { name: player.name, joinedAt: now() };
+      }
+      room.winnerQueue = queue.slice(1);
+      room.host = winnerId; room.hostName = winner.name;
+      delete room.invitedStudentId; delete room.invitedStudentName;
+      room.game = core.createGameState(gameKey, room.players, { seed: crypto.randomInt(1, 0x7fffffff) });
+      core.startGameState(gameKey, room.game, core.participantIds(room.players));
+      room.round = (Number(room.round) || 1) + 1;
+      room.state = 'playing'; room.startedAt = now(); delete room.finishedAt;
+    } else if (action === 'rematch-draw') {
+      if (!twoPlayerGame(gameKey) || room.state !== 'finished' || !room.game?.draw ||
+          !room.players?.[actor.studentId] || room.players[actor.studentId].active === false) {
+        operationError = 'Only current players can restart a drawn match.'; return;
+      }
+      room.game = core.createGameState(gameKey, room.players, { seed: crypto.randomInt(1, 0x7fffffff) });
+      core.startGameState(gameKey, room.game, core.participantIds(room.players));
+      room.round = (Number(room.round) || 1) + 1;
+      room.state = 'playing'; room.startedAt = now(); delete room.finishedAt;
     } else if (action === 'start') {
       if (actor.studentId !== room.host) { operationError = 'Only the host can start this game.'; return; }
       if (room.state !== 'lobby') { operationError = 'This game has already started.'; return; }
@@ -201,8 +300,11 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
       catch (error) { operationError = error.message; return; }
       if (game.finished) { room.state = 'finished'; room.finishedAt = now(); }
     } else if (action === 'leave') {
-      if (!room.players?.[actor.studentId]) { operationError = 'Join this room before leaving it.'; return; }
-      room.players[actor.studentId].active = false;
+      if (!room.players?.[actor.studentId] || room.players[actor.studentId].active === false) {
+        if (!room.spectators?.[actor.studentId]) { operationError = 'Join this room before leaving it.'; return; }
+        delete room.spectators[actor.studentId];
+        room.winnerQueue = activeQueue(room);
+      } else room.players[actor.studentId].active = false;
       if (room.host === actor.studentId) {
         room.state = 'closed';
         room.closedAt = now();
@@ -230,6 +332,14 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
     const actor = await authorizeStudent(request, db, String(data.workspaceId || ''));
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'create') return await newRoom(db, actor, String(data.gameKey || ''));
+    if (data.action === 'classmates') {
+      const members = (await db.ref(`b3Games/workspaces/${actor.workspaceId}/classes/${actor.classId}/members`).get()).val() || {};
+      return { classmates: Object.entries(members)
+        .filter(([id, member]) => id !== actor.studentId && SAFE_ID.test(id) && member?.active !== false &&
+          member?.toolAccess?.['multiplayer-center'] !== false)
+        .slice(0, 80).map(([studentId, member]) => ({ studentId, name: safeName(member.name) }))
+        .sort((a, b) => a.name.localeCompare(b.name)) };
+    }
     if (data.action === 'get-private') {
       if (!SAFE_ID.test(data.roomCode || '') || !core.gameConfig(data.gameKey)) throw new HttpsError('invalid-argument', 'Invalid room or game.');
       const p = paths(actor.workspaceId, actor.classId, data.roomCode);
@@ -240,7 +350,19 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       }
       return { private: handSnapshot.val() || core.privateView(data.gameKey, room.game, actor.studentId) };
     }
-    return await mutateRoom(db, actor, String(data.gameKey || ''), String(data.roomCode || ''), String(data.action || ''), data.move);
+    let validatedInvite = null;
+    if (data.action === 'invite-target' && data.move?.studentId) {
+      const target = String(data.move.studentId);
+      if (!SAFE_ID.test(target) || target === actor.studentId) {
+        throw new HttpsError('invalid-argument', 'Choose a different classmate.');
+      }
+      const member = (await db.ref(`b3Games/workspaces/${actor.workspaceId}/classes/${actor.classId}/members/${target}`).get()).val();
+      if (!member || member.active === false || member.toolAccess?.['multiplayer-center'] === false) {
+        throw new HttpsError('permission-denied', 'That classmate is not currently available for this game.');
+      }
+      validatedInvite = { studentId: target, name: safeName(member.name) };
+    }
+    return await mutateRoom(db, actor, String(data.gameKey || ''), String(data.roomCode || ''), String(data.action || ''), data.move, validatedInvite);
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     console.error('Multiplayer game action failed:', JSON.stringify({
