@@ -28,6 +28,9 @@ test.before(async () => {
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha': { active: true, role: 'teacher', classIds: { alpha: true } },
       'b3Games/workspaces/b3-2026/teachers/teacher_beta': { active: true, role: 'teacher', classIds: { beta: true } },
       'b3Games/workspaces/b3-2026/teachers/teacher_inactive': { active: false, role: 'teacher', classIds: { alpha: true } },
+      'b3Games/workspaces/b3-2026/teachers/teacher_et': { active: true, role: 'teacher', classIds: { et: true } },
+      'b3Games/workspaces/b3-2026/classes/et': { active: true, teacherIds: { teacher_et: true }, members: { student_et: { active: true } } },
+      'b3Games/siteSettings': { games: { 'multiplayer-center': true }, classGames: { et: { 'multiplayer-center': true } } },
       'b3Games/workspaces/b3-2026/classes/alpha': { active: true, teacherIds: { owner_alpha: true, teacher_alpha: true, teacher_inactive: true }, toolGrants: { 'multiplayer-center': true }, members: { student_alpha: { active: true, toolAccess: { 'multiplayer-center': true } }, student_disabled: { active: true, toolAccess: { 'multiplayer-center': false } } } },
       'b3Games/workspaces/b3-2026/classes/beta': { active: true, teacherIds: { owner_beta: true, teacher_beta: true }, toolGrants: { 'multiplayer-center': true }, members: { student_beta: { active: true } } },
       'multiplayerCenter/workspaces/b3-2026/classes/alpha/rooms/shorashim-1234': { host: 'teacher_owner_alpha', gameKey: 'shorashim', state: 'lobby', classId: 'alpha' },
@@ -82,6 +85,19 @@ testEmulator('teacher lobby listener requires both active assignment and class t
   await assertFails(get(ref(alpha, base + 'beta/rooms')));
   await assertFails(get(ref(beta, base + 'alpha/rooms')));
   await assertFails(get(ref(inactive, base + 'alpha/rooms')));
+});
+
+testEmulator('legacy ET lobby listener works with enabled class switch, then denies when disabled', async () => {
+  const path = 'multiplayerCenter/workspaces/b3-2026/classes/et/rooms';
+  const student = env.authenticatedContext('auth_et', { b3StudentRole: 'student', b3StudentId: 'student_et', b3ClassId: 'et' }).database();
+  const teacher = env.authenticatedContext('teacher_et', { email: 'et@example.test' }).database();
+  await assertSucceeds(get(ref(student, path)));
+  await assertSucceeds(get(ref(teacher, path)));
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(), 'b3Games/siteSettings/classGames/et/multiplayer-center'), false);
+  });
+  await assertFails(get(ref(student, path)));
+  await assertFails(get(ref(teacher, path)));
 });
 
 testEmulator('removing class membership or teacher assignment revokes waiting-room reads', async () => {
