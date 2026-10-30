@@ -39,15 +39,27 @@ test('new request creation maintains the private per-student index',()=>{
  assert.match(source,/studentPointHistoryIndexUpdates\("requests",requestId,String\(finalValue\.rewardStudentId\)\)/);
 });
 
-test('new request and index are included in the same multi-path update',async()=>{
+test('request transaction creates the record and separate index write cannot overwrite it',async()=>{
  const x=backend({studentRewards:{students:{student_a:{name:'Fictional Student',classId:'class_a'}},pointRequests:{}}});
  const start=source.indexOf('async function studentInfo('),end=source.indexOf('\n\nfunction dateKeyInNewYork',start);
  vm.runInContext(source.slice(start,end)+';globalThis.createPendingRequest=createPendingRequest;',x.ctx);
- await x.ctx.createPendingRequest({requestId:'fictional_request',rewardStudentId:'student_a',studentId:'practice_a',source:'chazara',amount:1,reason:'Synthetic'});
- const write=x.writes.find(update=>Object.hasOwn(update,'studentRewards/pointHistoryIndex/student_a/requests/fictional_request'));
+ const args={requestId:'fictional_request',rewardStudentId:'student_a',studentId:'practice_a',source:'chazara',amount:1,reason:'Synthetic'};
+ await x.ctx.createPendingRequest(args);
+ const requestPath='studentRewards/pointRequests/fictional_request';
+ const indexPath='studentRewards/pointHistoryIndex/student_a/requests/fictional_request';
+ const write=x.writes.find(update=>Object.hasOwn(update,indexPath));
  assert.ok(write);
- assert.ok(write['studentRewards/pointRequests/fictional_request']);
- assert.equal(write['studentRewards/pointHistoryIndex/student_a/requests/fictional_request'],true);
+ assert.equal(write[indexPath],true);
+ assert.ok(!Object.hasOwn(write,requestPath),'index update must not write a stale request snapshot');
+ assert.equal(x.tree.studentRewards.pointRequests.fictional_request.status,'pending');
+ // Simulate an index update lost after the request transaction committed.
+ delete x.tree.studentRewards.pointHistoryIndex.student_a.requests.fictional_request;
+ x.tree.studentRewards.pointRequests.fictional_request.status='approved';
+ const retry=await x.ctx.createPendingRequest(args);
+ assert.equal(retry.created,false);
+ assert.equal(retry.status,'approved');
+ assert.equal(x.tree.studentRewards.pointHistoryIndex.student_a.requests.fictional_request,true,'retry repairs missing index');
+ assert.equal(x.tree.studentRewards.pointRequests.fictional_request.status,'approved','retry preserves teacher decision');
 });
 
 test('migration advances in small resumable batches and is safe to retry',async()=>{
