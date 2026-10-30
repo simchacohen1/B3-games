@@ -22,10 +22,16 @@
       role = 'student';
     } else {
       var teacher = (await db.ref('b3Games/workspaces/' + WORKSPACE + '/teachers/' + user.uid).once('value')).val();
-      if (!teacher || teacher.active !== true || teacher.role !== 'teacher') throw new Error('Sign in with an authorized teacher account.');
+      if (!teacher || teacher.active !== true) throw new Error('Sign in with an authorized teacher account.');
       var assigned = Object.keys(teacher.classIds || {}).filter(function (id) { return teacher.classIds[id] === true && VALID_ID.test(id); });
-      classId = String(requestedClassId || assigned[0] || '');
-      if (!VALID_ID.test(classId) || assigned.indexOf(classId) < 0) throw new Error('Choose a class assigned to your teacher account.');
+      var ownerMode = teacher.role === 'owner';
+      if (teacher.role !== 'teacher' && !ownerMode) throw new Error('Sign in with an authorized teacher account.');
+      if (ownerMode) {
+        var admin = (await db.ref('b3Games/admins/' + user.uid).once('value')).val();
+        if (!admin || admin.active === false) throw new Error('Sign in with an authorized teacher account.');
+      }
+      classId = String(requestedClassId || assigned[0] || (ownerMode ? 'et' : ''));
+      if (!VALID_ID.test(classId) || !ownerMode && assigned.indexOf(classId) < 0) throw new Error('Choose a class assigned to your teacher account.');
       participantId = 'teacher_' + user.uid;
       name = String(teacher.displayName || user.displayName || 'Teacher');
       role = 'teacher';
