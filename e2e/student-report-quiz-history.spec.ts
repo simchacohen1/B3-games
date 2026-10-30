@@ -168,3 +168,63 @@ test('third class: its teacher sees only SC, a missed quiz shows as Not Started,
   expect(reads.some(p => /arik_test|beni_test|chaim_test/.test(p))).toBe(false);
   expect(errors).toEqual([]);
 });
+
+
+// PDF/ZIP libraries are mocked here so the test is deterministic and never
+// downloads scripts or student data from third-party services.
+async function mockQuizExportLibraries(page: any) {
+  await page.route('https://cdn.jsdelivr.net/**', (route: any) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+  await page.addInitScript(() => {
+    const host = window as any;
+    host.jspdf = { jsPDF: class {
+      addImage() {}
+      output() { return new TextEncoder().encode('%PDF-synthetic-test').buffer; }
+    } };
+    host.JSZip = class {
+      names: string[] = [];
+      file(name: string) { this.names.push(name); }
+      async generateAsync() { return new Blob([JSON.stringify(this.names)], { type: 'application/zip' }); }
+    };
+  });
+}
+
+test('single student: quizzes-only view, print choice and PDF exclude other tools', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'admin' }, '?class=et');
+  await page.locator('#period').selectOption('0');
+  await page.getByRole('button', { name: 'Synthetic Arik' }).click();
+  await page.getByRole('button', { name: /Quizzes Only/ }).click();
+  await expect(page.locator('.qsec')).toBeVisible();
+  await expect(page.locator('#report .rgrid')).toBeHidden();
+  await expect(page.locator('#report .rhead')).toContainText('Synthetic Arik');
+  await page.evaluate(() => { (window as any).print = () => { (window as any).__didPrint = true; }; });
+  await page.getByRole('button', { name: 'Print Quizzes' }).click();
+  expect(await page.evaluate(() => (window as any).__didPrint)).toBe(true);
+  expect(await page.evaluate(() => document.body.classList.contains('quiz-print-only'))).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  expect(await page.evaluate(() => document.body.classList.contains('quiz-print-only'))).toBe(false);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Download Quiz PDF' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('Synthetic-Arik-quizzes.pdf');
+  expect(fs.readFileSync(await download.path(), 'utf8')).toBe('%PDF-synthetic-test');
+  await page.getByRole('button', { name: 'Full Report' }).click();
+  await expect(page.locator('#report .rgrid')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('class ZIP: one quiz PDF per student in selected class, none from other classes', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'teacher', classIds: ['et'] }, '?class=et');
+  await page.locator('#period').selectOption('0');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /All Students Quiz PDFs \(ZIP\)/ }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^quiz-reports-East-Track-\\d{4}-\\d{2}-\\d{2}\\.zip$/);
+  const names: string[] = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+  expect(names).toEqual(['Synthetic-Arik-quizzes.pdf', 'Synthetic-Beni-quizzes.pdf']);
+  expect(names.join(' ')).not.toMatch(/Chaim|Dovid/);
+  expect(errors).toEqual([]);
+});
