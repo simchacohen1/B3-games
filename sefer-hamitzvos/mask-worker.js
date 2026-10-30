@@ -6,13 +6,6 @@ self.onmessage=function(event){
  const request=event.data||{};
  try{
   const data=new Uint8ClampedArray(request.pixels);
-  if(request.closedSections){
-   const mask=self.FTTMitzvahFill.createRegionMask({data},request.width,request.height);
-   if(!mask)throw new Error("Mask unavailable");
-   const labels=mask.labels.buffer;
-   self.postMessage({revision:request.revision,card:request.card,width:mask.width,height:mask.height,labels},[labels]);
-   return;
-  }
   const mask=self.FTTMitzvahFill.createObjectMask({data},request.width,request.height,request.groups);
   if(!mask)throw new Error('Mask unavailable');
   const labels=mask.fine.buffer,objects=mask.labels.buffer;
