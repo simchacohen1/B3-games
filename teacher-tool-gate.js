@@ -113,10 +113,34 @@
     }
     return { ok: true };
   }
+  // Revocation while the page stays open: site-settings only reads access when sign-in changes,
+  // so watch this teacher's own records and re-decide the moment they change.
+  var watchedUid = null;
+  function watchAccess(user) {
+    try {
+      var api = window.B3SiteSettings, fb = window.firebase;
+      if (!user || !user.uid || watchedUid === user.uid || !fb || !fb.database || !api) return;
+      if (String(user.email || "").toLowerCase() === "simcha5770@gmail.com") return; // owner is fixed by email
+      var db = fb.database(), ws = "b3Games/workspaces/" + (api.workspaceId || "b3-2026");
+      var adminRef = db.ref("b3Games/admins/" + user.uid), teacherRef = db.ref(ws + "/teachers/" + user.uid);
+      watchedUid = user.uid;
+      var first = { a: true, t: true };
+      function recheck() {
+        Promise.all([adminRef.once("value"), teacherRef.once("value")]).then(function (s) {
+          var admin = s[0].val(), teacher = s[1].val();
+          if (admin && admin.active !== false) return onDecision(user, true, { authorized: true, role: "admin", classIds: ["*"] });
+          var ids = teacher && teacher.active !== false && teacher.classIds ? Object.keys(teacher.classIds).filter(function (k) { return k !== "*" && teacher.classIds[k] === true; }) : [];
+          onDecision(user, ids.length > 0, ids.length ? { authorized: true, role: "teacher", classIds: ids } : { authorized: false, role: "", classIds: [] });
+        }).catch(function () { onDecision(user, false, { authorized: false, role: "", classIds: [] }); });
+      }
+      adminRef.on("value", function () { if (first.a) { first.a = false; return; } recheck(); });
+      teacherRef.on("value", function () { if (first.t) { first.t = false; return; } recheck(); });
+    } catch (e) { /* the sign-in-time check above still stands */ }
+  }
   function onDecision(user, authorized, access) {
     var d = decide(user, authorized, access);
     if (d.ok) {
-      stage = "allowed";
+      stage = "allowed"; watchAccess(user);
       allowedOnce = true; unlock(); markReady(); return;
     }
     deniedSinceLoad = true; stage = d.why; lock();

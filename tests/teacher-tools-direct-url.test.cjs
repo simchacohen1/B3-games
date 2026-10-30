@@ -103,3 +103,23 @@ test('pages that double as a student screen keep working for students; only teac
     assert.equal(teacherMode.locked, true, 'teacher mode must lock for a student');
   } finally { await browser.close(); server.close(); }
 });
+
+test('revoking a teacher or removing their class while a tool stays open locks it at once', { timeout: 120000 }, async () => {
+  const server = await H.startServer(), port = server.address().port, browser = await H.chromium.launch();
+  try {
+    for (const change of [
+      { name: 'teacher marked inactive', path: 'b3Games/workspaces/b3-2026/teachers/teacher_et/active', value: false },
+      { name: 'assigned class removed', path: 'b3Games/workspaces/b3-2026/teachers/teacher_et/classIds', value: {} },
+      { name: 'teacher record deleted', path: 'b3Games/workspaces/b3-2026/teachers/teacher_et', value: undefined }
+    ]) {
+      const { page, context } = await H.openAs(browser, port, 'teacherET', 'chazara/teacher.html?class=et', { settleMs: 0 });
+      await page.waitForFunction(() => document.documentElement.dataset.b3Gate === 'allowed', null, { timeout: 15000 });
+      await page.evaluate(c => window.__setTree(c.path, c.value), change);
+      await page.waitForFunction(() => document.documentElement.dataset.b3Gate !== 'allowed', null, { timeout: 5000 }).catch(() => {});
+      const s = await H.snapshot(page);
+      assert.equal(s.locked, true, change.name + ': tool must lock without reload or sign-out');
+      assert.equal(s.visibleControlsOutsideGate, 0, change.name + ': no tool controls may remain visible');
+      await context.close();
+    }
+  } finally { await browser.close(); server.close(); }
+});

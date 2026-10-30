@@ -36,13 +36,13 @@ const IDENTITIES = {
 function stubSource(identity) {
   const user = identity ? { ...identity } : null;
   return `(()=>{
- const T=${JSON.stringify(TREE)},U=${JSON.stringify(user)},reads=[],writes=[];
+ const T=${JSON.stringify(TREE)},U=${JSON.stringify(user)},reads=[],writes=[],watchers={};
  const USER=U?Object.assign({},U,{getIdToken:async()=> 'token-'+U.uid}):null;
  const at=p=>p.split('/').filter(Boolean).reduce((v,k)=>v==null?undefined:v[k],T);
  const snap=v=>({val:()=>v==null?null:structuredClone(v),exists:()=>v!=null,forEach:()=>false,numChildren:()=>0,key:null});
  const ref=p=>{const r={
   once:async()=>{reads.push(p);return snap(at(p))},get:async()=>{reads.push(p);return snap(at(p))},
-  on:(e,cb)=>{reads.push(p);setTimeout(()=>{try{cb&&cb(snap(at(p)))}catch(x){}},0);return cb},off:()=>{},
+  on:(e,cb)=>{reads.push(p);(watchers[p]=watchers[p]||[]).push(cb);setTimeout(()=>{try{cb&&cb(snap(at(p)))}catch(x){}},0);return cb},off:()=>{},
   set:async()=>{writes.push(p)},update:async()=>{writes.push(p)},remove:async()=>{writes.push(p)},transaction:async()=>{writes.push(p);return{committed:false,snapshot:snap(null)}},
   push:()=>ref(p+'/pushed'),child:c=>ref(p+'/'+c),orderByChild:()=>r,orderByKey:()=>r,equalTo:()=>r,limitToLast:()=>r,limitToFirst:()=>r,startAt:()=>r,endAt:()=>r,
   onDisconnect:()=>({set:async()=>{},remove:async()=>{},cancel:async()=>{}}),key:p.split('/').pop(),parent:null};return r};
@@ -53,6 +53,7 @@ function stubSource(identity) {
  function GoogleAuthProvider(){this.setCustomParameters=()=>{};this.addScope=()=>{}}
  const rememberedApp={auth:()=>remembered,delete:async()=>{}};
  const firebase={apps:[{}],initializeApp(){return rememberedApp},app:n=>{if(n==='FTTRememberedTeacher')return rememberedApp;return{auth:()=>auth,database:()=>db}},database:Object.assign(()=>db,{ServerValue:{TIMESTAMP:{'.sv':'timestamp'}}}),auth:Object.assign(()=>auth,{Auth:{Persistence:{LOCAL:'local',SESSION:'session',NONE:'none'}},GoogleAuthProvider}),storage:()=>({ref:()=>({put:async()=>{},getDownloadURL:async()=>''})}),functions:()=>({httpsCallable:()=>async()=>({data:{}})})};
+ window.__setTree=(p,v)=>{const k=p.split('/').filter(Boolean),last=k.pop();let o=T;for(const x of k)o=o[x]=o[x]||{};if(v===undefined)delete o[last];else o[last]=v;for(const w of Object.keys(watchers)){if(w===p||w.startsWith(p+'/')||p.startsWith(w+'/'))for(const cb of watchers[w])try{cb(snap(at(w)))}catch(x){}}};
  window.firebase=firebase;window.__reads=reads;window.__writes=writes;
  })();`;
 }

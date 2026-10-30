@@ -46,3 +46,9 @@ So a determined person can still use the database directly. Closing this is the 
 * Staging: not deployed. The staging copy is built by a local, untracked tool; this branch has only been tested locally.
 * Production: unchanged.
 * Real teacher / real student sign-in on the gated pages.
+
+## Review follow-ups (PR 441 review, 2026-10-28)
+
+* **Revocation while a tool is open:** the gate now also watches the signed-in teacher's own `admins/<uid>` and `teachers/<uid>` records and re-decides when they change (inactive, class removed, record deleted), without sign-out or reload. Tested with fictional data (`revoking a teacher or removing their class...`). This is the screen. Server-side denial of later writes still depends on the database rules (see "Still open").
+* **Hidden is not execution-blocked:** unchanged and stated plainly. Other scripts on a gated page still load and can issue reads (and, apart from Game Show's startup write which now waits for `B3TeacherGateReady`, the tests show no writes for denied users). The tests assert zero visible tool controls and zero writes for denied users; they do **not** claim zero reads. Data isolation must come from rules/functions; RTDB/Functions emulator checks per route belong with the rules work (#20/#94/#145/#344).
+* **`data-scope="b3"` and the hardcoded `et`/`wt` IDs:** intentional for now. Class Dashboard, Comment Log, Sync to Nigri, Chossid Lamdan marks and the Hebrew Reading lab are B3-only tools (not grantable per class), so they are limited to admins and ET/WT teachers. If they become class-generic, remove that special case together with #344 and keep existing lock/grant history. Not changed here.
