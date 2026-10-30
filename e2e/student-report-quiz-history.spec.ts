@@ -178,6 +178,7 @@ async function mockQuizExportLibraries(page: any) {
     const host = window as any;
     host.jspdf = { jsPDF: class {
       addImage() {}
+      addPage() { host.__pdfPagesAdded = (host.__pdfPagesAdded || 0) + 1; }
       output() { return new TextEncoder().encode('%PDF-synthetic-test').buffer; }
     } };
     host.JSZip = class {
@@ -226,5 +227,30 @@ test('class ZIP: one quiz PDF per student in selected class, none from other cla
   const names: string[] = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
   expect(names).toEqual(['Synthetic-Arik-quizzes.pdf', 'Synthetic-Beni-quizzes.pdf']);
   expect(names.join(' ')).not.toMatch(/Chaim|Dovid/);
+  expect(errors).toEqual([]);
+});
+
+
+test('quizzes-only PDF pagination keeps multiple pages', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'admin' }, '?class=et');
+  const pages = await page.evaluate(() => {
+    const host = window as any;
+    const z = Array.from({ length: 45 }, (_, i) => ({
+      title: 'Practice of many quiz rows '+i, date: Date.now(), status:'completed',
+      correct:8,total:10,pct:80,attempts:[{status:'completed'}],
+    }));
+    const input = {
+      name:'Synthetic Student', className:'Synthetic Class', period:'All time',
+      history:{
+        summary:{assigned:45,completed:45,inProgress:0,notStarted:0,avg:80,pointsEarned:360,pointsPossible:450},
+        quizzes:z,unavailable:[]
+      },
+      practice:[],
+    };
+    host.B3QuizExports.makePdf(input);
+    return host.__pdfPagesAdded||0;
+  });
+  expect(pages).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
