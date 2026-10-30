@@ -203,6 +203,8 @@ $('save').onclick=()=>{const a=document.createElement('a');a.download='mitzvah-'
 function showDate(iso){
  const today=calendar.studyToday(new Date(),window.FTTSunTimes);
  if(!canBrowseDates&&iso>today)iso=today;
+ // Finish a brush stroke under the old artwork's save namespace before switching dates.
+ if(active&&iso!==selectedDate){active=null;persist();}
  selectedDate=iso;$('tomorrow').disabled=!canBrowseDates&&iso>=today;const study=calendar.lesson(iso,days);window.FTTSeferWordActivity&&window.FTTSeferWordActivity.collectDay(iso,study.mitzvos);
  $('hebrewDate').textContent=calendar.hebrewDate(iso);$('hebrewText').textContent=calendar.hebrewDate(iso,'he-IL-u-ca-hebrew');$('civilDate').textContent=new Intl.DateTimeFormat('en-US',{dateStyle:'full',timeZone:'UTC'}).format(new Date(iso+'T12:00:00Z'));
  $('studyDay').textContent='Study day '+study.day+' of 339';
