@@ -513,7 +513,54 @@
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
         if (!classIds.length) return { authorized:false, role:"", classIds:[] };
-        return { authorized:true, role:"teacher", accountType:teacher.accountType==="principal"?"principal":"teacher", supervisedTeachers:teacher.accountType==="principal"?(teacher.supervisedTeachers||{}):{}, classIds:classIds };
+        if (teacher.accountType === "principal") {
+          // A principal's stored classIds are only an upper bound. A supervised
+          // teacher may have been disabled or moved out of a class since the
+          // owner's last reconciliation; never authorize from stale grants.
+          const supervisors = teacher.supervisedTeachers || {};
+          const ids = Object.keys(supervisors).filter(function(id) {
+            return /^[A-Za-z0-9_-]{1,100}$/.test(id);
+          });
+          if (!ids.length || ids.length > 100) return { authorized:false, role:"", classIds:[] };
+          return Promise.all(ids.map(function(id) {
+            return services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites/" + id).once("value").then(function(snap) {
+              const invite = snap.val();
+              if (!invite || invite.active === false || invite.accountType === "principal" || invite.role === "principal") return null;
+              const claimedUid = String(invite.claimedUid || "");
+              if (!claimedUid) return { id:id, invite:invite, claimed:null };
+              if (!/^[A-Za-z0-9_-]{1,128}$/.test(claimedUid)) return null;
+              return services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + claimedUid).once("value").then(function(s) {
+                return { id:id, invite:invite, claimed:s.val() };
+              });
+            });
+          })).then(function(rows) {
+            const allowed = new Set(classIds);
+            const current = new Set();
+            const validSupervisors = Object.create(null);
+            rows.forEach(function(row) {
+              if (!row) return;
+              const claimed = row.claimed;
+              // A claimed invitation must still point to a live teacher.
+              if (row.invite.claimedUid && !claimed) return;
+              if (claimed && (claimed.active === false || claimed.accountType === "principal")) return;
+              const saved = supervisors[row.id] && supervisors[row.id].classIds || {};
+              const invited = row.invite.classIds || {};
+              const claimedClasses = claimed && claimed.classIds || null;
+              const idsForTeacher = Object.keys(saved).filter(function(id) {
+                return allowed.has(id) && saved[id] === true && invited[id] === true &&
+                  (!claimedClasses || claimedClasses[id] === true);
+              });
+              if (!idsForTeacher.length) return;
+              validSupervisors[row.id] = { classIds:Object.fromEntries(idsForTeacher.map(function(id){return [id,true];})) };
+              idsForTeacher.forEach(function(id){current.add(id);});
+            });
+            const liveClassIds = classIds.filter(function(id){return current.has(id);});
+            if (!liveClassIds.length) return { authorized:false, role:"", classIds:[] };
+            return { authorized:true, role:"teacher", accountType:"principal",
+              supervisedTeachers:validSupervisors, classIds:liveClassIds };
+          });
+        }
+        return { authorized:true, role:"teacher", accountType:"teacher", supervisedTeachers:{}, classIds:classIds };
       }
 
       // Read only this verified user's invitation; never enumerate other teachers.

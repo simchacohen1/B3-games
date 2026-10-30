@@ -7,7 +7,11 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
   teacher_et:{active:true,classIds:{et:true}},
   teacher_wt:{active:true,classIds:{wt:true}},
   teacher_new:{active:true,classIds:{'new-room':true}},
-  principal:{active:true,accountType:'principal',classIds:{et:true,'new-room':true}}
+  principal:{active:true,accountType:'principal',classIds:{et:true,'new-room':true},
+    supervisedTeachers:{teacher_et:{classIds:{et:true}},teacher_new:{classIds:{'new-room':true}}}}
+ },teacherInvites:{
+  teacher_et:{active:true,role:'teacher',classIds:{et:true},claimedUid:'teacher_et'},
+  teacher_new:{active:true,role:'teacher',classIds:{'new-room':true},claimedUid:'teacher_new'}
  },classes:{
   et:{name:'ET',active:true,toolGrants:{chazara:true},members:{student_et:{active:true,name:'ET Student'}}},
   wt:{name:'WT',active:true,toolGrants:{chazara:true},members:{student_wt:{active:true,name:'WT Student'}}},
