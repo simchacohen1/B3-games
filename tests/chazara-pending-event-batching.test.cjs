@@ -20,12 +20,12 @@ const keyEnd=html.indexOf('function updateRecordingRow(',keyStart);
 assert.ok(keyStart>=0&&keyEnd>keyStart,'extract the real recording key encoder');
 const keyEncoder=html.slice(keyStart,keyEnd);
 
-function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs=null}={}){
+function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs=null,failOnceAt=-1}={}){
  const requests=requestPairs||Array.from({length:queueSplit?16:12},(_,i)=>({
   id:'request_'+i,recorded:true,practiceStudentId:'student_'+i,eventId:'event_'+i
  }));
  const dom={classList:{add(){},remove(){}},innerHTML:''};
- let active=0,peak=0,reads=0,listCalls=0;
+ let active=0,peak=0,reads=0,listCalls=0,failedOnce=false;
  const ctx={
   auth:{currentUser:{uid:'fictional_teacher'}},
   scopeGeneration:1,approvalGeneration:0,
@@ -53,6 +53,7 @@ function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs
    active--;
    if(revoke&&reads===4)ctx.scopeGeneration++;
    if(details.eventId==='event_'+failAt)throw Error('fictional read failure');
+   if(details.eventId==='event_'+failOnceAt&&!failedOnce){failedOnce=true;throw Error('fictional transient read failure')}
    return {event:{recorded:true,workspaceClassId:'alpha',createdAt:1234}};
   }
  };
@@ -140,4 +141,22 @@ test('tuple keys keep distinct student and event IDs separate even with undersco
  assert.equal(s.events.length,2,'both students retain their own recordings');
  assert.ok(x.hasPending(left),'first recording is present in pending filter');
  assert.ok(x.hasPending(right),'second recording is present in pending filter');
+});
+
+
+test('transient pending recording failure retries only the missing audio on the next refresh',async()=>{
+ const x=fixture({failOnceAt:2});
+ await x.run();
+ const first=x.state();
+ assert.equal(first.reads,12,'the initial pending queue fetches each recording once');
+ assert.equal(first.events.length,11,'one transient API failure leaves its audio unavailable');
+ assert.equal(first.pending,12,'a recording fetch failure must not remove its pending approval');
+ await x.run();
+ const recovered=x.state();
+ assert.equal(recovered.reads,13,'only the failed recording is retried; successful audio stays cached');
+ assert.equal(recovered.events.length,12,'the recovered recording is now available');
+ assert.equal(recovered.pending,12,'the authorized pending queue remains intact');
+ assert.ok(recovered.peak<=4,'recovery must respect the global four-read cap');
+ await x.run();
+ assert.equal(x.state().reads,13,'a third refresh reuses all recovered recordings');
 });
