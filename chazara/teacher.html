@@ -425,7 +425,15 @@ window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScop
 // the dashboard (which hides it while loading) when something actually changed.
 async function quietScopeCheck(){
  if(!teacherAccess?.authorized||!teacherScope||document.hidden)return;
- const sig=s=>JSON.stringify([Object.keys(s.classes||{}).sort(),Object.keys(s.students||{}).sort(),Object.values(s.students||{}).map(x=>x.classId).sort()]);
+ // Bind each student ID to its current class and full membership provenance.
+ // Sorting only the two sets independently misses class swaps between pupils.
+ const sig=s=>JSON.stringify([
+  Object.keys(s.classes||{}).sort(),
+  Object.entries(s.students||{}).sort(([a],[b])=>a.localeCompare(b)).map(([id,student])=>[
+   id,String(student?.classId||''),
+   [...new Set((Array.isArray(student?.membershipClassIds)?student.membershipClassIds:[]).filter(classId=>typeof classId==='string'))].sort()
+  ])
+ ]);
  try{
   let access=teacherAccess;
   if(needsTeacherAssignmentRefresh(access)){
