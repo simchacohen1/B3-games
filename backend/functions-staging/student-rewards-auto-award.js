@@ -24,6 +24,7 @@ const POINTS = Object.freeze({
   "shorashim-no-hints": 3,
   [rashiCore.RASHI_SOURCE]: rashiCore.RASHI_POINTS,
 });
+const POINT_HISTORY_MIGRATION_BATCH_SIZE=100;
 
 function cors(req, res) {
   const origin = String(req.headers.origin || "");
@@ -306,25 +307,35 @@ async function requirePracticeStudent(req,source){
 }
 
 async function studentPointHistory(studentId){
-  const [requestsSnap,adjustmentsSnap,classContribSnap]=await Promise.all([
-    rtdb.ref(`${SR_ROOT}/pointRequests`).get(),
-    rtdb.ref(`${SR_ROOT}/pointAdjustments`).get().catch(()=>null),
+  const [indexSnap,classContribSnap]=await Promise.all([
+    rtdb.ref(`${SR_ROOT}/pointHistoryIndex/${studentId}`).get().catch(()=>null),
     rtdb.ref(`${SR_ROOT}/classRewardContributionsByStudent/${studentId}`).get().catch(()=>null),
   ]);
+  const index=indexSnap?.val()||{};
+  const migration=(await rtdb.ref(`${SR_ROOT}/pointHistoryMigration`).get().catch(()=>null))?.val()||{};
+  if(migration.complete!==true)return {complete:false,history:[]};
+  // A student request never scans global ledgers. Legacy entries are added by
+  // the bounded owner migration action below.
+  const requestIds=Object.keys(index.requests||{}),adjustmentIds=Object.keys(index.adjustments||{});
+  const [requestSnaps,adjustmentSnaps]=await Promise.all([
+    Promise.all(requestIds.map(id=>rtdb.ref(`${SR_ROOT}/pointRequests/${id}`).get().catch(()=>null))),
+    Promise.all(adjustmentIds.map(id=>rtdb.ref(`${SR_ROOT}/pointAdjustments/${id}`).get().catch(()=>null))),
+  ]);
   const rows=[];
-  requestsSnap.forEach(child=>{
-    const item=child.val() || {};
+  requestSnaps.forEach((child,index)=>{
+    const item=child?.val() || {};
+    if(String(item.rewardStudentId||'')!==studentId)return;
     const amount=Number(item.actualAmount ?? item.amount ?? 0);
     if(String(item.rewardStudentId || "") !== studentId || item.status !== "approved" || !amount) return;
-    rows.push({id:child.key,...item,actualAmount:amount});
+    rows.push({id:requestIds[index],...item,actualAmount:amount});
   });
-  if(adjustmentsSnap){
-    adjustmentsSnap.forEach(child=>{
-      const item=child.val() || {};
+  if(adjustmentSnaps){
+    adjustmentSnaps.forEach((child,index)=>{
+      const item=child?.val() || {};
       const amount=Number(item.amount || 0);
       if(String(item.studentId || "") !== studentId || !amount) return;
       rows.push({
-        id:child.key,
+        id:adjustmentIds[index],
         source:"teacher-adjustment",
         reason:item.reason || "Teacher adjustment",
         actualAmount:amount,
@@ -356,7 +367,63 @@ async function studentPointHistory(studentId){
     });
   }
   rows.sort((a,b)=>(Number(b.reviewedAt || b.createdAt)||0)-(Number(a.reviewedAt || a.createdAt)||0));
-  return rows;
+  return {complete:true,history:rows};
+}
+
+function studentPointHistoryIndexUpdates(kind,id,studentId){
+  if(!studentId||!id)return {};
+  return {[`${SR_ROOT}/pointHistoryIndex/${studentId}/${kind}/${id}`]:true};
+}
+function updatesToIndex(updates,kind){
+  const marker=`/${kind}/`,out={};
+  for(const path of Object.keys(updates||{})){const at=path.indexOf(marker);if(at>=0)out[path.slice(at+marker.length)]=true;}
+  return out;
+}
+
+async function migratePointHistoryBatch(request={}){
+  const stateRef=rtdb.ref(`${SR_ROOT}/pointHistoryMigration`);
+  const ownerToken=`${Date.now()}_${Math.random().toString(36).slice(2)}`,now=Date.now();
+  const lease=await rtdb.ref(`${SR_ROOT}/pointHistoryMigrationLease`).transaction(current=>current&&Number(current.expiresAt)>now?undefined:{ownerToken,expiresAt:now+120000});
+  if(!lease.committed)return {busy:true,processed:0};
+  try{
+  const stateSnap=await stateRef.get();
+  const state=stateSnap.val()||{phase:'requests',cursor:null,highWater:null,complete:false};
+  if(state.complete===true)return {complete:true,processed:0,phase:'complete'};
+  const phase=state.phase==='adjustments'?'adjustments':'requests';
+  const path=`${SR_ROOT}/${phase==='requests'?'pointRequests':'pointAdjustments'}`;
+  const source=rtdb.ref(path);
+  let query=rtdb.ref(path).orderByKey();
+  if(state.highWater)query=query.endAt(String(state.highWater));
+  if(state.cursor)query=query.startAt(String(state.cursor));
+  query=query.limitToFirst(POINT_HISTORY_MIGRATION_BATCH_SIZE+1+(state.cursor?1:0));
+  let highWater=state.highWater;
+  if(!highWater){const last=(await rtdb.ref(path).orderByKey().limitToLast(1).get());highWater=Object.keys(last.val()||{}).sort().at(-1)||null;}
+  const snap=await query.get(),updates={},ids=[],keys=[];
+  keys.push(...Object.keys(snap.val()||{}).sort());
+  const pageKeys=state.cursor?keys.filter(key=>key!==String(state.cursor)):keys;
+  const selectedKeys=new Set(pageKeys.slice(0,POINT_HISTORY_MIGRATION_BATCH_SIZE));
+  for(const key of selectedKeys){
+    const value=snap.child(key).val()||{},studentId=String(phase==='requests'?value.rewardStudentId:value.studentId||'');
+    if(studentId){updates[`${SR_ROOT}/pointHistoryIndex/${studentId}/${phase}/${key}`]=true;ids.push(key);}
+  }
+  const selectedPage=pageKeys.slice(0,POINT_HISTORY_MIGRATION_BATCH_SIZE);
+  const lastKey=selectedPage.at(-1)||null;
+  const hasMore=pageKeys.length>POINT_HISTORY_MIGRATION_BATCH_SIZE;
+  const next=hasMore?{phase,cursor:lastKey,highWater,complete:false}:{phase:phase==='requests'?'adjustments':'complete',cursor:null,highWater:null,complete:phase==='adjustments'};
+  if(Object.keys(updates).length)await rtdb.ref().update(updates);
+  const liveLease=(await rtdb.ref(`${SR_ROOT}/pointHistoryMigrationLease`).get()).val()||{};
+  if(liveLease.ownerToken!==ownerToken||Number(liveLease.expiresAt)<=Date.now())throw new Error('Migration lease expired before checkpoint. Retry the batch.');
+  await stateRef.set(next);
+  return {complete:next.complete===true,processed:ids.length,phase:next.phase,cursor:next.cursor};
+  }finally{
+    // A transaction updater can first receive null when the server value is not
+    // cached locally, even when another owner has an active lease. Returning
+    // null lets RTDB compare against the server and retry with the actual value;
+    // only clear the lease when that authoritative value belongs to this batch.
+    await rtdb.ref(`${SR_ROOT}/pointHistoryMigrationLease`).transaction(current=>
+      current==null||current.ownerToken===ownerToken?null:undefined
+    ).catch(()=>{});
+  }
 }
 
 function studentClassIdsFromRoot(root,studentId){
@@ -941,6 +1008,7 @@ async function approvePendingRequest(requestId,reviewedBy){
   }
   const balanceAfter=Number(bal.snapshot.val() || 0);
   await ref.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy,reviewedAt:Date.now(),lastError:null});
+  await rtdb.ref().update(studentPointHistoryIndexUpdates("requests",requestId,rewardStudentId));
   await mirrorChazaraPointStatus(item,"approved");
   return {ok:true,status:"approved",actualAmount:applied,balanceAfter,studentName:item.studentName || rewardStudentId};
 }
@@ -969,6 +1037,7 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
   if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return{ok:false,error:'Could not add the reward points.'}}
   const balanceAfter=Number(bal.snapshot.val()||0);
   await ref.update({status:'approved',actualAmount:applied,balanceAfter,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
+  await rtdb.ref().update(studentPointHistoryIndexUpdates('requests',requestId,rewardStudentId));
   return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
@@ -1095,6 +1164,11 @@ async function createPendingRequest({requestId,rewardStudentId,studentId,source,
   };
   const tx=await ref.transaction(current=>current||value);
   const finalValue=tx.snapshot.val()||value;
+  if(finalValue.rewardStudentId){
+    const updates=studentPointHistoryIndexUpdates("requests",requestId,String(finalValue.rewardStudentId));
+    if(tx.committed)updates[`${SR_ROOT}/pointRequests/${requestId}`]=finalValue;
+    await rtdb.ref().update(updates);
+  }
   return {created:tx.committed,requestId,status:finalValue.status||"pending",amount:Number(finalValue.amount||amount)};
 }
 
@@ -1252,6 +1326,7 @@ async function reverseRecordingPointsForTeacherRejection(studentId,eventId,event
     });
     return {ok:true,action:"reversed",status:existing.status||"approved",requestId,amount:Number(existing.actualAmount??existing.amount??0),balanceAfter:existing.balanceAfter};
   }
+  await rtdb.ref().update(studentPointHistoryIndexUpdates('requests',requestId,rewardStudentId));
 
   let applied=0;
   const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
@@ -1393,6 +1468,7 @@ async function handleRemoval(studentId,eventId){
       await eventRef.update({removalPointRequestId:requestId,removalPointRequestStatus:existing.status||"approved"});
       return {ok:true,action:"reversed",status:existing.status||"approved",requestId,amount:Number(existing.actualAmount??existing.amount??0),balanceAfter:existing.balanceAfter};
     }
+    await rtdb.ref().update(studentPointHistoryIndexUpdates('requests',requestId,rewardStudentId));
     let applied=0;
     const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
     const bal=await balRef.transaction(cur=>{
@@ -1487,14 +1563,21 @@ exports.studentRewardsAutoAward = onRequest(
       const body=req.body&&typeof req.body==="object"&&!Buffer.isBuffer(req.body)?req.body:{};
       const action=String(body.action||"").trim();
       if(action==="rashi-student-status")return await rashiStudentStatus(req,res);
+      if(action==="migrate-point-history-index"){
+        const owner=await requireTeacher(req);
+        if(!owner.ok)return res.status(401).json({error:owner.error});
+        if(owner.owner!==true)return res.status(403).json({error:"Owner access required."});
+        const result=await migratePointHistoryBatch();
+        return res.status(200).json({ok:true,...result});
+      }
       if(action){
         if(action==="student-point-history" || action==="class-reward-status" || action==="contribute-class-reward"){
           const student=await requireStudent(req);
           if(!student.ok) return res.status(401).json({error:student.error});
           const preferredClassId=String(student.decoded?.studentRewardsClassId || student.decoded?.classId || "").trim();
           if(action==="student-point-history"){
-            const history=await studentPointHistory(student.studentId);
-            return res.status(200).json({ok:true,history});
+            const result=await studentPointHistory(student.studentId);
+            return res.status(200).json({ok:true,...result});
           }
           if(action==="class-reward-status"){
             const status=await classRewardStatusForStudent(student.studentId,preferredClassId);
@@ -1650,3 +1733,4 @@ exports.studentRewardsAutoAward = onRequest(
     }
   }
 );
+
