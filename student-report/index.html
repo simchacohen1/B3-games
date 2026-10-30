@@ -72,8 +72,19 @@ td.none{color:#cbd5e1}
 .linkbtn{background:none;border:0;color:#1d4ed8;font-weight:700;cursor:pointer;padding:0;font:inherit;white-space:nowrap}
 .linkbtn:hover{text-decoration:underline}
 .note{font-size:12px;color:#64748b;margin-top:3px;display:block}
+body.quiz-only-view #report>.attn,body.quiz-only-view #report>.good,body.quiz-only-view #report>.rgrid{display:none}
+body.quiz-only-view #report>.qsec{margin-top:18px}
+.qactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qactions .btn{font-size:13px}
+#zipStatus{color:#cbd5e1;font-size:13px}
+button:disabled{opacity:.55;cursor:wait}
 @media print{
  header,.bar,.stats,#classView,.noprint{display:none!important}
+ body.quiz-print-only #report>.attn,body.quiz-print-only #report>.good,body.quiz-print-only #report>.rgrid{display:none!important}
+ body.quiz-print-only #report>.qsec{margin:10px 0 0!important}
+ .qdet{break-inside:avoid}
+ .qsec table{font-size:11px}
+ .qsec th,.qsec td{padding:5px 6px}
  body{background:#fff}.wrap{margin:0;max-width:none}
  .card{box-shadow:none;border:0}
  #report{display:block!important}
@@ -89,10 +100,13 @@ td.none{color:#cbd5e1}
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
 <script src="quiz-history.js?v=20261026-simple-csv"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="quiz-export.js?v=20261030-quizzes-only"></script>
 </head><body>
 <header>
  <div><h1>📈 Student Report</h1><div class="sub">Every tool, one place — by student or whole class</div></div>
- <div class="noprint" style="display:flex;gap:8px"><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="csv" title="One row per student in the selected class">⬇ Class CSV (whole class)</button></div>
+ <div class="noprint" style="display:flex;gap:8px"><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="csv" title="One row per student in the selected class">⬇ Class CSV (whole class)</button><button class="btn blue" id="classQuizzesZip" title="One quizzes-only PDF per student in the selected class">⬇ All Students Quiz PDFs (ZIP)</button><span id="zipStatus" role="status" aria-live="polite"></span></div>
 </header>
 <div class="wrap">
  <div id="gate" class="gate">Checking your teacher account…</div>
@@ -135,6 +149,8 @@ function tone(p){return p===null?'':p>=80?'g':p>=60?'y':'r'}
 
 let access=null,user=null,classes=[],current='',loaded={},extras={},sortKey='name',sortDir=1,openId='';
 const openQuiz=new Set();
+let quizOnlyView=false;
+window.addEventListener('afterprint',()=>document.body.classList.remove('quiz-print-only'));
 
 /* ---------- Tool summaries ---------- */
 const RASHI_UNITS=[['zayin','ז'],['bet','בּ/ב'],['tsadi','צ'],['alef','א'],['tsadisofit','ץ'],['memsofit','ם'],['shin','שׁ/שׂ'],['samech','ס'],['finalreview','שׁ/שׂ review']];
@@ -329,7 +345,7 @@ function openReport(id,silent){
  const t=s.t,pl=$('period').selectedOptions[0].text.toLowerCase(),{a,g}=attention(s);
  const cls=classes.find(c=>c.id===current);
  let h='<div class="rhead"><div><h2>'+esc(s.name)+'</h2><div class="status">'+esc(cls?cls.name:'')+' · Report for '+esc(pl)+' · '+new Date().toLocaleDateString()+' · Last active '+esc(ago(s.last))+'</div></div>'+
-  '<div class="noprint" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn blue" id="printBtn">🖨 Print / Save PDF</button><button class="btn" id="studentCsv">⬇ Download This Student CSV</button><button class="btn light" id="closeBtn">✕ Back to class</button></div></div>';
+  '<div class="noprint" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn blue" id="printBtn">🖨 Print Full Report</button><button class="btn light" id="quizOnlyBtn">📝 Quizzes Only</button><button class="btn" id="studentCsv">⬇ Download This Student CSV</button><button class="btn light" id="closeBtn">✕ Back to class</button></div></div>';
  if(a.length)h+='<div class="attn" style="margin-top:16px"><h3>⚠️ Needs attention</h3><ul>'+a.map(li).join('')+'</ul></div>';
  if(g.length)h+='<div class="good" style="margin-top:10px"><h3>✅ Going well</h3><ul>'+g.map(li).join('')+'</ul></div>';
  h+='<div class="rgrid">';
@@ -345,7 +361,23 @@ function openReport(id,silent){
  h+='</div>';
  h+=quizSection(s,pl);
  $('report').innerHTML=h;$('report').style.display='block';$('classView').style.display='none';$('summary').style.display='none';
+ document.body.classList.toggle('quiz-only-view',quizOnlyView);
+ $('quizOnlyBtn').textContent=quizOnlyView?'← Full Report':'📝 Quizzes Only';
+ $('printBtn').style.display=quizOnlyView?'none':'';
  $('printBtn').onclick=()=>window.print();
+ $('quizOnlyBtn').onclick=()=>{quizOnlyView=!quizOnlyView;openReport(id,true)};
+ $('quizPrintBtn').onclick=()=>{
+   document.body.classList.add('quiz-print-only');
+   window.print();
+ };
+ $('quizPdfBtn').onclick=async()=>{
+   const b=$('quizPdfBtn');b.disabled=true;b.textContent='Preparing PDF…';
+   try{
+     const item=await quizExportInput(s,current,pl,Number($('period').value),d.quizRoot);
+     B3QuizExports.savePdf(item,B3QuizExports.safeName(s.name)+'-quizzes.pdf');
+   }catch(e){alert('Could not download quiz PDF: '+e.message)}
+   finally{if(b.isConnected){b.disabled=false;b.textContent='⬇ Download Quiz PDF'}}
+ };
  $('closeBtn').onclick=closeReport;
  $('studentCsv').onclick=()=>studentCsv(s);
  $('report').querySelectorAll('[data-qk]').forEach(b=>b.onclick=()=>{const k=b.dataset.qk;openQuiz.has(k)?openQuiz.delete(k):openQuiz.add(k);openReport(id,true)});
@@ -381,7 +413,7 @@ function attemptHtml(a){
 function quizSection(s,pl){
  const hist=s.quizHist,q=hist.summary,x=extras[current+'/'+s.id]||{},days=+$('period').value;
  const practice=x.practice?B3QuizHistory.practiceRows(x.practice,days?Date.now()-days*DAY:0):null;
- let h='<div class="qsec"><div class="qhead"><h3>📝 All Quizzes<small>'+esc(pl)+'</small></h3>'+(days?'<button class="btn light noprint" id="qAllTime">Show all time</button>':'')+'</div>';
+ let h='<div class="qsec"><div class="qhead"><h3>📝 All Quizzes<small>'+esc(pl)+'</small></h3><div class="qactions noprint">'+(days?'<button class="btn light" id="qAllTime">Show all time</button>':'')+'<button class="btn light" id="quizPrintBtn">🖨 Print Quizzes</button><button class="btn blue" id="quizPdfBtn">⬇ Download Quiz PDF</button></div></div>';
  h+='<div class="qchips"><span class="qchip"><b>'+q.assigned+'</b>assigned</span><span class="qchip"><b>'+q.completed+'</b>completed</span><span class="qchip"><b>'+q.inProgress+'</b>in progress</span><span class="qchip"><b>'+q.notStarted+'</b>not started</span>'+
   '<span class="qchip"><b class="'+tone(q.avg)+'">'+(q.avg===null?'—':q.avg+'%')+'</b>average of completed quizzes</span><span class="qchip"><b>'+q.pointsEarned+' / '+q.pointsPossible+'</b>points on completed quizzes</span></div>';
  if(!hist.quizzes.length&&!hist.unavailable.length)h+='<div class="empty">No Weekly Quizzes were given to him '+esc(pl)+'.</div>';
@@ -453,7 +485,44 @@ function studentCsv(s){
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+B3QuizHistory.toCsv(rows)],{type:'text/csv'}));
  a.download='quiz-history-'+s.name.replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
-function closeReport(){openId='';$('report').style.display='none';$('classView').style.display='';$('summary').style.display=''}
+function closeReport(){openId='';quizOnlyView=false;document.body.classList.remove('quiz-only-view','quiz-print-only');$('report').style.display='none';$('classView').style.display='';$('summary').style.display=''}
+async function quizExportInput(s,classId,period,days,quizRoot){
+ const key=classId+'/'+s.id;let x=extras[key];
+ if(!x||x.loading||!Object.prototype.hasOwnProperty.call(x,'practice')){
+   const [created,practice]=await Promise.all([
+     get('b3Games/students/'+s.id+'/profile/createdAt'),
+     get('b3Quiz/practiceAttempts/'+s.id)
+   ]);
+   x={joinedAt:num(created)||0,practice:practice===undefined?undefined:obj(practice)};
+   extras[key]=x;
+ }
+ const since=days?Date.now()-days*DAY:0;
+ return {
+   id:s.id,name:s.name,period,
+   className:(classes.find(c=>c.id===classId)||{}).name||classId,
+   history:B3QuizHistory.buildHistory({root:quizRoot,studentId:s.id,classId,joinedAt:x.joinedAt||0,since}),
+   practice:x.practice===undefined?null:B3QuizHistory.practiceRows(x.practice,since)
+ };
+}
+async function classQuizzesZip(){
+ const b=$('classQuizzesZip'),d=loaded[current],c=classes.find(c=>c.id===current);
+ if(!d||!d.view||!c){alert('Load a class before downloading.');return}
+ const selectedClass=current,days=Number($('period').value),period=$('period').selectedOptions[0].text;
+ b.disabled=true;
+ try{
+   const reports=[];
+   for(let i=0;i<d.view.length;i++){
+     $('zipStatus').textContent='Reading '+(i+1)+' of '+d.view.length+'…';
+     reports.push(await quizExportInput(d.view[i],selectedClass,period,days,d.quizRoot));
+   }
+   $('zipStatus').textContent='Creating PDFs…';
+   await B3QuizExports.saveZip(reports,c.name,period,(n,total)=>{
+     $('zipStatus').textContent='PDF '+n+' of '+total+'…';
+   });
+   $('zipStatus').textContent='ZIP downloaded.';
+ }catch(e){$('zipStatus').textContent='Download failed.';alert('Could not download class quiz ZIP: '+e.message)}
+ finally{b.disabled=false}
+}
 
 /* ---------- CSV ---------- */
 function classCsvHead(pl){return ['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average %, completed quizzes only ('+pl+')','Quizzes completed ('+pl+')','Quizzes assigned ('+pl+')','Points']}
@@ -501,6 +570,7 @@ async function start(u,authorized,acc){
 $('period').onchange=()=>drawTable();
 $('refresh').onclick=()=>show(true);
 $('csv').onclick=csv;
+$('classQuizzesZip').onclick=classQuizzesZip;
 if(api&&typeof api.onAuthStateChanged==='function')api.onAuthStateChanged(start);
 else $('gate').textContent='Teacher access could not start. Please refresh the page.';
 })();
