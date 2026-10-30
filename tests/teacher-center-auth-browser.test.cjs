@@ -7,9 +7,13 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
   teacher_et:{active:true,classIds:{et:true}},
   teacher_wt:{active:true,classIds:{wt:true}},
   teacher_new:{active:true,classIds:{'new-room':true}},
-  principal:{active:true,accountType:'principal',classIds:{et:true,'new-room':true},
+  principal:{active:true,accountType:'principal',email:'principal@example.test',
+    inviteId:'principal_invite',classIds:{et:true,'new-room':true},
     supervisedTeachers:{teacher_et:{classIds:{et:true}},teacher_new:{classIds:{'new-room':true}}}}
  },teacherInvites:{
+  principal_invite:{active:true,accountType:'principal',email:'principal@example.test',
+    claimedUid:'principal',classIds:{et:true,'new-room':true},
+    supervisedTeacherIds:{teacher_et:true,teacher_new:true}},
   teacher_et:{active:true,role:'teacher',classIds:{et:true},claimedUid:'teacher_et'},
   teacher_new:{active:true,role:'teacher',classIds:{'new-room':true},claimedUid:'teacher_new'}
  },classes:{
@@ -19,7 +23,7 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
  }}}}};
 const USER_STUB=`(()=>{
  const T=${JSON.stringify(tree)},params=new URLSearchParams(location.search),role=params.get('synthetic')||'teacher_new';
- const records={owner:{uid:'owner',email:'simcha5770@gmail.com',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'owner-token'},teacher_et:{uid:'teacher_et',email:'et@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'et-token'},teacher_wt:{uid:'teacher_wt',email:'wt@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'wt-token'},teacher_new:{uid:'teacher_new',email:'new@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'new-token'},principal:{uid:'principal',email:'principal@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'principal-token'}};
+ const records={owner:{uid:'owner',email:'simcha5770@gmail.com',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'owner-token'},teacher_et:{uid:'teacher_et',email:'et@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'et-token'},teacher_wt:{uid:'teacher_wt',email:'wt@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'wt-token'},teacher_new:{uid:'teacher_new',email:'new@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'new-token'},principal:{uid:'principal',email:'principal@example.test',emailVerified:true,providerData:[{providerId:'google.com'}],getIdToken:async()=> 'principal-token'}};
  const user=records[role],returning=params.get('returning')==='1',signIn=params.get('signin')==='1',delay=Number(params.get('authDelay')||35),reads=[];
  const snap=v=>({val:()=>v==null?null:structuredClone(v),exists:()=>v!=null});
  function at(p){return p.split('/').filter(Boolean).reduce((v,k)=>v==null?undefined:v[k],T)}

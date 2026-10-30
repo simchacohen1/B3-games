@@ -514,12 +514,27 @@
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
         if (!classIds.length) return { authorized:false, role:"", classIds:[] };
         if (teacher.accountType === "principal") {
-          // A principal's stored classIds are only an upper bound. A supervised
-          // teacher may have been disabled or moved out of a class since the
-          // owner's last reconciliation; never authorize from stale grants.
-          const supervisors = teacher.supervisedTeachers || {};
+          // Both the owner's current principal invitation and the supervised
+          // teachers' current grants must authorize this fresh access read.
+          // Cached principal classIds and supervisedTeachers are upper bounds.
+          const principalInviteId = String(teacher.inviteId || "");
+          const email = String(user.email || "").trim().toLowerCase();
+          if (user.emailVerified !== true ||
+              !/^[A-Za-z0-9_-]{1,100}$/.test(principalInviteId))
+            return { authorized:false, role:"", classIds:[] };
+          return services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites/" + principalInviteId)
+            .once("value").then(function(principalSnap) {
+            const principalInvite = principalSnap.val();
+            if (!principalInvite || principalInvite.active === false ||
+                principalInvite.accountType !== "principal" ||
+                String(principalInvite.claimedUid || "") !== String(user.uid || "") ||
+                String(principalInvite.email || "").trim().toLowerCase() !== email ||
+                String(teacher.email || "").trim().toLowerCase() !== email)
+              return { authorized:false, role:"", classIds:[] };
+            const supervisors = teacher.supervisedTeachers || {};
           const ids = Object.keys(supervisors).filter(function(id) {
-            return /^[A-Za-z0-9_-]{1,100}$/.test(id);
+            return /^[A-Za-z0-9_-]{1,100}$/.test(id) &&
+              principalInvite.supervisedTeacherIds && principalInvite.supervisedTeacherIds[id] === true;
           });
           if (!ids.length || ids.length > 100) return { authorized:false, role:"", classIds:[] };
           return Promise.all(ids.map(function(id) {
@@ -534,7 +549,9 @@
               });
             });
           })).then(function(rows) {
-            const allowed = new Set(classIds);
+            const allowed = new Set(classIds.filter(function(id) {
+              return principalInvite.classIds && principalInvite.classIds[id] === true;
+            }));
             const current = new Set();
             const validSupervisors = Object.create(null);
             rows.forEach(function(row) {
@@ -558,6 +575,7 @@
             if (!liveClassIds.length) return { authorized:false, role:"", classIds:[] };
             return { authorized:true, role:"teacher", accountType:"principal",
               supervisedTeachers:validSupervisors, classIds:liveClassIds };
+          });
           });
         }
         return { authorized:true, role:"teacher", accountType:"teacher", supervisedTeachers:{}, classIds:classIds };

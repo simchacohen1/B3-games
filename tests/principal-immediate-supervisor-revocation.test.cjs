@@ -16,6 +16,15 @@ const principal = {
   getIdToken: async () => 'fictional'
 };
 function access(data) {
+  // The owner's current principal invitation is the authoritative upper bound.
+  // Individual test cases vary supervised teacher invitations independently.
+  if (!Object.prototype.hasOwnProperty.call(data, ROOT + '/teacherInvites/principal_invite')) {
+    data[ROOT + '/teacherInvites/principal_invite'] = {
+      active:true,accountType:'principal',claimedUid:principal.uid,
+      email:principal.email,classIds:{et:true,wt:true},
+      supervisedTeacherIds:{teacherA:true,teacherB:true}
+    };
+  }
   const reads = [];
   const db = {
     ref(path) {
@@ -51,6 +60,7 @@ function access(data) {
 function teacherRecord(classIds) {
   return {
     active: true, role: 'teacher', accountType: 'principal',
+    inviteId:'principal_invite',email:principal.email,
     classIds, supervisedTeachers: { teacherA: { classIds: { et: true, wt: true } } }
   };
 }
