@@ -79,3 +79,41 @@ test('RED: supervisor class removal immediately removes only that principal clas
   assert.deepEqual(Array.from(result.classIds), ['et'],
     'principal must lose WT immediately, retaining the still-supervised ET class');
 });
+
+
+test('claimed supervisor disabled or missing denies a stale principal grant', async () => {
+  for (const claimedRecord of [{active:false,classIds:{et:true}}, null]) {
+    const data = {
+      [ROOT + '/teachers/fictional-principal']: teacherRecord({et:true}),
+      [ROOT + '/teacherInvites/teacherA']: {
+        role:'teacher', active:true, classIds:{et:true}, claimedUid:'claimed-teacher'
+      }
+    };
+    if (claimedRecord) data[ROOT + '/teachers/claimed-teacher'] = claimedRecord;
+    const x = access(data);
+    const result = await x.read();
+    assert.equal(result.authorized, false,
+      'a stale principal grant must not survive disabled or missing claimed teacher');
+    assert.ok(x.reads.includes(ROOT + '/teachers/claimed-teacher'));
+  }
+});
+
+test('overlapping supervisors retain only currently supervised classes', async () => {
+  const cached = teacherRecord({et:true,wt:true});
+  cached.supervisedTeachers.teacherB = {classIds:{et:true,wt:true}};
+  const x = access({
+    [ROOT + '/teachers/fictional-principal']: cached,
+    [ROOT + '/teacherInvites/teacherA']: {
+      role:'teacher', active:false, classIds:{et:true,wt:true}
+    },
+    [ROOT + '/teacherInvites/teacherB']: {
+      role:'teacher', active:true, classIds:{wt:true}
+    }
+  });
+  const result = await x.read();
+  assert.equal(result.authorized, true);
+  assert.deepEqual(Array.from(result.classIds), ['wt'],
+    'revoking one supervisor must not revoke another supervisor\'s valid WT grant');
+  assert.ok(!result.supervisedTeachers.teacherA);
+  assert.ok(result.supervisedTeachers.teacherB);
+});
