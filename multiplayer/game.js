@@ -53,6 +53,11 @@
     ref = db.ref(roomPath);
     listener = ref.on('value', snapshot => {
       room = snapshot.val();
+      if (params.get('b3Multiplayer') === 'spectate' && room && !room.allowSpectators &&
+          !(room.players || []).some(player => player.studentId === studentId)) {
+        unlisten(); notice('The host turned off spectator mode. Choose another game.', true);
+        roomSection.hidden = true; showBrowse(); return;
+      }
       if (!room || ['closed'].includes(room.state)) {
         unlisten(); notice('This game room has closed. You can choose another game.'); roomSection.hidden = true; showBrowse(); return;
       }
