@@ -29,6 +29,15 @@ const fixtureAssignments = [{
   students: fixtureStudents,
 }];
 
+test('main staging landing links teachers to Homework @homework-ui', async ({ page }) => {
+  const watch = await watchPage(page);
+  await page.goto(HOMEWORK_SITE + '/', { waitUntil: 'domcontentloaded' });
+  const link = page.locator('#homeworkCenterCard');
+  await expect(link).toHaveAttribute('href', 'assignment-center/teacher.html');
+  await expect(link).toContainText('Homework & Assignments');
+  expect(watch.productionRequests).toEqual([]);
+});
+
 test('fictional teacher sees distinct workload states and simple screens @homework-ui', async ({ page }, testInfo) => {
   const watch = await watchPage(page);
   await page.route('https://www.gstatic.com/firebasejs/**', route => route.abort());
