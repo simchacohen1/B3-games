@@ -102,7 +102,7 @@ function draw(){ctx.clearRect(0,0,cv.width,cv.height);for(const s of strokes){if
 let maskWorker=null;
 function regionGroupsFor(card){const all=window.FTT_SEFER_REGION_GROUPS||{};return Array.isArray(all[card])?all[card]:[];}
 // Main-thread fallback when workers are unavailable: same engine, same result.
-function buildMaskSync(){if(num>=500&&num<=503)return window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);try{const m=window.FTTMitzvahFill.createObjectMask(sourcePixels,cv.width,cv.height,regionGroupsFor(num));return m?{width:m.width,height:m.height,labels:m.fine,objectLabels:m.labels,groups:m.groups}:null;}catch(error){console.warn('Sefer object sections unavailable',error);return window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);}}
+function buildMaskSync(){try{const m=window.FTTMitzvahFill.createObjectMask(sourcePixels,cv.width,cv.height,regionGroupsFor(num));return m?{width:m.width,height:m.height,labels:m.fine,objectLabels:m.labels,groups:m.groups}:null;}catch(error){console.warn('Sefer object sections unavailable',error);return window.FTTMitzvahFill.createRegionMask(sourcePixels,cv.width,cv.height);}}
 function finishMask(mask,card,revision){
  if(revision!==artLoadRevision||card!==num)return;
  regionMask=mask;if(mask&&mask.objectLabels&&!mask.object)mask.object={width:mask.width,height:mask.height,labels:mask.objectLabels};
@@ -124,7 +124,7 @@ function startMask(card,revision){
    // Transfer a copy; the original source pixels are still needed to replay
    // existing legacy coloring without changing saved student records.
    const pixels=sourcePixels.data.slice().buffer;
-   maskWorker.postMessage({card,revision,width:cv.width,height:cv.height,pixels,closedSections:card>=500&&card<=503,groups:regionGroupsFor(card)},[pixels]);
+   maskWorker.postMessage({card,revision,width:cv.width,height:cv.height,pixels,groups:regionGroupsFor(card)},[pixels]);
    return;
   }catch(error){console.warn('Sefer mask worker unavailable',error);maskWorker.terminate();maskWorker=null;}
  }
@@ -132,7 +132,7 @@ function startMask(card,revision){
 }
 try{
  if(typeof Worker==='function'){
-  maskWorker=new Worker('mask-worker.js?v=20261025-approved');
+  maskWorker=new Worker('mask-worker.js?v=20261030-sliver-fill');
   maskWorker.onmessage=event=>{
    const result=event.data||{};
    if(result.revision!==artLoadRevision||result.card!==num)return;
