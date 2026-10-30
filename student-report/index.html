@@ -100,8 +100,6 @@ button:disabled{opacity:.55;cursor:wait}
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
 <script src="quiz-history.js?v=20261026-simple-csv"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="quiz-export.js?v=20261030-quizzes-only"></script>
 </head><body>
 <header>
@@ -374,7 +372,7 @@ function openReport(id,silent){
    const b=$('quizPdfBtn');b.disabled=true;b.textContent='Preparing PDF…';
    try{
      const item=await quizExportInput(s,current,pl,Number($('period').value),d.quizRoot);
-     B3QuizExports.savePdf(item,B3QuizExports.safeName(s.name)+'-quizzes.pdf');
+     await B3QuizExports.savePdf(item,B3QuizExports.safeName(s.name)+'-quizzes.pdf');
    }catch(e){alert('Could not download quiz PDF: '+e.message)}
    finally{if(b.isConnected){b.disabled=false;b.textContent='⬇ Download Quiz PDF'}}
  };
