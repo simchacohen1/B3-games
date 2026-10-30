@@ -81,14 +81,13 @@
     svg.setAttribute("aria-hidden", "true");
     return svg;
   }
-  // Keep all games visible as compact app tiles. A category can expand in place.
-  var expandedCategory = "";
+  // Keep every game visible at its full app-tile size from the first render.
   var readyToPlay = false;
   var categoriesEl = document.getElementById("gameCategories");
   var gameResultsSummary = document.getElementById("gameResultsSummary");
-  function drawGameCard(game, compact) {
+  function drawGameCard(game) {
     var category = GAME_CATEGORIES[game.key];
-    var card = make("article", "game game-" + category + " game-" + game.key + (compact ? " game-mini" : ""));
+    var card = make("article", "game game-" + category + " game-" + game.key);
     var button = make("button", "game-launch");
     var picture = make("span", "game-art");
     picture.setAttribute("aria-hidden", "true");
@@ -111,46 +110,22 @@
     categoriesEl.className = "category-shelf";
     CATEGORIES.filter(function (category) { return category.key !== "all"; }).forEach(function (category) {
       var games = GAMES.filter(function (game) { return GAME_CATEGORIES[game.key] === category.key; });
-      var isExpanded = expandedCategory === category.key || expandedCategory === "all";
-      var group = make("section", "category-group category-" + category.key + (isExpanded ? " is-expanded" : ""));
-      var toggle = make("button", "category-heading");
-      var gameGrid = make("div", "category-game-grid" + (isExpanded ? " is-expanded" : ""));
+      var group = make("section", "category-group category-" + category.key);
+      var heading = make("h3", "category-heading");
+      var gameGrid = make("div", "category-game-grid");
       var groupId = "category-games-" + category.key;
-      toggle.type = "button";
-      toggle.id = "category-toggle-" + category.key;
-      toggle.setAttribute("aria-controls", groupId);
-      toggle.setAttribute("aria-expanded", String(isExpanded));
-      toggle.append(make("span", "category-mark", category.icon),
+      heading.id = "category-heading-" + category.key;
+      heading.append(make("span", "category-mark", category.icon),
         make("span", "category-title", category.label),
-        make("span", "category-count", games.length + " games"),
-        make("span", "category-expand-label", isExpanded ? "Make smaller  −" : "Make bigger  +"));
-      toggle.addEventListener("click", function () {
-        expandedCategory = expandedCategory === category.key ? "" : category.key;
-        drawCategoryHome();
-        var focusTarget = document.getElementById(toggle.id);
-        if (focusTarget) focusTarget.focus();
-      });
+        make("span", "category-count", games.length + " games"));
       gameGrid.id = groupId;
       gameGrid.setAttribute("role", "group");
-      gameGrid.setAttribute("aria-labelledby", toggle.id);
-      games.forEach(function (game) { gameGrid.appendChild(drawGameCard(game, !isExpanded)); });
-      group.append(toggle, gameGrid);
+      gameGrid.setAttribute("aria-labelledby", heading.id);
+      games.forEach(function (game) { gameGrid.appendChild(drawGameCard(game)); });
+      group.append(heading, gameGrid);
       categoriesEl.appendChild(group);
     });
-    var allGames = make("button", "all-games-link", expandedCategory === "all" ? "🎮 Make all games smaller" : "🎮 Make all 17 games bigger");
-    allGames.type = "button";
-    allGames.setAttribute("aria-pressed", String(expandedCategory === "all"));
-    allGames.addEventListener("click", function () {
-      expandedCategory = expandedCategory === "all" ? "" : "all";
-      drawCategoryHome();
-      document.querySelector(".all-games-link").focus();
-    });
-    categoriesEl.appendChild(allGames);
-    gameResultsSummary.textContent = expandedCategory === "all"
-      ? "All 17 games are expanded. Click a category to expand only that group, or make all games smaller."
-      : expandedCategory
-        ? "" + CATEGORIES.find(function (category) { return category.key === expandedCategory; }).label + " is expanded. All 17 games remain visible."
-        : "All 17 games are visible as compact tiles. Choose a game to play or make a category bigger.";
+    gameResultsSummary.textContent = "All 17 games are ready to browse. Choose a game to play with your classmates.";
   }
   function declinedRooms() {
     try { return new Set(JSON.parse(sessionStorage.getItem("fttMultiplayerDeclined:" + scopeKey) || "[]")); }
