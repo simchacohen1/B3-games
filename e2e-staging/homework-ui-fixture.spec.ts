@@ -106,11 +106,18 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
 
   await page.getByRole('button', { name: /Create Homework/ }).click();
   await page.locator('#title').fill('Fictional guided assignment');
+  await expect(page.locator('#createStep1')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Next: Choose students/ })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('homework-teacher-create.png'), fullPage: true });
+  await page.getByRole('button', { name: /Next: Choose students/ }).click();
+  await expect(page.locator('#createStep2')).toBeVisible();
+  await page.getByRole('button', { name: /Next: Check homework/ }).click();
+  await expect(page.locator('#createStep3')).toBeVisible();
   await expect(page.locator('#createPreview')).toContainText('Fictional guided assignment');
   await expect(page.getByRole('button', { name: /Save Draft/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Publish to Students/ })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('homework-teacher-create.png'), fullPage: true });
-  await page.locator('#screenCreate .backHome').click();
+  await page.screenshot({ path: testInfo.outputPath('homework-teacher-review.png'), fullPage: true });
+  await page.locator('#screenCreate > .screen-head .backHome').click();
 
   await page.getByRole('button', { name: /Check Homework/ }).click();
   await expect(page.locator('#reviewList')).toContainText('Aviva Gold');
@@ -167,7 +174,12 @@ test('fictional student can read teacher feedback and send a private message @ho
   await expect(page.getByRole('tab', { name: /To Do/ })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Handed In/ })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Finished/ })).toBeVisible();
-  await expect(page.locator('#list')).toContainText('Try reading that line again.');
+  const messages = page.getByRole('button', { name: /Read messages/ });
+  await expect(messages).toBeVisible();
+  await expect(page.locator('.conversation-content')).toBeHidden();
+  await messages.click();
+  await expect(page.locator('.conversation-content')).toBeVisible();
+  await expect(page.locator('.conversation-content')).toContainText('Try reading that line again.');
   await expect(page.getByRole('button', { name: '▶ Listen to voice note' })).toBeVisible();
   await page.getByRole('tab', { name: /To Do/ }).click();
   await page.locator('.home-conversation textarea').fill('Thank you. I will try again!');

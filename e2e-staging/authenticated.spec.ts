@@ -185,6 +185,10 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await teacherPage.locator('#type').selectOption('shorashim');
     await teacherPage.locator('#title').fill(title);
     await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
+    await teacherPage.getByRole('button', { name: /Next: Choose students/ }).click();
+    await expect(teacherPage.locator('#createStep2')).toBeVisible();
+    await teacherPage.getByRole('button', { name: /Next: Check homework/ }).click();
+    await expect(teacherPage.locator('#createStep3')).toBeVisible();
     await teacherPage.locator('.optional-settings > summary').click();
     await teacherPage.locator('#assigned').fill(localDate(0));
     await teacherPage.locator('#due').fill(localDate(1));

@@ -80,9 +80,18 @@
   }
   function conversation(options) {
     var box = el('section', null, 'home-conversation');
-    box.append(el('h4', options.role === 'teacher' ? 'Notes with this student' : 'Notes with your teacher'));
+    var messages = options.messages || [];
+    var heading = options.role === 'teacher' ? 'Notes with this student' : 'Notes with your teacher';
+    box.append(el('h4', heading));
+    var toggle = null, content = el('div', null, 'conversation-content');
+    if (options.collapsed) {
+      toggle = el('button', (messages.length ? '💬 Read messages' : '💬 Message your teacher') + (messages.length ? ' · ' + messages.length : ''), 'conversation-toggle sec');
+      toggle.type = 'button'; toggle.setAttribute('aria-expanded', 'false');
+      toggle.onclick = function () { var open = toggle.getAttribute('aria-expanded') !== 'true'; toggle.setAttribute('aria-expanded', String(open)); content.hidden = !open; };
+      box.append(toggle); content.hidden = true;
+    }
     var history = el('div', null, 'conversation-history');
-    (options.messages || []).slice(-30).forEach(function (message) {
+    messages.slice(-30).forEach(function (message) {
       var item = el('article', null, 'conversation-message ' + (message.role === options.role ? 'mine' : 'theirs'));
       item.append(el('strong', message.role === 'teacher' ? 'Teacher' : 'Student'));
       if (message.text) item.append(el('p', message.text));
@@ -101,7 +110,7 @@
       history.append(item);
     });
     if (!(options.messages || []).length) history.append(el('p', 'No notes yet. Send a message if you have a question.', 'muted'));
-    box.append(history);
+    content.append(history);
     var note = el('textarea'); note.maxLength = 500; note.placeholder = options.role === 'teacher' ? 'Write a kind note or correction' : 'Ask your teacher a question';
     note.setAttribute('aria-label', 'Write a message');
     var actions = el('div', null, 'conversation-actions');
@@ -155,7 +164,7 @@
         feedback.textContent = error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : 'Could not start recording. You can send a written message.';
       }
     };
-    actions.append(sendText, record); box.append(note, actions, feedback);
+    actions.append(sendText, record); content.append(note, actions, feedback); box.append(content);
     return box;
   }
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
