@@ -60,6 +60,104 @@ function latestInvite(page: Page, studentName: string, gameName: string) {
   return page.locator('.invite').filter({ hasText: studentName }).filter({ hasText: gameName }).last();
 }
 
+test('all 17 compact game apps stay visible and categories expand in place on desktop, tablet, and phone', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const watch = await watchPage(page);
+  try {
+  await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+  await expectStagingIsolation(page);
+
+  await expect(page.getByRole('heading', { name: 'All 17 games, ready to play' })).toBeVisible();
+  await expect(page.locator('.category-group')).toHaveCount(4);
+  await expect(page.locator('.game')).toHaveCount(17);
+  await expect(page.locator('.game-mini')).toHaveCount(17);
+  await expect(page.locator('.game-illustration')).toHaveCount(17);
+  await expect(page.getByRole('button', { name: /^Start Game:/ })).toHaveCount(17);
+
+  const compactConnectFour = await page.locator('.game-connect-four .game-art').evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return { width: rect.width, height: rect.height, background: style.backgroundImage, radius: style.borderRadius, art: element.innerHTML };
+  });
+  expect(compactConnectFour.width).toBeGreaterThanOrEqual(75);
+  expect(compactConnectFour.width).toBeCloseTo(compactConnectFour.height, 0);
+  expect(compactConnectFour.background).toContain('linear-gradient');
+  expect(parseFloat(compactConnectFour.radius)).toBeGreaterThan(10);
+
+  const compactCardPositions = await page.locator('.category-cards .category-game-grid > .game').evaluateAll(elements =>
+    elements.map(element => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, gridColumn: getComputedStyle(element).gridColumnStart };
+    }),
+  );
+  expect(compactCardPositions[0].y).toBe(compactCardPositions[1].y);
+  expect(compactCardPositions[1].y).toBe(compactCardPositions[2].y);
+  expect(compactCardPositions[3].y).toBe(compactCardPositions[4].y);
+  expect(compactCardPositions[3].y).toBeGreaterThan(compactCardPositions[2].y);
+  expect(compactCardPositions[3].x).toBeGreaterThan(compactCardPositions[0].x);
+  expect(compactCardPositions[4].x).toBeLessThan(compactCardPositions[2].x);
+
+  const categories = [
+    { key: 'torah', label: 'Torah & Jewish', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
+    { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
+    { key: 'cards', label: 'Cards & Matching', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
+    { key: 'challenges', label: 'Quick Challenges', count: 2, games: ['Bingo', 'Math Race'] },
+  ];
+  for (const category of categories) {
+    const group = page.locator(`.category-group.category-${category.key}`);
+    const toggle = group.locator('.category-heading');
+    await expect(toggle).toContainText(category.label);
+    await expect(group.locator('.game')).toHaveCount(category.count);
+    await expect(group.locator('.game-name')).toHaveText(category.games);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    const expandedGroup = page.locator(`.category-group.category-${category.key}`);
+    await expect(expandedGroup.locator('.category-heading')).toHaveAttribute('aria-expanded', 'true');
+    await expect(expandedGroup.locator('.category-game-grid')).toHaveClass(/is-expanded/);
+    await expect(expandedGroup.locator('.game-mini')).toHaveCount(0);
+    await expect(page.locator('.game')).toHaveCount(17);
+    if (category.key === 'strategy') {
+      const expandedConnectFour = await expandedGroup.locator('.game-connect-four .game-art').evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return { width: rect.width, height: rect.height, background: style.backgroundImage, art: element.innerHTML };
+      });
+      expect(expandedConnectFour.width).toBeGreaterThan(compactConnectFour.width);
+      expect(expandedConnectFour.width).toBeCloseTo(expandedConnectFour.height, 0);
+      expect(expandedConnectFour.background).toBe(compactConnectFour.background);
+      expect(expandedConnectFour.art).toBe(compactConnectFour.art);
+    }
+    await expandedGroup.locator('.category-heading').click();
+    await expect(page.locator(`.category-group.category-${category.key} .category-heading`)).toHaveAttribute('aria-expanded', 'false');
+  }
+
+  await expect(page.locator('.game-connect-four .game-illustration')).toBeVisible();
+  await expect(page.locator('.game-tic-tac-toe .game-illustration')).toBeVisible();
+  await expect(page.locator('.game-checkers .game-illustration')).toBeVisible();
+  await expect(page.locator('.game-reversi .game-illustration')).toBeVisible();
+  await expect(page.locator('.game-shorashim .game-illustration')).toBeVisible();
+  expect(await page.locator('.game-uno-style .game-illustration').innerHTML()).not.toContain('🃏');
+
+  await page.getByRole('button', { name: '🎮 Make all 17 games bigger' }).click();
+  await expect(page.locator('.category-group.is-expanded')).toHaveCount(4);
+  await expect(page.locator('.game-mini')).toHaveCount(0);
+  await page.getByRole('button', { name: '🎮 Make all games smaller' }).click();
+  await expect(page.locator('.game-mini')).toHaveCount(17);
+
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await expect(page.locator('.game')).toHaveCount(17);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'tablet layout has no horizontal page overflow').toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'phone layout has no horizontal page overflow').toBe(true);
+  await expect(page.locator('.game')).toHaveCount(17);
+  expect(watch.productionRequests).toEqual([]);
+  expect(watch.pageErrors).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   test.skip(!credentials, NOT_CONFIGURED);
 
@@ -94,70 +192,6 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
 
   test.afterAll(async () => {
     await Promise.all([hostContext?.close(), guestContext?.close()]);
-  });
-
-  test('all 17 compact game apps stay visible and categories expand in place on desktop, tablet, and phone', async ({ browser }) => {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    const page = await context.newPage();
-    const watch = await watchPage(page);
-    try {
-    await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
-    await expectStagingIsolation(page);
-
-    await expect(page.getByRole('heading', { name: 'All 17 games, ready to play' })).toBeVisible();
-    await expect(page.locator('.category-group')).toHaveCount(4);
-    await expect(page.locator('.game')).toHaveCount(17);
-    await expect(page.locator('.game-mini')).toHaveCount(17);
-    await expect(page.locator('.game-illustration')).toHaveCount(17);
-    await expect(page.getByRole('button', { name: /^Start Game:/ })).toHaveCount(17);
-
-    const categories = [
-      { key: 'torah', label: 'Torah & Jewish', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
-      { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
-      { key: 'cards', label: 'Cards & Matching', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
-      { key: 'challenges', label: 'Quick Challenges', count: 2, games: ['Bingo', 'Math Race'] },
-    ];
-    for (const category of categories) {
-      const group = page.locator(`.category-group.category-${category.key}`);
-      const toggle = group.locator('.category-heading');
-      await expect(toggle).toContainText(category.label);
-      await expect(group.locator('.game')).toHaveCount(category.count);
-      await expect(group.locator('.game-name')).toHaveText(category.games);
-      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      await toggle.click();
-      const expandedGroup = page.locator(`.category-group.category-${category.key}`);
-      await expect(expandedGroup.locator('.category-heading')).toHaveAttribute('aria-expanded', 'true');
-      await expect(expandedGroup.locator('.category-game-grid')).toHaveClass(/is-expanded/);
-      await expect(expandedGroup.locator('.game-mini')).toHaveCount(0);
-      await expect(page.locator('.game')).toHaveCount(17);
-      await expandedGroup.locator('.category-heading').click();
-      await expect(page.locator(`.category-group.category-${category.key} .category-heading`)).toHaveAttribute('aria-expanded', 'false');
-    }
-
-    await expect(page.locator('.game-connect-four .game-illustration')).toBeVisible();
-    await expect(page.locator('.game-tic-tac-toe .game-illustration')).toBeVisible();
-    await expect(page.locator('.game-checkers .game-illustration')).toBeVisible();
-    await expect(page.locator('.game-reversi .game-illustration')).toBeVisible();
-    await expect(page.locator('.game-shorashim .game-illustration')).toBeVisible();
-    expect(await page.locator('.game-uno-style .game-illustration').innerHTML()).not.toContain('🃏');
-
-    await page.getByRole('button', { name: '🎮 Make all 17 games bigger' }).click();
-    await expect(page.locator('.category-group.is-expanded')).toHaveCount(4);
-    await expect(page.locator('.game-mini')).toHaveCount(0);
-    await page.getByRole('button', { name: '🎮 Make all games smaller' }).click();
-    await expect(page.locator('.game-mini')).toHaveCount(17);
-
-    await page.setViewportSize({ width: 820, height: 1180 });
-    await expect(page.locator('.game')).toHaveCount(17);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'tablet layout has no horizontal page overflow').toBe(true);
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'phone layout has no horizontal page overflow').toBe(true);
-    await expect(page.locator('.game')).toHaveCount(17);
-    expect(watch.productionRequests).toEqual([]);
-    expect(watch.pageErrors).toEqual([]);
-    } finally {
-      await context.close();
-    }
   });
 
   test('signing in from the arcade returns the student to the games', async ({ browser }) => {
