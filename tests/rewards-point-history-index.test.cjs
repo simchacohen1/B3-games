@@ -8,7 +8,7 @@ function backend(seed,studentId='student_a',options={}){
  const get=p=>parts(p).reduce((o,k)=>o?.[k],tree);
  const set=(p,v)=>{const keys=parts(p),last=keys.pop();let o=tree;for(const k of keys)o=o[k]??={};if(v===null)delete o[last];else o[last]=structuredClone(v)};
  const snap=v=>({val:()=>structuredClone(v??null),exists:()=>v!==undefined&&v!==null,child:key=>snap(v?.[key]),forEach:fn=>{for(const [key,value] of Object.entries(v||{})){if(fn({key,val:()=>structuredClone(value)})===true)return true}return false}});
- const db={ref(path=''){const query={after:null,end:null,limit:null,last:false,ordered:false};const build=q=>({get:async()=>{reads.push({path,limit:q.limit,ordered:q.ordered});if(!q.ordered)return snap(get(path));let selected=Object.entries(get(path)||{}).sort(([a],[b])=>a.localeCompare(b)).filter(([key])=>(!q.after||key>=q.after)&&(!q.end||key<=q.end));if(q.last&&q.limit!==null)selected=selected.slice(-q.limit);else if(q.limit!==null)selected=selected.slice(0,q.limit);return snap(Object.fromEntries(selected))},update:async updates=>{writes.push(updates);for(const [p,v] of Object.entries(updates))set(p,v)},set:async value=>{if(path.endsWith('pointHistoryMigration')&&options.failCheckpoint){options.failCheckpoint=false;throw new Error('simulated checkpoint interruption')}set(path,value)},transaction:async fn=>{const next=fn(get(path));if(next!==undefined)set(path,next);return {committed:next!==undefined,snapshot:snap(get(path))}},orderByKey:()=>build({...q,ordered:true}),startAt:key=>build({...q,after:key}),endAt:key=>build({...q,end:key}),limitToFirst:n=>build({...q,last:false,limit:n}),limitToLast:n=>build({...q,last:true,limit:n})});return build(query)}};
+ const db={ref(path=''){const query={after:null,end:null,limit:null,last:false,ordered:false};const build=q=>({get:async()=>{reads.push({path,limit:q.limit,ordered:q.ordered});if(!q.ordered)return snap(get(path));let selected=Object.entries(get(path)||{}).sort(([a],[b])=>a.localeCompare(b)).filter(([key])=>(!q.after||key>=q.after)&&(!q.end||key<=q.end));if(q.last&&q.limit!==null)selected=selected.slice(-q.limit);else if(q.limit!==null)selected=selected.slice(0,q.limit);return snap(Object.fromEntries(selected))},update:async updates=>{writes.push(updates);for(const [p,v] of Object.entries(updates))set(p,v)},set:async value=>{if(path.endsWith('pointHistoryMigration')&&options.failCheckpoint){options.failCheckpoint=false;throw new Error('simulated checkpoint interruption')}set(path,value)},transaction:async fn=>{const current=get(path);let next;if(options.transactionCacheMiss){next=fn(null);if(next!==undefined&&current!=null)next=fn(current)}else next=fn(current);if(next!==undefined)set(path,next);return {committed:next!==undefined,snapshot:snap(get(path))}},orderByKey:()=>build({...q,ordered:true}),startAt:key=>build({...q,after:key}),endAt:key=>build({...q,end:key}),limitToFirst:n=>build({...q,last:false,limit:n}),limitToLast:n=>build({...q,last:true,limit:n})});return build(query)}};
  const admin={apps:[{}],database:()=>db,auth:()=>({verifyIdToken:async()=>options.claims||{studentRewardsStudentId:studentId,studentRewardsRole:'student'}})};
  const ctx={exports:{},require:n=>n==='firebase-admin'?admin:n==='firebase-functions/v2/https'?{onRequest:(o,fn)=>fn}:n.startsWith('./')?require('../backend/functions/'+n.slice(2)):require(n),console,Buffer,Intl,Date};
  vm.runInNewContext(source,ctx);
@@ -73,6 +73,25 @@ test('migration advances in small resumable batches and is safe to retry',async(
  assert.ok(x.reads.filter(r=>['studentRewards/pointRequests','studentRewards/pointAdjustments'].includes(r.path)).every(r=>r.ordered&&r.limit!==null&&r.limit<=102),'every global ledger read is bounded to one migration page');
 });
 
+test('migration releases its lease when a transaction first sees an uncached null',async()=>{
+ const x=backend({studentRewards:{pointRequests:{r:{rewardStudentId:'student_a'}},pointAdjustments:{a:{studentId:'student_a'}}}},'student_a',{transactionCacheMiss:true});
+ const first=await x.ctx.migratePointHistoryBatch();
+ assert.equal(first.phase,'adjustments');
+ assert.equal(x.tree.studentRewards.pointHistoryMigrationLease,undefined,'the owned lease is removed after the request page');
+ const second=await x.ctx.migratePointHistoryBatch();
+ assert.equal(second.complete,true);
+ assert.equal(x.tree.studentRewards.pointHistoryMigrationLease,undefined,'the owned lease is removed after completion');
+});
+
+test('a transaction cache miss cannot steal another active migration lease',async()=>{
+ const existing={ownerToken:'another_batch',expiresAt:Date.now()+60000};
+ const x=backend({studentRewards:{pointRequests:{r:{rewardStudentId:'student_a'}},pointHistoryMigrationLease:existing}},'student_a',{transactionCacheMiss:true});
+ const result=await x.ctx.migratePointHistoryBatch();
+ assert.equal(result.busy,true);
+ assert.deepEqual(x.tree.studentRewards.pointHistoryMigrationLease,existing);
+ assert.equal(x.tree.studentRewards.pointHistoryMigration,undefined);
+});
+
 test('empty request ledger advances directly to adjustments and empty final ledger completes',async()=>{
  const x=backend({studentRewards:{pointRequests:{},pointAdjustments:{}}});
  const first=await x.ctx.migratePointHistoryBatch();
@@ -113,6 +132,7 @@ test('only the verified owner can advance the history migration',async()=>{
  assert.equal(allowed.code,200);
  assert.equal(allowed.body.phase,'adjustments');
 });
+
 
 
 

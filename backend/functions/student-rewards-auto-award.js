@@ -416,7 +416,13 @@ async function migratePointHistoryBatch(request={}){
   await stateRef.set(next);
   return {complete:next.complete===true,processed:ids.length,phase:next.phase,cursor:next.cursor};
   }finally{
-    await rtdb.ref(`${SR_ROOT}/pointHistoryMigrationLease`).transaction(current=>current?.ownerToken===ownerToken?null:undefined).catch(()=>{});
+    // A transaction updater can first receive null when the server value is not
+    // cached locally, even when another owner has an active lease. Returning
+    // null lets RTDB compare against the server and retry with the actual value;
+    // only clear the lease when that authoritative value belongs to this batch.
+    await rtdb.ref(`${SR_ROOT}/pointHistoryMigrationLease`).transaction(current=>
+      current==null||current.ownerToken===ownerToken?null:undefined
+    ).catch(()=>{});
   }
 }
 
@@ -1727,3 +1733,4 @@ exports.studentRewardsAutoAward = onRequest(
     }
   }
 );
+
