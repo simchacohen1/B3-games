@@ -28,7 +28,7 @@
     const rule=(top)=>{ctx.fillStyle='#e2e8f0';ctx.fillRect(M,top,RIGHT-M,2)};
     const wrap=(value,width,size=20,bold=false)=>{
       font(size,bold);
-      const words=String(value??'').split(/\\s+/).filter(Boolean);
+      const words=String(value??'').split(/\s+/).filter(Boolean);
       if(!words.length)return [''];
       const lines=[];let cur='';
       for(const word of words){
@@ -83,8 +83,8 @@
     ];
     let xx=M;
     for(const label of stats){
-      const w=ctx.measureText(label).width+32;
       font(17,true);
+      const w=ctx.measureText(label).width+32;
       const width=Math.max(w+10,150);
       if(xx+width>RIGHT){xx=M;y+=45}
       ctx.fillStyle='#f1f5f9';ctx.fillRect(xx,y,width-8,35);
