@@ -425,6 +425,12 @@ window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScop
 // the dashboard (which hides it while loading) when something actually changed.
 async function quietScopeCheck(){
  if(!teacherAccess?.authorized||!teacherScope||document.hidden)return;
+ // A background roster read must never apply to a different sign-in or to
+ // a dashboard that was rebuilt while the read was in flight.
+ const checkedUser=auth.currentUser,checkedAccess=teacherAccess,checkedGeneration=scopeGeneration;
+ if(!checkedUser?.uid)return;
+ const stillCurrent=()=>scopeGeneration===checkedGeneration&&
+  auth.currentUser?.uid===checkedUser.uid&&teacherAccess===checkedAccess;
  // Bind each student ID to its current class and full membership provenance.
  // Sorting only the two sets independently misses class swaps between pupils.
  const sig=s=>JSON.stringify([
@@ -435,15 +441,17 @@ async function quietScopeCheck(){
   ])
  ]);
  try{
-  let access=teacherAccess;
+  let access=checkedAccess;
   if(needsTeacherAssignmentRefresh(access)){
-   const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+auth.currentUser.uid).once('value')).val();
-   if(!row||row.active===false)return loadClassScope(auth.currentUser,teacherAccess);
+   const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+checkedUser.uid).once('value')).val();
+   if(!stillCurrent())return;
+   if(!row||row.active===false)return loadClassScope(checkedUser,checkedAccess);
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};
   }
   const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,new URLSearchParams(location.search).get('class')||'');
-  if(sig(scope)!==sig(teacherScope))loadClassScope(auth.currentUser,access);
- }catch(error){loadClassScope(auth.currentUser,teacherAccess)}
+  if(!stillCurrent())return;
+  if(sig(scope)!==sig(teacherScope))loadClassScope(checkedUser,access);
+ }catch(error){if(stillCurrent())loadClassScope(checkedUser,checkedAccess)}
 }
 setInterval(quietScopeCheck,60000);
 $('teacherApp').classList.add('review-only');
