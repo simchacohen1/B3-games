@@ -255,7 +255,11 @@ async function loadApprovals(){
   renderApprovals();renderRecordings();setApprovalStatus('');
   // Pending queue identifies the exact events. Never download all students' history on startup.
   const requests=Object.values(pendingPointRequests).filter(item=>item.recorded===true&&item.practiceStudentId&&item.eventId);
-  await Promise.all(requests.map(async item=>{
+  // Bound concurrent authenticated reads: a large pending queue must not flood
+  // the scoped API with one simultaneous request per recording.
+  for(let i=0;i<requests.length;i+=4){
+   if(generation!==scopeGeneration||request!==approvalGeneration)return;
+   await Promise.all(requests.slice(i,i+4).map(async item=>{
    const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
    if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
    try{
@@ -266,8 +270,10 @@ async function loadApprovals(){
      E[studentId][eventId]=event;
     }
    }catch(error){console.warn('Could not load pending Chazara recording',error)}
-  }));
-  if(generation!==scopeGeneration||request!==approvalGeneration)return;
+   }));
+   // Stop requesting more recordings if the selected class or sign-in changed.
+   if(generation!==scopeGeneration||request!==approvalGeneration)return;
+  }
   renderApprovals();renderRecordings();
   if(automatic.length)sweepAutomaticPoints(automatic);
  }catch(err){
