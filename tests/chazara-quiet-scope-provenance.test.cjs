@@ -112,3 +112,27 @@ test('roster error from an earlier session cannot revive a signed-out dashboard'
  await pending;
  assert.equal(x.reloads.length,0,'old authorization failures must not launch a new load for the signed-out user');
 });
+
+test('newer scope generation suppresses stale roster even for the same signed-in user',async()=>{
+ const before=scope({studentA:{classId:'alpha',membershipClassIds:['alpha']}});
+ const after=scope({studentA:{classId:'beta',membershipClassIds:['beta']}});
+ const gate=deferred();
+ const x=fixture(before,after,{rosterGate:gate.promise});
+ const pending=x.run();
+ x.context.scopeGeneration++;
+ gate.release();
+ await pending;
+ assert.equal(x.reloads.length,0,'a newer authorized dashboard must not be replaced by an old roster response');
+});
+
+test('identity switch alone invalidates a pending owner roster read',async()=>{
+ const before=scope({studentA:{classId:'alpha',membershipClassIds:['alpha']}});
+ const after=scope({studentA:{classId:'beta',membershipClassIds:['beta']}});
+ const gate=deferred();
+ const x=fixture(before,after,{rosterGate:gate.promise});
+ const pending=x.run();
+ x.context.auth.currentUser={uid:'fictional_other_user'};
+ gate.release();
+ await pending;
+ assert.equal(x.reloads.length,0,'never apply a previous identity’s access even before the auth callback updates generation');
+});
