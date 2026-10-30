@@ -21,7 +21,13 @@ function baseData() {
   return {
     [ROOT + '/teachers/principal']: {
       active: true, accountType: 'principal', classIds: { alpha: true },
+      email: 'principal@example.test', inviteId: 'principalInvite',
       supervisedTeachers: { teacherA: { classIds: { alpha: true } } }
+    },
+    [ROOT + '/teacherInvites/principalInvite']: {
+      active: true, accountType: 'principal', email: 'principal@example.test',
+      claimedUid: 'principal', classIds: { alpha: true },
+      supervisedTeacherIds: { teacherA: true }
     },
     [ROOT + '/classes/alpha']: {
       active: true, toolGrants: { chazara: true },
@@ -101,6 +107,7 @@ test('principal retains a class supervised by a second active teacher', async ()
   data[ROOT + '/teachers/principal'].supervisedTeachers.teacherB = {
     classIds: { alpha: true }
   };
+  data[ROOT + '/teacherInvites/principalInvite'].supervisedTeacherIds.teacherB = true;
   data[ROOT + '/teacherInvites/teacherA'] = {
     active: false, role: 'teacher', classIds: { alpha: true }
   };
@@ -148,4 +155,69 @@ test('principal denies an expired claimed teacher class while retaining ordinary
   data[ROOT + '/teachers/teacher'] = { active: true, classIds: { alpha: true } };
   const teacherResult = await authorize(data, 'teacher');
   assert.equal(teacherResult.result.ok, true, JSON.stringify(teacherResult.result));
+});
+
+
+test('principal loses Chazara access immediately when owner unassigns sole supervisor', async () => {
+  const data = baseData();
+  data[ROOT + '/teacherInvites/principalInvite'].supervisedTeacherIds = {};
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }
+  };
+  const { result, reads } = await authorize(data);
+  assert.equal(result.ok, false, 'stale cached supervision must not override owner removal');
+  assert.ok(reads.includes(ROOT + '/teacherInvites/principalInvite'));
+});
+
+test('principal denies revoked or missing own invitation even with stale teacher record', async () => {
+  for (const mode of ['inactive', 'missing']) {
+    const data = baseData();
+    data[ROOT + '/teacherInvites/teacherA'] = {
+      active: true, role: 'teacher', classIds: { alpha: true }
+    };
+    if (mode === 'inactive') data[ROOT + '/teacherInvites/principalInvite'].active = false;
+    else delete data[ROOT + '/teacherInvites/principalInvite'];
+    const { result } = await authorize(data);
+    assert.equal(result.ok, false, mode);
+  }
+});
+
+test('principal denies mismatched claimed UID or invitation email', async () => {
+  for (const mode of ['claimedUid', 'email']) {
+    const data = baseData();
+    data[ROOT + '/teacherInvites/teacherA'] = {
+      active: true, role: 'teacher', classIds: { alpha: true }
+    };
+    data[ROOT + '/teacherInvites/principalInvite'][mode] = mode === 'claimedUid'
+      ? 'anotherPrincipal' : 'another@example.test';
+    const { result } = await authorize(data);
+    assert.equal(result.ok, false, mode);
+  }
+});
+
+test('principal denies a class removed from their own invitation before reconciliation', async () => {
+  const data = baseData();
+  data[ROOT + '/teacherInvites/principalInvite'].classIds = {};
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }
+  };
+  const { result } = await authorize(data);
+  assert.equal(result.ok, false);
+});
+
+test('principal keeps alpha through another owner-assigned active supervisor', async () => {
+  const data = baseData();
+  data[ROOT + '/teachers/principal'].supervisedTeachers.teacherB = {
+    classIds: { alpha: true }
+  };
+  data[ROOT + '/teacherInvites/principalInvite'].supervisedTeacherIds = { teacherB: true };
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }
+  };
+  data[ROOT + '/teacherInvites/teacherB'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }
+  };
+  const { result } = await authorize(data);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.scope.selected, 'alpha');
 });
