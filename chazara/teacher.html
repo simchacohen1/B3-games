@@ -403,11 +403,14 @@ async function loadClassScope(user,access){
  try{
   if(needsTeacherAssignmentRefresh(access)){
    const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+user.uid).once('value')).val();
+   // Discard obsolete assignment results before they can replace the newer account's access.
+   if(generation!==scopeGeneration||auth.currentUser?.uid!==user?.uid)return;
    if(!row||row.active===false)throw new Error('Your teacher account is not active.');
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};teacherAccess=access;
   }
   const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,new URLSearchParams(location.search).get('class')||'');
-  if(generation!==scopeGeneration)return;
+  // A roster response can also arrive after an auth change but before its callback fires.
+  if(generation!==scopeGeneration||auth.currentUser?.uid!==user?.uid)return;
   teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
   for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/attempts',P]]:[])){
