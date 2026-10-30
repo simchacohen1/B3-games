@@ -19,7 +19,7 @@
     { key: "go-fish", name: "Go Fish", icon: "🐟", description: "Ask classmates for cards and collect complete sets.", url: "game.html?game=go-fish", mode: "start" },
     { key: "uno-style", name: "Uno-style Cards", icon: "UNO", description: "Match colors and numbers with simple action cards.", url: "game.html?game=uno-style", mode: "start" }
   ];
-  var sessionId = "", sessionName = "", db = null, roomsRef = null, roomsListener = null, scopeKey = "";
+  var sessionId = "", sessionName = "", db = null, roomsRef = null, roomsListener = null, scopeKey = "", classInfo = null;
   var statusBox = document.getElementById("accountStatus");
   var invitations = document.getElementById("invitations");
   var invitationSection = document.getElementById("invitationSection");
@@ -36,6 +36,7 @@
     var url = new URL(game.url, location.href);
     url.searchParams.set("b3Multiplayer", mode);
     if (code) url.searchParams.set("b3MultiplayerRoom", code);
+    if (classInfo) { url.searchParams.set("workspaceId", classInfo.workspaceId); url.searchParams.set("classId", classInfo.classId); url.searchParams.set("class", classInfo.classId); }
     location.assign(url.href);
   }
   // Presentation-only category grouping: existing multiplayer routing and permissions remain unchanged.
@@ -173,7 +174,7 @@
     }
     visible.sort(function (a, b) { return Number(a[1].createdAt) - Number(b[1].createdAt); }).forEach(function (entry) {
       var id = entry[0], room = entry[1], game = gameFor(room.gameKey), card = make("article", "invite");
-      card.append(make("h3", "", (room.hostName || "A classmate") + " wants to play"),
+      card.append(make("h3", "", (room.hostRole === "teacher" ? "Teacher " : "") + (room.hostName || "A classmate") + " wants to play"),
         make("p", "", game.icon + " " + game.name),
         make("small", "", Math.max(1, Number(room.playerCount) || 1) + " player" + (Number(room.playerCount) === 1 ? "" : "s") + " waiting"));
       var actions = make("div", "invite-actions"), join = make("button", "btn", "Join Game"), later = make("button", "quiet", "Not Now");
@@ -189,7 +190,7 @@
       sessionId = String(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "").trim();
       sessionName = String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student");
     } catch (e) {}
-    if (!sessionId || !window.firebase || !window.B3_FIREBASE_CONFIG) {
+    if (!window.firebase || !window.B3_FIREBASE_CONFIG) {
       statusBox.className = "notice error";
       statusBox.replaceChildren(document.createTextNode("Sign in on Fun Torah Tools first. "));
       var link = make("a", "", "Go to sign in");
@@ -210,31 +211,24 @@
         statusBox.className = "notice error"; statusBox.textContent = "Your saved sign-in has expired. Please sign in on Fun Torah Tools again."; return;
       }
       try {
-        var path = await window.B3Race.classCenterRoomsPath(db, sessionId);
-        if (!path) throw new Error("class scope unavailable");
-        var classInfo = await window.FunTorahStudentClass.resolve(db, sessionId);
-        var memberRecord = (await db.ref("b3Games/workspaces/" + classInfo.workspaceId + "/classes/" + classInfo.classId + "/members/" + sessionId).once("value")).val() || {};
-        var centerEnabled = memberRecord.active !== false && memberRecord.toolAccess?.["multiplayer-center"] !== false;
-        if (["et", "wt"].includes(classInfo.classId)) {
-          var settings = (await db.ref("b3Games/siteSettings").once("value")).val() || {};
-          centerEnabled = centerEnabled && settings.games?.["multiplayer-center"] !== false && settings.classGames?.[classInfo.classId]?.["multiplayer-center"] !== false;
-        } else {
-          var classGrant = (await db.ref("b3Games/workspaces/" + classInfo.workspaceId + "/classes/" + classInfo.classId + "/toolGrants/multiplayer-center").once("value")).val() === true;
-          centerEnabled = centerEnabled && classGrant;
+        var params = new URLSearchParams(location.search);
+        var requestedClass = params.get("classId") || params.get("class") || "";
+        classInfo = await window.B3MultiplayerIdentity.resolve(db, user, requestedClass, sessionId);
+        sessionId = classInfo.participantId;
+        sessionName = classInfo.participantName;
+        if (classInfo.role === "teacher") {
+          var backLink = document.querySelector("header a");
+          if (backLink) { backLink.href = "../teacher-home.html?class=" + encodeURIComponent(classInfo.classId); backLink.textContent = "← Back to teacher home"; }
         }
-        if (!centerEnabled) {
-          statusBox.className = "notice error";
-          statusBox.textContent = "Your teacher has not enabled Multiplayer Center for your class yet.";
-          return;
-        }
+        var path = "multiplayerCenter/workspaces/" + classInfo.workspaceId + "/classes/" + classInfo.classId + "/rooms";
         if (typeof firebase.functions === "function") {
-          try { await firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({ action: "cleanup", workspaceId: classInfo.workspaceId }); }
+          try { await firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({ action: "cleanup", workspaceId: classInfo.workspaceId, classId: classInfo.classId }); }
           catch (cleanupError) { console.warn("Multiplayer Center: stale-room cleanup will retry later", cleanupError); }
         }
         scopeKey = path;
         roomsRef = db.ref(path);
         statusBox.className = "notice good";
-        statusBox.textContent = "Signed in as " + sessionName + ". Showing games for your class.";
+        statusBox.textContent = (classInfo.role === "teacher" ? "Playing as teacher " : "Signed in as ") + sessionName + " · " + classInfo.className + ". Showing games for this class.";
         readyToPlay = true;
         drawCategoryHome();
         if (roomsListener) roomsRef.off("value", roomsListener);

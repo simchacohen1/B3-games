@@ -72,10 +72,16 @@
       url.searchParams.delete("b3Multiplayer"); url.searchParams.delete("b3MultiplayerRoom");
       root.history.replaceState(null, "", url.href);
     }
+    function centerHref() {
+      var url = new URL(opts.centerUrl || '../multiplayer/index.html', root.location.href);
+      var scope = String(opts.centerPath || '').match(/multiplayerCenter\/workspaces\/([^/]+)\/classes\/([^/]+)\/rooms$/);
+      if (scope) { url.searchParams.set('workspaceId', scope[1]); url.searchParams.set('classId', scope[2]); url.searchParams.set('class', scope[2]); }
+      return url.href;
+    }
     function publishCenterRoom(data, code) {
       if (!opts.centerPath || !opts.gameKey || !data || data.host !== me) return;
       var players = active(data);
-      var summary = { host: me, hostName: data.hostName || myName, gameKey: opts.gameKey,
+      var summary = { host: me, hostName: data.hostName || myName, hostRole: opts.role || "student", gameKey: opts.gameKey,
         gameName: opts.gameName || opts.gameKey, gameUrl: opts.gameUrl || "", roomCode: code,
         state: data.state, playerCount: players.length, createdAt: data.createdAt || now() };
       var key = opts.gameKey + "-" + code, signature = JSON.stringify(summary);
@@ -173,13 +179,13 @@
       if (!code) throw new Error("no free code");
       var wait = draw(); wait.append(el("p", "b3r-prompt", "Getting the questions ready…"));
       var ref = db.ref(path + "/" + code), players = {};
-      players[me] = { name: myName, score: 0, q: 0 };
+      players[me] = { name: myName, role: opts.role || "student", score: 0, q: 0 };
       var info = (opts.roomInfo && opts.roomInfo()) || {};
       var qs, v = view;
       try { qs = await opts.makeQuestions(); } catch (e) { qs = null; showProblem(e && e.message); return; }
       if (!qs || !list(qs).length) { showProblem("There are no questions to race on yet."); return; }
       if (v !== view) return;
-      await ref.set({ host: me, hostName: myName, label: info.label || "", state: "lobby",
+      await ref.set({ host: me, hostName: myName, hostRole: opts.role || "student", label: info.label || "", state: "lobby",
         createdAt: firebase.database.ServerValue.TIMESTAMP, questions: qs, players: players });
       ref.onDisconnect().remove();
       var inviteRef = centerRoomRef(code); if (inviteRef) inviteRef.onDisconnect().remove();
@@ -195,7 +201,7 @@
       if (active(r).length >= MAX_PLAYERS && !(r.players || {})[me]) return "That game is full.";
       leave();
       var mine = ref.child("players/" + me);
-      await mine.set(Object.assign({}, existing || {}, { name: myName, score: Number(existing && existing.score) || 0, q: Number(existing && existing.q) || 0, left: false }));
+      await mine.set(Object.assign({}, existing || {}, { name: myName, role: opts.role || "student", score: Number(existing && existing.score) || 0, q: Number(existing && existing.q) || 0, left: false }));
       mine.onDisconnect().update({ left: true });
       enter(code, false);
       return null;
@@ -225,7 +231,7 @@
           room = null;
           var closed = draw(); closed.append(el("p", "b3r-prompt", r.isHost ? "This waiting room has closed." : "The host left. This waiting room has closed."));
           var browse = el("button", "b3r-btn", "Browse other games"); browse.type = "button";
-          browse.onclick = function () { clearRoomRoute(); if (opts.centerUrl) root.location.href = opts.centerUrl; else if (opts.onExit) opts.onExit(); };
+          browse.onclick = function () { clearRoomRoute(); if (opts.centerUrl) root.location.href = centerHref(); else if (opts.onExit) opts.onExit(); };
           closed.append(browse);
         }
         return;
@@ -269,7 +275,7 @@
         }
         if (opts.centerUrl) {
           var browse = el("button", "b3r-small", "Leave and browse games"); browse.type = "button";
-          browse.onclick = function () { leave(); root.location.href = opts.centerUrl; };
+          browse.onclick = function () { leave(); root.location.href = centerHref(); };
           panel.append(browse);
         }
       }
@@ -353,19 +359,37 @@
 
   /* Finds this student's class and returns the rooms path for a game, or "" if he has no class. */
   function classRoomsPath(db, studentId, gameKey) {
-    if (!db || !studentId || !root.FunTorahStudentClass) return Promise.resolve("");
-    return root.FunTorahStudentClass.resolve(db, studentId).then(function (info) {
-      return info && info.classId ? "multiplayerCenter/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/games/" + gameKey + "/rooms" : "";
-    }).catch(function (e) { console.warn("B3Race: could not find class", e); return ""; });
+    if (!db) return Promise.resolve("");
+    if (!root.B3MultiplayerIdentity && root.FunTorahStudentClass && studentId) {
+      return root.FunTorahStudentClass.resolve(db, studentId).then(async function (info) {
+        var user = root.firebase && root.firebase.auth && root.firebase.auth().currentUser;
+        var token = user && await user.getIdTokenResult();
+        if (!info || !token || token.claims.b3StudentId !== studentId || token.claims.b3ClassId !== info.classId) return "";
+        return "multiplayerCenter/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/games/" + encodeURIComponent(gameKey) + "/rooms";
+      }).catch(function (e) { console.warn("B3Race: could not find class", e); return ""; });
+    }
+    if (!root.B3MultiplayerIdentity) return Promise.resolve("");
+    return classCenterRoomsPath(db, studentId).then(function (path) {
+      return path ? path.replace(/\/rooms$/, "/games/" + encodeURIComponent(gameKey) + "/rooms") : "";
+    });
   }
 
   function classCenterRoomsPath(db, studentId) {
-    if (!db || !studentId || !root.FunTorahStudentClass) return Promise.resolve("");
-    return root.FunTorahStudentClass.resolve(db, studentId).then(async function (info) {
+    if (!db) return Promise.resolve("");
+    if (!root.B3MultiplayerIdentity && root.FunTorahStudentClass && studentId) {
+      return root.FunTorahStudentClass.resolve(db, studentId).then(async function (info) {
+        var user = root.firebase && root.firebase.auth && root.firebase.auth().currentUser;
+        var token = user && await user.getIdTokenResult();
+        if (!info || !token || token.claims.b3StudentId !== studentId || token.claims.b3ClassId !== info.classId) return "";
+        return "multiplayerCenter/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/rooms";
+      }).catch(function (e) { console.warn("B3Race: could not find class", e); return ""; });
+    }
+    if (!root.B3MultiplayerIdentity) return Promise.resolve("");
+    return Promise.resolve().then(async function () {
       var user = root.firebase && root.firebase.auth && root.firebase.auth().currentUser;
-      if (!info || !info.classId || !user) return "";
-      var token = await user.getIdTokenResult();
-      if (!token || token.claims.b3StudentId !== studentId || token.claims.b3ClassId !== info.classId) return "";
+      if (!user) return "";
+      var params = new URLSearchParams(root.location.search);
+      var info = await root.B3MultiplayerIdentity.resolve(db, user, params.get("classId") || params.get("class") || "", studentId || "");
       return "multiplayerCenter/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/rooms";
     }).catch(function (e) { console.warn("B3Race: could not find multiplayer class", e); return ""; });
   }

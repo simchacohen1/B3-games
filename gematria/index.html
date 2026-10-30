@@ -115,8 +115,8 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js"></script>
-<script src="../student-class.js?v=20261007-tab-login"></script>
-<script src="../b3-race.js?v=20261007"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script><script src="../multiplayer/identity.js?v=teacher-player-20261029-1"></script>
+<script src="../b3-race.js?v=teacher-player-20261029-1"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
@@ -629,17 +629,20 @@ function raceQuestions(){
 let race=null;
 async function startRace(){
  if(isGuest()){$("raceBox").textContent="Playing with friends needs a signed-in student account.";window.B3Guest.unlock("Sign in to unlock","Racing classmates needs a signed-in student account.");return;}
- if(teacherPreview){$("raceBox").textContent="Class races require student accounts. Use solo games for demonstrations.";return;}
  if(!race){
-  const centerPath=await B3Race.classCenterRoomsPath(db,studentId);
-  const roomsPath=await B3Race.classRoomsPath(db,studentId,"gematria");
-  race=B3Race.create({container:$("raceBox"),db,roomsPath,centerPath,studentId,studentName:studentName||studentId,
-   gameKey:"gematria",gameName:"Gematria Race",gameUrl:"../gematria/index.html",centerUrl:"../multiplayer/index.html",onRoomCreated:B3Race.saveHostRoomCode,
-   makeQuestions:raceQuestions,roomInfo:()=>({label:"Level "+level+" ("+["","א–י","א–צ","א–ת"][level]+")"}),
-   onCorrect:()=>{star();save()},
-   onWrong:q=>{const h=VAL[q.big]?q.big:VAL[q.answer]?q.answer:"";if(h){P.missed[h]=num(P.missed[h])+1;save()}},
-   onFinish:({won})=>{P.race=P.race||{plays:0,wins:0};P.race.plays=num(P.race.plays)+1;if(won)P.race.wins=num(P.race.wins)+1;save()},
-   onExit:()=>show("menu")});
+  try{
+   if(!db){if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);db=firebase.database();}
+   const actor=await B3MultiplayerIdentity.resolve(db,firebase.auth().currentUser,new URLSearchParams(location.search).get("class")||"",studentId);
+   const centerPath=await B3Race.classCenterRoomsPath(db,actor.participantId);
+   const roomsPath=await B3Race.classRoomsPath(db,actor.participantId,"gematria");
+   race=B3Race.create({container:$("raceBox"),db,roomsPath,centerPath,studentId:actor.participantId,studentName:actor.participantName||studentName||actor.participantId,role:actor.role,
+    gameKey:"gematria",gameName:"Gematria Race",gameUrl:"../gematria/index.html",centerUrl:"../multiplayer/index.html",onRoomCreated:B3Race.saveHostRoomCode,
+    makeQuestions:raceQuestions,roomInfo:()=>({label:"Level "+level+" ("+["","א–י","א–צ","א–ת"][level]+")"}),
+    onCorrect:()=>{star();save()},
+    onWrong:q=>{const h=VAL[q.big]?q.big:VAL[q.answer]?q.answer:"";if(h){P.missed[h]=num(P.missed[h])+1;save()}},
+    onFinish:({won})=>{P.race=P.race||{plays:0,wins:0};P.race.plays=num(P.race.plays)+1;if(won)P.race.wins=num(P.race.wins)+1;save()},
+    onExit:()=>show("menu")});
+  }catch(e){$("raceBox").textContent=e.message||"Sign in with an assigned class account to play.";return;}
  }
  if(!B3Race.launchFromUrl(race))race.start();
  stopCurrent=()=>race.leave();

@@ -18,34 +18,58 @@ const paths = (workspaceId, classId, roomCode) => ({
   invite: `multiplayerCenter/workspaces/${workspaceId}/classes/${classId}/rooms/arcade-${roomCode}`,
 });
 
-async function authorizeStudent(request, db, requestedWorkspace) {
+async function authorizeActor(request, db, requestedWorkspace, requestedClassId) {
   const token = request.auth?.token;
   const studentId = String(token?.b3StudentId || '');
-  const classId = String(token?.b3ClassId || '');
-  if (!studentId || !SAFE_ID.test(studentId) || !SAFE_ID.test(classId) || !SAFE_ID.test(requestedWorkspace || '')) {
-    throw new HttpsError('permission-denied', 'Sign in with your class account to play.');
+  const classId = String(requestedClassId || token?.b3ClassId || '');
+  if (!SAFE_ID.test(classId) || !SAFE_ID.test(requestedWorkspace || '')) throw new HttpsError('permission-denied', 'Choose an assigned class to play.');
+  let member = null, cls = null, actorRole = 'student', participantId = studentId, name = '';
+  if (studentId) {
+    if (!SAFE_ID.test(studentId)) throw new HttpsError('permission-denied', 'Your active class membership is required.');
+    const membershipKey = `${requestedWorkspace}_${classId}`;
+    if (String(token?.b3ClassId || '') !== classId) throw new HttpsError('permission-denied', 'Your active class membership is required.');
+    const [membershipSnap, classSnap] = await Promise.all([
+      db.ref(`b3Games/students/${studentId}/memberships/${membershipKey}`).get(),
+      db.ref(`b3Games/workspaces/${requestedWorkspace}/classes/${classId}`).get(),
+    ]);
+    const membership = membershipSnap.val();
+    cls = classSnap.val();
+    member = cls?.members?.[studentId];
+    if (!membership || membership.active === false || membership.classId !== classId || membership.workspaceId !== requestedWorkspace ||
+        !cls || cls.active === false || !member || member.active === false) {
+      throw new HttpsError('permission-denied', 'Your active class membership is required.');
+    }
+    name = safeName(token?.b3StudentName || member.name);
+  } else {
+    const uid = String(request.auth?.uid || '');
+    if (!uid || !SAFE_ID.test(uid)) throw new HttpsError('permission-denied', 'Sign in with an authorized teacher account.');
+    const [teacherSnap, classSnap] = await Promise.all([
+      db.ref(`b3Games/workspaces/${requestedWorkspace}/teachers/${uid}`).get(),
+      db.ref(`b3Games/workspaces/${requestedWorkspace}/classes/${classId}`).get(),
+    ]);
+    const teacher = teacherSnap?.val();
+    if (!teacher || teacher.active !== true || teacher.role !== 'teacher' || teacher.classIds?.[classId] !== true) {
+      throw new HttpsError('permission-denied', 'An active teacher assignment for this class is required.');
+    }
+    participantId = `teacher_${uid}`;
+    if (!SAFE_ID.test(participantId)) throw new HttpsError('permission-denied', 'This teacher account cannot join the game.');
+    actorRole = 'teacher';
+    name = safeName(teacher.displayName || token?.name || 'Teacher');
+    cls = classSnap.val();
   }
-  const membershipKey = `${requestedWorkspace}_${classId}`;
-  const [membershipSnap, classSnap, legacySettingsSnap] = await Promise.all([
-    db.ref(`b3Games/students/${studentId}/memberships/${membershipKey}`).get(),
-    db.ref(`b3Games/workspaces/${requestedWorkspace}/classes/${classId}`).get(),
-    ['et', 'wt'].includes(classId) ? db.ref('b3Games/siteSettings').get() : Promise.resolve(null),
-  ]);
-  const membership = membershipSnap.val();
-  const cls = classSnap.val();
-  const member = cls?.members?.[studentId];
-  if (!membership || membership.active === false || membership.classId !== classId || membership.workspaceId !== requestedWorkspace ||
-      !cls || cls.active === false || !member || member.active === false) {
-    throw new HttpsError('permission-denied', 'Your active class membership is required.');
+  const legacySettingsSnap = ['et', 'wt'].includes(classId) ? await db.ref('b3Games/siteSettings').get() : null;
+  if (!cls || cls.active === false) throw new HttpsError('permission-denied', 'Your active class membership is required.');
+  if (actorRole === 'teacher' && cls.teacherIds?.[request.auth.uid] !== true) {
+    throw new HttpsError('permission-denied', 'This teacher is not assigned to the selected class.');
   }
   const legacySettings = legacySettingsSnap?.val() || {};
   const centerEnabled = ['et', 'wt'].includes(classId)
     ? legacySettings.games?.['multiplayer-center'] !== false && legacySettings.classGames?.[classId]?.['multiplayer-center'] !== false
     : cls.toolGrants?.['multiplayer-center'] === true;
-  if (!centerEnabled || member.toolAccess?.['multiplayer-center'] === false) {
+  if (!centerEnabled || actorRole === 'student' && member?.toolAccess?.['multiplayer-center'] === false) {
     throw new HttpsError('permission-denied', 'Ask your teacher to turn on Multiplayer Center.');
   }
-  return { studentId, classId, workspaceId: requestedWorkspace, name: safeName(member.name) };
+  return { studentId: participantId, participantId, actorRole, classId, workspaceId: requestedWorkspace, name };
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
@@ -55,7 +79,7 @@ function roomPublic(gameKey, room, state, timestamp) {
 function inviteSummary(gameKey, room, state, timestamp) {
   const config = core.gameConfig(gameKey);
   return {
-    host: room.host, hostName: room.hostName, gameKey,
+    host: room.host, hostName: room.hostName, hostRole: room.players?.[room.host]?.role || 'student', gameKey,
     gameName: config.name, gameUrl: '../multiplayer/game.html?game=' + encodeURIComponent(gameKey),
     roomCode: room.roomCode, state: room.state, playerCount: core.participantIds(room.players).length,
     createdAt: room.createdAt, updatedAt: timestamp,
@@ -141,7 +165,7 @@ async function newRoom(db, actor, gameKey) {
   if (!roomCode) throw new HttpsError('resource-exhausted', 'Could not open a game room. Try again.');
   const room = {
     roomCode, gameKey, host: actor.studentId, hostName: actor.name, state: 'lobby', createdAt: timestamp,
-    updatedAt: timestamp, players: { [actor.studentId]: { name: actor.name, active: true, joinedAt: timestamp } },
+    updatedAt: timestamp, players: { [actor.studentId]: { name: actor.name, role: actor.actorRole, active: true, joinedAt: timestamp } },
   };
   const state = core.createGameState(gameKey, room.players, { seed: crypto.randomInt(1, 0x7fffffff) });
   const multi = {
@@ -179,7 +203,7 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move) {
       }
       room.players ||= {};
       room.players[actor.studentId] = {
-        ...(previousPlayer || {}), name: actor.name, active: true,
+        ...(previousPlayer || {}), name: actor.name, role: actor.actorRole, active: true,
         joinedAt: previousPlayer?.joinedAt || now(),
       };
       if (!returningPlayer) {
@@ -227,7 +251,7 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
     if (Buffer.byteLength(JSON.stringify(data), 'utf8') > 2048) {
       throw new HttpsError('invalid-argument', 'That game action is too large.');
     }
-    const actor = await authorizeStudent(request, db, String(data.workspaceId || ''));
+    const actor = await authorizeActor(request, db, String(data.workspaceId || ''), String(data.classId || request.auth?.token?.b3ClassId || ''));
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'create') return await newRoom(db, actor, String(data.gameKey || ''));
     if (data.action === 'get-private') {
@@ -250,4 +274,4 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
   }
 });
 
-exports._test = { authorizeStudent, mutateRoom, newRoom, paths };
+exports._test = { authorizeActor, mutateRoom, newRoom, paths };
