@@ -5,6 +5,24 @@
   'use strict';
   const pdfReady=()=>root.jspdf&&typeof root.jspdf.jsPDF==='function';
   const zipReady=()=>typeof root.JSZip==='function';
+  const libraryLoads={};
+  function loadLibrary(key,url,ready){
+    if(ready())return Promise.resolve();
+    if(!libraryLoads[key]){
+      libraryLoads[key]=new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src=url;
+        script.onload=()=>ready()?resolve():reject(new Error(key+' did not initialize.'));
+        script.onerror=()=>reject(new Error(key+' could not load. Check your internet connection.'));
+        document.head.appendChild(script);
+      }).catch(err=>{delete libraryLoads[key];throw err});
+    }
+    return libraryLoads[key];
+  }
+  async function ensureLibraries(withZip){
+    await loadLibrary('PDF','https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',pdfReady);
+    if(withZip)await loadLibrary('ZIP','https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',zipReady);
+  }
   const safeName=(v)=>String(v||'Student').normalize('NFKD').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'Student';
   function saveBlob(blob,name){
     const url=URL.createObjectURL(blob), a=document.createElement('a');
@@ -146,11 +164,13 @@
     addCanvas();
     return doc.output('arraybuffer');
   }
-  function savePdf(input,filename){
+  async function savePdf(input,filename){
+    await ensureLibraries(false);
     const data=makePdf(input);
     saveBlob(new Blob([data],{type:'application/pdf'}),filename);
   }
   async function saveZip(students,className,period,onProgress){
+    await ensureLibraries(true);
     if(!zipReady())throw new Error('ZIP library is unavailable. Check your internet connection and try again.');
     if(!pdfReady())throw new Error('PDF library is unavailable. Check your internet connection and try again.');
     if(!students?.length)throw new Error('No students in the selected class.');
