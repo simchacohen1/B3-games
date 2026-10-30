@@ -536,7 +536,7 @@
           })).then(function(rows) {
             const allowed = new Set(classIds);
             const current = new Set();
-            const validSupervisors = {};
+            const validSupervisors = Object.create(null);
             rows.forEach(function(row) {
               if (!row) return;
               const claimed = row.claimed;
