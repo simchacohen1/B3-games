@@ -1146,6 +1146,11 @@ async function createPendingRequest({requestId,rewardStudentId,studentId,source,
   const existing=await ref.get();
   if(existing.exists()){
     const value=existing.val()||{};
+    // A previous request transaction may have succeeded before index maintenance failed.
+    // Repair the index without rewriting the live request or its teacher review state.
+    if(value.rewardStudentId){
+      await rtdb.ref().update(studentPointHistoryIndexUpdates("requests",requestId,String(value.rewardStudentId)));
+    }
     return {created:false,requestId,status:value.status||"pending",amount:Number(value.amount||amount)};
   }
   const info=await studentInfo(rewardStudentId);
@@ -1165,9 +1170,9 @@ async function createPendingRequest({requestId,rewardStudentId,studentId,source,
   const tx=await ref.transaction(current=>current||value);
   const finalValue=tx.snapshot.val()||value;
   if(finalValue.rewardStudentId){
-    const updates=studentPointHistoryIndexUpdates("requests",requestId,String(finalValue.rewardStudentId));
-    if(tx.committed)updates[`${SR_ROOT}/pointRequests/${requestId}`]=finalValue;
-    await rtdb.ref().update(updates);
+    // The transaction above already created the request. Never write its snapshot again:
+    // a teacher may approve or reject it while this index update is in flight.
+    await rtdb.ref().update(studentPointHistoryIndexUpdates("requests",requestId,String(finalValue.rewardStudentId)));
   }
   return {created:tx.committed,requestId,status:finalValue.status||"pending",amount:Number(finalValue.amount||amount)};
 }
