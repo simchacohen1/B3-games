@@ -20,7 +20,7 @@ const keyEnd=html.indexOf('function updateRecordingRow(',keyStart);
 assert.ok(keyStart>=0&&keyEnd>keyStart,'extract the real recording key encoder');
 const keyEncoder=html.slice(keyStart,keyEnd);
 
-function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs=null,failOnceAt=-1}={}){
+function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs=null,failOnceAt=-1,deniedStudents=[],emptyAfterFirst=false}={}){
  const requests=requestPairs||Array.from({length:queueSplit?16:12},(_,i)=>({
   id:'request_'+i,recorded:true,practiceStudentId:'student_'+i,eventId:'event_'+i
  }));
@@ -40,12 +40,12 @@ function fixture({revoke=false,failAt=-1,queueSplit=false,delayMs=5,requestPairs
     needsManualApproval:()=>true,
     isChazaraApproval:()=>true
    },
-   FunTorahTeacherScope:{recordAllowed:()=>true,validKey:()=>true}
+   FunTorahTeacherScope:{recordAllowed:(_scope,studentId)=>!deniedStudents.includes(studentId),validKey:()=>true}
   },
   teacherApi:async(action,details={})=>{
    if(action==='list-chazara-pending'){
     const call=listCalls++;
-    return {requests:queueSplit?(call===0?requests.slice(0,8):requests.slice(8)):requests};
+    return {requests:emptyAfterFirst&&call>0?[]:queueSplit?(call===0?requests.slice(0,8):requests.slice(8)):requests};
    }
    assert.equal(action,'get-chazara-event');
    reads++;active++;peak=Math.max(peak,active);
@@ -159,4 +159,31 @@ test('transient pending recording failure retries only the missing audio on the 
  assert.ok(recovered.peak<=4,'recovery must respect the global four-read cap');
  await x.run();
  assert.equal(x.state().reads,13,'a third refresh reuses all recovered recordings');
+});
+
+
+test('out-of-class pending items never trigger authenticated recording reads',async()=>{
+ const x=fixture({deniedStudents:['student_0','student_1']});
+ await x.run();
+ const s=x.state();
+ assert.equal(s.pending,10,'unauthorized pending requests must not be shown');
+ assert.equal(s.keys,10,'unauthorized recordings must not enter the pending filter');
+ assert.equal(s.reads,10,'do not request audio for out-of-class students');
+ assert.equal(s.events.length,10);
+ assert.ok(s.peak<=4);
+});
+
+test('new empty authorized queue invalidates an older in-flight recording batch',async()=>{
+ const x=fixture({emptyAfterFirst:true,delayMs:35});
+ const first=x.run();
+ for(let i=0;i<40&&x.state().reads<4;i++)await new Promise(resolve=>setTimeout(resolve,2));
+ assert.equal(x.state().reads,4,'old queue has four in-flight reads');
+ const second=x.run();
+ await Promise.all([first,second]);
+ const s=x.state();
+ assert.equal(s.pending,0,'the latest authorized queue must win');
+ assert.equal(s.keys,0,'removed pending recordings must not remain selectable');
+ assert.equal(s.reads,4,'do not start additional reads from the superseded queue');
+ assert.equal(s.events.length,0,'discard audio returned to an invalidated refresh');
+ assert.ok(s.peak<=4);
 });
