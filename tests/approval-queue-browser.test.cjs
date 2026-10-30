@@ -63,7 +63,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     assert.equal(state.approveAllVisible,true);
     assert.equal(state.recordingsApproveAllVisible,true);
     assert.equal(state.recordingsApproveAll,'Approve All Pending Points (2)');
-    assert.equal(state.reviewFilter,'needs');
+    assert.equal(state.reviewFilter,'pending');
     assert.deepEqual(state.historyReads,[],'historical data not loaded initially');
     await page.waitForFunction(()=>true);await page.waitForTimeout(300);
     assert.deepEqual(approvals,['m-et'],'Posuk milestone paid automatically, nothing else approved');
