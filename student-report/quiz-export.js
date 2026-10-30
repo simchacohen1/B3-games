@@ -72,7 +72,8 @@
       if(canvas)doc.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,841.89,595.28,undefined,'FAST');
     }
     function newPage(){
-      addCanvas();page++;
+      if(canvas){addCanvas();doc.addPage()}
+      page++;
       canvas=document.createElement('canvas');
       canvas.width=W*1.5;canvas.height=H*1.5;
       ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('PDF canvas is unavailable.');
