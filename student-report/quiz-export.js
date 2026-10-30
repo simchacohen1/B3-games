@@ -34,7 +34,7 @@
     if(!history||!history.summary)throw new Error('Quiz history has not loaded yet.');
     const q=history.summary, doc=new root.jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4',compress:true});
     const W=1200,H=848,M=48,RIGHT=W-M;
-    let canvas,ctx,y=0,page=0;
+    let canvas,ctx,y=0,page=0,tableColumns=null;
     const font=(size=20,bold=false,color='#26344b')=>{
       ctx.font=(bold?'bold ':'')+size+'px Arial, sans-serif';
       ctx.fillStyle=color;
@@ -83,14 +83,17 @@
       line(name, M,70,32,true,'#172033');
       line(className+'   |   '+period+'   |   '+new Date().toLocaleDateString(),M,112,18,false,'#64748b');
       rule(152);y=172;
+      if(tableColumns)columns(tableColumns.values,tableColumns.xs);
       ctx.fillStyle='#64748b';ctx.font='15px Arial, sans-serif';
       ctx.fillText('Page '+page,RIGHT-70,H-33);
     }
     function room(height){if(y+height>H-80)newPage()}
     function heading(text){
+      tableColumns=null;
       room(54);line(text,M,y,23,true,'#1e3a5f');y+=39;
     }
     function columns(values,xs,colors){
+      tableColumns={values,xs};
       values.forEach((v,i)=>line(v,xs[i],y,16,true,colors?.[i]||'#475569'));
       y+=28;rule(y);y+=9;
     }
@@ -141,6 +144,7 @@
     if(!(history.quizzes?.length||history.unavailable?.length)){
       room(35);line('No assigned quizzes in this period.',M,y,19);y+=38;
     }
+    tableColumns=null;
     room(77);
     y=paragraph('Average counts only completed quizzes. Unfinished and not-started quizzes are not counted as zero. For retakes, the newest completed attempt counts.',M,y+14,RIGHT-M,17,'#64748b',24)+20;
     heading('Practice quizzes (not assigned or included in the average)');
