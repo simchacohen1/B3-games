@@ -387,7 +387,8 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 </div>
 
 <script src="../student-class.js?v=20261007-tab-login"></script>
-<script src="../b3-race.js?v=20261029-center"></script>
+<script src="../multiplayer/identity.js?v=teacher-player-20261029-1"></script>
+<script src="../b3-race.js?v=teacher-player-20261029-1"></script>
 <script src="recordings.js?v=20261023-rashi-mic-tile"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -1372,10 +1373,12 @@ let simRoom = null;                  // the game I'm in
 let mpWatch = null;                  // listener on all games while I'm in multiplayer
 let mpClass = null;                  // my class id ('' if none)
 let mpCenterPath = '';
+let mpPlayerId = '', mpPlayerName = '', mpPlayerRole = 'student';
 let mpCenterSummarySignatures = Object.create(null);
 function saveRashiHostRoom(code){const url=new URL(location.href);url.searchParams.set('b3Multiplayer','host');url.searchParams.set('b3MultiplayerRoom',code);history.replaceState(null,'',url.href);}
 function clearRashiRoomUrl(){const url=new URL(location.href);url.searchParams.delete('b3Multiplayer');url.searchParams.delete('b3MultiplayerRoom');history.replaceState(null,'',url.href);}
-function publishRashiCenterRoom(room,code){if(!mpCenterPath||!room||room.host!==studentId)return;const summary={host:studentId,hostName:room.hostName||studentName,gameKey:'rashi-letters',gameName:'Rashi Letters Match',gameUrl:'../rashi-letters/student.html',roomCode:code,state:room.state,playerCount:activePlayers(room).length,createdAt:room.createdAt||Date.now()},key='rashi-letters-'+code,signature=JSON.stringify(summary);if(mpCenterSummarySignatures[key]===signature)return;mpCenterSummarySignatures[key]=signature;db.ref(mpCenterPath+'/'+key).set({...summary,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(e=>{if(mpCenterSummarySignatures[key]===signature)delete mpCenterSummarySignatures[key];console.warn('Rashi center invite update failed',e);});}
+function multiplayerCenterHref(){const url=new URL('../multiplayer/index.html',location.href),p=new URLSearchParams(location.search),classId=p.get('classId')||p.get('class')||mpClass;if(classId){url.searchParams.set('class',classId);url.searchParams.set('classId',classId);}return url.href;}
+function publishRashiCenterRoom(room,code){if(!mpCenterPath||!room||room.host!==mpPlayerId)return;const summary={host:mpPlayerId,hostName:room.hostName||mpPlayerName,hostRole:mpPlayerRole,gameKey:'rashi-letters',gameName:'Rashi Letters Match',gameUrl:'../rashi-letters/student.html',roomCode:code,state:room.state,playerCount:activePlayers(room).length,createdAt:room.createdAt||Date.now()},key='rashi-letters-'+code,signature=JSON.stringify(summary);if(mpCenterSummarySignatures[key]===signature)return;mpCenterSummarySignatures[key]=signature;db.ref(mpCenterPath+'/'+key).set({...summary,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(e=>{if(mpCenterSummarySignatures[key]===signature)delete mpCenterSummarySignatures[key];console.warn('Rashi center invite update failed',e);});}
 
 function renderMatchMenu(){
   leaveRoom();
@@ -1390,7 +1393,7 @@ function renderMatchMenu(){
 
 async function myClassId(){
   if(mpClass!==null) return mpClass;
-  try{ if(window.FunTorahStudentClass){ const c=await FunTorahStudentClass.resolve(db, studentId); mpClass=String(c.classId||''); mpCenterPath=await B3Race.classCenterRoomsPath(db,studentId); ROOMS_PATH=mpCenterPath.replace(/\/rooms$/,'/rashiRooms'); } else mpClass=''; }
+  try{ const actor=await B3MultiplayerIdentity.resolve(db,firebase.auth().currentUser,new URLSearchParams(location.search).get('class')||'',mpPlayerId||''); mpClass=actor.classId;mpPlayerId=actor.participantId;mpPlayerName=actor.participantName;mpPlayerRole=actor.role;mpCenterPath=await B3Race.classCenterRoomsPath(db,mpPlayerId);ROOMS_PATH=mpCenterPath.replace(/\/rooms$/,'/rashiRooms'); }
   catch(e){ mpClass=''; }
   return mpClass;
 }
@@ -1405,14 +1408,13 @@ function openGames(all){
 async function enterMultiplayer(msgText){
   leaveRoom(); viewVersion++;
   const area=document.getElementById('simArea');
-  if(!studentId){ area.replaceChildren(el('p','prompt','Please sign in on Fun Torah Tools to play with friends.')); return; }
   area.replaceChildren(el('p','prompt','Looking for friends…'));
   const v=viewVersion;
   try{
     await myClassId();
     if(!ROOMS_PATH){area.replaceChildren(el('p','prompt','Ask your teacher to add you to an active class before playing with friends.'));return;}
     const params=new URLSearchParams(location.search),roomCode=params.get('b3MultiplayerRoom'),mode=params.get('b3Multiplayer');
-    if(roomCode){const err=await joinRoom(roomCode,mode==='host');if(err){area.replaceChildren(el('p','prompt',err));const b=el('button','sim-small-btn','← Back to Multiplayer Center');b.onclick=()=>{clearRashiRoomUrl();location.href='../multiplayer/index.html';};area.appendChild(b);}return;}
+    if(roomCode){const err=await joinRoom(roomCode,mode==='host');if(err){area.replaceChildren(el('p','prompt',err));const b=el('button','sim-small-btn','← Back to Multiplayer Center');b.onclick=()=>{clearRashiRoomUrl();location.href=multiplayerCenterHref();};area.appendChild(b);}return;}
     if(mode==='start'){await createRoom();return;}
     const all=(await db.ref(ROOMS_PATH).once('value')).val()||{};
     if(v!==viewVersion) return;
@@ -1482,8 +1484,8 @@ async function createRoomInner(){
   }
   if(!code) throw new Error('no free code');
   const ref=db.ref(ROOMS_PATH+'/'+code);
-  const players={}; players[studentId]={name:studentName, score:0, q:0};
-  await ref.set({host:studentId, hostName:studentName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
+  const players={}; players[mpPlayerId]={name:mpPlayerName, score:0, q:0};
+  await ref.set({host:mpPlayerId, hostName:mpPlayerName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
   ref.onDisconnect().remove();
   db.ref(mpCenterPath+'/rashi-letters-'+code).onDisconnect().remove();
   saveRashiHostRoom(code);
@@ -1493,13 +1495,13 @@ async function createRoomInner(){
 async function joinRoom(code,reconnectAsHost){
   const ref=db.ref(ROOMS_PATH+'/'+code); const r=(await ref.once('value')).val();
   if(!r) return 'That game closed. Try another one.';
-  const existing=r.players&&r.players[studentId];
+  const existing=r.players&&r.players[mpPlayerId];
   if(r.state!=='lobby'&&!(r.state==='playing'&&existing)) return 'That game already started.';
-  if((reconnectAsHost||existing&&r.host===studentId)&&r.host===studentId&&existing){leaveRoom();enterRoom(code,true);return null;}
-  if(activePlayers(r).length>=8 && !(r.players||{})[studentId]) return 'That game is full.';
+  if((reconnectAsHost||existing&&r.host===mpPlayerId)&&r.host===mpPlayerId&&existing){leaveRoom();enterRoom(code,true);return null;}
+  if(activePlayers(r).length>=8 && !(r.players||{})[mpPlayerId]) return 'That game is full.';
   leaveRoom();   // if I was waiting in my own empty game, close it
-  const me=ref.child('players/'+studentId);
-  await me.set(Object.assign({},existing||{},{name:studentName,score:Number(existing&&existing.score)||0,q:Number(existing&&existing.q)||0,left:false}));
+  const me=ref.child('players/'+mpPlayerId);
+  await me.set(Object.assign({},existing||{},{name:mpPlayerName,score:Number(existing&&existing.score)||0,q:Number(existing&&existing.q)||0,left:false}));
   me.onDisconnect().update({left:true});
   enterRoom(code,false);
   return null;
@@ -1518,7 +1520,7 @@ function leaveRoom(){
   try{
     const state=r.data && r.data.state;
     if(r.isHost && (state==='lobby' || state==='playing' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); if(mpCenterPath){const center=db.ref(mpCenterPath+'/rashi-letters-'+r.code);center.onDisconnect().cancel();center.remove().catch(()=>{});} }
-    else if(!r.finished && r.data){ const me=r.ref.child('players/'+studentId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
+    else if(!r.finished && r.data){ const me=r.ref.child('players/'+mpPlayerId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
   }catch(e){ console.error(e); }
 }
 
@@ -1530,7 +1532,7 @@ function onRoomUpdate(room, all){
   if(!room){ if(r.shown!=='results'){
     simRoom=null; stopWatching();
     const area=document.getElementById('simArea'); area.replaceChildren(el('p','prompt',r.isHost?'This waiting room has closed.':'The host left. This waiting room has closed.'));
-    const browse=el('button','sim-small-btn','Browse other games'); browse.onclick=()=>{clearRashiRoomUrl();location.href='../multiplayer/index.html';}; area.appendChild(browse);
+    const browse=el('button','sim-small-btn','Browse other games'); browse.onclick=()=>{clearRashiRoomUrl();location.href=multiplayerCenterHref();}; area.appendChild(browse);
   } return; }
   r.data=room;
   publishRashiCenterRoom(room,r.code);
@@ -1538,9 +1540,9 @@ function onRoomUpdate(room, all){
   if(r.shown==='results') return;
   if(room.state==='ended' || (r.finished && allDone(room))){ renderMpResults(room); return; }
   if(room.state==='playing' && !r.started){
-    if(!room.players || !room.players[studentId] || room.players[studentId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
-    r.started=true;r.qi=Number(room.players[studentId].q)||0;r.score=Number(room.players[studentId].score)||0;
-    r.ref.child('players/'+studentId).onDisconnect().update({left:true});
+    if(!room.players || !room.players[mpPlayerId] || room.players[mpPlayerId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
+    r.started=true;r.qi=Number(room.players[mpPlayerId].q)||0;r.score=Number(room.players[mpPlayerId].score)||0;
+    r.ref.child('players/'+mpPlayerId).onDisconnect().update({left:true});
     if(r.qi>=room.questions.length)renderWaiting();else runCountdown(); return;
   }
   updateBoard(room);
@@ -1554,7 +1556,7 @@ function renderLobby(room, all){
   panel.append(el('h3',null, count<2 ? 'Waiting for friends to join…' : 'Your race is ready!'));
   if(count<2) panel.appendChild(el('p','sim-intro','When another boy taps 👥 Play with friends, he’ll be asked to join you.'));
   const list=el('div','mp-players');
-  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===studentId?' me':''), (id===room.host?'👑 ':'')+(id===studentId?'You':p.name))));
+  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===mpPlayerId?' me':''), (id===room.host?'👑 ':'')+(id===mpPlayerId?'You':p.name))));
   panel.append(el('div','sim-status',count+' player'+(count===1?'':'s')+' here'), list);
   if(r.isHost){
     const go=el('button','btn', count<2 ? 'Waiting…' : '▶ Start the race!'); go.disabled=count<2;
@@ -1565,7 +1567,7 @@ function renderLobby(room, all){
     const waitMs=Date.now()-(r.waitStartedAt||(r.waitStartedAt=Date.now()));
     if(waitMs>=30000)panel.appendChild(el('p','sim-intro','Still waiting? You can choose another game.'));
     else if(!r.reminderTimer)r.reminderTimer=setTimeout(()=>{if(simRoom===r&&r.shown==='lobby')renderLobby(r.data);},30000-waitMs);
-    const browse=el('button','sim-small-btn','Leave and browse games');browse.onclick=()=>{leaveRoom();location.href='../multiplayer/index.html';};panel.appendChild(browse);
+    const browse=el('button','sim-small-btn','Leave and browse games');browse.onclick=()=>{leaveRoom();location.href=multiplayerCenterHref();};panel.appendChild(browse);
   }
   area.appendChild(panel);
   // Someone else is waiting alone too? Offer to join them so nobody waits forever.
@@ -1594,10 +1596,10 @@ function boardRows(room, results){
   const total=(room.questions||[]).length||MP_QUESTIONS;
   const box=el('div','mp-board'+(results?' mp-results':''));
   rankPlayers(room).forEach(([id,p],i)=>{
-    const row=el('div','mp-row'+(id===studentId?' me':'')+(p.left?' left':''));
+    const row=el('div','mp-row'+(id===mpPlayerId?' me':'')+(p.left?' left':''));
     const medal=results ? (['🥇','🥈','🥉'][i]||(i+1)+'.') : (p.finishedAt?'🏁':(i+1)+'.');
     const bar=el('div','mp-bar'); const fill=document.createElement('i'); fill.style.width=Math.min(100,(p.q||0)/total*100)+'%'; bar.appendChild(fill);
-    row.append(el('span',null,medal), el('span','mp-name',(id===studentId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
+    row.append(el('span',null,medal), el('span','mp-name',(id===mpPlayerId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
     box.appendChild(row);
   });
   return box;
@@ -1621,8 +1623,8 @@ function renderMpQuestion(){
       else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===q.t) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='The green one is its twin.'; }
       r.qi++;
       const upd={score:r.score, q:r.qi};
-      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+studentId).onDisconnect().cancel(); }
-      r.ref.child('players/'+studentId).update(upd).catch(()=>{});
+      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+mpPlayerId).onDisconnect().cancel(); }
+      r.ref.child('players/'+mpPlayerId).update(upd).catch(()=>{});
       logAttempt('similar','letter',ok).catch(()=>{});
       setTimeout(()=>{ if(simRoom!==r || v!==viewVersion) return; if(r.qi>=qs.length) renderMpWaiting(); else renderMpQuestion(); }, ok?650:1400);
     };
@@ -1644,17 +1646,17 @@ function renderMpWaiting(){
 
 function renderMpResults(room){
   const r=simRoom; if(!r || r.shown==='results') return; r.shown='results';
-  r.ref.child('players/'+studentId).onDisconnect().cancel();
+  r.ref.child('players/'+mpPlayerId).onDisconnect().cancel();
   if(r.isHost) r.ref.onDisconnect().remove();
   const area=document.getElementById('simArea'); area.replaceChildren();
   const ranked=rankPlayers(room);
-  const iWon=ranked.length && ranked[0][0]===studentId;
+  const iWon=ranked.length && ranked[0][0]===mpPlayerId;
   const icon=el('div','finish-icon',iWon?'🏆':'🎉');
   const d=el('div','sim-done');
   const again=el('button','btn','Play again'); again.onclick=()=>enterMultiplayer(); again.style.marginTop='10px';
   d.append(icon, el('h3',null,iWon?'You won the race!':(ranked[0]?(ranked[0][1].name+' wins!'):'Game over')), boardRows(room,true), again);
   area.appendChild(d);
-  const myScore=(room.players&&room.players[studentId]&&room.players[studentId].score)||0;
+  const myScore=(room.players&&room.players[mpPlayerId]&&room.players[mpPlayerId].score)||0;
   if(myScore>=8) markMastered('similarDone');
   if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); setTimeout(()=>showQuestToast('🏆 Winner! +5 stars'), myScore>=8?1300:0); }
   else rewardBurst(icon,false);

@@ -72,12 +72,14 @@
     var box = $("yiFriendsBox"), d = getDb(), id = "", name = "";
     try { id = String(sessionStorage.getItem("b3Games_studentId") || "").trim(); name = sessionStorage.getItem("b3Games_studentName") || ""; } catch (e) {}
     if (student && student.name) name = student.name;
-    if (window.YiddishAPI.preview) { box.textContent = 'Class races require student accounts. Use solo activities for demonstrations.'; return; }
-    var path = await window.B3Race.classRoomsPath(d, id, "yiddish");
-    var centerPath = await window.B3Race.classCenterRoomsPath(d, id);
+    var actor;
+    try { actor = await window.B3MultiplayerIdentity.resolve(d, firebase.auth().currentUser, new URLSearchParams(location.search).get("class") || "", id); }
+    catch (e) { box.textContent = e.message || 'Sign in with an assigned class account to play.'; return; }
+    var path = await window.B3Race.classRoomsPath(d, actor.participantId, "yiddish");
+    var centerPath = await window.B3Race.classCenterRoomsPath(d, actor.participantId);
     if (race) race.leave();
     race = window.B3Race.create({
-      container: box, db: d, roomsPath: path, centerPath: centerPath, studentId: id, studentName: name || "Player",
+      container: box, db: d, roomsPath: path, centerPath: centerPath, studentId: actor.participantId, studentName: actor.participantName || name || "Player", role: actor.role,
       gameKey: "yiddish", gameName: "Yiddish Race", gameUrl: "../yiddish/index.html", centerUrl: "../multiplayer/index.html",
       onRoomCreated: window.B3Race.saveHostRoomCode,
       makeQuestions: makeQuestions,
