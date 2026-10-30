@@ -62,6 +62,14 @@
         unlisten(); notice('This game room has closed. You can choose another game.'); roomSection.hidden = true; showBrowse(); return;
       }
       roomSection.hidden = false;
+      // Keep the saved URL's role in sync after winner/challenger rotation.
+      // A former player becomes a spectator; a queued spectator becomes a player.
+      const currentPlayer = (room.players || []).some(player => player.studentId === studentId);
+      const desiredMode = currentPlayer ? (room.host === studentId ? 'host' : 'join') : 'spectate';
+      if (params.get('b3Multiplayer') !== desiredMode) {
+        params.set('b3Multiplayer', desiredMode);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+      }
       el('roomCode').textContent = 'Room code ' + roomCode;
       draw();
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
