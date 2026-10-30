@@ -123,7 +123,32 @@ async function requireTeacher(req){
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
     const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
-    const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
+    let classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
+    if(row.accountType==='principal'){
+      // Cached principal grants are only an upper bound. Owner reconciliation
+      // can lag a supervised teacher's deactivation or class removal.
+      const supervisors=row.supervisedTeachers||{},ids=Object.keys(supervisors);
+      if(!ids.length||ids.length>100||ids.some(id=>!teacherClassScope.validKey(id)))
+        return {ok:false,error:'No active supervised classes.'};
+      const root='b3Games/workspaces/b3-2026';
+      const current=await Promise.all(ids.map(async id=>{
+        const invite=await get(root+'/teacherInvites/'+id);
+        if(!invite||invite.active===false||invite.role==='principal'||invite.accountType==='principal')return [];
+        const uid=String(invite.claimedUid||'');
+        let claimed=null;
+        if(uid){
+          if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid))return [];
+          claimed=await get(root+'/teachers/'+uid);
+          if(!claimed||claimed.active===false||claimed.accountType==='principal')return [];
+        }
+        return Object.keys(supervisors[id]?.classIds||{}).filter(c=>
+          teacherClassScope.validKey(c)&&supervisors[id].classIds[c]===true&&
+          invite.classIds?.[c]===true&&(!claimed||claimed.classIds?.[c]===true));
+      }));
+      const live=new Set(current.flat());
+      classIds=classIds.filter(id=>live.has(id));
+      if(!classIds.length)return {ok:false,error:'No active supervised classes.'};
+    }
     const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
