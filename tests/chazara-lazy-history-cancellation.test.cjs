@@ -137,3 +137,40 @@ test('failed history for one student is retried without re-fetching successful s
   assert.equal(x.calls.join(','), 'student_a,student_b,student_b');
   assert.equal(x.context.historyStudentsLoaded.size, 2);
 });
+
+test('returning to pending while a nine-student history batch is in flight prevents later batches', async () => {
+  const gate = deferred();
+  const students = Array.from({length: 9}, (_, i) => 'student_' + i);
+  const x = fixture({students, api: async () => gate.promise});
+  const pending = x.run();
+  assert.equal(x.calls.length, 4, 'only the first bounded batch starts');
+  x.review('pending');
+  x.changeFilter();
+  gate.release({events: {old: {classId: 'alpha', recorded: true}}});
+  await pending;
+  assert.equal(x.calls.length, 4, 'cancelled history must not request the remaining five students');
+  assert.equal(x.context.historyStudentsLoaded.size, 0, 'cancelled results cannot populate cache');
+  assert.equal(Object.keys(x.context.E).length, 0, 'cancelled results cannot restore history');
+  assert.equal(x.context.historyLoading, false);
+  assert.equal(x.renders(), 1, 'pending UI is immediately restored');
+});
+
+test('switching selected student while a history read is pending keeps only the newer selection', async () => {
+  const gate = deferred();
+  const x = fixture({students: ['student_a', 'student_b'], api: async id =>
+    id === 'student_a' ? gate.promise : {events: {newer: {classId: 'alpha', recorded: true}}}
+  });
+  x.select('student_a');
+  const oldRead = x.run();
+  x.select('student_b');
+  await x.run();
+  gate.release({events: {older: {classId: 'alpha', recorded: true}}});
+  await oldRead;
+  assert.equal(x.calls.join(','), 'student_a,student_b');
+  assert.equal(x.context.historyStudentsLoaded.has('student_a'), false,
+    'superseded selected student cannot be cached');
+  assert.equal(x.context.historyStudentsLoaded.has('student_b'), true);
+  assert.deepEqual(Object.keys(x.context.E), ['student_b']);
+  assert.deepEqual(Object.keys(x.context.E.student_b), ['newer']);
+  assert.equal(x.context.historyLoading, false);
+});
