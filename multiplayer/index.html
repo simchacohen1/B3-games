@@ -1,11 +1,14 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script data-b3-staging-guard src="../staging/firebase-config.generated.js"></script>
+<script src="../staging/staging-config.js"></script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f3f7fe">
-<title>Multiplayer Center — Fun Torah Tools</title>
-<link rel="stylesheet" href="center.css">
+<meta name="theme-color" content="#f0f5ff">
+<title>Multiplayer Arcade — Fun Torah Tools</title>
+<link rel="stylesheet" href="center.css?v=arcade-pr480-full-size-default-20261029-5">
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -17,21 +20,23 @@
 <script src="../student-class.js"></script>
 <script src="../backend/functions/student-tool-policy.js"></script>
 <script src="../b3-race.js"></script>
-<script defer src="center.js"></script>
+<script defer src="center.js?v=arcade-pr480-full-size-default-20261029-5"></script>
 </head>
 <body>
 <main>
   <header><strong>🎲 Fun Torah Tools</strong><a href="../index.html">← Back to Fun Torah Tools</a></header>
-  <h1>Multiplayer Center</h1>
-  <p class="intro">Choose a game and invite your classmates. The host starts the game when everyone is ready.</p>
+  <h1>🎮 Multiplayer Arcade</h1>
+  <p class="intro">All 17 games are ready to browse. Choose a game from its category and invite your classmates to play.</p>
   <section id="accountStatus" class="notice" role="status" aria-live="polite">Checking your student sign-in…</section>
   <section id="invitationSection" aria-labelledby="invitationHeading" hidden>
-    <h2 id="invitationHeading">Games waiting for you</h2>
+    <h2 id="invitationHeading">Friends waiting to play</h2>
+    <p id="invitationSummary" class="invitation-summary" aria-live="polite"></p>
     <div id="invitations" class="invitations"></div>
   </section>
   <section aria-labelledby="gamesHeading">
-    <h2 id="gamesHeading">Choose a game</h2>
-    <div id="games" class="games"></div>
+    <h2 id="gamesHeading" tabindex="-1">All 17 games, ready to play</h2>
+    <div id="gameCategories" class="category-shelf" role="group" aria-label="Game categories"></div>
+    <p id="gameResultsSummary" class="visually-hidden" role="status" aria-live="polite"></p>
   </section>
   <footer>Use your existing Fun Torah Tools student sign-in. Games keep their original rules and progress.</footer>
 </main>
