@@ -89,8 +89,48 @@ function present(def, rec, now) {
     status: rec.status, late: isLate(def, rec, now),
     draft: rec.draft || '', progress: rec.progress || 0, answer: rec.answer || '',
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-    updatedAt: rec.updatedAt || null
+    updatedAt: rec.updatedAt || null,
+    messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
+      text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : []
   };
+}
+
+function cleanVoiceData(value) {
+  if (typeof value !== 'string') fail(400, 'Record a short voice note first.');
+  const match = value.match(/^data:(audio\/(?:webm|ogg|mp4|mpeg));base64,([A-Za-z0-9+/]+={0,2})$/i);
+  if (!match) fail(400, 'Use a supported audio recording.');
+  const audio = Buffer.from(match[2], 'base64');
+  if (!audio.length || audio.length > 100000 || audio.toString('base64') !== match[2])
+    fail(413, 'Voice notes must be shorter than 15 seconds. Please record a shorter note.');
+  const mime = match[1].toLowerCase();
+  const validAudio = mime === 'audio/webm' ? audio.subarray(0, 4).equals(Buffer.from('1a45dfa3', 'hex'))
+    : mime === 'audio/ogg' ? audio.subarray(0, 4).toString('ascii') === 'OggS'
+      : mime === 'audio/mp4' ? audio.subarray(4, 8).toString('ascii') === 'ftyp'
+        : audio.length > 1 && audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0;
+  if (!validAudio) fail(400, 'That file is not a valid voice recording. Please record it again.');
+  return value;
+}
+function messageInput(body, role, now, newId) {
+  const messageText = text(body.text, 500);
+  const voiceData = body.voiceDataURL == null ? null : cleanVoiceData(body.voiceDataURL);
+  if (!messageText && !voiceData) fail(400, 'Write a note or record a voice note before sending.');
+  const id = newId();
+  if (!key(id)) fail(500, 'Could not send the note.');
+  return { id, role, text: messageText, voice: !!voiceData, voiceData, createdAt: now };
+}
+async function addMessage(store, path, message) {
+  let limit = false;
+  const tx = await store.tx(path, cur => {
+    const messages = Array.isArray(cur?.messages) ? cur.messages : [];
+    if (messages.length >= 30 || (message.voiceData && messages.filter(item => item.voice).length >= 6)) { limit = true; return undefined; }
+    return { ...(cur || {}),
+    messages: [...messages,
+      { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: message.createdAt }],
+    ...(message.voiceData ? { voiceNotes: { ...(cur?.voiceNotes || {}), [message.id]: message.voiceData } } : {})
+  };
+  });
+  if (limit) fail(429, message.voiceData ? 'This homework has reached its voice-note limit.' : 'This homework has reached its comment limit.');
+  if (!tx || tx.committed === false) fail(409, 'The note could not be saved. Please try again.');
 }
 
 // ---- teacher actions -------------------------------------------------------
@@ -113,7 +153,9 @@ async function teacherDo(store, identity, body, now, newId) {
         const late = isLate(def, rec, now);
         if (late) counts.missing++;
         students[sid] = { name: members[sid].name, status: rec.status, late, answer: rec.answer || '',
-          progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null };
+          progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
+          messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
+            text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : [] };
       }
       rows.push({ id: def.id, type: def.type, title: def.title, details: def.details,
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
@@ -153,6 +195,22 @@ async function teacherDo(store, identity, body, now, newId) {
 
   const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
   if (!def) fail(404, 'That assignment was not found.');
+
+  if (body.action === 'comment' || body.action === 'voiceRead') {
+    const sid = body.studentId;
+    if (!key(sid) || !has(members, sid) || !targets(def, members).includes(sid)) fail(404, 'That student is not assigned this homework.');
+    const path = recordPath(classId, sid, def.id);
+    if (body.action === 'comment') {
+      const message = messageInput(body, 'teacher', now, newId);
+      await addMessage(store, path, message);
+      return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
+    }
+    const rec = await store.get(path), message = (rec?.messages || []).find(item => item.id === body.messageId && item.voice);
+    if (!message) fail(404, 'That voice note is no longer available.');
+    const voiceDataURL = await store.get(path + '/voiceNotes/' + message.id);
+    if (!voiceDataURL) fail(404, 'That voice note is no longer available.');
+    return { ok: true, voiceDataURL };
+  }
 
   if (body.action === 'publish') {
     if (publicationState(def) === 'archived') fail(409, 'Archived assignments must be restored before publishing.');
@@ -226,7 +284,7 @@ async function teacherDo(store, identity, body, now, newId) {
 }
 
 // ---- student actions -------------------------------------------------------
-async function studentDo(store, body, now, ip) {
+async function studentDo(store, body, now, ip, newId) {
   const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
     () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   const sid = student.id, classId = student.classId;
@@ -258,6 +316,18 @@ async function studentDo(store, body, now, ip) {
   const def = key(body.assignmentId) && has(defs, body.assignmentId) && mine(defs[body.assignmentId]) ? defs[body.assignmentId] : null;
   if (!def || !mine(def)) fail(404, 'That assignment was not found.');
   const path = recordPath(classId, sid, def.id);
+  if (body.action === 'comment') {
+    const message = messageInput(body, 'student', now, newId);
+    await addMessage(store, path, message);
+    return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
+  }
+  if (body.action === 'voiceRead') {
+    const rec = await store.get(path), message = (rec?.messages || []).find(item => item.id === body.messageId && item.voice);
+    if (!message) fail(404, 'That voice note is no longer available.');
+    const voiceDataURL = await store.get(path + '/voiceNotes/' + message.id);
+    if (!voiceDataURL) fail(404, 'That voice note is no longer available.');
+    return { ok: true, voiceDataURL };
+  }
   const minutes = v => {
     if (v == null || v === '') return null;
     const n = Number(v);
@@ -309,7 +379,9 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
-  if (['studentList', 'save', 'submit'].includes(a)) return studentDo(store, body, now, auth && auth.ip);
+  if (['comment', 'voiceRead'].includes(a) && auth && auth.identity)
+    return teacherDo(store, auth.identity, body, now, newId);
+  if (['studentList', 'save', 'submit', 'comment', 'voiceRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };

@@ -78,9 +78,89 @@
     });
     return counts;
   }
+  function conversation(options) {
+    var box = el('section', null, 'home-conversation');
+    box.append(el('h4', options.role === 'teacher' ? 'Notes with this student' : 'Notes with your teacher'));
+    var history = el('div', null, 'conversation-history');
+    (options.messages || []).slice(-30).forEach(function (message) {
+      var item = el('article', null, 'conversation-message ' + (message.role === options.role ? 'mine' : 'theirs'));
+      item.append(el('strong', message.role === 'teacher' ? 'Teacher' : 'Student'));
+      if (message.text) item.append(el('p', message.text));
+      if (message.voice) {
+        var listen = el('button', '▶ Listen to voice note', 'conversation-listen'); listen.type = 'button';
+        listen.onclick = async function () {
+          listen.disabled = true;
+          try { var audio = await options.send({ action: 'voiceRead', messageId: message.id });
+            var player = el('audio'); player.controls = true; player.preload = 'none'; player.src = audio.voiceDataURL;
+            listen.replaceWith(player);
+          } catch (error) { feedback.textContent = error.message || 'This voice note could not play.'; }
+          finally { listen.disabled = false; }
+        };
+        item.append(listen);
+      }
+      history.append(item);
+    });
+    if (!(options.messages || []).length) history.append(el('p', 'No notes yet. Send a message if you have a question.', 'muted'));
+    box.append(history);
+    var note = el('textarea'); note.maxLength = 500; note.placeholder = options.role === 'teacher' ? 'Write a kind note or correction' : 'Ask your teacher a question';
+    note.setAttribute('aria-label', 'Write a message');
+    var actions = el('div', null, 'conversation-actions');
+    var sendText = el('button', 'Send message', 'conversation-send'); sendText.type = 'button';
+    var record = el('button', '🎙 Record voice note', 'conversation-record sec'); record.type = 'button';
+    var feedback = el('p', null, 'conversation-feedback'); feedback.setAttribute('aria-live', 'polite');
+    async function send(payload) {
+      await options.send(Object.assign({ action: 'comment' }, payload));
+      if (options.onSent) await options.onSent();
+    }
+    sendText.onclick = async function () {
+      if (!note.value.trim()) { feedback.textContent = 'Write a message first.'; note.focus(); return; }
+      sendText.disabled = true;
+      try { await send({ text: note.value.trim() }); note.value = ''; feedback.textContent = 'Message sent.'; }
+      catch (error) { feedback.textContent = error.message || 'Message could not be sent.'; }
+      finally { sendText.disabled = false; }
+    };
+    record.onclick = async function () {
+      if (record.dataset.recording === 'true') { record._recorder.stop(); return; }
+      if (!root.navigator?.mediaDevices?.getUserMedia || !root.MediaRecorder) {
+        feedback.textContent = 'Voice notes are not supported in this browser. You can send a written message.'; return;
+      }
+      record.disabled = true;
+      var stream;
+      try {
+        stream = await root.navigator.mediaDevices.getUserMedia({ audio: true });
+        var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(function (type) {
+          return !root.MediaRecorder.isTypeSupported || root.MediaRecorder.isTypeSupported(type);
+        });
+        var recorder = new root.MediaRecorder(stream, mime ? { mimeType: mime } : undefined), chunks = [];
+        record._recorder = recorder; record.dataset.recording = 'true'; record.disabled = false;
+        record.textContent = '■ Stop & send'; feedback.textContent = 'Recording… up to 15 seconds.';
+        recorder.ondataavailable = function (event) { if (event.data?.size) chunks.push(event.data); };
+        recorder.onstop = async function () {
+          clearTimeout(record._recordTimer); stream.getTracks().forEach(function (track) { track.stop(); });
+          record.dataset.recording = 'false'; record.textContent = '🎙 Record voice note'; record.disabled = true;
+          try {
+            var blob = new Blob(chunks, { type: (recorder.mimeType || 'audio/webm').split(';')[0] });
+            if (!blob.size || blob.size > 100000) throw new Error('That recording was too large. Please try a shorter note.');
+            var voiceDataURL = await new Promise(function (resolve, reject) {
+              var reader = new FileReader(); reader.onload = function () { resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(blob);
+            });
+            await send({ voiceDataURL: voiceDataURL }); feedback.textContent = 'Voice note sent.';
+          } catch (error) { feedback.textContent = error.message || 'Voice note could not be sent.'; }
+          finally { record.disabled = false; }
+        };
+        record._recordTimer = setTimeout(function () { if (recorder.state === 'recording') recorder.stop(); }, 15000);
+      } catch (error) {
+        if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
+        record.dataset.recording = 'false'; record.disabled = false;
+        feedback.textContent = error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : 'Could not start recording. You can send a written message.';
+      }
+    };
+    actions.append(sendText, record); box.append(note, actions, feedback);
+    return box;
+  }
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
     isStagingRuntime: function () { return isStagingRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
-    dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue,
+    dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
     teacherStatusCounts: teacherStatusCounts };
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);

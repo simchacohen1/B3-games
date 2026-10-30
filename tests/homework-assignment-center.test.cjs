@@ -233,13 +233,16 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
   assert.match(fnSource, /homework-406-preview/);
-  for (const file of ['homework.js', 'homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
+  for (const file of ['homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(
       fs.readFileSync(__dirname + '/../backend/functions/homework-staging/' + file, 'utf8'),
       fs.readFileSync(__dirname + '/../backend/functions/' + file, 'utf8'),
       `${file} staging copy must match the canonical function source`,
     );
   }
+  const stagingEndpoint = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/homework.js', 'utf8');
+  assert.match(stagingEndpoint, /voiceComment\?320000:20000/, 'only the isolated staging endpoint permits bounded voice-note payloads');
+  assert.match(fnSource, /Buffer\.byteLength\(JSON\.stringify\(req\.body\|\|\{\}\)\)>20000/, 'production endpoint keeps its existing request limit');
   const stagingCore = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/homework-core.cjs', 'utf8');
   assert.doesNotMatch(stagingCore, /OWNER_EMAIL/, 'staging owner authorization is UID based');
   assert.match(stagingCore, /async function authorizedClasses\(store, identity\)/,

@@ -3,8 +3,8 @@
 <script src="/staging/preview-bootstrap.js"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Homework</title>
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18324b;background:#eef7ff}*{box-sizing:border-box}body{margin:0}
-header{background:#23558b;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}header strong{font-size:22px}
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18324b;background:#fff8e9}*{box-sizing:border-box}body{margin:0}
+header{background:linear-gradient(105deg,#2563eb,#3978e8);color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 4px 14px #173a6530}header strong{font-size:22px}
 header a{color:#fff}main{max-width:760px;margin:20px auto;padding:0 14px 60px}
 .card{background:#fff;border:1px solid #dce5ee;border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px #102b4510}
 .card h3{margin:0 0 4px}.muted{color:#5b6b7b}.badge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:13px;background:#eaf2fa;color:#174e7e;margin-right:6px}
@@ -15,7 +15,11 @@ button{font:inherit;border:0;border-radius:9px;padding:10px 16px;font-weight:600
 .msg{min-height:20px;margin-top:6px;font-weight:600}.err{color:#a31a1a}.good{color:#1c6b30}
 .button-link{display:inline-block;padding:10px 16px;margin:8px 8px 0 0;border-radius:9px;background:#18588f;color:#fff;font-weight:700;text-decoration:none}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #eea62b;outline-offset:2px}
-.home-intro{background:#fff;border-radius:20px;padding:18px;margin-bottom:16px}.home-intro h1{margin:0 0 6px;font-size:30px}.home-intro p{margin:0}.home-tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px}.home-tabs button{white-space:nowrap;border:2px solid #c8d8e8;background:#fff;color:#23558b;padding:11px 14px}.home-tabs button[aria-selected=true]{background:#23558b;color:#fff;border-color:#23558b}.home-tabs .count{display:inline-block;margin-left:5px;border-radius:12px;padding:1px 7px;background:#fff;color:#23558b}.home-section[hidden]{display:none}.home-section h2{font-size:22px}.home-card.todo{border-left:6px solid #5592d2}.home-card.handed{border-left:6px solid #e2a436}.home-card.finished{border-left:6px solid #56aa68}.note{font-size:17px;line-height:1.5}
+.home-intro{background:linear-gradient(120deg,#ffecb7,#ffe4ef 58%,#e7edff);border:2px solid #fff;border-radius:22px;padding:20px;margin-bottom:16px;box-shadow:0 6px 18px #ad8d3420}.home-intro h1{margin:0 0 6px;font-size:30px}.home-intro p{margin:0;font-size:17px;line-height:1.45}.home-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:4px 0 14px}.home-tabs button{white-space:normal;min-height:66px;border:2px solid #c8d8e8;background:#fff;color:#23558b;padding:11px 10px;font-size:17px}.home-tabs .tab-todo{background:#fff1c9;border-color:#f1c454;color:#704800}.home-tabs .tab-handed{background:#e7f1ff;border-color:#79a8ed;color:#174e8b}.home-tabs .tab-finished{background:#e5f8e7;border-color:#71c47b;color:#236231}.home-tabs button[aria-selected=true]{box-shadow:0 0 0 3px #17324d22;transform:translateY(-2px);font-weight:800}.home-tabs button:focus-visible{outline:3px solid #163b68;outline-offset:3px}.home-tabs .count{display:inline-block;margin-left:5px;border-radius:12px;padding:1px 7px;background:#fff;color:inherit}.home-section[hidden]{display:none}.home-section h2{font-size:24px;margin:8px 0 12px}.home-section>.card.muted{font-size:17px;background:#fff;border:2px dashed #e6c86f}.home-card{border:2px solid transparent;border-radius:20px;padding:20px}.home-card h3{font-size:22px;line-height:1.3}.home-card.todo{border-color:#f0cf72;background:#fffdf6}.home-card.handed{border-color:#91b8f1;background:#f7faff}.home-card.finished{border-color:#8dd394;background:#f7fff7}.home-card p{font-size:17px;line-height:1.5}.home-card label{font-size:17px;margin-top:16px}.home-card textarea,.home-card input{font-size:18px;padding:13px;border-radius:12px}.home-card button,.home-card .button-link{min-height:48px;font-size:17px;border-radius:13px;margin-top:12px}.home-card .button-link{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px}.home-card .badge{font-size:15px;padding:5px 11px}.note{font-size:17px;line-height:1.5;border-left-color:#f2aa35;background:#fff3cf}
+.home-conversation{border:2px solid #dbeafe;border-radius:16px;background:#f8fbff;padding:14px;margin:14px 0}.home-conversation h4{font-size:18px;margin:0 0 10px}.conversation-history{display:grid;gap:8px;max-height:250px;overflow:auto}.conversation-message{background:#fff;border:1px solid #dbe4f0;border-radius:12px;padding:10px 12px}.conversation-message.mine{border-color:#a9d8b0;background:#f5fff5}.conversation-message strong{font-size:14px;color:#355575}.conversation-message p{margin:5px 0 0}.conversation-message button{min-height:40px}.conversation-actions{display:flex;gap:8px;flex-wrap:wrap}.conversation-feedback{min-height:20px;margin:5px 0;color:#36516e}
+.conversation-message .conversation-listen{display:block;margin:8px 0 0}
+.conversation-message audio{display:block;max-width:100%;width:320px;margin-top:8px}
+@media(max-width:520px){main{margin:12px auto}.home-tabs{gap:6px}.home-tabs button{font-size:15px;padding:9px 5px;min-height:62px}.home-intro h1{font-size:26px}.home-card{padding:16px}}
 </style></head><body>
 <header><strong>📚 My Homework</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
 <main>
@@ -49,15 +53,15 @@ function call(body){return H.call(Object.assign({},auth,body))}
 function render(data){
   listBox.replaceChildren();
   statusBox.style.display='none';
-  var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'!'),el('p',!data.assignments.length?'No homework right now. Enjoy! 🎉':data.openCount?'Here is your homework. You can do it!':'You are all caught up. Great job! 🎉'));listBox.append(intro);
+  var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'! 🌟'),el('p',!data.assignments.length?'No homework for you right now. Enjoy your free time!':data.openCount?'Here’s what you can work on today.':'You finished everything. Great job! 🎉'));listBox.append(intro);
   var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
-  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div');groups.forEach(function(g,i){var b=el('button',g.name+' '+g.items.length);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===0?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=i!==0;pane.append(el('h2',g.name));if(!g.items.length)pane.append(el('div',g.id==='todo'?'Nothing to do right now. Enjoy your free time!':'Nothing here yet.','card muted'));g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
+  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 '};groups.forEach(function(g,i){var b=el('button',(tabIcons[g.id]||'')+g.name+' · '+g.items.length,'tab-'+g.id);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===0?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=i!==0;pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
 }
 function card(a){
   var bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';var c=el('article',null,'card home-card '+bucket);
   c.append(el('h3',a.title));
   var meta=el('div');
-  var stateLabel=a.status==='approved'?'Finished ✓':a.status==='submitted'?'Handed in — waiting for teacher':a.status==='returned'?'Returned — please fix it':a.status==='in_progress'?'Started — keep going':'Ready to start';
+  var stateLabel=a.status==='approved'?'Finished! 🌟':a.status==='submitted'?'Handed in — teacher will check it':a.status==='returned'?'Try again — see teacher note':a.status==='in_progress'?'Started — keep going':'Ready to start';
   var b=el('span',stateLabel,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
   meta.append(b,el('span',H.TYPES[a.type]||a.type,'badge'));
   if(a.dueAt!=null)meta.append(el('span',(a.late?'Late – was due ':'Due ')+H.when(a.dueAt),'badge'+(a.late?' late':'')));
@@ -67,10 +71,11 @@ function card(a){
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
   var activityUrl=H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='noopener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
-  if(a.status==='returned'&&a.feedback)c.append(el('div','Your teacher says: '+a.feedback,'note'));
+  if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
+  c.append(H.conversation({role:'student',messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh}));
   if(a.status==='approved'){
     if(a.stars)c.append(el('p','★'.repeat(a.stars)+'☆'.repeat(5-a.stars)));
-    if(a.feedback)c.append(el('div','Teacher says: '+a.feedback,'note'));
+    if(a.feedback)c.append(el('div','💬 Teacher says: '+a.feedback,'note'));
     return c;
   }
   if(a.status==='submitted'){c.append(el('p','You handed it in! Your teacher will look at it.','muted'));if(a.answer)c.append(el('p','Your answer: '+a.answer,'muted'));return c}
@@ -79,11 +84,11 @@ function card(a){
     c.append(el('label','Minutes I practiced'));
     mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
   }
-  c.append(el('label',a.targetUnit==='minutes'?'Short note (optional)':'What I did / my answer'));
+  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':'✏️ Tell your teacher what you did'));
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
-  var save=el('button','Save for later','sec'),sub=el('button',a.status==='returned'?'Fix and Hand In Again':'Hand In');
+  var save=el('button','Save for later','sec'),sub=el('button',a.status==='returned'?'Fix and Hand In Again':'Hand In Homework');
   save.type=sub.type='button';
   var mv=function(){return mins?Math.max(0,parseInt(mins.value,10)||0):undefined};
   save.onclick=async function(){

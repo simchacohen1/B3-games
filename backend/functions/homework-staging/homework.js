@@ -11,7 +11,8 @@ exports.homeworkPortal=onRequest({region:'us-central1',cors:[
  res.set('Cache-Control','no-store');
  if(req.method==='GET')return res.json({ok:true,ready:true,version:1});
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
- if(Buffer.byteLength(JSON.stringify(req.body||{}))>20000)return res.status(413).json({error:'Request too large.'});
+ const voiceComment=req.body?.action==='comment'&&typeof req.body?.voiceDataURL==='string';
+ if(Buffer.byteLength(JSON.stringify(req.body||{}))>(voiceComment?320000:20000))return res.status(413).json({error:'Request too large.'});
  try{
   const db=admin.database();
   const store={

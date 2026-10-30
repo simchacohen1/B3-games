@@ -13,7 +13,8 @@ const fixtureTeacher = {
 const fixtureStudents = {
   maya: { name: 'Maya Levin', status: 'assigned', late: true, answer: '', feedback: '' },
   noam: { name: 'Noam Cohen', status: 'in_progress', late: true, answer: 'I practiced twice.', feedback: '' },
-  aviva: { name: 'Aviva Gold', status: 'submitted', late: false, answer: 'I practiced five minutes.', feedback: '' },
+  aviva: { name: 'Aviva Gold', status: 'submitted', late: false, answer: 'I practiced five minutes.', feedback: '',
+    messages: [{ id: 'fixture-note', role: 'student', text: 'Did I write this correctly?', voice: false, createdAt: Date.now() }] },
   eli: { name: 'Eli Weiss', status: 'approved', late: false, answer: 'I finished the practice.', feedback: 'Great work!' },
 };
 
@@ -80,6 +81,8 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
     const request = route.request().postDataJSON();
     const result = request.action === 'authorizedClasses'
       ? { ok: true, classes: [{ id: 'TEST-ALEF', name: 'Fictional Test Class Alef' }] }
+      : request.action === 'create'
+        ? { ok: true, id: 'fixture-created-homework' }
       : { ok: true, students: fixtureStudents, assignments: fixtureAssignments };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
   });
@@ -103,15 +106,17 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
 
   await page.getByRole('button', { name: /Create Homework/ }).click();
   await page.locator('#title').fill('Fictional guided assignment');
-  await page.getByRole('button', { name: /Next: choose students/ }).click();
-  await expect(page.locator('#step2')).toBeVisible();
-  await page.getByRole('button', { name: /Next: dates & preview/ }).click();
   await expect(page.locator('#createPreview')).toContainText('Fictional guided assignment');
+  await expect(page.getByRole('button', { name: /Save Draft/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Publish to Students/ })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('homework-teacher-create.png'), fullPage: true });
   await page.locator('#screenCreate .backHome').click();
 
   await page.getByRole('button', { name: /Check Homework/ }).click();
   await expect(page.locator('#reviewList')).toContainText('Aviva Gold');
   await expect(page.locator('#reviewList')).toContainText('I practiced five minutes.');
+  await expect(page.locator('#reviewList')).toContainText('Did I write this correctly?');
+  await expect(page.locator('#reviewList')).toContainText('Record voice note');
   await expect(page.getByRole('button', { name: 'Approve work by Aviva Gold' })).toBeVisible();
   await page.locator('#screenCheck .backHome').click();
 
@@ -129,6 +134,46 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await expect(page.locator('#list')).toContainText('Eli Weiss · Completed ✓');
   await page.screenshot({ path: testInfo.outputPath('homework-teacher-assignments.png'), fullPage: true });
 
+  expect(watch.productionRequests).toEqual([]);
+  expect(watch.pageErrors).toEqual([]);
+});
+
+test('fictional student can read teacher feedback and send a private message @homework-ui', async ({ page }, testInfo) => {
+  const watch = await watchPage(page);
+  await page.addInitScript(() => {
+    sessionStorage.setItem('b3Games_studentId', 'fictional-ui-student');
+    sessionStorage.setItem('b3Games_studentName', 'Maya Levin');
+    sessionStorage.setItem('b3Games_classPin', 'fixture-pin');
+    sessionStorage.setItem('b3Games_studentClass', 'TEST-ALEF');
+  });
+  let sentText = '';
+  const assignment = {
+    id: 'fixture-homework-1', type: 'shorashim', title: 'Fictional Shorashim practice',
+    details: 'Practice the assigned roots for five minutes.', status: 'in_progress', late: false,
+    messages: [{ id: 'fixture-teacher-note', role: 'teacher', text: 'Try reading that line again.', voice: false, createdAt: Date.now() },
+      { id: 'fixture-teacher-voice', role: 'teacher', text: '', voice: true, createdAt: Date.now() }],
+  };
+  await page.route('**/homeworkPortal', async route => {
+    const request = route.request().postDataJSON();
+    if (request.action === 'comment') sentText = request.text || '';
+    const result = request.action === 'studentList'
+      ? { ok: true, name: 'Maya Levin', assignments: [assignment], openCount: 1 }
+      : request.action === 'voiceRead' ? { ok: true, voiceDataURL: 'data:audio/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEA' }
+      : { ok: true, message: { id: 'fixture-student-note', role: 'student', text: request.text || '', voice: false, createdAt: Date.now() } };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
+  });
+  await page.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
+  await expectStagingIsolation(page);
+  await expect(page.getByRole('tab', { name: /To Do/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Handed In/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Finished/ })).toBeVisible();
+  await expect(page.locator('#list')).toContainText('Try reading that line again.');
+  await expect(page.getByRole('button', { name: '▶ Listen to voice note' })).toBeVisible();
+  await page.getByRole('tab', { name: /To Do/ }).click();
+  await page.locator('.home-conversation textarea').fill('Thank you. I will try again!');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect.poll(() => sentText).toBe('Thank you. I will try again!');
+  await page.screenshot({ path: testInfo.outputPath('homework-student-messages.png'), fullPage: true });
   expect(watch.productionRequests).toEqual([]);
   expect(watch.pageErrors).toEqual([]);
 });

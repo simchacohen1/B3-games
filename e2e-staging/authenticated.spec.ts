@@ -152,6 +152,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
   let created = false;
   let archived = false;
   let teacherCard: Locator | null = null;
+  let assignmentId = '';
 
   const localDate = (daysFromNow: number) => {
     const date = new Date();
@@ -161,6 +162,12 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
 
   try {
     await signInAdult(teacherPage, adult, HOMEWORK_SITE);
+    const teacherProvider = await teacherPage.evaluate(() => {
+      const user = (window as any).firebase.auth().currentUser;
+      return { emailVerified: !!user?.emailVerified, providers: (user?.providerData || []).map((row: any) => row.providerId) };
+    });
+    test.skip(!teacherProvider.emailVerified || !teacherProvider.providers.includes('google.com'),
+      'BLOCKED: Homework teacher actions require a verified Google provider; the available fictional TEST-ALEF credential is email/password only.');
     await teacherPage.goto(HOMEWORK_SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
     await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
@@ -178,8 +185,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await teacherPage.locator('#type').selectOption('shorashim');
     await teacherPage.locator('#title').fill(title);
     await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
-    await teacherPage.getByRole('button', { name: /Next: choose students/ }).click();
-    await teacherPage.getByRole('button', { name: /Next: dates & preview/ }).click();
+    await teacherPage.locator('.optional-settings > summary').click();
     await teacherPage.locator('#assigned').fill(localDate(0));
     await teacherPage.locator('#due').fill(localDate(1));
     await teacherPage.locator('#target').fill('5');
@@ -189,6 +195,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherPage.locator('#formMsg')).toContainText('Draft saved.');
     created = true;
     teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+    assignmentId = await teacherCard.getAttribute('data-assignment-id') || '';
+    expect(assignmentId).not.toBe('');
     await expect(teacherCard).toContainText('Draft — students cannot see this');
 
     await signInStudent(studentPage, student, HOMEWORK_SITE);
@@ -217,15 +225,57 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     studentCard = studentPage.locator('#list .card').filter({ hasText: title });
     await expect(studentCard).toContainText('Not started');
 
-    await studentCard.locator('textarea').fill('Fictional student practiced five minutes.');
-    await studentCard.getByRole('button', { name: 'Hand in' }).click();
+    await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes.');
+    await studentCard.getByRole('button', { name: 'Hand In Homework' }).click();
     await expect(studentCard).toContainText('Handed in');
+    await studentPage.getByRole('tab', { name: /Handed In/ }).click();
+    studentCard = studentPage.locator('#section-handed .card').filter({ hasText: title });
+    await studentCard.locator('.home-conversation textarea').fill('Could you check my answer?');
+    await studentCard.getByRole('button', { name: 'Send message' }).click();
+    await expect(studentCard).toContainText('Could you check my answer?');
+
+    const studentVoice = await studentPage.evaluate(async assignmentId => {
+      const audio = 'data:audio/webm;base64,GkXfo0AgQoaBAUL3gQFCw==';
+      const body = { action: 'comment', assignmentId, voiceDataURL: audio,
+        studentId: sessionStorage.getItem('b3Games_studentId'), studentName: sessionStorage.getItem('b3Games_studentName'),
+        pin: sessionStorage.getItem('b3Games_classPin'), classId: sessionStorage.getItem('b3Games_studentClass') };
+      const response = await fetch('https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return { ok: response.ok, data: await response.json(), audio };
+    }, assignmentId);
+    expect(studentVoice.ok, JSON.stringify(studentVoice.data)).toBe(true);
+    expect(studentVoice.data.message.voice).toBe(true);
 
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
     await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
+    await expect(teacherCard).toContainText('Could you check my answer?');
+    await expect(teacherCard.getByRole('button', { name: /Listen to voice note/ })).toBeVisible();
+    await teacherCard.locator('.home-conversation textarea').fill('Yes—please add one more example.');
+    await teacherCard.getByRole('button', { name: 'Send message' }).click();
+    await expect(teacherCard).toContainText('Yes—please add one more example.');
+    const signedInStudentId = await studentPage.evaluate(() => sessionStorage.getItem('b3Games_studentId') || '');
+    const teacherVoice = await teacherPage.evaluate(async ({ assignmentId, studentId }) => {
+      const audio = 'data:audio/webm;base64,GkXfo0AgQoaBAUL3gQFCw==';
+      const token = await firebase.auth().currentUser.getIdToken();
+      const response = await fetch('https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ action: 'comment', classId: 'TEST-ALEF', assignmentId, studentId, voiceDataURL: audio }) });
+      return { ok: response.ok, data: await response.json(), audio };
+    }, { assignmentId, studentId: signedInStudentId });
+    expect(teacherVoice.ok, JSON.stringify(teacherVoice.data)).toBe(true);
+    const studentVoiceRead = await studentPage.evaluate(async ({ assignmentId, messageId }) => {
+      const response = await fetch('https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'voiceRead', assignmentId, messageId,
+          studentId: sessionStorage.getItem('b3Games_studentId'), studentName: sessionStorage.getItem('b3Games_studentName'),
+          pin: sessionStorage.getItem('b3Games_classPin'), classId: sessionStorage.getItem('b3Games_studentClass') }) });
+      return { ok: response.ok, data: await response.json() };
+    }, { assignmentId, messageId: teacherVoice.data.message.id });
+    expect(studentVoiceRead.ok, JSON.stringify(studentVoiceRead.data)).toBe(true);
+    expect(studentVoiceRead.data.voiceDataURL).toBe(teacherVoice.audio);
     await teacherCard.getByLabel('Feedback for the student').fill('Please add one more example.');
     await teacherCard.getByRole('button', { name: 'Return for Corrections' }).click();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
