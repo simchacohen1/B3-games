@@ -29,12 +29,17 @@ const fixtureAssignments = [{
   students: fixtureStudents,
 }];
 
-test('main staging landing links teachers to Homework @homework-ui', async ({ page }) => {
+test('main staging landing links teachers to Homework @homework-ui', async ({ page }, testInfo) => {
   const watch = await watchPage(page);
   await page.goto(HOMEWORK_SITE + '/', { waitUntil: 'domcontentloaded' });
   const link = page.locator('#homeworkCenterCard');
   await expect(link).toHaveAttribute('href', 'assignment-center/teacher.html');
   await expect(link).toContainText('Homework & Assignments');
+  // Reveal the sign-in-only section for this synthetic visual snapshot; no auth
+  // state or Firebase data is changed by this fixture.
+  await page.locator('#teacherToolsSection').evaluate(section => section.classList.remove('hidden'));
+  await expect(link).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('homework-main-teacher-entry.png'), fullPage: true });
   expect(watch.productionRequests).toEqual([]);
 });
 
