@@ -1,0 +1,226 @@
+{
+  "_about": "Every page that is part of Fun Torah Tools' Teacher Tools (issue #439). Each must be usable only by a signed-in, currently authorized teacher or admin. 'gate' = guarded by teacher-tool-gate.js; 'own' = page has its own teacher sign-in screen (teacher-home.html). Student-facing pages are deliberately NOT listed.",
+  "pages": [
+    {
+      "path": "teacher-home.html",
+      "name": "Teacher Center",
+      "gate": "own"
+    },
+    {
+      "path": "owner-admin.html",
+      "name": "Owner Admin",
+      "gate": "gate",
+      "scope": "admin"
+    },
+    {
+      "path": "admin.html",
+      "name": "Admin",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "halacha/teacher.html",
+      "name": "Halacha teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "yiddish/teacher.html",
+      "name": "Yiddish teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "yiddish/sync.html",
+      "name": "Yiddish story timing tool",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "record_pesukim/teacher.html",
+      "name": "Posuk Practice teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "rashi-letters/teacher.html",
+      "name": "Rashi Letters teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "gematria/teacher.html",
+      "name": "Gematria teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "shorashim/teacher.html",
+      "name": "Shorashim teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "chazara/teacher.html",
+      "name": "Chazara teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "game-show/teacher.html",
+      "name": "Game Show teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "student-rewards/teacher.html",
+      "name": "Student Rewards teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "weekly-quiz/teacher.html",
+      "name": "Weekly Quiz teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "follow-teacher/teacher.html",
+      "name": "Follow the Teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "word-bank/teacher.html",
+      "name": "Word Bank teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "class-pointer-prototype/dashboard.html?teacher=1",
+      "name": "Class Pointer dashboard (teacher mode; without teacher=1 it is the student screen)",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "class-pointer-prototype/classroom.html?dashboard=teacher",
+      "name": "Class Pointer classroom",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "class-pointer-prototype/index.html",
+      "name": "Class Pointer teacher screen",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "name-picker/index.html",
+      "name": "Name Picker",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "chavrusa/index.html",
+      "name": "Chavrusa of the Day",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "work-timer/index.html",
+      "name": "Work Timer",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "work_timer_v4/index.html",
+      "name": "Work Timer (old address; redirects to work-timer/)",
+      "gate": "redirect"
+    },
+    {
+      "path": "class-dashboard/index.html",
+      "name": "Class Dashboard",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "comment-log/b3-comment-log.html",
+      "name": "Comment Log",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "student-report/index.html",
+      "name": "Student Report",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "sync-to-nigri/index.html",
+      "name": "Sync to Nigri",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "sync-to-nigri/classtime.html",
+      "name": "Sync to Nigri - Classtime",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "sync-to-nigri/school-marks.html",
+      "name": "Sync to Nigri - School Marks",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "sync-to-nigri/chossid-lamdan.html",
+      "name": "Sync to Nigri - Chossid Lamdan",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "chossid-lamdan.html",
+      "name": "Chossid Lamdan weekly marks",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "weekly-quiz/chossid-lamdan.html",
+      "name": "Weekly Quiz Nigri marks",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "weekly-quiz/B3SchoolMarksBridge.html",
+      "name": "Weekly Quiz to School Marks bridge",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "hebrew-reading-validation/index.html",
+      "name": "Hebrew Reading grading lab",
+      "gate": "gate",
+      "scope": "b3"
+    },
+    {
+      "path": "teacher-preview-tool.html",
+      "name": "Teacher preview of a tool",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "teacher-student-split.html",
+      "name": "Teacher split student view",
+      "gate": "gate",
+      "scope": "teacher"
+    }
+  ],
+  "deliberatelyNotListed": [
+    "class-gallery/index.html (student Wall of Learning; teachers open the same page)",
+    "sefer-hamitzvos/index.html, davening_student_app_*/index.html (student apps that teachers link to)",
+    "class-pointer-prototype/student-view.html, student-share-window.html (student side)",
+    "all-pages.html (plain list of links, no data)",
+    "backup-*, preview-* folders (old copies; separate hosting cleanup)"
+  ]
+}

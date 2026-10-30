@@ -14,7 +14,7 @@ const API = 'https://us-central1-b3-games.cloudfunctions.net/classPointerShareAu
 const STUDENT_API = 'https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const PORT = 9319;
-const STUB_EMPTY = ['site-settings.js', 'dashboard-session.js', 'firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-database-compat.js', 'firebase-storage-compat.js'];
+const STUB_EMPTY = ['teacher-tool-gate.js', 'site-settings.js', 'dashboard-session.js', 'firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-database-compat.js', 'firebase-storage-compat.js'];
 
 test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,BlockInsecurePrivateNetworkRequests'] } });
 test.describe.configure({ mode: 'serial' });

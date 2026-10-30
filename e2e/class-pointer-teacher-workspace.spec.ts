@@ -14,7 +14,7 @@ const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javasc
 test.skip(({ browserName }) => browserName !== 'chromium', 'Classroom Pointer teacher workspace runs in Chrome/Edge');
 
 const shot = async (page: Page, name: string) => { if (process.env.POINTER_SHOTS) await page.screenshot({ path: path.join(process.env.POINTER_SHOTS, name + '.png') }); };
-const STUB_EMPTY = ['site-settings.js', 'dashboard-session.js', 'firebase-config.js', 'guest-mode.js'];
+const STUB_EMPTY = ['teacher-tool-gate.js', 'site-settings.js', 'dashboard-session.js', 'firebase-config.js', 'guest-mode.js'];
 
 async function wire(context: BrowserContext, opts: { student?: any; session?: any; realSession?: boolean } = {}) {
   await context.route('**/*', route => {

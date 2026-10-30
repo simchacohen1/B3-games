@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<head><script src="../teacher-tool-gate.js?v=20261028-gate" data-scope="teacher"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -1491,7 +1491,8 @@ let buzzSoundChoice = 'ding';
 try { buzzSoundChoice = localStorage.getItem('gameShowBuzzSound') || 'ding'; } catch (_) {}
 if (buzzSoundChoice !== 'random' && !BUZZ_SOUND_LABELS[buzzSoundChoice]) buzzSoundChoice = 'ding';
 document.getElementById('buzzSoundSelect').value = buzzSoundChoice;
-gameRef.child('buzzSound').set(buzzSoundChoice).catch(() => {});
+// Only a verified teacher's page may write this; see teacher-tool-gate.js.
+(window.B3TeacherGateReady || Promise.reject()).then(() => gameRef.child('buzzSound').set(buzzSoundChoice)).catch(() => {});
 
 function setBuzzSound(value) {
   buzzSoundChoice = value;
