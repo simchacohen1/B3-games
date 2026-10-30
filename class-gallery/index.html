@@ -994,8 +994,31 @@ function buildClassroom(room){
   });
 }
 
+// Student rooms are keyed by the identity of the boy whose room is open,
+// never by the identity of the teacher or classmate viewing it.
+// Older posts have no studentId; match those by full, normalized name only.
+function normalizeGalleryStudentName(name){
+  return String(name||'').normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase();
+}
+function galleryRoomStudentIds(studentName){
+  const name=normalizeGalleryStudentName(studentName);
+  return new Set(Object.entries(PRESENCE_STUDENTS).filter(([id,profile])=>
+    id&&profile&&profile.classId===galleryClassId&&normalizeGalleryStudentName(profile.name)===name
+  ).map(([id])=>id));
+}
+function approvedPostsForStudentGallery(studentName,rows=posts){
+  const name=normalizeGalleryStudentName(studentName),ids=galleryRoomStudentIds(studentName);
+  return rows.filter(p=>{
+    if(p.status!=='approved')return false;
+    const id=String(p.studentId||'').trim();
+    // A post with an ID must match the room's student ID. A similar name
+    // can never override an explicit ID belonging to another student.
+    if(id)return ids.has(id);
+    return normalizeGalleryStudentName(p.studentName)===name;
+  }).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
 function buildStudentGallery(studentName){
-  const roomPosts=posts.filter(p=>p.status==='approved' && p.studentName===studentName).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const roomPosts=approvedPostsForStudentGallery(studentName);
   buildGalleryClassroom({
     title:studentName || 'Student Gallery',
     subtitle:'Student Gallery • All Approved Work',
