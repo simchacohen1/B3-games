@@ -61,8 +61,26 @@
     var path = ACTIVITY_URLS[type];
     return path ? new URL(path, root.location.href).href : '';
   }
+  // Teacher-facing workload buckets are derived from the server-scoped
+  // student rows. Missing means not started after the due date; overdue
+  // includes any unfinished work past its due date.
+  function teacherStatusCounts(students) {
+    var counts = { assigned: 0, submitted: 0, completed: 0, missing: 0, overdue: 0 };
+    Object.keys(students || {}).forEach(function (id) {
+      var student = students[id] || {};
+      if (student.status === 'assigned') counts.assigned++;
+      if (student.status === 'submitted') counts.submitted++;
+      if (student.status === 'approved') counts.completed++;
+      if (student.late) {
+        counts.overdue++;
+        if (student.status === 'assigned') counts.missing++;
+      }
+    });
+    return counts;
+  }
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
     isStagingRuntime: function () { return isStagingRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
-    dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue };
+    dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue,
+    teacherStatusCounts: teacherStatusCounts };
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);

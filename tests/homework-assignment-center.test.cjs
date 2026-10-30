@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { seed, students, teachers, makeStore } = require('./fixtures/synthetic-class.cjs');
 const { homeworkApi } = require('../backend/functions/homework-core.cjs');
+const { teacherStatusCounts } = require('../assignment-center/homework-common.js');
 
 let next = 0;
 const call = (store, auth, body, now = 1000) =>
@@ -79,6 +80,16 @@ test('due date before assigned date is rejected and edits preserve the selected 
   assert.equal(row.title, 'Revised');
   assert.equal(row.assignedAt, 3000);
   assert.deepEqual(Object.keys(row.students), ['synthA1']);
+});
+
+test('teacher status totals separate missing, overdue, submitted, and completed work', () => {
+  assert.deepEqual(teacherStatusCounts({
+    notStartedLate: { status: 'assigned', late: true },
+    inProgressLate: { status: 'in_progress', late: true },
+    returnedOnTime: { status: 'returned', late: false },
+    handedIn: { status: 'submitted', late: false },
+    completed: { status: 'approved', late: false }
+  }), { assigned: 1, submitted: 1, completed: 1, missing: 1, overdue: 2 });
 });
 
 test('preview runtime refuses production Firebase and activity links never submit on open', async () => {
