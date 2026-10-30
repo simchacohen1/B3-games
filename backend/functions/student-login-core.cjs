@@ -69,7 +69,8 @@ async function resolveStudent(get,body){
   const cls=await get('b3Games/workspaces/b3-2026/classes/'+profile.classId);
   if(cls&&cls.active!==false&&cls.members?.[id]&&cls.members[id].active!==false)valid.push({classId:profile.classId,cls});
  }
- const selected=valid.find(v=>v.classId===body.classId)||(valid.length===1?valid[0]:null);
+ const requestedClass=String(body.classId||"");
+ const selected=requestedClass?valid.find(v=>v.classId===requestedClass):(valid.length===1?valid[0]:null);
  if(!selected)fail(403,'Choose an active class on the main site first.');
  return {id,profile,...selected};
 }

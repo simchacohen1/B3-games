@@ -1,0 +1,50 @@
+{
+  "functions": [
+    {
+      "source": "backend/functions/homework-staging",
+      "codebase": "homework-staging",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "site": "fun-torah-tools-staging",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firebase.*.json",
+      ".firebaserc",
+      "**/node_modules/**",
+      "**/backend/*.*",
+      "**/backend/!(functions)/**",
+      "**/backend/functions/!(student-tool-policy.js)",
+      "**/backend/functions/*/*",
+      "**/backend/functions/*/*/**",
+      "**/tests/**",
+      "**/e2e/**",
+      "**/e2e-staging/**",
+      "**/scripts/**",
+      "**/docs/**",
+      "**/staging/test-credentials.local.json",
+      "**/staging/*.local.*",
+      "preview-pointer-repair/**",
+      "preview-pr234/**",
+      "**/backup-*/**",
+      "**/_worktrees/**",
+      "**/playwright-report/**",
+      "**/test-results/**",
+      "**/staging-results/**",
+      "**/.env*",
+      "**/*.local.*",
+      "package.json",
+      "package-lock.json",
+      "README.md"
+    ]
+  }
+}

@@ -25,6 +25,11 @@ on:
         type: choice
         options: [smoke, auth, nightly]
         default: smoke
+      site:
+        description: 'Optional exact staging live or Homework preview URL'
+        type: string
+        required: false
+        default: ''
   pull_request:
     paths:
       - 'e2e-staging/**'
@@ -43,6 +48,7 @@ concurrency:
 
 env:
   TIER: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || github.event.schedule == '23 */2 * * *' && 'auth' || github.event.schedule == '41 4 * * *' && 'nightly' || 'smoke' }}
+  FTT_STAGING_SITE: ${{ github.event_name == 'workflow_dispatch' && inputs.site || '' }}
   # Issues are filed only for scheduled and manual runs on main, never from PRs.
   FILE_ISSUES: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 
@@ -114,6 +120,15 @@ jobs:
           2. Open the tool named in the failing check and compare with the expected result in the error.
           3. Locally: set FTT_STAGING_CREDENTIALS_FILE to staging/test-credentials.local.json and run npx playwright test -c playwright.staging.config.ts --grep @auth" \
             ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
+
+      - name: Upload fictional Homework Center screenshots
+        if: always() && (env.TIER == 'auth' || env.TIER == 'nightly')
+        uses: actions/upload-artifact@v4
+        with:
+          name: homework-center-preview-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: staging-results/evidence/**/*.png
 
       - name: Nightly regression suite and rules audit
         if: env.TIER == 'nightly'

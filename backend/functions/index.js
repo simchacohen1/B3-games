@@ -2737,3 +2737,7 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
 exports.cleanupClassPointerShareTickets = require('./class-pointer-share-ticket-cleanup').cleanupClassPointerShareTickets;
 exports.funTorahVocabularyBank = require('./vocabulary-bank').funTorahVocabularyBank;
+// Staging-only Homework & Assignment Center vertical slice (deploy explicitly to staging).
+exports.homeworkPortal = require('./homework').homeworkPortal;
+// Staging-only Homework & Assignment Center vertical slice (deploy explicitly to staging).
+exports.homeworkPortal = require('./homework').homeworkPortal;
