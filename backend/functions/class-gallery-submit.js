@@ -80,7 +80,7 @@ exports.classGallerySubmit = onRequest({
     const categoryMap = {
       shorashim:'Shorashim', halacha:'Halacha', 'class-pointer':'Class Pointer',
       chumash:'Chumash', yiddish:'Yiddish', chazara:'Chazara',
-      'posuk-practice':'Chumash', rashi:'Rashi', other:'Other'
+      'posuk-practice':'Chumash', rashi:'Rashi', 'sefer-hamitzvos':'Sefer HaMitzvos', other:'Other'
     };
     const source = cleanText(body.source, 36).toLowerCase();
     await postRef.set({

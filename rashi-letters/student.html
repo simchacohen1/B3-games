@@ -814,7 +814,7 @@ function renderLetterGrid(){
     else { const u=UNITS[st.i]; glyph = u.id==='finalreview' ? 'שׁ / שׂ' : u.label; label = u.id==='finalreview' ? 'Final review' : 'Mission ' + (st.i+1); }
     const badge = !unlocked ? '<span class="tile-lock">🔒</span>' : (mastered ? '<span class="tile-done">✓</span>' : (idx===cur ? '<span class="start-here">'+(idx===0?'START HERE':'NEXT')+'</span>' : ''));
     b.innerHTML = badge + '<span dir="rtl">' + glyph + '</span><small>' + (idx+1) + '. ' + label + '</small>';
-    b.setAttribute('aria-label', 'Step ' + (idx+1) + ': ' + stepName(st) + (unlocked ? (mastered ? ', mastered' : ', ready') : ', locked'));
+    b.setAttribute('aria-label', 'Step ' + (idx+1) + ': ' + stepName(st) + (unlocked ? (mastered ? ', mastered, tap to practice again' : ', ready') : ', locked'));
     b.onclick = () => {
       if(!unlocked){ showQuestToast('🔒 First master: ' + stepName(STEPS[firstUnmasteredBefore(idx)])); return; }
       if(st.k==='unit'){
@@ -902,8 +902,16 @@ function selectPracticeLetter(unitId, btnEl){
   practiceUnitId = unitId;
   document.querySelectorAll('.letter-pick-btn').forEach(b => b.classList.remove('selected'));
   btnEl.classList.add('selected');
-  document.getElementById('modeTypeSection').classList.remove('hidden');
-  document.getElementById('startPracticeBtn').classList.remove('hidden');
+  const section = document.getElementById('modeTypeSection');
+  section.classList.remove('hidden');
+  const startBtn = document.getElementById('startPracticeBtn');
+  startBtn.classList.remove('hidden');
+  const unit = UNITS.find(u => u.id === unitId);
+  const heading = section.querySelector('h3');
+  if(heading && unit) heading.textContent = 'Practice again: ' + (unit.id==='finalreview' ? 'Final review' : unit.label) + ' — what do you want to practice?';
+  // The practice choices sit below the tiles; bring them into view so a finished mission clearly reopens.
+  try{ section.scrollIntoView({behavior:'smooth', block:'center'}); }catch(_){ }
+  showQuestToast('🔁 Practice any time — your saved progress stays safe.');
 }
 
 function showModeGate(){

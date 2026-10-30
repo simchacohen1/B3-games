@@ -20,6 +20,7 @@
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="tag-collision.js?v=20261029-sweep"></script>
 <script src="access.js?v=20261007-gallery-lock"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script>
@@ -1712,6 +1713,23 @@ function ensureManhuntRound(){
     },()=>{tagAttemptBusy=false;});
   }
 }
+let tagSweepMe=null,tagSweepRemote=new Map();
+function recordTagSweep(){
+  const now=performance.now();
+  tagSweepMe={prev:tagSweepMe&&now-tagSweepMe.at<250?{x:tagSweepMe.x,z:tagSweepMe.z}:null,x:avatarState.x,z:avatarState.z,at:now};
+  remoteAvatars.forEach((entry,id)=>{
+    const old=tagSweepRemote.get(id),fresh=old&&now-old.at<250;
+    tagSweepRemote.set(id,{prev:fresh?{x:old.x,z:old.z}:null,x:entry.group.position.x,z:entry.group.position.z,nx:entry.targetX,nz:entry.targetZ,pnx:fresh?old.nx:null,pnz:fresh?old.nz:null,at:now});
+  });
+}
+function tagContactDistance(id,entry){
+  const cur=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z),r=tagSweepRemote.get(id);
+  if(!window.B3TagCollision||!tagSweepMe||!tagSweepMe.prev||!r||!r.prev)return cur;
+  const me0=tagSweepMe.prev,me1={x:tagSweepMe.x,z:tagSweepMe.z},sh0=r.prev,sh1={x:r.x,z:r.z};
+  const hasNet=r.pnx!=null&&Number.isFinite(r.nx)&&Number.isFinite(r.pnx);
+  const d=B3TagCollision.tagDistance(me0,me1,sh0,sh1,hasNet?{x:r.pnx,z:r.pnz}:null,hasNet?{x:r.nx,z:r.nz}:null);
+  return Math.min(cur,d);
+}
 function maybeTagNearbyClassmate(){
   const me=currentTagStudentKey();
   if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagAttemptBusy)return;
@@ -1731,7 +1749,7 @@ function maybeTagNearbyClassmate(){
       if(cleanId===me||isManhuntHunter(cleanId))return;
       const entry=remoteAvatars.get(id);
       if(!entry?.group?.visible)return;
-      const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);
+      const d=tagContactDistance(id,entry);
       if(d<best){best=d;targetId=cleanId;}
     });
     if(!targetId)return;
@@ -1761,7 +1779,7 @@ function maybeTagNearbyClassmate(){
     const cleanId=id.includes(':')?id.split(':').pop():id;
     const entry=remoteAvatars.get(id);
     if(!entry?.group?.visible||isEffectActive(cleanId,'shieldUntil',now))return;
-    const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);
+    const d=tagContactDistance(id,entry);
     if(d<best){best=d;targetId=cleanId;}
   });
   if(!targetId)return;
@@ -2018,7 +2036,7 @@ function updateAvatar(dt){
   if(tagOptedIn&&walking&&Math.hypot(avatarState.x-oldX,avatarState.z-oldZ)>.002)markItActivity();
   syncLivePresence(false);
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());if(!galleryAccessBlocked){updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();checkTagIdle();}updateTagHud();const now=performance.now();if(now-lastPowerUiAt>180){lastPowerUiAt=now;updatePowerStatusHud();if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();}renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());if(!galleryAccessBlocked){updateAvatar(dt);updateRemoteAvatars(dt);recordTagSweep();maybeTagNearbyClassmate();checkTagIdle();}updateTagHud();const now=performance.now();if(now-lastPowerUiAt>180){lastPowerUiAt=now;updatePowerStatusHud();if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();}renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;pointerDownAt=performance.now();renderer.domElement.setPointerCapture?.(e.pointerId);}
