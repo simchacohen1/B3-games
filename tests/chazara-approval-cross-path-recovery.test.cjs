@@ -123,3 +123,35 @@ test('RED: mirror write failure must be repaired by a safe idempotent retry',asy
   assert.equal(x.values[BALANCE],7,'retry must not award points twice');
   assert.equal(x.values[MIRROR],'approved','retry must repair missing recording status');
 });
+
+
+// RED design regressions: another authorized writer can change the same numeric
+// reward balance while a Chazara request is stranded after crediting points.
+// These changes model a separate completed numeric-child transaction, not a
+// Firebase call or a mock of the proposed recovery algorithm.
+for(const scenario of [
+  {label:'prize spend',delta:-3,expected:4},
+  {label:'teacher adjustment',delta:4,expected:11}
+]){
+  test('RED: retry after credited-but-unfinalized approval preserves concurrent '+scenario.label,async()=>{
+    const x=fixture('finalize-request');
+    const first=await x.call('approve-point-request');
+    assert.notEqual(first.code,200,'injected finalization failure must be visible');
+    assert.equal(x.values[REQUEST].status,'processing');
+    assert.equal(x.values[BALANCE],7,'the original two-point credit committed');
+
+    // A separate legitimate writer commits between the failure and retry.
+    // Starting 5 + Chazara 2 + concurrent delta is the only correct balance.
+    x.values[BALANCE]+=scenario.delta;
+    assert.equal(x.values[BALANCE],scenario.expected);
+
+    const retry=await x.call('approve-point-request');
+    assert.equal(retry.code,200,JSON.stringify(retry.body));
+    assert.equal(x.values[BALANCE],scenario.expected,
+      'recovery must neither double-credit nor overwrite the concurrent writer');
+    assert.equal(x.values[REQUEST].status,'approved',
+      'the original credited request must finalize');
+    assert.equal(x.values[MIRROR],'approved',
+      'the Chazara event mirror must be repaired');
+  });
+}
