@@ -50,11 +50,16 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
     const authFactory: any = () => authInstance;
     authFactory.GoogleAuthProvider = function GoogleAuthProvider() {};
     const apps: any[] = [];
+    const dbRef = () => ({
+      once: async () => ({ val: () => null, exists: () => false }),
+      set: async () => { throw new Error('The read-only Homework UI fixture blocks database writes.'); },
+      update: async () => { throw new Error('The read-only Homework UI fixture blocks database writes.'); },
+    });
     (window as any).firebase = {
       apps,
       initializeApp(options: any) { apps.push({ options }); },
       auth: authFactory,
-      database() { return {}; },
+      database() { return { ref: dbRef }; },
     };
   });
   await page.route('**/homeworkPortal', async route => {
