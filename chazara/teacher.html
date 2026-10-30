@@ -76,7 +76,15 @@
 </div>
 <script>
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const db=firebase.database(),auth=firebase.auth(),storage=firebase.storage(),$=x=>document.getElementById(x),ET=new Set(["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"]),WT=new Set(["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"]);let fullDashboardLoaded=false,D={},R={},E={},P={},teacherAccess=null,teacherScope=null,scopeGeneration=0,studentListeners=[];
-let pendingRecordingKeys=new Set(),historyStudentsLoaded=new Set(),historyLoading=false,historyGeneration=0,approvalGeneration=0;
+let pendingRecordingKeys=new Set(),historyStudentsLoaded=new Set(),historyLoading=false,historyGeneration=0,approvalGeneration=0,pendingEventFetches=new Map();
+// One shared permit pool limits all pending recording reads, including overlapping refreshes.
+let pendingEventActive=0,pendingEventWaiters=[];
+async function withPendingEventSlot(work){
+ if(pendingEventActive>=4)await new Promise(resolve=>pendingEventWaiters.push(resolve));
+ else pendingEventActive++;
+ try{return await work()}
+ finally{const next=pendingEventWaiters.shift();if(next)next();else pendingEventActive--}
+}
 function cls(id){let c=R[id]?.classId;return c?c:ET.has(id)?"et":WT.has(id)?"wt":""}function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}function fmt(t){return t?new Date(t).toLocaleDateString():"—"}
 function resultEntries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');if(v&&typeof v==='object')return Object.keys(v).filter(k=>/^\d+$/.test(k)).map(k=>[Number(k),v[k]]).filter(([,x])=>x&&typeof x==='object');return[]}
 function readingScore(a){return a&&typeof a.hebrewFinalScore==='number'?a.hebrewFinalScore:(a&&typeof a.hebrewScore==='number'?a.hebrewScore:null)}
@@ -111,7 +119,7 @@ function applyRecordingFilters(total,shown){const count=$('recordingCount'),summ
 function recordingStatus(e){return (e?.teacherRejected===true||e?.pointRequestStatus==='rejected')?'rejected':String(e?.pointRequestStatus||'pending')}
 function formatAudioLength(ms){const total=Math.max(0,Math.round(Number(ms||0)/1000)),m=Math.floor(total/60),sec=String(total%60).padStart(2,'0');return `${m}:${sec}`}
 function wireAudio(audio,lengthEl,fallbackMs){if(!audio)return;audio.preload='metadata';audio.addEventListener('play',()=>document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()}));const update=()=>{const seconds=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:Number(fallbackMs||0)/1000;if(lengthEl&&seconds>0)lengthEl.textContent='Length: '+formatAudioLength(seconds*1000)};audio.addEventListener('loadedmetadata',update);audio.addEventListener('durationchange',update);update()}
-function recordingKey(e){return String(e.studentId||'')+'__'+String(e.id||'')}
+function recordingKey(e){return JSON.stringify([String(e.studentId||''),String(e.id||'')])}
 function updateRecordingRow(row,e){
   const status=recordingStatus(e),checked=e.teacherFullyChecked===true,name=row.querySelector('[data-name]'),reason=row.querySelector('[data-reason]'),meta=row.querySelector('[data-meta]'),statusEl=row.querySelector('[data-status]'),reviewEl=row.querySelector('[data-review-status]'),lengthEl=row.querySelector('[data-length]'),checkedBtn=row.querySelector('[data-recording-checked]'),rejectBtn=row.querySelector('[data-recording-reject]');
   if(name)name.textContent=e.studentName||R[e.studentId]?.name||e.studentId||'Student';
@@ -251,7 +259,7 @@ async function loadApprovals(){
    if(Q.isPendingAutomatic(item)){automatic.push(item.id);continue}
    if(Q.needsManualApproval(item)&&Q.isChazaraApproval(item))pendingPointRequests[item.id]=item;
   }
-  pendingRecordingKeys=new Set(Object.values(pendingPointRequests).filter(item=>item.recorded===true&&item.practiceStudentId&&item.eventId).map(item=>String(item.practiceStudentId)+'__'+String(item.eventId)));
+  pendingRecordingKeys=new Set(Object.values(pendingPointRequests).filter(item=>item.recorded===true&&item.practiceStudentId&&item.eventId).map(item=>JSON.stringify([String(item.practiceStudentId),String(item.eventId)])));
   renderApprovals();renderRecordings();setApprovalStatus('');
   // Pending queue identifies the exact events. Never download all students' history on startup.
   const requests=Object.values(pendingPointRequests).filter(item=>item.recorded===true&&item.practiceStudentId&&item.eventId);
@@ -260,18 +268,30 @@ async function loadApprovals(){
   for(let i=0;i<requests.length;i+=4){
    if(generation!==scopeGeneration||request!==approvalGeneration)return;
    await Promise.all(requests.slice(i,i+4).map(async item=>{
-   const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
-   if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
-   try{
-    const data=await teacherApi('get-chazara-event',{studentId,eventId}),event=data.event||null;
-    if(generation!==scopeGeneration||request!==approvalGeneration)return;
-    if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
-     if(!E[studentId])E[studentId]={};
-     E[studentId][eventId]=event;
+    const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
+    if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
+    // The authenticated pending queue is refreshed each time; reuse audio already fetched.
+    if(E[studentId]?.[eventId])return;
+    const key=JSON.stringify([studentId,eventId]);
+    let fetchPromise=pendingEventFetches.get(key);
+    if(!fetchPromise){
+     fetchPromise=withPendingEventSlot(()=>{
+      // A queued read must not start after class revocation or queue removal.
+      if(generation!==scopeGeneration||!pendingRecordingKeys.has(key))return {event:null};
+      return teacherApi('get-chazara-event',{studentId,eventId});
+     });
+     pendingEventFetches.set(key,fetchPromise);
     }
-   }catch(error){console.warn('Could not load pending Chazara recording',error)}
+    try{
+     const data=await fetchPromise,event=data.event||null;
+     if(generation!==scopeGeneration||request!==approvalGeneration)return;
+     if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
+      if(!E[studentId])E[studentId]={};
+      E[studentId][eventId]=event;
+     }
+    }catch(error){console.warn('Could not load pending Chazara recording',error)}
+    finally{if(pendingEventFetches.get(key)===fetchPromise)pendingEventFetches.delete(key)}
    }));
-   // Stop requesting more recordings if the selected class or sign-in changed.
    if(generation!==scopeGeneration||request!==approvalGeneration)return;
   }
   renderApprovals();renderRecordings();
@@ -378,7 +398,7 @@ function refreshScopedViews(){
 // Normal teacher sessions must still reload their own live assignments.
 function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
 async function loadClassScope(user,access){
- const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();pendingEventFetches.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
  try{
   if(needsTeacherAssignmentRefresh(access)){
