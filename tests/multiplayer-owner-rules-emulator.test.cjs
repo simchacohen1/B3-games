@@ -28,7 +28,7 @@ test.before(async () => {
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha': { active: true, role: 'teacher', classIds: { alpha: true } },
       'b3Games/workspaces/b3-2026/teachers/teacher_beta': { active: true, role: 'teacher', classIds: { beta: true } },
       'b3Games/workspaces/b3-2026/teachers/teacher_inactive': { active: false, role: 'teacher', classIds: { alpha: true } },
-      'b3Games/workspaces/b3-2026/classes/alpha': { active: true, teacherIds: { owner_alpha: true, teacher_alpha: true }, toolGrants: { 'multiplayer-center': true }, members: { student_alpha: { active: true, toolAccess: { 'multiplayer-center': true } }, student_disabled: { active: true, toolAccess: { 'multiplayer-center': false } } } },
+      'b3Games/workspaces/b3-2026/classes/alpha': { active: true, teacherIds: { owner_alpha: true, teacher_alpha: true, teacher_inactive: true }, toolGrants: { 'multiplayer-center': true }, members: { student_alpha: { active: true, toolAccess: { 'multiplayer-center': true } }, student_disabled: { active: true, toolAccess: { 'multiplayer-center': false } } } },
       'b3Games/workspaces/b3-2026/classes/beta': { active: true, teacherIds: { owner_beta: true, teacher_beta: true }, toolGrants: { 'multiplayer-center': true }, members: { student_beta: { active: true } } },
       'multiplayerCenter/workspaces/b3-2026/classes/alpha/rooms/shorashim-1234': { host: 'teacher_owner_alpha', gameKey: 'shorashim', state: 'lobby', classId: 'alpha' },
       'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/123456/hands/teacher_owner_alpha': { hand: ['private-to-owner'] },
