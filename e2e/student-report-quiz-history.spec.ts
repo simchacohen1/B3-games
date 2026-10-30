@@ -222,7 +222,7 @@ test('class ZIP: one quiz PDF per student in selected class, none from other cla
     page.waitForEvent('download'),
     page.getByRole('button', { name: /All Students Quiz PDFs \(ZIP\)/ }).click(),
   ]);
-  expect(download.suggestedFilename()).toMatch(/^quiz-reports-East-Track-\\d{4}-\\d{2}-\\d{2}\\.zip$/);
+  expect(download.suggestedFilename()).toMatch(/^quiz-reports-East-Track-\d{4}-\d{2}-\d{2}\.zip$/);
   const names: string[] = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
   expect(names).toEqual(['Synthetic-Arik-quizzes.pdf', 'Synthetic-Beni-quizzes.pdf']);
   expect(names.join(' ')).not.toMatch(/Chaim|Dovid/);
