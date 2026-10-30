@@ -81,6 +81,8 @@
   .rec-words{ font-family:'Mekorot Rashi', serif; font-size:1.7rem; direction:rtl; text-align:right; line-height:1.5; }
   .rec-meta{ color:var(--ink-soft); font-size:0.85rem; }
   .rec-item audio{ width:100%; max-width:520px; }
+  .rec-bulk{ display:flex; align-items:center; gap:12px; margin:0 0 12px; }
+  .rec-bulk .hidden{ display:none; }
   .rec-actions{ display:flex; flex-wrap:wrap; gap:10px; }
   .btn.green{ background:#2e7d4f; box-shadow:0 3px 0 #1f5736; }
   .btn:disabled{ opacity:.55; cursor:default; }
@@ -117,6 +119,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   <section id="recPanel" aria-live="polite">
     <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
     <p class="rec-sub">Listen, then approve (+2 points) or ask the student to try again.</p>
+    <div class="rec-bulk"><button class="btn green hidden" id="approveAllBtn" type="button">✅ Approve All</button><span id="approveAllMsg" aria-live="polite"></span></div>
     <div id="recList"><div class="empty">Loading…</div></div>
   </section>
 
@@ -242,9 +245,14 @@ async function rashiApi(action, extra){
   if(!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
+let pendingRecordingIds = [];
 function renderRecordings(rows){
   const list = document.getElementById('recList');
   document.getElementById('recCount').textContent = rows.length ? '(' + rows.length + ')' : '';
+  pendingRecordingIds = rows.map(r => r.id);
+  const bulk = document.getElementById('approveAllBtn');
+  bulk.classList.toggle('hidden', !rows.length);
+  bulk.textContent = '✅ Approve All (' + rows.length + ')';
   if(!rows.length){ list.innerHTML = '<div class="empty">✅ No Rashi recordings are waiting.</div>'; return; }
   list.innerHTML = rows.map(r =>
     '<div class="rec-item" data-id="' + escapeHtml(r.id) + '">' +
@@ -273,6 +281,22 @@ document.getElementById('recList').addEventListener('click', async e => {
       : btn.dataset.act === 'approve' ? '✅ Approved. +' + (out.actualAmount ?? 2) + ' points.' : '🔄 Sent back to try again.';
     setTimeout(loadRecordings, 1200);
   }catch(error){ msg.textContent = error.message || 'Could not save.'; item.querySelectorAll('button').forEach(b => b.disabled = false); }
+});
+
+document.getElementById('approveAllBtn').addEventListener('click', async e => {
+  const btn = e.currentTarget, msg = document.getElementById('approveAllMsg'), ids = pendingRecordingIds.slice();
+  if(btn.disabled || !ids.length) return;
+  if(!confirm('Approve all ' + ids.length + ' Rashi recording' + (ids.length === 1 ? '' : 's') + ' waiting for you? Each student gets +2 points. This cannot be undone.')) return;
+  btn.disabled = true;
+  document.querySelectorAll('#recList button').forEach(b => b.disabled = true);
+  let done = 0, failed = 0;
+  for(const id of ids){
+    msg.textContent = 'Approving ' + (done + failed + 1) + ' of ' + ids.length + '…';
+    try{ await rashiApi('rashi-approve', { requestId: id }); done++; }catch(error){ failed++; console.warn('Rashi approve failed', id, error); }
+  }
+  msg.textContent = '✅ ' + done + ' approved.' + (failed ? ' ' + failed + ' could not be approved; they are still listed below.' : '');
+  btn.disabled = false;
+  await loadRecordings();
 });
 
 async function loadLockState(){
