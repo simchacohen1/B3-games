@@ -540,6 +540,8 @@
             rows.forEach(function(row) {
               if (!row) return;
               const claimed = row.claimed;
+              // A claimed invitation must still point to a live teacher.
+              if (row.invite.claimedUid && !claimed) return;
               if (claimed && (claimed.active === false || claimed.accountType === "principal")) return;
               const saved = supervisors[row.id] && supervisors[row.id].classIds || {};
               const invited = row.invite.classIds || {};
