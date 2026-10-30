@@ -94,3 +94,58 @@ test('control: ordinary assigned teacher retains legitimate Chazara access', asy
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.scope.selected, 'alpha');
 });
+
+
+test('principal retains a class supervised by a second active teacher', async () => {
+  const data = baseData();
+  data[ROOT + '/teachers/principal'].supervisedTeachers.teacherB = {
+    classIds: { alpha: true }
+  };
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: false, role: 'teacher', classIds: { alpha: true }
+  };
+  data[ROOT + '/teacherInvites/teacherB'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }
+  };
+  const { result, reads } = await authorize(data);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.scope.selected, 'alpha');
+  assert.ok(reads.includes(ROOT + '/teacherInvites/teacherB'));
+  assert.ok(!reads.includes(ROOT + '/teacherInvites'),
+    'authorization must read named supervisors, not enumerate all invitations');
+});
+
+test('principal denies a disabled claimed supervisor even with an active invitation', async () => {
+  const data = baseData();
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }, claimedUid: 'claimedA'
+  };
+  data[ROOT + '/teachers/claimedA'] = {
+    active: false, classIds: { alpha: true }
+  };
+  const { result, reads } = await authorize(data);
+  assert.equal(result.ok, false);
+  assert.ok(reads.includes(ROOT + '/teachers/claimedA'));
+});
+
+test('principal denies missing supervisors rather than trusting cached classIds', async () => {
+  const data = baseData();
+  data[ROOT + '/teachers/principal'].supervisedTeachers = {};
+  const { result } = await authorize(data);
+  assert.equal(result.ok, false);
+});
+
+test('principal denies an expired claimed teacher class while retaining ordinary teacher access', async () => {
+  const data = baseData();
+  data[ROOT + '/teacherInvites/teacherA'] = {
+    active: true, role: 'teacher', classIds: { alpha: true }, claimedUid: 'claimedA'
+  };
+  data[ROOT + '/teachers/claimedA'] = {
+    active: true, classIds: { beta: true }
+  };
+  const principalResult = await authorize(data);
+  assert.equal(principalResult.result.ok, false);
+  data[ROOT + '/teachers/teacher'] = { active: true, classIds: { alpha: true } };
+  const teacherResult = await authorize(data, 'teacher');
+  assert.equal(teacherResult.result.ok, true, JSON.stringify(teacherResult.result));
+});
