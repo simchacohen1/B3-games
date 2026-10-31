@@ -247,11 +247,14 @@ async function teacherApi(action,extra={}){
 }
 async function loadApprovals(){
  const btn=$('approvalSignInBtn'),generation=scopeGeneration,request=++approvalGeneration;
+ // Auth may change before the auth-state callback increments scopeGeneration.
+ const uid=auth.currentUser?.uid;
+ const stillCurrent=()=>generation===scopeGeneration&&request===approvalGeneration&&auth.currentUser?.uid===uid;
  if(!auth.currentUser){pendingPointRequests={};pendingRecordingKeys.clear();renderApprovals();$('approvalList').innerHTML='<div class="approval-empty">Sign in with your teacher Google account to load Chazara point requests.</div>';btn.classList.remove('hidden');setApprovalStatus('');return}
  btn.classList.add('hidden');setApprovalStatus('Loading…');
  try{
   const data=await teacherApi('list-chazara-pending');
-  if(generation!==scopeGeneration||request!==approvalGeneration)return;
+  if(!stillCurrent())return;
   const Q=window.FunTorahApprovalQueue,automatic=[];
   pendingPointRequests={};
   for(const item of (data.requests||[])){
@@ -266,7 +269,7 @@ async function loadApprovals(){
   // Bound concurrent authenticated reads: a large pending queue must not flood
   // the scoped API with one simultaneous request per recording.
   for(let i=0;i<requests.length;i+=4){
-   if(generation!==scopeGeneration||request!==approvalGeneration)return;
+   if(!stillCurrent())return;
    await Promise.all(requests.slice(i,i+4).map(async item=>{
     const studentId=String(item.practiceStudentId),eventId=String(item.eventId);
     if(!R[studentId]||!window.FunTorahTeacherScope.validKey(studentId)||!window.FunTorahTeacherScope.validKey(eventId))return;
@@ -277,14 +280,14 @@ async function loadApprovals(){
     if(!fetchPromise){
      fetchPromise=withPendingEventSlot(()=>{
       // A queued read must not start after class revocation or queue removal.
-      if(generation!==scopeGeneration||!pendingRecordingKeys.has(key))return {event:null};
+      if(!stillCurrent()||!pendingRecordingKeys.has(key))return {event:null};
       return teacherApi('get-chazara-event',{studentId,eventId});
      });
      pendingEventFetches.set(key,fetchPromise);
     }
     try{
      const data=await fetchPromise,event=data.event||null;
-     if(generation!==scopeGeneration||request!==approvalGeneration)return;
+     if(!stillCurrent())return;
      if(event&&window.FunTorahTeacherScope.recordAllowed(teacherScope,studentId,event)){
       if(!E[studentId])E[studentId]={};
       E[studentId][eventId]=event;
@@ -292,12 +295,12 @@ async function loadApprovals(){
     }catch(error){console.warn('Could not load pending Chazara recording',error)}
     finally{if(pendingEventFetches.get(key)===fetchPromise)pendingEventFetches.delete(key)}
    }));
-   if(generation!==scopeGeneration||request!==approvalGeneration)return;
+   if(!stillCurrent())return;
   }
   renderApprovals();renderRecordings();
   if(automatic.length)sweepAutomaticPoints(automatic);
  }catch(err){
-  if(generation!==scopeGeneration||request!==approvalGeneration)return;
+  if(!stillCurrent())return;
   console.error(err);pendingPointRequests={};pendingRecordingKeys.clear();renderApprovals();renderRecordings();
   $('approvalList').innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';
   setApprovalStatus(String(err?.message||err),true);
