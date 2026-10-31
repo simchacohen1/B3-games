@@ -19,8 +19,8 @@ const OPEN = ['assigned', 'in_progress', 'returned'];
 
 async function teacherAccess(store, identity, classId) {
   if (!identity || !identity.uid || identity.email_verified !== true ||
-      !identity.firebase || identity.firebase.sign_in_provider !== 'google.com')
-    fail(403, 'Verified Google teacher sign-in required.');
+      !identity.firebase || !['google.com', 'password'].includes(identity.firebase.sign_in_provider))
+    fail(403, 'Verified staging teacher sign-in required.');
   if (!key(classId)) fail(400, 'Choose a class.');
   const cls = await store.get('b3Games/workspaces/' + WS + '/classes/' + classId);
   if (!cls || cls.active === false) fail(403, 'This class is not available.');
@@ -37,8 +37,8 @@ async function teacherAccess(store, identity, classId) {
 
 async function authorizedClasses(store, identity) {
   if (!identity || !identity.uid || identity.email_verified !== true ||
-      !identity.firebase || identity.firebase.sign_in_provider !== 'google.com')
-    fail(403, 'Verified Google teacher sign-in required.');
+      !identity.firebase || !['google.com', 'password'].includes(identity.firebase.sign_in_provider))
+    fail(403, 'Verified staging teacher sign-in required.');
   const admin = await store.get('b3Games/admins/' + identity.uid);
   let rows = {};
   if (admin && admin.active !== false) {
