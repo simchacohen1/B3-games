@@ -312,8 +312,24 @@ async function loadApprovals(){
   setApprovalStatus(String(err?.message||err),true);
  }
 }
-let automaticSweepRunning=false;
-async function sweepAutomaticPoints(ids){if(automaticSweepRunning)return;automaticSweepRunning=true;try{for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id})}catch(err){console.warn("Automatic Posuk point approval failed",id,err)}}}finally{automaticSweepRunning=false}}
+// Automatic approvals are tied to the verified Firebase UID and class-scope
+// generation that produced the pending queue. A different Google account must
+// never inherit an unfinished sweep, even before onAuthStateChanged fires.
+let automaticSweepKey=null;
+async function sweepAutomaticPoints(ids){
+ const uid=auth.currentUser?.uid,generation=scopeGeneration;
+ if(!uid||teacherScope?.boundAuthUid!==uid)return;
+ const key=JSON.stringify([uid,generation]);
+ if(automaticSweepKey===key)return;
+ automaticSweepKey=key;
+ try{
+  for(const id of ids){
+   if(auth.currentUser?.uid!==uid||scopeGeneration!==generation||teacherScope?.boundAuthUid!==uid)return;
+   try{await teacherApi("approve-point-request",{requestId:id})}
+   catch(err){console.warn("Automatic Posuk point approval failed",id,err)}
+  }
+ }finally{if(automaticSweepKey===key)automaticSweepKey=null}
+}
 async function approvePointRequest(id,quiet=false){try{if(!quiet)setApprovalStatus("Approving…");const data=await teacherApi("approve-point-request",{requestId:id});if(data.status!=="approved"&&data.status!=="rejected"&&data.status!=="cancelled")throw new Error(`Approval did not complete (status: ${data.status||"unknown"}).`);if(!quiet)setApprovalStatus(`${data.studentName||"Student"}: ${Number(data.actualAmount||0)>=0?"+":""}${Number(data.actualAmount||0)} point${Math.abs(Number(data.actualAmount||0))===1?"":"s"} approved.`);await loadApprovals();return true}catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}}
 async function rejectPointRequest(id,quiet=false){
   try{

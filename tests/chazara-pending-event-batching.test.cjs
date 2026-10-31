@@ -8,7 +8,7 @@ const vm=require('node:vm');
 
 const html=fs.readFileSync('chazara/teacher.html','utf8');
 const start=html.indexOf('async function loadApprovals(){');
-const end=html.indexOf('\nlet automaticSweepRunning=',start);
+const end=html.indexOf('\nlet automaticSweepKey=',start);
 assert.ok(start>=0&&end>start,'extract the actual pending approval loader');
 const loader=html.slice(start,end);
 const permitStart=html.indexOf('let pendingEventActive=0,pendingEventWaiters=[];');
