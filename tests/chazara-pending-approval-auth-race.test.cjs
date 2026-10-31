@@ -121,3 +121,36 @@ test('unchanged teacher still receives the pending queue and requested recording
   assert.deepEqual(x.calls, ['list-chazara-pending', 'get-chazara-event']);
   assert.ok(x.renders.length >= 2);
 });
+
+test('old pending API rejection cannot clear the new account view before auth callback', async () => {
+  let rejectOld;
+  const pendingResponse = new Promise((_, reject) => { rejectOld = reject; });
+  const x = fixture({pendingResponse});
+  const old = x.run();
+  x.context.auth.currentUser = b; // scopeGeneration has not yet changed
+  rejectOld(new Error('fictional stale teacher request failed'));
+  await old;
+  assert.deepEqual(Object.keys(x.context.pendingPointRequests), []);
+  assert.deepEqual(x.renders, [], 'stale error must not render an error over the new account');
+});
+
+test('queued pending audio must not start after Google account changes before callback', async () => {
+  const queued = deferred(), release = deferred();
+  const x = fixture({
+    pendingResponse: {requests: [request(true)]},
+    eventResponse: {event: {classId: 'alpha', recorded: true}}
+  });
+  x.context.withPendingEventSlot = async fn => {
+    queued.resolve();
+    await release.promise;
+    return fn();
+  };
+  const old = x.run();
+  await queued.promise;
+  x.context.auth.currentUser = b; // still the same scopeGeneration
+  release.resolve();
+  await old;
+  assert.deepEqual(x.calls, ['list-chazara-pending'],
+    'queued audio API call must never start under the new account');
+  assert.equal(x.context.E.fictional_student_alpha, undefined);
+});
