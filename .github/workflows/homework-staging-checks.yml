@@ -1,0 +1,43 @@
+name: Homework staging safety checks
+
+on:
+  push:
+    branches:
+      - feature/assignment-center-staging-406
+    paths:
+      - 'assignment-center/**'
+      - 'backend/functions/homework-staging/**'
+      - 'backend/functions/homework-core.cjs'
+      - 'tests/homework*.test.cjs'
+      - 'tests/fixtures/synthetic-class.cjs'
+      - '.github/workflows/homework-staging-checks.yml'
+  pull_request:
+    paths:
+      - 'assignment-center/**'
+      - 'backend/functions/homework-staging/**'
+      - 'backend/functions/homework-core.cjs'
+      - 'tests/homework*.test.cjs'
+      - 'tests/fixtures/synthetic-class.cjs'
+      - '.github/workflows/homework-staging-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  homework-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify staging code syntax
+        run: |
+          node --check backend/functions/homework-staging/homework-core.cjs
+          node --check assignment-center/homework-common.js
+          node --check tests/homework-staging-teacher-provider.test.cjs
+          node --check tests/homework-staging-delete-preservation.test.cjs
+      - name: Run synthetic Homework Center and isolation tests (no Firebase access)
+        run: |
+          node --test tests/homework-portal.test.cjs tests/homework-synthetic-privacy.test.cjs tests/homework-assignment-center.test.cjs tests/homework-staging-communication.test.cjs tests/homework-staging-delete-preservation.test.cjs tests/homework-staging-teacher-provider.test.cjs tests/homework-staging-deployment-isolation.test.cjs assignment-center/assignment-policy.test.js
