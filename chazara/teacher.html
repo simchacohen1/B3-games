@@ -174,6 +174,7 @@ function makeRecordingRow(e){
   updateRecordingRow(row,e);return row
 }
 function renderRecordings(){
+ if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
  const box=$('recordingsList');if(!box)return;
  if(historyLoading&&recordingFilters().review!=='pending')return;
  const all=allRecordedEvents();syncRecordingFilters(all);
@@ -187,10 +188,11 @@ function renderRecordings(){
  applyRecordingFilters(rows.length,visible.length);
 }
 async function loadRecordingHistory(){
+ if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
  const generation=scopeGeneration,request=++historyGeneration,student=$('recordingStudentFilter').value,uid=auth.currentUser?.uid;
  const stillCurrent=()=>generation===scopeGeneration&&request===historyGeneration&&auth.currentUser?.uid===uid;
  const ids=(student?[student]:Object.keys(R)).filter(id=>R[id]&&!historyStudentsLoaded.has(id));
- if(!ids.length){historyLoading=false;renderRecordings();return}
+ if(!ids.length){if(!stillCurrent())return;historyLoading=false;renderRecordings();return}
  historyLoading=true;$('recordingsList').innerHTML='<div class="recording-empty">Loading selected recording history…</div>';
  let failed=0;
  for(let i=0;i<ids.length;i+=4){
@@ -211,6 +213,7 @@ async function loadRecordingHistory(){
  if(failed)setRecordingActionStatus('Some recording histories could not be loaded. Please try the filter again.',true);
 }
 function recordingFilterChanged(){
+ if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
  if(recordingFilters().review==='pending'){historyGeneration++;historyLoading=false;renderRecordings();return}
  const generation=scopeGeneration,uid=auth.currentUser?.uid;
  loadRecordingHistory().catch(error=>{if(generation!==scopeGeneration||auth.currentUser?.uid!==uid)return;historyLoading=false;setRecordingActionStatus(String(error.message||error),true);renderRecordings()});
@@ -219,6 +222,7 @@ function eventForRequest(item){const sid=String(item?.practiceStudentId||''),eid
 function updateApprovalRow(row,id,item){const amount=Number(item.amount||0),sign=amount>0?'+':'',kind=item.source==='reading100'||item.source==='translation100'||item.source==='understand100'?'📜 Posuk Practice milestone':item.recorded===true?'🎙️ Recorded Chazara':'Normal Chazara',when=item.createdAt?requestWhen(item.createdAt):'',event=eventForRequest(item);row.dataset.request=id;const name=row.querySelector('[data-name]'),reason=row.querySelector('[data-reason]'),meta=row.querySelector('[data-meta]'),amountEl=row.querySelector('[data-amount]');if(name)name.textContent=item.studentName||item.practiceStudentId||item.rewardStudentId||'Student';if(reason)reason.textContent=item.reason||'Activity points';if(meta)meta.textContent=kind+(when?' · '+when:'');if(amountEl)amountEl.textContent=`${sign}${amount} point${Math.abs(amount)===1?'':'s'}`;const approve=row.querySelector('[data-approve]'),reject=row.querySelector('[data-reject]');if(approve)approve.dataset.approve=id;if(reject)reject.dataset.reject=id;let wrap=row.querySelector('.approval-audio');if(item.recorded===true&&event){if(!wrap){wrap=document.createElement('div');wrap.className='approval-audio';wrap.innerHTML='<div class="audio-length" data-length></div><canvas class="approval-wave"></canvas>';row.appendChild(wrap)}const lengthEl=wrap.querySelector('[data-length]');if(lengthEl&&event.durationMs)lengthEl.textContent='Length: '+formatAudioLength(event.durationMs);let audio=wrap.querySelector('audio');const audioSrc=event.audioURL||event.audioDataURL||'',audioPath=event.storagePath||'';if(audioSrc||audioPath){if(!audio){audio=document.createElement('audio');audio.controls=true;audio.dataset.url=audioSrc;audio.dataset.privatePath=audioPath;wrap.appendChild(audio);wireAudio(audio,lengthEl,event.durationMs)}if(audioPath){if(audio.dataset.privatePath!==audioPath)audio.dataset.privateReady='false';audio.dataset.privatePath=audioPath;B3PrivateMedia.setSource(audio,audioPath).catch(err=>console.warn('Recording access failed:',err.message))}else if(audio.dataset.url!==audioSrc){audio.dataset.url=audioSrc;audio.src=audioSrc;audio.load()}}else if(audio){audio.remove()}const c=wrap.querySelector('.approval-wave');if(c)requestAnimationFrame(()=>drawSavedWave(c,event.waveform))}else if(wrap){wrap.remove()}}
 function makeApprovalRow(id,item){const row=document.createElement('div');row.className='request-row';row.dataset.request=id;row.innerHTML='<div class="request-main"><strong data-name></strong><div class="request-reason" data-reason></div><div class="request-meta" data-meta></div></div><div class="request-amount" data-amount></div><div class="req-buttons"><button class="req-approve" data-approve>Approve</button><button class="req-reject" data-reject>Reject</button></div>';updateApprovalRow(row,id,item);return row}
 function renderApprovals(){
+  if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
   const rows=Object.entries(pendingPointRequests||{}).map(([id,item])=>({id,item:item||{}})).sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
   $("approvalCount").textContent=rows.length?`${rows.length} pending`:"0";$("approveAllBtn").classList.toggle("hidden",!rows.length);const recordingsApproveAll=$("recordingsApproveAllBtn");if(recordingsApproveAll){recordingsApproveAll.classList.toggle("hidden",!rows.length);recordingsApproveAll.textContent=`Approve All Pending Points (${rows.length})`;}
   const box=$("approvalList");
@@ -391,6 +395,7 @@ if($('recordingClearFilters'))$('recordingClearFilters').onclick=()=>{
 $("q").oninput=render;$("f").onchange=render;
 function clearStudentListeners(){for(const [ref,handler] of studentListeners)ref.off('value',handler);studentListeners=[];}
 function refreshScopedViews(){
+ if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
  if(teacherScope)for(const [id,student] of Object.entries(R))if(!['et','wt'].includes(student.classId)){
   const reviews={};for(const e of Object.values(E[id]||{}))if(e.reviewApplied===true&&e.removed!==true&&e.teacherRejected!==true&&e.pointRequestStatus!=='rejected'){
    const key=e.perek+'_'+e.posuk,r=reviews[key]||(reviews[key]={count:0,lastAt:0});r.count++;r.lastAt=Math.max(r.lastAt,Number(e.createdAt)||0);
@@ -416,7 +421,7 @@ async function loadClassScope(user,access){
   const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,new URLSearchParams(location.search).get('class')||'');
   // A roster response can also arrive after an auth change but before its callback fires.
   if(generation!==scopeGeneration||auth.currentUser?.uid!==user?.uid)return;
-  teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
+  scope.boundAuthUid=user?.uid||null;teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
   for(const id of Object.keys(R))for(const [root,target] of (fullDashboardLoaded?[['posukPractice/chazara/students',D],['posukPractice/attempts',P]]:[])){
    const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};target[id]=value;refreshScopedViews();};
