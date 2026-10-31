@@ -133,10 +133,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   async function writeFixture(path:string,value:unknown){await env.withSecurityRulesDisabled(async c=>set(ref(c.database(),path),value));}
   const quizRoot=`b3Quiz/classes/${CLASS_ID}`;
   await page.getByRole('button', { name: /B\. Choice B/ }).click();
-  // The launch is re-polled every 2.5 s; an unsubmitted choice must survive (#355).
-  await page.waitForTimeout(6000);
+  // The launch is re-polled every 2.5 s; keep a choice selected for over
+  // 30 seconds without an implicit deadline or auto-submission (#355).
+  await page.waitForTimeout(32000);
   await expect(page.locator('#choices .choice.selected')).toHaveCount(1);
   await expect(page.locator('#choices .choice.selected')).toContainText('Choice B');
+  expect(await readFixture(`${quizRoot}/responses/quiz_one/${ariId}/0`)).toBeNull();
+  await expect(page.locator('#submitBtn')).toBeEnabled();
   await page.locator('#submitBtn').click();
   await expect.poll(async()=> (await readFixture(`${quizRoot}/responses/quiz_one/${ariId}/0`))?.choiceIndex).toBe(1);
   await page.reload();
