@@ -187,7 +187,8 @@ function renderRecordings(){
  applyRecordingFilters(rows.length,visible.length);
 }
 async function loadRecordingHistory(){
- const generation=scopeGeneration,request=++historyGeneration,student=$('recordingStudentFilter').value;
+ const generation=scopeGeneration,request=++historyGeneration,student=$('recordingStudentFilter').value,uid=auth.currentUser?.uid;
+ const stillCurrent=()=>generation===scopeGeneration&&request===historyGeneration&&auth.currentUser?.uid===uid;
  const ids=(student?[student]:Object.keys(R)).filter(id=>R[id]&&!historyStudentsLoaded.has(id));
  if(!ids.length){historyLoading=false;renderRecordings();return}
  historyLoading=true;$('recordingsList').innerHTML='<div class="recording-empty">Loading selected recording history…</div>';
@@ -197,7 +198,7 @@ async function loadRecordingHistory(){
    try{const data=await teacherApi('list-chazara-history',{studentId:id});return{id,events:data.events||{}}}
    catch(error){console.warn('Could not load Chazara history for '+id,error);return{id,error}}
   }));
-  if(generation!==scopeGeneration||request!==historyGeneration)return;
+  if(!stillCurrent())return;
   for(const result of results){
    if(result.error){failed++;continue}
    const entries=Object.entries(result.events).filter(([,event])=>window.FunTorahTeacherScope.recordAllowed(teacherScope,result.id,event));
@@ -205,13 +206,14 @@ async function loadRecordingHistory(){
    historyStudentsLoaded.add(result.id);
   }
  }
- if(generation!==scopeGeneration||request!==historyGeneration)return;
+ if(!stillCurrent())return;
  historyLoading=false;if(fullDashboardLoaded)refreshScopedViews();else renderRecordings();
  if(failed)setRecordingActionStatus('Some recording histories could not be loaded. Please try the filter again.',true);
 }
 function recordingFilterChanged(){
  if(recordingFilters().review==='pending'){historyGeneration++;historyLoading=false;renderRecordings();return}
- loadRecordingHistory().catch(error=>{historyLoading=false;setRecordingActionStatus(String(error.message||error),true);renderRecordings()});
+ const generation=scopeGeneration,uid=auth.currentUser?.uid;
+ loadRecordingHistory().catch(error=>{if(generation!==scopeGeneration||auth.currentUser?.uid!==uid)return;historyLoading=false;setRecordingActionStatus(String(error.message||error),true);renderRecordings()});
 }
 function eventForRequest(item){const sid=String(item?.practiceStudentId||''),eid=String(item?.eventId||'');return sid&&eid?E[sid]?.[eid]:null}
 function updateApprovalRow(row,id,item){const amount=Number(item.amount||0),sign=amount>0?'+':'',kind=item.source==='reading100'||item.source==='translation100'||item.source==='understand100'?'📜 Posuk Practice milestone':item.recorded===true?'🎙️ Recorded Chazara':'Normal Chazara',when=item.createdAt?requestWhen(item.createdAt):'',event=eventForRequest(item);row.dataset.request=id;const name=row.querySelector('[data-name]'),reason=row.querySelector('[data-reason]'),meta=row.querySelector('[data-meta]'),amountEl=row.querySelector('[data-amount]');if(name)name.textContent=item.studentName||item.practiceStudentId||item.rewardStudentId||'Student';if(reason)reason.textContent=item.reason||'Activity points';if(meta)meta.textContent=kind+(when?' · '+when:'');if(amountEl)amountEl.textContent=`${sign}${amount} point${Math.abs(amount)===1?'':'s'}`;const approve=row.querySelector('[data-approve]'),reject=row.querySelector('[data-reject]');if(approve)approve.dataset.approve=id;if(reject)reject.dataset.reject=id;let wrap=row.querySelector('.approval-audio');if(item.recorded===true&&event){if(!wrap){wrap=document.createElement('div');wrap.className='approval-audio';wrap.innerHTML='<div class="audio-length" data-length></div><canvas class="approval-wave"></canvas>';row.appendChild(wrap)}const lengthEl=wrap.querySelector('[data-length]');if(lengthEl&&event.durationMs)lengthEl.textContent='Length: '+formatAudioLength(event.durationMs);let audio=wrap.querySelector('audio');const audioSrc=event.audioURL||event.audioDataURL||'',audioPath=event.storagePath||'';if(audioSrc||audioPath){if(!audio){audio=document.createElement('audio');audio.controls=true;audio.dataset.url=audioSrc;audio.dataset.privatePath=audioPath;wrap.appendChild(audio);wireAudio(audio,lengthEl,event.durationMs)}if(audioPath){if(audio.dataset.privatePath!==audioPath)audio.dataset.privateReady='false';audio.dataset.privatePath=audioPath;B3PrivateMedia.setSource(audio,audioPath).catch(err=>console.warn('Recording access failed:',err.message))}else if(audio.dataset.url!==audioSrc){audio.dataset.url=audioSrc;audio.src=audioSrc;audio.load()}}else if(audio){audio.remove()}const c=wrap.querySelector('.approval-wave');if(c)requestAnimationFrame(()=>drawSavedWave(c,event.waveform))}else if(wrap){wrap.remove()}}

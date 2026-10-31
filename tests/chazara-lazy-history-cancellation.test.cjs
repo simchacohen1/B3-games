@@ -25,6 +25,7 @@ function fixture({students = ['student_a', 'student_b', 'student_c'], events = {
   const recordingsList = {innerHTML: ''};
   const context = {
     scopeGeneration: 1, historyGeneration: 0,
+    auth: {currentUser: {uid: 'teacher_alpha'}},
     historyStudentsLoaded: new Set(), historyLoading: false,
     fullDashboardLoaded: false, E: {},
     R: Object.fromEntries(students.map(id => [id, {name: id}])),
@@ -173,4 +174,35 @@ test('switching selected student while a history read is pending keeps only the 
   assert.deepEqual(Object.keys(x.context.E), ['student_b']);
   assert.deepEqual(Object.keys(x.context.E.student_b), ['newer']);
   assert.equal(x.context.historyLoading, false);
+});
+
+
+test('history response from a previous Google account is discarded before the auth callback', async () => {
+  const gate = deferred();
+  const students = Array.from({length: 9}, (_, i) => 'student_' + i);
+  const x = fixture({students, api: async () => gate.promise});
+  const pending = x.run();
+  assert.equal(x.calls.length, 4, 'only the first history batch begins');
+  // Firebase currentUser can switch before onAuthStateChanged increments scopeGeneration.
+  // The old class and history generations deliberately remain unchanged.
+  x.context.auth.currentUser = {uid: 'teacher_beta'};
+  gate.release({events: {former_teacher: {classId: 'alpha', recorded: true}}});
+  await pending;
+  assert.equal(x.context.scopeGeneration, 1);
+  assert.equal(x.calls.length, 4, 'remaining former-teacher history must never be fetched');
+  assert.equal(x.context.historyStudentsLoaded.size, 0, 'former-teacher history cannot be cached');
+  assert.equal(Object.keys(x.context.E).length, 0, 'former-teacher events cannot enter new session');
+  assert.equal(x.renders(), 0, 'former-teacher history cannot repaint new session');
+  assert.equal(x.messages.length, 0, 'no former-teacher status message is shown');
+});
+
+test('unchanged signed-in teacher may still load scoped history', async () => {
+  const x = fixture({students: ['student_a'], events: {
+    student_a: {own: {classId: 'alpha', recorded: true}}
+  }});
+  await x.run();
+  assert.equal(x.context.auth.currentUser.uid, 'teacher_alpha');
+  assert.equal(x.context.historyStudentsLoaded.has('student_a'), true);
+  assert.deepEqual(Object.keys(x.context.E.student_a), ['own']);
+  assert.equal(x.renders(), 1);
 });
