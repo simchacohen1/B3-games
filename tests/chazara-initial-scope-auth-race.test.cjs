@@ -41,6 +41,9 @@ function fixture({assignmentGates = {}, rosterGates = {}, assignmentRows = {}} =
     clearStudentListeners() {}, refreshScopedViews() {},
     loadApprovals: async () => { approvalCalls.push(true); },
     needsTeacherAssignmentRefresh: () => true,
+    // The real loader escapes class labels before rendering. Supply that UI helper
+    // so the positive-control test reaches loadApprovals rather than the catch gate.
+    escHtml: value => String(value),
     $: node, location: {search: ''}, URLSearchParams, console,
     db: {ref: path => ({once: async () => {
       assignmentPaths.push(path);
