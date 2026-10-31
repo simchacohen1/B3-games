@@ -421,17 +421,22 @@ if($("manualList"))$("manualList").onclick=e=>{const b=e.target.closest('[data-m
 
 function setRecordingActionStatus(message,bad=false){const el=$('recordingActionStatus');if(!el)return;el.textContent=message||'';el.style.color=bad?'#991b1b':'#475569'}
 if($("recordingsList"))$("recordingsList").onclick=async e=>{
+  // Never reuse a recording action from a previous Google UID or class scope.
+  const uid=auth.currentUser?.uid,generation=scopeGeneration;
+  const current=()=>currentChazaraAction(uid,generation);
+  if(!current())return;
   const checkedBtn=e.target.closest('[data-recording-checked]');
   if(checkedBtn){
     const studentId=checkedBtn.dataset.recordingStudent||'',eventId=checkedBtn.dataset.recordingEvent||'',wasChecked=checkedBtn.dataset.recordingChecked==='true';
     const old=checkedBtn.textContent;checkedBtn.disabled=true;checkedBtn.textContent=wasChecked?'Undoing…':'Saving…';setRecordingActionStatus(wasChecked?'Marking recording as needing full review…':'Marking recording as fully checked…');
     try{
       await teacherApi('teacher-set-recording-full-review',{studentId,eventId,checked:!wasChecked});
+      if(!current())return;
       if(E[studentId]?.[eventId]){E[studentId][eventId].teacherFullyChecked=!wasChecked;E[studentId][eventId].teacherFullyCheckedAt=!wasChecked?Date.now():null}
       renderRecordings();renderApprovals();
       setRecordingActionStatus(wasChecked?'Recording marked as needing full review again.':'Recording marked ✓ Fully checked.');
-    }catch(err){console.error(err);setRecordingActionStatus(String(err?.message||err),true)}
-    finally{checkedBtn.disabled=false;checkedBtn.textContent=old}
+    }catch(err){if(current()){console.error(err);setRecordingActionStatus(String(err?.message||err),true)}}
+    finally{if(current()){checkedBtn.disabled=false;checkedBtn.textContent=old}}
     return;
   }
   const b=e.target.closest('[data-recording-reject]');if(!b)return;
@@ -440,18 +445,20 @@ if($("recordingsList"))$("recordingsList").onclick=async e=>{
   const msg=legacy
     ?`Apply the new rejection behavior to ${event.studentName||manualStudentName(studentId)}, Perek ${event.perek||'?'} · Posuk ${event.posuk||'?'}?\n\nIt will stop counting as a Chazara and the posuk will reopen. The recording will stay in history.`
     :`Reject this recording for ${event.studentName||manualStudentName(studentId)}, Perek ${event.perek||'?'} · Posuk ${event.posuk||'?'}?\n\nIts points will be cancelled or reversed, it will stop counting as a Chazara, and the posuk will reopen. The recording will stay in history.`;
-  if(!confirm(msg))return;
+  if(!confirm(msg)||!current())return;
   const old=b.textContent;b.disabled=true;b.textContent='Rejecting…';setRecordingActionStatus('Rejecting recording and reopening the posuk…');
   try{
     const data=await teacherApi('teacher-reject-chazara-recording',{studentId,eventId});
+    if(!current())return;
     if(E[studentId]?.[eventId]){E[studentId][eventId].teacherRejected=true;E[studentId][eventId].pointRequestStatus='rejected'}
     renderRecordings();await loadApprovals();
+    if(!current())return;
     const amt=Number(data.pointsAmount||0);
     if(data.pointsAction==='reversed'&&amt<0)setRecordingActionStatus(`Recording rejected. ${Math.abs(amt)} point${Math.abs(amt)===1?'':'s'} removed and the posuk reopened.`);
     else if(data.pointsAction==='cancelled')setRecordingActionStatus('Recording rejected. Pending points cancelled and the posuk reopened.');
     else setRecordingActionStatus('Recording rejected and the posuk reopened.');
-  }catch(err){console.error(err);setRecordingActionStatus(String(err?.message||err),true)}
-  finally{b.disabled=false;b.textContent=old}
+  }catch(err){if(current()){console.error(err);setRecordingActionStatus(String(err?.message||err),true)}}
+  finally{if(current()){b.disabled=false;b.textContent=old}}
 };
 if($('recordingStudentFilter'))$('recordingStudentFilter').onchange=()=>{const p=$('recordingPerekFilter'),v=$('recordingPasukFilter');if(p)p.value='';if(v)v.value='';recordingFilterChanged()};
 if($('recordingPerekFilter'))$('recordingPerekFilter').onchange=()=>{const v=$('recordingPasukFilter');if(v)v.value='';recordingFilterChanged()};
