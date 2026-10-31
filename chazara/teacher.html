@@ -330,19 +330,46 @@ async function sweepAutomaticPoints(ids){
   }
  }finally{if(automaticSweepKey===key)automaticSweepKey=null}
 }
-async function approvePointRequest(id,quiet=false){try{if(!quiet)setApprovalStatus("Approving…");const data=await teacherApi("approve-point-request",{requestId:id});if(data.status!=="approved"&&data.status!=="rejected"&&data.status!=="cancelled")throw new Error(`Approval did not complete (status: ${data.status||"unknown"}).`);if(!quiet)setApprovalStatus(`${data.studentName||"Student"}: ${Number(data.actualAmount||0)>=0?"+":""}${Number(data.actualAmount||0)} point${Math.abs(Number(data.actualAmount||0))===1?"":"s"} approved.`);await loadApprovals();return true}catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}}
+// Individual approval/rejection uses the same account and class-scope boundary
+// as the bulk action. A late API response must not update another teacher's UI.
+function currentChazaraAction(uid,generation){
+ return !!uid&&auth.currentUser?.uid===uid&&scopeGeneration===generation&&teacherScope?.boundAuthUid===uid;
+}
+async function approvePointRequest(id,quiet=false){
+ const uid=auth.currentUser?.uid,generation=scopeGeneration,current=()=>currentChazaraAction(uid,generation);
+ if(!current())return false;
+ try{
+  if(!quiet)setApprovalStatus("Approving…");
+  const data=await teacherApi("approve-point-request",{requestId:id});
+  if(!current())return false;
+  if(data.status!=="approved"&&data.status!=="rejected"&&data.status!=="cancelled")throw new Error(`Approval did not complete (status: ${data.status||"unknown"}).`);
+  if(!quiet)setApprovalStatus(`${data.studentName||"Student"}: ${Number(data.actualAmount||0)>=0?"+":""}${Number(data.actualAmount||0)} point${Math.abs(Number(data.actualAmount||0))===1?"":"s"} approved.`);
+  await loadApprovals();
+  return current();
+ }catch(err){
+  if(!current())return false;
+  console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false;
+ }
+}
 async function rejectPointRequest(id,quiet=false){
-  try{
-    const item=pendingPointRequests?.[id]||{};
-    if(item.recorded===true&&item.practiceStudentId&&item.eventId){
-      const data=await teacherApi("teacher-reject-chazara-recording",{studentId:item.practiceStudentId,eventId:item.eventId});
-      if(!quiet)setApprovalStatus("Recording rejected. Its points were cancelled and the posuk reopened.");
-    }else{
-      await teacherApi("reject-point-request",{requestId:id});
-      if(!quiet)setApprovalStatus("Point request rejected.");
-    }
-    await loadApprovals();return true
-  }catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}
+ const uid=auth.currentUser?.uid,generation=scopeGeneration,current=()=>currentChazaraAction(uid,generation);
+ if(!current())return false;
+ try{
+  const item=pendingPointRequests?.[id]||{};
+  if(item.recorded===true&&item.practiceStudentId&&item.eventId){
+   await teacherApi("teacher-reject-chazara-recording",{studentId:item.practiceStudentId,eventId:item.eventId});
+   if(!current())return false;
+   if(!quiet)setApprovalStatus("Recording rejected. Its points were cancelled and the posuk reopened.");
+  }else{
+   await teacherApi("reject-point-request",{requestId:id});
+   if(!current())return false;
+   if(!quiet)setApprovalStatus("Point request rejected.");
+  }
+  await loadApprovals();return current();
+ }catch(err){
+  if(!current())return false;
+  console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false;
+ }
 }
 $("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject,oldText=b.textContent;b.disabled=true;b.textContent=a?"Approving…":"Rejecting…";try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false;b.textContent=oldText}};
 // Bulk manual approval must not continue old pending IDs under a new Google
