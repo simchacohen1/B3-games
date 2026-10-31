@@ -166,8 +166,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
       const user = (window as any).firebase.auth().currentUser;
       return { emailVerified: !!user?.emailVerified, providers: (user?.providerData || []).map((row: any) => row.providerId) };
     });
-    test.skip(!teacherProvider.emailVerified || !teacherProvider.providers.includes('google.com'),
-      'BLOCKED: Homework teacher actions require a verified Google provider; the available fictional TEST-ALEF credential is email/password only.');
+    test.skip(!teacherProvider.emailVerified || !teacherProvider.providers.some((provider: string) => ['google.com', 'password'].includes(provider)),
+      'BLOCKED: the fictional staging teacher must have a verified Google or email/password account.');
     await teacherPage.goto(HOMEWORK_SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
     await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
