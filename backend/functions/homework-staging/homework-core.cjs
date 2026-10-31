@@ -235,9 +235,14 @@ async function teacherDo(store, identity, body, now, newId) {
   }
 
   if (body.action === 'delete') {
-    if (publicationState(def) !== 'draft') fail(409, 'Archive published assignments so student work is kept.');
+    // Unpublishing does not undo publication: preserve every student's work and history.
+    // The record check also covers legacy definitions without a publishedAt marker,
+    // including records belonging to students since removed from the class roster.
+    const hasStudentRecord = Object.values(allRecords).some(row =>
+      row?.assignments && Object.prototype.hasOwnProperty.call(row.assignments, def.id));
+    if (publicationState(def) !== 'draft' || def.publishedAt != null || hasStudentRecord)
+      fail(409, 'Archive homework that was published or has student work, so nothing is lost.');
     await store.set(base(classId) + '/definitions/' + def.id, null);
-    for (const sid of Object.keys(cls.members || {})) if (key(sid)) await store.set(recordPath(classId, sid, def.id), null);
     return { ok: true };
   }
   if (body.action === 'edit') {
