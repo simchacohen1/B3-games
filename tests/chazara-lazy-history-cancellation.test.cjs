@@ -206,3 +206,32 @@ test('unchanged signed-in teacher may still load scoped history', async () => {
   assert.deepEqual(Object.keys(x.context.E.student_a), ['own']);
   assert.equal(x.renders(), 1);
 });
+
+
+test('cached Chazara history and pending filter cannot repaint after an account switch before the callback', async () => {
+  const x = fixture({students: ['student_a'], events: {
+    student_a: {old: {classId: 'alpha', recorded: true}}
+  }});
+  x.context.teacherScope.boundAuthUid = 'teacher_alpha';
+  await x.run();
+  assert.equal(x.renders(), 1, 'authorized history renders normally');
+  assert.equal(x.calls.length, 1);
+  x.context.auth.currentUser = {uid: 'teacher_beta'};
+  // No async request is needed: all history is already cached. The old
+  // generation numbers have not yet changed because the callback has not fired.
+  await x.run();
+  x.review('pending');
+  x.changeFilter();
+  assert.equal(x.renders(), 1, 'former teacher history must not repaint via cached or pending fast paths');
+  assert.equal(x.calls.length, 1, 'no additional former-teacher reads are initiated');
+});
+
+test('a new history request is blocked when the signed-in UID no longer owns the loaded scope', async () => {
+  const x = fixture({students: ['student_a']});
+  x.context.teacherScope.boundAuthUid = 'teacher_alpha';
+  x.context.auth.currentUser = {uid: 'teacher_beta'};
+  await x.run();
+  assert.equal(x.calls.length, 0, 'no API call may start with another account\'s loaded scope');
+  assert.equal(x.renders(), 0);
+  assert.equal(x.context.historyStudentsLoaded.size, 0);
+});
