@@ -21,7 +21,15 @@
     });
     return {classIds,supervisedTeachers,active:Object.keys(classIds).length>0};
   }
-  const api={principal,derive};
+  function accessFromPrincipalRecord(record){
+    if(!principal(record)||record.active===false)return {authorized:false,role:'',accountType:'principal',classIds:[]};
+    const classIds=Object.keys(record.classIds||{}).filter(id=>
+      id!=='*'&&/^[A-Za-z0-9_-]{1,100}$/.test(id)&&record.classIds[id]===true
+    ).sort();
+    if(!classIds.length)return {authorized:false,role:'',accountType:'principal',classIds:[]};
+    return {authorized:true,role:'teacher',accountType:'principal',supervisedTeachers:record.supervisedTeachers||{},classIds};
+  }
+  const api={principal,derive,accessFromPrincipalRecord};
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.B3PrincipalScope=api;
 })(typeof window==='object'?window:globalThis);
