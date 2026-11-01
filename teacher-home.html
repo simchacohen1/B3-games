@@ -56,6 +56,8 @@ let renderGeneration=0,previewActive=false;
 function previewHref(tool,classId){const p=new URLSearchParams({previewTeacher:previewTeacherId,previewType:previewParams.get('previewType')||'teacher',class:classId,tool});return 'teacher-preview-tool.html?'+p.toString();}
 function showTeacherSignIn(message){
  q('app').classList.add('hidden');q('gate').classList.remove('hidden');
+ q('classes').replaceChildren();q('principalSummary').replaceChildren();
+ q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');
  q('gate').innerHTML='<h2>Teacher &amp; administrator sign in</h2><p id="teacherSignInStatus" role="status"></p><button type="button" class="sign" id="login">Sign in with Google</button>';
  q('teacherSignInStatus').textContent=message||'Use your authorized teacher or administrator Google account.';
  q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in…';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
@@ -105,10 +107,38 @@ async function render(user,access){
 }
 q("actAsStudent").onclick=()=>api.openActAsStudentPicker();
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
+let principalAccessRef=null,principalAccessHandler=null;
+function stopPrincipalAccessWatch(){
+ if(principalAccessRef&&principalAccessHandler)principalAccessRef.off("value",principalAccessHandler);
+ principalAccessRef=null;principalAccessHandler=null;
+}
+function watchPrincipalAccess(user,access){
+ stopPrincipalAccessWatch();
+ if(!user?.uid||access?.accountType!=="principal"||previewTeacherId)return;
+ const ref=db.ref("b3Games/workspaces/"+WS+"/teachers/"+user.uid);
+ const handle=snapshot=>{
+  if(principalAccessRef!==ref)return;
+  render(user,window.B3PrincipalScope.accessFromPrincipalRecord(snapshot.val()));
+ };
+ const failed=()=>{
+  if(principalAccessRef!==ref)return;
+  q("classes").replaceChildren();q("principalSummary").replaceChildren();
+  q("signOut").classList.add("hidden");q("actAsStudent").classList.add("hidden");
+  q("app").classList.add("hidden");q("gate").classList.remove("hidden");
+  q("gate").textContent="Supervised class access could not be refreshed. Sign in again to continue.";
+ };
+ principalAccessRef=ref;principalAccessHandler=handle;
+ ref.on("value",handle,failed);
+}
+window.addEventListener("pagehide",stopPrincipalAccessWatch,{once:true});
 // The gate already says “Checking your teacher account…”. Keep that neutral
 // state until Firebase has restored the saved Google session and verified access.
 // Calling showTeacherSignIn() before this callback flashes the login unnecessarily.
-api.onAuthStateChanged((user,authorized,access)=>render(user,access||{authorized}));
+api.onAuthStateChanged((user,authorized,access)=>{
+ const resolved=access||{authorized};
+ render(user,resolved);
+ watchPrincipalAccess(user,resolved);
+});
 })();
 </script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="← Fun Torah Tools"></script></body></html>
 
