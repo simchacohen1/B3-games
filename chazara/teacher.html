@@ -371,8 +371,23 @@ function refreshScopedViews(){
 // by the parent shell. The logged-in Firebase UID is the owner, not that teacher.
 // Normal teacher sessions must still reload their own live assignments.
 function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
+// A claimed teacher's assignment is the authority for the open page, not the
+// access object captured at sign-in. Never keep previously loaded audio visible
+// after the teacher is disabled or their assigned classes change.
+function teacherAssignmentChange(access,row){
+ if(!row||row.active===false||(row.role&&!['teacher','principal'].includes(row.role)))return 'revoked';
+ const live=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true).sort();
+ const opened=(access.classIds||[]).filter(id=>id!=='*').slice().sort();
+ return JSON.stringify(live)===JSON.stringify(opened)?'':'changed';
+}
 async function loadClassScope(user,access){
  const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ // Hide and stop cached recording playback before any asynchronous revalidation.
+ for(const id of ['recordingsList','approvalList']){
+  const panel=$(id);if(!panel)continue;
+  panel.querySelectorAll('audio').forEach(audio=>{audio.pause();audio.removeAttribute('src');audio.load()});
+  panel.replaceChildren();
+ }
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
  try{
   if(needsTeacherAssignmentRefresh(access)){
@@ -388,6 +403,21 @@ async function loadClassScope(user,access){
    const ref=db.ref(root+'/'+id),handler=snap=>{if(generation!==scopeGeneration)return;let value=snap.val()||{};target[id]=value;refreshScopedViews();};
    studentListeners.push([ref,handler]);ref.on('value',handler);
   }
+  // One small teacher-record listener closes the already-open page promptly
+  // on account deactivation or class reassignment. The existing minute check
+  // still covers changes to class rosters, tool grants and memberships.
+  if(needsTeacherAssignmentRefresh(access)){
+   const assignmentRef=db.ref('b3Games/workspaces/b3-2026/teachers/'+user.uid);
+   const onAssignment=snap=>{
+    if(generation!==scopeGeneration)return;
+    const change=teacherAssignmentChange(access,snap.val());
+    if(change==='revoked')loadClassScope(user,{authorized:false});
+    else if(change==='changed')loadClassScope(user,access);
+   };
+   studentListeners.push([assignmentRef,onAssignment]);
+   assignmentRef.on('value',onAssignment,()=>{if(generation===scopeGeneration)loadClassScope(user,{authorized:false})});
+  }
+  if(generation!==scopeGeneration)return;
   $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();await loadApprovals();
   // Full dashboard also gets recording events through the server-scoped API.
   // Never attach a whole-student recording listener for a shared-class pupil.
