@@ -23,8 +23,17 @@ function serve(){return new Promise(r=>{const s=http.createServer((req,res)=>{co
 
 test('Chazara teacher default view: Approve All present, Posuk milestones automatic, history deferred',{timeout:60000},async()=>{
   const server=await serve(),port=server.address().port;
-  const browser=await chromium.launch({executablePath:fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':undefined}).catch(()=>chromium.launch());
-  const page=await browser.newPage(),approvals=[];
+  // GitHub-hosted runners include Chrome, but do not necessarily have the
+  // Playwright-managed Chromium download. Run the same browser assertions.
+  // Keep the server in the finally block even if browser launch fails: an
+  // orphaned server otherwise keeps node --test alive until CI times out.
+  let browser;
+  try{
+    const executablePath=fs.existsSync('/opt/pw-browsers/chromium')?'/opt/pw-browsers/chromium':
+      fs.existsSync('/usr/bin/google-chrome')?'/usr/bin/google-chrome':
+      fs.existsSync('/usr/bin/google-chrome-stable')?'/usr/bin/google-chrome-stable':undefined;
+    browser=await chromium.launch(executablePath?{executablePath}:{});
+    const page=await browser.newPage(),approvals=[];
   // Later routes win in Playwright, so register the catch-all first.
   await page.route(/gstatic\.com\/firebasejs\//,r=>r.fulfill({contentType:'text/javascript',body:''}));
   await page.route(/gstatic\.com\/firebasejs\/.*app-compat/,r=>r.fulfill({contentType:'text/javascript',body:FIREBASE_STUB}));
@@ -40,7 +49,6 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     if(body.action==='approve-point-request'){approvals.push(body.requestId);return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,status:'approved',actualAmount:1})})}
     return r.fulfill({contentType:'application/json',body:'{"ok":true}'});
   });
-  try{
     await page.goto(`http://127.0.0.1:${port}/chazara/teacher.html`);
     await page.waitForFunction(()=>document.querySelectorAll('#approvalList .request-row').length>0,null,{timeout:15000});
     const state=await page.evaluate(()=>({
@@ -74,5 +82,5 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     // History loads only on request.
     await page.click('#showFullDashboard');
     await page.waitForFunction(()=>window.__reads.some(p=>p.startsWith('posukPractice/attempts')));
-  }finally{await browser.close();server.close()}
+  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve))}
 });
