@@ -528,7 +528,7 @@ function refreshScopedViews(){
 // Normal teacher sessions must still reload their own live assignments.
 function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
 async function loadClassScope(user,access){
- const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();pendingEventFetches.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};const manualAddButton=$('manualAddBtn');if(manualAddButton){manualAddButton.disabled=false;manualAddButton.textContent='Add Chazara + Point'}$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();pendingEventFetches.clear();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};const manualAddButton=$('manualAddBtn');if(manualAddButton){manualAddButton.disabled=false;manualAddButton.textContent='Add Chazara + Point'}$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
  try{
   if(needsTeacherAssignmentRefresh(access)){
@@ -558,7 +558,7 @@ async function loadClassScope(user,access){
 let lastChazaraAuthUid=null;
 window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
  const uid=user?.uid||null;
- if(uid!==lastChazaraAuthUid){
+ if(uid!==lastChazaraAuthUid||authorized===false||access?.authorized===false){
   fullDashboardLoaded=false;
   $('teacherApp').classList.add('review-only');
   $('showFullDashboard').classList.remove('hidden');
