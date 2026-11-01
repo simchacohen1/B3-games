@@ -186,6 +186,13 @@
       const basename=safeName(s.name), suffix=safeName(s.id).slice(0,30);
       let filename=basename+'-quizzes.pdf';
       if(filenames.has(filename))filename=basename+'-'+suffix+'-quizzes.pdf';
+      // Sanitizing and truncating names/IDs can produce identical ZIP paths.
+      // JSZip replaces an existing entry with the same name, silently losing a report.
+      let duplicate=2;
+      while(filenames.has(filename)){
+        filename=basename+'-'+suffix+'-'+duplicate+'-quizzes.pdf';
+        duplicate++;
+      }
       filenames.add(filename);
       zip.file(filename,pdf);
       if(onProgress)onProgress(i+1,students.length);
