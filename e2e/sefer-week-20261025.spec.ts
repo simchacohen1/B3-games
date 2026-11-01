@@ -10,6 +10,12 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
   await page.addInitScript(() => {
     sessionStorage.setItem('b3Games_studentId', 'synthetic-sefer-week-20261025');
     sessionStorage.setItem('b3Games_studentClass', 'et');
+    for (const card of [502, 503]) {
+      const oldKey = 'ftt-sefer-hamitzvos:' + JSON.stringify([
+        'b3-2026', 'et', 'synthetic-sefer-week-20261025', card, 'approved-20261025'
+      ]);
+      localStorage.setItem(oldKey, JSON.stringify([{type:'fill',seed:[400,400],color:'#e53935'}]));
+    }
     localStorage.setItem('ftt-sefer-hamitzvos:'+JSON.stringify(['b3-2026','et','synthetic-sefer-week-20261025',500]),
       JSON.stringify([{ type: 'legacy-record-preserved' }]));
     const w=window as any;
@@ -62,7 +68,7 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       .toContain(String(card));
     expect(await page.locator('#outline').getAttribute('src')).toContain(`coloring-v2/${String(card).padStart(3, '0')}.png`);
     expect(await page.evaluate(() => [cv.width, cv.height, ($('outline') as HTMLImageElement).naturalWidth,
-      ($('outline') as HTMLImageElement).naturalHeight])).toEqual(card===503?[1537,1023,1537,1023]:[1536,1024,1536,1024]);
+      ($('outline') as HTMLImageElement).naturalHeight])).toEqual(card===502||card===503?[1448,1086,1448,1086]:[1536,1024,1536,1024]);
 
     if (date === '2026-10-25') {
       const seeds = await page.evaluate(() => {
@@ -98,6 +104,18 @@ test('Oct 25–31 coloring pictures fill, save, switch, reopen and stay responsi
       expect(fillCheck.legacy).toBe(JSON.stringify([{type:'legacy-record-preserved'}]));
       expect(await page.evaluate(()=>key(500))).toContain('"approved-20261025"');
       expect(await page.evaluate(()=>JSON.parse(localStorage.getItem(key(500))||'[]'))).toHaveLength(3);
+    }
+    if ((date === '2026-10-29' && card === 502) || (date === '2026-10-31' && card === 503)) {
+      const stale = await page.evaluate(card => {
+        const oldKey = 'ftt-sefer-hamitzvos:' + JSON.stringify([
+          'b3-2026', 'et', 'synthetic-sefer-week-20261025', card, 'approved-20261025'
+        ]);
+        const layer = fillCtx.getImageData(0,0,cv.width,cv.height).data;
+        return {old:localStorage.getItem(oldKey),painted:layer.some((pixel,index)=>index%4===3&&pixel>0)};
+      }, card);
+      expect(stale.old).toBeTruthy();
+      expect(stale.painted).toBe(false);
+      expect(await page.evaluate(()=>key(num))).toContain('"replacement-20261026"');
     }
     if (date === '2026-10-26') {
       await page.waitForFunction(() => !paintLoading && num===500);

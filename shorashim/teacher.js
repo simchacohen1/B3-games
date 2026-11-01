@@ -532,15 +532,30 @@ function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
   fullScopeListenerBound=true;
-  db.ref(SPACE).on('value',snap=>{
-    if($('teacherApp').classList.contains('hidden'))return;
-    const v=snap.val()||{};
-    if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
-    if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
-    if(v.students)state.students=v.students;
-    if(v.leaderboards)state.leaderboards=v.leaderboards;
-    renderAll()
+  const visible=()=>!$('teacherApp').classList.contains('hidden');
+  db.ref(`${SPACE}/catalog`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.catalog=withAllTracks(snap.val());renderAll();
   });
+  db.ref(`${SPACE}/settings`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.settings={minReviewMs:500,studentSiteOpen:true,...snap.val()};
+    renderStudentSiteControl();renderAll();
+  });
+  const studentsRef=db.ref(`${SPACE}/students`);
+  const applyStudent=snap=>{if(!visible()||!snap.key)return;state.students[snap.key]=snap.val()||{};renderAll();};
+  studentsRef.on('child_added',applyStudent);
+  studentsRef.on('child_changed',applyStudent);
+  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();});
+  state.leaderboards.match=state.leaderboards.match||{};
+  const leaderboardsRef=db.ref(`${SPACE}/leaderboards/match`);
+  const applyLeaderboard=snap=>{
+    if(!visible()||!snap.key)return;
+    state.leaderboards.match[snap.key]=snap.val()||{};renderLeaderboard();
+  };
+  leaderboardsRef.on('child_added',applyLeaderboard);
+  leaderboardsRef.on('child_changed',applyLeaderboard);
+  leaderboardsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.leaderboards.match[snap.key];renderLeaderboard();});
 }
 function bindLegacyScopedListeners(initialGlobalSettings={}){
   let globalSettings=initialGlobalSettings,classSettings=state.settings;

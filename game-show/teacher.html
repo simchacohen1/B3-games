@@ -253,6 +253,21 @@
   .setup-title h1 { margin: 0; font-size: 28px; font-weight: 900; }
   .setup-title p { margin: 4px 0 0; color: var(--muted); }
   .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .setup-steps { display: grid; gap: 16px; }
+  .setup-step { scroll-margin-top: 18px; }
+  .step-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+  .step-number { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 900; }
+  .step-heading h2 { margin: 0; font-size: 21px; }
+  .step-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+  .start-step { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .start-step .step-heading { margin: 0; }
+  .start-step .btn { font-size: 17px; padding: 14px 24px; }
+  .advanced { margin-top: 18px; }
+  .advanced > summary { cursor: pointer; font-weight: 800; color: var(--accent); padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+  .advanced > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .advanced[open] > summary { border-color: var(--accent); border-radius: 14px 14px 0 0; }
+  .advanced-content { padding-top: 16px; }
+  .student-join { border-color: var(--accent); }
   .setting .label { flex: 1; min-width: 0; }
   .card.danger { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .card.danger .hint { margin: 0; }
@@ -436,10 +451,10 @@
       <p>Everything here saves instantly. Switch back to Play when you're ready.</p>
     </div>
 
-    <div class="setup-grid">
+    <div class="setup-steps">
 
-      <section class="card wide">
-        <h3>Students join here</h3>
+      <section class="card student-join">
+        <h3>Student join link</h3>
         <p class="hint">Share this link. Students sign in with their Fun Torah Tools name and passcode.</p>
         <div class="row">
           <div class="link-box" id="studentLinkText">loading...</div>
@@ -447,8 +462,8 @@
         </div>
       </section>
 
-      <section class="card">
-        <h3>Questions</h3>
+      <section class="card setup-step">
+        <div class="step-heading"><span class="step-number">1</span><div><h2>Questions</h2><p>Add or review the questions for this game.</p></div></div>
         <p class="hint">Type questions, paste six columns for Multiple Choice, or paste the original two-column question and answer format.</p>
         <div class="row">
           <button class="btn btn-primary" id="editBtn" onclick="openEditor()">Edit questions</button>
@@ -456,8 +471,11 @@
         </div>
       </section>
 
+      <details class="advanced">
+        <summary>Advanced settings</summary>
+        <div class="advanced-content setup-grid">
       <section class="card">
-        <h3>Look</h3>
+        <h3>Board appearance</h3>
         <p class="hint">Changes the Play screen on this computer.</p>
         <div class="themes">
           <label class="theme-opt"><input type="radio" name="playTheme" value="gold" onchange="setPlayTheme('gold')"><span class="swatch gold">Gold spotlight</span></label>
@@ -526,7 +544,16 @@
         <p class="hint">Clears every contestant and score. Questions are kept.</p></div>
         <button class="btn btn-bad" id="resetGameBtn" onclick="resetGame()">Reset game</button>
       </section>
-
+        </div>
+      </details>
+      <section class="card setup-step">
+        <div class="step-heading"><span class="step-number">2</span><div><h2>Teams</h2><p>Choose how students play.</p></div></div>
+        <div id="teamModeMount"></div>
+      </section>
+      <section class="card setup-step start-step">
+        <div class="step-heading"><span class="step-number">3</span><div><h2>Start game</h2><p>When the questions and teams are ready, begin the show.</p></div></div>
+        <button class="btn btn-good" id="setupStartGameBtn" onclick="startGameShow()">Start game</button>
+      </section>
     </div>
   </div>
 </main>

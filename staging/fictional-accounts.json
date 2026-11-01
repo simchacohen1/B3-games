@@ -34,6 +34,11 @@
       "classId": "TEST-ALEF"
     },
     {
+      "id": "test_student_alef2",
+      "name": "Test Student A2",
+      "classId": "TEST-ALEF"
+    },
+    {
       "id": "test_student_beis",
       "name": "Test Student B1",
       "classId": "TEST-BEIS"

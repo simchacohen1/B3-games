@@ -56,8 +56,50 @@ async function authorizeStudent({decoded,get}){
   return {studentId,classId,name:String(profile.name||member.name||'Student'),root:rootFor(classId)};
 }
 
-function assignedTo(launch,studentId,classId){
-  return launch&&launch.classId===classId&&(!launch.targetStudents||launch.targetStudents[studentId]===true);
+// A teacher can revoke one student's unfinished assignment
+// (launches/<id>/revokedStudents/<studentId>) without touching anyone's history.
+function assignedTo(launch,studentId,classId,{allowRevoked=false}={}){
+  return !!launch&&launch.classId===classId&&(!launch.targetStudents||launch.targetStudents[studentId]===true)
+    &&(allowRevoked||!launch.revokedStudents?.[studentId]);
+}
+
+// Each student has his own queue of individual assignments
+// (settings/studentAssignments/<studentId>/<launchId>), so several retakes or
+// make-ups can be open at once. The single legacy pointers are still honored.
+const ASSIGNMENT_LIMIT=40;
+async function studentAssignments({student,get}){
+  const [queue,personal,classPointer]=await Promise.all([
+    get(`${student.root}/settings/studentAssignments/${student.studentId}`),
+    get(`${student.root}/settings/studentActiveLaunch/${student.studentId}`),
+    get(`${student.root}/settings/activeLaunchByClass/${student.classId}`)
+  ]);
+  const sources=new Map();
+  Object.entries(queue&&typeof queue==='object'?queue:{})
+    .filter(([id])=>validKey(id))
+    .sort(([a,x],[b,y])=>(Number(y?.assignedAt)||0)-(Number(x?.assignedAt)||0))
+    .slice(0,ASSIGNMENT_LIMIT)
+    .forEach(([id])=>sources.set(id,'assigned'));
+  if(validKey(personal)&&!sources.has(personal))sources.set(personal,'legacy');
+  if(validKey(classPointer)&&!sources.has(classPointer))sources.set(classPointer,'class');
+  const rows=await Promise.all([...sources].map(async([id,source])=>{
+    const launch=await get(`${student.root}/launches/${id}`);
+    if(!assignedTo(launch,student.studentId,student.classId))return null;
+    const [completion,responses]=await Promise.all([
+      get(`${student.root}/completions/${id}/${student.studentId}`),
+      get(`${student.root}/responses/${id}/${student.studentId}`)
+    ]);
+    // A quiz the teacher ended is no longer outstanding unless he finished it.
+    if(launch.endedAt&&!completion)return null;
+    const answered=Object.values(responses||{}).filter(Boolean).length;
+    return {
+      id,source,
+      launch:safeLaunch(id,launch),
+      completion:safeCompletion(launch,completion),
+      answered,
+      status:completion?'completed':(answered?'in-progress':'not-started')
+    };
+  }));
+  return {assignments:rows.filter(Boolean)};
 }
 
 function safeResponses(launch,responses){
@@ -98,17 +140,19 @@ async function weeklyQuizStudentAction({decoded,get,set,tx,body={},now=Date.now(
     const launches=await get(`${student.root}/launches`);
     const safeLaunches={},ownCompletions={};
     for(const [id,launch] of Object.entries(launches||{})){
-      if(!assignedTo(launch,student.studentId,student.classId))continue;
+      if(!assignedTo(launch,student.studentId,student.classId,{allowRevoked:true}))continue;
       const completion=await get(`${student.root}/completions/${id}/${student.studentId}`);
-      if(!completion||!assignedTo(launch,student.studentId,student.classId))continue;
+      if(!completion)continue;
       safeLaunches[id]=safeLaunch(id,launch);
       ownCompletions[id]=safeCompletion(launch,completion);
     }
     return {launches:safeLaunches,completions:ownCompletions};
   }
+  if(action==='assignments')return studentAssignments({student,get});
   if(!validKey(launchId))fail(400,'Invalid quiz launch.');
   const launch=await get(`${student.root}/launches/${launchId}`);
-  if(!assignedTo(launch,student.studentId,student.classId))fail(403,'This quiz is not assigned to your class.');
+  // A finished quiz stays reviewable even if its assignment was later revoked.
+  if(!assignedTo(launch,student.studentId,student.classId,{allowRevoked:action==='review'}))fail(403,'This quiz is not assigned to your class.');
   if(action==='launch'){
     const [responses,completion]=await Promise.all([
       get(`${student.root}/responses/${launchId}/${student.studentId}`),
@@ -159,4 +203,4 @@ async function weeklyQuizStudentAction({decoded,get,set,tx,body={},now=Date.now(
   fail(400,'Unknown Weekly Quiz action.');
 }
 
-module.exports={weeklyQuizStudentAction,safeLaunch,safeResponses,safeCompletion,authorizeStudent,completedRecord,rootFor};
+module.exports={weeklyQuizStudentAction,assignedTo,safeLaunch,safeResponses,safeCompletion,authorizeStudent,completedRecord,rootFor};

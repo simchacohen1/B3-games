@@ -50,7 +50,7 @@ jobs:
           FIREBASE_DATABASE_EMULATOR_PORT: '19100'
           FIREBASE_STORAGE_EMULATOR_PORT: '19199'
           JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx2g'
-        run: npx firebase emulators:exec --project demo-ftt-security --config firebase.security-test.json --only database,storage "node --test tests/security-rules-emulator.test.cjs && node --test tests/storage-rules-emulator.test.cjs"
+        run: npx firebase emulators:exec --project demo-ftt-security --config firebase.security-test.json --only database,storage "node --test tests/security-rules-emulator.test.cjs && node --test tests/multiplayer-owner-rules-emulator.test.cjs && node --test tests/storage-rules-emulator.test.cjs"
       - name: Verify teacher scopes and student management policies
         run: node --test tests/chazara-teacher-scope.test.cjs tests/posuk-teacher-scope.test.cjs tests/shorashim-teacher-scope.test.cjs tests/student-management.test.cjs
       - name: Run synthetic browser and emulator reliability suite

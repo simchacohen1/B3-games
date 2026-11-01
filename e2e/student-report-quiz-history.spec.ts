@@ -16,17 +16,24 @@ const R = (i: number, ok: boolean) => ({ choiceIndex: ok ? qs[i].correctIndex : 
 const member = (name: string) => ({ name, active: true });
 
 const DB = {
+  posukPractice: {
+    attempts: { arik_test: { 'perek18_posuk1': { a1: { timestamp: now - 2 * DAY, hebrewFinalScore: 100 } } } },
+    chazara: { students: { arik_test: { goal: 10, reviews: { '18:1': { count: 3, lastAt: now - DAY } } } }, events: { arik_test: { e1: { reviewApplied: true, perek: 18, posuk: 1, reviewNumber: 3, createdAt: now - DAY } } } },
+    shorashimLearning: { students: { arik_test: { cards: { 'shoresh:halach': { learnedAt: now - DAY, itemType: 'shoresh', itemId: 'halach' } } } } },
+  },
+  rashiLetters: { progress: { arik_test: { currentUnitIndex: 0, units: { zayin_letter: { attempts: 6, correct: 5 } } } } },
   b3Games: {
     workspaces: { 'b3-2026': { classes: {
       et: { name: 'East Track', active: true, members: { arik_test: member('Synthetic Arik'), beni_test: member('Synthetic Beni') } },
       wt: { name: 'West Track', active: true, members: { chaim_test: member('Synthetic Chaim') } },
       sc: { name: 'Synthetic Class', active: true, members: { dovid_test: member('Synthetic Dovid') } },
     } } },
-    students: { arik_test: { profile: { createdAt: now - 400 * DAY } } },
+    students: { arik_test: { profile: { createdAt: now - 400 * DAY }, halacha: { siman1: { updatedAt: now - DAY, state: { a_done: true } } } } },
   },
   b3Quiz: {
     launches: {
       done: L({ classId: 'et', deliveryType: 'live', endedAt: now - 9 * DAY, attemptGroupId: 'done', quizSnapshot: { title: 'Lech Lecha Quiz', questions: qs } }),
+      doneAgain: L({ classId: 'et', deliveryType: 'anytime', attemptGroupId: 'doneAgain', createdAt: now - 8 * DAY, startedAt: now - 8 * DAY, quizSnapshot: { title: 'Lech Lecha Quiz', questions: qs } }),
       half: L({ classId: 'et', deliveryType: 'anytime', targetStudents: { arik_test: true, beni_test: true }, attemptGroupId: 'half', createdAt: now - 3 * DAY, startedAt: now - 3 * DAY, quizSnapshot: { title: 'Vayeira Quiz', questions: qs } }),
       old: L({ classId: 'et', deliveryType: 'live', endedAt: now - 99 * DAY, createdAt: now - 100 * DAY, startedAt: now - 100 * DAY, attemptGroupId: 'old', quizSnapshot: { title: 'Bereishis Quiz', questions: qs } }),
       retake: L({ classId: 'et', deliveryType: 'anytime', targetStudents: { arik_test: true }, retakeOf: 'old', attemptNumber: 2, attemptGroupId: 'old', createdAt: now - 98 * DAY, startedAt: now - 98 * DAY, quizSnapshot: { title: 'Bereishis Quiz', questions: qs } }),
@@ -95,6 +102,7 @@ test('ET: a boy\'s report lists every quiz, all attempts, question detail and a 
   const row = (t: string) => sec.locator('tbody > tr', { hasText: t }).first();
   await expect(row('Lech Lecha Quiz')).toContainText('Completed');
   await expect(row('Lech Lecha Quiz')).toContainText('1 / 2');
+  await expect(row('Lech Lecha Quiz')).toContainText('1 of 2 times');
   await expect(row('Vayeira Quiz')).toContainText('In Progress');
   await expect(row('Bereishis Quiz')).toContainText('100%');
   await expect(sec.locator('tbody > tr', { hasText: 'Beni Private Quiz' })).toHaveCount(0);
@@ -108,10 +116,14 @@ test('ET: a boy\'s report lists every quiz, all attempts, question detail and a 
   await expect(sec).toContainText('Practice quiz');
   if (process.env.REPORT_SHOT) await page.screenshot({ path: process.env.REPORT_SHOT, fullPage: true });
   const csv = await csvOf(page, 'Download This Student CSV');
+  if (process.env.REPORT_CSV) fs.writeFileSync(process.env.REPORT_CSV, csv);
   expect(csv).toContain('Synthetic Arik');
   expect(csv).not.toContain('Synthetic Beni');
   expect(csv).not.toContain('Beni Private Quiz');
   expect(csv).toContain('In Progress');
+  expect(csv).toContain('Posuk pesukim at 100%');
+  for (const detail of ['"Posuk Practice","Perek 18:1","Read at 100%"', '"Chazara","Perek 18:1","Below goal (10×)","3"', '"Chazara (each one all time)","Perek 18:1"', '"Shorashim","halach"', '"Rashi Letters","Unit 1 ז (letters)","","6","5","83%"', '"Halacha","Section a","Done"']) expect(csv).toContain(detail);
+  expect(csv).not.toContain('Who went to Mitzrayim?');
   // the page itself must not scroll sideways at 100% zoom
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: /Back to class/ }).click();
@@ -154,5 +166,91 @@ test('third class: its teacher sees only SC, a missed quiz shows as Not Started,
   const reads: string[] = await page.evaluate(() => (window as any).__reads);
   expect(reads.filter(p => /^b3Quiz\/(launches|responses|completions)/.test(p))).toEqual([]);
   expect(reads.some(p => /arik_test|beni_test|chaim_test/.test(p))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+
+// PDF/ZIP libraries are mocked here so the test is deterministic and never
+// downloads scripts or student data from third-party services.
+async function mockQuizExportLibraries(page: any) {
+  await page.route('https://cdn.jsdelivr.net/**', (route: any) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+  await page.addInitScript(() => {
+    const host = window as any;
+    host.jspdf = { jsPDF: class {
+      addImage() {}
+      addPage() { host.__pdfPagesAdded = (host.__pdfPagesAdded || 0) + 1; }
+      output() { return new TextEncoder().encode('%PDF-synthetic-test').buffer; }
+    } };
+    host.JSZip = class {
+      names: string[] = [];
+      file(name: string) { this.names.push(name); }
+      async generateAsync() { return new Blob([JSON.stringify(this.names)], { type: 'application/zip' }); }
+    };
+  });
+}
+
+test('single student: quizzes-only view, print choice and PDF exclude other tools', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'admin' }, '?class=et');
+  await page.locator('#period').selectOption('0');
+  await page.getByRole('button', { name: 'Synthetic Arik' }).click();
+  await page.getByRole('button', { name: /Quizzes Only/ }).click();
+  await expect(page.locator('.qsec')).toBeVisible();
+  await expect(page.locator('#report .rgrid')).toBeHidden();
+  await expect(page.locator('#report .rhead')).toContainText('Synthetic Arik');
+  await page.evaluate(() => { (window as any).print = () => { (window as any).__didPrint = true; }; });
+  await page.getByRole('button', { name: 'Print Quizzes' }).click();
+  expect(await page.evaluate(() => (window as any).__didPrint)).toBe(true);
+  expect(await page.evaluate(() => document.body.classList.contains('quiz-print-only'))).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  expect(await page.evaluate(() => document.body.classList.contains('quiz-print-only'))).toBe(false);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Download Quiz PDF' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('Synthetic-Arik-quizzes.pdf');
+  expect(fs.readFileSync(await download.path(), 'utf8')).toBe('%PDF-synthetic-test');
+  await page.getByRole('button', { name: 'Full Report' }).click();
+  await expect(page.locator('#report .rgrid')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('class ZIP: one quiz PDF per student in selected class, none from other classes', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'teacher', classIds: ['et'] }, '?class=et');
+  await page.locator('#period').selectOption('0');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /All Students Quiz PDFs \(ZIP\)/ }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^quiz-reports-East-Track-\d{4}-\d{2}-\d{2}\.zip$/);
+  const names: string[] = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+  expect(names).toEqual(['Synthetic-Arik-quizzes.pdf', 'Synthetic-Beni-quizzes.pdf']);
+  expect(names.join(' ')).not.toMatch(/Chaim|Dovid/);
+  expect(errors).toEqual([]);
+});
+
+
+test('quizzes-only PDF pagination keeps multiple pages', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'admin' }, '?class=et');
+  const pages = await page.evaluate(() => {
+    const host = window as any;
+    const z = Array.from({ length: 45 }, (_, i) => ({
+      title: 'Practice of many quiz rows '+i, date: Date.now(), status:'completed',
+      correct:8,total:10,pct:80,attempts:[{status:'completed'}],
+    }));
+    const input = {
+      name:'Synthetic Student', className:'Synthetic Class', period:'All time',
+      history:{
+        summary:{assigned:45,completed:45,inProgress:0,notStarted:0,avg:80,pointsEarned:360,pointsPossible:450},
+        quizzes:z,unavailable:[]
+      },
+      practice:[],
+    };
+    host.B3QuizExports.makePdf(input);
+    return host.__pdfPagesAdded||0;
+  });
+  expect(pages).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });

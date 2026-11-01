@@ -19,6 +19,7 @@
 .recordings-list .audio-length{font-size:10px;margin:0;white-space:nowrap}
 .recordings-list .wave{display:none}
 .recordings-list .recording-row audio{grid-column:2;grid-row:1;width:100%;height:32px;margin:0}
+.recording-load-audio{grid-column:2;grid-row:1;justify-self:stretch;padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#334155;font-size:11px;font-weight:800;cursor:pointer}
 .recordings-list .recording-actions{grid-column:3;grid-row:1;gap:4px;flex-wrap:nowrap;justify-content:flex-end}
 .recordings-list .point-status,.recordings-list .review-status{font-size:10px;padding:4px 6px}
 .recordings-list .recording-checked,.recordings-list .recording-reject{font-size:11px;padding:5px 7px;white-space:nowrap}
@@ -28,7 +29,7 @@
 }
 @media(max-width:620px){
  .recordings-list .recording-row{grid-template-columns:minmax(0,1fr);padding:7px}
- .recordings-list .recording-row audio{grid-column:1;grid-row:2;max-width:270px}
+ .recordings-list .recording-row audio,.recording-load-audio{grid-column:1;grid-row:2;max-width:270px}
  .recordings-list .recording-actions{grid-column:1;grid-row:3}
 }
 </style>
@@ -109,8 +110,9 @@ function recordingMatches(e,f){const status=recordingStatus(e),checked=e.teacher
 function applyRecordingFilters(rows){const f=recordingFilters(),box=$('recordingsList');if(!box)return;let shown=0;rows.forEach(e=>{const row=Array.from(box.children).find(x=>x.classList?.contains('recording-row')&&x.dataset.eventKey===recordingKey(e));if(!row)return;const show=recordingMatches(e,f);row.classList.toggle('recording-filtered-out',!show);if(show)shown++;else{const a=row.querySelector('audio');if(a&&!a.paused)a.pause()}});const active=!!(f.student||f.perek||f.pasuk||f.review||f.date);$('recordingCount').textContent=active?`${shown} / ${rows.length}`:String(rows.length);const summary=$('recordingFilterSummary');if(summary)summary.textContent=active?`Showing ${shown} of ${rows.length} recordings`:`${rows.length} recording${rows.length===1?'':'s'}`}
 function recordingStatus(e){return (e?.teacherRejected===true||e?.pointRequestStatus==='rejected')?'rejected':String(e?.pointRequestStatus||'pending')}
 function formatAudioLength(ms){const total=Math.max(0,Math.round(Number(ms||0)/1000)),m=Math.floor(total/60),sec=String(total%60).padStart(2,'0');return `${m}:${sec}`}
-function wireAudio(audio,lengthEl,fallbackMs){if(!audio)return;audio.preload='metadata';audio.addEventListener('play',()=>document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()}));const update=()=>{const seconds=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:Number(fallbackMs||0)/1000;if(lengthEl&&seconds>0)lengthEl.textContent='Length: '+formatAudioLength(seconds*1000)};audio.addEventListener('loadedmetadata',update);audio.addEventListener('durationchange',update);update()}
+function wireAudio(audio,lengthEl,fallbackMs){if(!audio)return;audio.preload='metadata';audio.addEventListener('play',()=>document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()}));const update=()=>{const seconds=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:Number(fallbackMs||0)/1000;if(lengthEl&&seconds>0)lengthEl.textContent='Length: '+formatAudioLength(seconds*1000);if(Number.isFinite(audio.duration)&&audio.duration>0)audio.setAttribute('data-duration-ready','true')};audio.addEventListener('loadedmetadata',update);audio.addEventListener('durationchange',update);update()}
 function recordingKey(e){return String(e.studentId||'')+'__'+String(e.id||'')}
+function loadRecordingAudio(audio,button,path){if(!audio||!button||button.disabled)return;button.disabled=true;button.textContent='Loading audio…';B3PrivateMedia.setSource(audio,path).then(()=>{audio.dataset.privateReady='true';audio.hidden=false;button.remove()}).catch(err=>{button.disabled=false;button.textContent='Retry loading audio';console.warn('Recording access failed:',err.message)})}
 function updateRecordingRow(row,e){
   const status=recordingStatus(e),checked=e.teacherFullyChecked===true,name=row.querySelector('[data-name]'),reason=row.querySelector('[data-reason]'),meta=row.querySelector('[data-meta]'),statusEl=row.querySelector('[data-status]'),reviewEl=row.querySelector('[data-review-status]'),lengthEl=row.querySelector('[data-length]'),checkedBtn=row.querySelector('[data-recording-checked]'),rejectBtn=row.querySelector('[data-recording-reject]');
   if(name)name.textContent=e.studentName||R[e.studentId]?.name||e.studentId||'Student';
@@ -153,9 +155,9 @@ function updateRecordingRow(row,e){
   let audio=row.querySelector('audio');
   const audioSrc=e.audioDataURL||e.audioURL||'';
   if(audioSrc||e.storagePath){
-    if(!audio){audio=document.createElement('audio');audio.controls=true;audio.dataset.url=audioSrc;const wave=row.querySelector('.wave');wave.insertAdjacentElement('afterend',audio);wireAudio(audio,lengthEl,e.durationMs);audio.src=audioSrc}
-    else if(audio.dataset.url!==audioSrc){audio.dataset.url=audioSrc;audio.src=audioSrc;audio.load()}
-    if(e.storagePath)B3PrivateMedia.setSource(audio,e.storagePath).catch(err=>console.warn('Recording access failed:',err.message));
+    if(!audio){audio=document.createElement('audio');audio.controls=true;audio.dataset.url=audioSrc;const wave=row.querySelector('.wave');wave.insertAdjacentElement('afterend',audio);wireAudio(audio,lengthEl,e.durationMs)}
+    if(e.storagePath){const path=e.storagePath;let loadButton=row.querySelector('.recording-load-audio');if(audio.dataset.privatePath!==path){audio.dataset.privatePath=path;audio.dataset.privateReady='false';audio.removeAttribute('src');audio.hidden=true}if(!loadButton){loadButton=document.createElement('button');loadButton.type='button';loadButton.className='recording-load-audio';loadButton.textContent='Load audio';audio.insertAdjacentElement('afterend',loadButton)}loadButton.onclick=()=>loadRecordingAudio(audio,loadButton,path);loadButton.hidden=audio.dataset.privateReady==='true';if(audio.dataset.privateReady==='true')audio.hidden=false}
+    else{const loadButton=row.querySelector('.recording-load-audio');if(loadButton)loadButton.remove();audio.hidden=false;if(audio.dataset.url!==audioSrc||!audio.getAttribute('src')){audio.dataset.url=audioSrc;audio.src=audioSrc;audio.load()}}
   }else if(audio){audio.remove()}
   const c=row.querySelector('.wave');if(c)requestAnimationFrame(()=>drawSavedWave(c,e.waveform))
 }

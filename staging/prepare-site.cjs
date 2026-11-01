@@ -186,7 +186,12 @@ function stageSource(siteRoot, env = process.env) {
     'window.B3_STAGING_FIREBASE_CONFIG = window.B3_STAGING_FIREBASE_CONFIG || null;\n' +
     'if (!window.B3_STAGING_FIREBASE_CONFIG) throw new Error("Staging Firebase configuration is missing.");\n' +
     'window.B3_FIREBASE_CONFIG = window.B3_STAGING_FIREBASE_CONFIG;\n', 'utf8');
-  fs.copyFileSync(path.join(__dirname, 'staging-config.js'), path.join(stageDir, 'staging-config.js'));
+  let stagingRuntimeConfig = fs.readFileSync(path.join(__dirname, 'staging-config.js'), 'utf8');
+  if (env.B3_STAGING_TEST_FIXTURES === '1') {
+    stagingRuntimeConfig += '\n// Opt-in local fixtures for no-cost staging E2E runs.\n' +
+      "if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') window.B3_STAGING_TEST_FIXTURES = true;\n";
+  }
+  fs.writeFileSync(path.join(stageDir, 'staging-config.js'), stagingRuntimeConfig, 'utf8');
 
   const outputFiles = listFiles(root);
   const violations = [];

@@ -46,8 +46,10 @@ function attemptFor(id,l,responses,completion,joinedAt){
  if(comp){status='completed';completedHow='submitted'}
  else if(closed&&total&&answered>=total){status='completed';completedHow='all answered, quiz closed'}
  else if(answered)status='in_progress';
+ const title=String((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled quiz');
  return {
-  launchId:id,title:String((l.quizSnapshot&&l.quizSnapshot.title)||'Untitled quiz'),date,kind:kindOf(l),
+  launchId:id,title,date,kind:kindOf(l),quizId:String(l.quizId||''),
+  sameQuiz:(title.trim().toLowerCase()+'|'+qs.map(q=>String(q.q||'').trim().toLowerCase()).join('|')),
   attemptNumber:Number(l.attemptNumber)||1,status,completedHow,closed,answered,correct,total,
   pct:status==='completed'?pctOf(correct,total):null,
   partialPct:status==='in_progress'?pctOf(correct,answered):null,
@@ -78,8 +80,14 @@ function buildHistory({root,studentId,classId,joinedAt=0,since=0}){
  });
  // Group retakes and make-ups with the quiz they repeat.
  const groupOf=(id,seen=new Set())=>{const l=launches[id]||{};if(l.makeupOf&&launches[l.makeupOf]&&!seen.has(id)){seen.add(id);return groupOf(l.makeupOf,seen)}return String(l.attemptGroupId||id)};
+ // The same quiz given again (same saved quiz, or same name and same questions) is one
+ // quiz with several attempts, not a new quiz he "missed".
+ const link={},find=k=>link[k]&&link[k]!==k?(link[k]=find(link[k])):k,join=(a,b)=>{a=find(a);b=find(b);if(a!==b)link[b]=a};
+ const firstBy={};
+ attempts.forEach(a=>{const g=groupOf(a.launchId);link[g]=link[g]||g;a.group=g;
+  [a.quizId&&'id:'+a.quizId,'qs:'+a.sameQuiz].filter(Boolean).forEach(k=>{if(firstBy[k])join(firstBy[k],g);else firstBy[k]=g})});
  const groups={};
- attempts.forEach(a=>{const g=groupOf(a.launchId);(groups[g]||(groups[g]={key:g,attempts:[]})).attempts.push(a)});
+ attempts.forEach(a=>{const g=find(a.group);(groups[g]||(groups[g]={key:g,attempts:[]})).attempts.push(a)});
  let quizzes=Object.values(groups).map(g=>{
   const at=g.attempts.sort((a,b)=>(a.date-b.date)||(a.attemptNumber-b.attemptNumber));
   const done=at.filter(a=>a.status==='completed'),started=at.filter(a=>a.status==='in_progress');
@@ -93,6 +101,8 @@ function buildHistory({root,studentId,classId,joinedAt=0,since=0}){
  });
  if(since)quizzes=quizzes.filter(q=>q.attempts.some(a=>a.date>=since)||(!q.date));
  quizzes.sort((a,b)=>b.date-a.date);
+ const names={};quizzes.forEach(q=>{const n=q.title.trim().toLowerCase();names[n]=(names[n]||0)+1});
+ quizzes.forEach(q=>{q.sameNameOther=names[q.title.trim().toLowerCase()]>1});
  const unav=since?unavailable.filter(u=>!u.date||u.date>=since):unavailable;
  return {quizzes,unavailable:unav,summary:summarize(quizzes)};
 }
@@ -120,29 +130,21 @@ function practiceRows(raw,since=0){
 const STATUS={completed:'Completed',in_progress:'In Progress',not_started:'Not Started'};
 const day=t=>t?new Date(t).toLocaleDateString():'';
 const when=t=>t?new Date(t).toLocaleString():'';
-/* Rows for "Download This Student CSV": one row per attempt, then one per question. */
+/* Rows for "Download This Student CSV": one row per time a quiz was given (no per-question rows). */
 function studentCsvRows({name,className,periodLabel,history,practice}){
- const head=['Student','Class','Period','Row type','Quiz','Quiz date','Quiz status','Attempt','Attempt status','Points earned','Points possible','Percent','Counts toward average','Completed at','Question #','Question','His answer','Correct answer','Question result'];
+ const head=['Student','Class','Period','Row type','Quiz','Quiz date','Quiz status','Attempt','Attempt status','Points earned','Points possible','Percent','Counts toward average','Completed at'];
  const rows=[head],base=[name,className,periodLabel];
  history.quizzes.slice().sort((a,b)=>a.date-b.date).forEach(q=>{
-  if(!q.attempts.length)return;
   q.attempts.forEach(a=>{
-   const started=a.status!=='not_started';
-   rows.push([...base,'Attempt',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status]+(a.completedHow&&a.completedHow!=='submitted'?' ('+a.completedHow+')':'')+(a.status!=='completed'&&a.closed?' (quiz closed)':''),
-    started?a.correct:'',a.total||'',a.status==='completed'?a.pct+'%':(a.status==='in_progress'?'In progress — '+a.answered+' of '+a.total+' answered':''),
-    q.counted===a?'Yes':'No',when(a.completedAt),'','','','','']);
-   if(started)a.questions.forEach(x=>rows.push([...base,'Question',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status],'','','','','',x.n,x.q,x.answer,x.key,(x.result==='correct'?'Correct':x.result==='incorrect'?'Incorrect':'Unanswered')+(x.adjusted?' (teacher adjusted)':'')]));
-   if(started&&!a.questionsAvailable)rows.push([...base,'Question',q.title,day(q.date),STATUS[q.status],a.kind,STATUS[a.status],'','','','','','','Question details unavailable','','','']);
+   rows.push([...base,'Quiz',q.title,day(q.date),STATUS[q.status],a.kind+' · '+day(a.date),STATUS[a.status]+(a.completedHow&&a.completedHow!=='submitted'?' ('+a.completedHow+')':'')+(a.status!=='completed'&&a.closed?' (quiz closed)':''),
+    a.status!=='not_started'?a.correct:'',a.total||'',a.status==='completed'?a.pct+'%':(a.status==='in_progress'?'In progress — '+a.answered+' of '+a.total+' answered':''),
+    q.counted===a?'Yes':'No',when(a.completedAt)]);
   });
  });
- history.unavailable.forEach(u=>rows.push([...base,'Attempt','Quiz record no longer available',day(u.date),'Data unavailable','','Data unavailable','','','','No','','','','','','']));
- (practice||[]).slice().reverse().forEach(p=>{
-  rows.push([...base,'Practice',p.title,day(p.date),'Completed','Practice','Completed',p.correct,p.total,p.pct==null?'':p.pct+'%','No (practice)',when(p.date),'','','','','']);
-  p.questions.forEach(x=>rows.push([...base,'Practice question',p.title,day(p.date),'Completed','Practice','Completed','','','','','',x.n,x.q,'','',x.result==='correct'?'Correct':'Incorrect']));
- });
+ history.unavailable.forEach(u=>rows.push([...base,'Quiz','Quiz record no longer available',day(u.date),'Data unavailable','','Data unavailable','','','','No','']));
+ (practice||[]).slice().reverse().forEach(p=>rows.push([...base,'Practice',p.title,day(p.date),'Completed','Practice','Completed',p.correct,p.total,p.pct==null?'':p.pct+'%','No (practice)',when(p.date)]));
  const s=history.summary;
- rows.push([]);
- rows.push([...base,'Summary','Assigned quizzes: '+s.assigned,'','Completed '+s.completed+' · In progress '+s.inProgress+' · Not started '+s.notStarted,'','',s.pointsEarned,s.pointsPossible,s.avg==null?'':s.avg+'%','Average of completed quizzes only','','','','','','']);
+ rows.push([...base,'Summary','Assigned quizzes: '+s.assigned,'','Completed '+s.completed+' · In progress '+s.inProgress+' · Not started '+s.notStarted,'','',s.pointsEarned,s.pointsPossible,s.avg==null?'':s.avg+'%','Average of completed quizzes only','']);
  return rows;
 }
 function toCsv(rows){return rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n')}
