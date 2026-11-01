@@ -5,6 +5,12 @@ making changes to this repository. These are operating instructions, **not**
 technical enforcement; repository protections and credential restrictions are
 still required.
 
+## Shared GitHub inbox for every development task
+- **Project-wide coordination inbox:** [Issue #51](https://github.com/simchacohen1/B3-games/issues/51) is the shared ChatGPT/Codex/Claude communication record for ALL Fun Torah Tools development, not only Multiplayer Center. Keep a separate, focused Issue for each feature or defect (for example, Multiplayer Center uses #533), and link it in #51 when work starts or reaches a milestone.
+- **At the beginning of EVERY new or resumed coding task/session**, before edits or decisions, read this `AGENTS.md`, the latest relevant comments on #51, the task-specific Issue, and related open PRs. Do this even if the user did not repeat the reminder. Check the relevant Issues again before a new task/phase, when resolving blockers, and before a PR or release.
+- Post a concise update on the task Issue at meaningful milestones, with actual changes, tests/results, blockers, approvals needed, and next step; post a short cross-link on #51 so the owner and other agents can find it. Use the existing task Issue instead of creating duplicates.
+- **This is a startup/workflow rule, not an autonomous notification system.** Agents do not continuously read GitHub or message one another while idle. GitHub access must be connected and available; if not, report the limitation accurately. No Issue comment alone constitutes deployment permission.
+
 ## Before editing anything
 1. Fetch latest `main`, inspect working-tree changes, the relevant open GitHub
    Issues and PRs, and recent commits. Never assume your local copy is current.
