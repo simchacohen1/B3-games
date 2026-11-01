@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {studentAuth}=require('../backend/functions/student-auth-core.cjs');
+const {studentAuth,studentClassBootstrap}=require('../backend/functions/student-auth-core.cjs');
 const {manageStudents}=require('../backend/functions/student-management-core.cjs');
 const {readPasscode}=require('../backend/functions/student-passcodes.cjs');
 
@@ -19,6 +19,15 @@ const seed=()=>db({
  posukPractice:{allowedStudents:{dovid:{name:'Dovid',passcode:'3333'},yossi:{name:'Yossi'}}}
 });
 const login=(d,name,pin)=>studentAuth(d,{action:'login',name,pin},'1.2.3.4',1000);
+
+test('student class bootstrap contains only that student and homepage permission fields',()=>{
+ const cls={name:'ET',active:true,siteEnabled:true,access:{quiz:true},toolGrants:{chazara:true},members:{moshe:{active:true},dovid:{active:true}},privateTeacherNotes:'do not expose'};
+ const snapshot=studentClassBootstrap(cls,'moshe');
+ assert.deepEqual(snapshot,{name:'ET',active:true,members:{moshe:{active:true}},siteEnabled:true,access:{quiz:true},toolGrants:{chazara:true}});
+ assert.equal(JSON.stringify(snapshot).includes('dovid'),false);
+ assert.equal(JSON.stringify(snapshot).includes('privateTeacherNotes'),false);
+ assert.equal(studentClassBootstrap(null,'moshe'),null);
+});
 
 test('central passcode signs in and is moved to private storage',async()=>{const d=seed();const r=await login(d,'moshe levi','1111');assert.equal(r.id,'moshe');assert.equal(d.tree.b3Private.passcodes.moshe.passcode,'1111');assert.equal(d.tree.b3Games.students.moshe.profile.passcode,undefined)});
 test('once private, the old public passcode no longer works',async()=>{const d=seed();d.tree.b3Private={passcodes:{moshe:{passcode:'7777'}}};await assert.rejects(login(d,'Moshe Levi','1111'),{code:401});assert.equal((await login(d,'Moshe Levi','7777')).id,'moshe')});

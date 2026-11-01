@@ -1,13 +1,12 @@
 'use strict';
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
-const {studentAuth}=require('./student-auth-core.cjs');
+const {studentAuth,studentClassBootstrap}=require('./student-auth-core.cjs');
 const crypto=require('node:crypto');
 const studentTools=require('./student-tool-policy.js');
+const {corsForProductionOrigins}=require('./staging-cors.cjs');
 if(!admin.apps.length)admin.initializeApp();
-const authOrigins=['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'];
-if((process.env.GCLOUD_PROJECT||admin.app().options.projectId)==='fun-torah-tools-staging')authOrigins.push('https://fun-torah-tools-staging.web.app');
-exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:authOrigins,maxInstances:10},async(req,res)=>{
+exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:corsForProductionOrigins(['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com']),maxInstances:10},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>2000)return res.status(413).json({error:'Request too large.'});
@@ -66,8 +65,13 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:authOrigins,max
    if(!classIds.length&&/^[A-Za-z0-9_-]{1,100}$/.test(String(profile?.classId||'')))classIds.push(String(profile.classId));
    if(!classIds.length)classIds.push(requestedClassId);
    const classChoices=(await Promise.all(classIds.map(async id=>{
-    const row=await store.get('b3Games/workspaces/b3-2026/classes/'+id);
-    return row&&row.active!==false&&row.members?.[studentId]&&row.members[studentId].active!==false?{id,name:String(row.name||id)}:null;
+    // The requested class was already fetched and validated above. Reuse it
+    // and include a minimal snapshot so the homepage needn't block on a
+    // second set of class reads before showing the student's activities.
+    const row=id===requestedClassId?cls:await store.get('b3Games/workspaces/b3-2026/classes/'+id);
+    const bootstrap=row&&studentClassBootstrap(row,studentId);
+    return bootstrap&&row.active!==false&&row.members?.[studentId]&&row.members[studentId].active!==false
+     ?{id,name:String(row.name||id),bootstrap}:null;
    }))).filter(Boolean);
    if(!classChoices.some(c=>c.id===requestedClassId))return res.status(403).json({error:'This student is not active in the selected class.'});
    result.classId=requestedClassId;

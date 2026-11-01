@@ -7,7 +7,8 @@ function loadMediaModule(){
   const mod={exports:{}};
   const mockRequire=name=>{
     if(name==='firebase-functions/v2/https')return {onRequest:()=>({})};
-    if(name==='firebase-admin')return {apps:[],initializeApp(){}};
+    if(name==='firebase-admin')return {apps:[{options:{databaseURL:'https://b3-games-default-rtdb.firebaseio.com'}}],initializeApp(){}};
+    if(name==='./firebase-resource-targets.cjs')return {assertNoProductionFirebaseTarget(){}};
     throw Error('Unexpected dependency in media test: '+name);
   };
   new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/private-media-url.js'),'utf8'))(mockRequire,mod,mod.exports);
