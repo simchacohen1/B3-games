@@ -19,11 +19,57 @@
     { key: "go-fish", name: "Go Fish", icon: "🐟", description: "Ask classmates for cards and collect complete sets.", url: "game.html?game=go-fish", mode: "start" },
     { key: "uno-style", name: "Uno-style Cards", icon: "UNO", description: "Match colors and numbers with simple action cards.", url: "game.html?game=uno-style", mode: "start" }
   ];
-  var sessionId = "", sessionName = "", db = null, roomsRef = null, roomsListener = null, scopeKey = "", classInfo = null;
+  var sessionId = "", sessionName = "", db = null, roomsPollTimer = null, roomsCallable = null, roomsRequest = 0, scopeKey = "", classInfo = null;
   var statusBox = document.getElementById("accountStatus");
   var invitations = document.getElementById("invitations");
   var invitationSection = document.getElementById("invitationSection");
   var invitationSummary = document.getElementById("invitationSummary");
+  var leaderboardSection = document.getElementById("classLeaderboard");
+  function renderLeaderboard(rows, balance) {
+    var list = document.getElementById("leaderboardRows"), status = document.getElementById("leaderboardStatus");
+    var balanceBox = document.getElementById("gameCoinBalance");
+    list.replaceChildren();
+    (rows || []).slice(0, 10).forEach(function (entry) {
+      var item = make("li", "leaderboard-row");
+      item.append(make("span", "leaderboard-name", entry.name || "Student"), make("span", "leaderboard-coins", String(Math.max(0, Number(entry.coins) || 0)) + " coins"));
+      list.appendChild(item);
+    });
+    status.textContent = rows && rows.length ? "Top players in " + classInfo.className + "." : "No game coin scores yet. Play a class game to get started!";
+    var peerCoins = Math.max(0, Number(balance && balance.peerCoins) || 0);
+    var computerCoins = Math.max(0, Number(balance && balance.computerCoins) || 0);
+    document.getElementById("gameCoinTotal").textContent = String(Math.max(0, Number(balance && balance.totalCoins) || peerCoins + computerCoins));
+    document.getElementById("gameCoinBreakdown").textContent = "Peer games " + peerCoins + " · Computer games " + computerCoins;
+    balanceBox.hidden = false;
+  }
+
+  function setupCoinPolicyEditor() {
+    var section = document.getElementById("gameCoinSettings"), form = document.getElementById("gameCoinPolicyForm");
+    var status = document.getElementById("gameCoinPolicyStatus"), fields = ["win", "finish", "sportsmanship", "computerMultiplier"];
+    section.hidden = false;
+    firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({ action: "get-coin-policy", workspaceId: classInfo.workspaceId, classId: classInfo.classId })
+      .then(function (result) {
+        var policy = result.data && result.data.policy;
+        if (policy) fields.forEach(function (key) { form.elements.namedItem(key).value = String(policy[key]); });
+        status.textContent = policy ? "Current class rewards loaded. You can change them at any time." : "Set rewards for this class. No reward amounts are preset.";
+      })
+      .catch(function () { status.textContent = "Could not load reward settings. Check your teacher access and try again."; });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var policy = {};
+      fields.forEach(function (key) { policy[key] = form.elements.namedItem(key).valueAsNumber; });
+      if (![policy.win, policy.finish, policy.sportsmanship].every(Number.isSafeInteger) ||
+          !Number.isFinite(policy.computerMultiplier) || policy.computerMultiplier < 0 || policy.computerMultiplier >= 1) {
+        status.textContent = "Use whole non-negative coin amounts and a computer multiplier less than 1."; return;
+      }
+      var submit = form.querySelector("button[type=submit]");
+      submit.disabled = true; status.textContent = "Saving class rewards…";
+      firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({
+        action: "set-coin-policy", workspaceId: classInfo.workspaceId, classId: classInfo.classId, policy: policy
+      }).then(function () { status.textContent = "Class game coin rewards saved."; })
+        .catch(function () { status.textContent = "Could not save rewards. Please check the values and try again."; })
+        .finally(function () { submit.disabled = false; });
+    });
+  }
 
   function make(tag, className, text) {
     var node = document.createElement(tag);
@@ -146,14 +192,16 @@
   function renderRooms(all) {
     var ignored = declinedRooms(), visible = Object.entries(all || {}).filter(function (entry) {
       var id = entry[0], room = entry[1];
-      return room && room.host !== sessionId && room.state === "lobby" && room.roomCode && gameFor(room.gameKey) && !ignored.has(id) &&
+      return room && room.host !== sessionId && room.roomCode && gameFor(room.gameKey) && !ignored.has(id) &&
+        (room.state === "lobby" || (room.allowSpectators && ["playing", "finished"].includes(room.state))) &&
+        (!room.invitedStudentId || room.invitedStudentId === sessionId || room.allowSpectators || room.playerCount >= room.maxPlayers) &&
         room.createdAt && Date.now() - Number(room.createdAt) < 20 * 60 * 1000;
     });
     var saved = savedRejoin();
     invitations.replaceChildren();
     invitationSection.hidden = !visible.length && !saved;
     invitationSummary.textContent = visible.length
-      ? visible.length + (visible.length === 1 ? " classmate game is" : " classmate games are") + " ready to join."
+      ? visible.length + (visible.length === 1 ? " class game" : " class games") + " to join, watch, or start your own match."
       : "Pick up where you left off.";
     if (saved) {
       var savedGame = gameFor(saved.gameKey), resume = make("article", "invite");
@@ -172,17 +220,55 @@
       });
       resumeActions.append(rejoin, dismiss); resume.appendChild(resumeActions); invitations.appendChild(resume);
     }
-    visible.sort(function (a, b) { return Number(a[1].createdAt) - Number(b[1].createdAt); }).forEach(function (entry) {
+    visible.sort(function (a, b) {
+      var aDirect = a[1].invitedStudentId === sessionId ? 1 : 0;
+      var bDirect = b[1].invitedStudentId === sessionId ? 1 : 0;
+      return bDirect - aDirect || Number(a[1].createdAt) - Number(b[1].createdAt);
+    }).forEach(function (entry) {
       var id = entry[0], room = entry[1], game = gameFor(room.gameKey), card = make("article", "invite");
-      card.append(make("h3", "", (room.hostRole === "teacher" ? "Teacher " : "") + (room.hostName || "A classmate") + " wants to play"),
-        make("p", "", game.icon + " " + game.name),
-        make("small", "", Math.max(1, Number(room.playerCount) || 1) + " player" + (Number(room.playerCount) === 1 ? "" : "s") + " waiting"));
-      var actions = make("div", "invite-actions"), join = make("button", "btn", "Join Game"), later = make("button", "quiet", "Not Now");
-      join.type = later.type = "button";
-      join.addEventListener("click", function () { join.disabled = true; route(game, "join", String(room.roomCode)); });
+      var count = Math.max(1, Number(room.playerCount) || 1), max = Number(room.maxPlayers) || 0;
+      var full = max > 0 && count >= max, reserved = !!room.invitedStudentId && room.invitedStudentId !== sessionId;
+      var direct = room.invitedStudentId === sessionId, canJoin = room.state === "lobby" && !full && !reserved;
+      var canWatch = max === 2 && room.allowSpectators === true;
+      var label = direct ? "⭐ A personal invitation for you!" : (room.hostName || "A classmate") + (room.state === "lobby" ? " wants to play" : " is playing");
+      card.append(make("h3", "", label), make("p", "", game.icon + " " + game.name));
+      card.appendChild(make("small", "", room.state === "playing" ? "Game in progress" : room.state === "finished" ? "Match finished" : full ? count + "/" + max + " Players — Full" : count + (max ? "/" + max : "") + " players waiting"));
+      if (direct) card.appendChild(make("small", "", (room.hostName || "A classmate") + " invited you to this match."));
+      else if (reserved && room.state === "lobby") card.appendChild(make("small", "", "Reserved for " + (room.invitedStudentName || "an invited classmate") + "."));
+      var actions = make("div", "invite-actions");
+      if (canJoin) {
+        var join = make("button", "btn", "Join Game"); join.type = "button";
+        join.addEventListener("click", function () { join.disabled = true; route(game, "join", String(room.roomCode)); });
+        actions.appendChild(join);
+      }
+      if (canWatch) {
+        var watch = make("button", "quiet", "👀 Join as spectator"); watch.type = "button";
+        watch.addEventListener("click", function () { route(game, "spectate", String(room.roomCode)); });
+        actions.appendChild(watch);
+      }
+      if (max === 2 && !canJoin) {
+        var another = make("button", "btn", "Start another " + game.name + " match"); another.type = "button";
+        another.addEventListener("click", function () { route(game, "start"); });
+        actions.appendChild(another);
+      }
+      var later = make("button", "quiet", "Not Now"); later.type = "button";
       later.addEventListener("click", function () { decline(id); renderRooms(all); });
-      actions.append(join, later); card.appendChild(actions); invitations.appendChild(card);
+      actions.appendChild(later); card.appendChild(actions); invitations.appendChild(card);
     });
+  }
+  function loadRooms() {
+    if (!roomsCallable || !classInfo) return;
+    var request = ++roomsRequest;
+    roomsCallable({ action: "list-rooms", workspaceId: classInfo.workspaceId, classId: classInfo.classId })
+      .then(function (result) {
+        if (request !== roomsRequest) return;
+        renderRooms(result.data && result.data.rooms || {});
+      })
+      .catch(function () {
+        if (request !== roomsRequest) return;
+        invitationSection.hidden = false;
+        invitationSummary.textContent = "Waiting games are temporarily unavailable. You can still start a new class game.";
+      });
   }
   function start() {
     drawCategoryHome();
@@ -226,15 +312,23 @@
           catch (cleanupError) { console.warn("Multiplayer Center: stale-room cleanup will retry later", cleanupError); }
         }
         scopeKey = path;
-        roomsRef = db.ref(path);
+        if (typeof firebase.functions === "function") {
+          roomsCallable = firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction");
+        }
         statusBox.className = "notice good";
         statusBox.textContent = (classInfo.role === "teacher" ? "Playing as teacher " : "Signed in as ") + sessionName + " · " + classInfo.className + ". Showing games for this class.";
         readyToPlay = true;
         drawCategoryHome();
-        if (roomsListener) roomsRef.off("value", roomsListener);
-        roomsListener = roomsRef.on("value", function (snapshot) { renderRooms(snapshot.val() || {}); }, function () {
-          statusBox.className = "notice error"; statusBox.textContent = "Could not load your class's waiting games. Refresh to try again.";
-        });
+        if (classInfo.role === "student" && typeof firebase.functions === "function") {
+          leaderboardSection.hidden = false;
+          firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({ action: "leaderboard", workspaceId: classInfo.workspaceId, classId: classInfo.classId })
+            .then(function (result) { renderLeaderboard(result.data && result.data.leaderboard || [], result.data && result.data.balance || {}); })
+            .catch(function () { document.getElementById("leaderboardStatus").textContent = "Class leaderboard is unavailable right now."; });
+        }
+        if (classInfo.role === "teacher" && typeof firebase.functions === "function") setupCoinPolicyEditor();
+        loadRooms();
+        clearInterval(roomsPollTimer);
+        roomsPollTimer = setInterval(loadRooms, 5000);
       } catch (e) {
         console.warn("Multiplayer Center: class access check failed", e);
         statusBox.className = "notice error";
@@ -242,6 +336,6 @@
       }
     });
   }
-  window.addEventListener("pagehide", function () { if (roomsRef && roomsListener) roomsRef.off("value", roomsListener); });
+  window.addEventListener("pagehide", function () { clearInterval(roomsPollTimer); roomsPollTimer = null; roomsRequest += 1; });
   start();
 })();

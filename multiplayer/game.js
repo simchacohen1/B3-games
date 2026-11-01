@@ -1,11 +1,11 @@
 (function () {
   'use strict';
   const GAMES = {
-    'connect-four': { name: 'Connect 4', icon: '🔴', minPlayers: 2, columns: 7, rows: 6 },
-    'tic-tac-toe': { name: 'Tic Tac Toe', icon: '⭕', minPlayers: 2, columns: 3, rows: 3 },
+    'connect-four': { name: 'Connect 4', icon: '🔴', minPlayers: 2, maxPlayers: 2, columns: 7, rows: 6, computerOpponent: true },
+    'tic-tac-toe': { name: 'Tic Tac Toe', icon: '⭕', minPlayers: 2, maxPlayers: 2, columns: 3, rows: 3, computerOpponent: true },
     'memory-match': { name: 'Memory Match', icon: '🧠', minPlayers: 2, columns: 4, rows: 4 },
-    checkers: { name: 'Checkers', icon: '🔴', minPlayers: 2, columns: 8, rows: 8 },
-    reversi: { name: 'Reversi', icon: '⚫', minPlayers: 2, columns: 8, rows: 8 },
+    checkers: { name: 'Checkers', icon: '🔴', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
+    reversi: { name: 'Reversi', icon: '⚫', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
     bingo: { name: 'Bingo', icon: '🎯', minPlayers: 2, columns: 5, rows: 5 },
     'math-race': { name: 'Math Race', icon: '➕', minPlayers: 2 },
     set: { name: 'Set', icon: '🟣', minPlayers: 2 },
@@ -20,7 +20,7 @@
   const el = id => document.getElementById(id);
   const title = el('gameTitle'), hint = el('gameHint'), message = el('message'), roomSection = el('room');
   const board = el('board'), actions = el('actions');
-  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '';
+  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', countdownTimer = null, countdownRetryTimer = null, countdownStarting = false, settlementRetryTimer = null, settlementInFlight = '', settledRoomCode = '', settlementRetries = 0;
 
   function text(tag, className, value) {
     const node = document.createElement(tag);
@@ -58,7 +58,10 @@
       }
       roomSection.hidden = false;
       el('roomCode').textContent = 'Room code ' + roomCode;
+      if (room.state === 'countdown' && Number.isFinite(Number(room.countdownAt))) runCountdown(room.countdownAt);
+      else { clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); countdownTimer = countdownRetryTimer = null; countdownStarting = false; el('countdown').hidden = true; }
       draw();
+      if (room.state === 'finished') settleFinishedRoom();
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
     if (['bingo', 'dominoes', 'go-fish', 'uno-style'].includes(gameKey)) {
       privateRef = db.ref(`b3Private/multiplayerGames/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/rooms/${roomCode}/hands/${studentId}`);
@@ -70,7 +73,7 @@
       }, () => notice('Your private game information could not be loaded. Refresh to reconnect.', true));
     }
   }
-  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); ref = listener = privateRef = privateListener = null; }
+  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); clearTimeout(settlementRetryTimer); countdownTimer = countdownRetryTimer = settlementRetryTimer = null; ref = listener = privateRef = privateListener = null; }
   function clearSavedRejoin(code) {
     try {
       const key = 'fttMultiplayerRejoin:' + studentId, saved = JSON.parse(sessionStorage.getItem(key) || 'null');
@@ -96,26 +99,65 @@
       const chip = text('span', 'player-chip' + (player.studentId === room.turn ? ' current' : ''), player.name + (player.role === 'teacher' ? ' (teacher)' : '') + (player.studentId === studentId ? ' (you)' : ''));
       parent.appendChild(chip);
     });
+    (room?.spectators || []).forEach(spectator => parent.appendChild(text('span', 'player-chip', '👀 ' + spectator.name + ' (watching)')));
+  }
+  function addSpectatorControls() {
+    if (!room?.allowSpectators || (room.players || []).some(player => player.studentId === studentId)) return;
+    const queued = (room.winnerQueue || []).includes(studentId);
+    actions.append(button(queued ? 'Leave the play-next line' : 'Play the winner next', () =>
+      call(queued ? 'unqueue-winner' : 'queue-winner').catch(showError), 'quiet', pending || room.state !== 'playing'));
+    actions.append(button('Leave as spectator', leaveRoom, 'quiet', pending));
+  }
+  function addHostRoomOptions() {
+    if (room.host !== studentId || game?.maxPlayers !== 2) return;
+    const spectatorToggle = button(room.allowSpectators ? 'Turn off spectators' : 'Allow classmates to watch', () =>
+      call('spectators', { move: { allow: !room.allowSpectators } }).catch(showError), 'quiet', pending);
+    actions.append(spectatorToggle);
+    if (room.state !== 'lobby' || room.players.length > 1) return;
+    const selector = document.createElement('select'); selector.setAttribute('aria-label', 'Choose a classmate to invite');
+    selector.appendChild(text('option', '', 'Choose a classmate to invite…')); selector.options[0].value = '';
+    const load = button('Load classmates', () => call('classmates').then(result => {
+      selector.replaceChildren();
+      const none = text('option', '', room.invitedStudentId ? 'Clear personal invitation' : 'Choose a classmate to invite…'); none.value = ''; selector.appendChild(none);
+      (result.classmates || []).forEach(person => { const option = text('option', '', person.name); option.value = person.studentId; selector.appendChild(option); });
+      if (room.invitedStudentId) selector.value = room.invitedStudentId;
+    }).catch(showError), 'quiet', pending);
+    const invite = button('Send personal invite', () => {
+      if (invite.disabled) return;
+      call('invite-target', { move: { studentId: selector.value } }).then(() => notice(selector.value ? 'Personal invitation reserved for your classmate.' : 'Personal invitation cleared.')).catch(showError);
+    }, 'btn', pending);
+    actions.append(selector, load, invite);
+    if (room.invitedStudentName) actions.append(text('div', 'player-turn', 'Waiting for ' + room.invitedStudentName + '. They are saved from random matchmaking.'));
   }
   function drawActions() {
     actions.replaceChildren();
     if (!room) return;
     const ids = (room.players || []).map(player => player.studentId);
+    if (room.state === 'countdown') { actions.append(text('div', 'player-turn', 'Your classmate is here. Game starts together!')); return; }
     if (room.state === 'lobby') {
       if (room.host === studentId) {
         actions.append(button('Start game', () => call('start').catch(showError), 'btn', pending || ids.length < game.minPlayers));
         actions.append(button('Close room', leaveRoom, 'quiet', pending));
       } else actions.append(button('Leave game', leaveRoom, 'quiet', pending));
+      addHostRoomOptions();
+      addSpectatorControls();
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
       return;
     }
     if (room.finished || room.state === 'finished') {
+      if (studentId === room.winner && room.winnerQueue?.length && room.allowSpectators) {
+        actions.append(button('🏆 Play the next challenger', () => call('next-round').catch(showError), 'btn', pending));
+      }
+      if (room.draw && ids.includes(studentId)) actions.append(button('Rematch after the draw', () => call('rematch-draw').catch(showError), 'btn', pending));
+      addSpectatorControls();
       actions.append(button('Play again', () => { unlisten(); location.assign(`game.html?game=${encodeURIComponent(gameKey)}&b3Multiplayer=start`); }, 'btn'));
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
       return;
     }
     if (room.state === 'playing') {
+      if (!ids.includes(studentId)) { addSpectatorControls(); return; }
       actions.append(text('div', 'player-turn', statusText()));
+      if (game?.maxPlayers === 2 && room.allowSpectators && room.winnerQueue?.length) actions.append(text('div', 'player-turn', room.winnerQueue.length + ' classmate(s) are waiting to play the winner.'));
       if (gameKey === 'bingo' && room.host === studentId) actions.append(button('Draw next number', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
       if (gameKey === 'dominoes' && room.turn === studentId) actions.append(button('Draw a tile', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
       if (gameKey === 'uno-style' && room.turn === studentId) {
@@ -130,6 +172,96 @@
       actions.append(button('Leave game', leaveRoom, 'quiet', pending));
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
     }
+  }
+  function runCountdown(countdownAt) {
+    if (countdownTimer) return;
+    const overlay = el('countdown'); overlay.hidden = false;
+    const tick = () => {
+      const remaining = Number(countdownAt) - Date.now();
+      overlay.textContent = remaining > 0 ? String(Math.min(3, Math.ceil(remaining / 1000))) : 'Go!';
+      if (remaining <= 0 && !countdownStarting) {
+        countdownStarting = true; clearInterval(countdownTimer); countdownTimer = null;
+        overlay.textContent = 'Starting…';
+        call('countdown-start').catch(error => {
+          countdownStarting = false;
+          if (room?.state === 'countdown') {
+            // The two devices can have slightly different clocks. The server is
+            // authoritative, so retry instead of leaving an early caller stuck.
+            overlay.textContent = 'Starting…';
+            countdownRetryTimer = setTimeout(() => { countdownRetryTimer = null; runCountdown(countdownAt); }, 350);
+          } else showError(error);
+        });
+      }
+    };
+    tick(); countdownTimer = setInterval(tick, 100);
+  }
+  function settleFinishedRoom() {
+    if (!room || room.state !== 'finished' || settledRoomCode === roomCode || settlementInFlight === roomCode) return;
+    settlementInFlight = roomCode;
+    call('settle').then(() => {
+      settledRoomCode = roomCode; settlementInFlight = ''; settlementRetries = 0;
+      clearTimeout(settlementRetryTimer); settlementRetryTimer = null;
+    }).catch(() => {
+      settlementInFlight = '';
+      settlementRetries += 1;
+      if (settlementRetries <= 5 && room?.state === 'finished') {
+        settlementRetryTimer = setTimeout(() => { settlementRetryTimer = null; settleFinishedRoom(); }, 1500);
+      } else notice('Your game is finished, but the coin score is still saving. Refresh this game to try again.', true);
+    });
+  }
+  async function quickPlay() {
+    const countdown = el('countdown');
+    const supportsComputer = game?.computerOpponent === true;
+    let searchCancelled = false;
+    const cancelSearch = async () => {
+      searchCancelled = true;
+      try {
+        const response = await callable({ action: 'cancel-quick-play', gameKey, workspaceId: classInfo.workspaceId, classId: classInfo.classId });
+        const result = response.data || {};
+        if (result.roomCode) {
+          const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', result.roomCode); url.searchParams.set('b3Multiplayer', 'join');
+          location.assign(url.href); return;
+        }
+      } catch (error) { showError(error); return; }
+      location.assign('index.html');
+    };
+    actions.replaceChildren(button('Cancel search', cancelSearch, 'quiet'));
+    for (const n of [3, 2, 1]) {
+      if (searchCancelled) return;
+      countdown.hidden = false; countdown.textContent = String(n);
+      await new Promise(resolve => setTimeout(resolve, 700));
+    }
+    countdown.textContent = 'Go!';
+    try {
+      const result = await call('quick-play');
+      if (result.roomCode) {
+        const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', result.roomCode); url.searchParams.set('b3Multiplayer', 'join');
+        location.assign(url.href); return;
+      }
+      notice(supportsComputer ? 'Looking for a classmate…' : 'Looking for a classmate. This game needs another student to play.');
+      actions.replaceChildren(button('Cancel search', cancelSearch, 'quiet'));
+      const deadline = Date.now() + (supportsComputer ? 8000 : Number.POSITIVE_INFINITY);
+      while (Date.now() < deadline && !room) {
+        if (searchCancelled) return;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const poll = await call('quick-play');
+        if (poll.roomCode) {
+          const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', poll.roomCode); url.searchParams.set('b3Multiplayer', 'join');
+          location.assign(url.href); return;
+        }
+      }
+      if (!room && !searchCancelled && supportsComputer) {
+        try {
+          const cancelled = await call('cancel-quick-play');
+          if (cancelled.roomCode) {
+            const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', cancelled.roomCode); url.searchParams.set('b3Multiplayer', 'join');
+            location.assign(url.href); return;
+          }
+          const fallback = await call('create', { computerOpponent: true });
+          const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', fallback.roomCode); url.searchParams.set('b3Multiplayer', 'host'); url.searchParams.set('b3ComputerOpponent', '1'); location.assign(url.href);
+        } catch (error) { showError(error); }
+      }
+    } catch (error) { showError(error); }
   }
   function cell(label, className, onClick, disabled) {
     const node = button(label, onClick, 'board-cell ' + (className || ''), disabled || pending);
@@ -326,14 +458,20 @@
           const code = params.get('b3MultiplayerRoom');
           if (code) {
             roomCode = code;
-            const result = await call('join');
+            const isSpectating = params.get('b3Multiplayer') === 'spectate';
+            const result = await call(isSpectating ? 'spectate' : 'join');
             clearSavedRejoin(code);
             if (result.public?.state === 'closed') throw new Error('That room has closed.');
-            const mode = result.public?.host === studentId ? 'host' : 'join';
+            const mode = isSpectating ? 'spectate' : (result.public?.host === studentId ? 'host' : 'join');
             params.set('b3Multiplayer', mode);
             history.replaceState(null, '', location.pathname + '?' + params.toString());
-            listen(code); notice('Connected to your class game.');
+            listen(code); notice(isSpectating ? 'You are watching this match.' : 'Connected to your class game.');
           } else if (params.get('b3Multiplayer') === 'start' || !params.has('b3Multiplayer')) {
+            if (params.get('b3Multiplayer') === 'start') {
+              roomSection.hidden = false;
+              quickPlay();
+              return;
+            }
             const result = await call('create');
             const next = new URL(location.href); next.searchParams.set('b3Multiplayer', 'host'); next.searchParams.set('b3MultiplayerRoom', result.roomCode);
             history.replaceState(null, '', next.href);

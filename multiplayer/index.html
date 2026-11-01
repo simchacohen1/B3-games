@@ -25,7 +25,7 @@
 </head>
 <body>
 <main>
-  <header><strong>🎲 Fun Torah Tools</strong><a href="../index.html">← Back to Fun Torah Tools</a></header>
+  <header><strong>🎲 Fun Torah Tools</strong><div id="gameCoinBalance" class="game-coin-balance" hidden aria-live="polite"><span class="game-coin-icon" aria-hidden="true">🪙</span><span>Game Coins</span><strong id="gameCoinTotal">0</strong><small id="gameCoinBreakdown"></small></div><a href="../index.html">← Back to Fun Torah Tools</a></header>
   <h1>🎮 Multiplayer Arcade</h1>
   <p class="intro">All 17 games are ready to browse. Choose a game from its category and invite your classmates to play.</p>
   <section id="accountStatus" class="notice" role="status" aria-live="polite">Checking your Fun Torah Tools sign-in…</section>
@@ -33,6 +33,23 @@
     <h2 id="invitationHeading">Friends waiting to play</h2>
     <p id="invitationSummary" class="invitation-summary" aria-live="polite"></p>
     <div id="invitations" class="invitations"></div>
+  </section>
+  <section id="classLeaderboard" class="class-leaderboard" aria-labelledby="leaderboardHeading" hidden>
+    <h2 id="leaderboardHeading">🏆 Class Game Coins</h2>
+    <p id="leaderboardStatus" role="status" aria-live="polite">Loading this class’s leaderboard…</p>
+    <ol id="leaderboardRows" class="leaderboard-rows"></ol>
+  </section>
+  <section id="gameCoinSettings" class="class-leaderboard game-coin-settings" aria-labelledby="gameCoinSettingsHeading" hidden>
+    <h2 id="gameCoinSettingsHeading">⚙️ Set Class Game Coin Rewards</h2>
+    <p>Choose how many coins students earn. Computer games use the multiplier you set here.</p>
+    <form id="gameCoinPolicyForm">
+      <label>Win reward <input name="win" type="number" min="0" step="1" required></label>
+      <label>Finish reward <input name="finish" type="number" min="0" step="1" required></label>
+      <label>Sportsmanship bonus <input name="sportsmanship" type="number" min="0" step="1" required></label>
+      <label>Computer multiplier <input name="computerMultiplier" type="number" min="0" max="0.99" step="0.01" required></label>
+      <button class="btn" type="submit">Save class rewards</button>
+    </form>
+    <p id="gameCoinPolicyStatus" role="status" aria-live="polite"></p>
   </section>
   <section aria-labelledby="gamesHeading">
     <h2 id="gamesHeading" tabindex="-1">All 17 games, ready to play</h2>

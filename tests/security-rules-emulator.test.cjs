@@ -363,6 +363,9 @@ testEmulator('Multiplayer Center invites and Rashi rooms are private to an activ
   await succeeds(get(ref(one,ownSecret)));
   await fails(get(ref(one,friendSecret)));
   await fails(set(ref(one,ownSecret+'/hand/0'),'forged'));
+  const gameCoinLedger='b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/coins';
+  await fails(get(ref(one,gameCoinLedger)));
+  await fails(set(ref(one,gameCoinLedger+'/balances/synthetic_one/coins'),125));
   await fails(get(ref(beta,ownSecret)));
 });
 

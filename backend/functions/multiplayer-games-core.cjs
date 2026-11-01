@@ -1,8 +1,8 @@
 'use strict';
 
 const GAMES = Object.freeze({
-  'connect-four': { name: 'Connect 4', minPlayers: 2, maxPlayers: 2 },
-  'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2 },
+  'connect-four': { name: 'Connect 4', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
+  'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
   'memory-match': { name: 'Memory Match', minPlayers: 2, maxPlayers: 4 },
   checkers: { name: 'Checkers', minPlayers: 2, maxPlayers: 2 },
   reversi: { name: 'Reversi', minPlayers: 2, maxPlayers: 2 },
@@ -19,6 +19,10 @@ const MEMORY_FACES = Object.freeze(['🍎', '⭐', '🐟', '🌈', '⚽', '🦁'
 
 function gameConfig(gameKey) {
   return GAMES[gameKey] || null;
+}
+
+function supportsComputerOpponent(gameKey) {
+  return GAMES[gameKey]?.computerOpponent === true;
 }
 
 function participantIds(players) {
@@ -175,6 +179,42 @@ function applyMove(gameKey, state, playerId, move, players) {
   if (gameKey === 'checkers') return moveCheckers(state, playerId, move);
   if (gameKey === 'reversi') return moveReversi(state, playerId, move);
   reject('This multiplayer game is not available yet.');
+}
+
+function computerMove(gameKey, state, computerId) {
+  if (gameKey === 'tic-tac-toe') {
+    const botMark = state.playersOrder[0] === computerId ? 'X' : 'O';
+    const humanMark = botMark === 'X' ? 'O' : 'X';
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    const winAt = mark => lines.find(line => line.filter(index => state.board[index] === mark).length === 2 && line.some(index => !state.board[index]))?.find(index => !state.board[index]);
+    const win = winAt(botMark); if (win !== undefined) return { type: 'place', index: win };
+    const block = winAt(humanMark); if (block !== undefined) return { type: 'place', index: block };
+    if (!state.board[4]) return { type: 'place', index: 4 };
+    const open = [0,2,6,8,1,3,5,7].find(index => !state.board[index]);
+    return open === undefined ? null : { type: 'place', index: open };
+  }
+  if (gameKey === 'connect-four') {
+    const openColumns = [3, 2, 4, 1, 5, 0, 6].filter(column => !state.board[column]);
+    if (!openColumns.length) return null;
+    const drop = (board, column, mark) => {
+      const row = [5, 4, 3, 2, 1, 0].find(y => !board[y * 7 + column]);
+      if (row === undefined) return null;
+      board[row * 7 + column] = mark;
+      return board;
+    };
+    const botMark = computerId === state.playersOrder[0] ? 'red' : 'yellow';
+    const otherMark = botMark === 'red' ? 'yellow' : 'red';
+    for (const column of openColumns) {
+      const board = drop(state.board.slice(), column, botMark);
+      if (lineWinner(board, 7, 6, 4) === botMark) return { type: 'drop', column };
+    }
+    for (const column of openColumns) {
+      const board = drop(state.board.slice(), column, otherMark);
+      if (lineWinner(board, 7, 6, 4) === otherMark) return { type: 'drop', column };
+    }
+    return { type: 'drop', column: openColumns[0] };
+  }
+  return null;
 }
 
 function moveTicTacToe(state, playerId, move) {
@@ -636,4 +676,4 @@ function privateView(gameKey, state, studentId) {
   return {};
 }
 
-module.exports = { GAMES, gameConfig, participantIds, hydrateGameState, createGameState, startGameState, applyMove, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };
+module.exports = { GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };

@@ -3,6 +3,54 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const core = require('../backend/functions/multiplayer-games-core.cjs');
 
+test('computer fallback capability is explicit and limited to games with a server move engine', () => {
+  assert.deepEqual(Object.keys(core.GAMES).filter(core.supportsComputerOpponent), ['connect-four', 'tic-tac-toe']);
+  for (const gameKey of Object.keys(core.GAMES)) {
+    assert.equal(core.supportsComputerOpponent(gameKey), ['connect-four', 'tic-tac-toe'].includes(gameKey));
+  }
+  assert.equal(core.supportsComputerOpponent('not-a-game'), false);
+});
+
+test('computer opponent selects a winning tic-tac-toe move or blocks the human win', () => {
+  const botFirst = { board: ['X','X','','O','O','','','',''], playersOrder: ['cpu','avi'], moves: 4, turn: 'cpu', finished: false };
+  assert.deepEqual(core.computerMove('tic-tac-toe', botFirst, 'cpu'), { type: 'place', index: 2 });
+  const block = { board: ['X','X','','O','','','','',''], playersOrder: ['avi','cpu'], moves: 3, turn: 'cpu', finished: false };
+  assert.deepEqual(core.computerMove('tic-tac-toe', block, 'cpu'), { type: 'place', index: 2 });
+});
+
+test('computer opponent Connect Four move is a legal open column and unsupported games decline', () => {
+  const state = { board: Array(42).fill(''), playersOrder: ['avi','cpu'], turn: 'cpu' };
+  const move = core.computerMove('connect-four', state, 'cpu');
+  assert.equal(move.type, 'drop'); assert.ok(move.column >= 0 && move.column <= 6);
+  assert.equal(core.computerMove('checkers', state, 'cpu'), null);
+});
+
+test('Connect Four computer takes a win and blocks an immediate human win', () => {
+  const make = rows => {
+    const board = Array(42).fill('');
+    rows.forEach(([row, col, mark]) => { board[row * 7 + col] = mark; });
+    return { board, playersOrder: ['avi', 'computer_bot'], turn: 'computer_bot' };
+  };
+  const winning = make([[5,0,'yellow'],[5,1,'yellow'],[5,2,'yellow'],[5,4,'red']]);
+  assert.deepEqual(core.computerMove('connect-four', winning, 'computer_bot'), { type: 'drop', column: 3 });
+  const blocking = make([[5,0,'red'],[5,1,'red'],[5,2,'red'],[5,4,'yellow']]);
+  assert.deepEqual(core.computerMove('connect-four', blocking, 'computer_bot'), { type: 'drop', column: 3 });
+});
+
+test('computer opponent takes the server turn after a human move in supported rooms', () => {
+  const roomPlayers = { avi: { name: 'Avi', active: true, joinedAt: 1 }, computer_test: { name: 'Computer', role: 'computer', active: true, joinedAt: 2 } };
+  const game = core.createGameState('tic-tac-toe', roomPlayers, { seed: 5 });
+  core.startGameState('tic-tac-toe', game, core.participantIds(roomPlayers));
+  assert.equal(game.turn, 'avi');
+  core.applyMove('tic-tac-toe', game, 'avi', { type: 'place', index: 0 }, roomPlayers);
+  const response = core.computerMove('tic-tac-toe', game, 'computer_test');
+  assert.ok(response);
+  core.applyMove('tic-tac-toe', game, 'computer_test', response, roomPlayers);
+  assert.equal(game.moves, 2);
+  assert.equal(game.turn, 'avi');
+  assert.equal(game.board.filter(Boolean).length, 2);
+});
+
 function players(...ids) {
   return Object.fromEntries(ids.map((id, index) => [id, { name: id, active: true, joinedAt: index + 1 }]));
 }
