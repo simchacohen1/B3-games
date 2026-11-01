@@ -32,19 +32,14 @@ For every gated page it opens the direct URL as: anonymous, student, random Goog
 * `game-show/teacher.html` wrote `buzzSound` to the database as soon as it loaded, even for a stranger. It now waits for `window.B3TeacherGateReady`, which resolves only for a confirmed teacher.
 * Before the gate, about ten pages showed their working teacher screen to a signed-out visitor (Story Timing Tool, Work Timer, Sync to Nigri and its Classtime / School Marks / Chossid Lamdan pages, the root Chossid Lamdan page, Class Pointer teacher screen, Comment Log). The rest showed a sign-in message but still had their screens in the page.
 
-## Database security candidate in this draft PR
+## Still open (NOT fixed here — needs rules work and owner approval)
 
-This draft now includes a local Firebase rules candidate alongside the page gate:
+The gate does not change database rules. In the current `firebase-rules.json`, with no sign-in at all:
 
-* The broad `b3Games` parent read and wildcard grant are removed, so direct parent requests cannot inherit access to every class.
-* Teacher reads of class records, student profiles, memberships, student attempts, and Weekly Quiz data are restricted to the assigned class; owner/admin access is preserved.
-* Weekly Quiz launch, response, completion, and assignment paths are class-scoped. Direct collection reads and cross-class requests are covered by emulator tests.
-* The candidate keeps student writes bound to their own student ID. Class and student creation remain restricted at the database layer; principal creation/management still depends on the separate trusted management-function work in #344.
+* **Anyone can WRITE**: `questionSets` (Game Show), `tentTrailTrivia`, `posukPractice/settings/*`, `posukPractice/shorashimLearning`, `posukPractice/chazara/*/<student>`, `posukPractice/students/<student>`, `rashiLetters/progress`, `classGallery`, class `resources`.
+* **Anyone can READ**: `b3Games/workspaces` (all class records), `b3Games/teachers`, `b3Games/admins`, `posukPractice/students`, `posukPractice/allowedStudents`, and the others listed in issues #20, #94, #145.
 
-Focused fictional-account checks passed locally: rules/additive static checks (19/19), hardened rules emulator tests (18/18), and transitional class-scope/Weekly Quiz emulator tests (2/2). The emulator was local; no staging or production database was changed.
-
-Existing public leaf grants for public settings/content and legacy Class Gallery data remain outside this Teacher Sign-in rules change. The rules candidate must not be described as deployed.
-
+So a determined person can still use the database directly. Closing this is the real fix and is tracked by #20/#94/#145/#344 (PRs 334/335 etc.). Each tool's write path must be tightened one at a time with emulator tests, then deployed with owner approval.
 
 ## Not verified yet
 
