@@ -553,7 +553,21 @@ async function loadClassScope(user,access){
   if(fullDashboardLoaded)await loadRecordingHistory();
  }catch(error){if(generation===scopeGeneration)$('teacherGate').textContent=error.message||'Could not load your class.';}
 }
-window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScope(user,access||{authorized}));
+// Full-dashboard history is an explicit choice for one Google account.
+// Do not inherit its expensive history listeners when a different user signs in.
+let lastChazaraAuthUid=null;
+window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
+ const uid=user?.uid||null;
+ if(uid!==lastChazaraAuthUid){
+  fullDashboardLoaded=false;
+  $('teacherApp').classList.add('review-only');
+  $('showFullDashboard').classList.remove('hidden');
+  $('showPendingOnly').classList.add('hidden');
+  $('recordingReviewFilter').value='pending';
+ }
+ lastChazaraAuthUid=uid;
+ return loadClassScope(user,access||{authorized});
+});
 // Re-check the teacher's classes every minute in the background. Only rebuild
 // the dashboard (which hides it while loading) when something actually changed.
 async function quietScopeCheck(){
