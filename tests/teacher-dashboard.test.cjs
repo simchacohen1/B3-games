@@ -1,17 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function dashboard(rows,search=''){
- const nodes={},reads=[],listeners={};
- const node=id=>nodes[id]||(nodes[id]={classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:''});
+ const nodes={},reads=[],listeners={},errors={};
+ const node=id=>nodes[id]||(nodes[id]={classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:'',replaceChildren(){this.innerHTML='';this.textContent=''}});
  const api={workspaceId:'b3-2026',onAuthStateChanged:cb=>api.callback=cb};
  const document={getElementById:node,createElement:()=>({set textContent(v){this.innerHTML=String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}})};
  const db={ref:p=>({
   once:async()=>{reads.push(p);return {val:()=>rows[p]||{},exists:()=>!!rows[p]}},
-  on:(event,listener)=>{listeners[p]=listener;listener({val:()=>rows[p]||null})},
-  off:(event,listener)=>{if(listeners[p]===listener)delete listeners[p]}
+  on:(event,listener,onError)=>{listeners[p]=listener;if(onError)errors[p]=onError;listener({val:()=>rows[p]||null})},
+  off:(event,listener)=>{if(listeners[p]===listener){delete listeners[p];delete errors[p]}}
  })};
  const html=fs.readFileSync('teacher-home.html','utf8'),code=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?)<\/script>/)[1];
  vm.runInNewContext(code,{URLSearchParams,window:{B3SiteSettings:api,B3_FIREBASE_CONFIG:{},B3PrincipalScope:require('../principal-scope.js'),addEventListener(){}},firebase:{apps:[{}],database:()=>db},document,location:{search,replace(){}},console});
- return {nodes,reads,listeners,run:access=>api.callback({email:'teacher@test',uid:'principal-1'},true,access)};
+ return {nodes,reads,listeners,errors,run:async access=>{api.callback({email:'teacher@test',uid:'principal-1'},true,access);await new Promise(setImmediate)}};
 }
 test('regular teacher receives icon cards with selected-class links',async()=>{const x=dashboard({'b3Games/workspaces/b3-2026/classes/mine':{name:'Mine',active:true,toolGrants:{chazara:true,yiddish:true,'weekly-quiz':false}}});await x.run({authorized:true,role:'teacher',classIds:['mine']});const cards=x.nodes.classes.innerHTML;assert.match(cards,/tool-icon/);assert.match(cards,/🔁/);assert.match(cards,/yiddish-icon-v2.png/);assert.match(cards,/chazara\/teacher.html\?class=mine/);assert.ok(!cards.includes('weekly-quiz/teacher'));assert.deepEqual(x.reads,['b3Games/workspaces/b3-2026/classes/mine'])});
 test('disabled classes produce no teacher tool cards',async()=>{const x=dashboard({'b3Games/workspaces/b3-2026/classes/mine':{active:false,toolGrants:{chazara:true}}});await x.run({authorized:true,role:'teacher',classIds:['mine']});assert.ok(!x.nodes.classes.innerHTML.includes('chazara/teacher'))});
@@ -42,4 +42,20 @@ test('principal dashboard removes class links immediately when supervision is re
  await new Promise(setImmediate);
  assert.doesNotMatch(x.nodes.classes.innerHTML,/ET/);
  assert.ok(x.nodes.signOut.classList.values.has('hidden'));
+});
+
+test('principal listener permission failure clears visible classes and fails closed',async()=>{
+ const teacherPath='b3Games/workspaces/b3-2026/teachers/principal-1';
+ const x=dashboard({
+  [teacherPath]:{role:'teacher',accountType:'principal',active:true,classIds:{et:true},supervisedTeachers:{rabbiA:{name:'Rabbi A',classIds:{et:true}}}},
+  'b3Games/workspaces/b3-2026/classes/et':{name:'ET',active:true,toolGrants:{chazara:true}}
+ });
+ await x.run({authorized:true,role:'teacher',accountType:'principal',classIds:['et'],supervisedTeachers:{rabbiA:{name:'Rabbi A',classIds:{et:true}}}});
+ assert.match(x.nodes.classes.innerHTML,/ET/);
+ assert.equal(typeof x.errors[teacherPath],'function','principal live listener must have a fail-closed error callback');
+ x.errors[teacherPath](new Error('permission_denied'));
+ assert.equal(x.nodes.classes.innerHTML,'','stale class links must be cleared');
+ assert.ok(x.nodes.app.classList.values.has('hidden'),'principal dashboard must be hidden');
+ assert.ok(x.nodes.signOut.classList.values.has('hidden'),'teacher actions must be hidden');
+ assert.match(x.nodes.gate.textContent,/could not be refreshed/i);
 });
