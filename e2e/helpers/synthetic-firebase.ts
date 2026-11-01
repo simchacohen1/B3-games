@@ -96,9 +96,16 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
       };
       const functionName=path.basename(url.pathname);
       if(functionName in syntheticFunctions)return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(syntheticFunctions[functionName]),headers:{'access-control-allow-origin':origin(),'access-control-allow-headers':'authorization,content-type'}});
-      const response=await route.fetch({url:`http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/us-central1/${path.basename(url.pathname)}`,headers:{...req.headers(),origin:'https://funtorahtools.com'}});
-      if(!response.ok())failed.push(`${response.status()} ${url.pathname}`);
-      return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin(),vary:'Origin'}});
+      try{
+        const response=await route.fetch({url:`http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/us-central1/${path.basename(url.pathname)}`,headers:{...req.headers(),origin:'https://funtorahtools.com'}});
+        if(!response.ok())failed.push(`${response.status()} ${url.pathname}`);
+        return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin(),vary:'Origin'}});
+      }catch(error){
+        // A page can close while a synthetic emulator request is still in flight.
+        // Playwright disposes its route context during teardown; that is not an app failure.
+        if(/request context disposed|target closed/i.test(String(error)))return;
+        throw error;
+      }
     }
     if(['fonts.googleapis.com','fonts.gstatic.com'].includes(url.hostname))return route.fulfill({status:204,body:''});
     if(url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname))return route.continue();

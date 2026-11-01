@@ -2713,6 +2713,8 @@ exports.funTorahManageStudents = require("./student-management").funTorahManageS
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;
 // Weekly Quiz student reads and scoring are server-authorized to keep answer keys private.
 exports.weeklyQuizStudent = require("./weekly-quiz-student").weeklyQuizStudent;
+// Server-authoritative state and moves for new class-scoped multiplayer games.
+exports.multiplayerGameAction = require("./multiplayer-games").multiplayerGameAction;
 const gameShowStudent=require("./game-show-student-questions");
 exports.gameShowStudentQuestions=gameShowStudent.gameShowStudentQuestions;
 exports.gameShowStudentAction=gameShowStudent.gameShowStudentAction;

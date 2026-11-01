@@ -7,7 +7,7 @@ import { SITE, TOOL_PAGES, watchPage, expectStagingIsolation } from './staging-c
 test.describe('staging public smoke @smoke', () => {
   for (const tool of TOOL_PAGES) {
     test(`${tool.name} loads on staging without production calls @isolation`, async ({ page }) => {
-      const watch = watchPage(page);
+      const watch = await watchPage(page);
       const response = await page.goto(SITE + tool.path, { waitUntil: 'load', timeout: 45000 });
       expect(response?.status(), 'HTTP status').toBe(200);
       await expectStagingIsolation(page);
@@ -19,7 +19,7 @@ test.describe('staging public smoke @smoke', () => {
   }
 
   test('home page shows the student sign-in form @signin', async ({ page }) => {
-    const watch = watchPage(page);
+    const watch = await watchPage(page);
     await page.goto(SITE + '/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#studentNameInput')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('#classPinInput')).toHaveAttribute('type', 'password');
