@@ -95,6 +95,49 @@ test('staging functions derive database instances from staging config and reject
   assert.throws(() => databaseInstanceFromUrl('https://b3-games-default-rtdb.firebaseio.com', stage.projectId), /Refusing to bind staging triggers/);
   assert.doesNotThrow(() => assertNoProductionFirebaseTarget({ options: { ...stage } }));
   assert.throws(() => assertNoProductionFirebaseTarget({ options: { ...stage, storageBucket: 'b3-games.firebasestorage.app' } }), /Refusing to initialize/);
+  assert.throws(() => assertNoProductionFirebaseTarget({ options: { ...stage, databaseURL: 'https://b3-games-default-rtdb.firebaseio.com' } }), /Refusing to initialize/);
+});
+
+function withEnv(values, fn) {
+  const saved = {};
+  for (const key of Object.keys(values)) {
+    saved[key] = process.env[key];
+    if (values[key] === undefined) delete process.env[key]; else process.env[key] = values[key];
+  }
+  try { return fn(); } finally {
+    for (const key of Object.keys(saved)) {
+      if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key];
+    }
+  }
+}
+
+test('local Functions emulator database URLs resolve only inside the emulator', () => {
+  const emulatorUrl = 'http://127.0.0.1:19100/?ns=demo-ftt-readiness';
+  withEnv({ FUNCTIONS_EMULATOR: 'true', B3_STAGING_DEPLOYMENT: undefined }, () => {
+    assert.equal(databaseInstanceFromUrl(emulatorUrl, 'demo-ftt-readiness'), 'demo-ftt-readiness');
+    assert.equal(databaseInstanceFromUrl('http://localhost:9000/?ns=fun-torah-tools-staging-default-rtdb', stage.projectId), 'fun-torah-tools-staging-default-rtdb');
+    assert.throws(() => databaseInstanceFromUrl('http://127.0.0.1:19100/', 'demo-ftt-readiness'), /missing its namespace/);
+    assert.throws(() => databaseInstanceFromUrl('http://127.0.0.1:19100/?ns=b3-games-default-rtdb', stage.projectId), /Refusing to bind staging triggers/);
+    assert.throws(() => databaseInstanceFromUrl('http://evil.example:19100/?ns=demo-ftt-readiness', 'demo-ftt-readiness'), /not a supported Firebase database/);
+  });
+  withEnv({ FUNCTIONS_EMULATOR: undefined }, () => {
+    assert.throws(() => databaseInstanceFromUrl(emulatorUrl, 'demo-ftt-readiness'), /not a supported Firebase database/);
+  });
+});
+
+test('staging deployments fail closed on a production project ID or missing database URL', () => {
+  withEnv({ B3_STAGING_DEPLOYMENT: 'true' }, () => {
+    assert.doesNotThrow(() => assertNoProductionFirebaseTarget({ options: { ...stage } }));
+    assert.throws(() => assertNoProductionFirebaseTarget({ options: { ...stage, projectId: 'b3-games' } }), /outside the staging Firebase project/);
+    assert.throws(() => assertNoProductionFirebaseTarget({ options: {} }), /outside the staging Firebase project/);
+    assert.throws(() => assertNoProductionFirebaseTarget({ options: { ...stage, databaseURL: undefined } }), /without a staging Realtime Database URL/);
+    assert.throws(() => databaseInstanceFromUrl('https://b3-games-default-rtdb.firebaseio.com', 'b3-games'), /Refusing to bind staging triggers/);
+  });
+  withEnv({ B3_STAGING_DEPLOYMENT: undefined }, () => {
+    const production = { projectId: 'b3-games', databaseURL: 'https://b3-games-default-rtdb.firebaseio.com', storageBucket: 'b3-games.firebasestorage.app' };
+    assert.doesNotThrow(() => assertNoProductionFirebaseTarget({ options: production }));
+    assert.doesNotThrow(() => assertNoProductionFirebaseTarget({ options: {} }));
+  });
 });
 
 test('staging packager rewrites app endpoints and injects the guard before page code', () => {

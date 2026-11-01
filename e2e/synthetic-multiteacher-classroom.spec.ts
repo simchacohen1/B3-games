@@ -76,6 +76,8 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
     await expect.poll(async()=> (await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/toolGrants`))?.[tool]).toBe(true);
     await expect(ownerPage.locator('#status')).toContainText('Saved');
   }
+  // Pages keep live database/function requests open; stop routing before closing.
+  await ownerPage.unrouteAll({behavior:'ignoreErrors'});
   await ownerContext.close();
   await configureBrowser(page, pageErrors, failedFirebase);
   const teacherClassReads: string[] = [];
@@ -328,12 +330,14 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
   await chazaraTeacherPage.getByRole('button',{name:/Learn New Shorashim/}).click();
   await expect(chazaraTeacherPage.locator('[data-learning-perek="18"] .perek-progress')).toContainText('0 of 1 learned');
+  await chazaraTeacherPage.unrouteAll({behavior:'ignoreErrors'});
   await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);
   expect(claims.b3StudentId).toBe(ariId);expect(claims.b3ClassId).toBe(CLASS_ID);
   expect(claims.b3StudentRole).toBe('student');
   expect(await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/et/members`)).toEqual({synthetic_et:{name:'Synthetic ET Student',active:true}});
   expect(await readFixture(`b3Games/workspaces/${WORKSPACE}/classes/wt/members`)).toEqual({synthetic_wt:{name:'Synthetic WT Student',active:true}});
+  await page.unrouteAll({behavior:'ignoreErrors'});
   await studentContext.close();
   expect(failedFirebase).toEqual([]);
   expect(pageErrors).toEqual([]);
