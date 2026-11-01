@@ -101,3 +101,19 @@ test('principal claim refuses invalid class keys before constructing database pa
  assert.deepEqual(result.classIds,['wt']);
  assert.deepEqual(Object.keys(writes).filter(key=>key.includes('/teacherIds/')), [root+'/classes/wt/teacherIds/principal-uid']);
 });
+test('live principal record refresh grants only explicit valid classes',()=>{
+ const {accessFromPrincipalRecord}=require('../principal-scope.js');
+ assert.deepEqual(accessFromPrincipalRecord({role:'teacher',accountType:'principal',active:true,
+   classIds:{et:true,wt:true,'*':true,'bad id':true,no:false},
+   supervisedTeachers:{a:{name:'Rabbi A',classIds:{et:true}}}}),
+   {authorized:true,role:'teacher',accountType:'principal',supervisedTeachers:{a:{name:'Rabbi A',classIds:{et:true}}},classIds:['et','wt']});
+});
+test('live principal record immediately denies removed, inactive, or empty scope',()=>{
+ const {accessFromPrincipalRecord}=require('../principal-scope.js');
+ for(const record of [
+   {role:'teacher',accountType:'principal',active:false,classIds:{et:true}},
+   {role:'teacher',accountType:'principal',active:true,classIds:{}},
+   {role:'teacher',accountType:'principal',active:true,classIds:{et:false,'*':true}}
+ ]) assert.deepEqual(accessFromPrincipalRecord(record),
+   {authorized:false,role:'',accountType:'principal',classIds:[]});
+});
