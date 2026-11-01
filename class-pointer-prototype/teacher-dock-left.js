@@ -39,7 +39,13 @@
 #stage.tb-docked-left > #focusLayer,
 #stage.tb-docked-left > #pointerLayer,
 #stage.tb-docked-left > #boardsView{left:${RAIL}px!important;width:calc(100% - ${RAIL}px)!important}
-#stage.tb-docked-left > #pdfNav{left:${RAIL + 12}px!important}
+/* Centre the whiteboard/PDF buttons in the space right of the rail (the base style's -50% shift pushed them under it and squashed them). */
+#stage.tb-docked-left > #pdfNav{left:calc(${RAIL}px + (100% - ${RAIL}px) / 2)!important;transform:translateX(-50%)!important;max-width:calc(100% - ${RAIL + 24}px)!important;width:max-content}
+#stage.tb-docked-left > #pdfNav.min{left:${RAIL + 12}px!important;transform:none!important;width:auto}
+/* The one Stop button stays readable in the rail: icon plus a two-line label. */
+#stage .teacher-dock.floating.dock-left .cp-dock-stop{width:48px!important;height:auto!important;min-height:52px;flex-direction:column;gap:2px;padding:4px 2px!important;font-size:11px;line-height:1.15;overflow:visible}
+#stage .teacher-dock.floating.dock-left .cp-dock-stop>span{display:none}
+#stage .teacher-dock.floating.dock-left .cp-dock-stop::after{content:attr(data-short);white-space:pre-line;text-align:center;font-size:11px;font-weight:800}
 `;
 
   function getPref() {

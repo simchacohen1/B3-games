@@ -60,7 +60,7 @@
     // It respects a selected class and never revives a removed membership.
     if(!window.FunTorahStudentClass)await load(new URL('student-class.js',root).href);
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
-    const classId=scope.classId;
+    let classId=scope.classId;
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
     function sameStudent(){return sessionStorage.getItem('b3Games_studentId')===id &&
       (sessionStorage.getItem('b3Games_studentClass')||classId)===classId}
@@ -80,9 +80,9 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261020-follow-pointer1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261101-fix66',root).href);
     }
-    const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
+    let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
     holder.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
@@ -379,7 +379,40 @@
       if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
-    const identityTimer=typeof setInterval==='function'?setInterval(()=>{if(!sameStudent()){stopPresence();stop();clearInterval(identityTimer)}},1000):null;
+    // Another boy (or another class) signing in on this same page must not leave the old connection
+    // running, and must not leave the new boy waiting for a refresh: drop everything that belonged to
+    // the old identity, then adopt the new one in place and listen for his class's lesson.
+    let switching=false,failedAttempt='';
+    async function adoptNewIdentity(){
+      if(switching)return;
+      switching=true;
+      try{
+        stopPresence();stop();
+        try{sessions.off('value',onSessions)}catch{}
+        latestSession=null;active=null;presenceTarget='';presenceDelay=0;presenceFailures=0;
+        permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';
+        // The "removed from this lesson" note belongs to the previous boy's browser session only.
+        try{sessionStorage.removeItem('classPointerRemovedRoom')}catch{}
+        // Until a new boy is confirmed, nobody owns this connection (so the same boy signing back in is picked up too).
+        id='';
+        const nextId=sessionStorage.getItem('b3Games_studentId'),nextPin=sessionStorage.getItem('b3Games_classPin');
+        if(!nextId||!nextPin||!(/^[A-Za-z0-9_-]{1,100}$/).test(nextId))return; // signed out: the timer tries again once someone signs in
+        const attempt=nextId+':'+nextPin;
+        if(attempt===failedAttempt)return;
+        failedAttempt=attempt;
+        const verified=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:nextId,pin:nextPin})});
+        if(!verified.ok||!(await verified.json()).ok)return;
+        const nextScope=await window.FunTorahStudentClass.resolve(firebase.database(),nextId);
+        if(nextScope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(nextScope.classId||''))return;
+        // He may have switched again while this was checking.
+        if(sessionStorage.getItem('b3Games_studentId')!==nextId)return;
+        failedAttempt='';id=nextId;pin=nextPin;classId=nextScope.classId;
+        sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
+        sessions.on('value',onSessions,onSessionsError);
+      }catch(error){console.warn('Class Pointer could not switch student',error)}
+      finally{switching=false}
+    }
+    const identityTimer=typeof setInterval==='function'?setInterval(()=>{if(!switching&&!sameStudent())void adoptNewIdentity()},1000):null;
     identityTimer?.unref?.();
     window.addEventListener('pagehide',()=>{if(identityTimer)clearInterval(identityTimer)},{once:true});
 
@@ -436,7 +469,7 @@
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
-    sessions.on('value',async snapshot=>{
+    async function onSessions(snapshot){
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
@@ -448,7 +481,9 @@
       latestSession=next;
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
-    },()=>{stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
+    }
+    function onSessionsError(){stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()}
+    sessions.on('value',onSessions,onSessionsError);
     async function beginShare(){
       if(stream){stop();return}
       if(busy||!active||!sameStudent())return;

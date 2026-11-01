@@ -244,7 +244,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
 
   // Closing the whiteboard discards its pictures.
-  await page.getByRole('button', { name: /Close whiteboard/ }).click();
+  await page.locator('#cpDockStop').click();
   expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(0);
   expect(errors).toEqual([]);
   await context.close();
@@ -426,7 +426,7 @@ test('Follow Teacher launch opens the shared whiteboard automatically without ca
   const page=await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(BASE+'/class-pointer-prototype/classroom.html?dashboard=teacher&class=pointer_test&followTeacherWhiteboard=1');
   await expect(page.locator('#pdfView')).toBeVisible({timeout:20000});
-  await expect(page.getByRole('button',{name:/Close whiteboard/})).toBeVisible();
+  await expect(page.locator('#cpDockStop')).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__captureCalls)).toBe(0);
   expect(context.pages()).toHaveLength(1);expect(errors).toEqual([]);
   await context.close();
@@ -456,7 +456,7 @@ test('Stop sharing stays on the Live bar on every tab and ends the share from on
     } });
   });
   const page = await context.newPage(); const errors = await openTeacher(page);
-  const stop = page.locator('.cp-live-wrap > .cp-stop-btn');
+  const stop = page.locator('#cpDockStop');
   const stopScreen = page.locator('#stopScreen');
   const share = async () => { await page.evaluate(() => (document.getElementById('shareScreen') as HTMLButtonElement).click()); await expect(stopScreen).toBeEnabled(); };
   const tab = (name: string) => page.getByRole('button', { name, exact: true }).click();
