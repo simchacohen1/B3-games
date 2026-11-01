@@ -4,3 +4,4 @@ exports.funTorahTeacherClaim = require('./teacher-claim').funTorahTeacherClaim;
 exports.funTorahManageStudents = require('./student-management').funTorahManageStudents;
 exports.weeklyQuizStudent = require('./weekly-quiz-student').weeklyQuizStudent;
 exports.studentRewardsAutoAward = require('./student-rewards-auto-award').studentRewardsAutoAward;
+exports.classGalleryRead = require('./class-gallery-read').classGalleryRead;
