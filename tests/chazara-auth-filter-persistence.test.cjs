@@ -37,7 +37,7 @@ function fixture(){
     window:{B3SiteSettings:{onAuthStateChanged:fn=>{authCallback=fn}}}};
   vm.runInNewContext(script,ctx,{filename:'chazara/teacher.html'});
   assert.equal(typeof authCallback,'function');
-  return {ctx,nodes,auth:uid=>authCallback(uid?{uid}:null,!!uid,{authorized:!!uid})};
+  return {ctx,nodes,auth:(uid,authorized=!!uid)=>authCallback(uid?{uid}:null,authorized,{authorized})};
 }
 
 test('same-UID auth refresh retains an explicitly chosen historical review filter',async()=>{
@@ -57,6 +57,18 @@ test('switching to a different Google UID resets history and filter to pending',
   x.ctx.fullDashboardLoaded=true;
   x.nodes.recordingReviewFilter.value='checked';
   await x.auth('fictional_teacher_b');
+  assert.equal(x.ctx.fullDashboardLoaded,false);
+  assert.equal(x.nodes.recordingReviewFilter.value,'pending');
+});
+
+// A revoked account may retain the same Firebase UID; the full-history opt-in
+// must not survive an explicit authorization denial.
+test('same-UID authorization revocation resets historical view to pending',async()=>{
+  const x=fixture();
+  await x.auth('fictional_teacher_a');
+  x.ctx.fullDashboardLoaded=true;
+  x.nodes.recordingReviewFilter.value='checked';
+  await x.auth('fictional_teacher_a',false);
   assert.equal(x.ctx.fullDashboardLoaded,false);
   assert.equal(x.nodes.recordingReviewFilter.value,'pending');
 });
