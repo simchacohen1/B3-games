@@ -75,9 +75,9 @@
 </div>
 </div>
 <script>
-if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const db=firebase.database(),auth=firebase.auth(),storage=firebase.storage(),$=x=>document.getElementById(x),ET=new Set(["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"]),WT=new Set(["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"]);let fullDashboardLoaded=false,D={},R={},E={},P={},teacherAccess=null,teacherScope=null,scopeGeneration=0,studentListeners=[];
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const db=firebase.database(),auth=firebase.auth(),storage=firebase.storage(),$=x=>document.getElementById(x);let fullDashboardLoaded=false,D={},R={},E={},P={},teacherAccess=null,teacherScope=null,scopeGeneration=0,studentListeners=[];
 let pendingRecordingKeys=new Set(),historyStudentsLoaded=new Set(),historyLoading=false,historyGeneration=0,approvalGeneration=0;
-function cls(id){let c=R[id]?.classId;return c?c:ET.has(id)?"et":WT.has(id)?"wt":""}function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}function fmt(t){return t?new Date(t).toLocaleDateString():"—"}
+function cls(id){return R[id]?.classId||""}function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}function fmt(t){return t?new Date(t).toLocaleDateString():"—"}
 function resultEntries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');if(v&&typeof v==='object')return Object.keys(v).filter(k=>/^\d+$/.test(k)).map(k=>[Number(k),v[k]]).filter(([,x])=>x&&typeof x==='object');return[]}
 function readingScore(a){return a&&typeof a.hebrewFinalScore==='number'?a.hebrewFinalScore:(a&&typeof a.hebrewScore==='number'?a.hebrewScore:null)}
 function translationScore(a){if(!a)return null;const e=resultEntries(a.translationChunkResults);if(!e.length)return null;const max=Math.max(...e.map(([i,c])=>Number.isInteger(c.chunkIndex)?c.chunkIndex:i))+1,total=Math.max(Number(a.translationTotal)||0,max,e.length),correct=e.filter(([,c])=>(c.finalVerdict||c.verdict)==='correct').length;return total?Math.round(correct/total*100):null}
