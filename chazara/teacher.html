@@ -374,6 +374,16 @@ function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(w
 // A claimed teacher's assignment is the authority for the open page, not the
 // access object captured at sign-in. Never keep previously loaded audio visible
 // after the teacher is disabled or their assigned classes change.
+// Historical recordings are an explicit opt-in for one signed-in identity and
+// one verified class assignment. Reset before a different identity, denial or
+// changed assignment can initiate a new scoped history read.
+function resetChazaraHistoryView(){
+ fullDashboardLoaded=false;
+ $('teacherApp').classList.add('review-only');
+ $('showFullDashboard').classList.remove('hidden');
+ $('showPendingOnly').classList.add('hidden');
+ $('recordingReviewFilter').value='pending';
+}
 function teacherAssignmentChange(access,row){
  if(!row||row.active===false||(row.role&&!['teacher','principal'].includes(row.role)))return 'revoked';
  const live=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true).sort();
@@ -381,7 +391,7 @@ function teacherAssignmentChange(access,row){
  return JSON.stringify(live)===JSON.stringify(opened)?'':'changed';
 }
 async function loadClassScope(user,access){
- const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();$('recordingReviewFilter').value='pending';teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  // Hide and stop cached recording playback before any asynchronous revalidation.
  for(const id of ['recordingsList','approvalList']){
   const panel=$(id);if(!panel)continue;
@@ -411,11 +421,11 @@ async function loadClassScope(user,access){
    const onAssignment=snap=>{
     if(generation!==scopeGeneration)return;
     const change=teacherAssignmentChange(access,snap.val());
-    if(change==='revoked')loadClassScope(user,{authorized:false});
-    else if(change==='changed')loadClassScope(user,access);
+    if(change==='revoked'){resetChazaraHistoryView();loadClassScope(user,{authorized:false});}
+    else if(change==='changed'){resetChazaraHistoryView();loadClassScope(user,access);}
    };
    studentListeners.push([assignmentRef,onAssignment]);
-   assignmentRef.on('value',onAssignment,()=>{if(generation===scopeGeneration)loadClassScope(user,{authorized:false})});
+   assignmentRef.on('value',onAssignment,()=>{if(generation===scopeGeneration){resetChazaraHistoryView();loadClassScope(user,{authorized:false})}});
   }
   if(generation!==scopeGeneration)return;
   $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();await loadApprovals();
@@ -424,7 +434,13 @@ async function loadClassScope(user,access){
   if(fullDashboardLoaded)await loadRecordingHistory();
  }catch(error){if(generation===scopeGeneration)$('teacherGate').textContent=error.message||'Could not load your class.';}
 }
-window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScope(user,access||{authorized}));
+let lastChazaraAuthUid=null;
+window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
+ const uid=user?.uid||null;
+ if(uid!==lastChazaraAuthUid||authorized===false||access?.authorized===false)resetChazaraHistoryView();
+ lastChazaraAuthUid=uid;
+ return loadClassScope(user,access||{authorized});
+});
 // Re-check the teacher's classes every minute in the background. Only rebuild
 // the dashboard (which hides it while loading) when something actually changed.
 async function quietScopeCheck(){

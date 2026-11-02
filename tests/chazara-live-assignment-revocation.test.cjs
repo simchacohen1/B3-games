@@ -14,23 +14,28 @@ const handlerMatch=html.match(/const onAssignment=(snap=>\{[\s\S]*?\n   \});/);
 assert.ok(handlerMatch,'the live assignment listener callback exists');
 
 function fixture(){
- const calls=[],access={authorized:true,role:'teacher',classIds:['et','wt']},user={uid:'teacher-fixture'};
- const ctx={generation:4,scopeGeneration:4,teacherAssignmentChange,access,user,
-  loadClassScope:(...args)=>calls.push(args)};
+ const calls=[],loadedModes=[],access={authorized:true,role:'teacher',classIds:['et','wt']},user={uid:'teacher-fixture'};
+ let resets=0;
+ const ctx={generation:4,scopeGeneration:4,teacherAssignmentChange,access,user,fullDashboardLoaded:true,
+  resetChazaraHistoryView:()=>{resets++;ctx.fullDashboardLoaded=false;},
+  loadClassScope:(...args)=>{calls.push(args);loadedModes.push(ctx.fullDashboardLoaded);}};
  const handler=vm.runInNewContext('('+handlerMatch[1]+')',ctx);
- return {calls,access,user,ctx,handler,row:row=>handler({val:()=>row})};
+ return {calls,loadedModes,resetCount:()=>resets,access,user,ctx,handler,row:row=>handler({val:()=>row})};
 }
 
 test('unchanged assignment, including key ordering, does not reload the Chazara page',()=>{
  const x=fixture();
  x.row({role:'teacher',active:true,classIds:{wt:true,et:true,'*':true}});
  assert.equal(x.calls.length,0);
+ assert.equal(x.resetCount(),0,'unchanged assignments preserve the explicit history choice');
 });
 test('teacher deactivation or deletion immediately denies the open Chazara page',()=>{
  for(const row of [{role:'teacher',active:false,classIds:{et:true,wt:true}},null]){
   const x=fixture();x.row(row);
   assert.equal(x.calls.length,1);
   assert.equal(x.calls[0][1].authorized,false);
+  assert.equal(x.resetCount(),1);
+  assert.equal(x.loadedModes[0],false,'revocation clears historical opt-in before reload');
  }
 });
 test('removing or adding an assigned class triggers a fresh server-scoped load',()=>{
@@ -39,6 +44,8 @@ test('removing or adding an assigned class triggers a fresh server-scoped load',
   assert.equal(x.calls.length,1);
   assert.equal(x.calls[0][0],x.user);
   assert.equal(x.calls[0][1],x.access);
+  assert.equal(x.resetCount(),1);
+  assert.equal(x.loadedModes[0],false,'new class scope must not inherit full-history mode');
  }
 });
 test('non-teacher role fails closed, but unchanged principal teacher grant remains valid',()=>{
@@ -54,7 +61,7 @@ test('obsolete listener from a previous sign-in cannot reauthorize or reload',()
  assert.equal(x.calls.length,0);
 });
 test('listener cancellation denies access and scope resets stop cached audio',()=>{
- assert.match(html,/assignmentRef\.on\('value',onAssignment,\(\)=>\{if\(generation===scopeGeneration\)loadClassScope\(user,\{authorized:false\}\)\}\)/);
+ assert.match(html,/assignmentRef\.on\('value',onAssignment,\(\)=>\{if\(generation===scopeGeneration\)\{resetChazaraHistoryView\(\);loadClassScope\(user,\{authorized:false\}\)\}\}\)/);
  assert.match(html,/studentListeners\.push\(\[assignmentRef,onAssignment\]\)/);
  assert.match(html,/function clearStudentListeners\(\)\{for\(const \[ref,handler\] of studentListeners\)ref\.off\('value',handler\)/);
  assert.match(html,/panel\.querySelectorAll\('audio'\)\.forEach\(audio=>\{audio\.pause\(\);audio\.removeAttribute\('src'\);audio\.load\(\)\}\)/);
