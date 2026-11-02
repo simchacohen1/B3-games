@@ -711,6 +711,7 @@
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
         tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for his screen…':'';
         tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
+        tile.toClass.hidden=!screens||paused||!live||!window.ClassPointerClassShare;
         setVideo(tile.video,screens&&!paused?live:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
       }
@@ -732,10 +733,12 @@
     node.tabIndex=0;node.setAttribute('role','button');node.title='Open '+m.name+'’s tile large';
     v.muted=true;v.autoplay=true;v.playsInline=true;v.hidden=true;
     const block=button('🚫','Pause '+m.name,event=>{event.stopPropagation();toggleBlock(m)},'board-block');
-    node.append(c,v,note,el('span','board-name',m.name),block);
+    const toClass=button('📣','Show '+m.name+'’s screen to the whole class',event=>{event.stopPropagation();const id=personId(m)||m.studentId;if(id)window.ClassPointerActivityShares?.showToClass?.(id,m.name)},'board-block board-class-share');
+    toClass.hidden=true;
+    node.append(c,v,note,el('span','board-name',m.name),block,toClass);
     node.addEventListener('click',()=>setFocus(m.id));
     node.addEventListener('keydown',event=>{if(event.target===node&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setFocus(m.id)}});
-    return{node,canvas:c,video:v,note,block};
+    return{node,canvas:c,video:v,note,block,toClass};
   }
   function syncTiles(){
     const present=admitted();

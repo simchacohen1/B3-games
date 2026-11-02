@@ -111,3 +111,4 @@ body.boards-on #studentDock{display:none!important}
 
 /* Activity-page overlay must respect hidden controls without classroom.css. */
 #fttEmbeddedPointerStage [hidden]{display:none!important}
+.board-class-share{right:44px}
