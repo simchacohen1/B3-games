@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const admin = require('firebase-admin');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const core = require('./multiplayer-games-core.cjs');
+const { allowsMultiplayer } = require('./multiplayer-lock-policy.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -29,7 +30,7 @@ async function authorizeStudent(request, db, requestedWorkspace) {
   const [membershipSnap, classSnap, legacySettingsSnap] = await Promise.all([
     db.ref(`b3Games/students/${studentId}/memberships/${membershipKey}`).get(),
     db.ref(`b3Games/workspaces/${requestedWorkspace}/classes/${classId}`).get(),
-    ['et', 'wt'].includes(classId) ? db.ref('b3Games/siteSettings').get() : Promise.resolve(null),
+    db.ref('b3Games/siteSettings').get(),
   ]);
   const membership = membershipSnap.val();
   const cls = classSnap.val();
@@ -45,7 +46,7 @@ async function authorizeStudent(request, db, requestedWorkspace) {
   if (!centerEnabled || member.toolAccess?.['multiplayer-center'] === false) {
     throw new HttpsError('permission-denied', 'Ask your teacher to turn on Multiplayer Center.');
   }
-  return { studentId, classId, workspaceId: requestedWorkspace, name: safeName(member.name) };
+  return { studentId, classId, workspaceId: requestedWorkspace, name: safeName(member.name), lockSettings: legacySettings, classRow: cls };
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
@@ -213,6 +214,13 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       throw new HttpsError('invalid-argument', 'That game action is too large.');
     }
     const actor = await authorizeStudent(request, db, String(data.workspaceId || ''));
+    // Mirror production server-side lock protection for fictional staging students.
+    if (data.action !== 'leave' && data.action !== 'cleanup' && !allowsMultiplayer({
+      actorRole: 'student', classId: actor.classId, studentId: actor.studentId,
+      settings: actor.lockSettings, classRow: actor.classRow,
+    })) {
+      throw new HttpsError('permission-denied', 'Multiplayer Arcade is locked for your class. Ask your teacher to unlock it.');
+    }
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'create') return await newRoom(db, actor, String(data.gameKey || ''));
     if (data.action === 'get-private') {

@@ -581,7 +581,15 @@
       }
       // Tool grants are checked against the selected class, never another teacher's class.
       var teacherGrantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!teacherClassRecord||teacherClassRecord.active===false||!window.B3StudentTools.granted(teacherClassRecord,teacherGrantId)){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
+      // The B3 legacy ET/WT classroom activity switch is also the accepted
+      // Multiplayer Arcade teacher grant. Mirror teacher-home.html, which
+      // offers this activity without requiring a separate toolGrants record.
+      var legacyArcadeTeacherGrant=gameId==="multiplayer-center"&&(selected==="et"||selected==="wt")&&
+        gameIsEnabledForClass(lastSettings,selected);
+      if(!teacherClassRecord||teacherClassRecord.active===false||
+          !(window.B3StudentTools.granted(teacherClassRecord,teacherGrantId)||legacyArcadeTeacherGrant)){
+        showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;
+      }
       showOpen();return;
     }
     if(!studentActive){

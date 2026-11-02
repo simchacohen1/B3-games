@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const admin = require('firebase-admin');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const core = require('./multiplayer-games-core.cjs');
+const { allowsMultiplayer } = require('./multiplayer-lock-policy.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -62,7 +63,9 @@ async function authorizeActor(request, db, requestedWorkspace, requestedClassId)
     name = safeName(teacher.displayName || token?.name || 'Teacher');
     cls = classSnap.val();
   }
-  const legacySettingsSnap = ['et', 'wt'].includes(classId) ? await db.ref('b3Games/siteSettings').get() : null;
+  // A class lock can change at any moment. Read it on each callable action,
+  // not only when the browser first opened Multiplayer Arcade.
+  const legacySettingsSnap = await db.ref('b3Games/siteSettings').get();
   if (!cls || cls.active === false) throw new HttpsError('permission-denied', 'Your active class membership is required.');
   if (actorRole === 'teacher' && cls?.teacherIds?.[request.auth.uid] !== true) {
     throw new HttpsError('permission-denied', 'This teacher is not assigned to the selected class.');
@@ -74,7 +77,8 @@ async function authorizeActor(request, db, requestedWorkspace, requestedClassId)
   if (!centerEnabled || actorRole === 'student' && member?.toolAccess?.['multiplayer-center'] === false) {
     throw new HttpsError('permission-denied', 'Ask your teacher to turn on Multiplayer Center.');
   }
-  return { studentId: participantId, participantId, actorRole, classId, workspaceId: requestedWorkspace, name };
+  return { studentId: participantId, participantId, actorRole, classId, workspaceId: requestedWorkspace, name,
+    lockSettings: legacySettings, classRow: cls };
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
@@ -257,6 +261,15 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       throw new HttpsError('invalid-argument', 'That game action is too large.');
     }
     const actor = await authorizeActor(request, db, String(data.workspaceId || ''), String(data.classId || request.auth?.token?.b3ClassId || ''));
+    // Let students leave a room or clean stale invitations after locking.
+    // All gameplay, new rooms, joins, private hands, and future spectator /
+    // invitation actions must honor exactly the class lock and exceptions.
+    if (data.action !== 'leave' && data.action !== 'cleanup' && !allowsMultiplayer({
+      actorRole: actor.actorRole, classId: actor.classId, studentId: actor.studentId,
+      settings: actor.lockSettings, classRow: actor.classRow,
+    })) {
+      throw new HttpsError('permission-denied', 'Multiplayer Arcade is locked for your class. Ask your teacher to unlock it.');
+    }
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'create') return await newRoom(db, actor, String(data.gameKey || ''));
     if (data.action === 'get-private') {
