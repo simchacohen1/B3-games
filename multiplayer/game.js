@@ -5,7 +5,7 @@
     'tic-tac-toe': { name: 'Tic Tac Toe', icon: '⭕', minPlayers: 2, maxPlayers: 2, columns: 3, rows: 3, computerOpponent: true },
     'memory-match': { name: 'Memory Match', icon: '🧠', minPlayers: 2, columns: 4, rows: 4 },
     checkers: { name: 'Checkers', icon: '🔴', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
-    reversi: { name: 'Reversi', icon: '⚫', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
+    reversi: { name: 'Othello', icon: '⚫', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
     bingo: { name: 'Bingo', icon: '🎯', minPlayers: 2, columns: 5, rows: 5 },
     'math-race': { name: 'Math Race', icon: '➕', minPlayers: 2 },
     set: { name: 'Set', icon: '🟣', minPlayers: 2 },

@@ -195,7 +195,7 @@ test('Checkers enforces turn ownership, required captures, continuing jumps, and
   assert.equal(state.board[2], 'red-king');
 });
 
-test('Reversi validates captures, flips discs, skips a blocked turn, and scores the finish', () => {
+test('Othello validates captures, flips discs, skips a blocked turn, and scores the finish', () => {
   const { group, state } = start('reversi', ['a', 'b']);
   assert.throws(() => core.applyMove('reversi', state, 'a', { type: 'place', index: 0 }, group), /capture/);
   core.applyMove('reversi', state, 'a', { type: 'place', index: 20 }, group);
