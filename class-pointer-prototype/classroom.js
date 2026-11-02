@@ -175,6 +175,7 @@ function stopClassShare(){
 }
 function startClassShare(studentId,name,stream){
   if(!isTeacher||!started||!stream||typeof studentId!=='string'||!studentId)return false;
+  window.ClassPointerBoards?.stopClassBoard?.();
   stopClassShare();
   classShare={id:crypto.randomUUID(),studentId,name:String(name||'A student').slice(0,60),stream};
   for(const entry of presence.values())sendClassShare(entry);

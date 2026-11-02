@@ -72,7 +72,7 @@
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
     document.body.append(boardStage);
     const boardCss=document.createElement('link');boardCss.rel='stylesheet';
-    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261101-classshare1',root).href;
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261102-classboard1',root).href;
     document.head.append(boardCss);
     window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
       sendTeacher:message=>{
@@ -80,7 +80,7 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261101-classshare1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261102-classboard1',root).href);
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
