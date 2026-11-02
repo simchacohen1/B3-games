@@ -25,6 +25,10 @@ test('synthetic Shorashim display capture is authorized and rendered by teacher'
     window.fetch=async(url,options)=>{
       const body=options?.body?JSON.parse(options.body):{};
       if(String(url).includes('funTorahStudentAuth'))return {ok:true,status:200,json:async()=>({ok:true})};
+      if(body.action==='permissions'){
+        window.__permissionCheck={...body};
+        return {ok:true,status:200,json:async()=>({ok:true,screenSharingDenied:false,whiteboardDenied:false})};
+      }
       if(body.action==='issue')return {ok:true,status:200,json:async()=>({ok:true,token:'a'.repeat(64),studentName:'Arik'})};
       if(body.action==='verify'){
         window.__verified={...body,authorization:options.headers.Authorization};
@@ -74,11 +78,13 @@ test('synthetic Shorashim display capture is authorized and rendered by teacher'
     videoWidth:document.querySelector('#activityScreenTray video')?.videoWidth,
     trayVisible:!document.getElementById('activityScreenTray')?.hidden,
     verified:window.__verified,
+    permissionCheck:window.__permissionCheck,
     sessionPath:window.__sessionPath
   }));
   expect(result.videoStream).toBe(true);
   expect(result.trayVisible).toBe(true);
   expect(result.videoWidth).toBe(320);
+  expect(result.permissionCheck).toEqual({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:'class-pointer-12345678-1234-1234-1234-123456789abc'});
   expect(result.verified).toMatchObject({action:'verify',classId:'et',room:'class-pointer-12345678-1234-1234-1234-123456789abc',authorization:'Bearer teacher-id-token'});
   expect(result.sessionPath).toContain('/classes/et/classPointerSessions');
 });
