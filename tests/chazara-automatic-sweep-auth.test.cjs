@@ -23,6 +23,7 @@ function fixture(api=async()=>({status:'approved'})){
   auth:{currentUser:{uid:'teacher_alpha'}},
   scopeGeneration:1,
   teacherScope:{boundAuthUid:'teacher_alpha'},
+  teacherAccess:{authorized:true},
   teacherApi:async(action,args)=>{
    assert.equal(action,'approve-point-request');
    calls.push({uid:context.auth.currentUser?.uid,id:args.requestId});
