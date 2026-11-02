@@ -47,6 +47,13 @@
       .then(result => result.data || {})
       .finally(() => { pending = false; draw(); });
   }
+  function activePlayerCount(value) { return (value?.players || []).filter(player => player && player.active !== false).length; }
+  function setTitle() {
+    title.replaceChildren();
+    const art = window.FTT_GAME_ART?.illustration?.({ key: gameKey, icon: game.icon });
+    if (art) { const wrap = text('span', 'game-title-art'); wrap.append(art); title.append(wrap); } else title.append(game.icon + ' ');
+    title.append(game.name);
+  }
   function listen(code) {
     roomCode = code;
     const roomPath = `multiplayerCenter/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/strategyRooms/${roomCode}`;
@@ -58,7 +65,7 @@
       }
       roomSection.hidden = false;
       el('roomCode').textContent = 'Room code ' + roomCode;
-      if (room.state === 'countdown' && Number.isFinite(Number(room.countdownAt))) runCountdown(room.countdownAt);
+      if (room.state === 'countdown' && Number.isFinite(Number(room.countdownAt)) && activePlayerCount(room) >= 2) runCountdown(room.countdownAt);
       else { clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); countdownTimer = countdownRetryTimer = null; countdownStarting = false; el('countdown').hidden = true; }
       draw();
       if (room.state === 'finished') settleFinishedRoom();
@@ -433,7 +440,7 @@
       showBrowse(); return;
     }
     studentId = savedId;
-    title.textContent = game.icon + ' ' + game.name;
+    setTitle();
     document.title = game.name + ' — Fun Torah Tools';
     hint.textContent = gameKey === 'memory-match' ? 'Flip cards to find pairs. A match earns another turn.' : gameKey === 'bingo' ? 'The host draws numbers. Your card is marked as numbers are called.' : gameKey === 'go-fish' ? 'Ask for a rank already in your hand and collect four-of-a-kind books.' : gameKey === 'uno-style' ? 'Play a matching color or number. Wild cards let you pick a color.' : 'Take turns, make your move, and see who wins!';
     try {
@@ -446,7 +453,7 @@
         try {
           classInfo = await window.B3MultiplayerIdentity.resolve(db, user, params.get('classId') || '', savedId);
           studentId = classInfo.participantId;
-          title.textContent = game.icon + ' ' + game.name;
+          setTitle();
           if (typeof firebase.functions !== 'function') throw new Error('The secure multiplayer service did not load. Reload the page to try again.');
           callable = firebase.app().functions('us-central1').httpsCallable('multiplayerGameAction');
           const code = params.get('b3MultiplayerRoom');

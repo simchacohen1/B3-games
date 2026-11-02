@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const source = fs.readFileSync('multiplayer/center.js', 'utf8');
+const source = fs.readFileSync('multiplayer/center.js', 'utf8') + fs.readFileSync('multiplayer/art.js', 'utf8');
 function capture(expression, label) {
   const match = source.match(expression);
   assert.ok(match, `missing ${label}`);
