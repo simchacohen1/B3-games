@@ -105,3 +105,7 @@ test('page wiring: blank cells clickable in live grid and results; clear button 
   assert.match(html,/class="cell '\+cls\+'" onclick="openAnswerModal\(/);
   assert.match(html,/id="modalClearBtn"/);
 });
+test('audit trail stays write-only in the teacher page; no full audit root listener',()=>{
+  assert.doesNotMatch(html,/db\.ref\(QROOT\+'\/audit'\)\.on\('value'/);
+  assert.match(html,/async function writeAudit\(type,before,after,note,extra=\{\}\)\{[^\n]*db\.ref\(QROOT\+'\/audit\/'\+modalContext\.launchId\+'\/'\+modalContext\.studentId\)/);
+});
