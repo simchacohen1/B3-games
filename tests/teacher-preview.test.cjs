@@ -33,6 +33,8 @@ test('Chazara only skips the UID-based teacher lookup inside a verified read-onl
  assert.equal(withGuard({role:'teacher',preview:false}),true,'real teacher reloads live class assignments');
  assert.equal(withoutGuard({role:'teacher',preview:true}),true,'URL/forged preview flag alone cannot bypass teacher lookup');
  assert.equal(withGuard({role:'admin',preview:false}),false,'owners use administrator scope');
- assert.equal((html.match(/if\(needsTeacherAssignmentRefresh\(access\)\)\{/g)||[]).length,2,
-  'initial load and one-minute refresh must have the same policy');
+ assert.equal((html.match(/if\(needsTeacherAssignmentRefresh\(access\)\)\{/g)||[]).length,3,
+  'initial load, live assignment listener and one-minute refresh must share the verified-preview policy');
+ assert.match(html,/if\(needsTeacherAssignmentRefresh\(access\)\)\{\s*const assignmentRef=db\.ref/,
+  'the new live assignment watcher must also honor the verified owner-preview exception');
 });
