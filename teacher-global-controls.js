@@ -132,6 +132,15 @@
       '#fttTeacherQuickBar button[hidden],.ftt-home-follow[hidden]{display:none!important}',
       '#fttTeacherQuickBar button[aria-current=page],.ftt-home-follow[aria-current=page]{cursor:default}',
       '.ftt-home-follow{font-size:18px!important;padding:5px 9px!important;border-radius:999px!important}',
+      '#fttFollowStatus{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:99979;display:flex;align-items:center;gap:8px;padding:4px 6px 4px 12px;border-radius:999px;box-shadow:0 5px 16px #0f172a29;font:800 13px Arial,sans-serif;max-width:calc(100vw - 20px);border:2px solid}',
+      '#fttFollowStatus[hidden]{display:none!important}',
+      '#fttFollowStatus[data-mode=free]{background:#e8f8ee;border-color:#16a34a;color:#14532d}',
+      '#fttFollowStatus[data-mode=once]{background:#eaf2ff;border-color:#2563eb;color:#1e3a8a}',
+      '#fttFollowStatus[data-mode=locked]{background:#fee2e2;border-color:#dc2626;color:#7f1d1d}',
+      '#fttFollowStatus[data-mode=other]{background:#fff4d6;border-color:#d97706;color:#78350f}',
+      '#fttFollowStatus button{border:0;border-radius:999px;padding:6px 11px;background:#fff;color:#1e293b;font:800 12px Arial;cursor:pointer}',
+      '#fttFollowStatus button[hidden]{display:none!important}',
+      '#fttFollowStatus button:disabled{opacity:.5;cursor:default}',
       '#fttTeacherQuickModal{position:fixed;inset:0;z-index:100500;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:12px;font-family:Arial,sans-serif}',
       '#fttTeacherQuickModal .ftt-quick-card{background:#fff;color:#1e293b;border-radius:18px;width:min(980px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 65px #0005}',
       '#fttTeacherQuickModal .ftt-quick-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #cbd5e1;font-weight:900}',
@@ -234,7 +243,153 @@
     }
     syncPointerButtons();
   }
+
+  // ---- Always-visible control status (Issue #150) ----
+  // Reads the SAME record students listen to (classes/<id>/access/followTeacher),
+  // so it shows what students really receive, on every page and in every tab.
+  var statusBox = null, statusText = null, releaseBtn = null, takeBtn = null;
+  var statusRef = null, statusHandler = null, statusClass = '', statusState = null;
+  var statusKey = '', statusOffset = 0, offsetRef = null, statusTimer = null, renewTimer = null, renewing = false;
+  var coreLoading = null;
+  function followCore() { return window.FTTFollowTeacherCore || null; }
+  function loadCore() {
+    if (followCore()) return Promise.resolve();
+    if (!coreLoading) coreLoading = new Promise(function(resolve, reject) {
+      var s = el('script'); s.src = new URL('follow-teacher/core.js?v=20261102-status', base).href;
+      s.onload = resolve; s.onerror = function(){ coreLoading = null; reject(new Error('core')); };
+      document.head.appendChild(s);
+    });
+    return coreLoading;
+  }
+  function clock() { return Date.now() + statusOffset; }
+  function teacherKey(uid) {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('FTT-follow-v1:' + uid)).then(function(buf) {
+      return Array.from(new Uint8Array(buf), function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    });
+  }
+  function rememberLast(id, st) {
+    try { localStorage.setItem('b3FollowLast:' + id, JSON.stringify({destination:st.destination, subdestination:st.subdestination || ''})); } catch (_) {}
+  }
+  function readLast(id) {
+    try { return JSON.parse(localStorage.getItem('b3FollowLast:' + id) || 'null'); } catch (_) { return null; }
+  }
+  function classLabelFor(id) {
+    var row = classes.find(function(c){ return c.id === id; });
+    return row ? row.name : String(id).toUpperCase();
+  }
+  function describe(state) {
+    var C = followCore();
+    var live = !!(C && state && state.mode !== 'independent' && C.fresh(state, clock()));
+    if (!live) return {mode:'free', live:false};
+    var dest = C.DESTINATIONS[state.destination];
+    return {mode: state.mode === 'locked' ? 'locked' : 'once', live:true,
+      label: dest ? dest.label : 'Activity', mine: state.teacherUid === statusKey};
+  }
+  function renderStatus() {
+    if (!statusBox) return;
+    if (!authorized || !classIsValid(statusClass)) { statusBox.hidden = true; return; }
+    var d = describe(statusState), mode = d.mode;
+    if (d.live && !d.mine) mode = 'other';
+    statusBox.hidden = false;
+    statusBox.dataset.mode = mode;
+    var text = mode === 'locked' ? '🔴 Controlled → ' + d.label
+      : mode === 'once' ? '🔵 Followed once → ' + d.label + ' (students free)'
+      : mode === 'other' ? '🟠 Another teacher controls → ' + d.label
+      : '🟢 Free';
+    statusText.textContent = classLabelFor(statusClass) + ' · ' + text;
+    releaseBtn.hidden = !d.live || !d.mine;
+    takeBtn.hidden = mode === 'locked' || mode === 'other';
+    releaseBtn.disabled = takeBtn.disabled = false;
+  }
+  function writeState(mode, destInfo) {
+    var C = followCore(), user = firebase.auth().currentUser;
+    if (!C || !user || !classIsValid(statusClass) || !statusRef) return Promise.reject(new Error('not ready'));
+    var ref = statusRef, id = statusClass, independent = mode === 'independent';
+    return teacherKey(user.uid).then(function(key) {
+      var now = clock();
+      var rev = (crypto.randomUUID ? crypto.randomUUID() : String(now)).replace(/[^A-Za-z0-9_-]/g, '-');
+      var row = C.propose({workspaceId:workspace, classId:id, teacherUid:key, mode:mode,
+        destination: independent ? undefined : destInfo.destination,
+        subdestination: independent ? undefined : destInfo.subdestination,
+        targets:'all', revision:rev, issuedAt:now, heartbeatAt:now, expiresAt:now + C.MAX_HEARTBEAT_AGE_MS});
+      return ref.set(row);
+    });
+  }
+  function release() {
+    releaseBtn.disabled = takeBtn.disabled = true;
+    writeState('independent').catch(function(e){ console.warn('Release failed', e); }).then(renderStatus);
+  }
+  function takeControl() {
+    var last = readLast(statusClass), C = followCore();
+    if (!last || !C || !C.DESTINATIONS[last.destination]) { openPanel('follow'); return; }
+    releaseBtn.disabled = takeBtn.disabled = true;
+    writeState('locked', last).catch(function(e){ console.warn('Take control failed', e); openPanel('follow'); }).then(renderStatus);
+  }
+  // Keep a Locked session alive from any page; once every teacher page is closed it expires.
+  function renewIfMine() {
+    var C = followCore(), st = statusState;
+    if (renewing || !C || !st || st.mode !== 'locked' || st.teacherUid !== statusKey ||
+        !C.fresh(st, clock()) || !statusRef || !classIsValid(statusClass)) return;
+    renewing = true;
+    var ref = statusRef, rev = st.revision;
+    ref.once('value').then(function(snap) {
+      var cur = snap.val();
+      if (!cur || cur.revision !== rev || cur.mode !== 'locked') return;
+      var t = clock();
+      return ref.update({issuedAt:t, heartbeatAt:t, expiresAt:t + C.MAX_HEARTBEAT_AGE_MS});
+    }).catch(function(){}).then(function(){ renewing = false; });
+  }
+  function watchStatus() {
+    var id = currentClass();
+    if (!authorized || !statusBox) return;
+    if (id === statusClass && statusRef) return;
+    if (statusRef && statusHandler) statusRef.off('value', statusHandler);
+    statusRef = null; statusState = null; statusClass = ID.test(id) ? id : '';
+    renderStatus();
+    if (!classIsValid(statusClass)) return;
+    var mine = statusClass;
+    statusRef = firebase.database().ref('b3Games/workspaces/' + workspace + '/classes/' + mine + '/access/followTeacher');
+    statusHandler = function(snap) {
+      if (mine !== statusClass) return;
+      statusState = snap.val();
+      if (statusState && statusState.mode !== 'independent' && statusState.destination) rememberLast(mine, statusState);
+      renderStatus();
+      renewIfMine();
+    };
+    statusRef.on('value', statusHandler, function(e){ console.warn('Follow status unavailable', e); });
+  }
+  function startStatus() {
+    if (statusBox) { watchStatus(); renderStatus(); return; }
+    statusBox = el('div'); statusBox.id = 'fttFollowStatus'; statusBox.hidden = true;
+    statusBox.setAttribute('role', 'status'); statusBox.setAttribute('aria-live', 'polite');
+    statusText = el('span');
+    releaseBtn = el('button', '', 'Release control'); releaseBtn.type = 'button'; releaseBtn.hidden = true;
+    releaseBtn.title = 'Set students free right now';
+    takeBtn = el('button', '', 'Take control'); takeBtn.type = 'button';
+    takeBtn.title = 'Lock students to the last destination you used';
+    releaseBtn.addEventListener('click', release);
+    takeBtn.addEventListener('click', takeControl);
+    statusBox.append(statusText, releaseBtn, takeBtn);
+    document.body.appendChild(statusBox);
+    var user = firebase.auth().currentUser, prepared = [loadCore()];
+    if (user) prepared.push(teacherKey(user.uid).then(function(k){ statusKey = k; }));
+    if (!offsetRef) {
+      offsetRef = firebase.database().ref('.info/serverTimeOffset');
+      offsetRef.on('value', function(s){ statusOffset = Number(s.val()) || 0; renderStatus(); });
+    }
+    Promise.all(prepared).then(function(){ watchStatus(); renderStatus(); })
+      .catch(function(e){ console.warn('Follow status unavailable', e); });
+    // Pick up class changes (top pill or home selector) and lease expiry.
+    statusTimer = setInterval(function(){ watchStatus(); renderStatus(); }, 1000);
+    renewTimer = setInterval(renewIfMine, 20000);
+  }
+  function stopStatus() {
+    if (statusRef && statusHandler) statusRef.off('value', statusHandler);
+    statusRef = null; statusState = null; statusClass = '';
+    if (statusBox) statusBox.hidden = true;
+  }
   function reset() {
+    stopStatus();
     authorized = false; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
@@ -278,6 +433,7 @@
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
+      startStatus();
     } catch(e) {
       if (serial===identity) reset();
       console.warn('Teacher quick controls unavailable:',e);

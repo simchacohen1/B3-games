@@ -7,6 +7,15 @@
 
   let active = null, generation = 0, checking = false, rerunRequested = false;
   const appliedKey = 'fttFollowTeacherLastApplied';
+  // "Follow once" must stay once across every tab, so also remember it in localStorage.
+  function lastApplied() {
+    try { const a = sessionStorage.getItem(appliedKey) || localStorage.getItem(appliedKey) || ''; return a; }
+    catch (_) { return ''; }
+  }
+  function markApplied(key) {
+    try { sessionStorage.setItem(appliedKey, key); } catch (_) {}
+    try { localStorage.setItem(appliedKey, key); } catch (_) {}
+  }
   let banner = null;
   let policySignature = '';
   function policyChanged(run) {
@@ -127,7 +136,7 @@
         run.permittedState=state;
         window.dispatchEvent(new CustomEvent('ftt:follow-activity-changed'));
       }
-      const lastAppliedKey = sessionStorage.getItem(appliedKey) || '';
+      const lastAppliedKey = lastApplied();
       const decision = C.decide(state, {
         studentAuthorized: true, workspaceId: run.workspaceId,
         classId: run.classId, studentId: run.studentId,
@@ -137,7 +146,7 @@
       if (decision.action === 'none') { notice(''); clearTimeout(run.redirectTimer); return; }
       if (decision.action === 'stay') {
         clearTimeout(run.redirectTimer);
-        if (decision.mode === C.MODES.FREE) sessionStorage.setItem(appliedKey, decision.applyKey);
+        if (decision.mode === C.MODES.FREE) markApplied(decision.applyKey);
         notice(decision.mode === C.MODES.LOCKED ? 'Following your teacher · ' + C.DESTINATIONS[state.destination].label : '');
         return;
       }
@@ -170,7 +179,7 @@
             return;
           }
           if (decision.mode === C.MODES.FREE) {
-            sessionStorage.setItem(appliedKey, decision.applyKey);
+            markApplied(decision.applyKey);
           }
           const adapter=root.FTTFollowActivities?.[state.destination];
           if (state.subdestination && C.canonicalPath(location.href) === C.canonicalPath(decision.destination) &&
