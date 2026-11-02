@@ -318,7 +318,38 @@ async function rejectPointRequest(id,quiet=false){
   }catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}
 }
 $("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject,oldText=b.textContent;b.disabled=true;b.textContent=a?"Approving…":"Rejecting…";try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false;b.textContent=oldText}};
-$("approveAllBtn").onclick=async()=>{const ids=Object.keys(pendingPointRequests||{});if(!ids.length)return;if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;$("approveAllBtn").disabled=true;let done=0;for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id});done++}catch(err){console.error(err)}}$("approveAllBtn").disabled=false;setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved.`);await loadApprovals()};
+// Never continue an old batch of pending IDs under a different Google UID or
+// after class-scope revocation. Preserve partial-failure handling within a scope.
+async function approvePendingBatch(ids){
+ const uid=auth.currentUser?.uid,generation=scopeGeneration;
+ const current=()=>!!uid&&auth.currentUser?.uid===uid&&scopeGeneration===generation&&teacherScope?.boundAuthUid===uid&&teacherAccess?.authorized===true;
+ if(!current())return {done:0,current:false};
+ let done=0;
+ for(const id of ids){
+  if(!current())return {done,current:false};
+  try{
+   await teacherApi("approve-point-request",{requestId:id});
+   if(!current())return {done,current:false};
+   done++;
+  }catch(err){
+   if(!current())return {done,current:false};
+   console.error(err);
+  }
+ }
+ return {done,current:current()};
+}
+$("approveAllBtn").onclick=async()=>{
+ const ids=Object.keys(pendingPointRequests||{});
+ if(!ids.length)return;
+ if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;
+ const button=$("approveAllBtn");button.disabled=true;
+ try{
+  const result=await approvePendingBatch(ids);
+  if(!result.current)return;
+  setApprovalStatus(`${result.done} Chazara point request${result.done===1?"":"s"} approved.`);
+  await loadApprovals();
+ }finally{button.disabled=false}
+};
 $("recordingsApproveAllBtn").onclick=()=>{if(!$("approveAllBtn").disabled)$("approveAllBtn").click()};
 $("approvalSignInBtn").onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(provider)}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
 
