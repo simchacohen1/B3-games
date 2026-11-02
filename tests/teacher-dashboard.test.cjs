@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function dashboard(rows,search=''){
  const nodes={},reads=[],listeners={};
- const node=id=>nodes[id]||(nodes[id]={classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:''});
+ const node=id=>nodes[id]||(nodes[id]={classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:'',replaceChildren(){this.innerHTML=''}});
  const api={workspaceId:'b3-2026',onAuthStateChanged:cb=>api.callback=cb};
  const document={getElementById:node,createElement:()=>({set textContent(v){this.innerHTML=String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}})};
  const db={ref:p=>({
@@ -9,7 +9,7 @@ function dashboard(rows,search=''){
   on:(event,listener)=>{listeners[p]=listener;listener({val:()=>rows[p]||null})},
   off:(event,listener)=>{if(listeners[p]===listener)delete listeners[p]}
  })};
- const html=fs.readFileSync('teacher-home.html','utf8'),code=html.match(/<script>\\s*(\\(function\\(\\)\\{[\\s\\S]*?)<\\/script>/)[1];
+ const html=fs.readFileSync('teacher-home.html','utf8'),code=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?)<\/script>/)[1];
  vm.runInNewContext(code,{URLSearchParams,window:{B3SiteSettings:api,B3_FIREBASE_CONFIG:{},B3PrincipalScope:require('../principal-scope.js'),addEventListener(){}},firebase:{apps:[{}],database:()=>db},document,location:{search,replace(){}},console});
  return {nodes,reads,listeners,run:access=>api.callback({email:'teacher@test',uid:'principal-1'},true,access)};
 }
