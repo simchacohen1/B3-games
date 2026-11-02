@@ -7,10 +7,12 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 
 const html=fs.readFileSync('chazara/teacher.html','utf8');
-const start=html.indexOf('function currentChazaraAction(');
+const helperStart=html.indexOf('function currentChazaraAction(');
+const helperEnd=html.indexOf('function setRecordingActionStatus(',helperStart);
+const start=html.indexOf('async function approvePointRequest(');
 const end=html.indexOf('$("approvalList").onclick=',start);
-assert.ok(start>=0&&end>start,'extract real UID/scope-bound individual handlers');
-const source=html.slice(start,end);
+assert.ok(helperStart>=0&&helperEnd>helperStart&&start>=0&&end>start,'extract the existing shared action guard and real individual handlers');
+const source=html.slice(helperStart,helperEnd)+'\n'+html.slice(start,end);
 
 function deferred(){
  let resolve,reject;
@@ -23,6 +25,7 @@ function fixture(api=async()=>({status:'approved',studentName:'Synthetic Student
   auth:{currentUser:{uid:'teacher_alpha'}},
   scopeGeneration:7,
   teacherScope:{boundAuthUid:'teacher_alpha'},
+  teacherAccess:{authorized:true},
   pendingPointRequests:{
    recorded:{recorded:true,practiceStudentId:'student_a',eventId:'event_a'},
    normal:{recorded:false}
