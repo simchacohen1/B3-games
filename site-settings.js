@@ -509,8 +509,10 @@
       if (teacher && teacher.active === false) return { authorized:false, role:"", classIds:[] };
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
-        if (!classIds.length) return { authorized:false, role:"", classIds:[] };
-        return { authorized:true, role:"teacher", classIds:classIds };
+        if (classIds.length) return { authorized:true, role:"teacher", classIds:classIds };
+        // An active record with no classes may be damaged. Fall through to the
+        // invitation check: the server rebuilds the record only from an active,
+        // assigned invitation, so unassigned or revoked teachers stay denied.
       }
 
       // Read only this verified user's invitation; never enumerate other teachers.
@@ -528,7 +530,12 @@
             method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
           });
         }).then(async function(response){
-          if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
+          if(response.status===403){
+            // The server answered and refused: a real "not authorized".
+            console.warn("Teacher claim refused:",await response.text().catch(function(){return "";}));
+            return {authorized:false,role:"",classIds:[]};
+          }
+          if(!response.ok){const error=new Error("Teacher account linking failed (HTTP "+response.status+").");error.status=response.status;throw error;}
           const claimed=await response.json();
           const verifiedClassIds = Array.isArray(claimed.classIds) ? claimed.classIds.filter(id=>id!=="*" && typeof id==="string" && id.length>0) : [];
           if(claimed.authorized!==true || !verifiedClassIds.length) return {authorized:false,role:"",classIds:[]};
@@ -536,10 +543,14 @@
         }).catch(function(error){
           // A failed or unavailable verifier must never authorize a new teacher.
           console.warn("Teacher verification unavailable; access denied.",error);
-          return {authorized:false,role:"",classIds:[]};
+          return {authorized:false,role:"",classIds:[],checkFailed:true,error:String(error&&error.message||error)};
         });
       });
-    }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
+    }).catch(function(error){
+      // Still denied, but say why: a failed read is not the same as "not a teacher".
+      console.error("Teacher access check failed; access denied.",error);
+      return { authorized:false, role:"", classIds:[], checkFailed:true, error:String(error&&error.message||error) };
+    });
   }
 
   function readUserAccess(user) {
@@ -986,8 +997,10 @@
         else showToolVersions(access);
         if (!access.authorized) {
           return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
-            const error = new Error("This Google account is not authorized for Fun Torah Tools.");
-            error.code = "b3/unauthorized-user";
+            const error = access.checkFailed
+              ? new Error("We could not check your account just now. Please wait a minute and sign in again.")
+              : new Error("This Google account is not authorized for Fun Torah Tools.");
+            error.code = access.checkFailed ? "b3/access-check-failed" : "b3/unauthorized-user";
             throw error;
           });
         }
