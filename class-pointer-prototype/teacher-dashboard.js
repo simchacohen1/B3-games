@@ -355,6 +355,31 @@ function init(){
  function syncLibrary(){library.hidden=!$('pointerPdfLibrary')}
  syncLibrary();setTimeout(syncLibrary,1500);
 
+ /* ---------- Reminder: whiteboard still on while nobody is using it ---------- */
+ const IDLE_MS=5*60*1000,AWAY_MS=30*1000;
+ const reminder=el('div','cp-board-reminder');reminder.hidden=true;reminder.setAttribute('role','alert');
+ const reminderStop=el('button','cp-reminder-stop','Stop whiteboard'),reminderKeep=el('button','cp-reminder-keep','Keep it on');
+ reminderStop.type='button';reminderKeep.type='button';
+ reminder.append(el('span',null,'The whiteboard is still on for your students. Close it when you are done.'),reminderStop,reminderKeep);
+ document.body.append(reminder);
+ const baseTitle=document.title;
+ let boardLive=false,idleTimer=null,hiddenAt=0;
+ function showReminder(){if(boardLive)reminder.hidden=false}
+ function resetIdle(){clearTimeout(idleTimer);idleTimer=boardLive?setTimeout(showReminder,IDLE_MS):null}
+ function syncReminder(live){
+  boardLive=live;
+  if(!live){reminder.hidden=true;clearTimeout(idleTimer);idleTimer=null;document.title=baseTitle;return}
+  if(!idleTimer)resetIdle();
+ }
+ reminderStop.addEventListener('click',()=>{reminder.hidden=true;stopBtn.click()});
+ reminderKeep.addEventListener('click',()=>{reminder.hidden=true;resetIdle()});
+ for(const type of ['pointerdown','pointermove','keydown','wheel'])stage?.addEventListener(type,()=>{if(boardLive&&reminder.hidden)resetIdle()},{passive:true});
+ document.addEventListener('visibilitychange',()=>{
+  if(!boardLive)return;
+  if(document.hidden){hiddenAt=Date.now();document.title='⚠ Whiteboard still on – '+baseTitle}
+  else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
+ });
+
  function syncLive(){
   const isLive=docOpen()||sharingScreen();
   const boards=document.body.classList.contains('boards-on');
@@ -365,6 +390,8 @@ function init(){
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
   dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
+  dockStop.dataset.short='Stop\n'+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc==='Whiteboard'?'board':'page'):'screen');
+  syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
   syncLibrary();
  }

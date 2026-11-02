@@ -41,9 +41,8 @@ test('a new class with no tools shows a friendly empty state and no tool groups'
  const x=dashboard({[CLS+'fresh']:{name:'Fresh',active:true}});
  await x.run({authorized:true,role:'teacher',classIds:['fresh']});
  const html=x.nodes.classes.innerHTML;
- assert.match(html,/No tools have been turned on for this class yet/);
- assert.ok(!html.includes('game-group-title'));
- assert.ok(!html.includes('chazara/teacher')&&!html.includes('game-card'));
+ assert.match(html,/No tools have been enabled for this class yet/);
+ assert.ok(!html.includes('chazara/teacher')&&!html.includes('data-place="learn"'));
 });
 test('addClass in Owner Admin creates classes without any tool grants',()=>{
  const src=fs.readFileSync('owner-admin.html','utf8');
