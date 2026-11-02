@@ -72,7 +72,7 @@
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
     document.body.append(boardStage);
     const boardCss=document.createElement('link');boardCss.rel='stylesheet';
-    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261018-embedded1',root).href;
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261101-classshare1',root).href;
     document.head.append(boardCss);
     window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
       sendTeacher:message=>{
@@ -80,7 +80,7 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261101-fix66',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261101-classshare1',root).href);
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -278,7 +278,49 @@
     });
     reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null}
+    // ---------- A classmate's screen that the teacher chose to show to the whole class ----------
+    // Only the teacher's room can start this (students cannot), and only while this student is admitted to it.
+    // The picture is view-only and is removed the moment the teacher stops it.
+    const shareOverlay=document.createElement('section');shareOverlay.id='fttClassShareOverlay';shareOverlay.setAttribute('role','status');
+    shareOverlay.style.cssText='position:fixed;inset:0;z-index:2147483639;background:#071426;display:none;flex-direction:column;font:700 18px system-ui,sans-serif;color:white';
+    const shareTitle=document.createElement('div');shareTitle.style.cssText='padding:12px 16px;background:#9a3412;text-align:center';
+    const shareVideo=document.createElement('video');shareVideo.autoplay=true;shareVideo.muted=true;shareVideo.playsInline=true;
+    shareVideo.style.cssText='display:block;flex:1;min-height:0;width:100%;object-fit:contain;background:#071426';
+    shareOverlay.append(shareTitle,shareVideo);document.body.appendChild(shareOverlay);
+    let shareExpect=null,shareCall=null,pendingShare=null,pendingShareTimer=null;
+    function closeClassShare(){
+      shareExpect=null;cancelLater(pendingShareTimer);pendingShareTimer=null;
+      const old=shareCall,waiting=pendingShare;shareCall=null;pendingShare=null;
+      try{old?.close()}catch{}try{waiting?.close()}catch{}
+      shareVideo.srcObject=null;shareOverlay.style.display='none';
+    }
+    function acceptClassShare(call){
+      try{shareCall?.close()}catch{}shareCall=call;
+      call.on('stream',media=>{if(shareCall!==call||!shareExpect)return;shareVideo.srcObject=media;shareOverlay.style.display='flex';shareVideo.play?.().catch(()=>{})});
+      const gone=()=>{if(shareCall===call)closeClassShare()};
+      call.on('close',gone);call.on('error',gone);
+      try{call.answer()}catch{gone()}
+    }
+    function incomingClassShare(call){
+      const id=call.metadata?.shareId;
+      if(typeof id!=='string'||!id||id.length>120||!admitted){try{call.close()}catch{}return}
+      if(shareExpect&&shareExpect.id===id){acceptClassShare(call);return}
+      // The call can beat the announcement: hold it briefly, never answer a share the teacher did not announce.
+      try{pendingShare?.close()}catch{}pendingShare=call;cancelLater(pendingShareTimer);
+      pendingShareTimer=later(()=>{if(pendingShare===call){pendingShare=null;try{call.close()}catch{}}},15000);
+    }
+    function onClassShareMessage(message){
+      if(message.active===true&&typeof message.id==='string'&&message.id&&message.id.length<=120&&typeof message.name==='string'){
+        const waiting=pendingShare&&pendingShare.metadata?.shareId===message.id?pendingShare:null;
+        if(waiting){cancelLater(pendingShareTimer);pendingShareTimer=null;pendingShare=null}
+        closeClassShare();
+        shareExpect={id:message.id,name:message.name.slice(0,60)};
+        shareTitle.textContent='📺 '+shareExpect.name+'’s screen — your teacher is showing it to the class';
+        if(waiting)acceptClassShare(waiting);
+      }else if(message.active===false&&shareExpect&&message.id===shareExpect.id)closeClassShare();
+    }
     function clearLesson(){
+      closeClassShare();
       lessonLevel='none';lessonDraft=null;lessonMarks={points:{},strokes:[],members:[]};redrawToolbar();renderLessonMarks();
       admitted=false;lessonActive=false;lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
       const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
@@ -341,7 +383,7 @@
         const own=new Peer('class-pointer-student-'+crypto.randomUUID());
         if(typeof own.on!=='function'||typeof own.connect!=='function'){try{own.destroy?.()}catch{}return}
         presencePeer=own;
-        own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}incomingLesson(incoming)});
+        own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}if(incoming.metadata?.kind==='class-share'){if(!sameStudent()||incoming.peer!==presenceTarget){try{incoming.close()}catch{}return}incomingClassShare(incoming);return}incomingLesson(incoming)});
         await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
         if(presencePeer!==own||latestSession?.roomId!==room)return;
         // The teacher's room may not be registered yet (student page opened as the lesson starts):
@@ -365,6 +407,7 @@
           if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
           if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[]};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
+          if(message.type==='class-share'){if(admitted)onClassShareMessage(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
           if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
