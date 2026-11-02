@@ -15,7 +15,8 @@
     "@firebase/rules-unit-testing": "^6.0.0",
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
-    "firebase": "^13.0.0"
+    "firebase": "^13.0.0",
+    "firebase-tools": "15.26.0"
   },
   "overrides": {
     "@firebase/firestore": {
