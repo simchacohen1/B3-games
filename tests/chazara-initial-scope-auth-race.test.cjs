@@ -1,5 +1,6 @@
 'use strict';
-// Fictional-data regression for the actual Chazara initial class-scope loader.\n// Adapted from existing draft #516/#519 for the #554 live-listener integration.
+// Fictional-data regression for the actual Chazara initial class-scope loader.
+// Adapted from existing draft #516/#519 for the #554 live-listener integration.
 // No Firebase credentials, network, student records or deployed rules are used.
 const test = require('node:test');
 const assert = require('node:assert/strict');
