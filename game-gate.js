@@ -414,8 +414,8 @@
   async function startFollowTeacherListener(classId,studentId) {
     if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
     if (!followLoader) {
-      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261020-follow-pointer1",rootBase).href)
-        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261020-follow-pointer1",rootBase).href))
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261102-arcade-follow",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261102-arcade-follow",rootBase).href))
         .catch(error=>{followLoader=null;throw error;});
     }
     return followLoader.then(()=>{
