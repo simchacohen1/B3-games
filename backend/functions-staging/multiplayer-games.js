@@ -45,7 +45,7 @@ async function authorizeStudent(request, db, requestedWorkspace) {
   if (!centerEnabled || member.toolAccess?.['multiplayer-center'] === false) {
     throw new HttpsError('permission-denied', 'Ask your teacher to turn on Multiplayer Center.');
   }
-  return { studentId, classId, workspaceId: requestedWorkspace, name: safeName(member.name) };
+  return { studentId, classId, workspaceId: requestedWorkspace, name: safeName(member.name), className: safeName(cls.name || classId) };
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
@@ -213,6 +213,16 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       throw new HttpsError('invalid-argument', 'That game action is too large.');
     }
     const actor = await authorizeStudent(request, db, String(data.workspaceId || ''));
+    if (data.action === 'identity') {
+      return {
+        workspaceId: actor.workspaceId,
+        classId: actor.classId,
+        participantId: actor.studentId,
+        participantName: actor.name,
+        role: 'student',
+        className: actor.className,
+      };
+    }
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'create') return await newRoom(db, actor, String(data.gameKey || ''));
     if (data.action === 'get-private') {

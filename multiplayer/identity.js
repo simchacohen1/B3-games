@@ -12,14 +12,17 @@
       participantId = String(claims.b3StudentId);
       classId = String(claims.b3ClassId);
       if (requestedStudentId && requestedStudentId !== participantId) throw new Error('Your student sign-in has changed. Sign in again.');
-      var membership = (await db.ref('b3Games/students/' + participantId + '/memberships/' + WORKSPACE + '_' + classId).once('value')).val();
-      var studentClass = (await db.ref('b3Games/workspaces/' + WORKSPACE + '/classes/' + classId).once('value')).val();
-      var student = studentClass && studentClass.members && studentClass.members[participantId];
-      if (!membership || membership.active === false || membership.classId !== classId || membership.workspaceId !== WORKSPACE || !student || student.active === false) {
+      if (!root.firebase || typeof root.firebase.functions !== 'function') throw new Error('The class access service is unavailable.');
+      var response = await root.firebase.app().functions('us-central1').httpsCallable('multiplayerGameAction')({
+        action: 'identity', workspaceId: WORKSPACE
+      });
+      var identity = response && response.data || {};
+      if (identity.role !== 'student' || identity.classId !== classId || identity.participantId !== participantId || identity.workspaceId !== WORKSPACE) {
         throw new Error('Your active class membership is required.');
       }
-      name = String(claims.b3StudentName || student.name || participantId);
-      role = 'student';
+      name = String(identity.participantName || claims.b3StudentName || participantId);
+      return { workspaceId: WORKSPACE, classId: classId, participantId: participantId, participantName: name.slice(0, 32),
+        role: 'student', className: String(identity.className || classId), teacherClasses: null };
     } else {
       var teacher = (await db.ref('b3Games/workspaces/' + WORKSPACE + '/teachers/' + user.uid).once('value')).val();
       if (!teacher || teacher.active !== true) throw new Error('Sign in with an authorized teacher account.');
