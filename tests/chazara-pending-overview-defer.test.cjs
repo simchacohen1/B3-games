@@ -21,7 +21,7 @@ function run({full=false,uid='teacher-a',boundUid='teacher-a',D={},R={},E={}}={}
   renderRecordings:()=>calls.push('recordings')
  };
  vm.runInNewContext(fn+';refreshScopedViews();',context);
- return {D:context.D,calls};
+ return {D:JSON.parse(JSON.stringify(context.D)),calls};
 }
 
 test('pending-only Chazara does not synthesize incomplete third-class overview from pending events',()=>{
