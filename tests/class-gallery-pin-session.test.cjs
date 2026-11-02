@@ -13,7 +13,7 @@ const end=html.indexOf('/* ---------- review ---------- */',begin);
 assert.ok(begin>=0&&end>begin,'submission handler must remain extractable');
 const section=html.slice(begin,end);
 
-function fixture({studentId='synthetic-et',classId='et',verifiedClass='et',blocked=false,photo=false}={}){
+function fixture({studentId='synthetic-et',classId='et',pageStudentId='synthetic-et',pageClassId='et',verifiedClass=pageClassId,blocked=false,photo=false}={}){
   const values=new Map([
     ['b3Games_studentId',studentId],
     ['b3Games_studentName','Synthetic Student'],
@@ -29,7 +29,7 @@ function fixture({studentId='synthetic-et',classId='et',verifiedClass='et',block
     addEventListener(type,fn){if(id==='projectForm'&&type==='submit')submitHandler=fn},
     replaceChildren(){},reset(){},
   });
-  element('classSelect').value='B3 ET';
+  element('classSelect').value=pageClassId==='et'?'B3 ET':pageClassId==='wt'?'B3 WT':pageClassId;
   element('studentName').value='Synthetic Student';
   element('title').value='Fictional project';
   element('category').value='art';
@@ -47,7 +47,7 @@ function fixture({studentId='synthetic-et',classId='et',verifiedClass='et',block
     escapeHtml:s=>s};
   vm.runInNewContext(
     'const ROSTERS={};const isGuestGallery=false;let isTeacher=false;'+
-    'const galleryClassId="et",galleryWorkspaceId="b3-2026",presenceStudentId="synthetic-et";'+
+    'const galleryClassId='+JSON.stringify(pageClassId)+',galleryWorkspaceId="b3-2026",presenceStudentId='+JSON.stringify(pageStudentId)+';'+
     'const storedPresenceName="Synthetic Student";'+
     'let galleryVerifiedClass='+JSON.stringify(verifiedClass)+
     ',galleryAccessBlocked='+JSON.stringify(blocked)+';\n'+section+
@@ -60,14 +60,17 @@ function fixture({studentId='synthetic-et',classId='et',verifiedClass='et',block
     resolveResize:value=>resizeResolve(value)};
 }
 
-test('in-gallery Pin Work saves a fictional same-class post for approval',async()=>{
-  const f=fixture();
-  await f.submit();
-  assert.equal(f.pushes,1);
-  assert.equal(f.writes.length,1);
-  assert.equal(f.writes[0].studentId,'synthetic-et');
-  assert.equal(f.writes[0].classId,'et');
-  assert.equal(f.writes[0].status,'pending');
+test('in-gallery Pin Work saves fictional ET, WT and third-class posts for approval',async()=>{
+  for(const classId of ['et','wt','roomC']){
+    const studentId='synthetic-'+classId;
+    const f=fixture({studentId,classId,pageStudentId:studentId,pageClassId:classId});
+    await f.submit();
+    assert.equal(f.pushes,1);
+    assert.equal(f.writes.length,1);
+    assert.equal(f.writes[0].studentId,studentId);
+    assert.equal(f.writes[0].classId,classId);
+    assert.equal(f.writes[0].status,'pending');
+  }
 });
 
 test('switching students before opening the form is rejected',()=>{
