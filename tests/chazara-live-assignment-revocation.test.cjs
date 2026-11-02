@@ -61,7 +61,7 @@ test('obsolete listener from a previous sign-in cannot reauthorize or reload',()
  assert.equal(x.calls.length,0);
 });
 test('listener cancellation denies access and scope resets stop cached audio',()=>{
- assert.match(html,/assignmentRef\.on\('value',onAssignment,\(\)=>\{if\(generation===scopeGeneration\)loadClassScope\(user,\{authorized:false\}\)\}\)/);
+ assert.match(html,/assignmentRef\.on\('value',onAssignment,\(\)=>\{if\(generation===scopeGeneration\)\{resetChazaraHistoryView\(\);loadClassScope\(user,\{authorized:false\}\)\}\}\)/);
  assert.match(html,/studentListeners\.push\(\[assignmentRef,onAssignment\]\)/);
  assert.match(html,/function clearStudentListeners\(\)\{for\(const \[ref,handler\] of studentListeners\)ref\.off\('value',handler\)/);
  assert.match(html,/panel\.querySelectorAll\('audio'\)\.forEach\(audio=>\{audio\.pause\(\);audio\.removeAttribute\('src'\);audio\.load\(\)\}\)/);
