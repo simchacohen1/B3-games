@@ -414,8 +414,8 @@
   async function startFollowTeacherListener(classId,studentId) {
     if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
     if (!followLoader) {
-      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261102-arcade-follow",rootBase).href)
-        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261102-arcade-follow",rootBase).href))
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261020-follow-pointer1",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261020-follow-pointer1",rootBase).href))
         .catch(error=>{followLoader=null;throw error;});
     }
     return followLoader.then(()=>{
@@ -574,6 +574,8 @@
     }
 
     if(verifiedTeacherAccess&&verifiedTeacherAccess.authorized){
+      // Opt-in (multiplayer pages): the page's own teacher check (identity.js) picks the class, and its game links carry no ?class=. Students are still gated.
+      if(scriptEl&&scriptEl.hasAttribute("data-teachers-open")){showOpen();return;}
       var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
       if(!(verifiedTeacherAccess.classIds||[]).includes(selected)){
         if(gameId==="class-gallery"){showGalleryClassChoices();return;}

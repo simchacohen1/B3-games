@@ -29,10 +29,7 @@
     'game-show': Object.freeze({label: 'Game Show', path: '/game-show/player.html'}),
     'student-rewards': Object.freeze({label: 'Student Rewards', path: '/student-rewards/student.html'}),
     'class-gallery': Object.freeze({label: 'Class Gallery', path: '/class-gallery/'}),
-    'class-pointer': Object.freeze({label: 'Class Pointer', path: '/class-pointer-prototype/student-view.html'}),
-    // The Arcade is the center page plus its in-page games (game.html); both count as "there".
-    'multiplayer-center': Object.freeze({label: 'Multiplayer Arcade', path: '/multiplayer/',
-      alsoPaths: Object.freeze(['/multiplayer/game.html'])})
+    'class-pointer': Object.freeze({label: 'Class Pointer', path: '/class-pointer-prototype/student-view.html'})
   });
   // Each activity opts in with an adapter; never accept arbitrary teacher URLs.
   const SUBDESTINATIONS = Object.freeze({shorashim: Object.freeze({
@@ -109,9 +106,7 @@
     const applyKey = [state.workspaceId, state.classId, state.revision, c.studentId].join(':');
     const section = c.currentSection !== undefined ? c.currentSection :
       new URL(c.currentUrl || '/', 'https://funtorahtools.com').searchParams.get('section');
-    const here = canonicalPath(c.currentUrl);
-    const alreadyThere = (here === canonicalPath(destination.path) ||
-      (destination.alsoPaths || []).some(extra => here === canonicalPath(extra))) &&
+    const alreadyThere = canonicalPath(c.currentUrl) === canonicalPath(destination.path) &&
       (!state.subdestination || section === state.subdestination);
     if (state.mode === MODES.FREE) {
       if (c.lastAppliedKey === applyKey) return none('already-sent');
