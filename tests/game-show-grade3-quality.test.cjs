@@ -62,3 +62,13 @@ test("creation questions use short, direct wording for children", () => {
   ], "open", "", 1);
   assert.equal(item.q, "What did Hashem see on day one?");
 });
+
+test("Bereishis 18:15 asks why Sarah denied laughing and loads one teacher generator", () => {
+  const core = loadCore();
+  const item = core.questionAndAnswer({ ref: "Genesis 18:15", text: "Sarah denied laughing because she was afraid." }, "");
+  assert.match(item.q, /Sarah Imeinu say she did not laugh/);
+  assert.equal(item.answer, "Sarah was afraid.");
+
+  const teacher = fs.readFileSync("game-show/teacher.html", "utf8");
+  assert.equal((teacher.match(/<script src="question-generator-grade3-v4\.js\?/g) || []).length, 1);
+});
