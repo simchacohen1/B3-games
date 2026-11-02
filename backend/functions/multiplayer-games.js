@@ -97,7 +97,7 @@ async function authorizeActor(request, db, requestedWorkspace, requestedClassId)
     throw new HttpsError('permission-denied', 'Ask your teacher to turn on Multiplayer Center.');
   }
   return { studentId: participantId, participantId, actorRole, classId, workspaceId: requestedWorkspace, name,
-    lockSettings: legacySettings, classRow: cls };
+    lockSettings: legacySettings, classRow: cls, className: safeName(cls.name || classId) };
 }
 
 function roomPublic(gameKey, room, state, timestamp) {
@@ -566,6 +566,10 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       throw new HttpsError('invalid-argument', 'That game action is too large.');
     }
     const actor = await authorizeActor(request, db, String(data.workspaceId || ''), String(data.classId || request.auth?.token?.b3ClassId || ''));
+    if (data.action === 'identity') {
+      return { workspaceId: actor.workspaceId, classId: actor.classId, participantId: actor.participantId,
+        participantName: actor.name, role: actor.actorRole, className: actor.className };
+    }
     if (!['leave', 'cleanup', 'list-rooms'].includes(data.action) && !allowsMultiplayer({
       actorRole: actor.actorRole, classId: actor.classId, studentId: actor.studentId,
       settings: actor.lockSettings, classRow: actor.classRow,

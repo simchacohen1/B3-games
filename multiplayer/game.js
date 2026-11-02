@@ -210,7 +210,6 @@
     });
   }
   async function quickPlay() {
-    const countdown = el('countdown');
     const supportsComputer = game?.computerOpponent === true;
     let searchCancelled = false;
     const cancelSearch = async () => {
@@ -226,12 +225,7 @@
       location.assign('index.html');
     };
     actions.replaceChildren(button('Cancel search', cancelSearch, 'quiet'));
-    for (const n of [3, 2, 1]) {
-      if (searchCancelled) return;
-      countdown.hidden = false; countdown.textContent = String(n);
-      await new Promise(resolve => setTimeout(resolve, 700));
-    }
-    countdown.textContent = 'Go!';
+    notice('Looking for a classmate…');
     try {
       const result = await call('quick-play');
       if (result.roomCode) {
