@@ -425,7 +425,7 @@ async function loadClassScope(user,access){
     else if(change==='changed'){resetChazaraHistoryView();loadClassScope(user,access);}
    };
    studentListeners.push([assignmentRef,onAssignment]);
-   assignmentRef.on('value',onAssignment,()=>{if(generation===scopeGeneration)loadClassScope(user,{authorized:false})});
+   assignmentRef.on('value',onAssignment,()=>{if(generation===scopeGeneration){resetChazaraHistoryView();loadClassScope(user,{authorized:false})}});
   }
   if(generation!==scopeGeneration)return;
   $('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');refreshScopedViews();await loadApprovals();
