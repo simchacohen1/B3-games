@@ -11,10 +11,11 @@
  * It re-checks Firebase while the page remains open, so a teacher override
  * takes effect without requiring a new tab or a new login.
  */
+(function(){try{if(!window.B3_FIREBASE_CONFIG&&/fun-torah-tools-staging.*.web.app$/.test(location.hostname)&&document.readyState==="loading")document.write("<script src=\"/firebase-config.js\"></script>");}catch(_){}})();
 (function () {
   "use strict";
 
-  var DATABASE_URL = "https://b3-games-default-rtdb.firebaseio.com";
+  var DATABASE_URL = "https://fun-torah-tools-staging-default-rtdb.firebaseio.com";
   var SETTINGS_PATH = "b3Games/siteSettings";
   // Phase 1: identify the whole B3 classroom without changing the live
   // settings path yet. Existing ET/WT values remain the within-class tracks.
