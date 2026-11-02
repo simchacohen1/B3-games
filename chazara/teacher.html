@@ -495,7 +495,9 @@ $("q").oninput=render;$("f").onchange=render;
 function clearStudentListeners(){for(const [ref,handler] of studentListeners)ref.off('value',handler);studentListeners=[];}
 function refreshScopedViews(){
  if(teacherScope?.boundAuthUid&&auth.currentUser?.uid!==teacherScope.boundAuthUid)return;
- if(teacherScope)for(const [id,student] of Object.entries(R))if(!['et','wt'].includes(student.classId)){
+ // The pending-only view never displays overview counts. Do not derive
+ // partial third-class totals from the pending event subset on startup.
+ if(fullDashboardLoaded&&teacherScope)for(const [id,student] of Object.entries(R))if(!['et','wt'].includes(student.classId)){
   const reviews={};for(const e of Object.values(E[id]||{}))if(e.reviewApplied===true&&e.removed!==true&&e.teacherRejected!==true&&e.pointRequestStatus!=='rejected'){
    const key=e.perek+'_'+e.posuk,r=reviews[key]||(reviews[key]={count:0,lastAt:0});r.count++;r.lastAt=Math.max(r.lastAt,Number(e.createdAt)||0);
   }
