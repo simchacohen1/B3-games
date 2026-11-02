@@ -466,6 +466,10 @@
     "studentRewards": {
       ".read": false,
       ".write": false,
+      "pointHistoryIndex": {
+        ".read": false,
+        ".write": false
+      },
       "settings": {
         ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
         ".write": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",

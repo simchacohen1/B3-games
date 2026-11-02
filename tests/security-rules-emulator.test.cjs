@@ -343,6 +343,8 @@ testEmulator('Student Rewards own paths work while peer data and direct awards s
   await fails(get(ref(one,'studentRewards/students/reward_two')));
   await succeeds(get(ref(one,'studentRewards/rewards')));
   await fails(get(ref(one,'studentRewards')));
+  await fails(get(ref(one,'studentRewards/pointHistoryIndex/reward_one')));
+  await fails(set(ref(one,'studentRewards/pointHistoryIndex/reward_one/requests/request_one'),true));
   await fails(set(ref(one,'studentRewards/students/reward_one/rewardBalance'),999));
   await succeeds(set(ref(one,'studentRewards/refundRequests/reward_one/new'),{status:'pending',amount:2}));
   await fails(set(ref(two,'studentRewards/refundRequests/reward_one/other'),{status:'pending',amount:2}));

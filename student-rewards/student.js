@@ -71,13 +71,20 @@ function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a
 async function websiteEnabled(){const r=await fetch(window.B3_FIREBASE_CONFIG.databaseURL+'/'+ROOT+'/settings/studentWebsiteEnabled.json',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw new Error('Could not check Student Rewards access.');return String(await r.json())!=='false'}
 function own(path){return db.ref(`${ROOT}/${path}/${state.studentId}`)}
 async function loadActivityPointHistory(){
+  const loadedAt=Number(state.activityPointHistoryLoadedAt)||0;
+  if(state.activityPointHistoryRequest)return state.activityPointHistoryRequest;
+  if(loadedAt&&Date.now()-loadedAt<60000)return state.activityPointHistory;
   const user=auth.currentUser;
   if(!user)return [];
   const token=await user.getIdToken();
-  const r=await fetch(POINTS_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({action:'student-point-history'})});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(j.error||'Could not load point history');
-  return Array.isArray(j.history)?j.history:[];
+  state.activityPointHistoryRequest=fetch(POINTS_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({action:'student-point-history'})})
+  .then(async r=>{
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||'Could not load point history');
+    state.activityPointHistoryLoadedAt=Date.now();
+    return Array.isArray(j.history)?j.history:[];
+  }).finally(()=>{state.activityPointHistoryRequest=null;});
+  return state.activityPointHistoryRequest;
 }
 async function classRewardsApi(action,payload={}){
   const user=auth.currentUser;
@@ -107,7 +114,7 @@ function startClassGoalPolling(){
     try{const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;render()}catch(err){console.warn('Could not refresh class reward goals',err)}
   },60000);
 }
-function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').innerHTML=tabs.map(t=>`<button data-tab="${t}" class="${state.tab===t?'active':''}">${t}</button>`).join('');$('#studentNav').onclick=ev=>{const b=ev.target.closest('[data-tab]');if(!b)return;state.tab=b.dataset.tab;render()}}
+function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').innerHTML=tabs.map(t=>`<button data-tab="${t}" class="${state.tab===t?'active':''}">${t}</button>`).join('');$('#studentNav').onclick=async ev=>{const b=ev.target.closest('[data-tab]');if(!b)return;state.tab=b.dataset.tab;if(state.tab==='Progress'&&state.root){try{state.activityPointHistory=await loadActivityPointHistory()}catch(err){console.warn('Could not refresh point history',err)}}render()}}
 
 async function signInB3(name,pin,idHint=''){
   if(!await websiteEnabled()){showBlocked();return}
@@ -195,7 +202,7 @@ function subscribe(){
     const next=s.val(),nextBalance=Number(next?.rewardBalance||0),balanceChanged=nextBalance!==lastBalance;
     state.root.student=next;state.student=next;lastBalance=nextBalance;state.serverRewardBalance=Math.max(0,nextBalance);
     if(balanceChanged){
-      try{state.activityPointHistory=await loadActivityPointHistory()}catch(err){console.warn('Could not refresh point history',err)}
+      state.activityPointHistoryLoadedAt=0;
     }
     render();
   });

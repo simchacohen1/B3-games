@@ -79,6 +79,7 @@ function backend(tree){
     transaction:async fn=>{const cur=get(p);const next=fn(cur===undefined?null:JSON.parse(JSON.stringify(cur)));if(next===undefined)return{committed:false,snapshot:snap(get(p))};set(p,next);return{committed:true,snapshot:snap(next)}}})};
   const code=slice('const AUTOMATIC_MILESTONE_REVIEWER','async function rejectPendingRequest')+slice('async function mirrorChazaraPointStatus','async function repairMissingChazaraPointRequests');
   const ctx={rtdb,SR_ROOT:'studentRewards',console,Object,Number,String,Date,
+    studentPointHistoryIndexUpdates:(kind,id,studentId)=>({[`studentRewards/pointHistoryIndex/${studentId}/${kind}/${id}`]:true}),
     isMilestoneRequest:i=>['reading100','translation100','understand100'].includes(String(i?.source||'')),
     isShorashimRequest:i=>['shorashim-recording','shorashim-no-hints'].includes(String(i?.source||'')),
     isRashiRequest:i=>String(i?.source||'')==='rashi-recording',rashiCore:{RASHI_POINTS:2},

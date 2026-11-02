@@ -252,7 +252,10 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   const reason=String(body.reason||'Teacher adjustment').slice(0,200);
   const {applied,balance}=await addToBalance(store,sid,amount);
   const id='adj_'+nowMs+'_'+sha(sid+nowMs+Math.random()).slice(0,8);
-  await store.update({[SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now}});
+  await store.update({
+   [SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now},
+   [SR+'/pointHistoryIndex/'+sid+'/adjustments/'+id]:true
+  });
   return {ok:true,applied,balance};
  }
  if(action==='comment'){
