@@ -23,6 +23,7 @@ function fixture(api=async()=>({status:'approved'})){
   auth:{currentUser:{uid:'teacher_alpha'}},
   scopeGeneration:5,
   teacherScope:{boundAuthUid:'teacher_alpha'},
+  teacherAccess:{authorized:true},
   pendingPointRequests:{request_a:{},request_b:{},request_c:{}},
   $:id=>id==='approveAllBtn'?button:null,
   confirm:()=>true,
