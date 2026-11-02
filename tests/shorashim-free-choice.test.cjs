@@ -6,6 +6,8 @@ const vm=require('node:vm');
 
 const app=fs.readFileSync('shorashim/app.js','utf8');
 const html=fs.readFileSync('shorashim/index.html','utf8');
+// app.js is cache-busted on every release; require a build label dated on or after this feature.
+const appBuildDate=()=>{const m=html.match(/<script src="app\.js\?v=(\d{8})[^"]*"><\/script>/);assert.ok(m,'app.js is loaded with a dated cache-bust label');return Number(m[1]);};
 const fn=name=>{const line=app.split(/\r?\n/).find(x=>x.startsWith('function '+name+'('));assert.ok(line,name+' exists');return line;};
 
 test('unlearned later roots and affixes are selectable without prior cards',()=>{
@@ -33,7 +35,7 @@ test('word list does not label or disable future available words',()=>{
   for(const btn of nodes.wordList.children){assert.notEqual(btn.disabled,true);assert.match(btn.innerHTML,/Choose • Learn/);assert.doesNotMatch(btn.className,/locked/);}
   assert.match(html,/Choose any word in any order/);
   assert.doesNotMatch(html,/New items unlock strictly in order/);
-  assert.match(html,/app\.js\?v=20261019-perek-choice/);
+  assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the perek-choice release');
 });
 
 test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
@@ -58,7 +60,7 @@ test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
 });
 
 test('choosing a perek updates the menu without leaving Shorashim',()=>{
-  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',goScreen:x=>screens.push(x)});
+  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',followAllowsScreen:()=>true,goScreen:x=>screens.push(x)}); // no Follow Teacher restriction active
   vm.runInContext(fn('chooseLearningPerek'),ctx);
   ctx.chooseLearningPerek('19');
   assert.equal(ctx.currentTrack,'shorashim');

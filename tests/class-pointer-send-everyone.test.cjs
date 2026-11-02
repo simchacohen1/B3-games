@@ -48,7 +48,7 @@ async function studentFixture(){
   let subscribe,goTo=null,sessionPath='',shareHolder,shareOverlay,policy={},permissionRevision=0;const permissionRequests=[];
   const stored=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','12345']]);
   const makeElement=tag=>({
-    tag,style:{cssText:''},textContent:'',children:[],
+    tag,style:{cssText:''},dataset:{},textContent:'',children:[],
     setAttribute(){},append(...args){this.children.push(...args)},
     addEventListener(){},getTracks(){return[]}
   });

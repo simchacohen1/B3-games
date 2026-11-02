@@ -1,26 +1,6 @@
 <!doctype html>
 <html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script><meta charset="utf-8">
+<meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -121,7 +101,20 @@ if(new URLSearchParams(location.search).get('embedded')==='1'){
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
 const PLATFORM_TOOLS=[
- ["sefer-hamitzvos","Sefer HaMitzvos","dual"],["halacha","Halacha","dual"],["yiddish","Yiddish","dual"],["posuk-practice-scroll","Posuk Practice","dual"],["rashi-letters","Rashi Letters","dual"],["gematria","Gematria","dual"],["shorashim","Shorashim","dual"],["chazara","Chazara","dual"],["game-show","Game Show","dual"],["student-rewards","Student Rewards","dual"],["weekly-quiz","Weekly Quiz","dual"],["gallery","Gallery","dual"],["tag","Tag Game","dual"],
+ ["sefer-hamitzvos","Sefer HaMitzvos","dual"],
+ ["halacha","Halacha","dual"],
+ ["yiddish","Yiddish","dual"],
+ ["posuk-practice-scroll","Posuk Practice","dual"],
+ ["rashi-letters","Rashi Letters","dual"],
+ ["gematria","Gematria","dual"],
+ ["shorashim","Shorashim","dual"],
+ ["chazara","Chazara","dual"],
+ ["game-show","Game Show","dual"],
+ ["student-rewards","Student Rewards","dual"],
+ ["weekly-quiz","Weekly Quiz","dual"],
+ ["multiplayer-center","Multiplayer Center","dual"],
+ ["gallery","Gallery","dual"],
+ ["tag","Tag Game","dual"],
  ["davening","Davening Player","teacher"],["chavrusa","Chavrusa of the Day","teacher"],["name-picker","Name Picker","teacher"],
  ["class-pointer","Class Pointer","unsorted"]
 ];

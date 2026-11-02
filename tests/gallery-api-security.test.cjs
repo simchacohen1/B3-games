@@ -11,6 +11,7 @@ function loadGalleryModule(){
   const mockRequire=name=>{
     if(name==='firebase-functions/v2/https')return {onRequest:()=>({})};
     if(name==='firebase-admin')return {apps:[],initializeApp(){}};
+    if(name==='node:crypto')return require('node:crypto');
     throw Error('Unexpected dependency in gallery test: '+name);
   };
   new Function('require','module','exports',fs.readFileSync(file,'utf8'))(mockRequire,mod,mod.exports);

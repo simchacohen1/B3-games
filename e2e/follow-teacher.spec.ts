@@ -38,7 +38,9 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   await page.addScriptTag({content:core});
   await page.addScriptTag({content:teacher});
   await expect(page.locator('#app')).toBeVisible();
-  await expect(page.locator('input[name="mode"][value="independent"]')).toHaveCount(0);
+  // Independent mode was intentionally restored (commit 828761ba); it must exist but not be the default.
+  await expect(page.locator('input[name="mode"][value="independent"]')).toHaveCount(1);
+  await expect(page.locator('input[name="mode"][value="independent"]')).not.toBeChecked();
   await expect(page.locator('input[name="mode"][value="free"]')).toBeChecked();
   await page.locator('#subdestination').selectOption('review');
   await page.locator('input[name="mode"][value="locked"]').check();

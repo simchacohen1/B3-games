@@ -7,11 +7,12 @@ const {ref,uploadBytes,getBytes,deleteObject}=require('firebase/storage');
 
 const projectId='demo-b3-security';
 const enabled=process.env.B3_RUN_STORAGE_EMULATOR_TESTS==='1';
+const emulatorPort=Number(process.env.FIREBASE_STORAGE_EMULATOR_PORT||19199);
 const testStorage=enabled?test:test.skip;
 let env;
 test.before(async()=>{
   if(!enabled)return;
-  env=await initializeTestEnvironment({projectId,storage:{host:'127.0.0.1',port:9199,rules:fs.readFileSync('storage-rules.hardened.rules','utf8')}});
+  env=await initializeTestEnvironment({projectId,storage:{host:'127.0.0.1',port:emulatorPort,rules:fs.readFileSync('storage-rules.hardened.rules','utf8')}});
 });
 test.after(async()=>{await env?.cleanup()});
 const storage=(uid,claims)=>env.authenticatedContext(uid,claims).storage();

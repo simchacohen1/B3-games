@@ -1,27 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -1015,8 +994,31 @@ function buildClassroom(room){
   });
 }
 
+// Student rooms are keyed by the identity of the boy whose room is open,
+// never by the identity of the teacher or classmate viewing it.
+// Older posts have no studentId; match those by full, normalized name only.
+function normalizeGalleryStudentName(name){
+  return String(name||'').normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase();
+}
+function galleryRoomStudentIds(studentName){
+  const name=normalizeGalleryStudentName(studentName);
+  return new Set(Object.entries(PRESENCE_STUDENTS).filter(([id,profile])=>
+    id&&profile&&profile.classId===galleryClassId&&normalizeGalleryStudentName(profile.name)===name
+  ).map(([id])=>id));
+}
+function approvedPostsForStudentGallery(studentName,rows=posts){
+  const name=normalizeGalleryStudentName(studentName),ids=galleryRoomStudentIds(studentName);
+  return rows.filter(p=>{
+    if(p.status!=='approved')return false;
+    const id=String(p.studentId||'').trim();
+    // A post with an ID must match the room's student ID. A similar name
+    // can never override an explicit ID belonging to another student.
+    if(id)return ids.has(id);
+    return normalizeGalleryStudentName(p.studentName)===name;
+  }).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
 function buildStudentGallery(studentName){
-  const roomPosts=posts.filter(p=>p.status==='approved' && p.studentName===studentName).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const roomPosts=approvedPostsForStudentGallery(studentName);
   buildGalleryClassroom({
     title:studentName || 'Student Gallery',
     subtitle:'Student Gallery • All Approved Work',
@@ -2596,7 +2598,7 @@ openPowerShop=function(){
 };
 document.getElementById('powerShopBtn').onclick=openPowerShop;
 </script>
-<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261020-pointer-lifecycle3"></script>
+<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 

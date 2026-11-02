@@ -47,7 +47,7 @@ function make(id){
  section.insertBefore(el,section.firstChild);
  section.classList.add('ha-new');
  const q=s=>el.querySelector(s),canvas=q('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
- let image=new Image(),base=null,actions=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false,loading=false;
+ let image=new Image(),cleanedArt=null,base=null,actions=[],color=colors[0],tool='fill',brushSize=9,activeWord=0,drawing=null,ready=false,loading=false;
  function status(txt){q('.ha-status').textContent=txt}
  function commit(txt){if(!readonly()&&halachaCloudLoading){status('Please wait for your account to finish loading.');return}persist(id,actions);status(txt)}
  function recolor(x,y,hex){
@@ -69,7 +69,7 @@ function make(id){
  }
  function redraw(){if(!base)return;ctx.putImageData(base,0,0);
   for(const a of actions){if(a.t==='fill'){recolor(a.x,a.y,a.c)}else if(a.pts&&a.pts.length){ctx.lineWidth=a.t==='eraser'?20:(a.size||9);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=a.t==='eraser'?'white':a.c;ctx.beginPath();a.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(a.pts.length===1)ctx.lineTo(a.pts[0][0]+.1,a.pts[0][1]+.1);ctx.stroke()}}
-  ctx.globalCompositeOperation='multiply';ctx.drawImage(image,0,0);ctx.globalCompositeOperation='source-over';
+  ctx.globalCompositeOperation='multiply';ctx.drawImage(cleanedArt||image,0,0);ctx.globalCompositeOperation='source-over';
  }
  function pointer(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(canvas.width-1,Math.round((e.clientX-r.left)*canvas.width/r.width))),Math.max(0,Math.min(canvas.height-1,Math.round((e.clientY-r.top)*canvas.height/r.height)))];}
  canvas.addEventListener('pointerdown',e=>{if(!ready||loading)return;e.preventDefault();
@@ -115,7 +115,24 @@ function make(id){
  }
  if(plainStart<source.length)reading.appendChild(document.createTextNode(source.slice(plainStart)));
  const artData=window.HALACHA_ALEF_ART&&window.HALACHA_ALEF_ART[id];if(!artData){status('Lesson artwork is missing.');return}
- image.onload=()=>{canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;ctx.drawImage(image,0,0);base=ctx.getImageData(0,0,canvas.width,canvas.height);ready=true;canvas.dataset.ready='true';restore();};
+ image.onload=()=>{
+  canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+  ctx.drawImage(image,0,0);
+  if(id==='a7'){
+    // Special Tefillah: leave the decorative wall frame, but remove its crown symbol.
+    // Update the base pixels so coloring, previews, undo and downloads all stay consistent.
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(649,94,72,110);
+  }
+  if(id==='a7'){
+    // Use the corrected picture for the outline overlay, too, or redraw would restore the crown.
+    cleanedArt=document.createElement('canvas');
+    cleanedArt.width=canvas.width;cleanedArt.height=canvas.height;
+    cleanedArt.getContext('2d').drawImage(canvas,0,0);
+  }
+  base=ctx.getImageData(0,0,canvas.width,canvas.height);
+  ready=true;canvas.dataset.ready='true';restore();
+ };
  image.onerror=()=>status('Could not load this lesson picture.');image.src=artData;
  function restore(){
   if(!ready)return;

@@ -349,3 +349,30 @@ test('Siman Gimmel seifim 1-8 use the large pictures too', async ({ page }) => {
     expect(await canvas.evaluate((c: HTMLCanvasElement) => c.width), `${id} uses the large picture`).toBe(1100);
   }
 });
+
+
+test('Gimmel seif 6 mother has a fully covered teichel in the colorable picture', async ({page}) => {
+  await open(page);
+  await showLesson(page, 's3f');
+  const canvas=page.locator('#s3f .ha-classroom[data-seif="6"] canvas');
+  await expect(canvas).toHaveAttribute('data-ready','true');
+  const comparison=await canvas.evaluate(async (display:HTMLCanvasElement)=>{
+    const original=new Image();
+    original.src='/halacha/art/simanim/siman-3-seif-06.png';
+    await original.decode();
+    const hidden=document.createElement('canvas');
+    hidden.width=display.width;hidden.height=display.height;
+    hidden.getContext('2d')!.drawImage(original,0,0,hidden.width,hidden.height);
+    const before=hidden.getContext('2d')!.getImageData(0,0,hidden.width,hidden.height).data;
+    const after=display.getContext('2d')!.getImageData(0,0,display.width,display.height).data;
+    let corrected=0;
+    for(let y=65;y<183;y++)for(let x=202;x<378;x++){
+      const at=(y*display.width+x)*4;
+      if(Math.abs(before[at]-after[at])>90)corrected++;
+    }
+    return {width:display.width,height:display.height,corrected};
+  });
+  expect(comparison.width).toBe(1100);
+  expect(comparison.height).toBe(825);
+  expect(comparison.corrected).toBeGreaterThan(100);
+});

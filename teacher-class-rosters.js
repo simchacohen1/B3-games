@@ -3,7 +3,8 @@
   // Shared, authenticated roster lookup for teacher-only class tools.
   // An unassigned class ID in a URL never grants access to its roster.
   const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
-  const ROOT = "b3Games/workspaces/" + (window.B3SiteSettings?.workspaceId || "b3-2026") + "/classes";
+  const WORKSPACE_ID = window.B3SiteSettings?.workspaceId || "b3-2026";
+  const ROOT = "b3Games/workspaces/" + WORKSPACE_ID + "/classes";
   async function load() {
     if (!window.B3SiteSettings || !window.firebase || !firebase.database) {
       throw new Error("Teacher sign-in is unavailable. Open this tool from your Teacher Center.");
@@ -44,13 +45,13 @@
       const checked = await Promise.all(entries.map(async ([studentId, member]) => {
         const [profileSnap, membershipSnap] = await Promise.all([
           db.ref("b3Games/students/" + studentId + "/profile").once("value"),
-          db.ref("b3Games/students/" + studentId + "/memberships/b3-2026_" + id).once("value")
+          db.ref("b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + id).once("value")
         ]);
         const profile = profileSnap.val();
         const membership = membershipSnap.val();
         // Require both sides of an active class membership: a removed student
         // may retain their central profile for other classes or past work.
-        if (!profile || profile.active === false || !membership || membership.active === false || membership.classId !== id) return null;
+        if (!profile || profile.active === false || !membership || membership.active === false || membership.workspaceId !== WORKSPACE_ID || membership.classId !== id) return null;
         return { id: studentId, name: String(profile.name || member.name || "").trim() || studentId };
       }));
       const activeRows = checked.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
@@ -59,11 +60,8 @@
     const classes = rows.filter(Boolean);
     if (requested && classes.length === 0) throw new Error("This class is unavailable.");
     if (!classes.length) throw new Error("No active classes are assigned to this teacher.");
-    // Keep the familiar ET / WT order, followed by any other assigned classes.
-    classes.sort((a, b) =>
-      (a.id === "et" ? -2 : a.id === "wt" ? -1 : 0) -
-      (b.id === "et" ? -2 : b.id === "wt" ? -1 : 0) ||
-      a.name.localeCompare(b.name));
+    // All classes share the same ordering, regardless of their IDs.
+    classes.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     return {
       classes, selectedId: requested || classes[0].id,
       uid: session.user.uid, role: session.access.role

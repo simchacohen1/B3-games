@@ -53,3 +53,24 @@ test('teacher preview painting is temporary and never touches student saved work
   expect(await page.evaluate(()=>(window as any).__saves)).toBe(0);
   expect(await page.evaluate(()=>(window as any).S.halacha_picture_siman_a_v2_a)).toBeUndefined();
 });
+test('Special Tefillah wall picture has no crown and keeps its frame',async({page})=>{
+  await fixture(page);
+  const result=await page.evaluate(()=>{
+    const canvas=document.querySelector('#a7 .ha-art canvas') as HTMLCanvasElement;
+    const ctx=canvas.getContext('2d')!;
+    const cleared=ctx.getImageData(649,94,72,110).data;
+    let darkInside=0;
+    for(let i=0;i<cleared.length;i+=4){
+      if(cleared[i]<240||cleared[i+1]<240||cleared[i+2]<240)darkInside++;
+    }
+    // The original picture frame outside the cleared area remains visible.
+    const panel=ctx.getImageData(625,30,120,235).data;
+    let darkFrame=0;
+    for(let i=0;i<panel.length;i+=4){
+      if(panel[i]<80&&panel[i+1]<80&&panel[i+2]<80)darkFrame++;
+    }
+    return {darkInside,darkFrame};
+  });
+  expect(result.darkInside).toBe(0);
+  expect(result.darkFrame).toBeGreaterThan(100);
+});

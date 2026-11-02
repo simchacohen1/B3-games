@@ -1,27 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -472,7 +452,9 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   const resize=()=>{const height=d.body.offsetHeight;if(frame.style.height!==height+'px')frame.style.height=height+'px';};
-  new ResizeObserver(resize).observe(d.body);
+  // Resize on the next frame: changing the frame's height inside the observer callback
+  // re-lays out the observed body and raises "ResizeObserver loop" errors (seen in Safari).
+  new ResizeObserver(()=>requestAnimationFrame(resize)).observe(d.body);
   resize();
   organize();
   // Do not observe/rewrite the panel class here. The embedded page legitimately

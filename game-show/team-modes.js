@@ -80,6 +80,7 @@
   if (isTeacher) {
     const setup=document.querySelector("#tabSetup .setup-grid");
     const buzzerCard=[...setup.querySelectorAll(".card")].find(el=>el.querySelector("#delayToggle"));
+    const teamModeMount=document.getElementById("teamModeMount");
     if (setup && buzzerCard) {
       const card=document.createElement("section");
       card.className="card";
@@ -90,7 +91,8 @@
         '<label class="setting"><span class="label"><b>Play a little music during announcements</b><span>Original gentle game-show jingle; off by default</span></span><span class="ctrl"><input type="checkbox" class="switch" id="regularJingleToggle" aria-label="Music during game show announcements"></span></label>'+
         '<button class="btn" type="button" id="stopNarrationBtn">Stop reading and open buzzers</button>'+
         '<div id="teamModeSummary" class="status-line" aria-live="polite"></div>';
-      buzzerCard.insertAdjacentElement("afterend",card);
+      if (teamModeMount && typeof teamModeMount.replaceWith === "function") teamModeMount.replaceWith(card);
+      else buzzerCard.insertAdjacentElement("afterend",card);
       const save=()=>gameRef.update({
         teamMode:document.getElementById("teamModeToggle").checked,
         multipleChoice:document.getElementById("multipleChoiceToggle").checked,
@@ -287,6 +289,8 @@
     };
     gameRef.on("value",snap=>{
       const data=snap.val()||{};
+      const setupStart=document.getElementById("setupStartGameBtn");
+      if(setupStart)setupStart.hidden=!!data.showStarted;
       const team=document.getElementById("teamModeToggle");
       const mc=document.getElementById("multipleChoiceToggle");
       if(team)team.checked=!!data.teamMode;if(mc)mc.checked=!!data.multipleChoice;
@@ -348,11 +352,18 @@
 
     function submitChoice(index){
       const q=questionAt(lastData);
-      if(!q||!Number.isInteger(q.correctIndex))return;
-      gameRef.transaction(current=>{
-        if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
-        return applyChoice(current,myName,index,q.correctIndex);
-      },(err,committed)=>{if(err)document.getElementById("answerFeedback").textContent="Could not submit. Try again.";});
+      if(!q)return;
+      const qi=Number(lastData&&lastData.qIndex)||0;
+      const feedback=document.getElementById("answerFeedback");
+      gameRef.parent.child('set/questions/'+qi+'/correctIndex').once('value').then(snap=>{
+        const raw=snap.val();
+        const correctIndex=Number.isInteger(q.correctIndex)?q.correctIndex:(raw===null?NaN:Number(raw));
+        if(!Number.isInteger(correctIndex)){feedback.textContent="Could not check the answer. Ask your teacher.";return;}
+        gameRef.transaction(current=>{
+          if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
+          return applyChoice(current,myName,index,correctIndex);
+        },(err,committed)=>{if(err)feedback.textContent="Could not submit. Try again.";});
+      }).catch(()=>{feedback.textContent="Could not submit. Try again.";});
     }
 
     function updateChoices(data){
@@ -412,4 +423,70 @@
       }
     };
   }
+})();
+
+// Show the team score summary on the Play screen, just above Contestants.
+(function moveTeamSummaryToPlay(){
+  if(typeof setInterval!=="function"||typeof document==="undefined"||!document||typeof document.getElementById!=="function")return;
+  let tries=0;
+  const timer=setInterval(()=>{
+    const summary=document.getElementById('teamModeSummary');
+    const board=document.getElementById('board');
+    if(summary&&board&&board.parentElement){
+      board.parentElement.insertBefore(summary,board);
+      summary.style.fontWeight='800';
+      summary.style.fontSize='20px';
+      summary.style.margin='8px 0 12px';
+      summary.style.color='#fff';
+      clearInterval(timer);
+    }else if(++tries>40){clearInterval(timer);}
+  },250);
+})();
+
+// Early-buzz penalty (student screen only): pressing BUZZ before the round
+// opens locks that student out until 1.5 seconds AFTER the round opens.
+(function earlyBuzzPenalty(){
+  if(typeof window==="undefined"||typeof document==="undefined"||!document||typeof document.getElementById!=="function")return;
+  const btn=document.getElementById("buzzBtn");
+  if(!btn||typeof window.buzzIn!=="function")return;
+  const PENALTY_MS=1500;
+  let earlyAt=0, earlyRound=null;
+  const now=()=>(typeof serverNow==="function"?serverNow():Date.now());
+  const data=()=>{try{return lastData;}catch(e){return null;}};
+  const roundKey=d=>d&&d.roundActive===true?String(d.roundToken||((d.buzzOpenAt||0)+":"+(d.qIndex||0))):null;
+  const openAt=d=>Number(d&&d.buzzUnlockAt)||Number(d&&d.buzzOpenAt)||0;
+  const isOpen=(d,t)=>!!d&&d.roundActive===true&&!d.buzzedBy&&!d.narrationLocked&&t>=openAt(d);
+  function penaltyEndsAt(d){
+    if(!earlyAt||!d||d.roundActive!==true)return 0;
+    const key=roundKey(d);
+    const applies=(earlyRound!==null&&earlyRound===key)||(earlyRound===null&&openAt(d)>=earlyAt);
+    if(!applies)return 0;
+    if(d.narrationLocked||now()<openAt(d))return Infinity;
+    return openAt(d)+PENALTY_MS;
+  }
+  function say(text){const s=document.getElementById("status");if(s)s.textContent=text;}
+  // Keep the button clickable so an early press can be caught; show it dimmed instead.
+  const style=document.createElement("style");
+  style.textContent=".buzz-btn.buzz-locked{opacity:.45;filter:grayscale(.7);}";
+  document.head.appendChild(style);
+  Object.defineProperty(btn,"disabled",{configurable:true,get(){return false;},set(v){btn.classList.toggle("buzz-locked",!!v);}});
+  const inner=window.buzzIn;
+  window.buzzIn=function(){
+    const d=data(), t=now();
+    if(d&&d.buzzedBy)return inner();
+    const until=penaltyEndsAt(d);
+    if(t<until){say("Too early! You can buzz 1.5 seconds after it opens.");return;}
+    if(!isOpen(d,t)){
+      earlyAt=t; earlyRound=roundKey(d);
+      btn.classList.add("buzz-locked");
+      say("Too early! Wait until 1.5 seconds after the buzzer opens.");
+      return;
+    }
+    return inner();
+  };
+  setInterval(()=>{
+    const d=data(), until=penaltyEndsAt(d), t=now();
+    if(until&&t<until){btn.classList.add("buzz-locked");}
+    else if(earlyAt&&until&&t>=until){earlyAt=0;earlyRound=null;say("");}
+  },200);
 })();
