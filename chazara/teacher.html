@@ -231,14 +231,53 @@ function manualStudentName(id){return R[id]?.name||D[id]?.name||id}
 function populateManualStudents(){const sel=$('manualStudent');if(!sel)return;const keep=sel.value,ids=[...new Set([...Object.keys(R||{}),...Object.keys(D||{}),...Object.keys(E||{})])];ids.sort((a,b)=>manualStudentName(a).localeCompare(manualStudentName(b)));sel.innerHTML='<option value="">Choose student</option>'+ids.map(id=>`<option value="${escHtml(id)}">${escHtml(manualStudentName(id))}</option>`).join('');if(ids.includes(keep))sel.value=keep}
 function setManualStatus(message,bad=false){const el=$('manualStatus');if(!el)return;el.textContent=message||'';el.style.color=bad?'#991b1b':'#475569'}
 function renderManualMatches(){const box=$('manualList');if(!box)return;const student=$('manualStudent')?.value||'',date=$('manualDate')?.value||'',perek=$('manualPerek')?.value||'',posuk=$('manualPasuk')?.value||'';if(!student){box.innerHTML='<div class="manual-empty">Choose a student to see matching Chazaras.</div>';return}let rows=allActiveChazaraEvents().filter(e=>String(e.studentId)===student);if(date)rows=rows.filter(e=>chazaraDate(e)===date);if(perek)rows=rows.filter(e=>String(e.perek)===String(Number(perek)));if(posuk)rows=rows.filter(e=>String(e.posuk)===String(Number(posuk)));if(!rows.length){box.innerHTML='<div class="manual-empty">No matching Chazaras.</div>';return}box.innerHTML='';rows.slice(0,100).forEach(e=>{const row=document.createElement('div');row.className='manual-event';const kind=e.teacherEntered===true?'Teacher entered':e.recorded===true?'Recorded':'Student entry',points=e.pointRequestStatus==='approved'?'points approved':e.pointRequestStatus==='pending'?'points pending':e.pointRequestStatus==='rejected'?'points rejected':'point status unknown';row.innerHTML=`<div class="manual-event-main"><div class="manual-event-title">Perek ${escHtml(e.perek||'?')} · Pasuk ${escHtml(e.posuk||'?')}<span class="manual-badge">${escHtml(kind)}</span></div><div class="manual-event-meta">${escHtml(chazaraDate(e))}${e.createdAt?' · '+escHtml(requestWhen(e.createdAt)):''} · ${escHtml(points)}</div></div><button type="button" class="manual-delete" data-manual-delete="${escHtml(e.id)}" data-manual-student="${escHtml(e.studentId)}">Delete Chazara + Points</button>`;box.appendChild(row)});if(rows.length>100){const more=document.createElement('div');more.className='manual-empty';more.textContent=`Showing the newest 100 of ${rows.length} matches.`;box.appendChild(more)}}
-async function addManualChazara(){const btn=$('manualAddBtn'),student=$('manualStudent')?.value||'',date=$('manualDate')?.value||'',perek=Number($('manualPerek')?.value),posuk=Number($('manualPasuk')?.value),quantity=Math.max(1,Math.min(20,Math.floor(Number($('manualQuantity')?.value)||1)));if(!student){setManualStatus('Choose a student.',true);return}if(!date){setManualStatus('Choose the date the Chazara was done.',true);return}if(!Number.isInteger(perek)||perek<1){setManualStatus('Enter the perek.',true);return}if(!Number.isInteger(posuk)||posuk<1){setManualStatus('Enter the pasuk.',true);return}btn.disabled=true;btn.textContent='Adding…';setManualStatus('Adding Chazara and points…');try{const data=await teacherApi('teacher-add-chazara',{studentId:student,date,perek,posuk,quantity});setManualStatus(`Added ${data.quantity} Chazara${data.quantity===1?'':'s'} and ${data.pointsAdded} point${Math.abs(Number(data.pointsAdded))===1?'':'s'} for ${data.studentName||manualStudentName(student)}.`);$('manualQuantity').value='1';renderManualMatches()}catch(err){console.error(err);setManualStatus(String(err?.message||err),true)}finally{btn.disabled=false;btn.textContent='Add Chazara + Point'}}
-async function deleteManualChazara(studentId,eventId,button){const event=E?.[studentId]?.[eventId]||{},name=event.studentName||manualStudentName(studentId);if(!confirm(`Delete this Chazara for ${name}, Perek ${event.perek||'?'} · Pasuk ${event.posuk||'?'}?\n\nAny linked points will also be removed or cancelled.`))return;const old=button.textContent;button.disabled=true;button.textContent='Deleting…';setManualStatus('Deleting Chazara and adjusting points…');try{const data=await teacherApi('teacher-delete-chazara',{studentId,eventId});const amt=Number(data.pointsAmount||0);if(data.pointsAction==='reversed'&&amt<0)setManualStatus(`Chazara deleted. ${Math.abs(amt)} point${Math.abs(amt)===1?'':'s'} removed.`);else if(data.pointsAction==='cancelled')setManualStatus('Chazara deleted. Its pending points were cancelled.');else setManualStatus('Chazara deleted. No points needed to be removed.');renderManualMatches()}catch(err){console.error(err);setManualStatus(String(err?.message||err),true)}finally{button.disabled=false;button.textContent=old}}
+async function addManualChazara(){
+ const uid=auth.currentUser?.uid,generation=scopeGeneration,current=()=>currentChazaraAction(uid,generation);
+ if(!current())return;
+ const btn=$('manualAddBtn'),student=$('manualStudent')?.value||'',date=$('manualDate')?.value||'',perek=Number($('manualPerek')?.value),posuk=Number($('manualPasuk')?.value),quantity=Math.max(1,Math.min(20,Math.floor(Number($('manualQuantity')?.value)||1)));
+ if(!student){setManualStatus('Choose a student.',true);return}
+ if(!date){setManualStatus('Choose the date the Chazara was done.',true);return}
+ if(!Number.isInteger(perek)||perek<1){setManualStatus('Enter the perek.',true);return}
+ if(!Number.isInteger(posuk)||posuk<1){setManualStatus('Enter the pasuk.',true);return}
+ if(!current())return;
+ btn.disabled=true;btn.textContent='Adding…';setManualStatus('Adding Chazara and points…');
+ try{
+  const data=await teacherApi('teacher-add-chazara',{studentId:student,date,perek,posuk,quantity});
+  if(!current())return;
+  setManualStatus(`Added ${data.quantity} Chazara${data.quantity===1?'':'s'} and ${data.pointsAdded} point${Math.abs(Number(data.pointsAdded))===1?'':'s'} for ${data.studentName||manualStudentName(student)}.`);
+  $('manualQuantity').value='1';renderManualMatches();
+ }catch(err){if(!current())return;console.error(err);setManualStatus(String(err?.message||err),true)}
+ finally{if(current()){btn.disabled=false;btn.textContent='Add Chazara + Point'}}
+}
+async function deleteManualChazara(studentId,eventId,button){
+ const uid=auth.currentUser?.uid,generation=scopeGeneration,current=()=>currentChazaraAction(uid,generation);
+ if(!current())return;
+ const event=E?.[studentId]?.[eventId]||{},name=event.studentName||manualStudentName(studentId);
+ if(!confirm(`Delete this Chazara for ${name}, Perek ${event.perek||'?'} · Pasuk ${event.posuk||'?'}?\n\nAny linked points will also be removed or cancelled.`))return;
+ if(!current())return;
+ const old=button.textContent;button.disabled=true;button.textContent='Deleting…';setManualStatus('Deleting Chazara and adjusting points…');
+ try{
+  const data=await teacherApi('teacher-delete-chazara',{studentId,eventId});
+  if(!current())return;
+  const amt=Number(data.pointsAmount||0);
+  if(data.pointsAction==='reversed'&&amt<0)setManualStatus(`Chazara deleted. ${Math.abs(amt)} point${Math.abs(amt)===1?'':'s'} removed.`);
+  else if(data.pointsAction==='cancelled')setManualStatus('Chazara deleted. Its pending points were cancelled.');
+  else setManualStatus('Chazara deleted. No points needed to be removed.');
+  renderManualMatches();
+ }catch(err){if(!current())return;console.error(err);setManualStatus(String(err?.message||err),true)}
+ finally{if(current()){button.disabled=false;button.textContent=old}}
+}
 
 async function teacherApi(action,extra={}){
   const user=auth.currentUser;
   if(!user||!teacherAccess?.authorized||!teacherScope) throw new Error("Teacher sign-in required.");
+  const uid=user.uid,generation=scopeGeneration,scope=teacherScope;
+  if(!currentChazaraAction(uid,generation))throw new Error("Teacher session changed.");
   const token=await user.getIdToken();
-  const response=await fetch(POINTS_API,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action,...extra,classId:teacherScope.selected})});
+  // A Google account or class can change while the token is being fetched.
+  // Never dispatch an old class action using the next account's session.
+  if(!currentChazaraAction(uid,generation)||teacherScope!==scope)throw new Error("Teacher session changed.");
+  const response=await fetch(POINTS_API,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action,...extra,classId:scope.selected})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok) throw new Error(data.error||("HTTP "+response.status));
   return data;
@@ -487,7 +526,7 @@ function teacherAssignmentChange(access,row){
  return JSON.stringify(live)===JSON.stringify(opened)?'':'changed';
 }
 async function loadClassScope(user,access){
- const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
+ const generation=++scopeGeneration;clearStudentListeners();historyGeneration++;approvalGeneration++;historyLoading=false;historyStudentsLoaded.clear();pendingRecordingKeys.clear();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};const manualAddButton=$('manualAddBtn');if(manualAddButton){manualAddButton.disabled=false;manualAddButton.textContent='Add Chazara + Point'}$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  // Hide and stop cached recording playback before any asynchronous revalidation.
  for(const id of ['recordingsList','approvalList']){
   const panel=$(id);if(!panel)continue;
