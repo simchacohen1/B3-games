@@ -108,6 +108,7 @@ function roomPublic(gameKey, room, state, timestamp) {
   view.invitedStudentId = room.invitedStudentId || null;
   view.invitedStudentName = room.invitedStudentName || null;
   view.round = room.round || 1;
+  if (room.state === 'countdown' && Number.isFinite(Number(room.countdownAt))) view.countdownAt = Number(room.countdownAt);
   return view;
 }
 
