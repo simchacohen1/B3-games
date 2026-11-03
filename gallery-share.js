@@ -10,6 +10,9 @@
   const endpoint = 'https://us-central1-b3-games.cloudfunctions.net/classGallerySubmit';
   const excluded = /\/(?:class-gallery|admin|owner-admin|teacher-home|student-report|sync-to-nigri)(?:\/|\.html|$)/i;
   if (excluded.test(location.pathname) || /(?:^|[/-])teacher(?:[/.?]|$)/i.test(location.pathname)) return;
+  // The Arcade catalog has no student work to capture, and the floating pin obscures game tiles on phones.
+  // Keep Gallery capture available on actual multiplayer game pages and other supported activities.
+  if (/\/multiplayer\/(?:index\.html)?$/i.test(location.pathname)) return;
   const params = new URLSearchParams(location.search);
   if (['previewStudentId','teacherPreview','teacher_preview'].some(key => params.has(key))) return;
 
