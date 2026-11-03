@@ -33,12 +33,17 @@
     return { saved: true, text: 'Saved ✓ (username ending …' + String(body.hint || '') + ')' };
   }
 
-  async function call(env, method, payload) {
+  // One plain line per course: the label, and either "ready" or why it is off. Never shows IDs of other rooms.
+  function courseLine(course) {
+    return course.label + ' — ' + (course.available ? 'ready' : 'not available: ' + (course.reason || 'unknown'));
+  }
+
+  async function call(env, method, payload, path) {
     var token = await env.getToken();
     if (!token) return { ok: false, message: 'Please sign in as a teacher first.' };
     var res;
     try {
-      res = await env.fetch(env.base + '/nigri-login', {
+      res = await env.fetch(env.base + (path || '/nigri-login'), {
         method: method,
         headers: Object.assign({ Authorization: 'Bearer ' + token }, payload ? { 'Content-Type': 'application/json' } : {}),
         body: payload ? JSON.stringify(payload) : undefined,
@@ -48,6 +53,7 @@
     var body = null;
     try { body = await res.json(); } catch (e) { body = null; }
     if (!res.ok) return { ok: false, message: describe(res.status, body) };
+    if (path) return { ok: true, grade: body && body.grade, courses: (body && body.courses) || [] };
     return Object.assign({ ok: true }, show(body));
   }
 
@@ -55,7 +61,9 @@
     isStagingHost: isStagingHost, serverBase: serverBase,
     status: function (env) { return call(env, 'GET'); },
     save: function (env, username, password) { return call(env, 'PUT', { username: username, password: password }); },
-    remove: function (env) { return call(env, 'DELETE'); }
+    remove: function (env) { return call(env, 'DELETE'); },
+    courses: function (env, classId) { return call(env, 'GET', null, '/nigri-courses?class=' + encodeURIComponent(classId)); },
+    courseLine: courseLine
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.NigriLoginClient = api;
