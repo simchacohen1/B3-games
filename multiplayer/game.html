@@ -16,15 +16,16 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-functions-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../student-class.js"></script>
+<script src="identity.js?v=teacher-player-20261029-1"></script>
 <script src="../backend/functions/student-tool-policy.js"></script>
-<script defer src="game.js"></script>
+<script defer src="game.js?v=teacher-player-20261029-1"></script>
 </head>
 <body>
 <main>
   <header><strong>🎲 Fun Torah Tools</strong><a href="index.html">← Back to Multiplayer Center</a></header>
   <h1 id="gameTitle">Class Game</h1>
   <p id="gameHint" class="intro">Wait for your classmates and start when everyone is ready.</p>
-  <section id="message" class="notice" role="status" aria-live="polite">Checking your student sign-in…</section>
+  <section id="message" class="notice" role="status" aria-live="polite">Checking your Fun Torah Tools sign-in…</section>
   <section id="room" class="play-area" hidden>
     <div class="room-top"><div><strong id="roomCode"></strong><div id="roomState" class="muted"></div></div><div id="players" class="player-list"></div></div>
     <div id="board" aria-label="Game board"></div>

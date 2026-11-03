@@ -80,21 +80,44 @@ async function openStudentPage(page: Page, server: Server, progress: any = { cur
   await page.goto(SITE + '/rashi-letters/student.html');
   await expect(page.locator('#modeGate')).toBeVisible({ timeout: 15000 });
 }
+// Open the "Reading with Mic" page from the menu tile; row 0 is Mission 1 (zayin).
+async function openHub(page: Page) {
+  await page.locator('.mic-tile').click();
+  await expect(page.locator('#recordHub')).toBeVisible();
+}
+const hubRow = (page: Page, i = 0) => page.locator('#recordHub .rr-menu-row').nth(i);
 const fresh = (): Server => ({ sections: {}, submits: [], failNext: 0 });
 
-test('menu lists finished sections with a Record Reading button and no status yet', async ({ page }) => {
+test('menu has a Reading with Mic tile; it opens a page with every section to record from', async ({ page }) => {
   await openStudentPage(page, fresh());
-  const row = page.locator('#recMenu .rr-menu-row');
-  await expect(row).toHaveCount(1);                                    // only Mission 1 is finished
-  await expect(row).toContainText('Mission 1 (ז) words');
-  await expect(row).toContainText('Not recorded yet');
-  await expect(row.getByRole('button', { name: /Record Reading/ })).toBeVisible();
+  await expect(page.locator('.mic-tile')).toContainText('Reading with Mic');
+  await openHub(page);
+  const rows = page.locator('#recordHub .rr-menu-row');
+  await expect(rows).toHaveCount(12);                                  // 9 missions + 2/3/4-letter words, all open
+  await expect(rows.first()).toContainText('Mission 1 (ז) words');
+  await expect(rows.first()).toContainText('Not recorded yet');
+  await expect(rows.nth(11)).toContainText('4-letter words');
+  await expect(rows.first().getByRole('button', { name: /Record/ })).toBeVisible();
+  await page.locator('#recordHub').getByRole('button', { name: /Menu/ }).click();
+  await expect(page.locator('#modeGate')).toBeVisible();
+  await expect(page.locator('#recordHub')).toBeHidden();
+});
+
+test('a section can be chosen from the page even before finishing its mission, and Back returns to the page', async ({ page }) => {
+  await openStudentPage(page, fresh(), { currentUnitIndex: 0, currentPhase: 'letter' });
+  await openHub(page);
+  await hubRow(page, 4).getByRole('button', { name: /Record/ }).click();   // Mission 5
+  await expect(page.locator('#recordScreen')).toContainText('Mission 5');
+  await expect(page.locator('#recordScreen .rr-word')).toHaveCount(8);
+  await page.locator('#recordScreen').getByRole('button', { name: /All readings/ }).click();
+  await expect(page.locator('#recordHub')).toBeVisible();
 });
 
 test('record, stop, play, rerecord and submit; then it waits for the teacher', async ({ page, browserName }) => {
   const server = fresh();
   await openStudentPage(page, server);
-  await page.locator('#recMenu').getByRole('button', { name: /Record Reading/ }).click();
+  await openHub(page);
+  await hubRow(page).getByRole('button', { name: /Record/ }).click();
   const screen = page.locator('#recordScreen');
   await expect(screen).toBeVisible();
   await expect(screen.locator('.rr-word')).toHaveCount(8);              // the section's eight Rashi words
@@ -126,7 +149,8 @@ test('record, stop, play, rerecord and submit; then it waits for the teacher', a
 test('a failed send keeps the recording so he can press Submit again', async ({ page }) => {
   const server = fresh(); server.failNext = 1;
   await openStudentPage(page, server);
-  await page.locator('#recMenu').getByRole('button', { name: /Record Reading/ }).click();
+  await openHub(page);
+  await hubRow(page).getByRole('button', { name: /Record/ }).click();
   const screen = page.locator('#recordScreen');
   await screen.getByRole('button', { name: /🎤 Record Reading/ }).click();
   await page.waitForTimeout(2200);
@@ -142,18 +166,22 @@ test('a failed send keeps the recording so he can press Submit again', async ({ 
 test('status survives a refresh: pending, approved (+2) and rejected (new attempt allowed)', async ({ page }) => {
   const server = fresh(); server.sections = { zayin: { status: 'pending' } };
   await openStudentPage(page, server);
-  await expect(page.locator('#recMenu .rr-menu-row')).toContainText('Waiting for Teacher Approval');
-  await page.locator('#recMenu').getByRole('button', { name: 'View' }).click();
+  await openHub(page);
+  await expect(hubRow(page)).toContainText('Waiting for Teacher Approval');
+  await hubRow(page).getByRole('button', { name: 'View' }).click();
   await expect(page.locator('#recordScreen .rr-banner')).toContainText('⏳ Waiting for Teacher Approval');
   await expect(page.locator('#recordScreen').getByRole('button', { name: /🎤 Record Reading/ })).toHaveCount(0);
 
   server.sections.zayin = { status: 'approved', points: 2 };
   await page.reload(); await expect(page.locator('#modeGate')).toBeVisible();
-  await expect(page.locator('#recMenu .rr-menu-row')).toContainText('✅ Approved! +2 Points');
+  await openHub(page);
+  await expect(hubRow(page)).toContainText('✅ Approved! +2 Points');
 
   server.sections.zayin = { status: 'rejected' };
   await page.reload(); await expect(page.locator('#modeGate')).toBeVisible();
-  await page.locator('#recMenu').getByRole('button', { name: /Record Reading/ }).click();
+  await openHub(page);
+  await expect(hubRow(page)).toContainText('try again');
+  await hubRow(page).getByRole('button', { name: /Record/ }).click();
   await expect(page.locator('#recordScreen .rr-banner')).toContainText('try again');
   await expect(page.locator('#recordScreen').getByRole('button', { name: /🎤 Record Reading/ })).toBeVisible();
 });

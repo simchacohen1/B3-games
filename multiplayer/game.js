@@ -43,7 +43,7 @@
     if (!callable || pending) return Promise.reject(new Error('Please wait for the previous action to finish.'));
     pending = true;
     drawActions();
-    return callable({ action, gameKey, workspaceId: classInfo.workspaceId, roomCode, ...extra })
+    return callable({ action, gameKey, workspaceId: classInfo.workspaceId, classId: classInfo.classId, roomCode, ...extra })
       .then(result => result.data || {})
       .finally(() => { pending = false; draw(); });
   }
@@ -93,7 +93,7 @@
   function drawPlayers() {
     const parent = el('players'); parent.replaceChildren();
     (room?.players || []).forEach(player => {
-      const chip = text('span', 'player-chip' + (player.studentId === room.turn ? ' current' : ''), player.name + (player.studentId === studentId ? ' (you)' : ''));
+      const chip = text('span', 'player-chip' + (player.studentId === room.turn ? ' current' : ''), player.name + (player.role === 'teacher' ? ' (teacher)' : '') + (player.studentId === studentId ? ' (you)' : ''));
       parent.appendChild(chip);
     });
   }
@@ -302,7 +302,7 @@
   }
   async function launch() {
     const savedId = String(sessionStorage.getItem('b3Games_studentId') || sessionStorage.getItem('posukPractice_studentId') || '').trim();
-    if (!savedId || !window.firebase || !window.B3_FIREBASE_CONFIG || !game) {
+    if (!window.firebase || !window.B3_FIREBASE_CONFIG || !game) {
       notice(game ? 'Sign in on Fun Torah Tools first. ' : 'Choose a game from the Multiplayer Center.', true);
       showBrowse(); return;
     }
@@ -318,19 +318,9 @@
         authReady = true;
         if (!user) { notice('Your saved sign-in expired. Please sign in again.', true); showBrowse(); return; }
         try {
-          const token = await user.getIdTokenResult();
-          classInfo = await window.FunTorahStudentClass.resolve(db, studentId);
-          if (!classInfo.classId || token.claims.b3StudentId !== studentId || token.claims.b3ClassId !== classInfo.classId) throw new Error('A current student sign-in for your class is required.');
-          const member = (await db.ref(`b3Games/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/members/${studentId}`).once('value')).val() || {};
-          let centerEnabled = member.active !== false && member.toolAccess?.['multiplayer-center'] !== false;
-          if (['et', 'wt'].includes(classInfo.classId)) {
-            const settings = (await db.ref('b3Games/siteSettings').once('value')).val() || {};
-            centerEnabled = centerEnabled && settings.games?.['multiplayer-center'] !== false && settings.classGames?.[classInfo.classId]?.['multiplayer-center'] !== false;
-          } else {
-            const classGrant = (await db.ref(`b3Games/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/toolGrants/multiplayer-center`).once('value')).val() === true;
-            centerEnabled = centerEnabled && classGrant;
-          }
-          if (!centerEnabled) throw new Error('Your teacher has not enabled Multiplayer Center for you yet.');
+          classInfo = await window.B3MultiplayerIdentity.resolve(db, user, params.get('classId') || '', savedId);
+          studentId = classInfo.participantId;
+          title.textContent = game.icon + ' ' + game.name;
           if (typeof firebase.functions !== 'function') throw new Error('The secure multiplayer service did not load. Reload the page to try again.');
           callable = firebase.app().functions('us-central1').httpsCallable('multiplayerGameAction');
           const code = params.get('b3MultiplayerRoom');

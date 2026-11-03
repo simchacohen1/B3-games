@@ -31,10 +31,8 @@
         choices: mix([x.en].concat(others)), answer: x.en, explain: x.he + " = " + x.en };
     });
   }
-  async function roomsPath() {
-    var id = (typeof cloudStudentId !== "undefined" && cloudStudentId) || "";
-    if (!id || !window.FunTorahStudentClass) return "";
-    return window.B3Race.classRoomsPath(cloudDb, id, "shorashim");
+  async function roomsPath(id) {
+    return window.B3Race.classRoomsPath(cloudDb, id || "", "shorashim");
   }
   async function open() {
     if (typeof cleanupGameRuntime === "function") cleanupGameRuntime();
@@ -49,23 +47,25 @@
     // available and the app has finished its initial home-screen render, or
     // that render will hide the newly opened race.
     var readyUntil = Date.now() + 15000;
-    while (!(typeof cloudStudentId !== "undefined" && cloudStudentId && typeof appStarted !== "undefined" && appStarted) && Date.now() < readyUntil) {
+    while (!((typeof cloudStudentId !== "undefined" && cloudStudentId || typeof teacherPreview !== "undefined" && teacherPreview) && typeof appStarted !== "undefined" && appStarted) && Date.now() < readyUntil) {
       await new Promise(function (resolve) { setTimeout(resolve, 100); });
     }
-    if (!(typeof cloudStudentId !== "undefined" && cloudStudentId && typeof appStarted !== "undefined" && appStarted)) {
-      box.textContent = "Please sign in on Fun Torah Tools to play with friends.";
+    if (!((typeof cloudStudentId !== "undefined" && cloudStudentId || typeof teacherPreview !== "undefined" && teacherPreview) && typeof appStarted !== "undefined" && appStarted)) {
+      box.textContent = "Please sign in with a student or assigned teacher account to play with friends.";
       return;
     }
     if (pool().length < 4) { box.innerHTML = '<p class="muted">Your class needs at least 4 words in the list before you can race.</p>'; return; }
-    var path = "", centerPath = "";
-    try { path = await roomsPath(); } catch (e) { console.warn("Shorashim race: could not find class", e); }
-    try { centerPath = await window.B3Race.classCenterRoomsPath(cloudDb, (typeof cloudStudentId !== "undefined" && cloudStudentId) || ""); } catch (e) { console.warn("Shorashim center: could not find class", e); }
+    var path = "", centerPath = "", actor;
+    try { actor = await window.B3MultiplayerIdentity.resolve(cloudDb, firebase.auth().currentUser, new URLSearchParams(location.search).get("class") || "", (typeof cloudStudentId !== "undefined" && cloudStudentId) || ""); }
+    catch (e) { box.textContent = e.message || "Sign in with an assigned class account to play."; return; }
+    try { path = await roomsPath(actor.participantId); } catch (e) { console.warn("Shorashim race: could not find class", e); }
+    try { centerPath = await window.B3Race.classCenterRoomsPath(cloudDb, actor.participantId); } catch (e) { console.warn("Shorashim center: could not find class", e); }
     if (race) race.leave();
     race = window.B3Race.create({
       container: box, db: cloudDb, roomsPath: path, centerPath: centerPath,
       gameKey: "shorashim", gameName: "Shorashim Race", gameUrl: "../shorashim/index.html", centerUrl: "../multiplayer/index.html",
       onRoomCreated: window.B3Race.saveHostRoomCode,
-      studentId: (typeof cloudStudentId !== "undefined" && cloudStudentId) || "", studentName: (typeof cloudStudentName !== "undefined" && cloudStudentName) || "Player",
+      studentId: actor.participantId, studentName: actor.participantName, role: actor.role,
       makeQuestions: makeQuestions,
       onFinish: function () { try { if (typeof finishGame === "function") finishGame(); } catch (e) {} },
       onExit: function () { stage.classList.add("hidden"); stage.innerHTML = ""; }

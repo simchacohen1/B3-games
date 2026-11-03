@@ -14,7 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="../firebase-config.js?v=20261029-staging-config"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
-<script src="../b3-race.js?v=20261007b"></script>
+<script src="../multiplayer/identity.js?v=teacher-player-20261029-1"></script>
+<script src="../b3-race.js?v=teacher-player-20261029-1"></script>
 <style>
 :root{--ink:#19324d;--purple:#6c4fd3;--blue:#3197e3;--green:#35b86b;--yellow:#ffd85b;--orange:#ff9b4a;--pink:#ff6fae;--line:#cfe0ef;}
 *{box-sizing:border-box}
@@ -372,11 +373,13 @@ async function startFriendsRace(){
   document.getElementById('builder').classList.add('hidden');document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');
   document.getElementById('raceCard').classList.remove('hidden');
   const box=document.getElementById('raceBox');box.innerHTML='<p style="text-align:center;font-weight:900">Loading…</p>';
-  if(teacherPreview){box.textContent='Class races require a student account. Use solo practice in teacher preview.';return;}
-  const path=await B3Race.classRoomsPath(db,studentId,'weekly-quiz');
-  const centerPath=await B3Race.classCenterRoomsPath(db,studentId);
+  let actor;
+  try{actor=await B3MultiplayerIdentity.resolve(db,firebase.auth().currentUser,new URLSearchParams(location.search).get('class')||'',studentId)}
+  catch(e){box.textContent=e.message||'Sign in with an assigned class account to play.';return;}
+  const path=await B3Race.classRoomsPath(db,actor.participantId,'weekly-quiz');
+  const centerPath=await B3Race.classCenterRoomsPath(db,actor.participantId);
   if(race)race.leave();
-  race=B3Race.create({container:box,db,roomsPath:path,centerPath,studentId,studentName:studentName||studentId,
+  race=B3Race.create({container:box,db,roomsPath:path,centerPath,studentId:actor.participantId,studentName:actor.participantName||studentName||actor.participantId,role:actor.role,
     gameKey:'weekly-quiz',gameName:'Weekly Quiz Race',gameUrl:'../weekly-quiz/practice.html',centerUrl:'../multiplayer/index.html',onRoomCreated:B3Race.saveHostRoomCode,
     makeQuestions:raceQuestions,
     roomInfo:()=>({label:typeLabel(quizType)+' • '+difficultyLabel(difficulty)+' • '+selected.size+' posuk'+(selected.size===1?'':'im')}),

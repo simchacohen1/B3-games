@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { SITE, loadCredentials, signInStudent, watchPage, expectStagingIsolation, type PageWatch } from './staging-common';
 
 // Runs only against the isolated staging site with fictional TEST-ALEF students.
@@ -30,6 +30,25 @@ const gameJourneys: Array<{ name: string; card: number; hostBox: string; guestBo
   { name: 'Rashi Letters Match', card: 4, hostBox: '#simArea', guestBox: '#simArea', status: 'Letter 1 of', nextStatus: 'Letter 2 of', choices: '.choice-btn' },
 ];
 
+const gameCategory: Record<string, { label: string; count: number }> = {
+  'Shorashim Race': { label: 'Torah & Jewish', count: 5 }, 'Yiddish Race': { label: 'Torah & Jewish', count: 5 },
+  'Gematria Race': { label: 'Torah & Jewish', count: 5 }, 'Weekly Quiz Race': { label: 'Torah & Jewish', count: 5 },
+  'Rashi Letters Match': { label: 'Torah & Jewish', count: 5 }, 'Connect 4': { label: 'Board & Strategy', count: 5 },
+  'Tic Tac Toe': { label: 'Board & Strategy', count: 5 }, Checkers: { label: 'Board & Strategy', count: 5 },
+  Reversi: { label: 'Board & Strategy', count: 5 }, Ludo: { label: 'Board & Strategy', count: 5 },
+  'Memory Match': { label: 'Cards & Matching', count: 5 }, Set: { label: 'Cards & Matching', count: 5 },
+  Dominoes: { label: 'Cards & Matching', count: 5 }, 'Go Fish': { label: 'Cards & Matching', count: 5 },
+  'Uno-style Cards': { label: 'Cards & Matching', count: 5 }, Bingo: { label: 'Quick Challenges', count: 2 },
+  'Math Race': { label: 'Quick Challenges', count: 2 },
+};
+
+async function openGame(page: Page, gameName: string) {
+  const category = gameCategory[gameName];
+  const categoryKey: Record<string, string> = { 'Torah & Jewish': 'torah', 'Board & Strategy': 'strategy', 'Cards & Matching': 'cards', 'Quick Challenges': 'challenges' };
+  await page.locator(`.category-group.category-${categoryKey[category.label]} .category-heading`).click();
+  await page.getByRole('button', { name: `Start Game: ${gameName}`, exact: true }).click();
+}
+
 async function answerOneQuestion(page: Page, game: typeof gameJourneys[number]) {
   const box = page.locator(game.guestBox);
   await expect(box).toContainText(game.status, { timeout: 30000 });
@@ -41,37 +60,152 @@ function latestInvite(page: Page, studentName: string, gameName: string) {
   return page.locator('.invite').filter({ hasText: studentName }).filter({ hasText: gameName }).last();
 }
 
+test('all 17 full-size game apps stay visible in 3+2 category grids on desktop, tablet, and phone', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const watch = await watchPage(page);
+  try {
+    await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(page);
+
+    await expect(page.getByRole('heading', { name: 'All 17 games, ready to play' })).toBeVisible();
+    await expect(page.locator('.category-group')).toHaveCount(4);
+    await expect(page.locator('.game')).toHaveCount(17);
+    await expect(page.locator('.game-mini')).toHaveCount(0);
+    await expect(page.locator('.game-illustration')).toHaveCount(17);
+    await expect(page.getByRole('button', { name: /^Start Game:/ })).toHaveCount(17);
+    await expect(page.getByRole('button', { name: /make (all )?(bigger|smaller)/i })).toHaveCount(0);
+    await expect(page.locator('.category-expand-label, .all-games-link')).toHaveCount(0);
+
+    const categories = [
+      { key: 'torah', label: 'Torah & Jewish', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
+      { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
+      { key: 'cards', label: 'Cards & Matching', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
+      { key: 'challenges', label: 'Quick Challenges', count: 2, games: ['Bingo', 'Math Race'] },
+    ];
+    for (const category of categories) {
+      const group = page.locator(`.category-group.category-${category.key}`);
+      await expect(group.locator('.category-heading')).toContainText(category.label);
+      await expect(group.locator('.game')).toHaveCount(category.count);
+      await expect(group.locator('.game-name')).toHaveText(category.games);
+      await expect(group.locator('.game-launch')).toHaveCount(category.count);
+    }
+
+    const connectFourArt = await page.locator('.game-connect-four .game-art').evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { width: rect.width, height: rect.height, background: style.backgroundImage, radius: style.borderRadius, art: element.innerHTML };
+    });
+    expect(connectFourArt.width).toBeGreaterThanOrEqual(100);
+    expect(connectFourArt.width).toBeCloseTo(connectFourArt.height, 0);
+    expect(connectFourArt.background).toContain('linear-gradient');
+    expect(parseFloat(connectFourArt.radius)).toBeGreaterThan(10);
+    expect(connectFourArt.art).toContain('connect-four-holes');
+
+    async function expectCenteredThreeTwoLayout() {
+      const positions = await page.locator('.category-cards .category-game-grid > .game').evaluateAll(elements =>
+        elements.map(element => {
+          const rect = element.getBoundingClientRect();
+          return { x: rect.x, y: rect.y };
+        }),
+      );
+      expect(positions[0].y).toBe(positions[1].y);
+      expect(positions[1].y).toBe(positions[2].y);
+      expect(positions[3].y).toBe(positions[4].y);
+      expect(positions[3].y).toBeGreaterThan(positions[2].y);
+      expect(positions[3].x).toBeGreaterThan(positions[0].x);
+      expect(positions[4].x).toBeLessThan(positions[2].x);
+    }
+    await expectCenteredThreeTwoLayout();
+
+    await expect(page.locator('.game-connect-four .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-tic-tac-toe .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-checkers .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-reversi .game-illustration')).toBeVisible();
+    await expect(page.locator('.game-shorashim .game-illustration')).toBeVisible();
+    expect(await page.locator('.game-uno-style .game-illustration').innerHTML()).not.toContain('🃏');
+
+    for (const viewport of [{ width: 820, height: 1180 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator('.game')).toHaveCount(17);
+      await expectCenteredThreeTwoLayout();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${viewport.width}px layout has no horizontal page overflow`).toBe(true);
+    }
+    expect(watch.productionRequests).toEqual([]);
+    expect(watch.pageErrors).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
 test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   test.skip(!credentials, NOT_CONFIGURED);
-  test.skip(classAccounts.length < 2, 'NOT VERIFIED: two fictional TEST-ALEF students are required');
 
   let host: Page;
   let guest: Page;
   let hostWatch: PageWatch;
   let guestWatch: PageWatch;
+  let hostContext: BrowserContext;
+  let guestContext: BrowserContext;
 
-  test.beforeEach(async ({ browser }) => {
-    const browserClient = browser as Browser;
-    host = await browserClient.newPage({ viewport: { width: 1280, height: 900 } });
-    guest = await browserClient.newPage({ viewport: { width: 390, height: 844 } });
+  test.beforeAll(async ({ browser }) => {
+    hostContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    guestContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    host = await hostContext.newPage();
+    guest = await guestContext.newPage();
     [hostWatch, guestWatch] = await Promise.all([watchPage(host), watchPage(guest)]);
-    await Promise.all([
-      signInStudent(host, classAccounts[0]),
-      signInStudent(guest, classAccounts[1]),
-    ]);
+    await signInStudent(host, classAccounts[0]);
+    if (classAccounts[1]) await signInStudent(guest, classAccounts[1]);
+  });
+
+  test.beforeEach(async () => {
+    hostWatch.productionRequests.length = 0;
+    hostWatch.pageErrors.length = 0;
+    guestWatch.productionRequests.length = 0;
+    guestWatch.pageErrors.length = 0;
   });
 
   test.afterEach(async () => {
     expect(hostWatch.productionRequests, 'host requests to production').toEqual([]);
     expect(guestWatch.productionRequests, 'guest requests to production').toEqual([]);
-    await Promise.all([host?.close(), guest?.close()]);
+  });
+
+  test.afterAll(async () => {
+    await Promise.all([hostContext?.close(), guestContext?.close()]);
+  });
+
+  test('signing in from the arcade returns the student to the games', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const pageWatch = await watchPage(page);
+    try {
+      await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+      await expectStagingIsolation(page);
+      await page.getByRole('link', { name: 'Go to sign in' }).click();
+      await expect(page).toHaveURL(/index\.html(?:\?.*)?$/);
+      await expect.poll(() => page.evaluate(() => sessionStorage.getItem('b3StudentReturnTo'))).toBe('multiplayer/index.html');
+
+      await page.locator('#studentNameInput').fill(classAccounts[0].name);
+      await page.locator('#classPinInput').fill(classAccounts[0].passcode);
+      await page.locator('#studentSignInBtn').click();
+
+      await expect(page).toHaveURL(/multiplayer\/index\.html$/, { timeout: 45000 });
+      await expectStagingIsolation(page);
+      await expect(page.locator('#accountStatus')).toContainText(classAccounts[0].name, { timeout: 30000 });
+      await expect(page.locator('.category-group')).toHaveCount(4);
+      await expect(page.locator('.game')).toHaveCount(17);
+      expect(pageWatch.productionRequests, 'sign-in journey requests to production').toEqual([]);
+      expect(pageWatch.pageErrors, 'sign-in journey browser errors').toEqual([]);
+    } finally {
+      await context.close();
+    }
   });
 
   test('host invitation is class scoped, guests can leave, rejoin, and wait for the host', async () => {
+    test.skip(classAccounts.length < 2, 'NOT VERIFIED: a second fictional TEST-ALEF account is required for multiplayer');
     await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(host);
     await expect(host.locator('#accountStatus')).toContainText(classAccounts[0].name, { timeout: 30000 });
-    await host.getByRole('button', { name: 'Start Game' }).nth(4).click();
+    await openGame(host, 'Rashi Letters Match');
     await expect(host).toHaveURL(/rashi-letters\/student\.html\?b3Multiplayer=start/);
     await expect(host.locator('#simArea')).toContainText('Waiting for friends to join', { timeout: 45000 });
 
@@ -107,9 +241,10 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
   });
 
   test('Not Now dismisses a waiting invitation and the mobile center stays usable', async () => {
+    test.skip(classAccounts.length < 2, 'NOT VERIFIED: a second fictional TEST-ALEF account is required for invitation testing');
     await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(host);
-    await host.getByRole('button', { name: 'Start Game' }).nth(4).click();
+    await openGame(host, 'Rashi Letters Match');
     await expect(host.locator('#simArea')).toContainText('Waiting for friends to join', { timeout: 45000 });
 
     await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
@@ -120,8 +255,7 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     const inviteCount = await matchingInvites.count();
     await invite.getByRole('button', { name: 'Not Now' }).click();
     await expect(matchingInvites).toHaveCount(inviteCount - 1);
-    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(17);
-    await expect(guest.getByRole('button', { name: 'Start Game' }).nth(4)).toBeVisible();
+    await expect(guest.locator('.category-group')).toHaveCount(4);
     expect(guestWatch.pageErrors).toEqual([]);
   });
 
@@ -133,12 +267,12 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
       await signInStudent(secondHost, classAccounts[2]);
       await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
       await expectStagingIsolation(host);
-      await host.getByRole('button', { name: 'Start Game' }).nth(4).click();
+      await openGame(host, 'Rashi Letters Match');
       await expect(host.locator('#simArea')).toContainText('Waiting for friends to join', { timeout: 45000 });
 
       await secondHost.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
       await expectStagingIsolation(secondHost);
-      await secondHost.getByRole('button', { name: 'Start Game' }).nth(2).click();
+      await openGame(secondHost, 'Gematria Race');
       await expect(secondHost.locator('#raceBox')).toContainText('Waiting for friends to join', { timeout: 45000 });
 
       await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
@@ -164,29 +298,12 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
     }
   });
 
-  test('a disconnected host closes the waiting room with a clear way back', async () => {
-    await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
-    await expectStagingIsolation(host);
-    await host.getByRole('button', { name: 'Start Game' }).nth(4).click();
-    await expect(host.locator('#simArea')).toContainText('Waiting for friends to join', { timeout: 45000 });
-
-    await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
-    await expectStagingIsolation(guest);
-    const invite = latestInvite(guest, classAccounts[0].name, 'Rashi Letters Match');
-    await invite.getByRole('button', { name: 'Join Game' }).click();
-    await expect(guest.locator('#simArea')).toContainText('Waiting for', { timeout: 30000 });
-    await host.close();
-    await expect(guest.locator('#simArea')).toContainText('The host left. This waiting room has closed.', { timeout: 30000 });
-    await guest.locator('#simArea').getByRole('button', { name: 'Browse other games' }).click();
-    await expect(guest).toHaveURL(/multiplayer\/index\.html/);
-    await expect(guest.getByRole('button', { name: 'Start Game' })).toHaveCount(17);
-  });
-
   for (const game of gameJourneys) {
     test(`${game.name} starts, joins, and accepts live answers`, async () => {
+      test.skip(classAccounts.length < 2, 'NOT VERIFIED: a second fictional TEST-ALEF account is required for multiplayer');
       await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
       await expectStagingIsolation(host);
-      await host.getByRole('button', { name: 'Start Game' }).nth(game.card).click();
+      await openGame(host, game.name);
       if (game.configureWeeklyQuiz) {
         await expect(host.locator('#posukGrid button').first()).toBeVisible({ timeout: 45000 });
         await host.getByRole('button', { name: 'Select All' }).click();
@@ -199,6 +316,8 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
       await expectStagingIsolation(guest);
       const invite = latestInvite(guest, classAccounts[0].name, game.name);
       await expect(invite).toContainText(game.name, { timeout: 30000 });
+      await expect(guest.getByRole('heading', { name: 'Friends waiting to play' })).toBeVisible();
+      await expect(guest.locator('#invitationSummary')).toContainText('ready to join');
       await invite.getByRole('button', { name: 'Join Game' }).click();
       await expect(guest.locator(game.guestBox)).toBeVisible();
       await expect(guest.locator(game.guestBox)).toContainText('Waiting for', { timeout: 30000 });
@@ -213,4 +332,23 @@ test.describe('Multiplayer Center staging journeys @multiplayer @auth', () => {
       expect(guestWatch.pageErrors).toEqual([]);
     });
   }
+
+  test('a disconnected host closes the waiting room with a clear way back', async () => {
+    test.skip(classAccounts.length < 2, 'NOT VERIFIED: a second fictional TEST-ALEF account is required for multiplayer');
+    await host.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(host);
+    await openGame(host, 'Rashi Letters Match');
+    await expect(host.locator('#simArea')).toContainText('Waiting for friends to join', { timeout: 45000 });
+
+    await guest.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(guest);
+    const invite = latestInvite(guest, classAccounts[0].name, 'Rashi Letters Match');
+    await invite.getByRole('button', { name: 'Join Game' }).click();
+    await expect(guest.locator('#simArea')).toContainText('Waiting for', { timeout: 30000 });
+    await host.close();
+    await expect(guest.locator('#simArea')).toContainText('The host left. This waiting room has closed.', { timeout: 30000 });
+    await guest.locator('#simArea').getByRole('button', { name: 'Browse other games' }).click();
+    await expect(guest).toHaveURL(/multiplayer\/index\.html/);
+    await expect(guest.locator('.category-group')).toHaveCount(4);
+  });
 });

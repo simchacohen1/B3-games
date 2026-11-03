@@ -586,7 +586,7 @@ function startGameState(gameKey, state, ids) {
 
 function publicView(gameKey, state, room, now = Date.now()) {
   const players = Object.entries(room.players || {}).filter(([, player]) => player && player.active !== false)
-    .map(([studentId, player]) => ({ studentId, name: String(player.name || 'Student'), score: state.scores?.[studentId] || 0 }));
+    .map(([studentId, player]) => ({ studentId, name: String(player.name || 'Student'), role: player.role === 'teacher' ? 'teacher' : 'student', score: state.scores?.[studentId] || 0 }));
   const view = {
     roomCode: room.roomCode, gameKey, gameName: GAMES[gameKey].name, host: room.host,
     hostName: room.hostName, state: room.state, createdAt: room.createdAt, updatedAt: now,
