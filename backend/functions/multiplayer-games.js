@@ -345,11 +345,14 @@ async function gameLeaderboard(db, actor) {
   };
 }
 
+// The older race games publish their waiting rooms as <gameKey>-<code> next to the arcade-<code> rooms.
+const RACE_GAME_KEYS = new Set(['shorashim', 'yiddish', 'gematria', 'weekly-quiz', 'rashi-letters']);
 async function listPublicRooms(db, actor) {
   const path = `multiplayerCenter/workspaces/${actor.workspaceId}/classes/${actor.classId}/rooms`;
   const rooms = (await db.ref(path).get()).val() || {};
   const recent = Object.entries(rooms)
-    .filter(([key, room]) => key.startsWith('arcade-') && room && SAFE_ID.test(String(room.roomCode || '')) && core.gameConfig(room.gameKey))
+    .filter(([key, room]) => room && SAFE_ID.test(String(room.roomCode || '')) &&
+      (key.startsWith('arcade-') && core.gameConfig(room.gameKey) || RACE_GAME_KEYS.has(room.gameKey) && key === `${room.gameKey}-${room.roomCode}`))
     .sort((a, b) => Number(b[1].updatedAt || b[1].createdAt || 0) - Number(a[1].updatedAt || a[1].createdAt || 0))
     .slice(0, 50);
   return { rooms: Object.fromEntries(recent) };

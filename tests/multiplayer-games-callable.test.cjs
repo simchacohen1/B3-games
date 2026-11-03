@@ -155,9 +155,12 @@ test('callable quick play joins two fictional classmates to one room and shared 
   await database.ref('multiplayerCenter/workspaces/testSchool/classes/grade4/rooms/arcade-654321').set({
     ...fixtureRoom, roomCode: '654321', host: 'chana',
   });
+  // Older race games publish waiting rooms as <gameKey>-<code>; those are listed, but a key that does not match its own code is not.
+  await database.ref('multiplayerCenter/workspaces/testSchool/classes/grade3/rooms/gematria-5831').set({ ...fixtureRoom, roomCode: '5831', gameKey: 'gematria' });
+  await database.ref('multiplayerCenter/workspaces/testSchool/classes/grade3/rooms/gematria-9999').set({ ...fixtureRoom, roomCode: '1111', gameKey: 'gematria' });
   const grade3Rooms = await request('avi', { action: 'list-rooms' });
   const grade4Rooms = await request('chana', { action: 'list-rooms' }, 'grade4');
-  assert.deepEqual(Object.keys(grade3Rooms.rooms), ['arcade-123456'], 'callable room listing only returns the signed-in class');
+  assert.deepEqual(Object.keys(grade3Rooms.rooms).sort(), ['arcade-123456', 'gematria-5831'], 'callable room listing only returns the signed-in class, including race rooms');
   assert.deepEqual(Object.keys(grade4Rooms.rooms), ['arcade-654321'], 'another class receives only its own room list');
   const lockedRoom = await request('chana', { action: 'create', gameKey: 'tic-tac-toe' }, 'grade4');
   const grade4Class = database.read('b3Games/workspaces/testSchool/classes/grade4');
