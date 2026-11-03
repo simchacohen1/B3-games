@@ -358,7 +358,7 @@ async function studentDo(store, body, now, ip, newId) {
   }
   if (body.action === 'submit') {
     const answer = text(body.answer, 2000), progress = minutes(body.progress);
-    if (!answer && !def.targetMinutes) fail(400, 'Write a short note about what you did.');
+    if (!answer && def.targetUnit !== 'minutes' && !def.targetMinutes) fail(400, 'Write a short note about what you did.');
     await store.tx(path, cur => {
       const rec = cur || newRecord(def, now);
       if (rec.status === 'submitted' && rec.answer === answer) return rec; // repeat tap: same result
