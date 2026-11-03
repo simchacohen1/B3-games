@@ -3,6 +3,8 @@
 (() => {
   'use strict';
   if (window.__fttGalleryShare) return;
+  // Gallery submission is not deployed to staging; never probe the production endpoint there.
+  if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') return;
   window.__fttGalleryShare = true;
   const root = new URL('.', document.currentScript?.src || location.href);
   const endpoint = 'https://us-central1-b3-games.cloudfunctions.net/classGallerySubmit';
@@ -240,4 +242,18 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
+})();
+
+
+// Independent teacher toolbar: share this loader with pages that import
+// Firebase configuration, while keeping the student Gallery code unchanged.
+(function () {
+  if (typeof document === 'undefined' || window.__fttTeacherToolbarLoading) return;
+  window.__fttTeacherToolbarLoading = true;
+  const current = document.currentScript;
+  if (!current || !current.src) return;
+  const script = document.createElement('script');
+  script.src = new URL('teacher-global-controls.js?v=20261022-pointer2', current.src).href;
+  script.async = true;
+  (document.head || document.documentElement).appendChild(script);
 })();

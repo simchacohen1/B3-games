@@ -1,0 +1,54 @@
+/* Professional original artwork – Siman Aleph Seif Aleph */
+.section#a .hal-story-gallery {padding:0;margin:0 0 24px}
+.section#a .hal-story-gallery>h3 {margin:0 0 14px;color:#153461;font-size:clamp(20px,2vw,25px)}
+.section#a .hal-story-grid {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.section#a .hal-story-card {margin:0;background:white;border:1px solid #d1e5dd;border-radius:14px;overflow:hidden;box-shadow:0 5px 15px #173c4810}
+.section#a .hal-story-card img {display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#f9f4eb}
+.section#a .hal-story-card figcaption {display:grid;gap:5px;padding:10px 10px 12px;line-height:1.35;text-align:left}
+.section#a .hal-story-card strong {font-size:15px;color:#183b58}
+.section#a .hal-story-card span {font-size:13px;color:#465e6f}
+.section#a .hal-a-scene-art img {display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px}
+.section#a .hal-sticker-shelf {padding:12px 0;margin:14px 0;border-top:1px solid #e7d2db;border-bottom:1px solid #e7d2db}
+.section#a .hal-sticker-shelf h3 {font-size:18px;margin:0 0 6px;color:#19466e}
+.section#a .hal-sticker-hint {font-size:12px;line-height:1.4;margin:0 0 12px;color:#577083}
+.section#a .hal-sticker-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.section#a .hal-sticker-button {display:grid;gap:4px;place-items:center;background:#fff!important;padding:5px;border:1px solid #e0e7ef;border-radius:10px;cursor:pointer;min-width:0}
+.section#a .hal-sticker-button:hover {border-color:#75aad1;box-shadow:0 0 0 2px #d5effc}
+.section#a .hal-sticker-button:focus-visible {outline:3px solid #ecb64e;outline-offset:2px}
+.section#a .hal-sticker-button img {display:block;width:100%;max-width:83px;aspect-ratio:1/1;object-fit:contain;border-radius:5px}
+.section#a .hal-sticker-button span {color:#244b67;font-size:11px;font-weight:700;text-align:center}
+.section#a .hal-sticker-button:disabled {opacity:.5;cursor:not-allowed}
+.section#a .hal-illustrated-piece img {display:block;width:100%;height:auto;pointer-events:none}
+@media(max-width:1000px) {
+ .section#a .hal-story-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px) {
+ .section#a .hal-story-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .section#a .hal-story-card strong {font-size:13px}
+ .section#a .hal-story-card span {font-size:12px}
+}
+@media print {
+ .section#a .hal-sticker-shelf {display:none!important}
+}
+
+/* Add a picture or its words to the student's actual scrapbook. */
+.section#a .hal-story-grid{gap:8px}
+.section#a .hal-story-gallery{margin-bottom:9px}
+.section#a .hal-story-gallery>h3{font-size:17px;margin:0 0 7px}
+.section#a .hal-story-card img{aspect-ratio:3/2;object-fit:cover}
+.section#a .hal-story-card figcaption{padding:6px 8px;gap:3px}
+.section#a .hal-story-card strong{font-size:14px}
+.section#a .hal-story-card span{font-size:12px}
+.section#a .hal-story-actions{display:flex;gap:5px;justify-content:space-evenly;flex-wrap:wrap;padding:5px 7px 8px}
+.section#a .hal-story-use{cursor:pointer;flex:1 1 auto;border:1px solid #9dc8bb;border-radius:7px;padding:6px 4px;background:#f1fff7;color:#24584c;font-size:12px;font-weight:800}
+.section#a .hal-story-use:focus-visible{outline:3px solid #f5bc55;outline-offset:2px}
+.section#a .hal-story-use:disabled{opacity:.48;cursor:not-allowed}
+.section#a .hal-art-status{font-size:13px;font-weight:700;color:#22634f;margin:5px 0 0;min-height:0}
+.section#a .hal-lesson-text-piece .tb-text{font-size:clamp(14px,1.7vw,20px);line-height:1.4;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:1000px){.section#a .hal-story-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.section#a .hal-story-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section#a .hal-story-use{font-size:11px}}
+
+
+/* Shivisi pictures remain easy to see immediately on entering the lesson. */
+.section#a .hal-a-body>.hal-story-gallery{padding:8px 0 12px;margin:0 0 10px;border-bottom:2px solid #e1eced}
+.section#a .hal-story-grid{grid-auto-flow:row}

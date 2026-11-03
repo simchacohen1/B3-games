@@ -3,9 +3,26 @@ const scopeApi=require('../backend/functions/teacher-class-scope');
 function data(){return {'b3Games/workspaces/b3-2026/classes/alpha':{active:true,name:'Alpha',toolGrants:{chazara:true},members:{mine:{name:'Child',active:true},blocked:{active:true}}},'b3Games/students/mine/profile':{name:'Child',active:true},'b3Games/students/mine/memberships':{a:{workspaceId:'b3-2026',classId:'alpha',active:true}},'b3Games/students/blocked/profile':{active:false},'b3Games/workspaces/b3-2026/teachers/teacher':{active:true,classIds:{alpha:true}}};}
 const access={authorized:true,role:'teacher',classIds:['alpha']};
 test('Chazara roster reads assigned class only and excludes blocked profiles',async()=>{const d=data(),reads=[],scope=await scopeApi.roster(async p=>{reads.push(p);return d[p]},access,'alpha');assert.deepEqual(Object.keys(scope.students),['mine']);assert.ok(!reads.includes('posukPractice/allowedStudents'));assert.ok(!reads.some(p=>p.includes('classes/et')))});
+test('Chazara administrator discovers every active class, not only ET and WT',async()=>{const d=data(),root='b3Games/workspaces/b3-2026/classes',reads=[];d[root]={alpha:d[root+'/alpha'],inactive:{active:false}};const scope=await scopeApi.roster(async p=>{reads.push(p);return d[p]},{authorized:true,role:'admin',classIds:['*']});assert.deepEqual(Object.keys(scope.classes),['alpha']);assert.deepEqual(Object.keys(scope.students),['mine']);assert.ok(reads.includes(root));assert.ok(!reads.includes(root+'/et'));assert.ok(!reads.includes(root+'/inactive'))});
 test('Chazara URL cannot select another teacher class',async()=>{let reads=0;await assert.rejects(scopeApi.roster(async()=>{reads++},access,'beta'),/not assigned/);assert.equal(reads,0)});
 test('Chazara revoked grant denies dashboard data',async()=>{const d=data();d['b3Games/workspaces/b3-2026/classes/alpha'].toolGrants.chazara=false;await assert.rejects(scopeApi.roster(async p=>d[p],access,'alpha'),/not available/)});
 test('Chazara multi-class events stay in the selected class',async()=>{const scope={students:{mine:{classId:'alpha',membershipClassIds:['alpha','beta']}}};assert.equal(scopeApi.recordAllowed(scope,'mine',{workspaceClassId:'alpha'}),true);assert.equal(scopeApi.recordAllowed(scope,'mine',{workspaceClassId:'beta'}),false);assert.equal(scopeApi.recordAllowed(scope,'mine',{}),false)});
+
+test('Classless legacy records require exactly one verified matching membership, for all class IDs',()=>{
+ for(const id of ['et','wt','alpha']){
+  const one={students:{mine:{classId:id,membershipClassIds:[id]}}};
+  assert.equal(scopeApi.recordAllowed(one,'mine',{}),true);
+  const multiple={students:{mine:{classId:id,membershipClassIds:[id,'beta']}}};
+  assert.equal(scopeApi.recordAllowed(multiple,'mine',{}),false);
+  assert.equal(scopeApi.recordAllowed(multiple,'mine',{workspaceClassId:id}),true);
+  assert.equal(scopeApi.recordAllowed(multiple,'mine',{workspaceClassId:'beta'}),false);
+  const unmatched={students:{mine:{classId:id,membershipClassIds:['other']}}};
+  assert.equal(scopeApi.recordAllowed(unmatched,'mine',{}),false);
+  const missing={students:{mine:{classId:id,membershipClassIds:[]}}};
+  assert.equal(scopeApi.recordAllowed(missing,'mine',{}),false);
+ }
+});
+
 function backend(d,claims){const reads=[],writes=[];const snap=value=>({val:()=>value,exists:()=>value!=null});const db={ref:path=>({get:async()=>{reads.push(path);return snap(d[path])},set:async v=>writes.push([path,v]),update:async v=>writes.push([path,v])})};const admin={apps:[{}],database:()=>db,auth:()=>({verifyIdToken:async()=>claims})},ctx={exports:{},require:n=>n==='firebase-admin'?admin:n==='firebase-functions/v2/https'?{onRequest:(o,fn)=>fn}:n==='./teacher-class-scope'?scopeApi:n.startsWith('./')?require('../backend/functions/'+n.slice(2)):require(n),console,Buffer,Intl,Date};vm.runInNewContext(fs.readFileSync('backend/functions/student-rewards-auto-award.js','utf8'),ctx);return {ctx,reads,writes,run:async body=>{const req={body,headers:{authorization:'Bearer test'},method:'POST'},res={set(){},status(c){this.code=c;return this},json(v){this.body=v;return this}};await ctx.exports.studentRewardsAutoAward(req,res);return res}};}
 const claims={uid:'teacher',email:'teacher@test',email_verified:true};
 test('Chazara backend rejects changing another student before any write',async()=>{const x=backend(data(),claims),r=await x.run({action:'teacher-delete-chazara',classId:'alpha',studentId:'other',eventId:'event'});assert.equal(r.code,403);assert.equal(x.writes.length,0);assert.match(r.body.error,/selected class/)});

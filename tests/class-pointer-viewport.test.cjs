@@ -41,7 +41,7 @@ async function viewportFixture(){
   }
   const body=new Element('body'),stage=new Element('stage'),tool=new Element('select'),share=new Element('button');share.parentElement=body;
   const document={body,createElement:tag=>new Element(tag),getElementById:id=>({shareScreen:share,teacherTool:tool}[id])};
-  const context=vm.createContext({window:{ClassPointerViewportCore:V,ClassPointerCore:require('../class-pointer-prototype/classroom-core.js')},document,HTMLCanvasElement:Element,requestAnimationFrame:()=>1,cancelAnimationFrame(){},setTimeout,clearTimeout});
+  const context=vm.createContext({window:{ClassPointerViewportCore:V,ClassPointerCore:require('../class-pointer-prototype/classroom-core.js')},document,HTMLCanvasElement:Element,setInterval:()=>1,clearInterval(){},requestAnimationFrame:()=>1,cancelAnimationFrame(){},setTimeout,clearTimeout});
   vm.runInContext(fs.readFileSync(require.resolve('../class-pointer-prototype/viewport.js'),'utf8'),context);
   let resets=0;
   const controller=await context.window.ClassPointerViewport.create({rawStream:{getTracks:()=>[]},stage,lesson:stage,onBeforeViewChange(){resets++}});

@@ -1,0 +1,231 @@
+/* Learning Island look for the teacher home. Copied from index.html (owner's homepage) so both pages look the same. */
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f5f7fa;color:#1f2937;text-align:center;margin:0;padding:32px 18px 60px}
+h1{font-size:46px;margin:8px 0 8px;color:#26364a}
+.subtitle{color:#64748b;margin-bottom:24px}
+.hidden{display:none!important}
+.game-container{display:grid;gap:18px;max-width:900px;margin:auto}
+.game-group{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:18px;box-shadow:0 4px 14px rgba(15,23,42,.06);text-align:left}
+.game-group-head{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.game-group-icon{font-size:27px;line-height:1}
+.game-group-title{font-size:20px;font-weight:900;color:#26364a}
+.game-group-subtitle{font-size:12px;color:#64748b;margin-top:2px}
+.game-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px}
+.game-group .game-card{box-shadow:0 3px 9px rgba(0,0,0,.08);border:1px solid #edf2f7}
+.game-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:white;padding:24px 12px;border-radius:16px;box-shadow:0 4px 10px rgba(0,0,0,.1);text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
+.game-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+.card-icon{font-size:40px;line-height:1}.yiddish-icon{width:74px;height:74px;object-fit:contain;object-position:center;display:block;border-radius:12px}.rashi-icon{font-family:"Noto Rashi Hebrew",serif;font-size:44px;font-weight:600;line-height:1;direction:rtl}.card-title{font-size:17px;font-weight:bold;color:#333}.disabled-note{margin-top:35px;color:#64748b}
+.teacher-tools-section{max-width:900px;margin:50px auto 0;padding-top:28px;border-top:2px solid #e5e7eb}
+.teacher-tools-section h2{font-size:26px;color:#1f2937;margin:0 0 6px}
+.teacher-tools-subtitle{color:#6b7280;font-size:14px;margin:0 0 22px}
+.teacher-tools-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;max-width:900px;margin:auto}
+.teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:22px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
+.teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+.teacher-tool-card .card-title{color:#92400e}
+.game-card{position:relative;overflow:visible}
+@media(max-width:560px){h1{font-size:38px}}
+/* Keep the student launchers visible together on desktop screens. */
+@media(min-width:760px){
+ body{padding-top:16px}
+ h1{font-size:34px;margin:4px 0}
+ .subtitle{margin-bottom:12px}
+ .student-bar{max-width:1100px;margin-bottom:12px;padding:9px 14px}
+ .game-container{max-width:1100px;grid-template-columns:1fr;gap:8px}
+ .game-group{padding:10px 12px;border-radius:16px}
+ .game-group-head{margin-bottom:6px}
+ .game-group-title{font-size:18px}
+ .game-group-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .game-group[data-game-group="class"] .game-group-grid,.game-group[data-game-group="challenge"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-card{min-height:64px;padding:10px 8px;gap:10px;border-radius:12px;flex-direction:row}
+ .card-icon{font-size:54px}.rashi-icon{font-size:58px}.yiddish-icon{width:68px;height:68px}
+ .card-title{font-size:18px;font-weight:800}
+ .teacher-tools-section{margin-top:24px;padding-top:18px}
+}
+.student-card-shell{position:relative;min-width:0}.student-card-shell>.game-card{height:100%;padding-right:40px}
+/* Each activity group stays on ONE row. On narrow screens the gaps, icons and text shrink instead of wrapping. */
+.game-group-grid,.game-group[data-game-group] .game-group-grid{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:clamp(4px,1.4vw,14px)}
+.game-group-grid>*{min-width:0}
+.game-group-grid .game-card{min-width:0;padding:clamp(8px,2vw,24px) clamp(3px,1vw,12px);gap:clamp(4px,1vw,10px);min-height:clamp(78px,16vw,125px)}
+.game-group-grid .card-title{font-size:clamp(11px,2.4vw,17px);line-height:1.15;text-align:center;overflow-wrap:break-word;min-width:0}
+.game-group-grid .card-icon{font-size:clamp(24px,6.5vw,40px)}
+.game-group-grid .rashi-icon{font-size:clamp(26px,7vw,44px)}
+.game-group-grid .yiddish-icon{width:clamp(36px,10vw,74px);height:clamp(36px,10vw,74px)}
+.game-group-grid .student-card-shell>.game-card{padding-right:clamp(3px,1vw,12px);padding-top:clamp(30px,6vw,24px)}
+.game-group-grid .card-lock{width:clamp(26px,5vw,42px);height:clamp(26px,5vw,42px);font-size:clamp(14px,2.8vw,24px);right:clamp(3px,.8vw,7px);top:clamp(3px,.8vw,7px)}
+@media(min-width:760px){
+ .game-group-grid .game-card{min-height:64px;padding:10px 8px;gap:clamp(6px,.9vw,10px);flex-direction:row}
+ .game-group-grid .card-title{font-size:clamp(14px,1.6vw,18px);text-align:left}
+ .game-group-grid .card-icon{font-size:clamp(34px,4.6vw,54px)}
+ .game-group-grid .rashi-icon{font-size:clamp(36px,5vw,58px)}
+ .game-group-grid .yiddish-icon{width:clamp(44px,5.8vw,68px);height:clamp(44px,5.8vw,68px)}
+ .game-group-grid .student-card-shell>.game-card{padding-right:clamp(30px,4vw,40px);padding-top:10px}
+}
+/* Learning Island: visual homepage only; all original links and class gates remain active. */
+body{background:linear-gradient(180deg,#d9f4ff 0%,#eaf9fd 32%,#f4fbf4 100%);padding-inline:clamp(12px,2vw,30px)}
+#gamesArea{max-width:1190px;margin:auto}
+.island-intro{max-width:1130px;margin:12px auto 22px;padding:18px 22px;display:flex;align-items:center;justify-content:center;gap:20px;background:#fffefa;border:2px solid #bde6d5;border-radius:26px;box-shadow:0 8px 22px #164f3a12}
+.island-intro h2{font-size:clamp(25px,3vw,37px);margin:0;color:#18583e}
+.island-intro p{font-size:18px;margin:6px 0 0;color:#395b60}
+
+.island-map{max-width:1130px;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;padding:24px;background:linear-gradient(155deg,#a8e0c5,#c8edb4 50%,#9ddbc4);border:10px solid #c3ebf7;border-radius:42% 38% 35% 32% / 8% 9% 8% 7%;box-shadow:0 16px 38px #154d6533}
+.island-place{background:#fffdf4ed;border:2px solid #ffffff;border-radius:27px;padding:20px;box-shadow:0 7px 0 #418d6552,0 12px 26px #174c3320;min-width:0}
+.island-place .game-group-head{margin-bottom:16px;align-items:center}
+.island-place .game-group-icon{font-size:clamp(44px,5vw,66px);line-height:1}
+.island-place .game-group-title{font-size:clamp(21px,2.2vw,28px);color:#214b38}
+.island-place .game-group-subtitle{font-size:15px;color:#476053;line-height:1.4;margin-top:5px}
+.island-place .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.island-place .student-card-shell{min-width:0}
+.island-place .game-card{min-height:145px;padding:18px 12px;border:2px solid #cde6dc;border-radius:21px;background:#fff;gap:12px}
+.island-place .card-icon{font-size:48px}
+.island-place .card-title{font-size:clamp(17px,1.7vw,21px);line-height:1.25;text-align:center;overflow-wrap:anywhere}
+.island-main{background:#fffcef;border-color:#f7e6a9}
+.island-main .game-card{min-height:182px;background:#fffefa}
+.island-roots .game-group-grid{grid-template-columns:minmax(0,1fr);max-width:280px;margin:auto}
+.island-roots .game-card{min-height:182px}
+.island-place .game-card:focus-visible{outline:4px solid #1d6cc7;outline-offset:3px}
+@media(min-width:850px){.island-place[data-game-group="skills"]{grid-column:1}.island-place[data-game-group="more-learning"]{grid-column:2}}
+@media(max-width:750px){.island-map{grid-template-columns:1fr;border-radius:34px;padding:14px;gap:16px;border-width:6px}.island-intro{padding:15px}.island-place{padding:16px}.island-place .game-group-grid{gap:10px}.island-place .game-card{min-height:130px}.island-main .game-card{min-height:150px}}
+@media(max-width:380px){.island-place .game-group-grid{grid-template-columns:1fr}.island-place .game-group-icon{font-size:42px}}
+@media(prefers-reduced-motion:reduce){.island-place .game-card{transition:none}}
+/* ===== Fun Torah Tools — Homepage redesign =====
+ 1) Add to <head>, before your stylesheet:
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+ 2) Paste this whole file at the END of your main CSS.
+*/
+
+body {
+background: #fffaf0 !important;
+font-family: 'Nunito', Arial, sans-serif !important;
+color: #1f2a44;
+overflow-x: hidden;
+}
+
+/* ---- Sky header with curved bottom ---- */
+body > h1 {
+margin: -16px calc(50% - 50vw) 0 !important; /* -16px = body top padding */
+padding: 44px 16px 4px !important;
+background: linear-gradient(180deg, #38bdf8 0%, #60c8f5 100%);
+color: #fff !important;
+font-family: 'Fredoka', sans-serif !important;
+font-size: 52px !important;
+font-weight: 700 !important;
+letter-spacing: .5px;
+text-shadow: 0 3px 0 rgba(3, 105, 161, .35);
+}
+body > .subtitle {
+position: relative;
+margin: 0 calc(50% - 50vw) !important;
+padding: 0 16px 70px !important;
+background: linear-gradient(180deg, #60c8f5 0%, #7dd3fc 100%);
+color: #e0f5ff !important;
+font-size: 18px !important;
+font-weight: 700;
+}
+body > .subtitle::after {
+content: "";
+position: absolute;
+left: 0; right: 0; bottom: -1px;
+height: 40px;
+background: #fffaf0;
+border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+/* ---- Name pill ---- */
+#studentBar.student-bar {
+max-width: 520px !important;
+margin: -6px auto 8px !important;
+padding: 10px 22px !important;
+border-radius: 999px !important;
+background: #fff !important;
+border: 2px solid #fde68a !important;
+box-shadow: 0 6px 18px rgba(234, 179, 8, .15) !important;
+text-align: center;
+justify-content: center;
+}
+#studentBar strong { font-family: 'Fredoka', sans-serif; font-size: 18px; color: #1f2a44; }
+#studentBar #studentClassLabel { color: #92400e !important; font-weight: 700; }
+
+/* ---- Welcome ---- */
+.island-intro { background: none !important; border: none !important; box-shadow: none !important; padding: 8px 0 0 !important; }
+.island-intro .island-sun { display: inline-block; animation: ftt-spin 18s linear infinite; }
+@keyframes ftt-spin { to { transform: rotate(360deg); } }
+.island-intro h2 { font-family: 'Fredoka', sans-serif !important; font-size: 40px !important; color: #0f3b5f !important; font-weight: 700 !important; }
+.island-intro p { color: #5b6b85 !important; font-size: 18px !important; font-weight: 700; }
+
+/* ---- Island places: each gets its own color ---- */
+.game-container.island-map { background: none !important; box-shadow: none !important; border: none !important; gap: 28px !important; padding: 12px 24px 40px !important; }
+.game-container.island-map::before,
+.game-container.island-map::after { display: none !important; }
+
+.game-group.island-place {
+--c: #0ea5e9; --soft: #e0f2fe; --deep: #0c4a6e;
+position: relative;
+overflow: hidden;
+background: #fff !important;
+border: none !important;
+border-radius: 28px !important;
+padding: 22px !important;
+box-shadow: 0 10px 0 var(--soft), 0 18px 34px rgba(15, 23, 42, .08) !important;
+transition: transform .2s;
+}
+.game-group.island-place::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 8px; background: var(--c); }
+.game-group.island-place:hover { transform: translateY(-3px); }
+
+.island-map > .game-group:nth-of-type(1) { --c: #f59e0b; --soft: #fef3c7; --deep: #78350f; } /* Chumash Cheder */
+.island-map > .game-group:nth-of-type(2) { --c: #22c55e; --soft: #dcfce7; --deep: #14532d; } /* Shorashim Grove */
+.island-map > .game-group:nth-of-type(3) { --c: #ec4899; --soft: #fce7f3; --deep: #831843; } /* Skills Library */
+.island-map > .game-group:nth-of-type(4) { --c: #6366f1; --soft: #e0e7ff; --deep: #312e81; } /* Beis Midrash */
+.island-map > .game-group:nth-of-type(5) { --c: #f97316; --soft: #ffedd5; --deep: #7c2d12; } /* Class Village */
+.island-map > .game-group:nth-of-type(6) { --c: #0ea5e9; --soft: #e0f2fe; --deep: #0c4a6e; } /* Challenge Playground */
+
+.game-group .game-group-head { align-items: center !important; gap: 14px !important; margin-bottom: 16px !important; }
+.game-group .game-group-icon {
+display: flex !important; align-items: center; justify-content: center;
+width: 64px !important; height: 64px !important; min-width: 64px;
+font-size: 38px !important;
+background: var(--soft);
+border-radius: 20px;
+}
+.game-group .game-group-title { font-family: 'Fredoka', sans-serif !important; font-size: 26px !important; color: var(--deep) !important; font-weight: 700 !important; line-height: 1.1 !important; }
+.game-group .game-group-subtitle { color: #64748b !important; font-size: 15px !important; font-weight: 700; }
+
+/* ---- Activity buttons ---- */
+.game-group .game-group-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 14px !important; }
+.game-group .game-card {
+flex-direction: column !important;
+gap: 10px !important;
+min-height: 140px;
+min-width: 0;
+padding: 20px 12px 18px !important;
+text-align: center;
+background: var(--soft) !important;
+border: 2px solid transparent !important;
+border-radius: 22px !important;
+box-shadow: 0 5px 0 color-mix(in srgb, var(--c) 35%, transparent) !important;
+transition: transform .15s, box-shadow .15s, border-color .15s !important;
+}
+.game-group .game-card:hover { transform: translateY(-4px) !important; border-color: var(--c) !important; box-shadow: 0 9px 0 color-mix(in srgb, var(--c) 45%, transparent) !important; }
+.game-group .game-card:active { transform: translateY(2px) !important; box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 45%, transparent) !important; }
+.game-group .card-icon { font-size: 44px !important; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .12)); }
+.game-group .card-title { font-family: 'Fredoka', sans-serif !important; font-size: 19px !important; font-weight: 600 !important; color: var(--deep) !important; line-height: 1.2 !important; overflow-wrap: normal; word-break: normal; }
+.game-group .game-card.activity-closed { background: #f1f5f9 !important; box-shadow: none !important; border: 2px dashed #cbd5e1 !important; }
+
+/* ---- Teacher Tools ---- */
+.teacher-tools-section {
+max-width: 1100px;
+margin: 10px auto 40px !important;
+padding: 28px !important;
+background: #fff7ed !important;
+border: 2px dashed #fdba74 !important;
+border-radius: 28px !important;
+}
+.teacher-tools-section h2 { font-family: 'Fredoka', sans-serif !important; color: #9a3412 !important; }
+.teacher-tool-card { border-radius: 20px !important; background: #fff !important; border: 2px solid #fed7aa !important; box-shadow: 0 4px 0 #fed7aa !important; transition: transform .15s !important; }
+.teacher-tool-card:hover { transform: translateY(-3px) !important; }
+.teacher-tool-card .card-title { font-family: 'Fredoka', sans-serif !important; font-weight: 600 !important; }
+
+@media (max-width: 600px) {
+body > h1 { font-size: 36px !important; }
+.island-intro h2 { font-size: 28px !important; }
+.game-container.island-map { padding: 8px 4px 32px !important; }
+}

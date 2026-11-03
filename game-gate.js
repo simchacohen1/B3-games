@@ -14,7 +14,31 @@
 (function () {
   "use strict";
 
-  var DATABASE_URL = "https://b3-games-default-rtdb.firebaseio.com";
+  var databaseNamespace = "";
+  function databaseUrl() {
+    var stagingHost = location.hostname === "fun-torah-tools-staging.web.app" ||
+      location.hostname === "fun-torah-tools-staging.firebaseapp.com";
+    var stagingProject = window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    if (stagingProject === "fun-torah-tools-staging" || stagingHost) {
+      return String(window.B3_STAGING_FIREBASE_CONFIG?.databaseURL ||
+        window.B3_FIREBASE_CONFIG?.databaseURL ||
+        "https://fun-torah-tools-staging-default-rtdb.firebaseio.com").replace(/\/+$/, "");
+    }
+    var configured = String(window.B3_FIREBASE_CONFIG?.databaseURL ||
+      "https://b3-games-default-rtdb.firebaseio.com");
+    try {
+      var parsed = new URL(configured);
+      // Firebase's RTDB emulator accepts its namespace as a query parameter.
+      // Keep the base URL path-only because callers append REST paths to it;
+      // fetchJson adds the namespace alongside auth/cache-busting parameters.
+      databaseNamespace = parsed.searchParams.get("ns") || "";
+      parsed.search = "";
+      return parsed.href.replace(/\/+$/, "");
+    } catch (_) {
+      databaseNamespace = "";
+      return configured.replace(/\/+$/, "");
+    }
+  }
   var SETTINGS_PATH = "b3Games/siteSettings";
   // Phase 1: identify the whole B3 classroom without changing the live
   // settings path yet. Existing ET/WT values remain the within-class tracks.
@@ -26,8 +50,18 @@
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 30000;
-  var FETCH_TIMEOUT_MS = 4500;
+  // Bound slow Firebase reads while preserving the fail-closed decision.
+  var FETCH_TIMEOUT_MS = 15000;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
+  var authReadyResolve;
+  var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
+  // Other student clients share this initialization instead of loading a second SDK.
+  window.B3GameGateAuthReady = authReadyPromise;
+  function markAuthReady() {
+    if (!authReadyResolve) return;
+    authReadyResolve();
+    authReadyResolve = null;
+  }
 
   var scriptEl = document.currentScript;
   var gameId = scriptEl && (scriptEl.getAttribute("data-game-id") || scriptEl.getAttribute("data-b3-tool-id"));
@@ -168,14 +202,19 @@
   }
 
   function showClosed(title, message) {
-    document.querySelectorAll("audio,video").forEach(function(media){try{media.pause();}catch(error){}});
+    // The independently authenticated Pointer lesson remains usable above a
+    // locked activity. Closing that activity must not freeze the teacher video.
+    document.querySelectorAll("audio,video").forEach(function(media){
+      if(media.closest('#fttTeacherLessonOverlay'))return;
+      try{media.pause();}catch(error){}
+    });
     markFirstDecision();
     reveal();
     if (!overlay) {
       overlay = document.createElement("div");
       overlay.id = "b3-gate-overlay";
       overlay.style.cssText =
-        "position:fixed;inset:0;z-index:2147483647;background:#f5f7fa;" +
+        "position:fixed;inset:0;z-index:2147483635;background:#f5f7fa;" +
         "display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;" +
         "text-align:center;padding:24px;color:#1f2937;";
       overlay.innerHTML =
@@ -254,6 +293,27 @@
       return loadOneScript(new URL("vendor/firebase/12.15.0/"+m[1],rootBase).href);
     });
   }
+  function waitForFirebaseAuthState(auth) {
+    if (auth && typeof auth.authStateReady === "function") return auth.authStateReady();
+    if (!auth || typeof auth.onAuthStateChanged !== "function") return Promise.resolve();
+    // Firebase v8 does not expose authStateReady(). Its first observer callback
+    // is the signal that persisted auth has been restored (including null for a
+    // signed-out browser). Do not let private REST reads race that restoration.
+    return new Promise(function(resolve, reject) {
+      var unsubscribe = null, finished = false;
+      function finish(error) {
+        if (finished) return;
+        finished = true;
+        if (unsubscribe) unsubscribe();
+        if (error) reject(error); else resolve();
+      }
+      try {
+        unsubscribe = auth.onAuthStateChanged(function() { finish(); }, finish);
+        // Some SDK/test implementations invoke the initial callback inline.
+        if (finished && unsubscribe) unsubscribe();
+      } catch (error) { finish(error); }
+    });
+  }
   async function watchTeacherAccess() {
     try {
       // Let the page's own Firebase scripts finish before supplying missing ones.
@@ -267,14 +327,19 @@
       if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
       if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      await waitForFirebaseAuthState(window.firebase.auth());
+      markAuthReady();
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
+        markAuthReady();
         teacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
         if(resolveGalleryTeacherClass())return;
         checkNow();
       });
     } catch(error){
+      markAuthReady();
       teacherCheckPending=false;
       console.warn("Teacher access could not be verified",error);
       checkNow();
@@ -290,21 +355,44 @@
     return String(c || "").trim();
   }
 
-  function fetchJson(url) {
-    var sep = url.indexOf("?") >= 0 ? "&" : "?";
-    var target = url + sep + "_=" + Date.now();
+  async function fetchJson(url) {
+    var params = new URLSearchParams();
+    params.set("_", String(Date.now()));
+    if (databaseNamespace) params.set("ns", databaseNamespace);
+    // Firebase's REST API accepts Firebase ID tokens using the `auth` query
+    // parameter. Use the current signed-in user's token so private rules can
+    // authorize this gate's narrow reads. Public settings continue to work
+    // before authentication is available.
+    try {
+      // Do not race this against a short timer: the protected profile and
+      // membership reads below must never fall back to anonymous requests
+      // just because Firebase's scripts or persisted auth state initialize
+      // more slowly than the page. watchTeacherAccess resolves this promise
+      // after initialization (or its catch path if initialization fails).
+      await authReadyPromise;
+      var auth = window.firebase && window.firebase.auth && window.firebase.auth();
+      if (auth && typeof auth.authStateReady === "function") await auth.authStateReady();
+      var user = auth && auth.currentUser;
+      if (user && typeof user.getIdToken === "function") params.set("auth", await user.getIdToken());
+    } catch (_) {
+      // Firebase may not have initialized yet; public gate settings can still
+      // load, and a later auth-state callback will retry protected reads.
+    }
+    var target = url + (url.indexOf("?") >= 0 ? "&" : "?") + params.toString();
 
     // Never allow a Firebase request to hang forever. A hung request used to
     // leave the entire page hidden because the gate was waiting for a decision.
     return new Promise(function (resolve, reject) {
       var settled = false;
+      var controller = new AbortController();
       var timer = setTimeout(function () {
         if (settled) return;
         settled = true;
+        controller.abort();
         reject(new Error("Access check timed out"));
       }, FETCH_TIMEOUT_MS);
 
-      fetch(target, { cache: "no-store" }).then(function (res) {
+      fetch(target, { cache: "no-store", signal: controller.signal }).then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       }).then(function (data) {
@@ -321,13 +409,30 @@
     });
   }
 
+  let followLoader=null;
+  let followActivityOpen=false;
+  async function startFollowTeacherListener(classId,studentId) {
+    if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
+    if (!followLoader) {
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261020-follow-pointer1",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261020-follow-pointer1",rootBase).href))
+        .catch(error=>{followLoader=null;throw error;});
+    }
+    return followLoader.then(()=>{
+      if (studentActive && studentClassId===classId &&
+          getStoredStudentId()===studentId) {
+        return window.FTTFollowStudent?.start({workspaceId:WORKSPACE_ID,classId,studentId});
+      }
+    }).catch(error=>console.warn("Follow Teacher not available",error));
+  }
+
   async function resolveStudentClass() {
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
     if(!studentId)return "";
     var rows=await Promise.all([
-      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
-      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
+      fetchJson(databaseUrl()+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
+      fetchJson(databaseUrl()+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
     ]);
     var profile=rows[0],memberships=rows[1]||{};
     if(profile && profile.active===false)return "";
@@ -335,14 +440,29 @@
     var match=valid.find(function(m){return m.classId===storedClass;})||(valid.length===1?valid[0]:null);
     if(match)studentClassId=String(match.classId);
     else if(!Object.keys(memberships).length){
-      var legacy=await fetchJson(DATABASE_URL+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
+      var legacy=await fetchJson(databaseUrl()+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
       if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
     if(!studentClassId)return "";
-    assignedClass=await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId)+".json");
-    var member=assignedClass&&assignedClass.members&&assignedClass.members[studentId];
-    if(!assignedClass||assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
+    var classPath=databaseUrl()+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    // The display name is not used to authorize tool access. Avoid a
+    // redundant, occasionally slow Firebase read on every gate refresh.
+    // Keep every permission-critical field and the student membership check.
+    var classFields=await Promise.all([
+      fetchJson(classPath+"/active.json"),
+      fetchJson(classPath+"/siteEnabled.json"),
+      fetchJson(classPath+"/access.json"),
+      fetchJson(classPath+"/toolGrants.json"),
+      fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
+    ]);
+    var member=classFields[4];
+    assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
+    assignedClass.members[studentId]=member;
+    if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
     studentActive=true;
+    // Follow Teacher is an optional, class-scoped navigation listener.
+    // It starts only after the shared gate has resolved an active student.
+    void startFollowTeacherListener(studentClassId, studentId);
     return studentClassId;
   }
 
@@ -461,7 +581,7 @@
       }
       // Tool grants are checked against the selected class, never another teacher's class.
       var teacherGrantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!teacherClassRecord||teacherClassRecord.active===false||(teacherClassRecord.toolGrants?.[teacherGrantId]!==true&&!(gameId==="class-gallery"&&(teacherClassRecord.toolGrants?.tag===true||teacherClassRecord.toolGrants?.["class-gallery"]===true)))){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
+      if(!teacherClassRecord||teacherClassRecord.active===false||!window.B3StudentTools.granted(teacherClassRecord,teacherGrantId)){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
       showOpen();return;
     }
     if(!studentActive){
@@ -480,8 +600,8 @@
         showClosed("Fun Torah Tools is closed", "The administrator has activated the emergency lock.");return;
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked"){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
+      if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 
@@ -505,6 +625,9 @@
       );
       return;
     }
+
+    // Follow grants only the authenticated, permitted destination, never other tools.
+    if (followActivityOpen) { showOpen(); return; }
 
     // A class-wide exception lets exactly one selected activity stay open for
     // every student in that ET/WT class while the site/class lock is active.
@@ -550,18 +673,28 @@
     if (isGuestPreview()) { showOpen(); return; }
     if (requestInFlight) { refreshRequested = true; return; }
     requestInFlight = true;
+    followActivityOpen = false;
 
     Promise.resolve().then(async function () {
       if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected)+".json"):null;
+        var teacherClassPath=databaseUrl()+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
+        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
+          active:await fetchJson(teacherClassPath+"/active.json"),
+          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
+          access:await fetchJson(teacherClassPath+"/access.json"),
+          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
+        }:null;
         return;
       }
       await resolveStudentClass();
+      // Optional navigation must not block verification of tool permissions.
+      if (studentActive) void startFollowTeacherListener(studentClassId, getStoredStudentId());
+      followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
-      return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
+      return fetchJson(databaseUrl() + "/" + SETTINGS_PATH + ".json");
     }).then(function (settings) {
       // When teacher auth finishes during a student-first check, ignore that
       // stale decision; the queued pass will load the teacher's class record.
@@ -591,6 +724,7 @@
   ["click","pointerdown","keydown","submit"].forEach(function(type){
     document.addEventListener(type,function(event){
       if(!overlay||overlay.contains(event.target))return;
+      if(window.B3PointerAssignedUI?.allowsEvent(event.target))return;
       event.preventDefault();event.stopImmediatePropagation();
     },true);
   });
@@ -601,6 +735,7 @@
     if (document.visibilityState === "visible") checkNow();
   });
   window.addEventListener("focus", checkNow);
+  window.addEventListener("ftt:follow-policy-changed", checkNow);
 
   // ---- "← Fun Torah Tools" home button -------------------------------------------
   // Every student page loads this gate, so it is the one place that can make

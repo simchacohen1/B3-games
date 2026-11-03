@@ -63,6 +63,7 @@
     "class-gallery": true,
     "game-show": true,
     "weekly-quiz": true,
+    "multiplayer-center": true,
     "work-timer": true,
     "elul-yom-kippur-slides": true,
     "dvarim-game": true
@@ -390,6 +391,72 @@
   let firebaseDb = null;
   let firebaseAuth = null;
   let activeMode = "local-preview";
+  let rememberedTeacherAuth = null;
+  let teacherRestore = null;
+  let teacherSignOutVersion = 0;
+
+  // A separate Firebase app remembers Google credentials. The default app
+  // remains tab-scoped so a passcode login cannot replace a teacher elsewhere.
+  function getRememberedTeacherAuth() {
+    if (!rememberedTeacherAuth) {
+      let app;
+      try { app = window.firebase.app("FTTRememberedTeacher"); }
+      catch (_) { app = window.firebase.initializeApp(getConfiguredFirebaseOptions(), "FTTRememberedTeacher"); }
+      rememberedTeacherAuth = app.auth();
+    }
+    return rememberedTeacherAuth;
+  }
+
+  function isStudentTab() {
+    return Boolean(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("b3ActingAsStudent"));
+  }
+
+  // A tab where a student pressed "Switch student" must not quietly turn into
+  // the teacher's tab just because the teacher's Google login is remembered
+  // on this computer. Only pressing Teacher Sign-in in this tab lifts this.
+  const NO_RESTORE_KEY = "b3NoTeacherRestore";
+  function teacherRestoreBlocked() {
+    try { return sessionStorage.getItem(NO_RESTORE_KEY) === "1"; } catch (_) { return false; }
+  }
+
+  // Teachers sign in with Google; students sign in with a custom token and
+  // have no provider. A student identity must never keep a teacher tab from
+  // restoring the teacher (it can leak in via browser-wide LOCAL persistence).
+  function isGoogleUser(user) {
+    return Boolean(user && Array.isArray(user.providerData) &&
+      user.providerData.some(function (p) { return p && p.providerId === "google.com"; }));
+  }
+
+  // The compat Firebase build used here has no authStateReady(); its first
+  // observer callback fires once stored credentials have been loaded.
+  function waitForAuthState(auth) {
+    if (typeof auth.authStateReady === "function") return auth.authStateReady();
+    return new Promise(function (resolve) {
+      let off = function () {}, done = false;
+      const finish = function () { if (done) return; done = true; try { off(); } catch (_) {} resolve(); };
+      off = auth.onAuthStateChanged(finish, finish);
+      if (done) off();
+    });
+  }
+
+  function restoreTeacher(services) {
+    if (isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
+    if (!teacherRestore) teacherRestore = (async function () {
+      const signOutVersion = teacherSignOutVersion;
+      const savedAuth = getRememberedTeacherAuth();
+      await waitForAuthState(savedAuth);
+      const saved = savedAuth.currentUser;
+      if (!saved || isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser)) return false;
+      // Restore Firebase identity before reading protected teacher records.
+      // onAuthStateChanged still checks current authorization before granting UI access.
+      if (isStudentTab() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+      if (isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.updateCurrentUser(saved);
+      return true;
+    })().finally(function () { teacherRestore = null; });
+    return teacherRestore;
+  }
 
   function ensureFirebase() {
     const config = getConfiguredFirebaseOptions();
@@ -415,12 +482,16 @@
   }
 
   let currentAccess = { authorized: false, role: "", classIds: [] };
+  // Popup completion and Firebase's auth-state callback can request the same
+  // authorization check at the same time. Share only in-flight work for this
+  // UID; once it settles, the next auth event performs fresh permission reads.
+  const accessChecksInFlight = new Map();
 
   function isBootstrapAdmin(user) {
     return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
-  function readUserAccess(user) {
+  function readUserAccessFromFirebase(user) {
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
@@ -438,43 +509,61 @@
       if (teacher && teacher.active === false) return { authorized:false, role:"", classIds:[] };
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
-        if (!classIds.length) return { authorized:false, role:"", classIds:[] };
-        return { authorized:true, role:"teacher", classIds:classIds };
+        if (classIds.length) return { authorized:true, role:"teacher", accountType:teacher.accountType==="principal"?"principal":"teacher", supervisedTeachers:teacher.accountType==="principal"?(teacher.supervisedTeachers||{}):{}, classIds:classIds };
+        // An active record with no classes may be damaged. Fall through to the
+        // invitation check: the server rebuilds the record only from an active,
+        // assigned invitation, so unassigned or revoked teachers stay denied.
       }
 
-      // Only unclaimed accounts need the invitations collection.
-      return services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites").once("value").then(function(inviteSnap){
-        const email = String(user.email || "").trim().toLowerCase();
-        const invites = inviteSnap.val() || {};
-        const inviteEntry = Object.keys(invites).map(function (id) {
-          return { id:id, value:invites[id] || {} };
-        }).find(function (entry) {
-          return entry.value.active !== false &&
-            String(entry.value.email || "").trim().toLowerCase() === email;
-        });
-        if (inviteEntry && user.emailVerified === true) {
-          const invite = inviteEntry.value;
-          const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
-          if (!classIds.length) return { authorized:false, role:"", classIds:[] };
-          return user.getIdToken().then(function(token){
-            return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
-              method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
-            });
-          }).then(async function(response){
-            if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
-            const claimed=await response.json();
-            const verifiedClassIds = Array.isArray(claimed.classIds) ? claimed.classIds.filter(id=>id!=="*" && typeof id==="string" && id.length>0) : [];
-            if(claimed.authorized!==true || !verifiedClassIds.length) return {authorized:false,role:"",classIds:[]};
-            return {authorized:true,role:"teacher",classIds:verifiedClassIds,inviteId:inviteEntry.id};
-          }).catch(function(error){
-            // A failed or unavailable verifier must never authorize a new teacher.
-            console.warn("Teacher verification unavailable; access denied.",error);
-            return {authorized:false,role:"",classIds:[]};
-          });
+      // Read only this verified user's invitation; never enumerate other teachers.
+      const email = String(user.email || "").trim().toLowerCase();
+      if (user.emailVerified !== true || !email) return { authorized:false, role:"", classIds:[] };
+      const inviteId = email.replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+      if (!inviteId) return { authorized:false, role:"", classIds:[] };
+      return services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites/" + inviteId).once("value").then(function(inviteSnap){
+        const invite = inviteSnap.val();
+        if (!invite || invite.active === false || String(invite.email || "").trim().toLowerCase() !== email) {
+          return { authorized:false, role:"", classIds:[] };
         }
-        return { authorized:false, role:"", classIds:[] };
+        return user.getIdToken().then(function(token){
+          return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
+            method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
+          });
+        }).then(async function(response){
+          if(response.status===403){
+            // The server answered and refused: a real "not authorized".
+            console.warn("Teacher claim refused:",await response.text().catch(function(){return "";}));
+            return {authorized:false,role:"",classIds:[]};
+          }
+          if(!response.ok){const error=new Error("Teacher account linking failed (HTTP "+response.status+").");error.status=response.status;throw error;}
+          const claimed=await response.json();
+          const verifiedClassIds = Array.isArray(claimed.classIds) ? claimed.classIds.filter(id=>id!=="*" && typeof id==="string" && id.length>0) : [];
+          if(claimed.authorized!==true || !verifiedClassIds.length) return {authorized:false,role:"",classIds:[]};
+          return {authorized:true,role:"teacher",accountType:claimed.accountType==="principal"?"principal":"teacher",supervisedTeachers:claimed.supervisedTeachers||{},classIds:verifiedClassIds,inviteId:claimed.inviteId||inviteId};
+        }).catch(function(error){
+          // A failed or unavailable verifier must never authorize a new teacher.
+          console.warn("Teacher verification unavailable; access denied.",error);
+          return {authorized:false,role:"",classIds:[],checkFailed:true,error:String(error&&error.message||error)};
+        });
       });
-    }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
+    }).catch(function(error){
+      // Still denied, but say why: a failed read is not the same as "not a teacher".
+      console.error("Teacher access check failed; access denied.",error);
+      return { authorized:false, role:"", classIds:[], checkFailed:true, error:String(error&&error.message||error) };
+    });
+  }
+
+  function readUserAccess(user) {
+    const uid = user && String(user.uid || "");
+    if (!uid) return readUserAccessFromFirebase(user);
+    const pending = accessChecksInFlight.get(uid);
+    if (pending) return pending;
+    let request;
+    request = readUserAccessFromFirebase(user).finally(function () {
+      if (accessChecksInFlight.get(uid) === request) accessChecksInFlight.delete(uid);
+    });
+    accessChecksInFlight.set(uid, request);
+    return request;
   }
 
   function isAuthorizedUser(user) {
@@ -887,24 +976,31 @@
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    return services.auth.signInWithPopup(provider).catch(function (error) {
+    try { sessionStorage.removeItem(NO_RESTORE_KEY); } catch (_) {}
+    const savedAuth = getRememberedTeacherAuth();
+    return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
+      .then(function () { return savedAuth.signInWithPopup(provider); }).catch(function (error) {
       const code = error && error.code ? error.code : "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
-        return services.auth.signInWithRedirect(provider).then(function () { return null; });
+        return savedAuth.signInWithRedirect(provider).then(function () { return null; });
       }
       throw error;
     }).then(function (result) {
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
-      return readUserAccess(result.user).then(function(access){
+      return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+        .then(function () { return services.auth.updateCurrentUser(result.user); })
+        .then(function () { return readUserAccess(result.user); }).then(function(access){
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
         if (!access.authorized) {
-          return services.auth.signOut().then(function () {
-            const error = new Error("This Google account is not authorized for Fun Torah Tools.");
-            error.code = "b3/unauthorized-user";
+          return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
+            const error = access.checkFailed
+              ? new Error("We could not check your account just now. Please wait a minute and sign in again.")
+              : new Error("This Google account is not authorized for Fun Torah Tools.");
+            error.code = access.checkFailed ? "b3/access-check-failed" : "b3/unauthorized-user";
             throw error;
           });
         }
@@ -914,11 +1010,22 @@
   }
 
   function signOut() {
+    teacherSignOutVersion++;
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
-    return services.auth.signOut();
+    return getRememberedTeacherAuth().signOut().then(function () { return services.auth.signOut(); });
   }
 
+
+  // Ends only the STUDENT's session in this tab. The teacher's remembered
+  // Google login is untouched, and this tab will not adopt it automatically.
+  async function endStudentSession() {
+    try { sessionStorage.setItem(NO_RESTORE_KEY, "1"); } catch (_) {}
+    try { STUDENT_STORAGE_KEYS.forEach(function (k) { sessionStorage.removeItem(k); }); sessionStorage.removeItem(ACTING_KEY); } catch (_) {}
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (user && !isGoogleUser(user)) await services.auth.signOut();
+  }
 
   // Verified teachers can switch between dashboards and student demonstrations.
   function showToolVersions(access) {
@@ -947,7 +1054,7 @@
     if (bar) bar.remove();
     bar = document.createElement('nav'); bar.id = 'b3ToolVersions';
     bar.setAttribute('aria-label','Tool version');
-    bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;padding:10px 16px;margin:0;background:#eef4f2;font:600 15px Arial;color:#163c49';
+    bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;padding:10px 16px;margin:64px 0 0;background:#eef4f2;font:600 15px Arial;color:#163c49;position:relative;z-index:1';
     const requested = current.searchParams.get('class');
     const validClass = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id);
     const classId = validClass(requested) ? requested : (access.classIds || []).find(validClass) || (access.role==='admin'?'et':'');
@@ -957,6 +1064,13 @@
       if (index===1) target.searchParams.set('demo','1');
       link.href=target.href; link.textContent=index===0?'Teacher version':'Student version';
       link.style.cssText='padding:8px 14px;border-radius:8px;background:white;color:#163c49;text-decoration:none;border:1px solid #cbd8d5';
+      if (index===1) {
+        // This is a teacher-authorized, read-only student preview. Do not
+        // impersonate a student or switch Firebase identities from this link.
+        // The separate "Sign in as a student" action remains available when
+        // a teacher intentionally needs to test an actual student session.
+        link.title = 'Preview the student version with your teacher login; student progress is not saved';
+      }
       bar.appendChild(link);
     });
     document.body.insertBefore(bar,document.body.firstChild);
@@ -969,8 +1083,16 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
-    return services.auth.onAuthStateChanged(function (user) {
+    return services.auth.onAuthStateChanged(async function (user) {
+      // A student identity sitting in a non-student tab is not this tab's
+      // identity: let the remembered teacher replace it.
+      if (user && !isGoogleUser(user) && !isStudentTab() && !teacherRestoreBlocked()) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
+      }
       if (!user) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
         callback(null, false, currentAccess);
@@ -1061,16 +1183,18 @@
           const m = cls.members[sid];
           return ACTING_ID.test(sid) && m && m.active !== false;
         }).map(function (sid) {
-          return { id:sid, name:String(cls.members[sid].name || sid) };
-        }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+          return { id:sid, name:String(cls.members[sid].name || sid), demo:cls.members[sid].demo === true };
+        }).filter(function (s) { return !s.demo; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
         return { classId:id, className:String(cls.name || id.toUpperCase()), students:students };
       });
     }));
-    return rows.filter(function (r) { return r && r.students.length; })
+    return rows.filter(function (r) { return r; })
       .sort(function (a, b) { return a.className.localeCompare(b.className); });
   }
 
-  async function startActingAsStudent(classId, studentId) {
+  // Only same-site tool pages may be used as the landing page after sign-in.
+  const NEXT_PATH = /^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/;
+  async function startActingAsStudent(classId, studentId, studentTab, nextPath) {
     classId = String(classId || ""); studentId = String(studentId || "");
     if (!ACTING_ID.test(classId) || !ACTING_ID.test(studentId)) throw new Error("Choose a student.");
     const services = ensureFirebase();
@@ -1092,23 +1216,70 @@
     const pin = String((result.passcodes || {})[studentId] || "").trim();
     if (!pin) throw new Error("This student doesn't have a passcode yet. Set one in Manage Class first.");
     const name = String(member.name || studentId);
-    clearStudentStorage();
-    sessionStorage.setItem("b3Games_studentId", studentId);
-    sessionStorage.setItem("b3Games_studentName", name);
-    sessionStorage.setItem("b3Games_studentClass", classId);
-    sessionStorage.setItem("b3Games_classPin", pin);
-    sessionStorage.setItem("posukPractice_studentId", studentId);
-    sessionStorage.setItem("posukPractice_studentName", name);
-    sessionStorage.setItem("weeklyQuiz_classId", classId);
-    sessionStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
-    sessionStorage.removeItem("b3TeacherBypass");
-    sessionStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
-    location.href = SITE_BASE + "index.html?v=20261007-tab-login";
+    // The student opens in a different tab, with its own Firebase session.
+    // Migrate the teacher's existing LOCAL login to SESSION before the child
+    // signs in; otherwise Firebase would broadcast the student's identity
+    // to every teacher tab using the same browser-wide auth persistence.
+    if (studentTab) {
+      if (studentTab.closed) throw new Error("The student tab was closed. Please try again.");
+      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+    }
+    const studentSession = studentTab ? studentTab.sessionStorage : sessionStorage;
+    if (studentTab) studentSession.clear();
+    else clearStudentStorage();
+    studentSession.setItem("b3Games_studentId", studentId);
+    studentSession.setItem("b3Games_studentName", name);
+    studentSession.setItem("b3Games_studentClass", classId);
+    studentSession.setItem("b3Games_classPin", pin);
+    studentSession.setItem("posukPractice_studentId", studentId);
+    studentSession.setItem("posukPractice_studentName", name);
+    studentSession.setItem("weeklyQuiz_classId", classId);
+    studentSession.setItem("b3Games_workspaceId", WORKSPACE_ID);
+    studentSession.removeItem("b3TeacherBypass");
+    if (nextPath && NEXT_PATH.test(nextPath)) studentSession.setItem("b3ActAsNext", nextPath);
+    studentSession.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
+    if (studentTab) {
+      studentSession.setItem("b3ActAsSeparateTab", "1");
+      // Do not leave a cross-tab opener path back into the teacher dashboard.
+      studentTab.opener = null;
+      studentTab.location.replace(SITE_BASE + "index.html?v=20261019-student-tab");
+    } else {
+      location.href = SITE_BASE + "index.html?v=20261019-student-tab";
+    }
+  }
+
+  // The teacher's own demo student: created (or re-added to this class) by
+  // the server, then opened exactly like "Sign in as a student".
+  async function openMyDemoStudent(classId, studentTab, nextPath) {
+    classId = String(classId || "");
+    if (!ACTING_ID.test(classId)) throw new Error("Choose a class.");
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) throw new Error("Sign in with your teacher Google account first.");
+    const response = await fetch(MANAGE_STUDENTS_URL, {
+      method:"POST", signal:AbortSignal.timeout(15000),
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + await user.getIdToken() },
+      body:JSON.stringify({ action:"demoStudent", classId:classId })
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok || !ACTING_ID.test(String(result.studentId || ""))) throw new Error(result.error || "Could not open your demo student.");
+    return startActingAsStudent(classId, result.studentId, studentTab, nextPath);
   }
 
   function stopActingAsStudent() {
+    const separateTab = sessionStorage.getItem("b3ActAsSeparateTab") === "1";
     clearStudentStorage();
     try { sessionStorage.removeItem(ACTING_KEY); } catch (e) {}
+    if (separateTab) {
+      // The teacher is still signed in in the original tab. Close only this
+      // test-student tab; never navigate it to a teacher-only page.
+      const services = ensureFirebase();
+      Promise.resolve(services && services.auth ? services.auth.signOut() : null).catch(function () {}).then(function () {
+        window.close();
+        setTimeout(function () { if (!window.closed) location.href = SITE_BASE + "index.html"; }, 150);
+      });
+      return;
+    }
     location.href = SITE_BASE + "teacher-home.html";
   }
 
@@ -1121,10 +1292,10 @@
     bar.id = "b3ActingBanner";
     bar.setAttribute("role", "status");
     bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
-      "padding:10px 12px 10px 16px;border-radius:999px;background:#7c2d12;color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
-      "box-shadow:0 8px 24px rgba(0,0,0,.28)";
+      "padding:10px 12px 10px 16px;border-radius:999px;background:rgba(124,45,18,.45);color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
+      "text-shadow:0 1px 2px rgba(0,0,0,.6);opacity:.8;pointer-events:none";
     bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
-      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap">Exit student view</button>';
+      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap;pointer-events:auto;text-shadow:none">Exit student view</button>';
     bar.querySelector("button").onclick = stopActingAsStudent;
     document.body.appendChild(bar);
   }
@@ -1140,11 +1311,12 @@
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
       '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. This tab keeps its own student login; other tabs stay as they are. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">A new student tab opens while this teacher tab stays signed in. Anything you do in the student tab counts as work by that student. <strong>My demo student</strong> opens your own student account instead, which saves progress like a real student. Press <strong>Exit student view</strong> to close the student tab.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">' +
+      '<button type="button" id="b3ActAsDemo" style="margin-right:auto;border:0;background:#7c3aed;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">\uD83E\uDDEA My demo student</button>' +
       '<button type="button" id="b3ActAsCancel" style="border:1px solid #cbd5e1;background:#fff;color:#1f2937;border-radius:10px;padding:10px 14px;font:700 14px Arial,sans-serif;cursor:pointer">Cancel</button>' +
       '<button type="button" id="b3ActAsGo" disabled style="border:0;background:#15803d;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">Open as student</button>' +
       '</div></div>';
@@ -1160,18 +1332,36 @@
         return '<option value="' + actingEsc(s.id) + '">' + actingEsc(s.name) + '</option>';
       }).join("");
       q("b3ActAsGo").disabled = !cls || !cls.students.length;
+      q("b3ActAsDemo").disabled = !cls;
+    };
+    q("b3ActAsDemo").onclick = function () {
+      const studentTab = window.open("about:blank", "_blank");
+      if (!studentTab) { q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again."; return; }
+      q("b3ActAsDemo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening your demo student\u2026";
+      openMyDemoStudent(q("b3ActAsClass").value, studentTab).catch(function (e) {
+        try { studentTab.close(); } catch (_error) {}
+        q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open your demo student.";
+        q("b3ActAsDemo").disabled = false;
+      });
     };
     q("b3ActAsClass").onchange = fillStudents;
     q("b3ActAsGo").onclick = function () {
+      // Open synchronously with the click so popup blockers allow the new tab.
+      const studentTab = window.open("about:blank", "_blank");
+      if (!studentTab) {
+        q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again.";
+        return;
+      }
       q("b3ActAsGo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening\u2026";
-      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value).catch(function (e) {
+      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value, studentTab).catch(function (e) {
+        try { studentTab.close(); } catch (_error) {}
         q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open this student.";
         q("b3ActAsGo").disabled = false;
       });
     };
     listStudentsForActing().then(function (rows) {
       classes = rows;
-      if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No students in your classes</option>'; fillStudents(); return; }
+      if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No classes assigned</option>'; fillStudents(); return; }
       q("b3ActAsClass").innerHTML = rows.map(function (c) { return '<option value="' + actingEsc(c.classId) + '">' + actingEsc(c.className) + '</option>'; }).join("");
       fillStudents();
     }).catch(function (e) {
@@ -1254,16 +1444,18 @@
     signOut: signOut,
     onAuthStateChanged: onAuthStateChanged,
     isAuthorizedUser: isAuthorizedUser,
-    getCurrentAccess: function(){ return {authorized:currentAccess.authorized,role:currentAccess.role,classIds:currentAccess.classIds.slice()}; },
+    getCurrentAccess: function(){ return {authorized:currentAccess.authorized,role:currentAccess.role,accountType:currentAccess.accountType||"teacher",supervisedTeachers:currentAccess.supervisedTeachers||{},classIds:currentAccess.classIds.slice()}; },
     workspaceId: WORKSPACE_ID,
     timeZone: TIME_ZONE,
     dayKeys: DAY_KEYS.slice(),
     getMode: function () { ensureFirebase(); return activeMode; },
     getActingStudent: getActingStudent,
+    endStudentSession: endStudentSession,
     listStudentsForActing: listStudentsForActing,
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,
-    openActAsStudentPicker: openActAsStudentPicker
+    openActAsStudentPicker: openActAsStudentPicker,
+    openMyDemoStudent: openMyDemoStudent
   };
   // Pages that never ask about sign-in still need their sign-in screens shown.
   if (authChecking) {

@@ -24,7 +24,8 @@ test('student screens default to screens but whiteboard choice remains',()=>{
 });
 test('teacher screen permission is disabled when closing the viewer',()=>{
  const s=read('student-boards.js');
- assert.match(s,/setStudentScreenSharing\(on&&mode==='screens'\)/);
+ assert.match(s,/if\(!on\|\|mode==='screens'\)window\.ClassPointerDashboard\?\.setStudentScreenSharing\(screenPermissionEnabled\)/);
+ assert.match(s,/screenPermissionEnabled=next\?\(screenPermissionEnabled\|\|mode==='screens'\):false/);
  assert.match(s,/Do not send an asynchronous child update here/);
 });
 test('class picker preserves authorization checks',()=>{
@@ -33,12 +34,14 @@ test('class picker preserves authorization checks',()=>{
  assert.match(s,/C\.permitted\(access,id,classRow\)/);
 });
 
-test('student capture prefers a browser tab but requires the browser permission chooser',()=>{
+test('student capture requires Entire Screen and offers a persistent share window',()=>{
  const s=read('student-boards.js');
  assert.match(s,/getDisplayMedia\(/);
- assert.match(s,/preferCurrentTab:true/);
- assert.match(s,/surfaceSwitching:'include'/);
+ assert.match(s,/displaySurface:'monitor'/);
+ assert.match(s,/surfaceSwitching:'exclude'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
+ assert.match(s,/window\.open\(url\.href,'classPointerStudentShare'/);
+ assert.doesNotMatch(s,/Share a browser tab/);
 });
 
 test('activity sharing requires a verified student before opening a screen button',()=>{
@@ -66,9 +69,10 @@ test('teacher can send a single class to student screen sharing while the browse
   assert.match(session,/requestScreenSharing/);
   assert.match(session,/shareRequest:\{at:firebase\.database\.ServerValue\.TIMESTAMP\}/);
   assert.match(activity,/shareRequest\?\.at/);
-  assert.match(activity,/sessionStorage\.setItem\(inviteKey,marker\)/);
-  assert.match(activity,/location\.assign\(new URL\(/);
-  assert.match(activity,/class-pointer-prototype\/dashboard\.html/);
+  assert.match(activity,/btn\.addEventListener\('click',beginShare\)/);
+  assert.doesNotMatch(activity,/fttShareRequestOverlay|Open Sharing Window/);
+  assert.doesNotMatch(activity,/location\.assign\(new URL\(/);
+  assert.match(activity,/ClassPointerBoards\?\.fromTeacher\(message\)/);
   assert.match(activity,/getDisplayMedia\(/);
 });
 

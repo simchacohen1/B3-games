@@ -1,34 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
+
 <meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="rashi-letters"></script>
+<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="rashi-letters"></script>
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap" rel="stylesheet">
 <style>
   @font-face{
     font-family: 'Mekorot Rashi';
@@ -209,6 +195,8 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
 
 /* Look-alike letters */
+.letter-pick-btn.mic-tile{grid-column:1/-1;background:linear-gradient(135deg,#ffe3e3,#fff1d6)!important;border:3px solid #d93b3b;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px}
+.letter-pick-btn.mic-tile span{font-size:40px}.letter-pick-btn.mic-tile small{font-size:17px;font-weight:800;color:#8a1f1f}
 .letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
 .letter-pick-btn.similar-tile span{font-size:32px;letter-spacing:3px}
 #similarScreen{display:none}
@@ -297,7 +285,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style>
-<script defer src="../gallery-share.js?v=20261011b"></script>
+<script defer src="../gallery-share.js?v=20261022-pointer2"></script>
 </head>
 <body>
 <div class="wrap">
@@ -314,7 +302,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
     <div class="mode-gate-section">
-      <h3>Your Rashi path — master each step to unlock the next:</h3>
+      <h3>Choose any Rashi activity — all levels are open:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
@@ -370,7 +358,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b></p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Try to get 7 of 8 in 🎯 Match it!</b></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
@@ -400,19 +388,16 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 </div>
 
 <script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
+<script src="../b3-race.js?v=teacher-player-20261029-1"></script>
+<script src="recordings.js?v=20261023-rashi-mic-tile"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="../firebase-config.js?v=20261029-staging-config"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);
+const firebaseConfig = window.B3_FIREBASE_CONFIG;
+if(!firebaseConfig) throw new Error('Firebase configuration is missing.');
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const UNITS = [
@@ -522,6 +507,8 @@ const MAX_QUESTIONS_PER_STEP = 5;
 let soundOn = true, starsThisVisit = 0, coinsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
+let rashiFollowPending=false;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(rashiFollowPending)e.preventDefault();});
 let unitIndex = 0;
 let phase = 'letter'; // 'letter' | 'word'
 let streak = 0; // correct answers earned in the current step; mistakes do not erase them
@@ -809,7 +796,7 @@ async function loadProgress(){
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
   streak = 0; attemptsThisStep = 0; retryQuestion = null; guidedIndex = unitIndex; guidedPhase = phase;
-  chainFlags = { similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
+  chainFlags = { alphabetDone:!!rec.alphabetDone, confusionDone:!!rec.confusionDone, similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
 }
 
 function renderLetterGrid(){
@@ -821,7 +808,9 @@ function renderLetterGrid(){
     const unlocked = stepUnlocked(idx), mastered = stepMastered(idx);
     b.className = 'letter-pick-btn' + (st.k==='similar' ? ' similar-tile' : '') + (st.k==='words' ? ' words-tile' : '') + (unlocked ? '' : ' locked') + (mastered ? ' mastered' : '');
     let glyph, label;
-    if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
+    if(st.k==='alphabet'){ glyph='א ב ג'; label='All 27 letters'; }
+    else if(st.k==='confusion'){ glyph='ל צ ס'; label='Tricky pairs'; }
+    else if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
     else if(st.k==='words'){ glyph={2:'כִּי',3:'טוֹב',4:'תּוֹרָה'}[st.n]; label=st.n+'-letter words'; }
     else { const u=UNITS[st.i]; glyph = u.id==='finalreview' ? 'שׁ / שׂ' : u.label; label = u.id==='finalreview' ? 'Final review' : 'Mission ' + (st.i+1); }
     const badge = !unlocked ? '<span class="tile-lock">🔒</span>' : (mastered ? '<span class="tile-done">✓</span>' : (idx===cur ? '<span class="start-here">'+(idx===0?'START HERE':'NEXT')+'</span>' : ''));
@@ -836,15 +825,25 @@ function renderLetterGrid(){
     };
     grid.appendChild(b);
   });
+  if(window.RashiRecordings){
+    const mic=document.createElement('button');
+    mic.className='letter-pick-btn mic-tile';
+    mic.innerHTML='<span>🎤</span><small>Reading with Mic — earn 2 points per reading</small>';
+    mic.setAttribute('aria-label','Reading with Mic: record yourself reading Rashi words');
+    mic.onclick=()=>window.RashiRecordings.openHub(allRecSections());
+    grid.appendChild(mic);
+  }
 }
 
 /* ---------- Locked path in "Reading Rashi Made Easy Shmeezy" order ---------- */
-const STEPS = [{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
+const STEPS = [{k:'alphabet'},{k:'confusion'},{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
   {k:'unit',i:2},{k:'unit',i:3},{k:'unit',i:4},{k:'unit',i:5},{k:'unit',i:6},{k:'unit',i:7},{k:'unit',i:8}];
 const MASTER_MATCH = 7, MASTER_WORDS = 5;
 let chainFlags = {}, pendingWordLevel = null;
-function flagKey(st){ return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
+function flagKey(st){ if(st.k==='alphabet') return 'alphabetDone'; if(st.k==='confusion') return 'confusionDone'; return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
 function stepName(st){
+  if(st.k==='alphabet') return 'Full Alef-Beis Lab';
+  if(st.k==='confusion') return 'Tricky letter pairs';
   if(st.k==='similar') return 'Look-alike letters';
   if(st.k==='words') return st.n+'-letter words';
   const u=UNITS[st.i]; return u.id==='finalreview' ? 'Final review' : 'Mission '+(st.i+1)+' ('+u.label+')';
@@ -855,7 +854,7 @@ function stepMastered(idx){
   return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
 }
 // A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
-function stepUnlocked(idx){ if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+function stepUnlocked(idx){ return idx>=0 && idx<STEPS.length; }
 function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
@@ -867,11 +866,15 @@ function goStep(idx){
     showModeGate(); return;
   }
   const st=STEPS[idx];
+  { const rs=document.getElementById('recordScreen'); if(rs) rs.style.display='none'; }
+  if(st.k==='alphabet' || st.k==='confusion'){ window.openRashiAlphabetLab(st.k); return; }
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
   mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
   document.getElementById('modeGate').style.display='none';
   document.getElementById('similarScreen').style.display='none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display='none';
   document.getElementById('app').style.display='block';
   renderQuestion();
 }
@@ -906,6 +909,8 @@ function selectPracticeLetter(unitId, btnEl){
 
 function showModeGate(){
   clearTimeout(questionTimer); viewVersion++;
+  { const rs=document.getElementById('recordScreen'); if(rs) rs.style.display='none'; }
+  if(window.RashiRecordings) window.RashiRecordings.hideHub();
   document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
   const cur = currentStep();
   document.getElementById('continueBtn').textContent = cur < 0 ? '★ Quest complete — practice any step below' : '▶ Continue my quest · Step ' + (cur+1) + ' of ' + STEPS.length + ': ' + stepName(STEPS[cur]);
@@ -914,9 +919,22 @@ function showModeGate(){
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
   document.getElementById('similarScreen').style.display = 'none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display = 'none';
   if(typeof leaveRoom==='function') leaveRoom();
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
+  const launchParams=new URLSearchParams(location.search);
+  if(studentId&&(launchParams.get('b3Multiplayer')==='start'||launchParams.get('b3Multiplayer')==='host'||launchParams.get('b3MultiplayerRoom'))){
+    setTimeout(()=>{
+      // simArea lives inside the normally hidden look-alike activity screen.
+      // Direct Multiplayer Center launches must open that screen before
+      // rendering the room, including when a guest reloads to rejoin.
+      openSimilar();
+      setSimTab('match');
+      enterMultiplayer();
+    },0);
+  }
 }
 
 document.getElementById('continueBtn').onclick = () => goNextStep();
@@ -1145,22 +1163,60 @@ async function handleAnswer(letter, btnEl){
     }
   }
 
-  try{await Promise.all(writes);}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  // Keep question transitions responsive even when Firebase is slow.
+  // Progress is still saved, but saving no longer blocks the next question.
+  rashiFollowPending=true;
+  Promise.all(writes).then(()=>{
+    rashiFollowPending=false;
+  }).catch(()=>{
+    rashiFollowPending=false;
+    if(version===viewVersion) fb.textContent+=' Progress could not save. Check your connection.';
+  });
   if(version!==viewVersion) return;
 
   if(practiceFinished){
     questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
   } else if(miniGamePending){
     const delay = stepComplete ? 1250 : 900;
-    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? goNextStep : renderQuestion),delay);
+    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? ()=>offerUnitRecording(unit) : renderQuestion),delay);
   } else if(stepComplete){
-    questionTimer=setTimeout(unitAdvanced ? goNextStep : renderQuestion,1400);
+    questionTimer=setTimeout(unitAdvanced ? ()=>offerUnitRecording(unit) : renderQuestion,1400);
   } else if(isCorrect){
     questionTimer=setTimeout(renderQuestion,1050);
   } else {
     document.getElementById('nextBtn').classList.remove('hidden');
   }
 }
+
+/* ---------- Record Reading (recordings.js) ---------- */
+function unitRecSection(i){
+  const u=UNITS[i];
+  return {id:u.id, label:u.id==='finalreview' ? 'Final review words' : 'Mission '+(i+1)+' ('+u.label+') words', words:u.words.map(w=>w.w)};
+}
+function wordsRecSection(n, words){
+  return {id:'words'+n, label:n+'-letter words', words:(words && words.length ? words : wordsFor(n).slice(0,6))};
+}
+// A finished mission offers its recording, then carries on to the next step.
+function offerUnitRecording(unit){
+  const i=UNITS.indexOf(unit);
+  if(i<0 || !window.RashiRecordings) return goNextStep();
+  window.RashiRecordings.offer(unitRecSection(i), goNextStep);
+}
+// "Reading with Mic": every section is open as a choice (all levels are open).
+function allRecSections(){
+  const sections=UNITS.map((u,i)=>unitRecSection(i));
+  [2,3,4].forEach(n=>sections.push(wordsRecSection(n, PRACTICE_WORDS.filter(w=>baseLetters(w).length===n).slice(0,6))));
+  return sections;
+}
+if(window.RashiRecordings) window.RashiRecordings.init({
+  isPreview:()=>teacherPreview,
+  onBack:()=>showModeGate(),
+  hideOthers:()=>{
+    ['app','modeGate','similarScreen','practiceCompleteScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+    const a=document.getElementById('alphabetLabScreen'); if(a) a.style.display='none';
+    document.getElementById('completeScreen').classList.remove('show');
+  }
+});
 
 /* ---------- Look-alike letters ---------- */
 const ALL_LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
@@ -1172,7 +1228,7 @@ function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.clas
 
 function openSimilar(){
   clearTimeout(questionTimer); viewVersion++;
-  ['modeGate','app','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+  ['modeGate','app','practiceCompleteScreen','alphabetLabScreen'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('similarScreen').style.display='block';
   setSimTab('explore');
@@ -1243,6 +1299,7 @@ function renderSimMatch(){
     const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'🏆':'💪'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'),
       el('p','sim-intro', passed ? 'Look-alike letters mastered! See? Rashi and regular letters are almost twins.' : 'Get '+MASTER_MATCH+' of '+m.order.length+' to unlock the next step. Try again!'));
     const again=el('button','btn','Play again'); again.onclick=startSimMatch; again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && window.RashiRecordings){ const rec=el('button','btn','🎤 Record Reading'); rec.style.margin='10px 6px 0'; rec.onclick=()=>window.RashiRecordings.open(wordsRecSection(g.level,g.order), ()=>showModeGate()); d.appendChild(rec); }
     if(passed && currentStep()>=0) d.appendChild(nextStepButton());
     area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
   }
@@ -1312,10 +1369,17 @@ function renderSimMemory(){
 /* ---------- Match it: solo or live multiplayer ---------- */
 const MP_QUESTIONS = 10;
 const MP_OPEN_MS = 20*60*1000;      // a waiting game stays open for 20 minutes
-const ROOMS_PATH = 'rashiLetters/matchRooms';
+let ROOMS_PATH = '';
 let simRoom = null;                  // the game I'm in
 let mpWatch = null;                  // listener on all games while I'm in multiplayer
 let mpClass = null;                  // my class id ('' if none)
+let mpCenterPath = '';
+let mpPlayerId = '', mpPlayerName = '', mpPlayerRole = 'student';
+let mpCenterSummarySignatures = Object.create(null);
+function saveRashiHostRoom(code){const url=new URL(location.href);url.searchParams.set('b3Multiplayer','host');url.searchParams.set('b3MultiplayerRoom',code);history.replaceState(null,'',url.href);}
+function clearRashiRoomUrl(){const url=new URL(location.href);url.searchParams.delete('b3Multiplayer');url.searchParams.delete('b3MultiplayerRoom');history.replaceState(null,'',url.href);}
+function multiplayerCenterHref(){const url=new URL('../multiplayer/index.html',location.href),p=new URLSearchParams(location.search),classId=p.get('classId')||p.get('class')||mpClass;if(classId){url.searchParams.set('class',classId);url.searchParams.set('classId',classId);}return url.href;}
+function publishRashiCenterRoom(room,code){const actorId=typeof mpPlayerId!=='undefined'?mpPlayerId:studentId,actorName=typeof mpPlayerName!=='undefined'?mpPlayerName:studentName,actorRole=typeof mpPlayerRole!=='undefined'?mpPlayerRole:'student';if(!mpCenterPath||!room||room.host!==actorId)return;const summary={host:actorId,hostName:room.hostName||actorName,hostRole:actorRole,gameKey:'rashi-letters',gameName:'Rashi Letters Match',gameUrl:'../rashi-letters/student.html',roomCode:code,state:room.state,playerCount:activePlayers(room).length,createdAt:room.createdAt||Date.now()},key='rashi-letters-'+code,signature=JSON.stringify(summary);if(mpCenterSummarySignatures[key]===signature)return;mpCenterSummarySignatures[key]=signature;db.ref(mpCenterPath+'/'+key).set({...summary,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(e=>{if(mpCenterSummarySignatures[key]===signature)delete mpCenterSummarySignatures[key];console.warn('Rashi center invite update failed',e);});}
 
 function renderMatchMenu(){
   leaveRoom();
@@ -1330,7 +1394,7 @@ function renderMatchMenu(){
 
 async function myClassId(){
   if(mpClass!==null) return mpClass;
-  try{ if(window.FunTorahStudentClass){ const c=await FunTorahStudentClass.resolve(db, studentId); mpClass=String(c.classId||''); } else mpClass=''; }
+  try{ const actor=await B3MultiplayerIdentity.resolve(db,firebase.auth().currentUser,new URLSearchParams(location.search).get('class')||'',mpPlayerId||''); mpClass=actor.classId;mpPlayerId=actor.participantId;mpPlayerName=actor.participantName;mpPlayerRole=actor.role;mpCenterPath=await B3Race.classCenterRoomsPath(db,mpPlayerId);ROOMS_PATH=mpCenterPath.replace(/\/rooms$/,'/rashiRooms'); }
   catch(e){ mpClass=''; }
   return mpClass;
 }
@@ -1345,11 +1409,14 @@ function openGames(all){
 async function enterMultiplayer(msgText){
   leaveRoom(); viewVersion++;
   const area=document.getElementById('simArea');
-  if(!studentId){ area.replaceChildren(el('p','prompt','Please sign in on Fun Torah Tools to play with friends.')); return; }
   area.replaceChildren(el('p','prompt','Looking for friends…'));
   const v=viewVersion;
   try{
     await myClassId();
+    if(!ROOMS_PATH){area.replaceChildren(el('p','prompt','Ask your teacher to add you to an active class before playing with friends.'));return;}
+    const params=new URLSearchParams(location.search),roomCode=params.get('b3MultiplayerRoom'),mode=params.get('b3Multiplayer');
+    if(roomCode){const err=await joinRoom(roomCode,mode==='host');if(err){area.replaceChildren(el('p','prompt',err));const b=el('button','sim-small-btn','← Back to Multiplayer Center');b.onclick=()=>{clearRashiRoomUrl();location.href=multiplayerCenterHref();};area.appendChild(b);}return;}
+    if(mode==='start'){await createRoom();return;}
     const all=(await db.ref(ROOMS_PATH).once('value')).val()||{};
     if(v!==viewVersion) return;
     cleanupOldGames(all);
@@ -1414,24 +1481,28 @@ async function createRoomInner(){
   for(let i=0;i<8 && !code;i++){
     const c=String(1000+Math.floor(Math.random()*9000));
     const r=(await db.ref(ROOMS_PATH+'/'+c).once('value')).val();
-    if(!r || (r.createdAt && Date.now()-r.createdAt>3*3600*1000)) code=c;
+    if(!r) code=c;
   }
   if(!code) throw new Error('no free code');
   const ref=db.ref(ROOMS_PATH+'/'+code);
-  const players={}; players[studentId]={name:studentName, score:0, q:0};
-  await ref.set({host:studentId, hostName:studentName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
+  const players={}; players[mpPlayerId]={name:mpPlayerName, score:0, q:0};
+  await ref.set({host:mpPlayerId, hostName:mpPlayerName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
   ref.onDisconnect().remove();
+  db.ref(mpCenterPath+'/rashi-letters-'+code).onDisconnect().remove();
+  saveRashiHostRoom(code);
   enterRoom(code,true);
 }
 
-async function joinRoom(code){
+async function joinRoom(code,reconnectAsHost){
   const ref=db.ref(ROOMS_PATH+'/'+code); const r=(await ref.once('value')).val();
   if(!r) return 'That game closed. Try another one.';
-  if(r.state!=='lobby') return 'That game already started.';
-  if(activePlayers(r).length>=8 && !(r.players||{})[studentId]) return 'That game is full.';
+  const existing=r.players&&r.players[mpPlayerId];
+  if(r.state!=='lobby'&&!(r.state==='playing'&&existing)) return 'That game already started.';
+  if((reconnectAsHost||existing&&r.host===mpPlayerId)&&r.host===mpPlayerId&&existing){leaveRoom();enterRoom(code,true);return null;}
+  if(activePlayers(r).length>=8 && !(r.players||{})[mpPlayerId]) return 'That game is full.';
   leaveRoom();   // if I was waiting in my own empty game, close it
-  const me=ref.child('players/'+studentId);
-  await me.set({name:studentName, score:0, q:0});
+  const me=ref.child('players/'+mpPlayerId);
+  await me.set(Object.assign({},existing||{},{name:mpPlayerName,score:Number(existing&&existing.score)||0,q:Number(existing&&existing.q)||0,left:false}));
   me.onDisconnect().update({left:true});
   enterRoom(code,false);
   return null;
@@ -1439,7 +1510,7 @@ async function joinRoom(code){
 
 function enterRoom(code,isHost){
   viewVersion++;
-  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null};
+  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null,waitStartedAt:Date.now(),reminderTimer:null};
   watchGames();
   db.ref(ROOMS_PATH).once('value').then(s=>{ const all=s.val()||{}; if(simRoom && simRoom.code===code) onRoomUpdate(all[code]||null, all); });
 }
@@ -1449,8 +1520,8 @@ function leaveRoom(){
   const r=simRoom; if(!r) return; simRoom=null;
   try{
     const state=r.data && r.data.state;
-    if(r.isHost && (state==='lobby' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); }
-    else if(!r.finished && r.data){ const me=r.ref.child('players/'+studentId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
+    if(r.isHost && (state==='lobby' || state==='playing' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); if(mpCenterPath){const center=db.ref(mpCenterPath+'/rashi-letters-'+r.code);center.onDisconnect().cancel();center.remove().catch(()=>{});} }
+    else if(!r.finished && r.data){ const me=r.ref.child('players/'+mpPlayerId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
   }catch(e){ console.error(e); }
 }
 
@@ -1459,16 +1530,21 @@ function allDone(room){ const a=activePlayers(room); return a.length>0 && a.ever
 
 function onRoomUpdate(room, all){
   const r=simRoom; if(!r) return;
-  if(!room){ if(r.shown!=='results'){ simRoom=null; enterMultiplayer(r.isHost?'':'That game was closed.'); } return; }
+  if(!room){ if(r.shown!=='results'){
+    simRoom=null; stopWatching();
+    const area=document.getElementById('simArea'); area.replaceChildren(el('p','prompt',r.isHost?'This waiting room has closed.':'The host left. This waiting room has closed.'));
+    const browse=el('button','sim-small-btn','Browse other games'); browse.onclick=()=>{clearRashiRoomUrl();location.href=multiplayerCenterHref();}; area.appendChild(browse);
+  } return; }
   r.data=room;
+  publishRashiCenterRoom(room,r.code);
   if(room.state==='lobby'){ renderLobby(room, all); return; }
   if(r.shown==='results') return;
   if(room.state==='ended' || (r.finished && allDone(room))){ renderMpResults(room); return; }
   if(room.state==='playing' && !r.started){
-    if(!room.players || !room.players[studentId] || room.players[studentId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
-    r.started=true; r.ref.onDisconnect().cancel();
-    r.ref.child('players/'+studentId).onDisconnect().update({left:true});
-    runCountdown(); return;
+    if(!room.players || !room.players[mpPlayerId] || room.players[mpPlayerId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
+    r.started=true;r.qi=Number(room.players[mpPlayerId].q)||0;r.score=Number(room.players[mpPlayerId].score)||0;
+    r.ref.child('players/'+mpPlayerId).onDisconnect().update({left:true});
+    if(r.qi>=room.questions.length)renderWaiting();else runCountdown(); return;
   }
   updateBoard(room);
 }
@@ -1481,20 +1557,26 @@ function renderLobby(room, all){
   panel.append(el('h3',null, count<2 ? 'Waiting for friends to join…' : 'Your race is ready!'));
   if(count<2) panel.appendChild(el('p','sim-intro','When another boy taps 👥 Play with friends, he’ll be asked to join you.'));
   const list=el('div','mp-players');
-  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===studentId?' me':''), (id===room.host?'👑 ':'')+(id===studentId?'You':p.name))));
+  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===mpPlayerId?' me':''), (id===room.host?'👑 ':'')+(id===mpPlayerId?'You':p.name))));
   panel.append(el('div','sim-status',count+' player'+(count===1?'':'s')+' here'), list);
   if(r.isHost){
     const go=el('button','btn', count<2 ? 'Waiting…' : '▶ Start the race!'); go.disabled=count<2;
-    go.onclick=()=>{ go.disabled=true; r.ref.onDisconnect().cancel(); r.ref.update({state:'playing', startedAt:firebase.database.ServerValue.TIMESTAMP}); };
+    go.onclick=()=>{ go.disabled=true; r.ref.update({state:'playing', startedAt:firebase.database.ServerValue.TIMESTAMP}); };
     panel.appendChild(go);
-  } else panel.appendChild(el('p','prompt','Waiting for '+(room.hostName||'the host')+' to start…'));
+  } else {
+    panel.appendChild(el('p','prompt','Waiting for '+(room.hostName||'the host')+' to start…'));
+    const waitMs=Date.now()-(r.waitStartedAt||(r.waitStartedAt=Date.now()));
+    if(waitMs>=30000)panel.appendChild(el('p','sim-intro','Still waiting? You can choose another game.'));
+    else if(!r.reminderTimer)r.reminderTimer=setTimeout(()=>{if(simRoom===r&&r.shown==='lobby')renderLobby(r.data);},30000-waitMs);
+    const browse=el('button','sim-small-btn','Leave and browse games');browse.onclick=()=>{leaveRoom();location.href=multiplayerCenterHref();};panel.appendChild(browse);
+  }
   area.appendChild(panel);
   // Someone else is waiting alone too? Offer to join them so nobody waits forever.
   if(r.isHost && count<2 && all){
     const offers=offerList(all);
     if(offers.children.length){ area.append(el('p','prompt','Or join a friend who is waiting:'), offers); }
   }
-  const leave=el('button','sim-small-btn','← Leave'); leave.onclick=renderMatchMenu;
+  const leave=el('button','sim-small-btn','← Leave'); leave.onclick=()=>{clearRashiRoomUrl();renderMatchMenu();};
   area.appendChild(leave);
 }
 
@@ -1515,10 +1597,10 @@ function boardRows(room, results){
   const total=(room.questions||[]).length||MP_QUESTIONS;
   const box=el('div','mp-board'+(results?' mp-results':''));
   rankPlayers(room).forEach(([id,p],i)=>{
-    const row=el('div','mp-row'+(id===studentId?' me':'')+(p.left?' left':''));
+    const row=el('div','mp-row'+(id===mpPlayerId?' me':'')+(p.left?' left':''));
     const medal=results ? (['🥇','🥈','🥉'][i]||(i+1)+'.') : (p.finishedAt?'🏁':(i+1)+'.');
     const bar=el('div','mp-bar'); const fill=document.createElement('i'); fill.style.width=Math.min(100,(p.q||0)/total*100)+'%'; bar.appendChild(fill);
-    row.append(el('span',null,medal), el('span','mp-name',(id===studentId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
+    row.append(el('span',null,medal), el('span','mp-name',(id===mpPlayerId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
     box.appendChild(row);
   });
   return box;
@@ -1542,8 +1624,8 @@ function renderMpQuestion(){
       else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===q.t) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='The green one is its twin.'; }
       r.qi++;
       const upd={score:r.score, q:r.qi};
-      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+studentId).onDisconnect().cancel(); }
-      r.ref.child('players/'+studentId).update(upd).catch(()=>{});
+      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+mpPlayerId).onDisconnect().cancel(); }
+      r.ref.child('players/'+mpPlayerId).update(upd).catch(()=>{});
       logAttempt('similar','letter',ok).catch(()=>{});
       setTimeout(()=>{ if(simRoom!==r || v!==viewVersion) return; if(r.qi>=qs.length) renderMpWaiting(); else renderMpQuestion(); }, ok?650:1400);
     };
@@ -1565,17 +1647,17 @@ function renderMpWaiting(){
 
 function renderMpResults(room){
   const r=simRoom; if(!r || r.shown==='results') return; r.shown='results';
-  r.ref.child('players/'+studentId).onDisconnect().cancel();
+  r.ref.child('players/'+mpPlayerId).onDisconnect().cancel();
   if(r.isHost) r.ref.onDisconnect().remove();
   const area=document.getElementById('simArea'); area.replaceChildren();
   const ranked=rankPlayers(room);
-  const iWon=ranked.length && ranked[0][0]===studentId;
+  const iWon=ranked.length && ranked[0][0]===mpPlayerId;
   const icon=el('div','finish-icon',iWon?'🏆':'🎉');
   const d=el('div','sim-done');
   const again=el('button','btn','Play again'); again.onclick=()=>enterMultiplayer(); again.style.marginTop='10px';
   d.append(icon, el('h3',null,iWon?'You won the race!':(ranked[0]?(ranked[0][1].name+' wins!'):'Game over')), boardRows(room,true), again);
   area.appendChild(d);
-  const myScore=(room.players&&room.players[studentId]&&room.players[studentId].score)||0;
+  const myScore=(room.players&&room.players[mpPlayerId]&&room.players[mpPlayerId].score)||0;
   if(myScore>=8) markMastered('similarDone');
   if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); setTimeout(()=>showQuestToast('🏆 Winner! +5 stars'), myScore>=8?1300:0); }
   else rewardBurst(icon,false);
@@ -1594,14 +1676,24 @@ const PRACTICE_WORDS = [
 const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
 let wordLevel = 2, wordGame = null;
 function unlockedLetters(){
-  const set=new Set(SIMILAR);
-  const done = Math.min(typeof guidedIndex==='number'?guidedIndex:0, UNITS.length);
-  UNITS.slice(0,done).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>set.add(c))));
-  return set;
+  // Progress, not menu access, determines which letters a student has learned.
+  if(chainFlags.alphabetDone) return new Set(ALL_LETTERS);
+  const known=new Set();
+  if(chainFlags.similarDone) SIMILAR.forEach(ch=>known.add(ch));
+  const completed=Math.min(guidedIndex,UNITS.length);
+  UNITS.slice(0,completed).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>known.add(c))));
+  return known;
 }
 function wordsFor(level){
-  const ok=unlockedLetters();
-  return PRACTICE_WORDS.filter(w=>{ const b=baseLetters(w); return b.length===level && b.every(c=>ok.has(c)); });
+  const known=unlockedLetters();
+  const candidates=PRACTICE_WORDS.filter(w=>baseLetters(w).length===level);
+  // Prefer fully learned words; if there are too few for a playable round,
+  // introduce only the minimum number of unfamiliar letters needed.
+  const unfamiliarCount=w=>baseLetters(w).filter(ch=>!known.has(ch)).length;
+  const ranked=candidates.map(w=>({word:w,missing:unfamiliarCount(w)}));
+  ranked.sort((a,b)=>a.missing-b.missing);
+  const maxMissing=ranked[Math.min(5,ranked.length-1)]?.missing ?? 0;
+  return ranked.filter(item=>item.missing<=maxMissing).map(item=>item.word);
 }
 function startWords(level){
   wordLevel=level;
@@ -1622,7 +1714,7 @@ function renderWords(){
     const go=el('button','btn','Go there →'); go.onclick=()=>goStep(firstUnmasteredBefore(si)); area.appendChild(go); return;
   }
   if(g.pool.length<4){
-    area.append(el('p','prompt','Finish more missions to unlock '+g.level+'-letter words!'), el('p','sim-intro','These words use letters from missions you haven’t done yet. Try 2-letter words first.'));
+    area.append(el('p','prompt','There are not enough words available for this level.'), el('p','sim-intro','Try another word length.'));
     return;
   }
   if(g.round>=g.order.length){
@@ -1667,7 +1759,8 @@ async function logAttempt(unitId, ph, correct){
   await db.ref('rashiLetters/progress/' + studentId + '/name').set(studentName);
 }
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script src="alphabet-lab.js?v=20261022-auto-advance"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 

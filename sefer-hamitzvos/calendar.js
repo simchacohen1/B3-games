@@ -24,6 +24,9 @@
   function cardMap(days){
     const map={};let card=0;
     for(const reading of days)for(const ref of reading.match(/[PN]\d+/g)||[])if(!map[ref])map[ref]=++card;
+    // Preserve the original artwork card IDs when the October 18/19 lessons swap N295 and N296.
+    const originalN295Card=map.N296,originalN296Card=map.N295;
+    if(originalN295Card&&originalN296Card){map.N295=originalN295Card;map.N296=originalN296Card;}
     return map;
   }
   function hebrewDate(iso,locale='en-u-ca-hebrew'){

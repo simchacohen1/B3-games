@@ -4,11 +4,17 @@ if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);const db=fireba
 // plain link keep the original shared lists. Any other class has its own separate
 // lists, students and leaderboards, starts empty, and needs a Google teacher sign-in.
 const CLASS_ID=(new URLSearchParams(location.search).get('class')||'').trim();
-const CLASS_MODE=!!CLASS_ID&&!['et','wt'].includes(CLASS_ID);
+const LEGACY_CLASS_IDS=['et','wt'];
+const CLASS_MODE=!!CLASS_ID&&!LEGACY_CLASS_IDS.includes(CLASS_ID);
 // Firebase drops empty lists, so a brand-new class may come back with no tracks at all.
 function withAllTracks(c){c=c||{};['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
 const CLASS_ID_VALID=/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID);
 const SPACE=CLASS_MODE&&CLASS_ID_VALID?`${ROOT}/classes/${CLASS_ID}`:ROOT;
+let activeTeacherAccess=null,isSiteAdmin=false,activeLegacyClassScope='',scopedStudentIds=[];
+const legacyScoped=()=>!!activeLegacyClassScope&&!isSiteAdmin;
+const teacherSettingsPath=()=>legacyScoped()?`${ROOT}/classes/${activeLegacyClassScope}/settings`:`${SPACE}/settings`;
+const scopedListeners=[];
+let fullScopeListenerBound=false;
 // Teacher access is verified through the signed-in Google teacher account.
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
@@ -462,11 +468,30 @@ function mergeCatalogWithoutReplacingPictures(current,local){
   return next;
 }
 
-function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||(t==='shorashim'&&Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM.find(x=>x.id===id):null)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt&&(!type||c.itemType===type)&&itemFor(c.itemKey)&&!itemFor(c.itemKey).hidden)}function reviewDone(s){const r=s.dailyReview||{};const total=learned(s).length;const seen=r.date===today()?Object.keys(r.seen||{}).length:0;return{total,seen,complete:!!total&&r.date===today()&&seen>=total}}
 function status(t,k=''){const e=$('teacherCloudStatus');e.textContent=t;e.className='cloud-status '+k}
 async function loadAll(){
   status('☁️ Loading…','syncing');
+  if(legacyScoped()){
+    const roster=await window.B3TeacherClassRosters.load();
+    const selected=roster.classes.find(row=>row.id===activeLegacyClassScope);
+    if(!selected)throw new Error('This class is not assigned to your teacher account.');
+    scopedStudentIds=selected.studentIds||[];
+    const [catalogSnap,globalSettingsSnap,classSettingsSnap,...studentSnaps]=await Promise.all([
+      db.ref(`${ROOT}/catalog`).once('value'),db.ref(`${ROOT}/settings`).once('value'),db.ref(`${ROOT}/classes/${activeLegacyClassScope}/settings`).once('value'),
+      ...scopedStudentIds.map(id=>db.ref(`${ROOT}/students/${id}`).once('value'))
+    ]);
+    state.catalog=withAllTracks(catalogSnap.val()||state.catalog);
+    state.settings={minReviewMs:500,studentSiteOpen:true,...(globalSettingsSnap.val()||{}),...(classSettingsSnap.val()||{})};
+    state.students=Object.fromEntries(scopedStudentIds.map((id,index)=>[id,studentSnaps[index]?.val()]).filter(([,value])=>value));
+    state.leaderboards={match:{'8':{}}};
+    const scores=await Promise.all(scopedStudentIds.map(id=>db.ref(`${ROOT}/leaderboards/match/8/${id}`).once('value')));
+    scores.forEach((snap,index)=>{if(snap.exists())state.leaderboards.match['8'][scopedStudentIds[index]]=snap.val();});
+    bindLegacyScopedListeners(globalSettingsSnap.val()||{});
+    $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
+    loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
+  }
   const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
@@ -474,7 +499,7 @@ async function loadAll(){
   state.leaderboards=d.val()||{};
   // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
   // so a word deleted later stays deleted even after page reloads or file updates.
-  const needsCatalogSeed=!CLASS_MODE&&Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
+  const needsCatalogSeed=!CLASS_MODE&&!legacyScoped()&&Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
@@ -495,6 +520,7 @@ async function loadAll(){
   renderStudentSiteControl();
   renderAll();
   loadShorashimRecordings();
+  bindFullScopeListener();
   const updates=[];
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
@@ -504,6 +530,43 @@ async function loadAll(){
   applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
+function bindFullScopeListener(){
+  if(legacyScoped()||fullScopeListenerBound)return;
+  fullScopeListenerBound=true;
+  const visible=()=>!$('teacherApp').classList.contains('hidden');
+  db.ref(`${SPACE}/catalog`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.catalog=withAllTracks(snap.val());renderAll();
+  });
+  db.ref(`${SPACE}/settings`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.settings={minReviewMs:500,studentSiteOpen:true,...snap.val()};
+    renderStudentSiteControl();renderAll();
+  });
+  const studentsRef=db.ref(`${SPACE}/students`);
+  const applyStudent=snap=>{if(!visible()||!snap.key)return;state.students[snap.key]=snap.val()||{};renderAll();};
+  studentsRef.on('child_added',applyStudent);
+  studentsRef.on('child_changed',applyStudent);
+  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();});
+  state.leaderboards.match=state.leaderboards.match||{};
+  const leaderboardsRef=db.ref(`${SPACE}/leaderboards/match`);
+  const applyLeaderboard=snap=>{
+    if(!visible()||!snap.key)return;
+    state.leaderboards.match[snap.key]=snap.val()||{};renderLeaderboard();
+  };
+  leaderboardsRef.on('child_added',applyLeaderboard);
+  leaderboardsRef.on('child_changed',applyLeaderboard);
+  leaderboardsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.leaderboards.match[snap.key];renderLeaderboard();});
+}
+function bindLegacyScopedListeners(initialGlobalSettings={}){
+  let globalSettings=initialGlobalSettings,classSettings=state.settings;
+  const on=(path,callback)=>{const ref=db.ref(path);scopedListeners.push(ref);ref.on('value',callback);};
+  on(`${ROOT}/catalog`,snap=>{if(snap.exists())state.catalog=withAllTracks(snap.val());renderAll();});
+  on(`${ROOT}/settings`,snap=>{globalSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};renderStudentSiteControl();renderCatalog();});
+  on(`${ROOT}/classes/${activeLegacyClassScope}/settings`,snap=>{classSettings=snap.val()||{};state.settings={minReviewMs:500,studentSiteOpen:true,...globalSettings,...classSettings};renderStudentSiteControl();renderCatalog();});
+  scopedStudentIds.forEach(id=>on(`${ROOT}/students/${id}`,snap=>{if(snap.exists())state.students[id]=snap.val();else delete state.students[id];renderAll();}));
+  scopedStudentIds.forEach(id=>on(`${ROOT}/leaderboards/match/8/${id}`,snap=>{if(snap.exists())state.leaderboards.match['8'][id]=snap.val();else delete state.leaderboards.match['8'][id];renderLeaderboard();}));
+}
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
 function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
 function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
@@ -652,23 +715,12 @@ async function mergeDuplicateWord(duplicateId){
   if(Number(duplicate.commonness||0)>Number(keeper.commonness||0))keeper.commonness=duplicate.commonness;
 
   const oldKey=`shorashim:${duplicate.id}`, newKey=`shorashim:${keeper.id}`;
-  for(const student of Object.values(state.students||{})){
-    if(!student||!student.cards||!student.cards[oldKey])continue;
-    const oldCard=student.cards[oldKey], newCard=student.cards[newKey];
-    if(!newCard){
-      student.cards[newKey]={...oldCard,itemKey:newKey,itemId:keeper.id};
-    }else{
-      const times=[newCard.learnedAt,oldCard.learnedAt].filter(Boolean);
-      if(times.length)newCard.learnedAt=Math.min(...times);
-    }
-    delete student.cards[oldKey];
-  }
+  const changedStudentIds=Object.entries(state.students||{}).filter(([,student])=>student?.cards?.[oldKey]).map(([studentId])=>studentId);
   state.catalog.shorashim=list.filter(x=>x.id!==duplicate.id);
   status('☁️ Merging duplicate…','syncing');
-  await Promise.all([
-    db.ref(`${SPACE}/catalog`).set(state.catalog),
-    db.ref(`${SPACE}/students`).set(state.students)
-  ]);
+  const scopedChanges=legacyScoped()?changedStudentIds.filter(id=>scopedStudentIds.includes(id)):changedStudentIds;
+  const studentWrites=scopedChanges.map(studentId=>db.ref(`${SPACE}/students/${studentId}`).transaction(student=>B3ShorashimProgressMerge.mergeStudentCards(student,oldKey,newKey,keeper.id)));
+  await Promise.all([db.ref(`${SPACE}/catalog`).set(state.catalog),...studentWrites]);
   renderCatalog();
   status(`☁️ Duplicate merged • ${duplicate.front}`);
 }
@@ -761,7 +813,7 @@ async function toggleStudentSite(){
   state.settings.studentSiteOpen=!currentlyOpen;
   renderStudentSiteControl();
   status('☁️ Saving…','syncing');
-  await db.ref(`${SPACE}/settings/studentSiteOpen`).set(state.settings.studentSiteOpen);
+  await db.ref(`${teacherSettingsPath()}/studentSiteOpen`).set(state.settings.studentSiteOpen);
   status('☁️ Saved');
 }
 async function loadAccess(){const a=await db.ref('posukPractice/allowedStudents').once('value');renderRoster(a.val()||{})}
@@ -808,7 +860,7 @@ $('teacherNewList').onclick=async()=>{
   const lists=Array.isArray(state.settings.namedLists[currentTrack])?state.settings.namedLists[currentTrack]:[];
   if(namedLists().some(x=>x.toLowerCase()===name.toLowerCase())){alert('A list with that name already exists.');refreshNamedLists(name);return}
   state.settings.namedLists[currentTrack]=[...lists,name];
-  status('☁️ Saving…','syncing');await db.ref(`${SPACE}/settings`).set(state.settings);status('☁️ Saved');
+  status('☁️ Saving…','syncing');await db.ref(teacherSettingsPath()).set(state.settings);status('☁️ Saved');
   refreshNamedLists(name);renderCatalog();$('teacherListName').value=name;renderCatalog()
 };
 $('teacherBulkAdd').onclick=()=>{
@@ -859,7 +911,7 @@ $('saveBulkItems').onclick=async e=>{
   if(missing)status(`☁️ Saved • ${missing} new word(s) still need pictures; retry when picture service is available`);
 };
 $('toggleStudentSite').onclick=toggleStudentSite;
-$('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(`${SPACE}/settings`).set(state.settings)};
+$('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(teacherSettingsPath()).set(state.settings)};
 $('teacherAddItem').onclick=()=>openEdit();
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
@@ -870,6 +922,8 @@ let teacherAppOpened=false;
 function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
 async function checkClassTeacher(user,access){
   if(!user||!access?.authorized){$('teacherGoogleSignIn').classList.remove('hidden');$('teacherGateMsg').textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return}
+  activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
+  if(!isSiteAdmin){$('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');}
   const admin=access.role==='admin';
   if(!admin&&!(access.classIds||[]).includes(CLASS_ID)){$('teacherGateMsg').textContent='This class is not assigned to your teacher account.';return}
   const cls=(await db.ref(`b3Games/workspaces/${window.B3_APP_CONTEXT?.workspaceId||'b3-2026'}/classes/${CLASS_ID}`).once('value')).val();
@@ -877,6 +931,17 @@ async function checkClassTeacher(user,access){
   $('teacherGoogleSignIn').classList.add('hidden');
   document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${cls.name||CLASS_ID}`;
   openTeacherApp();
+}
+function openOwnClass(ids){
+  const go=id=>{const u=new URL(location.href);u.searchParams.set('class',id);u.searchParams.delete('v');location.replace(u.href)};
+  const own=(ids||[]).filter(id=>id&&id!=='*');
+  if(own.length===1){$('teacherGateMsg').textContent='Opening your class…';go(own[0]);return}
+  $('teacherGateMsg').textContent='Choose your class.';
+  window.B3TeacherClassRosters.load().then(r=>{
+    const rows=(r.classes||[]).filter(c=>own.includes(c.id));
+    $('teacherGateMsg').innerHTML=rows.map(c=>`<button type="button" class="primary" style="margin:6px" data-pick-class="${esc(c.id)}">${esc(c.name||c.id)}</button>`).join('')||'You have no class assigned. Ask the admin.';
+    $('teacherGateMsg').querySelectorAll('[data-pick-class]').forEach(b=>b.onclick=()=>go(b.dataset.pickClass));
+  }).catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
 }
 if(CLASS_MODE){
   // Class teachers and B3 teachers use the same verified Google sign-in flow.
@@ -898,25 +963,25 @@ if(CLASS_MODE){
       return;
     }
     const ids=access.classIds||[];
-    if(access.role==='admin'||ids.includes('*')||B3_CLASSES.some(id=>ids.includes(id))){
+    activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
+    if(isSiteAdmin){
       document.querySelector('.topbar h1').textContent='Shorashim Learning Lab';
       openTeacherApp();
+    }else if(CLASS_ID&&LEGACY_CLASS_IDS.includes(CLASS_ID)&&ids.includes(CLASS_ID)){
+      activeLegacyClassScope=CLASS_ID;
+      document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${CLASS_ID.toUpperCase()}`;
+      $('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');
+      openTeacherApp();
+    }else if(!CLASS_ID){
+      // Already signed in as a teacher but this link names no class: go to the teacher's class
+      // instead of leaving the sign-in card on screen (issue 410).
+      $('teacherGoogleSignIn').classList.add('hidden');
+      openOwnClass(ids);
     }else{
       $('teacherGateMsg').textContent='This Google account is not assigned to the B3 Shorashim classes.';
     }
   });
 }
-
-db.ref(SPACE).on('value',snap=>{
-  if($('teacherApp').classList.contains('hidden'))return;
-  const v=snap.val()||{};
-  if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
-  if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
-  if(v.students)state.students=v.students;
-  if(v.leaderboards)state.leaderboards=v.leaderboards;
-  renderAll()
-});
-
 
 /* ===== Shorashim recording approvals ===== */
 const STUDENT_REWARDS_AUTO_AWARD_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
@@ -933,12 +998,14 @@ function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
-    const snap=await db.ref(`${SPACE}/recordingEvents`).once('value');
     const rows=[];
-    snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{
-      const r=eventSnap.val()||{};
-      rows.push({studentId:studentSnap.key,eventId:eventSnap.key,...r});
-    }));
+    if(legacyScoped()){
+      const snaps=await Promise.all(scopedStudentIds.map(id=>db.ref(`${ROOT}/recordingEvents/${id}`).once('value')));
+      snaps.forEach((studentSnap,index)=>studentSnap.forEach(eventSnap=>{const r=eventSnap.val()||{};rows.push({studentId:scopedStudentIds[index],eventId:eventSnap.key,...r});}));
+    }else{
+      const snap=await db.ref(`${SPACE}/recordingEvents`).once('value');
+      snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{const r=eventSnap.val()||{};rows.push({studentId:studentSnap.key,eventId:eventSnap.key,...r});}));
+    }
     rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
     shorashimRecordingRows=rows;
     renderShorashimRecordings();

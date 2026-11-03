@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="text-encoding.js?v=20261013-1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<script src="../game-gate.js?v=20261020-follow-pointer1" data-game-id="game-show"></script>
+<title>Game Show - Play</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1: #123566; --bg2: #040b19;
+    --card: #0d2547; --card2: #06132a;
+    --line: rgba(126, 200, 255, 0.3);
+    --accent: #7ec8ff; --accent-ink: #04101f;
+    --glow: rgba(126, 200, 255, 0.5);
+    --gold: #ffd76a; --hot: #ff5a4a; --good: #4fcf6a;
+    --text: #f4f9ff; --muted: #a7c3e4;
+    --font: "Rubik", "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--text); text-align: center;
+    background:
+      radial-gradient(60% 40% at 50% -5%, var(--glow) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 0%, var(--bg1) 0%, var(--bg2) 75%);
+    background-color: var(--bg2); background-attachment: fixed;
+    display: flex; flex-direction: column; height: 100dvh; padding: 10px 14px; overflow: hidden;
+  }
+  button, input { font-family: inherit; }
+  .hidden { display: none !important; }
+
+  h1 {
+    margin: 2px 0 0; font-size: 26px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--gold); text-shadow: 0 0 14px rgba(255,215,106,.6), 0 2px 0 rgba(0,0,0,.5);
+    flex-shrink: 0;
+  }
+  h1 .star { color: var(--hot); text-shadow: none; }
+  .subtitle { margin: 0 0 8px; font-size: 13px; color: var(--muted); letter-spacing: 1px; flex-shrink: 0; }
+
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--line); border-radius: 18px;
+  }
+  .master-blocked { max-width: 420px; margin: 50px auto 0; padding: 28px; font-size: 18px; }
+
+  /* Login (kept for safety; students normally sign in on the home page) */
+  .name-box { max-width: 420px; width: 100%; margin: 20px auto; padding: 24px; text-align: left; }
+  .name-box h2 { margin: 0 0 6px; text-align: center; }
+  .login-note { margin: 0 0 16px; text-align: center; color: var(--muted); font-size: 14px; }
+  .name-box label { display: block; font-weight: 700; margin: 12px 0 5px; }
+  .name-box input { width: 100%; font-size: 18px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.4); color: var(--text); }
+  .name-box button { width: 100%; margin-top: 16px; font-size: 17px; font-weight: 800; padding: 12px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  .login-msg { min-height: 1.25em; margin-top: 10px; color: #ff9c8a; font-weight: 700; text-align: center; }
+
+  /* Game layout */
+  #gameArea { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; width: 100%; max-width: 640px; margin: 0 auto; }
+  .topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+  .signed-in { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 14px; }
+  .signed-in b { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .switch-btn { border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .switch-btn:hover { color: var(--text); border-color: var(--accent); }
+  .score-display {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    background: var(--gold); color: #2a1708; border-radius: 999px; padding: 6px 16px;
+    font-weight: 800; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;
+    box-shadow: 0 0 18px rgba(255,215,106,.45);
+  }
+  .score-display span { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .score-display.bump { animation: bump .5s ease; }
+  @keyframes bump { 40% { transform: scale(1.25); } }
+
+  /* Question card with marquee bulbs */
+  #gameArea > .panel:not(.scoreboard) {
+    position: relative; flex-shrink: 0;
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 3px solid var(--accent); border-radius: 22px;
+    box-shadow: 0 0 0 5px rgba(0,0,0,.35), 0 0 30px var(--glow), inset 0 0 40px rgba(0,0,0,.4);
+    padding: 26px 16px 14px; margin-top: 10px;
+  }
+  #gameArea > .panel:not(.scoreboard)::before {
+    content: ""; position: absolute; left: 20px; right: 20px; top: 7px; height: 8px;
+    background: radial-gradient(circle, var(--accent) 0 2.5px, transparent 3.5px) 0 50% / 20px 8px repeat-x;
+    animation: bulbs 1.6s steps(2) infinite;
+  }
+  @keyframes bulbs { 50% { opacity: .4; } }
+  .qnum {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 4px 14px;
+    font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
+  }
+  .qtext {
+    font-size: clamp(22px, 6vw, 34px); font-weight: 700; line-height: 1.25; white-space: pre-line;
+    max-height: 5.4em; overflow-y: auto; overflow-wrap: anywhere; margin: 4px 0 6px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+  }
+  .qtext:focus { outline: none; }
+
+  /* The big arcade buzzer */
+  .buzz-wrap { position: relative; width: 168px; height: 168px; margin: 10px auto 4px; }
+  .buzz-wrap::before { /* metal base ring */
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #5a6a80, #1b2433 70%);
+    box-shadow: 0 10px 24px rgba(0,0,0,.6), inset 0 2px 2px rgba(255,255,255,.25);
+  }
+  .buzz-btn {
+    position: absolute; inset: 14px; border-radius: 50%; border: 0; cursor: pointer;
+    font-size: 24px; font-weight: 900; letter-spacing: 2px; color: #fff;
+    text-shadow: 0 2px 0 rgba(0,0,0,.35);
+    background: radial-gradient(circle at 40% 30%, #ff8a7a 0%, #ff3b2f 40%, #b3140d 100%);
+    box-shadow: 0 9px 0 #6e0904, 0 12px 20px rgba(0,0,0,.5), inset 0 -6px 10px rgba(0,0,0,.25), 0 0 34px rgba(255,90,74,.65);
+    transform: translateY(-6px);
+    transition: transform .06s, box-shadow .06s;
+    animation: ready 1.4s ease-in-out infinite;
+  }
+  .buzz-btn:hover { filter: brightness(1.07); }
+  .buzz-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #6e0904, 0 3px 8px rgba(0,0,0,.5), inset 0 -3px 8px rgba(0,0,0,.25); }
+  .buzz-btn:focus-visible { outline: 4px solid var(--gold); outline-offset: 6px; }
+  @keyframes ready { 50% { box-shadow: 0 9px 0 #6e0904, 0 12px 20px rgba(0,0,0,.5), inset 0 -6px 10px rgba(0,0,0,.25), 0 0 54px rgba(255,90,74,.95); } }
+  .buzz-btn:disabled {
+    cursor: not-allowed; animation: none; filter: none; color: rgba(255,255,255,.55);
+    background: radial-gradient(circle at 40% 30%, #8a96a8 0%, #59657a 45%, #343d4d 100%);
+    box-shadow: 0 9px 0 #1e2430, 0 12px 20px rgba(0,0,0,.5), inset 0 -6px 10px rgba(0,0,0,.25);
+  }
+  body.won .buzz-btn:disabled {
+    color: #fff; background: radial-gradient(circle at 40% 30%, #9cf5ae 0%, #36c25a 45%, #157a30 100%);
+    box-shadow: 0 9px 0 #0c4a1c, 0 0 40px rgba(79,207,106,.9);
+  }
+  .key-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .key-hint kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; font-family: inherit; }
+
+  .countdown {
+    margin: 8px auto 0; display: inline-block; font-size: 20px; font-weight: 900; color: var(--gold);
+    background: rgba(255,215,106,.12); border: 2px solid var(--gold); border-radius: 999px; padding: 4px 16px;
+  }
+  .status { margin-top: 8px; font-size: 17px; font-weight: 700; color: var(--muted); }
+  body.won .status { color: #b9f5c4; font-size: 22px; font-weight: 900; animation: pop .4s ease; }
+  body.lost .status { color: var(--gold); }
+  .countdown:empty, .status:empty { display: none; }
+  @keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  body.won #gameArea > .panel:not(.scoreboard) { border-color: var(--good); box-shadow: 0 0 0 5px rgba(0,0,0,.35), 0 0 40px rgba(79,207,106,.7); }
+
+  /* Waiting screen inserted by the script */
+  #waitingMsg .qtext { font-size: 22px; }
+
+  /* Leaderboard */
+  #gameArea > .scoreboard {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
+    background: linear-gradient(180deg, var(--card), var(--card2)); border: 1px solid var(--line); border-radius: 18px;
+    padding: 12px; text-align: left;
+  }
+  .scoreboard h2 { margin: 0 0 8px; font-size: 12px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); flex-shrink: 0; }
+  .scoreboard-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .scoreboard-empty { margin: 0; color: var(--muted); }
+  .scoreboard table { width: 100%; border-collapse: separate; border-spacing: 0 5px; table-layout: fixed; }
+  .scoreboard thead { display: none; }
+  .scoreboard td { padding: 8px 10px; font-size: 16px; background: rgba(255,255,255,.05); }
+  .scoreboard td:first-child { width: 48px; text-align: center; font-weight: 800; color: var(--muted); border-radius: 10px 0 0 10px; }
+  .scoreboard td:nth-child(2) { overflow-wrap: anywhere; font-weight: 600; }
+  .scoreboard td:last-child { width: 64px; text-align: right; font-weight: 900; font-size: 19px; color: var(--gold); font-variant-numeric: tabular-nums; border-radius: 0 10px 10px 0; }
+  .scoreboard .your-row td { background: rgba(126,200,255,.18); }
+  .scoreboard .your-row td:nth-child(2) { color: #fff; font-weight: 800; }
+
+  @media (max-height: 640px) {
+    .buzz-wrap { width: 128px; height: 128px; }
+    .buzz-btn { font-size: 19px; inset: 11px; }
+    .qtext { font-size: 21px; max-height: 3.8em; }
+    .key-hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .buzz-btn, #gameArea > .panel:not(.scoreboard)::before { animation: none; }
+  }
+</style>
+<script src="../teacher-account.js?v=20261008"></script><script defer src="../gallery-share.js?v=20261011b"></script>
+</head>
+<body>
+
+<h1><span class="star">★</span> Game Show <span class="star">★</span></h1>
+<div class="subtitle">Get ready to play!</div>
+
+<div class="card master-blocked hidden" id="masterBlocked">
+  This game is currently turned off. Ask your teacher.
+</div>
+
+<div class="card name-box" id="nameBox">
+  <h2>Sign in on Fun Torah Tools</h2>
+  <p class="login-note">Students sign in once on the homepage, then open Game Show.</p>
+  <a href="../index.html">Go to Fun Torah Tools</a>
+</div>
+
+<div id="gameArea" class="hidden">
+  <div class="topline">
+    <div class="signed-in">
+      <span>Playing as <b id="signedInName"></b></span>
+      <button class="switch-btn" id="switchStudentBtn" type="button">Switch</button>
+    </div>
+    <div class="score-display" id="scorePill">Score <span id="myScore">0</span></div>
+  </div>
+  <div class="panel">
+    <div class="qnum" id="qnum">Question 1 of 1</div>
+    <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question"></div>
+    <div class="buzz-wrap"><button class="buzz-btn" id="buzzBtn" onclick="buzzIn()">BUZZ!</button></div>
+    <div class="key-hint">or press <kbd>Space</kbd></div>
+    <div class="countdown" id="countdown" aria-live="polite"></div>
+    <div class="status" id="status" aria-live="polite"></div>
+  </div>
+  <section class="panel scoreboard" aria-labelledby="scoreboardTitle">
+    <h2 id="scoreboardTitle">Leaderboard</h2>
+    <p id="scoreboardEmpty" class="scoreboard-empty">Waiting for players to join.</p>
+    <div class="scoreboard-list" tabindex="0" role="region" aria-label="Player scoreboard">
+    <table id="scoreboardTable" class="hidden" aria-label="Live player scores">
+      <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
+      <tbody id="scoreboardRows"></tbody>
+    </table>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---- REPLACE WITH YOUR FIREBASE CONFIG (same as teacher.html) ----
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+// --------------------------------------------------------------------
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+// Every class, including ET and WT, uses its own Game Show session and question set.
+const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || 'unassigned').trim();
+const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
+const CLASS_SPACE = true;
+
+// Every screen measures the wait timer against Firebase's server clock, so a
+// student whose computer clock is a few seconds off still unlocks on time.
+let serverOffset = 0;
+db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
+function serverNow() { return Date.now() + serverOffset; }
+const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
+const gameShowAuth=firebase.auth();
+const GAME_SHOW_QUESTIONS_URL='https://us-central1-b3-games.cloudfunctions.net/gameShowStudentQuestions';
+const GAME_SHOW_ACTION_URL='https://us-central1-b3-games.cloudfunctions.net/gameShowStudentAction';
+
+// Questions live in the database (teacher.html is the master copy). This
+// screen just reads them live - you never need to edit this file for
+// question changes.
+const ACTIVE_SET_ID = "vayeira18";
+const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' : "questionSets/" + ACTIVE_SET_ID);
+
+let questions = [];
+let questionsReady = false;
+
+async function loadStudentQuestions(){
+  try{
+    const user=gameShowAuth.currentUser;
+    if(!user)throw new Error('Sign in on Fun Torah Tools first.');
+    const token=await user.getIdToken();
+    const response=await fetch(GAME_SHOW_QUESTIONS_URL,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Could not load questions.');
+    questions=window.GameShowTextEncoding.repairQuestions(data.questions||[]).questions;
+    questionsReady=questions.length>0;
+  }catch(error){console.warn('Game Show questions unavailable:',error);questionsReady=false;}
+}
+gameShowAuth.onAuthStateChanged(user=>{if(user)loadStudentQuestions();else{questions=[];questionsReady=false;}});
+
+let myName = "";
+let myStudentId = "";
+let teacherPreview=false;
+
+function sanitize(name) {
+  return String(name || '').replace(/[.#$\[\]]/g, '_');
+}
+
+function slugify(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function setLoginMsg(text) {
+  document.getElementById('loginMsg').textContent = text || '';
+}
+
+// Master admin toggle: the same b3Games/siteSettings node the B3 Games
+// homepage admin panel writes to. If the whole site or just this game has
+// been switched off, block joining and show the closed message - even for
+// a student who already had this tab open.
+let masterBlocked = false;
+function applyMasterBlocked() {
+  if(teacherPreview)masterBlocked=false;
+  document.getElementById('masterBlocked').classList.toggle('hidden', !masterBlocked);
+  if (masterBlocked) {
+    document.getElementById('nameBox').classList.add('hidden');
+    document.getElementById('gameArea').classList.add('hidden');
+  } else if (myStudentId) {
+    document.getElementById('nameBox').classList.add('hidden');
+    document.getElementById('gameArea').classList.remove('hidden');
+  } else {
+    document.getElementById('nameBox').classList.remove('hidden');
+    document.getElementById('gameArea').classList.add('hidden');
+  }
+}
+db.ref('b3Games/siteSettings').on('value', snap => {
+  const settings = snap.val() || {};
+  const gamesMap = settings.games || {};
+  masterBlocked = settings.siteEnabled === false || gamesMap['game-show'] === false;
+  applyMasterBlocked();
+}, err => {
+  console.warn('Could not read master site settings', err);
+  masterBlocked = false;
+  applyMasterBlocked();
+});
+
+// Kept for the legacy button handler; student sign-in happens on the homepage.
+async function checkStudentAccess(name, pin) {
+  const slug=slugify(name);if(!slug)return {ok:false,reason:'Please type your name.'};
+  const profileSnap=await db.ref('b3Games/students/'+slug+'/profile').once('value');
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name.trim())};
+}
+
+function enterGame(displayName, studentId) {
+  myStudentId = studentId;
+  myName = sanitize(displayName);
+
+  sessionStorage.setItem('posukPractice_studentName', displayName);
+  sessionStorage.setItem('posukPractice_studentId', studentId);
+
+  document.getElementById('signedInName').textContent = displayName;
+  applyMasterBlocked();
+
+  renderScoreboard(lastData && lastData.scores);
+}
+
+async function joinGame() {
+  location.href='../index.html';return;
+  if (masterBlocked) return;
+
+  const name = document.getElementById('studentNameInput').value.trim();
+  const pin = document.getElementById('classPinInput').value.trim();
+  const joinButton = document.getElementById('joinButton');
+
+  if (!name) {
+    setLoginMsg('Please type your name.');
+    return;
+  }
+
+  joinButton.disabled = true;
+  setLoginMsg('Checking…');
+
+  try {
+    const result = await checkStudentAccess(name, pin);
+    if (!result.ok) {
+      setLoginMsg(result.reason);
+      return;
+    }
+
+    setLoginMsg('');
+    enterGame(result.displayName, result.slug);
+  } catch (error) {
+    console.error('Game Show login failed:', error);
+    setLoginMsg('Could not check your login. Try again.');
+  } finally {
+    joinButton.disabled = false;
+  }
+}
+
+async function restoreSharedStudentLogin() {
+const account=await window.B3TeacherAccountReady;
+if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+teacherPreview=true;myStudentId='teacher_preview';myName='Teacher Preview';masterBlocked=false;
+document.getElementById('signedInName').textContent='Teacher Preview - practice buzzer, no live game changes';applyMasterBlocked();
+if(!questions.length)questions=[{q:'How many days are in a week?'}];questionsReady=true;
+renderGameSnapshot({val:()=>({qIndex:0,roundActive:true,hostSeenAt:Date.now(),scores:{'Teacher Preview':0}})});return;
+}
+  const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const savedName=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
+  if(!savedId||!savedName){location.href='../index.html';return;}
+  try{
+    const profileSnap=await db.ref('b3Games/students/'+savedId+'/profile').once('value');
+    let profile=profileSnap.val();
+    if(!profile){
+      const legacySnap=await db.ref('posukPractice/allowedStudents/'+savedId).once('value');
+      if(!legacySnap.exists())return;
+      profile=legacySnap.val()||{};
+    }
+    if(profile.active===false)return;
+    enterGame(profile.name?String(profile.name):savedName,savedId);
+  }catch(error){console.warn('Could not restore shared student login:',error);}
+}
+
+// Students switch accounts on the Fun Torah Tools homepage only.
+document.getElementById('switchStudentBtn').addEventListener('click', () => { location.href='../index.html'; });
+
+restoreSharedStudentLogin();
+
+let sharedPlayerCtx = null;
+
+function playBuzzSound() {
+  if (!sharedPlayerCtx) {
+    sharedPlayerCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (sharedPlayerCtx.state === "suspended") { sharedPlayerCtx.resume(); }
+  const ctx = sharedPlayerCtx;
+  const start = ctx.currentTime + 0.01;
+  const bus = ctx.createGain();
+  bus.gain.value = 0.8;
+  bus.connect(ctx.destination);
+  function tone(freq, offset, dur, level, type, hold) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain(), at = start + offset;
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, at);
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.008);
+    if (hold) gain.gain.setValueAtTime(level, at + dur - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain); gain.connect(bus); osc.start(at); osc.stop(at + dur);
+  }
+  function sweep(f0, f1, offset, dur, level, type) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain(), at = start + offset;
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, at);
+    osc.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.006);
+    gain.gain.setValueAtTime(level, at + dur * 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain); gain.connect(bus); osc.start(at); osc.stop(at + dur);
+  }
+  // Same buzz-in sound the teacher picked in Setup.
+  const kinds = ['ding', 'chime', 'zap', 'bloop', 'alarm'];
+  let kind = (lastData && lastData.buzzSound) || 'ding';
+  if (kind === 'random') kind = kinds[Math.floor(Math.random() * kinds.length)];
+  if (kind === 'chime') {
+    [783.99, 987.77, 1318.51].forEach((f, i) => tone(f, i * 0.12, 0.6, 0.28, 'sine'));
+  } else if (kind === 'zap') {
+    sweep(1900, 160, 0, 0.32, 0.16, 'sawtooth');
+    sweep(1400, 120, 0.02, 0.3, 0.1, 'square');
+    tone(1568, 0.32, 0.18, 0.18, 'sine');
+  } else if (kind === 'bloop') {
+    sweep(260, 880, 0, 0.14, 0.3, 'triangle');
+    tone(880, 0.14, 0.4, 0.26, 'triangle');
+  } else if (kind === 'alarm') {
+    for (let i = 0; i < 6; i++) tone(i % 2 ? 660 : 990, i * 0.11, 0.1, 0.13, 'square', true);
+  } else {
+    [[880, 0.36], [1760, 0.13], [2398, 0.085]].forEach(([f, l]) => tone(f, 0, f > 2000 ? 0.28 : 0.68, l, 'sine'));
+  }
+  setTimeout(() => bus.disconnect(), 1500);
+}
+
+// A separate success fanfare: being first to buzz is not a correct answer.
+function playCorrectAnswerSound() {
+  try {
+    if (!sharedPlayerCtx) sharedPlayerCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = sharedPlayerCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime + 0.04;
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const at = now + i * 0.13;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(frequency, at);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.19, at + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + 0.44);
+    });
+  } catch (error) { console.warn('Correct-answer sound unavailable', error); }
+}
+
+// Show who won the buzz, without a confetti celebration.
+let lastCelebrated = '';
+function showBuzzResult(data, qIndex) {
+  const won = !!(data.buzzedBy && data.buzzedBy === myName);
+  document.body.classList.toggle('won', won);
+  document.body.classList.toggle('lost', !!(data.buzzedBy && !won));
+  const key = qIndex + '|' + (data.buzzOpenAt || 0);
+  if (won && lastCelebrated !== key) { lastCelebrated = key; if (data.revealDelayOn) playBuzzSound(); }
+}
+
+function launchConfetti() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#ffd76a', '#ff5a4a', '#4fcf6a', '#7ec8ff', '#ffffff'];
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden';
+  document.body.appendChild(box);
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement('div'), size = 7 + Math.random() * 8;
+    p.style.cssText = 'position:absolute;top:-16px;border-radius:2px;left:' + (Math.random() * 100) + '%;width:' + size + 'px;height:' + (size * .45) + 'px;background:' + colors[i % colors.length];
+    const dur = 1.4 + Math.random() * 1.1, drift = Math.random() * 140 - 70;
+    p.style.transition = 'transform ' + dur + 's cubic-bezier(.25,.46,.45,.94), opacity ' + dur + 's linear';
+    box.appendChild(p);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      p.style.transform = 'translate(' + drift + 'px,' + (innerHeight + 40) + 'px) rotate(' + (Math.random() * 720) + 'deg)';
+      p.style.opacity = '0';
+    }));
+  }
+  setTimeout(() => box.remove(), 2800);
+}
+
+// Space bar buzzes too (unless typing in a box).
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.repeat || /INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement && document.activeElement.tagName)) return;
+  const btn = document.getElementById('buzzBtn');
+  if (btn && !btn.disabled && !document.getElementById('gameArea').classList.contains('hidden')) { e.preventDefault(); btn.click(); }
+});
+
+function mustSitOut(data, name) { return false; }
+
+function buzzIn() {
+  if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
+  if (masterBlocked || !myName) return;
+  if (!lastData || lastData.roundActive !== true) return;
+  if (lockedUntil && serverNow() < lockedUntil) return;
+  if (lastData && (lastData.buzzedBy || lastData.narrationLocked || serverNow() < (lastData.buzzUnlockAt || 0))) return;
+  // The authenticated server action performs the transaction so students
+  // cannot write shared Game Show answer state directly.
+  gameShowAuth.currentUser?.getIdToken().then(token=>fetch(GAME_SHOW_ACTION_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'buzz'}),cache:'no-store'})).then(async response=>{
+    if(!response?.ok){const result=await response?.json().catch(()=>({}));document.getElementById('status').textContent=result?.error||'Could not buzz in. Please try again.';}
+    else if(!lastData?.revealDelayOn)playBuzzSound();
+  }).catch(()=>{document.getElementById('status').textContent='Could not buzz in. Please try again.';});
+}
+
+let lockedUntil = 0;
+let countdownInterval = null;
+let lastData = null;
+
+function updateBuzzAvailability() {
+  const buzzBtn = document.getElementById('buzzBtn');
+  const countdownEl = document.getElementById('countdown');
+  const now = serverNow();
+
+  if (!lastData || lastData.roundActive !== true) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    return;
+  }
+  if (lastData.narrationLocked) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = 'Listen to the question and colored choices…';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (lockedUntil && now < lockedUntil) {
+    buzzBtn.disabled = true;
+    const secsLeft = Math.ceil((lockedUntil - now) / 1000);
+    countdownEl.textContent = 'Get ready… ' + secsLeft;
+    if (!countdownInterval) {
+      countdownInterval = setInterval(updateBuzzAvailability, 250);
+    }
+  } else {
+    countdownEl.textContent = '';
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    // Only re-enable if nobody has buzzed in yet, and (in randomize-winner
+    // mode) I haven't already buzzed myself this question.
+    const iAlreadyBuzzed = !!(lastData && lastData.revealDelayOn && lastData.buzzPool && lastData.buzzPool[myName]);
+    if (!lastData || (!lastData.buzzedBy && !iAlreadyBuzzed)) {
+      buzzBtn.disabled = false;
+    }
+  }
+}
+
+// The game is "live" only while the teacher's Game Show screen is open (it updates
+// hostSeenAt every 20 seconds) or a question was opened recently.
+const LIVE_WINDOW_MS = 10 * 60 * 1000;
+function gameIsLive(d) {
+  const last = Math.max(Number(d && d.hostSeenAt) || 0, Number(d && d.buzzOpenAt) || 0);
+  return last > 0 && serverNow() - last < LIVE_WINDOW_MS;
+}
+function showWaiting(waiting) {
+  const panel = document.querySelector('#gameArea .panel:not(#waitingMsg)');
+  let w = document.getElementById('waitingMsg');
+  if (!w) {
+    w = document.createElement('div'); w.id = 'waitingMsg'; w.className = 'panel';
+    w.innerHTML = '<div class="qtext">⏳ Waiting for Teacher</div><div class="status">Your teacher will show the question when the round begins.</div>';
+    panel.parentNode.insertBefore(w, panel);
+  }
+  w.style.display = waiting ? '' : 'none';
+  panel.style.display = waiting ? 'none' : '';
+}
+setInterval(() => { if (lastData) showWaiting(!gameIsLive(lastData)); }, 15000);
+
+let lastMyScore = null;
+let lastCorrectAnswerId = null;
+
+// Use the current game's score roster, so each class sees its own players.
+function renderScoreboard(scores) {
+  const players = Object.entries(scores || {}).map(([name, score]) => ({
+    name, score: Number.isFinite(Number(score)) ? Number(score) : 0
+  })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  const rows = document.getElementById('scoreboardRows');
+  rows.replaceChildren();
+  document.getElementById('scoreboardEmpty').classList.toggle('hidden', players.length > 0);
+  document.getElementById('scoreboardTable').classList.toggle('hidden', players.length === 0);
+  const myScoreNow = (players.find(player => player.name === myName) || { score: 0 }).score;
+  if (lastMyScore !== null && myScoreNow > lastMyScore) {
+    const pill = document.getElementById('scorePill');
+    pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump');
+  }
+  lastMyScore = myScoreNow;
+  document.getElementById('myScore').textContent = myScoreNow;
+  let rank = 0;
+  players.forEach((player, index) => {
+    if (index === 0 || player.score !== players[index - 1].score) rank = index + 1;
+    const row = document.createElement('tr');
+    const isYou = player.name === myName;
+    row.classList.toggle('your-row', isYou);
+    [rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank, player.name + (isYou ? ' (you)' : ''), player.score].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    rows.appendChild(row);
+  });
+}
+
+gameRef.on('value', snapshot => {if(!teacherPreview)renderGameSnapshot(snapshot);});
+function renderGameSnapshot(snapshot){
+  const data = snapshot.val() || {};
+  lastData = data;
+  const correctAnswer = data.lastCorrectAnswer;
+  if (correctAnswer && correctAnswer.id && correctAnswer.id !== lastCorrectAnswerId) {
+    if (lastCorrectAnswerId !== null && correctAnswer.player === myName) { launchConfetti(); playCorrectAnswerSound(); }
+    lastCorrectAnswerId = correctAnswer.id;
+  }
+  renderScoreboard(data.scores);
+  if (!questionsReady) return; // Scores can update while questions load.
+  showWaiting(!gameIsLive(data) || data.roundActive !== true);
+  const qIndex = data.qIndex || 0;
+  const q = questions[qIndex] || questions[0];
+  document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
+  document.getElementById('qtext').textContent = q.q;
+
+  lockedUntil = data.buzzUnlockAt || 0;
+
+  const buzzBtn = document.getElementById('buzzBtn');
+  const status = document.getElementById('status');
+  if (data.roundActive !== true) {
+    buzzBtn.disabled = true;
+    status.textContent = 'Waiting for Teacher';
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    showBuzzResult(data, qIndex);
+    return;
+  }
+  const iAlreadyBuzzed = !!(data.revealDelayOn && data.buzzPool && data.buzzPool[myName]);
+  if (data.buzzedBy) {
+    buzzBtn.disabled = true;
+    status.textContent = data.buzzedBy === myName ? "You're first! Get ready to answer." : data.buzzedBy + " buzzed in first.";
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (iAlreadyBuzzed) {
+    buzzBtn.disabled = true;
+    status.textContent = "You buzzed in! Waiting...";
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else {
+    status.textContent = "";
+    updateBuzzAvailability();
+  }
+  showBuzzResult(data, qIndex);
+
+
+}
+</script>
+
+<script src="team-modes.js?v=20261015-colored-choices1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-follow-pointer1"></script>
+</body>
+</html>
+

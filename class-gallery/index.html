@@ -1,32 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="guest-demo.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261011-gallery-class-choice" data-game-id="class-gallery"></script>
+<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="class-gallery"></script>
 <title>Our Wall of Learning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
@@ -35,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261008-owner-demo"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="access.js?v=20261007-gallery-lock"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
@@ -120,7 +104,7 @@ button,input,select,textarea{font:inherit}
 .btn-primary,.btn-secondary,.btn-danger{border:0;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
 .btn-primary{background:#427250;color:#fff}.btn-secondary{background:#ebe3d7;color:#4c4034}.btn-danger{background:#b44f47;color:#fff}.btn-primary:disabled{opacity:.55;cursor:not-allowed}
 .status-msg{min-height:18px;margin-top:9px;font-size:.8rem;font-weight:800}
-.review-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eadfce}.review-item:last-child{border-bottom:0}.review-item img{width:72px;height:72px;object-fit:cover;border-radius:8px}.review-item .info{min-width:0;flex:1}.review-item h4{margin:0 0 3px;font-family:'Caveat';font-size:1.35rem}.review-item p{font-size:.78rem;margin:0;color:#67594b}.review-item .meta{font-size:.7rem;color:#8a7763;margin-top:4px}.review-actions{display:flex;flex-direction:column;gap:6px}.review-actions button{border:0;border-radius:8px;padding:7px 10px;color:#fff;font-size:.72rem;font-weight:800;cursor:pointer}.btn-approve{background:#477b55}.btn-reject{background:#b34e47}.empty-review{padding:20px;text-align:center;color:#8c7b69}
+.review-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eadfce}.review-item:last-child{border-bottom:0}.review-item img{width:72px;height:72px;object-fit:cover;border-radius:8px}.review-item .info{min-width:0;flex:1}.review-item h4{margin:0 0 3px;font-family:'Caveat';font-size:1.35rem}.review-item p{font-size:.78rem;margin:0;color:#67594b}.review-item .meta{font-size:.7rem;color:#8a7763;margin-top:4px}.review-actions{display:flex;flex-direction:column;gap:6px}.review-actions button{border:0;border-radius:8px;padding:7px 10px;color:#fff;font-size:.72rem;font-weight:800;cursor:pointer}#reviewClassSwitchBtn.attention{background:#b44f47;color:#fff}.btn-approve{background:#477b55}.btn-reject{background:#b34e47}.empty-review{padding:20px;text-align:center;color:#8c7b69}
 .teacher-live-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;margin-bottom:10px;border-radius:12px;background:#f3ecdf;border:1px solid #e4d7c4}.teacher-live-controls strong{display:block;font-size:.82rem}.teacher-live-controls span{display:block;font-size:.7rem;color:#7a6855;margin-top:2px}.teacher-live-controls button{border:0;border-radius:999px;padding:8px 13px;color:white;font-size:.72rem;font-weight:800;cursor:pointer;background:#477b55}.teacher-live-controls button.off{background:#a64d47}.teacher-live-controls button.tag-on{background:#9b4f34}
 
 .lightbox-card{max-width:650px;max-height:90vh;overflow:auto}.lightbox-card img{display:block;width:100%;max-height:390px;object-fit:contain;background:#f5efe6;border-radius:9px;margin-bottom:14px}.lightbox-card video{width:100%;border-radius:9px;margin-bottom:12px}.lightbox-card audio{width:100%;margin-bottom:12px}.lightbox-card .category{display:inline-block;background:#315576;color:#fff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:800}.lightbox-card .desc{line-height:1.5;color:#594c3f}.lightbox-card .by{margin-top:13px;font-weight:800;color:#715c46}.lightbox-card a{display:inline-block;margin-top:11px;color:#315f8f;font-weight:800}.teacher-lightbox-actions{margin-top:16px;display:flex;justify-content:flex-end}
@@ -300,6 +284,7 @@ button,input,select,textarea{font:inherit}
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
       <div class="teacher-live-controls"><div><strong>Tag Games</strong><span id="teacherTagStatus">Students can choose Regular Tag or Manhunt.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
       <div class="teacher-live-controls"><div><strong id="teacherPlaysLabel">Teacher Plays</strong><span id="teacherJoinTagStatus">Choose a mode only when you want your avatar to join the game.</span></div><div class="teacher-mode-buttons"><button type="button" id="teacherJoinTagBtn" class="off">Regular Tag</button><button type="button" id="teacherJoinManhuntBtn" class="off">Manhunt</button></div></div>
+      <div class="teacher-live-controls" id="reviewClassWrap" style="display:none;"><div><strong id="reviewClassLabel">Class</strong><span id="reviewClassOther">Projects from your other class are on its own gallery.</span></div><button type="button" id="reviewClassSwitchBtn">Switch</button></div>
       <div class="teacher-live-controls" id="approveAllWrap" style="display:none;"><div><strong>Pending Projects</strong><span id="approveAllStatus">Approve every project currently waiting for review.</span></div><button type="button" id="approveAllBtn">Approve All</button></div>
       <div id="reviewList"></div>
     </div>
@@ -388,9 +373,54 @@ let hallDoorPositions = {};
 /* ---------- basic helpers ---------- */
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
 function resizeImage(file,maxWidth){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>maxWidth){h=Math.round(h*(maxWidth/w));w=maxWidth;} const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.72));}; img.onerror=reject; img.src=e.target.result;};r.onerror=reject;r.readAsDataURL(file);}); }
-function uploadToStorage(file,path,onProgress){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,async()=>resolve(await task.snapshot.ref.getDownloadURL())); }); }
+function uploadToStorage(file,path,onProgress,extraMeta){ return new Promise((resolve,reject)=>{ const ref=firebase.storage().ref(path); const task=ref.put(file,{contentType:file.type||'application/octet-stream',...(extraMeta||{})}); task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,()=>resolve(path)); }); }
+// Keeps the database small: the picture goes to Storage and the post keeps only its link.
+// If anything fails (not signed in, offline, no permission) the caller keeps the inline picture, so posting never breaks.
+async function galleryImageToStorage(dataUrl,id){
+  try{
+    if(!/^data:image\/jpeg;base64,/.test(dataUrl)||!presenceStudentId)return null;
+    // Right after the page opens the sign-in may still be restoring; give it a few seconds before giving up.
+    if(!firebase.auth().currentUser)await new Promise(res=>{const off=firebase.auth().onAuthStateChanged(u=>{if(u){off();res();}});setTimeout(()=>{off();res();},4000);});
+    if(!firebase.auth().currentUser)return null;
+    const blob=await (await fetch(dataUrl)).blob();
+    const path=`classGallery/${galleryClassId}/${presenceStudentId}/${id}/image.jpg`;
+    const work=(async()=>{await uploadToStorage(blob,path,null,{cacheControl:'public, max-age=31536000, immutable'});return firebase.storage().ref(path).getDownloadURL();})();
+    return await Promise.race([work,new Promise((_,rej)=>setTimeout(()=>rej(new Error('picture upload timed out')),25000))]);
+  }catch(err){console.warn('Picture stayed inline:',err&&err.message);return null;}
+}
+// Reuse recently signed media links instead of calling the private-media
+// service again for every post whenever one gallery entry is edited.
+const galleryMediaUrlCache=new Map();
+async function galleryPrivateMediaUrl(path){
+  const user=firebase.auth().currentUser;
+  if(!user)throw new Error('Sign in to open this media.');
+  // Signed links must not carry over if a different account uses this tab.
+  const cacheKey=user.uid+':'+path;
+  const cached=galleryMediaUrlCache.get(cacheKey);
+  if(cached && Date.now()-cached.savedAt<3*60*1000)return cached.url;
+  const token=await user.getIdToken();
+  const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/privateMediaUrl',{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({path}),cache:'no-store'
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.url)throw new Error(j.error||'Media is not available.');
+  galleryMediaUrlCache.set(cacheKey,{url:j.url,savedAt:Date.now()});
+  return j.url;
+}
+async function resolveGalleryMedia(rows){await Promise.all(rows.map(async p=>{for(const [field,pathField] of [['audioUrl','audioStoragePath'],['videoUrl','videoStoragePath']])if(p[pathField]){try{p[field]=await galleryPrivateMediaUrl(p[pathField])}catch(error){console.warn('Gallery media unavailable:',error.message);p[field]=''}}}));return rows;}
 function wrapCanvasText(ctx,text,x,y,maxWidth,lineHeight,maxLines){ const words=String(text||'').split(/\s+/); let line='',lines=[]; for(const word of words){ const test=line?line+' '+word:word; if(ctx.measureText(test).width>maxWidth && line){lines.push(line);line=word;if(lines.length>=maxLines-1) break;}else line=test;} if(line&&lines.length<maxLines)lines.push(line); lines.forEach((ln,i)=>ctx.fillText(ln,x,y+i*lineHeight)); return lines.length; }
 function roundedRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+// Speed: signs and labels are drawn once and reused when the 3D room is rebuilt,
+// so the browser does not re-upload hundreds of pictures to the graphics card each time.
+const labelTextureCache=new Map();
+function cachedLabelTexture(key,draw){
+  const fontsReady=!document.fonts||document.fonts.status==='loaded';
+  if(fontsReady&&labelTextureCache.has(key))return labelTextureCache.get(key);
+  const tex=makeTexture(draw());
+  if(fontsReady){tex.userData.keep=true;labelTextureCache.set(key,tex);}
+  return tex;
+}
 function makeTexture(canvas){ const tex=new THREE.CanvasTexture(canvas); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.()||1); tex.needsUpdate=true; return tex; }
 function classroomLabel(id){ return CLASSROOMS.find(r=>r.id===id)?.label || 'Main Hallway'; }
 function populateRoomSelect(){
@@ -578,18 +608,23 @@ if(tagSettingsRef){
 }
 window.addEventListener('pagehide',()=>{if(presenceOwnRef)presenceOwnRef.remove().catch(()=>{});});
 
-function makeNoiseTexture(base='#eee3d2',grid=false){
+const proceduralCanvasCache=new Map();
+function cachedProceduralTexture(key,draw){let c=proceduralCanvasCache.get(key);if(!c){c=draw();proceduralCanvasCache.set(key,c);}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;}
+function makeNoiseTexture(base='#eee3d2',grid=false){return cachedProceduralTexture('noise:'+base+':'+grid,()=>drawNoiseCanvas(base,grid));}
+function drawNoiseCanvas(base,grid){
   const c=document.createElement('canvas'); c.width=c.height=512; const ctx=c.getContext('2d');
   ctx.fillStyle=base;ctx.fillRect(0,0,512,512);
   for(let i=0;i<16000;i++){const a=Math.random()*.035;ctx.fillStyle=`rgba(60,40,20,${a})`;ctx.fillRect(Math.random()*512,Math.random()*512,1,1);}
   if(grid){ctx.strokeStyle='rgba(96,111,125,.22)';ctx.lineWidth=2;for(let i=0;i<=512;i+=128){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,512);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(512,i);ctx.stroke();}}
-  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+  return c;
 }
-function makeWoodTexture(){
-  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,512,0);g.addColorStop(0,'#6a3f23');g.addColorStop(.45,'#a26a3d');g.addColorStop(1,'#724429');ctx.fillStyle=g;ctx.fillRect(0,0,512,512);for(let y=0;y<512;y+=18){ctx.strokeStyle=`rgba(55,26,10,${.09+Math.random()*.07})`;ctx.lineWidth=1+Math.random()*2;ctx.beginPath();ctx.moveTo(0,y+Math.random()*6);for(let x=0;x<512;x+=32)ctx.lineTo(x,y+Math.sin(x*.04+y)*3+Math.random()*2);ctx.stroke();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+function makeWoodTexture(){return cachedProceduralTexture('wood',drawWoodCanvas);}
+function drawWoodCanvas(){
+  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,512,0);g.addColorStop(0,'#6a3f23');g.addColorStop(.45,'#a26a3d');g.addColorStop(1,'#724429');ctx.fillStyle=g;ctx.fillRect(0,0,512,512);for(let y=0;y<512;y+=18){ctx.strokeStyle=`rgba(55,26,10,${.09+Math.random()*.07})`;ctx.lineWidth=1+Math.random()*2;ctx.beginPath();ctx.moveTo(0,y+Math.random()*6);for(let x=0;x<512;x+=32)ctx.lineTo(x,y+Math.sin(x*.04+y)*3+Math.random()*2);ctx.stroke();}return c;
 }
-function makeCorkTexture(){
-  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');ctx.fillStyle='#bd8550';ctx.fillRect(0,0,512,512);for(let i=0;i<7200;i++){const x=Math.random()*512,y=Math.random()*512,r=Math.random()*1.7+.4;ctx.fillStyle=Math.random()>.5?'rgba(91,52,25,.16)':'rgba(255,229,190,.16)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
+function makeCorkTexture(){return cachedProceduralTexture('cork',drawCorkCanvas);}
+function drawCorkCanvas(){
+  const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');ctx.fillStyle='#bd8550';ctx.fillRect(0,0,512,512);for(let i=0;i<7200;i++){const x=Math.random()*512,y=Math.random()*512,r=Math.random()*1.7+.4;ctx.fillStyle=Math.random()>.5?'rgba(91,52,25,.16)':'rgba(255,229,190,.16)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}return c;
 }
 function addBox(parent,w,h,d,mat,x,y,z,cast=true,receive=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=receive;parent.add(m);return m;}
 function addHallObstacleSegment(x,z,w,d,yaw,wallMat,trimMat){
@@ -641,6 +676,8 @@ function hallCameraSafeT(startX,startZ,endX,endZ){
 }
 
 
+// Automatically reduce GPU work on school Chromebooks and lower-powered devices.
+const galleryLowGraphics=(Number(navigator.deviceMemory)>0&&navigator.deviceMemory<=4)||(Number(navigator.hardwareConcurrency)>0&&navigator.hardwareConcurrency<=4);
 function createHallwayRenderer(){
   // A high-performance GPU request can be rejected even when ordinary WebGL works.
   // Retry with fewer demands before reporting that the browser cannot start 3D.
@@ -663,10 +700,10 @@ function init3D(){
   const host=document.getElementById('threeHost');
   scene=new THREE.Scene();scene.background=new THREE.Color(0xe9dfd0);scene.fog=new THREE.Fog(0xe9dfd0,46,155);
   camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,.05,220);
-  renderer=createHallwayRenderer();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
+  renderer=createHallwayRenderer();renderer.setPixelRatio(Math.min(devicePixelRatio, galleryLowGraphics?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=!galleryLowGraphics;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
   clock=new THREE.Clock();
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
-  const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
+  const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(galleryLowGraphics?512:1024,galleryLowGraphics?512:1024);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
   buildScene();
   avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
   remoteAvatarsGroup=new THREE.Group();scene.add(remoteAvatarsGroup);
@@ -753,10 +790,15 @@ function buildHallway(){
   const leftFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);leftFork.position.set(-2.15,2.25,forkLength/2+.55);leftFork.rotation.y=Math.PI/2;worldGroup.add(leftFork);
   const rightFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);rightFork.position.set(2.15,2.25,forkLength/2+.55);rightFork.rotation.y=-Math.PI/2;worldGroup.add(rightFork);
 
+  let hallLightIndex=0;
   for(let z=hallMinZ+6;z<hallMaxZ-4;z+=8.5){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.45,roughness:.35});
     addBox(worldGroup,1.8,.05,.52,panelMat,0,4.72,z,false,false);
-    const light=new THREE.PointLight(0xffe7b2,.46,12,2);light.position.set(0,4.45,z);worldGroup.add(light);
+    // The illuminated ceiling panels remain; fewer dynamic point lights
+    // markedly reduce the shader work on lower-powered computers.
+    if(hallLightIndex++%(galleryLowGraphics?3:2)===0){
+      const light=new THREE.PointLight(0xffe7b2,.46,12,2);light.position.set(0,4.45,z);worldGroup.add(light);
+    }
   }
 
   addEndWall(hallMinZ,false,wallMat,trimMat);addEndWall(hallMaxZ,true,wallMat,trimMat);
@@ -835,11 +877,12 @@ function addDirectoryBoard(side,z,classLabel,names,frameMat,corkMat){
 }
 
 function makeDirectoryNameLabel(name,w,h){
+  const tex=cachedLabelTexture('dir:'+name,()=>{
   const c=document.createElement('canvas');c.width=1000;c.height=72;const ctx=c.getContext('2d');
   ctx.fillStyle='rgba(255,250,240,.96)';roundedRect(ctx,5,5,990,62,14);ctx.fill();
   ctx.strokeStyle='rgba(126,91,55,.34)';ctx.lineWidth=3;ctx.stroke();
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#43566a';ctx.font='700 31px Quicksand, sans-serif';ctx.fillText(name,500,37);
-  const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
+  return c;});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
 }
 
 function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,wallX=6.51,targetExtra={}){
@@ -877,10 +920,11 @@ function addDoor(side,z,woodMat,trimMat,label,roomId){
 }
 
 function makePlaqueMesh(title,subtitle,w,h){
+  const tex=cachedLabelTexture('plaque:'+title+'\n'+subtitle,()=>{
   const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d');
   const g=ctx.createLinearGradient(0,0,1024,0);g.addColorStop(0,'#7f4d2c');g.addColorStop(.5,'#b37848');g.addColorStop(1,'#7a4828');ctx.fillStyle=g;roundedRect(ctx,12,12,1000,232,28);ctx.fill();ctx.strokeStyle='#5f351f';ctx.lineWidth=12;ctx.stroke();
   ctx.textAlign='center';ctx.fillStyle='#fff6e7';ctx.font='700 74px Caveat, cursive';ctx.fillText(title,512,111);ctx.font='700 30px Quicksand, sans-serif';ctx.fillStyle='#f4dfbf';ctx.fillText(subtitle,512,174);
-  const tex=makeTexture(c);const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.62,side:THREE.FrontSide});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+  return c;});const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.62,side:THREE.FrontSide});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
 }
 function makeDoubleSidedPlaque(title,subtitle,w,h){
   const g=new THREE.Group();
@@ -889,14 +933,34 @@ function makeDoubleSidedPlaque(title,subtitle,w,h){
   return g;
 }
 function makeSmallBoardTitle(text,w,h){
-  const c=document.createElement('canvas');c.width=768;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='rgba(247,241,228,.96)';roundedRect(ctx,4,4,760,152,18);ctx.fill();ctx.strokeStyle='#8e5b35';ctx.lineWidth=12;ctx.stroke();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#48586a';ctx.font='700 56px Caveat, cursive';ctx.fillText(text,384,84);const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.8,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
+  const tex=cachedLabelTexture('board:'+text,()=>{const c=document.createElement('canvas');c.width=768;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='rgba(247,241,228,.96)';roundedRect(ctx,4,4,760,152,18);ctx.fill();ctx.strokeStyle='#8e5b35';ctx.lineWidth=12;ctx.stroke();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#48586a';ctx.font='700 56px Caveat, cursive';ctx.fillText(text,384,84);return c;});return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.8,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
 }
 function makeEmptyCard(){
-  const c=document.createElement('canvas');c.width=600;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle='#fffaf0';roundedRect(ctx,12,12,576,276,18);ctx.fill();ctx.strokeStyle='#d8c9b0';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle='#8c7b69';ctx.font='700 30px Quicksand';ctx.fillText('Waiting for work to be pinned…',300,158);const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.05),new THREE.MeshStandardMaterial({map:tex,side:THREE.DoubleSide,roughness:.86,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  const tex=cachedLabelTexture('empty',()=>{const c=document.createElement('canvas');c.width=600;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle='#fffaf0';roundedRect(ctx,12,12,576,276,18);ctx.fill();ctx.strokeStyle='#d8c9b0';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle='#8c7b69';ctx.font='700 30px Quicksand';ctx.fillText('Waiting for work to be pinned…',300,158);return c;});return new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.05),new THREE.MeshStandardMaterial({map:tex,side:THREE.DoubleSide,roughness:.86,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
 }
 
+const projectCardCache=new Map();
+function projectCardKey(post){const img=String(post.image||'');return [post.id,post.title,post.category,post.studentName,post.className,img.length,img.slice(0,48),img.slice(-48)].join('|');}
+function pruneProjectCardCache(){const live=new Set(posts.map(projectCardKey));for(const [k,entry] of projectCardCache)if(!live.has(k)){entry.tex?.dispose?.();projectCardCache.delete(k);}}
 function createProjectCard(post){
-  const c=document.createElement('canvas');c.width=512;c.height=610;const ctx=c.getContext('2d');
+  const key=projectCardKey(post);let entry=projectCardCache.get(key);
+  if(!entry){entry=drawProjectCardCanvas(post);projectCardCache.set(key,entry);}
+  if(!entry.tex){entry.tex=makeTexture(entry.canvas);entry.tex.userData.keep=true;entry.textures.add(entry.tex);}
+  const tex=entry.tex;
+  const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
+  return mesh;
+}
+const cardRedrawQueue=[];
+function queueCardRedraw(fn){
+  cardRedrawQueue.push(fn);
+  if(cardRedrawQueue.length===1)requestAnimationFrame(function step(){
+    const start=performance.now();
+    let done=0;while(cardRedrawQueue.length&&done<2&&performance.now()-start<8){done++;try{cardRedrawQueue.shift()();}catch(e){console.warn(e);}}
+    if(cardRedrawQueue.length)requestAnimationFrame(step);
+  });
+}
+function drawProjectCardCanvas(post){
+  const c=document.createElement('canvas');c.width=512;c.height=610;const ctx=c.getContext('2d');const entry={canvas:c,textures:new Set()};
   const redraw=(img)=>{
     ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#fffdf8';roundedRect(ctx,8,8,496,594,9);ctx.fill();ctx.strokeStyle='rgba(92,69,44,.25)';ctx.lineWidth=3;ctx.stroke();
     ctx.save();ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=8;ctx.shadowOffsetY=4;ctx.fillStyle='#f2eee5';ctx.fillRect(34,34,444,300);ctx.restore();
@@ -905,9 +969,19 @@ function createProjectCard(post){
     const colors={Chumash:'#386b98',Parsha:'#b38a2e',Halacha:'#5c875f',Other:'#826aa6'};ctx.fillStyle=colors[post.category]||'#826aa6';roundedRect(ctx,32,360,142,38,18);ctx.fill();ctx.fillStyle='white';ctx.font='700 18px Quicksand';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(post.category||'Other',103,379);
     ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle='#354453';ctx.font='700 34px Caveat, cursive';wrapCanvasText(ctx,post.title||'Untitled',32,445,448,38,2);ctx.fillStyle='#6d5b48';ctx.font='700 18px Quicksand';ctx.fillText(post.studentName||'',32,552);ctx.font='600 15px Quicksand';ctx.fillStyle='#99846f';ctx.fillText(post.className||'',32,579);
   };
-  redraw(null);const tex=makeTexture(c);const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.83,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.16,1.38),mat);mesh.castShadow=true;
-  if(post.image){const img=new Image();img.onload=()=>{redraw(img);tex.needsUpdate=true};img.src=post.image;}
-  return mesh;
+  redraw(null);
+  if(post.image){
+    const img=new Image();
+    // Pictures stored on another site must allow CORS, or WebGL refuses the whole texture
+    // ("Tainted canvases may not be loaded") and the hallway glitches. If they don't, keep the placeholder.
+    if(!/^(data|blob):/i.test(post.image))img.crossOrigin='anonymous';
+    // Speed: decode the picture in the background, then draw a few cards per frame instead of all at once.
+    // (crossOrigin is set above, so a picture without permission fails to load instead of breaking the 3D view.)
+    img.onload=()=>{(img.decode?img.decode():Promise.resolve()).catch(()=>{}).then(()=>queueCardRedraw(()=>{redraw(img);entry.textures.forEach(t=>t.needsUpdate=true);}));};
+    img.onerror=()=>console.warn('Gallery picture could not be shown in 3D:',post.title||post.id);
+    img.src=post.image;
+  }
+  return entry;
 }
 
 function buildClassroom(room){
@@ -921,8 +995,31 @@ function buildClassroom(room){
   });
 }
 
+// Student rooms are keyed by the identity of the boy whose room is open,
+// never by the identity of the teacher or classmate viewing it.
+// Older posts have no studentId; match those by full, normalized name only.
+function normalizeGalleryStudentName(name){
+  return String(name||'').normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase();
+}
+function galleryRoomStudentIds(studentName){
+  const name=normalizeGalleryStudentName(studentName);
+  return new Set(Object.entries(PRESENCE_STUDENTS).filter(([id,profile])=>
+    id&&profile&&profile.classId===galleryClassId&&normalizeGalleryStudentName(profile.name)===name
+  ).map(([id])=>id));
+}
+function approvedPostsForStudentGallery(studentName,rows=posts){
+  const name=normalizeGalleryStudentName(studentName),ids=galleryRoomStudentIds(studentName);
+  return rows.filter(p=>{
+    if(p.status!=='approved')return false;
+    const id=String(p.studentId||'').trim();
+    // A post with an ID must match the room's student ID. A similar name
+    // can never override an explicit ID belonging to another student.
+    if(id)return ids.has(id);
+    return normalizeGalleryStudentName(p.studentName)===name;
+  }).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
 function buildStudentGallery(studentName){
-  const roomPosts=posts.filter(p=>p.status==='approved' && p.studentName===studentName).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const roomPosts=approvedPostsForStudentGallery(studentName);
   buildGalleryClassroom({
     title:studentName || 'Student Gallery',
     subtitle:'Student Gallery • All Approved Work',
@@ -963,9 +1060,13 @@ function buildGalleryClassroom({title,subtitle,roomPosts,exitKind,exitId}){
   addBox(worldGroup,.1,.25,roomLength,trimMat,-roomWidth/2+.12,.25,0,false,true);addBox(worldGroup,.1,.25,roomLength,trimMat,roomWidth/2-.12,.25,0,false,true);
   addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMinZ+.12,false,true);addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMaxZ-.12,false,true);
 
+  let roomLightIndex=0;
   for(let z=hallMinZ+3.3;z<hallMaxZ-2.5;z+=4.4){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.35,roughness:.35});
-    addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);
+    addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);
+    if(roomLightIndex++%(galleryLowGraphics?3:2)===0){
+      const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);
+    }
   }
 
   const chalkMat=new THREE.MeshStandardMaterial({color:0x274f44,roughness:.88});
@@ -1118,7 +1219,7 @@ function closeAvatarChooser(save=true){
 }
 
 
-function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map)m.map.dispose?.();m.dispose?.();});}});}
+function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map&&!m.map.userData?.keep)m.map.dispose?.();m.dispose?.();});}});}
 
 function currentPresenceSpace(){
   if(sceneMode==='classroom')return 'classroom:'+String(activeClassroomId||'');
@@ -2005,8 +2106,85 @@ document.querySelectorAll('.touch-btn').forEach(btn=>{const key=btn.dataset.move
 setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 
 /* ---------- data render ---------- */
+// Server polling must not recreate hundreds of meshes, textures, and lights
+// when the underlying posts have not changed. Only a changed post snapshot
+// can trigger a full rebuild; media URL renewal is handled separately.
+let lastGalleryPostsSnapshot=null,galleryApplyRevision=0;
+let lastGallerySceneSignature=null;
+function gallerySceneSignature(rows){return rows.filter(p=>p.status==='approved').map(projectCardKey).concat(rows.filter(p=>p.status==='approved').map(p=>p.id+':'+(p.galleryRoom||'')+':'+(p.createdAt||''))).sort().join('\n');}
+function applyGalleryPosts(data){
+  const snapshot=JSON.stringify(data||{});
+  if(snapshot===lastGalleryPostsSnapshot)return;
+  lastGalleryPostsSnapshot=snapshot;
+  const revision=++galleryApplyRevision;
+  const rows=Object.keys(data||{}).map(id=>({id,...data[id]}));
+  // Pictures are already in the post data. Show the gallery immediately;
+  // private audio/video URLs can finish loading without blocking 3D posts.
+  posts=rows;updatePending();
+  const sceneSig=gallerySceneSignature(rows);
+  if(scene&&sceneSig!==lastGallerySceneSignature){lastGallerySceneSignature=sceneSig;buildScene();pruneProjectCardCache();}
+  refreshRemoteAvatars();
+  const renderOpenPanels=()=>{
+    if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();
+    if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview();
+  };
+  renderOpenPanels();
+  resolveGalleryMedia(rows).then(()=>{
+    if(revision!==galleryApplyRevision)return; // A newer response won the race.
+    renderOpenPanels(); // Show audio/video indicators once links are ready.
+  }).catch(err=>console.error('Gallery media load failed:',err));
+}
 if(dbRef){
-  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();refreshRemoteAvatars();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview();},err=>console.error('Firebase read failed:',err));
+  if(isGuestGallery)dbRef.on('value',snapshot=>applyGalleryPosts(snapshot.val()||{}),err=>console.error('Gallery demo read failed:',err));
+  else{
+    const showGalleryReadError=(message)=>{
+      let notice=document.getElementById('galleryReadError');
+      if(!notice){
+        notice=document.createElement('div');
+        notice.id='galleryReadError';
+        notice.setAttribute('role','alert');
+        notice.style.cssText='position:fixed;z-index:9998;top:72px;left:16px;right:16px;max-width:700px;margin:auto;padding:14px 18px;border:2px solid #b44f47;border-radius:12px;background:#fffaf1;color:#602b29;font:700 15px/1.5 Arial,sans-serif;box-shadow:0 8px 22px #0004;text-align:center';
+        document.body.append(notice);
+      }
+      notice.textContent='Class Gallery could not load saved posts. Your work may still be saved; do not resubmit yet. '+message;
+    };
+    let galleryFetchInFlight=false;
+    let galleryResponseHash=null,galleryResponseUser=null;
+    // Version check: the server keeps a small per-class change counter. While it is unchanged the poll is a tiny reply.
+    // A full reload still happens every 5 minutes as a safety net in case a counter update is ever missed.
+    let galleryVersion=null,galleryFullAt=0;const GALLERY_FULL_REFRESH_MS=5*60*1000;
+    const loadScopedPosts=async()=>{
+      if(galleryFetchInFlight)return;
+      galleryFetchInFlight=true;
+      try{
+        const user=firebase.auth().currentUser;
+        if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
+        // A new signed-in identity must not reuse another person's response hash.
+        if(galleryResponseUser!==user.uid){galleryResponseHash=null;galleryVersion=null;galleryFullAt=0;galleryResponseUser=user.uid;}
+        const sendVersion=!!galleryVersion&&Date.now()-galleryFullAt<GALLERY_FULL_REFRESH_MS;
+        const token=await user.getIdToken();
+        const readUrl='https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId)+(galleryResponseHash?'&since='+encodeURIComponent(galleryResponseHash):'')+(sendVersion?'&v='+galleryVersion:'');
+        const r=await fetch(readUrl,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(r.status===404?'The gallery service is unavailable. Please tell your teacher.':(j.error||'Could not connect to your classroom.'));
+        document.getElementById('galleryReadError')?.remove();
+        const newVersion=Number.isSafeInteger(j.version)&&j.version>0?j.version:null;
+        if(!sendVersion)galleryFullAt=Date.now();
+        galleryVersion=newVersion;
+        if(j.unchanged===true)return;
+        // Legacy backends without hashes still work and return their complete snapshot.
+        galleryResponseHash=typeof j.hash==='string'&&/^[a-f0-9]{64}$/.test(j.hash)?j.hash:null;
+        applyGalleryPosts(j.posts||{});
+      }catch(err){console.error('Gallery read failed:',err);showGalleryReadError(err?.message||'Please tell your teacher.');}
+      finally{galleryFetchInFlight=false;}
+    };
+    B3SiteSettings.onAuthStateChanged(loadScopedPosts);
+    // Skip hidden tabs, and immediately catch up when a student comes back.
+    setInterval(()=>{if(!document.hidden)loadScopedPosts()},20000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadScopedPosts()});
+  }
+  // Renew short-lived private audio/video links without rebuilding the 3D room.
+  setInterval(()=>{if(!document.hidden&&posts.length)resolveGalleryMedia(posts).catch(err=>console.warn('Gallery media renewal failed:',err))},4*60*1000);
 }
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
 
@@ -2016,13 +2194,33 @@ document.getElementById('closeAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('useAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.target.id==='avatarOverlay')closeAvatarChooser(true);});
 
+/* Follow the Teacher must not interrupt an open gallery submission or upload. */
+window.addEventListener('ftt:before-follow-navigation', event => {
+  const form = document.getElementById('projectForm');
+  const overlay = document.getElementById('overlay');
+  if ((overlay && overlay.classList.contains('show')) ||
+      (form && form.querySelector('#submitBtn')?.disabled)) event.preventDefault();
+});
+
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});
-const overlay=document.getElementById('overlay');document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
+const overlay=document.getElementById('overlay');
+function bindStudentGalleryIdentity(){
+  const classPicker=document.getElementById('classSelect'),namePicker=document.getElementById('studentName');
+  if(isTeacher){classPicker.disabled=false;namePicker.disabled=false;return true;}
+  const studentName=String(sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||storedPresenceName||'').trim();
+  if(!presenceStudentId||!studentName){alert('Please sign in as a student first.');return false;}
+  const className=galleryClassId==='et'?'B3 ET':galleryClassId==='wt'?'B3 WT':galleryClassId;
+  classPicker.replaceChildren(new Option(className,className,true,true));
+  namePicker.replaceChildren(new Option(studentName,studentName,true,true));
+  classPicker.disabled=true;namePicker.disabled=true;
+  return true;
+}
+document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}if(!bindStudentGalleryIdentity())return;overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();const submit=document.getElementById('submitBtn'),status=document.getElementById('statusMsg');submit.disabled=true;status.textContent='Pinning...';status.style.color='#5b4632';
-  const className=document.getElementById('classSelect').value,studentName=document.getElementById('studentName').value.trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
-  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;let audioUrl=null,videoUrl=null;if(audio){status.textContent='Uploading audio... 0%';audioUrl=await uploadToStorage(audio,`classGallery/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoUrl=await uploadToStorage(video,`classGallery/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl,videoUrl,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
+  const className=isTeacher?document.getElementById('classSelect').value:(galleryClassId==='et'?'B3 ET':galleryClassId==='wt'?'B3 WT':galleryClassId),studentName=isTeacher?document.getElementById('studentName').value.trim():String(sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||storedPresenceName||'').trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
+  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;if(image){status.textContent='Uploading picture...';image=await galleryImageToStorage(image,id)||image;}let audioStoragePath=null,videoStoragePath=null;if(audio){status.textContent='Uploading audio... 0%';audioStoragePath=await uploadToStorage(audio,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoStoragePath=await uploadToStorage(video,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl:null,videoUrl:null,audioStoragePath,videoStoragePath,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
 });
 
 /* ---------- review ---------- */
@@ -2080,7 +2278,34 @@ document.getElementById('powerShopBtn').onclick=openPowerShop;
 document.getElementById('closePowerBtn').onclick=closePowerShop;
 document.getElementById('powerOverlay').addEventListener('click',e=>{if(e.target.id==='powerOverlay')closePowerShop();});
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
-function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList'),approveWrap=document.getElementById('approveAllWrap'),approveStatus=document.getElementById('approveAllStatus');if(approveWrap)approveWrap.style.display=pending.length?'flex':'none';if(approveStatus)approveStatus.textContent=pending.length===1?'Approve the 1 project currently waiting for review.':`Approve all ${pending.length} projects currently waiting for review.`;if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
+// ET and WT share one post list, but each gallery shows one class. Tell the teacher what is
+// waiting in the other class and let them jump there, so no pending project is hidden.
+let otherClassPendingCheckedAt=0,otherClassVersion=null,otherClassCount=null,otherClassFullAt=0;
+function renderReviewClassSwitch(){
+  const wrap=document.getElementById('reviewClassWrap');if(!wrap)return;
+  if(!legacyGallery||!isTeacher||isGuestGallery){wrap.style.display='none';return;}
+  const other=galleryClassId==='et'?'wt':'et',label=c=>c==='et'?'B3 ET':'B3 WT';
+  wrap.style.display='flex';
+  document.getElementById('reviewClassLabel').textContent='Viewing '+label(galleryClassId)+' gallery';
+  const btn=document.getElementById('reviewClassSwitchBtn');btn.textContent='Open '+label(other);
+  btn.onclick=()=>{const q=new URLSearchParams(location.search);q.set('class',other);q.set('review','pending');location.search=q.toString();};
+  if(Date.now()-otherClassPendingCheckedAt<15000)return;otherClassPendingCheckedAt=Date.now();
+  const note=document.getElementById('reviewClassOther');
+  (async()=>{try{
+    const token=await firebase.auth().currentUser.getIdToken();
+    const reuse=otherClassVersion&&otherClassCount!==null&&Date.now()-otherClassFullAt<5*60*1000;
+    const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+other+(reuse?'&v='+otherClassVersion:''),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    if(!r.ok){note.textContent='Projects from '+label(other)+' are on its own gallery.';return;}
+    const otherReply=await r.json();
+    let n;
+    if(reuse&&otherReply.unchanged===true)n=otherClassCount;
+    else{n=Object.values(otherReply.posts||{}).filter(p=>p&&p.status==='pending').length;otherClassCount=n;otherClassFullAt=Date.now();}
+    otherClassVersion=Number.isSafeInteger(otherReply.version)&&otherReply.version>0?otherReply.version:null;
+    note.textContent=n?`${n} project${n===1?'':'s'} waiting in ${label(other)}.`:`Nothing waiting in ${label(other)}.`;
+    btn.classList.toggle('attention',n>0);
+  }catch(e){note.textContent='Projects from '+label(other)+' are on its own gallery.';}})();
+}
+function renderReviewList(){renderReviewClassSwitch();const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList'),approveWrap=document.getElementById('approveAllWrap'),approveStatus=document.getElementById('approveAllStatus');if(approveWrap)approveWrap.style.display=pending.length?'flex':'none';if(approveStatus)approveStatus.textContent=pending.length===1?'Approve the 1 project currently waiting for review.':`Approve all ${pending.length} projects currently waiting for review.`;if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
 
 document.getElementById('approveAllBtn').onclick=async()=>{
   if(!isTeacher||!dbRef)return;
@@ -2374,7 +2599,7 @@ openPowerShop=function(){
 };
 document.getElementById('powerShopBtn').onclick=openPowerShop;
 </script>
-<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 

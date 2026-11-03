@@ -30,10 +30,27 @@
     if(!values.length) return null;
     return Math.round(values.reduce((s,v)=>s+(typeof v==='number'?v:(progressValue[v]??100)),0)/values.length);
   }
+  // Daily Points are earned per category from that category's rating, so
+  // every point is labeled (Davening, Learning, Participation, ...).
+  const ratingPoints={Excellent:4,Good:3,Fair:2,'Needs Improvement':1,Average:2,Poor:1};
+  function dailyCategoryPoints(ratingsByCategory){
+    const byCategory={};let total=0;
+    Object.entries(ratingsByCategory||{}).forEach(([category,rating])=>{const pts=ratingPoints[rating]??ratingPoints.Good;byCategory[category]=pts;total+=pts});
+    return {byCategory,total};
+  }
   function dailyAward(ratings){
-    // Daily reward points are teacher-controlled. The default is 10 for a
-    // present saved day; the Daily Points screen lets the teacher change it.
-    return ratings.length ? 10 : 0;
+    return (ratings||[]).reduce((a,r)=>a+(ratingPoints[r]??ratingPoints.Good),0);
+  }
+  // One ledger line per category when the day was saved with a breakdown;
+  // older days without one stay a single "Daily Points" line.
+  function dailyAwardParts(award){
+    const total=Number(award?.points||0), by=award?.byCategory;
+    if(by&&typeof by==='object'){
+      const parts=Object.values(by).map(x=>({category:String(x?.category||''),rating:String(x?.rating||''),points:Number(x?.points||0)})).filter(x=>x.category&&x.points);
+      const sum=parts.reduce((a,x)=>a+x.points,0);
+      if(parts.length&&sum===total)return parts;
+    }
+    return total?[{category:'',rating:'',points:total}]:[];
   }
   function cumulativeProgress(dateRows){
     const days={};
@@ -80,5 +97,5 @@
     el.className=`toast show ${type}`;el.textContent=message;clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove('show'),2800);
   }
   function formatDate(iso){try{return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}catch{return iso}}
-  window.StudentRewardsCommon={ROOT,ADMIN_EMAIL,LOGIN_URL,REDEEM_URL,CANCEL_URL,ensureFirebase,schoolDateString,progressValue,dailyProgress,dailyAward,cumulativeProgress,escapeHtml,ratingClass,categoryKey,sha256,objectValues,activeClasses,classRoster,activeCategories,latestRatings,allProgressRows,toast,formatDate};
+  window.StudentRewardsCommon={ROOT,ADMIN_EMAIL,LOGIN_URL,REDEEM_URL,CANCEL_URL,ensureFirebase,schoolDateString,progressValue,ratingPoints,dailyProgress,dailyAward,dailyCategoryPoints,dailyAwardParts,cumulativeProgress,escapeHtml,ratingClass,categoryKey,sha256,objectValues,activeClasses,classRoster,activeCategories,latestRatings,allProgressRows,toast,formatDate};
 })();

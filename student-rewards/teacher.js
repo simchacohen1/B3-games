@@ -4,7 +4,7 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase();
 const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
-const OWNER_NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+const OWNER_NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Approvals","Reports","People & Classes","Settings"];
 // Teachers other than the owner award points for their own classes through the
 // studentRewardsTeacher backend; the store, categories and settings stay with the owner.
 const TEACHER_NAV=["Overview","Points Dashboard","Daily Points","Students","Comments","Rewards","Approvals","Reports"];
@@ -124,7 +124,20 @@ function getActivityPointRequests(){
     .filter(x=>!state.classId || !x.item.classId || x.item.classId===state.classId)
     .sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
 }
-function pendingActivityPointRequests(){return getActivityPointRequests().filter(x=>x.item.status==="pending")}
+// Posuk Practice 100% milestones are automatic and never wait in this queue
+// (shared rule in ../approval-queue.js, also used by the homepage and Chazara page).
+function approvalQueueRules(){return window.FunTorahApprovalQueue||{needsManualApproval:i=>i?.status==="pending"&&!["reading100","translation100","understand100"].includes(String(i?.source||"")),isPendingAutomatic:i=>i?.status==="pending"&&["reading100","translation100","understand100"].includes(String(i?.source||""))}}
+function pendingActivityPointRequests(){const Q=approvalQueueRules();return getActivityPointRequests().filter(x=>x.item.status==="pending"&&Q.needsManualApproval(x.item))}
+let automaticPointSweepRunning=false;
+async function sweepAutomaticPosukPoints(){
+  if(automaticPointSweepRunning)return;
+  const Q=approvalQueueRules(), ids=getActivityPointRequests().filter(x=>Q.isPendingAutomatic(x.item)).map(x=>x.id);
+  if(!ids.length)return;
+  automaticPointSweepRunning=true;
+  try{for(const id of ids)await approveActivityPoint(id,true)}
+  catch(err){console.warn("Automatic Posuk point approval failed",err)}
+  finally{automaticPointSweepRunning=false}
+}
 function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length+pendingRefundRequests().length}
 // REFUND REQUESTS - 2026-10-08
 // Students ask for points back on any purchase or class contribution; nothing
@@ -244,9 +257,15 @@ function renderClassSelect(){
 }
 async function loadRoot(){
   if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
-  else{const snap=await db.ref(ROOT).once("value");state.root=snap.val()||{};}
+  else{
+    const adminRead=path=>db.ref(`${ROOT}/${path}`).once("value").then(s=>s.val());
+    const paths={classes:"classes",students:"students",categories:"categories",rewards:"rewards",classRewardCatalog:"classRewardCatalog",settings:"settings",dailyRatings:"dailyRatings",dailyAwards:"dailyAwards",dailyAttendance:"dailyAttendance",commentsByStudent:"commentsByStudent",redemptionsByStudent:"redemptionsByStudent",enrollments:"enrollments",pointAdjustments:"pointAdjustments",audit:"audit",pointRequests:"pointRequests",classRewardContributionsByStudent:"classRewardContributionsByStudent",refundRequests:"refundRequests",classRewardRounds:"classRewardRounds"};
+    const entries=await Promise.all(Object.entries(paths).map(async([key,path])=>[key,await adminRead(path)]));
+    state.root=Object.fromEntries(entries.map(([key,value])=>[key,value||{}]));
+  }
   if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";
   prepareDraft();renderClassSelect();setHeader();buildNav();
+  setTimeout(()=>{sweepAutomaticPosukPoints()},0);
 }
 async function ensureRewardModelV2(){
   if(state.root?.settings?.rewardModelV2Seeded===true)return false;
@@ -274,14 +293,12 @@ async function ensureRewardModelV2(){
   await db.ref().update(updates);
   return true;
 }
-function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
+function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000);return}clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000)}
 function prepareDraft(){
   if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
   for(const s of roster()){
     const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==="absent")state.absent.add(s.id);
     const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];
-    const savedAward=state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date];
-    state.awardDraft[s.id]=savedAward&&Number.isFinite(Number(savedAward.points))?Number(savedAward.points):10;
     const prior=C.latestRatings(state.root,s.id,state.classId,state.date);
     const source=saved||prior.ratings||{};
     for(const cat of categories()){const found=vals(source).find(r=>r.category===cat.name);state.draft[`${s.id}|${cat.name}`]=found?.rating||"Good"}
@@ -308,7 +325,7 @@ function overview(){
   <div class="stats">
     <article class="stat purple"><i>↗</i><div><span>Class average</span><strong>${avg}%</strong><small class="up">Based on saved ratings</small></div><div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div></article>
     <article class="stat gold"><i>★</i><div><span>Students scored today</span><strong>${scored}</strong><small>of ${r.length} students</small></div><div class="ring" style="background:conic-gradient(#e7ae34 ${r.length?Math.round(scored/r.length*100):0}%,#f1f2f6 0)"><b>${r.length?Math.round(scored/r.length*100):0}%</b></div></article>
-    <article class="stat green click" data-go="${state.teacherMode?"Approvals":"Rewards"}"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
+    <article class="stat green click" data-go="Approvals"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
   </div>
   <div class="dash">
     <section class="panel"><div class="panelhead"><div><h2>Student performance</h2><p>Today’s saved score</p></div><button data-go="Students">View all →</button></div><div class="list">${r.slice(0,6).map(s=>`<button class="studentrow" data-student="${esc(s.id)}"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><strong>${esc(s.name)}</strong><small>${Number(s.rewardBalance)||0} reward points</small></span><u><i style="width:${Math.min(100,scoreFor(s))}%;background:${esc(safeColor(s))}"></i></u><b>${scoreFor(s)}%</b></button>`).join("")}</div></section>
@@ -333,12 +350,12 @@ function pointClassName(classId){return state.root?.classes?.[classId]?.name||cl
 function pointSourceGroup(source){
   const s=String(source||"");
   if(["reading100","translation100","understand100"].includes(s))return "posuk";
-  if(["chazara","chazara-recording","chazara-remove"].includes(s))return "chazara";
+  if(["chazara","chazara-recording","chazara-remove","chazara-reject","shorashim-recording","shorashim-no-hints"].includes(s))return "chazara";
   if(s==="teacher-adjustment")return "teacher";
   return "activity";
 }
 function pointSourceLabel(source){
-  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'teacher-adjustment':"Teacher adjustment"};
+  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'chazara-reject':"Chazara approval reversed",'shorashim-recording':"Shorashim · Recorded Chazara",'shorashim-no-hints':"Shorashim · No Hints Challenge",'rashi-recording':"Rashi Letters · Recorded reading",'teacher-adjustment':"Teacher adjustment"};
   return labels[source]||String(source||"Activity points");
 }
 function allPointLedger(includeGaps=true){
@@ -350,8 +367,11 @@ function allPointLedger(includeGaps=true){
   for(const s of r){
     for(const [cid,dates] of Object.entries(state.root?.dailyAwards?.[s.id]||{})){
       for(const [date,award] of Object.entries(dates||{})){
-        const amount=Number(award?.points||0);if(!amount)continue;
-        add({id:`daily:${s.id}:${cid}:${date}`,sid:s.id,amount,when:pointTime(award?.savedAt)||pointDateFromSchoolDate(date),source:"daily",sourceGroup:"daily",sourceLabel:"Daily Points",reason:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+        const when=pointTime(award?.savedAt)||pointDateFromSchoolDate(date);
+        for(const part of C.dailyAwardParts(award)){
+          const label=part.category?`Daily Points · ${part.category}`:"Daily Points";
+          add({id:`daily:${s.id}:${cid}:${date}${part.category?":"+C.categoryKey(part.category):""}`,sid:s.id,amount:part.points,when,source:"daily",sourceGroup:"daily",sourceLabel:label,reason:part.category?`${part.category} — ${part.rating} — ${C.formatDate(date)}`:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+        }
       }
     }
   }
@@ -573,30 +593,30 @@ function daily(){
   </div></section>`;
 }
 function dailyRow(s,cats,saved){
-  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:Number(state.awardDraft[s.id]??10), cdate=carryDate(s);
+  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:C.dailyAward(ratings), cdate=carryDate(s);
   return `<div class="row ${absent?"absentrow":""}" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px">
     <div class="person"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><b>${esc(s.name)}</b>${!saved&&cdate?`<small class="carrysource">Started from ${new Date(`${cdate}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small>`:""}</span></div>
     <div class="attendance-wrap"><button class="attendance ${absent?"absent":""}" data-att="${esc(s.id)}">${absent?"Absent":"Present"}</button></div>
-    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option ${x===val?"selected":""}>${x}</option>`).join("")}</select></div>`}).join("")}
-    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`<input class="daily-award-input" data-award="${esc(s.id)}" type="number" min="0" step="1" value="${award}" aria-label="Reward points for ${esc(s.name)}"> points if saved`}</small></div>
+    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option value="${x}" ${x===val?"selected":""}>${x} (+${C.ratingPoints[x]})</option>`).join("")}</select></div>`}).join("")}
+    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`${award} points if saved`}</small></div>
   </div>`;
 }
 function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
 async function saveDaily(){
   if(state.teacherMode){
     const cats=categories(), r=roster();
-    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings,award:absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0))}});
+    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings}});
     try{await teacherApi("saveDaily",{classId:state.classId,date:state.date,rows});toast(`Saved ${r.length} students`)}catch(err){toast(err.message,"error")}
     await loadRoot();render();return;
   }
   const updates={}, cats=categories(), r=roster(), stamp=now(), balanceDeltas=[];
   for(const s of r){
     const absent=state.absent.has(s.id), ratings={};
-    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good";ratings[C.categoryKey(cat.name)]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp}}
-    const newAward=absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0));
+    const byCategory={};let newAward=0;
+    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good",key=C.categoryKey(cat.name),pts=C.ratingPoints[rating]??C.ratingPoints.Good;ratings[key]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp};byCategory[key]={category:cat.name,rating,points:pts};newAward+=pts}
     const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
     updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
-    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:stamp};
+    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,...(absent?{}:{byCategory}),teacherEmail:state.user.email,savedAt:stamp};
     updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?"absent":"present",teacherEmail:state.user.email,savedAt:stamp};
     balanceDeltas.push({id:s.id,delta:newAward-oldAward});
   }
@@ -651,15 +671,15 @@ function classRewardSnapshot(item,classId=state.classId){
 function approvalsPage(){
   const pointReq=pendingActivityPointRequests();
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">APPROVALS</p><h1>Activity points</h1><p>Posuk Practice and Chazara points for your students. Nothing below has been added yet.</p></div></div>
-  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Awaiting approval</h2></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:`<div class="empty"><h3>All caught up</h3><p>No points are waiting for approval.</p></div>`}</section>`;
+  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting review</h2></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:`<div class="empty"><h3>All caught up</h3><p>No activity point requests are waiting for review.</p></div>`}
+  ${refundQueueHTML()}</section>`;
 }
 function rewardsPage(){
-  const rewards=vals(state.root.rewards||{}).filter(r=>itemInStore(r)&&r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>itemInStore(x)&&x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
+  const rewards=vals(state.root.rewards||{}).filter(r=>itemInStore(r)&&r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>itemInStore(x)&&x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||""));
   const storeOpen=classStoreOpen();
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS${isTeacherStore(state.classId)?" · "+esc((cls()?.name||"").toUpperCase())+" STORE":""}</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
   <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can buy personal rewards and contribute to class goals.":"Students can browse rewards and progress, but cannot spend points."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div>
-  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
-  ${refundQueueHTML()}
+
   <div class="reward-type-stack">
     <section class="teacher-reward-section personal-rewards"><div class="teacher-reward-heading"><span>👤</span><div><h2>Personal Rewards</h2><p>One boy spends his points and receives this reward himself. Each reward can also have its own time cooldown.</p></div><button class="primary" id="addReward">+ Add personal reward</button></div><div class="rewardgrid">${rewards.length?rewards.map(r=>{const available=r.available!==false,cd=personalCooldownInfo(r);return `<article class="${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><p><strong>${esc(cd.label)}</strong></p><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-reward="${esc(r.id)}">${available?"Close":"Open"}</button><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No personal rewards</h3></div>`}</div></section>
     <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. You can set a cooldown (for example 14 days) after the class earns each prize.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x),available=x.available!==false,cdLabel=g.cooling?`Available again in ${cooldownText(g.cooldownUntil)}`:(g.cooldownDays?`Cooldown: ${g.cooldownDays} day${g.cooldownDays===1?"":"s"}`:"No cooldown");return `<article class="teacher-class-goal ${g.status==="completed"||g.status==="cooldown"?"complete":""} ${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p><p><strong>${esc(cdLabel)}</strong></p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div>${gimkitTeacherModesHTML(g)}<div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="cooldown"?`⏳ ${esc(cdLabel)}`:g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-class-reward="${esc(x.id)}">${available?"Close":"Open"}</button><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">${isGimkitClassReward(x)?(g.cooling?"End cooldown":"Reset all mode bars"):(g.cooling?"End cooldown / start new goal":"Reset goal")}</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
@@ -674,6 +694,12 @@ function activityPointRow(x){
 function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId],status=x.item.status||"pending";return `<div class="request"><em style="background:${esc(safeColor(s))}">${esc(s?.initials||"?")}</em><span><strong>${esc(s?.name||x.sid)}</strong><small>${esc(r?.name||"Reward")} · ${Number(x.item.cost)||0} ★ · ${esc(status)}</small></span>${status==="pending"?`<button class="deny" data-decline="${esc(x.sid)}|${esc(x.key)}">×</button><button class="approve" data-approve="${esc(x.sid)}|${esc(x.key)}">✓</button>`:""}${status==="ready"?`<button class="approve" data-collect="${esc(x.sid)}|${esc(x.key)}">Given</button>`:""}</div>`}
 async function setChazaraPointStatus(item,status){
   if(!item?.eventId||!item?.practiceStudentId)return;
+  // Shorashim recordings mirror their status on the Shorashim recording event,
+  // which is what the homepage and Shorashim page count.
+  if(["shorashim-recording","shorashim-no-hints"].includes(String(item.source||""))){
+    try{await db.ref(`posukPractice/shorashimLearning/recordingEvents/${item.practiceStudentId}/${item.eventId}/pointRequestStatus`).set(status)}catch(e){console.warn('Could not mirror Shorashim point status',e)}
+    return;
+  }
   const path=`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}`;
   const field=Number(item.amount||0)<0?"removalPointRequestStatus":"pointRequestStatus";
   try{await db.ref(path+'/'+field).set(status)}catch(e){console.warn('Could not mirror Chazara point status',e)}
@@ -898,13 +924,12 @@ function bindPage(){
     $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
     $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
     document.querySelectorAll("[data-rating]").forEach(s=>s.onchange=()=>{state.draft[`${s.dataset.rating}|${s.dataset.cat}`]=s.value;render()});
-    document.querySelectorAll("[data-award]").forEach(inp=>inp.onchange=()=>{state.awardDraft[inp.dataset.award]=Math.max(0,Math.round(Number(inp.value)||0));inp.value=state.awardDraft[inp.dataset.award]});
   }
   if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
   if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
   if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-toggle-reward]").forEach(b=>b.onclick=()=>toggleRewardAvailability(b.dataset.toggleReward));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-toggle-class-reward]").forEach(b=>b.onclick=()=>toggleClassRewardAvailability(b.dataset.toggleClassReward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")});document.querySelectorAll("[data-refund-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundApprove.split("|");decideRefund(s,k,"approve")});document.querySelectorAll("[data-refund-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundDecline.split("|");decideRefund(s,k,"decline")})}
-  if(state.tab==="Approvals"){if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject))}
+  if(state.tab==="Approvals"){if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-refund-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundApprove.split("|");decideRefund(s,k,"approve")});document.querySelectorAll("[data-refund-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundDecline.split("|");decideRefund(s,k,"decline")})}
   if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
   if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
   if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}

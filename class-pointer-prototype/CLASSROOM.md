@@ -83,3 +83,10 @@ Each boy receives his own editable Hebrew text object when a word is sent. He ca
 ## Automatic classroom start
 
 Click **Open teacher classroom** in Teacher Tools → Class Pointer. The classroom page now begins the class session automatically after validating the teacher account and assigned class, connects to PeerJS, publishes the room for student discovery, and enables **Share teaching screen** when ready. There is no second **Start class** click. Browser screen capture still requires the teacher to click **Share teaching screen**, as browsers do not allow a page to start capture automatically. On authorization/connection errors, show a retry button; after intentionally ending the class, show **Start another class**. The existing student automatic-join flow, class isolation, PDF/whiteboard modes, and teacher controls are retained.
+
+## Teacher workspace (design match, Oct 2026)
+
+- Drawing tools appear only after the teacher picks something to teach from. While live, the tabs row shows **Live: <source>**, a **Switch / stop** menu and Full screen.
+- The Students panel is one table: each student's level on the teacher's screen (Nothing, Pointer, + Highlight, + Pen), plus Screen and Board checkboxes. **Everyone** sets the level for the whole class and the default for students who join later (default: Nothing). Levels chosen for students who have not joined yet are remembered by name for this class session.
+- Levels are per student: `publish()` sends each member's own `tools`, and the teacher enforces them on every point and stroke. The full-screen toolbar keeps the original "Tools for selected students" menu.
+- Send screens / Send whiteboards, the join link and Enable student sharing are under **More options** in the panel.

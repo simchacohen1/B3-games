@@ -1,0 +1,248 @@
+/* Simplified teacher workspace: top bar, picker in the empty stage, students drawer on the right.
+   Presentation only; original controls keep their handlers. */
+.teacher-dashboard-source,.teacher-dashboard-menu-trigger{display:none!important}
+body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:360px;background:#eef1f6}
+
+/* ---------- Top bar ---------- */
+body.cp-simple .app-header.cp-header{display:block;padding:0;margin:0 0 12px;border:0}
+.cp-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--cp-navy);color:#fff;border-radius:14px;padding:10px 16px}
+.cp-topbar-title{display:flex;align-items:center;gap:8px}
+.cp-topbar-title h1{margin:0;font-size:20px;color:#fff}
+.cp-topbar-logo{font-size:22px}
+.cp-topbar .pointer-class-picker{display:flex;align-items:center;gap:8px;color:#c9d6f2;font-size:14px;margin:0}
+.cp-topbar .pointer-class-picker select{background:#2a3a5c;color:#fff;border:0;border-radius:10px;padding:8px 12px;min-height:40px}
+.cp-topbar-spacer{flex:1 1 auto}
+.cp-joined{font-size:14px;color:#c9d6f2;margin:0}
+.cp-joined.cp-joined-alert{color:#fde68a;font-weight:700}
+.cp-topbar-btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #3b4d74;background:transparent;color:#fff;font-weight:600;font-size:15px;margin:0}
+.cp-topbar-btn:hover:not(:disabled){background:#22314f}
+.cp-students-toggle{background:#f5b800;border-color:#f5b800;color:var(--cp-navy)}
+.cp-students-toggle:hover:not(:disabled){background:#ffc928}
+body.cp-drawer-closed .cp-students-toggle{background:var(--cp-blue);border-color:var(--cp-blue);color:#fff}
+.cp-topbar-back{color:#c9d6f2;font-size:14px}
+.cp-topbar-back:hover{color:#fff}
+
+/* ---------- Tabs: one neutral segmented control ---------- */
+body.cp-simple.teacher-view .cp-workspace-tabs{display:inline-grid;grid-template-columns:repeat(3,auto);gap:4px;padding:4px;margin:0 0 10px;background:#dce2ec;border:0;border-radius:12px}
+body.cp-simple.teacher-view .cp-workspace-tab{background:transparent!important;color:var(--cp-navy)!important;border:0!important;min-height:40px;padding:0 16px;font-size:15px;font-weight:500;box-shadow:none}
+body.cp-simple.teacher-view .cp-workspace-tab[aria-selected=true]{background:#fff!important;font-weight:700;box-shadow:0 1px 2px #17233b26}
+body.cp-simple.teacher-view .cp-workspace-tab .cp-tab-icon{display:none}
+body.cp-simple #navigationHint{display:none}
+body.cp-simple #connectionStatus{font-size:13px;font-weight:500;color:var(--cp-muted);min-height:0;margin:0 0 6px}
+
+/* ---------- Tabs row: tabs left, live status right ---------- */
+.cp-tabs-row{position:relative;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
+.cp-tabs-spacer{flex:1 1 auto}
+.cp-live-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cp-live-wrap[hidden]{display:none}
+.cp-live-chip{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:#b91c1c;font-size:14px;padding:0 4px}
+.cp-live-chip::before{content:"";width:10px;height:10px;border-radius:50%;background:#dc2626}
+.cp-live-wrap button,.cp-live-wrap .tab-controls button{min-height:44px;padding:0 16px;margin:0;border-radius:10px;border:1px solid #c3cbd9;background:#fff;color:var(--cp-navy);font-size:15px;font-weight:500}
+.cp-live-wrap .tab-controls{display:inline-flex;gap:6px}
+.cp-live-wrap .tab-controls[hidden]{display:none}
+.cp-live-wrap .cp-icon-btn{width:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.cp-switch-wrap{position:relative}
+.cp-switch-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:240px;display:flex;flex-direction:column;gap:2px;padding:8px;background:#fff;border:1px solid var(--cp-line);border-radius:12px;box-shadow:0 10px 30px #17233b2e}
+.cp-switch-menu[hidden]{display:none}
+.cp-switch-menu small{font-size:12px;font-weight:600;color:var(--cp-muted);padding:4px 8px}
+.cp-live-wrap .cp-switch-menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0!important;background:transparent!important;box-shadow:none!important;min-height:44px;padding:0 10px;font-size:15px;color:var(--cp-navy)}
+.cp-live-wrap .cp-switch-menu button:hover:not(:disabled){background:#f3f6fb!important}
+.cp-live-wrap .cp-switch-menu button:disabled{display:none}
+.cp-live-wrap .cp-switch-menu #stopScreen{display:none}
+.cp-live-wrap .cp-switch-menu .cp-stop-btn{margin-top:4px;border-top:1px solid var(--cp-line);border-radius:0 0 8px 8px;color:#991b1b!important;font-weight:600;border-top:1px solid var(--cp-line)!important}
+.cp-live-wrap button:focus-visible{outline:3px solid var(--cp-blue);outline-offset:2px}
+.cp-topbar-btn,.cp-topbar-logo{display:inline-flex;align-items:center;gap:8px}
+
+/* Drawing tools appear only once something is live (full screen and student boards keep them). */
+body.cp-simple.teacher-view:not(.cp-is-live):not(.boards-on) #teacherDock:not(.floating){display:none!important}
+
+/* ---------- Source picker in the empty stage ---------- */
+#stage .cp-source-picker{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;background:#fff;cursor:default;overflow:auto}
+#stage .cp-source-picker h2{margin:0;font-size:26px;color:var(--cp-navy);text-align:center}
+.cp-source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;width:100%;max-width:860px}
+.cp-source-tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:18px;border-radius:14px;border:2px solid var(--cp-line);background:#f7f9fc;color:var(--cp-navy);text-align:left;margin:0}
+.cp-source-tile:hover:not(:disabled){border-color:var(--cp-blue);background:#fff}
+.cp-source-tile:focus-visible,.cp-source-link:focus-visible{outline:3px solid var(--cp-blue);outline-offset:2px}
+.cp-source-icon{display:flex;height:32px}
+.cp-source-sep{color:var(--cp-muted);margin:0 6px}
+.cp-source-note{margin:0;font-size:14px;color:var(--cp-muted);text-align:center}
+.cp-source-name{font-size:17px;font-weight:700}
+.cp-source-desc{font-size:14px;font-weight:400;color:var(--cp-muted)}
+.cp-source-foot{margin:0;text-align:center}
+.cp-source-link{background:none;border:0;padding:6px;color:var(--cp-blue);font-weight:500;text-decoration:underline;margin:0}
+#stage:has(.cp-source-picker:not([hidden])) #placeholder{visibility:hidden}
+
+/* Helper bubble now lives in the Students drawer; floating Gallery button moves off the stage corner. */
+body.cp-simple #activityScreenHelp,body.cp-simple #stage>a[href="../index.html"]{display:none!important}
+body.cp-simple.teacher-view #fttGalleryShareButton{right:auto;left:18px}
+
+/* ---------- Toolbar: fewer choices in the normal view (full screen keeps everything) ---------- */
+body.cp-simple #teacherDock:not(.floating) .tb-move-handle,
+body.cp-simple #teacherDock:not(.floating) #tbDockLeft,
+body.cp-simple #teacherDock:not(.floating) .tb-sizes{display:none!important}
+body.cp-simple #teacherDock .tb-mode[data-mode=box]{display:none!important}
+body.cp-simple #teacherDock .tb-swatches [data-color="#7ce4dc"],
+body.cp-simple #teacherDock .tb-swatches [data-color="#dca0ff"],
+body.cp-simple #teacherDock .tb-swatches [data-color="#ffa65c"],
+body.cp-simple #teacherDock .tb-swatches [data-color="#1d4ed8"]{display:none!important}
+body.teacher-view #teacherDock:not(.floating) #tbFullscreen,body.teacher-view #teacherDock:not(.floating) .teacher-dashboard-share-trigger{display:none}
+
+/* ---------- Students drawer ---------- */
+.cp-permissions-sidebar{background:#fff;border:1px solid var(--cp-line);border-radius:16px;padding:16px;box-sizing:border-box}
+body.cp-drawer-closed .cp-permissions-sidebar{display:none}
+.cp-drawer-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cp-drawer-head h2{flex:1;margin:0;font-size:20px;color:var(--cp-navy)}
+.cp-drawer-close{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:10px;background:#eef1f6;color:var(--cp-navy);font-size:16px}
+.cp-permissions-sidebar select{min-width:0;max-width:100%}
+.teacher-dashboard-roster{position:static!important;inset:auto!important;display:block!important;visibility:visible!important;transform:none!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;resize:none!important}
+.teacher-dashboard-roster::before{display:none!important}
+.teacher-dashboard-roster[hidden]{display:block!important}
+.cp-permission-help{font-size:13px;line-height:1.4;margin:10px 0 6px;color:var(--cp-muted)}
+.cp-permissions-sidebar .permission-tools{display:flex;flex-wrap:wrap;gap:8px;background:#f3f6fb;padding:12px;border-radius:12px}
+.cp-permissions-sidebar .permission-tools strong{flex-basis:100%;font-size:14px}
+.cp-permissions-sidebar .sharing-permissions{background:#f7f9fc!important;border:1px solid var(--cp-line)!important;border-radius:12px;padding:12px!important;margin-top:14px}
+.cp-permissions-sidebar .sharing-permissions>p{font-size:13px;color:var(--cp-muted)}
+.cp-permissions-sidebar .sharing-permissions-roster{max-height:30dvh!important;overflow:auto}
+.cp-permissions-sidebar #roster{max-height:30dvh!important;overflow:auto}
+.cp-permissions-sidebar details{margin-top:12px}
+.cp-permissions-sidebar summary{cursor:pointer;font-weight:600;font-size:14px}
+.cp-student-sharing{border-top:1px solid var(--cp-line);margin-top:14px;padding-top:12px}
+.cp-student-sharing p{font-size:13px;color:var(--cp-muted)}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu{width:100%!important;min-width:0!important;max-height:none!important;overflow:visible!important}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools{display:flex;flex-wrap:wrap;white-space:normal}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools label{font-size:14px;padding:6px 8px;min-width:0}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .pointer-bulk-actions{display:flex;flex-wrap:wrap;gap:6px}
+
+/* Original permissions menu is kept for full screen only. */
+.cp-permissions-sidebar #tbStudentsMenu{display:none!important}
+.cp-everyone{display:flex;flex-direction:column;gap:8px;background:#f3f6fb;border-radius:12px;padding:14px;margin-bottom:14px}
+.cp-everyone strong{font-size:14px}
+.cp-everyone-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:14px}
+.cp-everyone-row select,.cp-level{font:inherit;font-size:14px;padding:6px 8px;border-radius:8px;border:1px solid #c3cbd9;background:#fff;color:var(--cp-navy);min-height:40px}
+.cp-everyone-help{font-size:13px;color:var(--cp-muted)}
+.cp-student-head,.cp-student-body{display:grid;grid-template-columns:minmax(0,1fr) 104px 42px 42px;gap:8px 6px;align-items:center;font-size:14px}
+.cp-student-head{padding-bottom:6px;border-bottom:1px solid var(--cp-line);margin-bottom:8px}
+.cp-student-head span{font-size:12px;font-weight:600;color:var(--cp-muted)}
+.cp-student-head .cp-c{text-align:center}
+.cp-student-body{max-height:none}
+.cp-student-empty{grid-column:1/-1;margin:4px 0;font-size:13px;color:var(--cp-muted)}
+.cp-student-name{display:flex;align-items:center;gap:6px;min-width:0}
+.cp-name-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cp-dot{width:9px;height:9px;flex-shrink:0;border-radius:50%;background:#b8c0cf}
+.cp-dot.cp-dot-on{background:#16a34a}
+.cp-level{font-size:13px;min-height:36px;padding:4px 4px;width:100%}
+.cp-check{width:22px;height:22px;justify-self:center;margin:0;accent-color:var(--cp-blue)}
+.cp-remove{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;margin:0 0 0 auto;border:0;border-radius:8px;background:transparent;color:var(--cp-muted)}
+.cp-remove:hover{background:#fee2e2;color:#991b1b}
+.cp-mini-btn{font-size:12px;padding:4px 8px;margin:0;border-radius:8px;border:1px solid var(--cp-blue);background:#fff;color:var(--cp-blue)}
+.cp-more{border-top:1px solid var(--cp-line);margin-top:16px;padding-top:12px}
+.cp-more>summary{cursor:pointer;font-weight:600;font-size:14px;min-height:32px;display:flex;align-items:center}
+.cp-more-help{font-size:13px;color:var(--cp-muted);margin:8px 0 6px}
+.cp-more-send{display:flex;flex-wrap:wrap;gap:8px}
+.cp-more-btn{min-height:40px;padding:0 12px;margin:0;border-radius:10px;border:1px solid var(--cp-line);background:#f7f9fc;color:var(--cp-navy);font-size:14px;font-weight:500}
+.cp-permissions-sidebar #startClass{margin:12px 0 0;width:100%}
+
+/* ---------- Desktop: fill the window, drawer beside the lesson ---------- */
+@media(min-width:1000px){
+body.teacher-view.cp-compact-workspace main{max-width:none;margin:0;border:0;border-radius:0;background:transparent;padding:12px calc(var(--cp-drawer) + 28px) 12px 16px;height:100dvh;min-height:550px;display:flex;flex-direction:column;gap:0;box-sizing:border-box}
+body.teacher-view.cp-compact-workspace.cp-drawer-closed main{padding-right:16px}
+body.teacher-view.cp-compact-workspace main>*{flex-shrink:0}
+body.teacher-view .cp-permissions-sidebar{position:fixed;right:12px;top:var(--cp-drawer-top,12px);bottom:12px;width:var(--cp-drawer);overflow:auto;z-index:8}
+body.teacher-view.cp-compact-workspace:not(.cp-drawer-closed) .app-header.cp-header{margin-right:calc(-1 * (var(--cp-drawer) + 16px))}
+body.teacher-view #teacherPanel{margin:0}
+body.teacher-view.cp-compact-workspace #stage:not(.lesson-fullscreen):not(:fullscreen){flex:1 1 0;min-height:180px;height:auto;aspect-ratio:auto}
+body.teacher-view.cp-compact-workspace .lesson-actions:empty{display:none}
+body.teacher-view #teacherDock:not(.floating){font-size:13px;gap:4px;padding:6px}
+body.teacher-view #teacherDock .tb-btn{padding:8px;font-size:13px}
+body.cp-simple footer{display:none}
+}
+@media(max-width:999px){
+.cp-permissions-sidebar{margin:10px 0}
+.cp-permissions-sidebar #roster{max-height:220px!important}
+body.cp-simple.teacher-view .cp-workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+body.cp-simple.teacher-view .cp-workspace-tab{white-space:normal;font-size:13px;padding:0 6px}
+.cp-joined{flex-basis:100%;order:10}
+body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min-height:620px}
+}
+
+/* Full-screen left rail: text-only buttons become icons so nothing spills out of the rail. */
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"],
+#stage .teacher-dock.floating.dock-left #pointerPdfLibrary{font-size:0!important;width:44px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{content:"\1F5A5";font-size:17px}
+#stage .teacher-dock.floating.dock-left #pointerPdfLibrary::before{content:"\1F4DA";font-size:17px}
+#stage.tb-docked-left > #placeholder{left:56px!important;width:calc(100% - 56px)!important;box-sizing:border-box}
+
+/* Full screen: Students panel as an overlay inside the lesson, opened from the 👥 rail button. */
+#stage .cp-permissions-sidebar.cp-drawer-overlay{display:none!important;position:absolute!important;top:12px!important;bottom:12px!important;right:12px!important;left:auto!important;width:min(360px,calc(100% - 80px));margin:0!important;overflow:auto;z-index:40;box-shadow:0 12px 36px #0006;cursor:default}
+#stage.tb-docked-left .cp-permissions-sidebar.cp-drawer-overlay{left:66px!important;right:auto!important}
+#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open{display:block!important}
+#stage .teacher-dock .cp-dock-active{background:var(--cp-blue,#2563eb)!important;color:#fff!important}
+#stage .teacher-dock.floating.dock-left{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+
+/* Classroom Pointer cleanup: the Students drawer owns participant controls.
+   Keep the actual live screen/whiteboard tiles visible, not a duplicate toolbar. */
+body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!important}
+/* Give the floating full-screen Students drawer a larger, readable surface.
+   The teacher can resize it (bottom-right corner) without affecting permissions.
+   Width/height deliberately avoid !important: the browser's resize handle writes
+   plain inline sizes, which an !important stylesheet value would silently override. */
+#stage .cp-permissions-sidebar.cp-drawer-overlay{
+  width:clamp(340px,36vw,650px);
+  max-width:calc(100% - 24px)!important;
+  height:min(76vh,760px);
+  max-height:calc(100% - 24px)!important;
+  bottom:auto!important;
+  resize:both!important;
+  min-width:300px!important;
+  min-height:220px!important;
+}
+#stage .cp-permissions-sidebar.cp-drawer-overlay #roster,
+#stage .cp-permissions-sidebar.cp-drawer-overlay .sharing-permissions-roster{max-height:none!important}
+#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-drawer-head{cursor:move;touch-action:none}
+#stage .cp-permissions-sidebar.cp-drawer-overlay button,
+#stage .cp-permissions-sidebar.cp-drawer-overlay select{min-height:38px}
+#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-level{font-size:15px;min-height:42px}
+
+/* ---------- Full screen: larger, clearer Present controls ----------
+   Present is the teacher's main action, so in full screen it is a solid blue
+   button with a readable label, and its menu uses big rows with icons. */
+#stage .teacher-dock.floating .teacher-dashboard-share-trigger,
+#stage .teacher-dock.floating .tb-menu-wrap:has(>[data-menu="tbShareMenu"]){width:100%;justify-content:center}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]{min-height:46px;width:100%;padding:8px 14px;border:0;border-radius:12px;background:#1d4ed8;color:#fff;font-size:16px!important;font-weight:800;justify-content:center;box-shadow:0 3px 10px #1d4ed855}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]:hover,
+#stage .teacher-dock.floating [data-menu="tbShareMenu"][aria-expanded="true"]{background:#1e40af;color:#fff}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+#stage .teacher-dock.floating #tbShareMenu{min-width:320px;padding:12px;gap:6px;border-radius:16px}
+#stage .teacher-dock.floating #tbShareMenu>strong{font-size:17px;padding:2px 6px 6px;color:#12305f}
+#stage .teacher-dock.floating #tbShareMenu>button{min-height:52px;padding:10px 14px;font-size:17px;font-weight:700;border:1px solid #dbe3f2;background:#f8fafc;border-radius:12px;gap:12px}
+#stage .teacher-dock.floating #tbShareMenu>button:hover:enabled{background:#e8effd;border-color:#93b4f5}
+#stage .teacher-dock.floating #tbShareMenu>button:disabled{opacity:.45}
+#stage .teacher-dock.floating #tbShareMenu>button[data-source]::before{font-size:22px;width:28px;text-align:center;flex:none}
+#tbShareMenu>button[data-source="shareScreen"]::before{content:"\1F5A5"}
+#tbShareMenu>button[data-source="openBrowserTab"]::before{content:"\1F4F7"}
+#tbShareMenu>button[data-source="openPdf"]::before{content:"\1F4C4"}
+#tbShareMenu>button[data-source="openWebpage"]::before{content:"\1F310"}
+#tbShareMenu>button[data-source="openWhiteboard"]::before{content:"\1F4DD"}
+#tbShareMenu>button[data-source="stopScreen"]::before{content:"\23F9"}
+#stage .teacher-dock.floating #tbShareMenu>button[data-source="stopScreen"]:enabled{color:#b4232f}
+/* Left rail: keep Present large enough to find, with its label under the icon. */
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]{width:48px!important;height:56px!important;min-height:0;padding:2px 0!important;flex-direction:column;gap:1px;background:#1d4ed8!important;color:#fff!important;border-radius:10px}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{font-size:22px!important;line-height:1}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::after{content:"Present";font-size:11px;font-weight:800;line-height:1.1}
+
+/* Teacher whiteboard: pasted pictures waiting to be placed (move / resize). */
+#pdfContent .board-picture-edit{position:absolute;z-index:3;box-sizing:border-box;outline:3px dashed #2563eb;outline-offset:2px;cursor:move;touch-action:none;background:#fff;box-shadow:0 8px 26px #0f172a40}
+#pdfContent .board-picture-edit.selected{outline-style:solid}
+#pdfContent .board-picture-edit img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-select:none;user-select:none}
+#pdfContent .board-picture-handle{position:absolute;width:20px;height:20px;background:#fff;border:3px solid #2563eb;border-radius:50%;box-sizing:border-box;touch-action:none}
+#pdfContent .board-picture-handle.nw{left:-12px;top:-12px;cursor:nwse-resize}
+#pdfContent .board-picture-handle.ne{right:-12px;top:-12px;cursor:nesw-resize}
+#pdfContent .board-picture-handle.sw{left:-12px;bottom:-12px;cursor:nesw-resize}
+#pdfContent .board-picture-handle.se{right:-12px;bottom:-12px;cursor:nwse-resize}
+#pdfContent .board-picture-remove{position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:32px;height:32px;min-height:0;padding:0;border:0;border-radius:50%;background:#b4232f;color:#fff;font:700 16px/32px system-ui;cursor:pointer;box-shadow:0 2px 8px #0005}
+.board-picture-bar{position:absolute;z-index:12;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:calc(100% - 24px);padding:10px 12px 10px 16px;background:#101827f0;color:#fff;border-radius:14px;box-shadow:0 10px 30px #0006;font:600 15px system-ui}
+.board-picture-bar[hidden]{display:none}
+.board-picture-bar .board-picture-done{min-height:44px;padding:0 18px;border:0;border-radius:11px;background:#16a34a;color:#fff;font:800 16px system-ui;cursor:pointer;white-space:nowrap}
+.board-picture-bar .board-picture-done:hover{background:#15803d}
+@media(max-width:640px){.board-picture-bar .board-picture-help{display:none}}

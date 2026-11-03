@@ -1,32 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fun Torah Tools</title>
-<link rel="icon" type="image/jpeg" href="/favicon.jpg?v=20261016b">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <style>
@@ -149,6 +135,20 @@
   .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
   .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
+  .home-class-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 6px 5px 14px;box-shadow:0 6px 16px rgba(0,0,0,.16);font-weight:900;color:#1f2937}
+  .home-class-bar.hidden{display:none}
+  body.has-home-class-bar>h1{padding-top:66px!important}
+  .home-class-bar label{font-size:13px}
+  .home-class-bar select{border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:900;background:#f8fafc;color:#1f2937;cursor:pointer;max-width:170px}
+  .home-class-lock{border:0;border-radius:999px;background:#1f2937;color:#fff;font-size:18px;width:38px;height:34px;cursor:pointer}
+  .home-class-lock:hover{background:#334155}
+  .home-access-modal{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+  .home-access-modal.hidden{display:none}
+  .home-access-card{width:min(780px,100%);height:min(92vh,1000px);background:#f1f5f9;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+  .home-access-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#172033;color:#fff;font-weight:900;font-size:18px}
+  .home-access-head button{border:0;border-radius:999px;background:#fff;color:#172033;font-size:20px;font-weight:900;width:38px;height:38px;cursor:pointer}
+  .home-access-card iframe{flex:1;width:100%;border:0;background:#f1f5f9}
+  @media(max-width:560px){.home-class-bar{top:58px;left:auto;right:10px;transform:none}body.has-home-class-bar>h1{padding-top:104px!important}.home-class-bar label{display:none}.home-access-modal{padding:0}.home-access-card{height:100%;border-radius:0}}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
 .login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
 /* Keep the student launchers visible together on desktop screens. */
@@ -391,14 +391,18 @@ body > .subtitle::after {
     if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
   });
 </script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="vendor/firebase/12.15.0/firebase-app-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
+<script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
+<script src="firebase-config.js?v=20261001-teacherauth" defer></script>
 <script src="backend/functions/student-tool-policy.js"></script>
-<script src="student-tool-controls.js"></script>
-<script src="guest-mode.js?v=20261011-guest"></script>
-<script src="site-settings.js?v=20261008-owner-demo"></script>
+<script src="student-tool-controls.js" defer></script>
+<script defer src="assignment-center/home-link.js?v=20261027-staging"></script>
+<script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
+<script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
+<script src="guest-mode.js?v=20261011-guest" defer></script>
+<script src="site-settings.js?v=20261020-demo-student" defer></script>
+<script src="approval-queue.js?v=20261021-approvals" defer></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -409,7 +413,7 @@ body > .subtitle::after {
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
-    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
+    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" class="hidden" style="display:none!important" aria-hidden="true" tabindex="-1">👆 Class Pointer</a>
   </div>
 
   <div id="loginCard" class="login-card">
@@ -445,7 +449,7 @@ body > .subtitle::after {
             <section class="game-group island-place " data-game-group="skills">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" loading="lazy" decoding="async" width="74" height="74" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
 <a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
       </section>
             <section class="game-group island-place " data-game-group="more-learning">
@@ -461,7 +465,8 @@ body > .subtitle::after {
             <section class="game-group island-place " data-game-group="challenge">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏆</span><div><div class="game-group-title">Challenge Playground</div><div class="game-group-subtitle">Quiz yourself or play a game</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a></div>
+<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+<a class="game-card" data-game-id="multiplayer-center" href="multiplayer/index.html"><span class="card-icon">🎲</span><span class="card-title">Multiplayer Center</span></a></div>
       </section>
     </div>
     <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
@@ -473,8 +478,10 @@ body > .subtitle::after {
     <div class="teacher-tools-container">
       <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
       <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
+      <a class="teacher-tool-card" id="homeworkCenterCard" href="assignment-center/teacher.html"><span class="card-icon">📚</span><span class="card-title">Homework &amp; Assignments</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
+      <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
       <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
@@ -507,6 +514,17 @@ body > .subtitle::after {
     </div>
   </div>
 
+  <div id="homeClassBar" class="home-class-bar hidden">
+    <label for="homeClassSelect">Class</label>
+    <select id="homeClassSelect" aria-label="Choose class"><option value="et">ET</option><option value="wt">WT</option></select>
+    <button id="homeClassLock" class="home-class-lock" type="button" title="Open Class Access for this class" aria-label="Open Class Access for this class">🔒</button>
+  </div>
+  <div id="homeAccessModal" class="home-access-modal hidden" role="dialog" aria-modal="true" aria-labelledby="homeAccessTitle">
+    <div class="home-access-card">
+      <div class="home-access-head"><span id="homeAccessTitle">🔒 Class Access</span><button id="homeAccessClose" type="button" aria-label="Close Class Access">×</button></div>
+      <iframe id="homeAccessFrame" title="Class Access"></iframe>
+    </div>
+  </div>
   <button id="approvalCenterButton" class="approval-button hidden" type="button">🔔 Approvals <span id="approvalCenterBadge" class="approval-button-badge">0</span></button>
   <div id="approvalCenterModal" class="approval-center-modal hidden" role="dialog" aria-modal="true" aria-labelledby="approvalCenterTitle">
     <div class="approval-center-card">
@@ -599,6 +617,8 @@ body > .subtitle::after {
   </div>
 
 <script>
+// Runs after the deferred scripts above have loaded (faster first paint).
+document.addEventListener("DOMContentLoaded",function(){
 (function(){
   "use strict";
   const settingsApi=window.B3SiteSettings;
@@ -842,7 +862,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function openVersionModal(game){
     const teacherHref=teacherVersionByGame[game.id];
     if(!teacherHref)return false;
-    // Teachers go straight to the Teacher Version — no Student/Teacher chooser.
+    // Open directly in the teacher tool. site-settings.js provides the
+    // persistent Teacher version / Student version navigation inside it.
     window.location.assign(teacherHref);
     return true;
   }
@@ -864,6 +885,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let approvalCenterAutoShown=false;
   let approvalCenterLoading=false;
   let approvalCounts={};
+  let approvalClassCounts={};
+  let approvalClassNames={};
+  let approvalAttemptsCache=null,approvalAttemptsAt=0,approvalSweepAt=0;
+  const APPROVAL_POLL_MS=60000,APPROVAL_ATTEMPTS_MAX_AGE_MS=5*60000,APPROVAL_SWEEP_MIN_MS=5*60000;
+  const POINTS_API_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 
   const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
   const studentNudgeMessages={
@@ -895,8 +921,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
-    {key:"posukPoints",icon:"⭐",title:"Posuk Practice points",detail:"100% milestone point requests waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
     {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
@@ -957,9 +983,36 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     }
     list.innerHTML=active.map(function(item){
       const count=Number(approvalCounts[item.key]||0);
-      return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+'</small></span><span class="approval-center-count">'+count+'</span></a>';
+      const split=approvalClassSplitText(approvalClassCounts[item.key]);
+      return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+(split?' '+split:'')+'</small></span><span class="approval-center-count">'+count+'</span></a>';
     }).join("");
     return total;
+  }
+  function approvalClassSplitText(map){
+    if(!map)return "";
+    const names={et:"ET",wt:"WT"};
+    // Student Rewards class ids are long ids (for example class-b3-wt); show the class name.
+    const label=function(k){const n=String(approvalClassNames[k]||names[k]||k||"Unassigned");return n.replace(/^B3\s+/i,"");};
+    const parts=Object.keys(map).filter(function(k){return map[k]>0;}).sort(function(a,b){return label(a).localeCompare(label(b));}).map(function(k){return label(k)+" "+map[k];});
+    return parts.length?"("+parts.join(" · ")+")":"";
+  }
+  function approvalClassFallback(x){return x&&x.className?({"B3 ET":"et","B3 WT":"wt"})[x.className]||"":"";}
+  // Posuk Practice 100% milestones are automatic. Anything still pending from
+  // before the automatic flow is paid through the same server approve action
+  // teachers use (idempotent: an already-approved request is never paid twice).
+  async function sweepAutomaticPosukPoints(pointRequestsMap){
+    const Q=window.FunTorahApprovalQueue;
+    if(!Q||!isAuthorizedAdmin||Date.now()-approvalSweepAt<APPROVAL_SWEEP_MIN_MS)return;
+    const ids=Q.automaticQueue(pointRequestsMap).map(function(x){return x.id;});
+    if(!ids.length)return;
+    approvalSweepAt=Date.now();
+    try{
+      const user=firebase.auth().currentUser;if(!user)return;
+      const token=await user.getIdToken();
+      for(const id of ids){
+        await fetch(POINTS_API_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action:"approve-point-request",requestId:id})}).catch(function(err){console.warn("Automatic Posuk point approval failed",id,err);});
+      }
+    }catch(err){console.warn("Automatic Posuk point sweep failed",err);}
   }
   function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
   function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
@@ -968,12 +1021,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     approvalCenterLoading=true;
     renderApprovalCenter();
     const reads=[
-      ["attempts",db.ref("posukPractice/attempts").once("value")],
+      // The full Posuk attempts tree is large; reuse it for a few minutes.
+      ["attempts",(approvalAttemptsCache&&Date.now()-approvalAttemptsAt<APPROVAL_ATTEMPTS_MAX_AGE_MS)?Promise.resolve(approvalAttemptsCache):db.ref("posukPractice/attempts").once("value").then(function(snap){approvalAttemptsCache=snap;approvalAttemptsAt=Date.now();return snap;})],
       ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
       ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
       ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
       ["gallery",db.ref("classGallery/posts").once("value")],
-      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")]
+      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")],
+      ["rewardClasses",db.ref("studentRewards/classes").once("value")]
     ];
     const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
     const data={};const failed=[];
@@ -982,14 +1037,34 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(result.status==="fulfilled")data[key]=result.value.val()||{};
       else failed.push(key);
     });
-    const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
+    // Gallery posts live in one shared list but the gallery page shows one class at a time,
+    // so link straight to the class that has the waiting projects (most pending first).
+    const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
+    const galleryByClass={};
+    galleryPending.forEach(function(x){const c=x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et";galleryByClass[c]=(galleryByClass[c]||0)+1;});
+    const galleryClass=Object.keys(galleryByClass).sort(function(a,b){return galleryByClass[b]-galleryByClass[a];})[0];
+    const galleryDef=approvalDefinitions.find(function(d){return d.key==="gallery";});
+    if(galleryDef)galleryDef.href="class-gallery/index.html?"+(galleryClass?"class="+encodeURIComponent(galleryClass)+"&":"")+"review=pending";
+    const Q=window.FunTorahApprovalQueue;
+    approvalClassNames={};
+    Object.keys(data.rewardClasses||{}).forEach(function(id){const c=data.rewardClasses[id];if(c&&c.name)approvalClassNames[id]=c.name;});
+    // Same rule as the Chazara teacher page and Student Rewards: Posuk Practice
+    // milestones never count as manual approvals.
+    const chazaraPending=data.pointRequests?Q.manualQueue(data.pointRequests,Q.isChazaraApproval).map(function(x){return x.item;}):[];
+    const rashiPending=data.pointRequests?Q.rashiQueue(data.pointRequests).map(function(x){return x.item;}):[];
+    approvalClassCounts={
+      chazara:Q.countByClass(chazaraPending,approvalClassFallback),
+      rashiRecordings:Q.countByClass(rashiPending,function(x){return x&&x.workspaceClassId||approvalClassFallback(x);}),
+      gallery:Q.countByClass(galleryPending.map(function(x){return {classId:x.classId||({"B3 ET":"et","B3 WT":"wt"})[x.className]||"et"};}))
+    };
+    if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
-      posukPoints:data.pointRequests?pointRequests.filter(function(x){return ["reading100","translation100","understand100"].includes(String(x.source||""));}).length:0,
-      chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
+      chazara:chazaraPending.length,
+      rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
       shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
-      gallery:data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}).length:0,
+      gallery:galleryPending.length,
       prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
     };
     approvalCenterLoading=false;
@@ -1011,13 +1086,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(approvalCenterTimer)clearInterval(approvalCenterTimer);
     // Keep the corner approval badge updated without auto-opening the center modal.
     loadApprovalCenter(false);
-    approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
+    approvalCenterTimer=setInterval(function(){if(!document.hidden)loadApprovalCenter(false);},APPROVAL_POLL_MS);
   }
   function stopApprovalCenter(){
     if(approvalCenterTimer){clearInterval(approvalCenterTimer);approvalCenterTimer=null;}
     el("approvalCenterButton").classList.add("hidden");
     closeApprovalCenter();
     approvalCounts={};
+    approvalClassCounts={};
+    approvalAttemptsCache=null;approvalAttemptsAt=0;
     approvalCenterAutoShown=false;
   }
 
@@ -1190,7 +1267,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const button=document.createElement('button');
       button.type='button';
       button.className='card-lock';
-      button.textContent=locked?'\uD83D\uDD12':'\uD83D\uDD13';
+      button.textContent=locked?'🔒':'🔓';
       button.classList.add(locked?'is-locked':'is-open');
 
       if(!globallyActive){
@@ -1323,7 +1400,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
 
   function renderStudentAccess(){
-    el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
+    el("classPointerStudentLink").classList.add("hidden"); // Student Pointer is now embedded in their activities.
     queueMicrotask(renderStudentNudges);
     queueMicrotask(renderCardLocks);
     setTeacherToolPairVisibility();
@@ -1363,7 +1440,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1430,12 +1507,30 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
-  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  function studentAuthUrl(){
+    const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/i.test(location.hostname);
+    if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
+    return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  }
   async function studentAuthCall(body){
-    const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw Object.assign(new Error(data.error||"Could not check your login. Try again."),{status:response.status});
-    return data;
+    // Retry temporary function failures, never rejected credentials.
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const response=await fetch(studentAuthUrl(),{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok){
+          const error=Object.assign(new Error(data.error||(response.status>=500?"Sign-in service is temporarily unavailable. Please try again.":"Could not check your login. Try again.")),{status:response.status});
+          if(response.status>=500&&attempt===0){await new Promise(resolve=>setTimeout(resolve,1000));continue;}
+          throw error;
+        }
+        return data;
+      }catch(error){
+        if(attempt===0&&(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError)){await new Promise(resolve=>setTimeout(resolve,1000));continue;}
+        if(error.name==="TimeoutError"||error.name==="AbortError"||error instanceof TypeError)throw new Error("Sign-in connection is slow. Please try again in a moment.");
+        throw error;
+      }
+    }
   }
   async function checkStudentAccess(name,pin){
     const typed=String(name||"").trim(),enteredPin=String(pin||"").trim();
@@ -1445,21 +1540,67 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
     catch(e){return{ok:false,reason:e.message,status:e.status}}
     let classId;
-    try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
-    catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
+    if(Array.isArray(r.classChoices)&&r.classChoices.length){
+      studentClassChoices=r.classChoices;
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=(studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0]).id;
+    }else{
+      // Older auth-function deployments return the selected class but not the
+      // full classChoices list. Use that trusted server result so sign-in does
+      // not depend on an unauthenticated Firebase roster read timing out.
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=stored||r.classId||legacyMigrationClass(r.id);
+      studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
+    }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId};
+    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
   async function enterStudent(r){
+    if(!isStudentPreview){
+      const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+      if(!pin)throw new Error("Please sign in again so your student access can be secured.");
+      let customToken=r.customToken;
+      // Reuse the token returned by the initial passcode check when it matches
+      // the selected class. This avoids a redundant second function request.
+      if(!customToken){
+        const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
+        customToken=credential.customToken;
+      }
+      if(!customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
+      try{
+        // A real student login must remain in this tab only; teacher tabs
+        // continue to use their own Firebase sessions.
+        await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+        await firebase.auth().signInWithCustomToken(customToken);
+      }catch(e){
+        if(e?.code!=="auth/network-request-failed")throw e;
+        // Firebase can lose the connection while exchanging an otherwise
+        // valid custom token. Retry once after a short pause for transient drops.
+        await new Promise(resolve=>setTimeout(resolve,800));
+        try{await firebase.auth().signInWithCustomToken(customToken);}
+        catch(retryError){
+          if(retryError?.code==="auth/network-request-failed"){
+            throw new Error("Your passcode was accepted, but Firebase sign-in was interrupted. Please try again.");
+          }
+          throw retryError;
+        }
+      }
+    }
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
     if(studentMembershipWatch)studentMembershipWatch.off();
     studentAccessRevoked=false;
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
-    try{myClassRecord=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId,8000)).val()||null;}catch(e){}
+    try{
+      const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+      const fields=["name","active","siteEnabled","access","toolGrants"];
+      const snapshots=await Promise.all([...fields.map(field=>readOnce(classPath+"/"+field,8000)),readOnce(classPath+"/members/"+myStudentId,8000)]);
+      myClassRecord=Object.fromEntries(fields.map((field,i)=>[field,snapshots[i].val()]));
+      myClassRecord.members={[myStudentId]:snapshots[fields.length].val()};
+    }catch(e){}
     if(!isStudentPreview){
       sessionStorage.setItem("b3Games_studentId",myStudentId);
       sessionStorage.setItem("b3Games_studentName",myStudentName);
@@ -1469,14 +1610,24 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       sessionStorage.setItem("weeklyQuiz_classId",myClassId);
       // Wake the class-wide Classroom Pointer listener after the first login.
       window.dispatchEvent(new Event("fttStudentSignedIn"));
+      // Student's verified Firebase token is required for follow navigation.
+      void window.FTTFollowStudent?.start({workspaceId,classId:myClassId,studentId:myStudentId})
+        .catch(error=>console.warn("Follow Teacher unavailable",error));
     }
     let chooser=el("activeStudentClass");
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
     chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
     chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
     chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
-    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
-    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
+    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();
+    const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+    const classRefs=[...(["name","active","siteEnabled","access","toolGrants"].map(field=>({field,ref:db.ref(classPath+"/"+field)}))),{field:"member",ref:db.ref(classPath+"/members/"+myStudentId)}];
+    studentClassWatch={off(){classRefs.forEach(x=>x.ref.off());}};
+    classRefs.forEach(({field,ref})=>ref.on("value",snap=>{
+      if(field==="member")myClassRecord.members={[myStudentId]:snap.val()};else myClassRecord[field]=snap.val();
+      if(myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}
+      renderStudentAccess();
+    }));
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
@@ -1527,17 +1678,48 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       clearWrongPasscodeAttempts(studentName);
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+      // A student who opened a direct activity link (e.g. a teacher-assigned
+      // Weekly Quiz) before signing in goes straight back to it.
+      let returnTo="";try{returnTo=sessionStorage.getItem("b3StudentReturnTo")||"";sessionStorage.removeItem("b3StudentReturnTo");}catch(e){}
+      if(returnTo&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(returnTo)){location.replace(new URL(returnTo,location.href).href);return;}
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
     finally{btn.disabled=false;}
   }
 
+  let actingStudentRestoreInFlight=false;
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
     if(isGuest()&&!isStudentPreview){renderStudentAccess();return;}
-    const id=isStudentPreview?previewStudentId:(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
+    const actingStudent=settingsApi.getActingStudent?.();
+    const id=isStudentPreview?previewStudentId:(actingStudent?.id||sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
+    // Firebase fires onAuthStateChanged again as the dedicated student tab
+    // signs in. Do not start a second login or overwrite a ready student.
+    if(actingStudent&&(actingStudentRestoreInFlight||
+        (myStudentId===id&&myClassId===actingStudent.classId&&!studentAccessRevoked)))return;
     showChecking();
     try{
+      if(actingStudent&&!isStudentPreview){
+        actingStudentRestoreInFlight=true;
+        try {
+        // The separate student tab has no teacher Firebase credentials.
+        // Authenticate its copied, server-verified student passcode before
+        // attempting any Firebase database reads.
+        const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+        if(!pin){showLogin();setLoginMsg("Please reopen student view from your teacher tab.");return;}
+        const identity=await studentAuthCall({action:"login",name:actingStudent.name,pin,classId:actingStudent.classId});
+        if(!identity?.customToken||identity.id!==id||identity.classId!==actingStudent.classId){
+          throw new Error("This student no longer has access to the selected class.");
+        }
+        studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
+        await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        // "Student version" from a teacher page lands on that tool once signed in.
+        const next=sessionStorage.getItem("b3ActAsNext");
+        sessionStorage.removeItem("b3ActAsNext");
+        if(next&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(next)){location.replace(new URL(next,location.href).href);}
+        return;
+        } finally { actingStudentRestoreInFlight=false; }
+      }
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
       let d=snap.val()||{};
       if(!snap.exists()){
@@ -1549,6 +1731,16 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       if(isAuthorizedTeacher)return;
       if(d.active===false){showLogin();return;}
+      if(actingStudent){
+        const classId=actingStudent.classId;
+        const clsSnap=await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+classId);
+        const cls=clsSnap.val();
+        const member=cls?.members?.[id];
+        if(!cls||cls.active===false||!member||member.active===false){showLogin();return;}
+        studentClassChoices=[{id:classId,name:String(cls.name||actingStudent.className||classId)}];
+        await enterStudent({id,name:String(d.name||actingStudent.name),classId});
+        return;
+      }
       // Every activity reuses the passcode saved at homepage sign-in. If it is
       // missing or out of date, ask once here instead of inside each activity.
       if(!isStudentPreview){
@@ -1562,22 +1754,39 @@ const active=(members[id]?.active!==false&&profile.active!==false);
           showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
         }
       }
-      const restoredClassId=await resolvedStudentClass(id,d);
+      const identity=await studentAuthCall({action:"login",name:d.name||sessionStorage.getItem("b3Games_studentName")||id,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});
+      studentClassChoices=Array.isArray(identity.classChoices)?identity.classChoices:[];
+      const storedClassId=sessionStorage.getItem("b3Games_studentClass");
+      const restoredClassId=(studentClassChoices.find(c=>c.id===storedClassId)||studentClassChoices.find(c=>c.id===identity.classId)||studentClassChoices[0]||{}).id||await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
       await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 
-  function switchStudent(){
-    resetPinForm();
-    studentAccessRevoked=false;
+  async function switchStudent(){
+    // Clear the student identity first so auth callbacks cannot restore the
+    // previous student while Firebase finishes signing out.
+    window.FTTFollowStudent?.stop();
+    studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
+    studentMembershipWatch=studentClassWatch=studentProfileWatch=null;
     ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
+    // Ends only this student's Firebase session. The teacher's remembered
+    // Google login is untouched and this tab will not adopt it.
+    if(!isAuthorizedTeacher){
+      try { await settingsApi.endStudentSession(); }
+      catch(error){
+        console.warn("Could not sign out student Firebase session:",error);
+        setLoginMsg("Could not fully sign out. Please retry before another student signs in.");
+        return;
+      }
+    }
+    studentAccessRevoked=false;
   }
 
   function timeParts(value){
@@ -2023,7 +2232,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
   el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
-  el("approvalCenterRefresh")?.addEventListener("click",()=>loadApprovalCenter(false));
+  el("approvalCenterRefresh")?.addEventListener("click",()=>{approvalAttemptsAt=0;loadApprovalCenter(false);});
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
@@ -2166,6 +2375,50 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(isAuthorizedTeacher||(homepageTeacherChecked&&homepageStudentChecked))
       document.documentElement.classList.remove("b3-home-auth-pending");
   }
+  // ---- Owner home bar: class picker + padlock that opens Class Access in place.
+  const homeClassBarAllowed=window.top===window&&pageParams.get("adminPage")!=="1"&&!isStudentPreview;
+  let homeClassUnsub=null,homeClassNames={et:"ET",wt:"WT"};
+  let homeClassId=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
+  function homeClassAccessUrl(){return "admin.html?tab=access&embed=1&class="+encodeURIComponent(homeClassId);}
+  function syncHomeClassAccess(){
+    el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[homeClassId]||homeClassId);
+    const frame=el("homeAccessFrame");
+    if(!el("homeAccessModal").classList.contains("hidden")&&frame.getAttribute("src")!==homeClassAccessUrl())frame.setAttribute("src",homeClassAccessUrl());
+  }
+  function closeHomeClassAccess(){el("homeAccessModal").classList.add("hidden");document.body.style.overflow="";}
+  function openHomeClassAccess(){el("homeAccessModal").classList.remove("hidden");document.body.style.overflow="hidden";syncHomeClassAccess();}
+  function renderHomeClassBar(){
+    const show=homeClassBarAllowed&&isAuthorizedAdmin;
+    el("homeClassBar").classList.toggle("hidden",!show);
+    document.body.classList.toggle("has-home-class-bar",show);
+    if(!show){closeHomeClassAccess();return;}
+    if(homeClassUnsub)return;
+    const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
+    const onValue=snapshot=>{
+      const rows=snapshot.val()||{};
+      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
+      const list=all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+      homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
+      if(!homeClassNames[homeClassId])homeClassId=list[0].id;
+      const select=el("homeClassSelect");select.innerHTML="";
+      list.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=homeClassNames[c.id];select.appendChild(o);});
+      select.value=homeClassId;
+      syncHomeClassAccess();
+    };
+    ref.on("value",onValue,e=>console.warn("Could not load classes for the home class bar",e));
+    homeClassUnsub=()=>ref.off("value",onValue);
+  }
+  el("homeClassSelect").addEventListener("change",e=>{
+    homeClassId=e.target.value;
+    try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}
+    syncHomeClassAccess();
+  });
+  el("homeClassLock").addEventListener("click",openHomeClassAccess);
+  el("homeAccessClose").addEventListener("click",closeHomeClassAccess);
+  el("homeAccessModal").addEventListener("click",e=>{if(e.target===el("homeAccessModal"))closeHomeClassAccess();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!el("homeAccessModal").classList.contains("hidden"))closeHomeClassAccess();});
+
   // A slow or failed network should not leave the login form hidden forever.
   setTimeout(()=>document.documentElement.classList.remove("b3-home-auth-pending"),12000);
   settingsApi.onAuthStateChanged((user,authorized,access)=>{
@@ -2183,6 +2436,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     currentAccess=access||{authorized:false,role:"",classIds:[]};
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
+    renderHomeClassBar();
     homepageTeacherChecked=true;
     finishHomepageBootstrap();
     // A verified teacher always wins over a guest preview.
@@ -2202,8 +2456,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     finishHomepageBootstrap();
   });
 })();
+},{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 

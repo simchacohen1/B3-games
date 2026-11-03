@@ -1,0 +1,1995 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
+  <meta charset="utf-8" />
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="../guest-mode.js?v=20261011-guest"></script>
+  <script src="../backend/functions/student-tool-policy.js?v=pr234-deps1"></script>
+<script src="../game-gate.js?v=pr234-deps1" data-game-id="shorashim"></script>
+  <title>Shorashim Learning Lab</title>
+  <style>
+:root{
+  --bg:#f6f7fb;--panel:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;
+  --primary:#4f46e5;--primary2:#eef2ff;--danger:#b91c1c;--green:#047857;--gold:#a16207;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eef2ff 0,#f8fafc 260px,#f6f7fb 100%);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}.muted{color:var(--muted)}
+.app-shell{max-width:1480px;margin:0 auto;padding:24px}.topbar{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:24px}.topbar h1{margin:2px 0 0;font-size:clamp(28px,4vw,46px)}
+.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--primary)}.topbar-actions{display:flex;background:#fff;border:1px solid var(--line);padding:4px;border-radius:14px;box-shadow:0 4px 14px #00000010}.seg{border:0;background:transparent;border-radius:10px;padding:10px 18px;font-weight:800;color:var(--muted)}.seg.active{background:var(--primary);color:#fff}
+.card-panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 12px 35px #1720330d}.compact{padding:12px 16px}.prototype-picker{display:flex;gap:14px;justify-content:space-between;align-items:center;margin-bottom:18px}.prototype-picker>div{flex:1}.prototype-picker select{min-width:220px}
+select,input,textarea{border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;background:#fff}.primary,.ghost,.danger{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.primary{background:var(--primary);color:#fff}.primary:hover{filter:brightness(.96)}.ghost{background:#f1f5f9;color:#334155}.danger{background:#fee2e2;color:#991b1b}.big{font-size:18px;padding:14px 26px}.small{padding:8px 10px;font-size:13px}
+.screen{display:none}.screen.active{display:block}.hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.hero-grid.two{grid-template-columns:repeat(2,minmax(0,1fr));max-width:900px}.feature-card{min-height:170px;text-align:left;border:1px solid var(--line);border-radius:24px;padding:22px;background:#fff;box-shadow:0 12px 30px #0000000b;display:flex;flex-direction:column;gap:8px;transition:.15s}.feature-card:hover{transform:translateY(-2px)}.feature-card strong{font-size:21px}.feature-card span:last-child{color:var(--muted)}.feature-icon{font-size:38px}.feature-card.learn{background:linear-gradient(145deg,#eef2ff,#fff)}.feature-card.affix{background:linear-gradient(145deg,#f0fdfa,#fff)}.feature-card.review{background:linear-gradient(145deg,#ecfdf5,#fff)}.feature-card.games{background:linear-gradient(145deg,#fdf4ff,#fff)}.feature-card.gallery{background:linear-gradient(145deg,#fff7ed,#fff)}.feature-card.locked{filter:grayscale(.5);opacity:.72}
+.stats-grid,.teacher-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}.stat-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}.stat-card .value{font-size:28px;font-weight:900;margin-top:4px}.stat-card .label{font-size:13px;color:var(--muted);font-weight:700}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:8px 0 18px}.section-head h2{margin:2px 0 0;font-size:30px}.session-status{font-size:13px;font-weight:800;background:#eef2ff;color:#4338ca;padding:9px 12px;border-radius:999px}.center-panel{text-align:center;max-width:620px;margin:60px auto}.center-panel h3{font-size:26px;margin:0 0 8px}.center-panel p{color:var(--muted);line-height:1.6}
+.learn-layout{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}.panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.panel-title-row h3{margin:0}.pill,.badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;background:#eef2ff;color:#4338ca}.pill.subtle{background:#f1f5f9;color:#475569}.badge{background:#fef3c7;color:#92400e}.word-list{display:flex;flex-direction:column;gap:8px;max-height:780px;overflow:auto;padding-right:4px}.word-row{border:1px solid var(--line);border-radius:14px;padding:11px;background:#fff;text-align:left}.word-row:hover:not(:disabled){border-color:#a5b4fc;background:#f8faff}.word-row.active{border-color:var(--primary);background:#eef2ff}.word-row.learned{opacity:.62}.word-row.locked{opacity:.45}.word-row .hebrew{font-size:27px;font-weight:800;direction:rtl}.word-row .meta{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}.editor-panel{min-height:700px}.empty-state{text-align:center;color:var(--muted);padding:50px 20px}
+.example-teaching{border:1px solid #c7d2fe;background:#eef2ff;border-radius:16px;padding:14px;margin:12px 0}.example-teaching h4{margin:0 0 8px}.example-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.example-pair{background:#fff;border-radius:12px;padding:9px}.example-pair .heb{font-size:22px;font-weight:900;direction:rtl}.example-pair .eng{font-size:13px;color:var(--muted);margin-top:4px}.affix-mark{color:#4f46e5;background:#e0e7ff;border-radius:6px;padding:0 2px}
+.flip-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.flashcard{position:relative;overflow:hidden;border-radius:24px;border:2px solid #e2e8f0;background:#fff9e8;min-height:360px;box-shadow:inset 0 0 0 1px #ffffff80}.card-label{position:absolute;top:14px;left:14px;font-size:11px;letter-spacing:.08em;font-weight:900;color:#64748b;background:#ffffffd9;border-radius:999px;padding:5px 8px;z-index:10}.editable .movable{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);user-select:none;cursor:move;z-index:5;max-width:88%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.08}.hebrew-text{font-size:58px;font-weight:800;direction:rtl}.english-text{font-size:46px;font-weight:800}.card-examples{position:absolute;left:8%;right:8%;top:45%;display:grid;gap:5px;text-align:center;z-index:4;pointer-events:none}.card-examples .heb-example{direction:rtl;font-size:22px;font-weight:800}.card-examples.back-examples{top:62%;font-size:14px;color:#475569}.approved-art-layer,.review-art-layer,.gallery-art-layer{position:absolute;inset:0;z-index:3;pointer-events:none}.art-item{position:absolute;transform:translate(-50%,-50%);user-select:none;pointer-events:auto}.art-item.emoji{line-height:1}.art-item.illustration img{width:100%;height:100%;object-fit:contain;display:block}.art-item.selected{outline:3px solid #6366f1;outline-offset:3px;border-radius:10px}.editable canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;touch-action:none}.tool-columns{display:grid;grid-template-columns:1.1fr .9fr 1fr;gap:12px;margin-top:14px}.toolbox{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fafafa}.toolbox h4{margin:0 0 10px}.toolbox label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:9px 0;font-size:13px;font-weight:700}.toolbox input[type="range"]{max-width:135px}.art-choices{display:flex;flex-wrap:wrap;gap:10px}.art-choice{font-size:48px;line-height:1;border:2px solid var(--line);background:#fff;border-radius:15px;width:74px;height:74px;padding:6px;display:grid;place-items:center}.art-choice:hover,.art-choice:focus-visible{border-color:#6366f1;transform:scale(1.04)}.art-choice img{width:100%;height:100%;object-fit:contain}.art-section-label{font-size:12px;font-weight:800;color:#64748b;margin:8px 0}.mini-note{font-size:12px;color:var(--muted)}.button-row,.draw-row,.editor-actions,.review-nav{display:flex;gap:8px;flex-wrap:wrap}.editor-actions{justify-content:flex-end;margin-top:14px}.session-footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
+.review-rule{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;background:#fffbeb;border-color:#fde68a}.review-controls{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:18px}.review-controls label{display:flex;flex-direction:column;gap:6px;font-weight:800}.review-meta{display:flex;justify-content:space-between;gap:10px;max-width:760px;margin:0 auto 10px;flex-wrap:wrap}.review-card-wrap{display:flex;justify-content:center}.review-card{width:min(760px,92vw);min-height:440px;border:2px solid #dbeafe;background:#fff;box-shadow:0 24px 70px #1e3a8a18;padding:0}.review-hebrew,.review-english{font-size:72px;font-weight:900;position:absolute;left:50%;top:28%;transform:translate(-50%,-50%);direction:rtl;max-width:88%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.08}.review-english{font-size:54px;direction:ltr}.review-examples{position:absolute;left:8%;right:8%;top:46%;display:grid;gap:6px;text-align:center}.review-examples .heb-example{direction:rtl;font-size:24px;font-weight:800}.review-examples.back{top:63%;font-size:17px;color:#475569}.review-drawing{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.review-nav{justify-content:center;margin-top:14px}.keyboard-hint{text-align:center;color:#64748b;margin-top:10px;font-size:13px}.too-fast{max-width:760px;margin:0 auto 8px;background:#fee2e2;color:#991b1b;border-radius:12px;padding:8px 12px;font-weight:800;text-align:center}
+.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.gallery-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px}.gallery-card{position:relative;height:190px;border:1px solid var(--line);border-radius:14px;overflow:hidden}.gallery-card .g-hebrew{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);direction:rtl;font-size:34px;font-weight:900;max-width:88%;text-align:center}.gallery-card .g-examples{position:absolute;left:8%;right:8%;top:45%;text-align:center;font-size:14px;direction:rtl}.gallery-card img.g-drawing{position:absolute;inset:0;width:100%;height:100%}.gallery-item .g-meta{margin-top:8px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.table-wrap{overflow:auto}.teacher-table{width:100%;border-collapse:collapse}.teacher-table th,.teacher-table td{text-align:left;padding:13px;border-bottom:1px solid var(--line)}.teacher-table th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}.teacher-table tr.clickable:hover{background:#f8fafc;cursor:pointer}.history-list{display:flex;flex-direction:column;gap:8px}.history-row{display:grid;grid-template-columns:150px 100px 1fr 170px;gap:12px;padding:10px;border-bottom:1px solid var(--line)}.subhead{margin-top:28px}
+.manager-controls{display:flex;gap:16px;align-items:end;flex-wrap:wrap}.manager-controls label{display:flex;flex-direction:column;gap:6px;font-weight:800}.catalog-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}.catalog-row{display:grid;grid-template-columns:52px 130px 1fr auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px}.catalog-row.hidden-item{opacity:.5}.catalog-term{font-size:24px;font-weight:900;direction:rtl}.catalog-actions{display:flex;gap:6px;flex-wrap:wrap}.order-buttons{display:flex;flex-direction:column;gap:4px}.order-buttons button{padding:3px 7px;border:0;border-radius:7px;background:#f1f5f9}
+.game-stage{margin-top:18px;min-height:360px}.game-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}.match-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.match-tile{min-height:92px;border:2px solid #e2e8f0;background:#fff;border-radius:14px;font-weight:800;padding:10px}.match-tile.hebrew{font-size:24px;direction:rtl}.match-tile.selected{border-color:#6366f1;background:#eef2ff}.match-tile.matched{opacity:.35;pointer-events:none}.shoot-prompt{text-align:center;font-size:42px;font-weight:900;direction:rtl;margin:20px 0}.targets{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.target{min-height:150px;border:0;border-radius:50%;background:radial-gradient(circle,#fff 0 28%,#fee2e2 29% 48%,#fff 49% 67%,#fecaca 68% 100%);box-shadow:0 10px 25px #0001;font-weight:900;padding:22px}.target.correct{outline:5px solid #10b981}.target.wrong{outline:5px solid #ef4444}
+dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialog-card{min-width:min(430px,92vw);padding:22px;display:flex;flex-direction:column;gap:12px}.dialog-card.wide{min-width:min(650px,92vw)}.dialog-card label{display:flex;flex-direction:column;gap:5px;font-weight:800}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+@media(max-width:1050px){.hero-grid,.stats-grid,.teacher-summary,.gallery-grid{grid-template-columns:repeat(2,1fr)}.learn-layout{grid-template-columns:1fr}.word-list{max-height:320px}.tool-columns{grid-template-columns:1fr}.flip-stage{grid-template-columns:1fr}.match-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.app-shell{padding:14px}.topbar,.prototype-picker,.section-head,.session-footer{align-items:stretch;flex-direction:column}.hero-grid,.hero-grid.two,.stats-grid,.teacher-summary,.gallery-grid,.targets{grid-template-columns:1fr}.topbar-actions{align-self:flex-start}.review-card{min-height:390px}.review-hebrew{font-size:56px}.review-english{font-size:42px}.catalog-row{grid-template-columns:40px 1fr}.catalog-actions{grid-column:1/-1}.history-row{grid-template-columns:1fr}}
+
+/* Simplified kid-friendly color choices */
+.color-control{display:flex;flex-direction:column;gap:7px;margin:10px 0;font-size:13px;font-weight:800}.color-control.compact-color{flex:1;min-width:180px}.color-swatches{display:flex;flex-wrap:wrap;gap:7px}.color-swatch{width:30px;height:30px;border-radius:9px;border:2px solid #cbd5e1;padding:0;box-shadow:inset 0 0 0 1px #fff8;position:relative}.color-swatch:hover{transform:translateY(-1px);border-color:#64748b}.color-swatch.active{border-color:#111827;box-shadow:0 0 0 3px #c7d2fe}.color-swatch.active:after{content:'✓';position:absolute;inset:0;display:grid;place-items:center;font-weight:1000;color:#fff;text-shadow:0 1px 3px #000}.color-swatch[style*="255, 255, 255"].active:after,.color-swatch[style*="#ffffff"].active:after{color:#111827;text-shadow:none}.background-swatches .color-swatch{width:34px;height:34px}
+
+/* Picture editing */
+.approved-art-layer{pointer-events:none}.approved-art-layer .art-item{pointer-events:auto;touch-action:none;cursor:grab}.approved-art-layer .art-item:active{cursor:grabbing}.art-item.illustration img{pointer-events:none;-webkit-user-drag:none;user-select:none}.art-item.selected{outline:4px solid #4f46e5;outline-offset:4px;background:#ffffff30}.art-edit-row{margin-top:10px}.danger.small{padding:7px 10px}
+/* While the Draw tool is active, placed pictures must not intercept pointer events -- otherwise a drag near a sticker moves the sticker instead of drawing on the canvas underneath it. */
+.ux-drawing .approved-art-layer .art-item{pointer-events:none}
+
+/* Game menu and shared arcade UI */
+.game-menu-grid{margin-bottom:4px}.game-scorebox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.game-scorebox>b,.game-scorebox>span{background:#f1f5f9;border-radius:999px;padding:7px 10px}.game-result-banner,.game-finish{text-align:center;margin:18px auto 0;padding:18px;border-radius:18px;background:#f8fafc;border:1px solid var(--line);max-width:620px}.game-finish{margin-top:60px}.game-finish .finish-icon{font-size:58px}.game-message{text-align:center;font-weight:900;color:#475569;margin-top:10px;min-height:24px}.game-message.correct{color:#047857}.game-message.wrong,.game-message.miss{color:#b91c1c}
+
+/* Match */
+.match-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px;align-items:start}.match-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.match-tile{transition:transform .12s,border-color .12s,background .12s}.match-tile:hover:not(:disabled){transform:translateY(-2px)}.leaderboard{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.leaderboard-title{font-weight:1000;margin-bottom:8px}.leaderboard-row{display:flex;justify-content:space-between;gap:8px;padding:7px 5px;border-bottom:1px solid #eef2f7;font-size:13px}.leaderboard-row:last-child{border-bottom:0}.leaderboard-row.current{background:#eef2ff;border-radius:8px;color:#3730a3}
+
+/* Target Shoot */
+.shoot-arena{height:360px;position:relative;overflow:hidden;border-radius:24px;background:linear-gradient(#dbeafe 0 60%,#dcfce7 60%);border:3px solid #bfdbfe;cursor:crosshair;user-select:none}.moving-target{position:absolute;width:150px;height:76px;border-radius:50%;display:grid;place-items:center;text-align:center;padding:8px;font-weight:1000;background:radial-gradient(circle,#fff 0 27%,#fecaca 28% 47%,#fff 48% 66%,#ef4444 67% 100%);box-shadow:0 10px 24px #0002;will-change:transform;pointer-events:none}.moving-target.bullseye{box-shadow:0 0 0 7px #22c55e,0 12px 30px #0002;transform:scale(1.08)}.moving-target.wrong-hit{box-shadow:0 0 0 7px #991b1b,0 12px 30px #0002}.crosshair{position:absolute;transform:translate(-50%,-50%);font-size:38px;font-weight:1000;color:#111827;opacity:0;z-index:8;pointer-events:none;text-shadow:0 1px 2px #fff}.crosshair.visible{opacity:.8}.shooter-base{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);font-size:44px;z-index:3;pointer-events:none}.dart-shot{position:absolute;z-index:9;font-size:28px;transform-origin:center;transition:transform .28s linear,opacity .38s ease;pointer-events:none}.shoot-prompt{margin:8px 0 14px}
+
+/* Whack-a-Word */
+.whack-prompt{text-align:center;font-size:46px;font-weight:1000;direction:rtl;margin:10px 0 18px}.whack-board{display:grid;grid-template-columns:repeat(3,1fr);gap:20px 16px;max-width:760px;margin:0 auto}.whack-hole{height:125px;position:relative;overflow:hidden;border-radius:18px 18px 50% 50%;background:linear-gradient(to bottom,transparent 0 55%,#78350f 56% 69%,#451a03 70% 100%)}.mole{position:absolute;left:50%;bottom:-105px;transform:translateX(-50%);width:88%;min-height:94px;border:0;border-radius:50% 50% 38% 38%;background:#d6a56c;border:4px solid #92400e;font-weight:1000;padding:12px;transition:bottom .18s ease,transform .12s;box-shadow:inset 0 -10px #b77942;cursor:pointer}.mole:before{content:'👀';display:block;font-size:20px;margin-bottom:2px}.mole.up{bottom:14px}.mole.hit{background:#86efac;border-color:#16a34a;transform:translateX(-50%) scale(.92)}.mole.wrong{background:#fca5a5;border-color:#dc2626;transform:translateX(-50%) rotate(-4deg)}
+
+/* Word Race */
+.race-track{display:grid;gap:12px;margin:14px 0 20px}.race-lane{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:10px}.lane-name{font-weight:1000}.race-road{height:72px;position:relative;border-radius:12px;overflow:hidden;background:repeating-linear-gradient(90deg,#475569 0 70px,#4b5563 70px 140px);border:4px solid #94a3b8}.race-road:after{content:'';position:absolute;left:0;right:0;top:50%;border-top:3px dashed #f8fafc}.race-car{position:absolute;left:-28px;top:9px;font-size:44px;z-index:2;transition:left .55s cubic-bezier(.2,.8,.2,1)}.race-car.computer{top:8px}.finish-line{position:absolute;right:3px;top:7px;font-size:42px;z-index:2}.race-prompt{text-align:center;font-size:46px;font-weight:1000;direction:rtl;margin:12px 0}.race-answers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:820px;margin:0 auto}.race-answer{min-height:80px;border:2px solid #cbd5e1;border-radius:16px;background:#fff;font-size:17px;font-weight:900;padding:12px}.race-answer:hover{border-color:#6366f1;background:#eef2ff}.race-answer.correct{border-color:#16a34a;background:#dcfce7}.race-answer.wrong{border-color:#dc2626;background:#fee2e2}
+
+@media(max-width:900px){.match-layout{grid-template-columns:1fr}.leaderboard{max-width:520px;margin:0 auto}.whack-board{grid-template-columns:repeat(2,1fr)}.race-answers{grid-template-columns:1fr}.shoot-arena{height:330px}}
+@media(max-width:650px){.game-scorebox{justify-content:flex-start}.match-grid{grid-template-columns:repeat(2,1fr)}.whack-board{grid-template-columns:1fr 1fr;gap:10px}.whack-hole{height:110px}.race-lane{grid-template-columns:60px 1fr}.lane-name{font-size:12px}.race-prompt,.whack-prompt{font-size:38px}.moving-target{width:120px;height:68px;font-size:12px}.shoot-arena{height:320px}}
+
+/* ===== Classroom login / cloud version ===== */
+.login-gate{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:24px; background:radial-gradient(circle at 25% 15%,#fff8dc 0,#f3ead0 48%,#dfd0a7 100%);
+}
+.login-card{
+  width:min(440px,100%); background:#fff; border:2px solid #d7b94b; border-radius:24px;
+  padding:30px; box-shadow:0 18px 50px rgba(55,43,20,.18); text-align:center;
+}
+.login-card h1{margin:.2rem 0 .4rem;font-size:2rem}.login-card p{color:#6b6256;margin:0 0 20px}
+.login-icon{font-size:3.3rem;line-height:1;margin-bottom:8px}
+.login-card label{display:block;text-align:left;font-weight:800;margin:14px 0 6px;color:#34312c}
+.login-card input{width:100%;margin-top:7px;padding:13px 14px;border:2px solid #d8d3c6;border-radius:13px;font:inherit;background:#fff}
+.login-card input:focus{outline:none;border-color:#b99928;box-shadow:0 0 0 3px rgba(185,153,40,.13)}
+.login-card .big{width:100%;margin-top:18px}
+.login-msg{min-height:1.3em;margin-top:12px;font-weight:700;color:#b42318;font-size:.9rem}
+.signed-in-as{white-space:nowrap}.cloud-status{font-size:.82rem;color:#5d695c;white-space:nowrap}
+.cloud-status.syncing{color:#8a6d1a}.cloud-status.error{color:#b42318}
+@media(max-width:650px){.login-card{padding:23px 18px}.signed-in-as{width:100%;text-align:right}.cloud-status{margin-left:auto}}
+
+</style>
+
+<style data-shorashim-workspace-ux="v1">
+  /*
+    Responsive learning-workspace UX
+    Goal: make the card creator comfortable at normal browser zoom.
+  */
+
+  /* -------- Compact learning-screen header on laptop-height screens -------- */
+  body.shorashim-learning-active .topbar {
+    padding-top: 14px !important;
+    padding-bottom: 10px !important;
+    gap: 12px !important;
+  }
+
+  body.shorashim-learning-active .topbar h1 {
+    font-size: clamp(2rem, 3.1vw, 2.75rem) !important;
+    line-height: 1.05 !important;
+    margin-top: 4px !important;
+    margin-bottom: 0 !important;
+  }
+
+  body.shorashim-learning-active #learnScreen .section-head {
+    margin-top: 8px !important;
+    margin-bottom: 10px !important;
+    min-height: 52px;
+  }
+
+  body.shorashim-learning-active #learnScreen .section-head h2 {
+    font-size: clamp(1.55rem, 2.3vw, 2rem) !important;
+    line-height: 1.08 !important;
+    margin: 2px 0 0 !important;
+  }
+
+  /* -------- Main two-column workspace -------- */
+  #learnWorkspace .learn-layout {
+    display: grid !important;
+    grid-template-columns: minmax(220px, 270px) minmax(0, 1fr) !important;
+    gap: 14px !important;
+    align-items: start !important;
+  }
+
+  #learnWorkspace.ux-path-collapsed .learn-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #learnWorkspace.ux-path-collapsed .word-list-panel {
+    display: none !important;
+  }
+
+  #learnWorkspace .word-list-panel {
+    position: sticky !important;
+    top: 10px !important;
+    max-height: calc(100vh - 165px) !important;
+    overflow: hidden !important;
+    padding: 14px !important;
+  }
+
+  #learnWorkspace .word-list-panel .panel-title-row {
+    gap: 8px !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+
+  #learnWorkspace .word-list-panel h3 {
+    margin: 0 !important;
+    line-height: 1.15 !important;
+  }
+
+  #learnWorkspace .word-list-panel .mini-note {
+    margin: 8px 0 10px !important;
+    line-height: 1.35 !important;
+  }
+
+  #learnWorkspace .word-list {
+    max-height: calc(100vh - 285px) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+  }
+
+  .ux-path-toggle {
+    border-radius: 999px !important;
+    padding: 6px 10px !important;
+    min-height: 0 !important;
+    font-size: .78rem !important;
+    white-space: nowrap;
+  }
+
+  /* -------- Editor -------- */
+  #learnWorkspace .editor-panel {
+    min-width: 0 !important;
+    padding: 14px 16px 16px !important;
+  }
+
+  #learnWorkspace .editor-panel > .panel-title-row {
+    margin-bottom: 8px !important;
+    gap: 10px !important;
+  }
+
+  #learnWorkspace .editor-panel > .panel-title-row > div:first-child {
+    min-width: 0;
+  }
+
+  #learnWorkspace #editorTitle {
+    margin: 2px 0 0 !important;
+    line-height: 1.15 !important;
+  }
+
+  /* Keep the two card sides large enough to use, but not so tall
+     that the controls disappear below the screen. */
+  #learnWorkspace .flip-stage {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    align-items: stretch !important;
+  }
+
+  #learnWorkspace .flashcard.editable {
+    min-height: 0 !important;
+    height: clamp(245px, 34vh, 350px) !important;
+    max-height: 350px !important;
+    border-radius: 20px !important;
+  }
+
+  #learnWorkspace .flashcard .card-label {
+    top: 12px !important;
+    left: 12px !important;
+  }
+
+  /* -------- Editing tabs: one tool group at a time -------- */
+  .ux-tool-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 8px;
+    padding: 5px;
+    border: 1px solid rgba(99, 102, 241, .16);
+    border-radius: 15px;
+    background: rgba(248, 250, 252, .92);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .ux-tool-tab {
+    appearance: none;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    padding: 9px 14px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+  }
+
+  .ux-tool-tab:hover {
+    background: #eef2ff;
+  }
+
+  .ux-tool-tab.active {
+    background: #fff;
+    border-color: #c7d2fe;
+    box-shadow: 0 2px 9px rgba(49, 46, 129, .10);
+    color: #3730a3;
+  }
+
+  .ux-tool-tab:active {
+    transform: translateY(1px);
+  }
+
+  #learnWorkspace .tool-columns {
+    display: block !important;
+    margin-top: 0 !important;
+  }
+
+  #learnWorkspace .tool-columns > .toolbox {
+    display: none !important;
+    margin: 0 !important;
+    padding: 13px 14px !important;
+    min-height: 112px;
+    border-radius: 14px !important;
+  }
+
+  #learnWorkspace .tool-columns > .toolbox.ux-tool-active {
+    display: block !important;
+  }
+
+  /* Text controls become a compact two-column form. */
+  #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"].ux-tool-active {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 9px 18px !important;
+    align-items: center;
+  }
+
+  #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] > h4 {
+    grid-column: 1 / -1;
+    margin: 0 0 2px !important;
+  }
+
+  #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] > label {
+    margin: 0 !important;
+    gap: 8px !important;
+  }
+
+  #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-section-label,
+  #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .draw-row {
+    margin-top: 6px !important;
+  }
+
+  #learnWorkspace .art-edit-row,
+  #learnWorkspace .tool-columns .button-row {
+    gap: 7px !important;
+    flex-wrap: wrap !important;
+  }
+
+  /* -------- Always-available Save & Next -------- */
+  .ux-quick-save {
+    margin-left: auto !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    padding: 9px 14px !important;
+    min-height: 38px !important;
+    background: #4f46e5 !important;
+    color: #fff !important;
+    font: inherit;
+    font-weight: 900 !important;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, .18);
+    white-space: nowrap;
+  }
+
+  .ux-quick-save:hover {
+    filter: brightness(1.05);
+  }
+
+  .ux-quick-save[hidden] {
+    display: none !important;
+  }
+
+  /* Original actions stay available but take less vertical space. */
+  #learnWorkspace .editor-actions {
+    margin-top: 10px !important;
+    padding-top: 10px !important;
+  }
+
+  #learnWorkspace .session-footer {
+    margin-top: 12px !important;
+  }
+
+  /* -------- Short laptop screens: even more compact -------- */
+  @media (min-width: 901px) and (max-height: 860px) {
+    body.shorashim-learning-active .topbar {
+      padding-top: 9px !important;
+      padding-bottom: 7px !important;
+    }
+
+    body.shorashim-learning-active .topbar h1 {
+      font-size: 2.1rem !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head {
+      margin-top: 4px !important;
+      margin-bottom: 7px !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      height: clamp(220px, 31vh, 285px) !important;
+      max-height: 285px !important;
+    }
+
+    #learnWorkspace .word-list-panel {
+      max-height: calc(100vh - 135px) !important;
+    }
+
+    #learnWorkspace .word-list {
+      max-height: calc(100vh - 250px) !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox {
+      min-height: 96px;
+      padding-top: 10px !important;
+      padding-bottom: 10px !important;
+    }
+  }
+
+  /* -------- Narrow screens -------- */
+  @media (max-width: 900px) {
+    #learnWorkspace .learn-layout {
+      grid-template-columns: 1fr !important;
+    }
+
+    #learnWorkspace .word-list-panel {
+      position: static !important;
+      max-height: none !important;
+    }
+
+    #learnWorkspace .word-list {
+      max-height: 240px !important;
+    }
+
+    #learnWorkspace .flip-stage {
+      grid-template-columns: 1fr !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      height: clamp(250px, 44vh, 340px) !important;
+      max-height: 340px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"].ux-tool-active {
+      grid-template-columns: 1fr !important;
+    }
+
+    .ux-quick-save {
+      width: 100%;
+      order: 5;
+      margin-left: 0 !important;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .ux-tool-tabs {
+      gap: 5px;
+    }
+
+    .ux-tool-tab {
+      padding: 8px 10px;
+      font-size: .86rem;
+    }
+  }
+</style>
+
+
+<style data-shorashim-one-screen="v2">
+  /*
+    ONE-SCREEN MODE
+    At desktop/laptop widths, the Learn New Shorashim page itself
+    does not vertically scroll at 100% browser zoom.
+  */
+
+  @media (min-width: 901px) {
+    html:has(body.shorashim-learning-active),
+    body.shorashim-learning-active {
+      height: 100%;
+      overflow: hidden !important;
+    }
+
+    body.shorashim-learning-active {
+      min-height: 100dvh !important;
+    }
+
+    /* Compress the branding/header while a learning session is open. */
+    body.shorashim-learning-active .topbar {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 70px !important;
+      padding: 7px 28px !important;
+      margin: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 14px !important;
+    }
+
+    body.shorashim-learning-active .topbar .eyebrow {
+      display: none !important;
+    }
+
+    body.shorashim-learning-active .topbar h1 {
+      font-size: clamp(1.75rem, 2.5vw, 2.25rem) !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+      white-space: nowrap;
+    }
+
+    body.shorashim-learning-active .topbar > * {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* The learning screen owns the rest of the viewport. */
+    body.shorashim-learning-active #learnScreen.active {
+      box-sizing: border-box !important;
+      height: calc(100dvh - 70px) !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      padding-top: 0 !important;
+      padding-bottom: 8px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head {
+      flex: 0 0 48px !important;
+      min-height: 48px !important;
+      height: 48px !important;
+      margin: 0 0 6px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      display: grid !important;
+      grid-template-columns: 180px minmax(0, 1fr) 180px !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head .eyebrow {
+      display: none !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head h2 {
+      font-size: clamp(1.4rem, 2vw, 1.75rem) !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head > * {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    #learnWorkspace {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .learn-layout {
+      box-sizing: border-box !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      gap: 10px !important;
+      padding-bottom: 0 !important;
+    }
+
+    /* Sidebar stays on-screen; only its list itself can scroll. */
+    #learnWorkspace .word-list-panel {
+      box-sizing: border-box !important;
+      position: static !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      padding: 11px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .word-list-panel .panel-title-row {
+      flex: 0 0 auto !important;
+    }
+
+    #learnWorkspace .word-list-panel .mini-note {
+      flex: 0 0 auto !important;
+      margin: 5px 0 7px !important;
+      font-size: .76rem !important;
+      line-height: 1.25 !important;
+    }
+
+    #learnWorkspace .word-list {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow-y: auto !important;
+    }
+
+    #learnWorkspace .word-list > * {
+      margin-bottom: 7px !important;
+    }
+
+    /* Editor fills the remaining height exactly. */
+    #learnWorkspace .editor-panel {
+      box-sizing: border-box !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      padding: 10px 12px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    #learnWorkspace .editor-panel > .panel-title-row {
+      flex: 0 0 38px !important;
+      min-height: 38px !important;
+      margin: 0 0 6px !important;
+      align-items: center !important;
+    }
+
+    #learnWorkspace .editor-panel > .panel-title-row .eyebrow {
+      font-size: .7rem !important;
+      line-height: 1 !important;
+      margin-bottom: 2px !important;
+    }
+
+    #learnWorkspace #editorTitle {
+      font-size: 1rem !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+    }
+
+    #learnWorkspace .ux-quick-save {
+      padding: 8px 13px !important;
+      min-height: 34px !important;
+      height: 34px !important;
+      border-radius: 10px !important;
+    }
+
+    /* The editor content becomes a fixed-height workspace:
+       cards -> tabs -> active tools. */
+    #learnWorkspace #editorContent:not(.hidden) {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: hidden !important;
+      display: grid !important;
+      grid-template-rows:
+        minmax(185px, 1fr)
+        42px
+        minmax(118px, 27%) !important;
+      gap: 6px !important;
+    }
+
+    #learnWorkspace .flip-stage {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      gap: 10px !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      height: 100% !important;
+      border-radius: 17px !important;
+    }
+
+    /* Slightly smaller default content so large words/pictures still fit. */
+    #learnWorkspace .flashcard.editable .hebrew,
+    #learnWorkspace .flashcard.editable .hebrew-word {
+      line-height: 1 !important;
+    }
+
+    /* Compact tab strip. */
+    #learnWorkspace .ux-tool-tabs {
+      box-sizing: border-box !important;
+      min-height: 42px !important;
+      height: 42px !important;
+      margin: 0 !important;
+      padding: 3px 5px !important;
+      border-radius: 12px !important;
+      gap: 5px !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .ux-tool-tab {
+      box-sizing: border-box !important;
+      min-height: 34px !important;
+      height: 34px !important;
+      padding: 5px 12px !important;
+      font-size: .88rem !important;
+      border-radius: 9px !important;
+    }
+
+    /* Tool area fills the final portion of the screen but never pushes
+       the page below the viewport. */
+    #learnWorkspace .tool-columns {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 8px 10px !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox > h4 {
+      font-size: .9rem !important;
+      line-height: 1 !important;
+      margin: 0 0 5px !important;
+    }
+
+    /* Text & Card: all controls in two compact columns. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"].ux-tool-active {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      grid-auto-rows: minmax(0, auto) !important;
+      align-content: start !important;
+      column-gap: 16px !important;
+      row-gap: 4px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] > h4 {
+      grid-column: 1 / -1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] label {
+      margin: 0 !important;
+      font-size: .75rem !important;
+      line-height: 1.1 !important;
+      gap: 3px !important;
+    }
+
+    #learnWorkspace .tool-columns input[type="range"] {
+      margin-top: 2px !important;
+      margin-bottom: 2px !important;
+    }
+
+    #learnWorkspace .tool-columns select {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+      font-size: .78rem !important;
+    }
+
+    /* Picture controls: small image buttons and tighter groups. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"].ux-tool-active {
+      display: grid !important;
+      grid-template-columns: minmax(170px, 1fr) minmax(220px, 1.4fr) !important;
+      grid-template-rows: auto 1fr !important;
+      column-gap: 14px !important;
+      align-content: start !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] > h4 {
+      grid-column: 1 / -1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-section-label {
+      margin: 2px 0 !important;
+      font-size: .72rem !important;
+      line-height: 1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] button,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] button {
+      min-height: 28px !important;
+      padding: 4px 8px !important;
+      font-size: .72rem !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-option,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .emoji-option {
+      width: 42px !important;
+      height: 42px !important;
+      min-width: 42px !important;
+      min-height: 42px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] img {
+      max-height: 36px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .mini-note,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] p:last-child {
+      display: none !important;
+    }
+
+    /* Draw controls in one compact row where possible. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"].ux-tool-active {
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-start !important;
+      gap: 5px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .draw-row,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .button-row {
+      margin: 0 !important;
+      gap: 5px !important;
+    }
+
+    /* The top quick-save replaces the need for vertical room at bottom. */
+    #learnWorkspace .editor-actions {
+      margin: 0 !important;
+      padding: 0 !important;
+      min-height: 0 !important;
+    }
+
+    #learnWorkspace .editor-actions #saveCardBtn {
+      display: none !important;
+    }
+
+    /* If this footer exists in this screen, keep it from consuming
+       the working viewport. */
+    #learnWorkspace .session-footer {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  }
+
+  /* Very short laptop viewport: make cards slightly shorter and
+     give controls enough guaranteed space. */
+  @media (min-width: 901px) and (max-height: 720px) {
+    body.shorashim-learning-active .topbar {
+      height: 58px !important;
+      padding-top: 5px !important;
+      padding-bottom: 5px !important;
+    }
+
+    body.shorashim-learning-active .topbar h1 {
+      font-size: 1.65rem !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active {
+      height: calc(100dvh - 58px) !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head {
+      flex-basis: 42px !important;
+      height: 42px !important;
+      min-height: 42px !important;
+    }
+
+    #learnWorkspace #editorContent:not(.hidden) {
+      grid-template-rows:
+        minmax(155px, 1fr)
+        38px
+        minmax(108px, 29%) !important;
+    }
+
+    #learnWorkspace .ux-tool-tabs {
+      min-height: 38px !important;
+      height: 38px !important;
+    }
+
+    #learnWorkspace .ux-tool-tab {
+      min-height: 30px !important;
+      height: 30px !important;
+      padding-top: 3px !important;
+      padding-bottom: 3px !important;
+    }
+  }
+
+  /*
+    Narrow/mobile remains naturally scrollable. "No page scroll" is
+    intentionally a desktop/laptop rule, where the two-card workspace
+    is meant to fit in one viewport.
+  */
+</style>
+
+<!-- Keep the learning editor spacious without trapping it in a fixed-height
+     desktop viewport. The workspace is intentionally scrollable when its
+     cards or tools need more room. -->
+<style data-shorashim-scrollable-workspace="v1">
+  @media (min-width: 901px) {
+    html:has(body.shorashim-learning-active),
+    body.shorashim-learning-active {
+      height: auto !important;
+      overflow: auto !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active,
+    #learnWorkspace,
+    #learnWorkspace .learn-layout,
+    #learnWorkspace .editor-panel,
+    #learnWorkspace #editorContent:not(.hidden),
+    #learnWorkspace .tool-columns,
+    #learnWorkspace .tool-columns > .toolbox {
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active,
+    #learnWorkspace .editor-panel {
+      display: block !important;
+    }
+
+    #learnWorkspace #editorContent:not(.hidden) {
+      display: block !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      height: clamp(245px, 34vh, 350px) !important;
+      max-height: 350px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox {
+      padding: 13px 14px !important;
+    }
+
+    #learnWorkspace .editor-actions #saveCardBtn {
+      display: inline-flex !important;
+    }
+
+    #learnWorkspace .art-choice {
+      width: 82px !important;
+      height: 82px !important;
+      font-size: 46px !important;
+    }
+
+    #learnWorkspace .art-choice img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+</style>
+
+
+<style id="review-grid-fullscreen-fix">
+.review-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;max-height:52vh;overflow:auto;padding:6px}.review-pick-row{position:relative;border:1px solid #dbe3ef;border-radius:16px;background:#fff;padding:14px;min-height:92px;display:flex;align-items:center;cursor:default}.review-pick-row label{width:100%;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center}.review-pick-row .hebrew{font-size:28px;direction:rtl}.review-pick-row label span{grid-column:2;color:#64748b}.review-pick-row.manual-draggable{cursor:grab;touch-action:none}.review-pick-row.manual-draggable:active{cursor:grabbing}.review-pick-row.dragging{opacity:.45;outline:3px solid #6366f1}.review-pick-row.drag-over{box-shadow:inset 0 0 0 3px #818cf8}.review-drag-hint{display:none;font-size:12px;color:#6366f1;font-weight:800;grid-column:2}.review-pick-row.manual-draggable .review-drag-hint{display:block}
+body.shorashim-review-active{overflow:hidden}body.shorashim-review-active .topbar{display:none!important}body.shorashim-review-active #reviewScreen.active{height:100vh;padding:12px;display:flex;flex-direction:column;overflow:hidden}body.shorashim-review-active #reviewScreen .section-head{flex:0 0 auto;margin:0 0 8px}body.shorashim-review-active #reviewScreen .review-rule,body.shorashim-review-active #reviewScreen #reviewSetup,body.shorashim-review-active #reviewScreen #reviewEmpty{display:none!important}body.shorashim-review-active #reviewScreen #reviewArea{display:flex!important;flex:1;min-height:0;flex-direction:column;justify-content:center}body.shorashim-review-active #reviewScreen .review-card{min-height:0;height:min(66vh,620px)}
+</style>
+
+<style id="learn-edit-viewport-fix-v2">
+@media (min-width: 901px) {
+  html:has(body.shorashim-learning-active),
+  body.shorashim-learning-active {
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body.shorashim-learning-active #appShell {
+    height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  body.shorashim-learning-active #appShell > .topbar {
+    flex: 0 0 auto !important;
+  }
+
+  body.shorashim-learning-active #appShell > main {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.shorashim-learning-active #studentView {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.shorashim-learning-active #learnScreen.active {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  body.shorashim-learning-active #learnScreen .section-head {
+    flex: 0 0 auto !important;
+  }
+
+  body.shorashim-learning-active #learnWorkspace:not(.hidden) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    display: block !important;
+  }
+
+  body.shorashim-learning-active #learnWorkspace .learn-layout {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    align-items: stretch !important;
+  }
+
+  body.shorashim-learning-active #learnWorkspace .word-list-panel {
+    position: static !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  body.shorashim-learning-active #learnWorkspace .word-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  body.shorashim-learning-active #learnWorkspace .editor-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+  }
+
+  body.shorashim-learning-active #learnWorkspace .session-footer {
+    flex: 0 0 auto !important;
+  }
+}
+
+/* Review can always return to the card chooser without refreshing. */
+body.shorashim-review-active #chooseReviewCardsBtn {
+  display: inline-flex !important;
+}
+</style>
+
+  <style id="review-track-tabs-v1">
+    .review-track-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}
+    .review-track-intro .mini-note{margin:0}
+    .review-track-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 16px}
+    .review-track-btn{border:1px solid #dbe3ef;border-radius:16px;background:#f8fafc;padding:13px 14px;text-align:left;font-weight:900;color:#334155;display:flex;flex-direction:column;gap:4px;cursor:pointer}
+    .review-track-btn:hover{border-color:#a5b4fc;background:#f8faff}
+    .review-track-btn.active{border-color:#4f46e5;background:#eef2ff;color:#3730a3;box-shadow:inset 0 0 0 1px #4f46e5}
+    .review-track-btn .track-title{font-size:16px}
+    .review-track-btn .track-progress{font-size:12px;font-weight:800;color:#64748b}
+    .review-track-btn.active .track-progress{color:#6366f1}
+    .review-track-empty{grid-column:1/-1;border:1px dashed #cbd5e1;border-radius:14px;padding:24px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800}
+    @media(max-width:640px){.review-track-tabs{grid-template-columns:1fr}.review-track-intro{align-items:flex-start;flex-direction:column}}
+  </style>
+<style id="perek-unit-styles">
+.review-perek-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc}
+.perek-filter-btn{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-weight:800;cursor:pointer}
+.perek-filter-btn.active{background:#eef2ff;border-color:#4f46e5;color:#3730a3}
+.perek-badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
+.review-perek-filter.hidden{display:none!important}
+</style>
+<style id="shorashim-recording-points-v1">.shorashim-challenge-box{margin:12px 0 16px;padding:14px 16px;border:2px solid #f59e0b;border-radius:16px;background:#fffbeb}.shorashim-challenge-box label{display:block;font-size:16px}.shorashim-challenge-box input{transform:scale(1.35);margin-right:8px}.shorashim-record-box{max-width:760px;margin:14px auto 0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #c7d2fe;border-radius:16px;background:#eef2ff}.shorashim-record-box .mini-note{max-width:520px}</style>
+<style id="review-record-flow-fix">
+#activeReviewRecording{align-items:center;justify-content:center;margin:4px 0 10px;gap:10px}
+#activeReviewRecording .mini-note{max-width:430px}
+body.shorashim-review-active #reviewScreen .review-choice-panel,
+body.shorashim-review-active #reviewScreen .review-options{display:none!important}
+body.shorashim-review-active #activeReviewRecording{display:flex!important}
+</style>
+
+<style id="third-grade-review-ui-v1">
+/* Third-grade review: large, visual, one obvious action at a time */
+#reviewScreen{max-width:1100px;margin:0 auto}
+#reviewScreen .section-head{margin-bottom:18px}
+#reviewScreen .section-head h2{font-size:clamp(32px,5vw,52px);margin:0}
+#reviewScreen .section-head .eyebrow{display:none}
+
+.review-choice-panel{
+  max-width:1000px;margin:0 auto 20px;padding:24px;
+  border:0;border-radius:30px;background:#fff;
+  box-shadow:0 18px 50px rgba(23,32,51,.12)
+}
+.review-choice-title{
+  text-align:center;font-size:clamp(25px,3vw,36px);font-weight:950;
+  margin:0 0 20px;color:#172033
+}
+.review-choice-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:20px!important
+}
+.review-choice{
+  min-height:180px!important;border:4px solid transparent!important;border-radius:28px!important;
+  padding:16px 12px!important;display:flex!important;flex-direction:column!important;
+  align-items:center!important;justify-content:center!important;gap:10px!important;
+  text-align:center!important;box-shadow:0 10px 24px rgba(23,32,51,.10)!important;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease!important
+}
+.review-choice:hover{transform:translateY(-4px)}
+.review-choice .choice-icon{font-size:32px!important;line-height:1!important}
+.review-choice strong{font-size:clamp(24px,2.5vw,32px)!important;line-height:1.05!important}
+.review-choice span:not(.choice-icon){font-size:20px!important;font-weight:800!important}
+.review-choice b{font-size:25px!important;padding:7px 14px;border-radius:999px;background:#fff!important}
+.review-choice.points-choice{background:linear-gradient(145deg,#dbeafe,#eff6ff)!important}
+.review-choice.challenge-choice{background:linear-gradient(145deg,#fef3c7,#fff7ed)!important}
+.review-choice.practice-choice{background:linear-gradient(145deg,#dcfce7,#f0fdf4)!important}
+.review-choice.active{
+  border-color:#4f46e5!important;box-shadow:0 0 0 6px rgba(79,70,229,.13),0 16px 35px rgba(23,32,51,.16)!important;
+  transform:translateY(-3px)
+}
+.review-choice.active::after{content:"✓";position:absolute;top:10px;right:10px;
+  width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#4f46e5;color:white;
+  font-size:20px;font-weight:950}
+.review-choice{position:relative}
+
+.kid-review-actions{display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap;margin-top:24px}
+.kid-start-review{
+  border:0;border-radius:22px;padding:20px 34px;min-width:330px;
+  font-size:clamp(24px,3vw,34px);font-weight:950;background:#4f46e5;color:#fff;
+  box-shadow:0 12px 28px rgba(79,70,229,.30);cursor:pointer
+}
+.kid-short-reminder{text-align:center!important;font-size:18px!important;font-weight:850!important;margin:14px 0 0!important;color:#475569!important}
+
+.review-options{max-width:760px!important;margin:16px auto!important;padding:0!important;box-shadow:none!important;background:transparent!important;border:0!important}
+.review-options>summary{
+  list-style:none;text-align:center;cursor:pointer;font-size:18px!important;font-weight:850!important;
+  color:#64748b;padding:10px
+}
+.review-options>summary::-webkit-details-marker{display:none}
+.review-options[open]{background:#fff!important;border:1px solid #e2e8f0!important;padding:16px!important}
+
+body.shorashim-review-active #reviewScreen .section-head{margin-bottom:8px}
+body.shorashim-review-active #reviewScreen .section-head>div:nth-child(2){display:none}
+body.shorashim-review-active #reviewScreen .review-choice-panel,
+body.shorashim-review-active #reviewScreen .review-options{display:none!important}
+body.shorashim-review-active #reviewArea{display:block!important;max-width:980px;margin:0 auto}
+body.shorashim-review-active #activeReviewRecording{
+  display:flex!important;max-width:900px!important;margin:0 auto 14px!important;
+  padding:14px!important;border:0!important;background:transparent!important
+}
+body.shorashim-review-active #shorashimRecordBtn{
+  min-height:66px!important;border-radius:20px!important;padding:15px 26px!important;
+  font-size:clamp(21px,2.4vw,29px)!important;font-weight:950!important;
+  box-shadow:0 10px 25px rgba(79,70,229,.24)
+}
+body.shorashim-review-active #shorashimPauseBtn{
+  min-height:60px!important;border-radius:18px!important;padding:14px 22px!important;
+  font-size:21px!important;font-weight:900!important
+}
+body.shorashim-review-active .kid-record-note{font-size:17px!important;font-weight:800!important;text-align:center}
+body.shorashim-review-active .review-meta{justify-content:center!important;font-size:18px!important}
+body.shorashim-review-active .review-card-wrap{max-width:820px!important;margin:0 auto!important}
+body.shorashim-review-active .review-card{border-radius:32px!important;box-shadow:0 20px 55px rgba(23,32,51,.16)!important}
+body.shorashim-review-active .review-hebrew{font-size:clamp(58px,9vw,100px)!important}
+body.shorashim-review-active .review-english{font-size:clamp(34px,5vw,58px)!important}
+body.shorashim-review-active .review-nav{
+  max-width:820px!important;margin:16px auto 0!important;display:flex!important;
+  justify-content:center!important;gap:12px!important;flex-wrap:wrap!important
+}
+body.shorashim-review-active .review-nav button{min-height:56px!important;font-size:19px!important;border-radius:17px!important;font-weight:900!important}
+body.shorashim-review-active .keyboard-hint{display:none!important}
+body.shorashim-review-active #editReviewBtn{display:none!important}
+
+@media(max-width:760px){
+  .review-choice-grid{grid-template-columns:1fr!important}
+  .review-choice{min-height:160px!important}
+  .kid-start-review{width:100%;min-width:0}
+}
+</style>
+
+
+<style id="progress-pause-fix-v2">
+body.shorashim-review-active #reviewMeta,body.shorashim-review-active .review-meta{font-size:clamp(25px,3vw,36px)!important;line-height:1.2!important;font-weight:950!important;color:#172033!important;gap:20px!important;margin:8px auto 16px!important;text-align:center!important}
+body.shorashim-review-active #reviewMeta *,body.shorashim-review-active .review-meta *{font-size:inherit!important;font-weight:inherit!important}
+body.shorashim-review-active #activeReviewRecording{display:grid!important;grid-template-columns:repeat(2,minmax(260px,1fr))!important;align-items:stretch!important;gap:18px!important;max-width:860px!important}
+body.shorashim-review-active #shorashimRecordBtn,body.shorashim-review-active #shorashimPauseBtn{width:100%!important;min-height:80px!important;margin:0!important;padding:17px 22px!important;border-radius:22px!important;font-size:clamp(24px,2.5vw,32px)!important;line-height:1.1!important;font-weight:950!important;box-shadow:0 10px 24px rgba(23,32,51,.18)!important}
+body.shorashim-review-active #shorashimPauseBtn{background:#fff!important;color:#172033!important;border:4px solid #4f46e5!important}
+body.shorashim-review-active #shorashimRecordBtn{border:4px solid transparent!important}
+body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column:1/-1!important;font-size:18px!important;margin-top:-4px!important}
+body.shorashim-review-active .review-card-wrap{max-width:880px!important}
+@media(max-width:680px){body.shorashim-review-active #activeReviewRecording{grid-template-columns:1fr!important}body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column:1!important}}
+</style>
+<style id="review-fit-screen-v1">
+/* Review mode: fit card + controls on one screen, trim extra text */
+body.shorashim-review-active .app-shell{padding:0 24px!important}
+body.shorashim-review-active #reviewScreen.active{height:100vh!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;padding:10px 12px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;box-sizing:border-box}
+body.shorashim-review-active #reviewArea{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;flex:1 1 auto!important;min-height:0!important;width:100%}
+body.shorashim-review-active #reviewPasuk,body.shorashim-review-active #shorashimRecordStatus,body.shorashim-review-active .keyboard-hint{display:none!important}
+body.shorashim-review-active .review-meta{font-size:22px!important;margin:0 auto 8px!important;gap:16px!important;justify-content:center!important}
+body.shorashim-review-active #activeReviewRecording{display:flex!important;justify-content:center!important;gap:12px!important;margin:0 auto 10px!important;padding:0!important;min-height:0!important;max-width:none!important}
+body.shorashim-review-active #activeReviewRecording.hidden,body.shorashim-review-active #shorashimPauseBtn.hidden{display:none!important}
+body.shorashim-review-active #shorashimRecordBtn,body.shorashim-review-active #shorashimPauseBtn{width:auto!important;min-height:0!important;padding:10px 22px!important;font-size:20px!important;border-radius:16px!important}
+body.shorashim-review-active .review-card-wrap{flex:0 1 auto!important;min-height:0!important;display:flex!important;justify-content:center!important;align-items:center!important;width:100%}
+body.shorashim-review-active #reviewScreen .review-card{height:min(620px,calc(100dvh - 250px))!important;min-height:0!important;max-height:none!important;width:min(760px,92vw)!important}
+body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px!important}
+</style>
+<script defer src="../gallery-share.js?v=20261011b"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
+<link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
+<style id="shorashim-perek-menu-styles">
+  .perek-choice-grid{margin:26px auto 0}
+  .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
+  .perek-choice:hover,.perek-choice:focus-visible{border-color:#4f46e5;background:#eef2ff;outline-offset:3px}
+  .perek-choice .perek-number{font-size:52px;line-height:1;font-weight:900;color:#4338ca}
+  .perek-choice strong{font-size:clamp(23px,2.8vw,29px)}
+  .perek-choice .perek-progress{font-size:15px;font-weight:800;color:#475569}
+  .perek-choice-hint{text-align:center;color:#475569;font-size:15px;font-weight:700;margin:20px 0}
+  .hero-grid.two.perek-choice-grid{max-width:1150px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .perek-choice .perek-number{flex:0 0 auto}
+  .booklet-week-wrap{display:flex;flex-direction:column;gap:7px;font-weight:800;margin:14px 0;color:#172033}
+  .booklet-week-wrap select{font-size:17px;font-weight:700;width:100%;border:2px solid #c7d2fe}
+  @media(max-width:900px){.hero-grid.two.perek-choice-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <section id="studentSiteClosed" class="login-gate hidden">
+    <div class="login-card">
+      <div class="login-icon">🔒</div>
+      <div class="eyebrow">Shorashim Learning Lab</div>
+      <h1>Practice is closed right now</h1>
+      <p>Your teacher has closed Shorashim practice for now. Please wait until your teacher opens it again.</p>
+    </div>
+  </section>
+
+  <section id="loginGate" class="login-gate">
+    <div class="login-card">
+      <div class="login-icon">🌱</div>
+      <div class="eyebrow">Shorashim Learning Lab</div>
+      <h1>Opening Shorashim…</h1>
+      <p>Using your Fun Torah Tools sign-in.</p>
+      <button id="loginBtn" class="primary big hidden">Back to Fun Torah Tools</button>
+      <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell hidden">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Hebrew vocabulary practice</div>
+        <h1>Shorashim Learning Lab</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="signed-in-as">👋 <b id="signedInStudentName"></b></span>
+        <span id="cloudStatus" class="cloud-status">☁️ Connected</span>
+        <button id="switchStudentBtn" class="ghost small">Not you?</button>
+        <button id="studentModeBtn" class="seg active hidden" tabindex="-1" aria-hidden="true">Student</button>
+        <button id="teacherModeBtn" class="seg hidden" tabindex="-1" aria-hidden="true">Teacher</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="studentView">
+        <div class="prototype-picker card-panel compact hidden" aria-hidden="true">
+          <div>
+            <b>Prototype only: preview as a student</b>
+            <div class="mini-note">In the classroom version, each boy signs in and lands directly in his own account. Students will not see this dropdown.</div>
+          </div>
+          <select id="studentSelect" aria-label="Preview student"></select>
+          <button id="addStudentBtn" class="ghost">+ Add test student</button>
+        </div>
+
+        <section id="studentHome" class="screen active">
+          <div class="hero-grid">
+            <button class="feature-card review review-main" data-go="reviewScreen">
+              <span class="feature-icon">🔁</span>
+              <strong>Review Shorashim</strong>
+              <span>Review what you learned — and record your Chazara for points!</span>
+            </button>
+            <button class="feature-card learn" data-go="shorashimPerekScreen" data-track="shorashim">
+              <span class="feature-icon">✏️</span>
+              <strong>Learn New Shorashim</strong>
+              <span>Learn new roots and make picture clues.</span>
+            </button>
+            <button id="gamesHomeCard" class="feature-card games" data-go="gamesScreen">
+              <span class="feature-icon">🎮</span>
+              <strong>Games</strong>
+              <span id="gamesHomeMessage">Choose a practice game.</span>
+            </button>
+            <button class="feature-card gallery" data-go="galleryScreen">
+              <span class="feature-icon">🖼️</span>
+              <strong>My Card Gallery</strong>
+              <span>See the cards you created.</span>
+            </button>
+            <button class="feature-card affix" data-go="affixHomeScreen">
+              <span class="feature-icon">🧩</span>
+              <strong>Learn Prefixes & Suffixes</strong>
+              <span>Learn prefixes and suffixes with examples.</span>
+            </button>
+          </div>
+          <div class="stats-grid" id="studentStats"></div>
+        </section>
+
+        <section id="shorashimPerekScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Shorashim List</h2></div>
+          </div>
+          <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="18">
+              <span class="perek-number" lang="he" dir="rtl">י״ח</span>
+              <strong>Perek 18 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="19">
+              <span class="perek-number" lang="he" dir="rtl">י״ט</span>
+              <strong>Perek 19 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="booklet">
+              <span class="perek-number" aria-hidden="true">📘</span>
+              <strong>3rd Grade Shoroshim Booklet</strong>
+              <span>30 weeks • 6 words each</span>
+              <span class="perek-progress">180 words</span>
+            </button>
+          </div>
+          <p class="perek-choice-hint">Choose a list. No words need to be learned in order.</p>
+        </section>
+
+        <section id="affixHomeScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Prefixes & suffixes</div><h2>Choose What to Learn</h2></div>
+          </div>
+          <div class="hero-grid two">
+            <button class="feature-card affix" data-go="learnScreen" data-track="prefix">
+              <span class="feature-icon">前</span><strong>Prefixes</strong><span>Choose any prefix and learn it with examples.</span>
+            </button>
+            <button class="feature-card affix" data-go="learnScreen" data-track="suffix">
+              <span class="feature-icon">🔚</span><strong>Suffixes</strong><span>Choose any suffix and learn it with examples.</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="learnScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div>
+              <div class="eyebrow">Learn and customize</div>
+              <h2 id="learnHeading">Learn New Shorashim</h2>
+            </div>
+            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change List</button>
+            <div class="session-status" id="sessionStatus">Cards save as you go</div>
+          </div>
+
+          <div id="startSessionPanel" class="card-panel center-panel">
+            <h3 id="startSessionTitle">Ready to learn?</h3>
+            <p>Items created in this session are <b>New</b>. When the session ends, they automatically move into your Learned pile.</p>
+            <button id="startSessionBtn" class="primary big">Start Session</button>
+          </div>
+
+          <div id="learnWorkspace" class="hidden">
+            <div class="learn-layout">
+              <aside class="card-panel word-list-panel">
+                <div class="panel-title-row">
+                  <h3 id="pathTitle">Your Learning Path</h3>
+                  <span id="availableCount" class="pill"></span>
+                </div>
+                <p class="mini-note">Choose any word in any order. All available words are open; select a learned card any time to edit it.</p>
+                <label id="bookletWeekWrap" class="booklet-week-wrap hidden" for="bookletWeekSelect">Booklet week
+                  <select id="bookletWeekSelect" aria-label="Choose booklet week">
+                    <option value="all">All 30 Weeks</option>
+                    <option value="1">Week 1</option>
+                    <option value="2">Week 2</option>
+                    <option value="3">Week 3</option>
+                    <option value="4">Week 4</option>
+                    <option value="5">Week 5</option>
+                    <option value="6">Week 6</option>
+                    <option value="7">Week 7</option>
+                    <option value="8">Week 8</option>
+                    <option value="9">Week 9</option>
+                    <option value="10">Week 10</option>
+                    <option value="11">Week 11</option>
+                    <option value="12">Week 12</option>
+                    <option value="13">Week 13</option>
+                    <option value="14">Week 14</option>
+                    <option value="15">Week 15</option>
+                    <option value="16">Week 16</option>
+                    <option value="17">Week 17</option>
+                    <option value="18">Week 18</option>
+                    <option value="19">Week 19</option>
+                    <option value="20">Week 20</option>
+                    <option value="21">Week 21</option>
+                    <option value="22">Week 22</option>
+                    <option value="23">Week 23</option>
+                    <option value="24">Week 24</option>
+                    <option value="25">Week 25</option>
+                    <option value="26">Week 26</option>
+                    <option value="27">Week 27</option>
+                    <option value="28">Week 28</option>
+                    <option value="29">Week 29</option>
+                    <option value="30">Week 30</option>
+                  </select>
+                </label>
+                <div id="wordList" class="word-list"></div>
+              </aside>
+
+              <section class="card-panel editor-panel">
+                <div class="panel-title-row">
+                  <div><div class="eyebrow">Customize this card</div><h3 id="editorTitle">Next item</h3></div>
+                  <span id="newBadge" class="badge hidden">NEW</span>
+                </div>
+
+                <div id="emptyEditor" class="empty-state">Choose a learned card to edit, or customize the next new card.</div>
+
+                <div id="editorContent" class="hidden">
+                  <div id="exampleTeachingBox" class="example-teaching hidden"></div>
+                  <div class="flip-stage">
+                    <div class="flashcard editable" id="frontCard">
+                      <div class="card-label">FRONT</div>
+                      <div id="hebrewText" class="movable hebrew-text" tabindex="0"></div>
+                      <div id="frontExamples" class="card-examples"></div>
+                      <div id="approvedArtLayer" class="approved-art-layer"></div>
+                      <canvas id="drawCanvas" width="620" height="360"></canvas>
+                    </div>
+                    <div class="flashcard editable" id="backCard">
+                      <div class="card-label">BACK</div>
+                      <div id="englishText" class="movable english-text" tabindex="0"></div>
+                      <div id="backExamples" class="card-examples back-examples"></div>
+                    </div>
+                  </div>
+
+                  <div class="tool-columns">
+                    <div class="toolbox">
+                      <h4>Text & card</h4>
+                      <label>Hebrew size <input id="hebrewSize" type="range" min="34" max="260" value="58"></label>
+                      <label>Hebrew font
+                        <select id="hebrewFont">
+                          <option value="David, 'Times New Roman', serif">Classic — David</option>
+                          <option value="Gisha, Arial, sans-serif">Simple — Gisha</option>
+                          <option value="FrankRuehl, 'Frank Ruehl', 'Times New Roman', serif">Book — FrankRuehl</option>
+                          <option value="Aharoni, 'Arial Rounded MT Bold', Arial, sans-serif">Rounded — Aharoni</option>
+                        </select>
+                      </label>
+                      <div class="color-control"><span>Hebrew color</span><div class="color-swatches" data-color-target="hebrewColor"></div><input id="hebrewColor" type="hidden" value="#1f2937"></div>
+                      <label>English size <input id="englishSize" type="range" min="24" max="74" value="46"></label>
+                      <label>English font
+                        <select id="englishFont">
+                          <option value="Arial, sans-serif">Simple</option>
+                          <option value="Georgia, serif">Book</option>
+                          <option value="'Trebuchet MS', sans-serif">Rounded</option>
+                          <option value="'Times New Roman', serif">Classic</option>
+                        </select>
+                      </label>
+                      <div class="color-control"><span>English color</span><div class="color-swatches" data-color-target="englishColor"></div><input id="englishColor" type="hidden" value="#1f2937"></div>
+                      <div class="color-control"><span>Card background</span><div class="color-swatches background-swatches" data-color-target="backgroundColor"></div><input id="backgroundColor" type="hidden" value="#fff9e8"></div>
+                    </div>
+
+                    <div class="toolbox">
+                      <h4>Pictures</h4>
+                      <div class="art-section-label">Emojis</div>
+                      <div id="emojiChoices" class="art-choices"></div>
+                      <div class="art-section-label illustration-label">Illustrations</div>
+                      <div id="illustrationChoices" class="art-choices illustration-choices"></div>
+                      <label class="art-size-control">Selected picture size <input id="artSize" type="range" min="30" max="380" value="126" disabled></label>
+                      <div class="button-row art-edit-row">
+                        <button id="artSmallerBtn" class="ghost small">Smaller</button>
+                        <button id="artBiggerBtn" class="ghost small">Bigger</button>
+                        <button id="removeArtBtn" class="danger small">Delete selected</button>
+                        <button id="removeAllArtBtn" class="ghost small">Remove all</button>
+                      </div>
+                      <p class="mini-note">Tap a picture to select it. Drag it anywhere on the card, resize it, or press Delete. You can add more than one. Outside uploads are disabled.</p>
+                    </div>
+
+                    <div class="toolbox">
+                      <h4>Draw & color</h4>
+                      <div class="draw-row">
+                        <div class="color-control compact-color"><span>Color</span><div class="color-swatches" data-color-target="drawColor"></div><input id="drawColor" type="hidden" value="#2563eb"></div>
+                        <label>Brush <input id="brushSize" type="range" min="2" max="24" value="6"></label>
+                      </div>
+                      <div class="button-row">
+                        <button id="eraserBtn" class="ghost small">Eraser</button>
+                        <button id="undoBtn" class="ghost small">Undo</button>
+                        <button id="clearDrawingBtn" class="ghost small">Clear</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="editor-actions">
+                    <button id="saveCardBtn" class="primary">Save Card & Go to Next</button>
+                    <button id="resetCardBtn" class="ghost">Reset Design</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="session-footer card-panel">
+              <div><b id="sessionNewCount">0 new cards</b> <span class="muted">saved and learned this session</span></div>
+              <button id="endSessionBtn" class="ghost">End Session</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="reviewScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Daily Chazara</div><h2>Review Shorashim</h2></div>
+            <div id="dailyReviewBadge" class="session-status"></div>
+          </div>
+
+          <div class="review-choice-panel">
+            <div class="review-choice-title">Choose how you want to review:</div>
+            <div class="review-choice-grid">
+              <button type="button" id="regularChazaraChoice" class="review-choice points-choice active">
+                <span class="choice-icon">🎙️</span><strong>Record Chazara</strong><span>Pictures allowed</span><b>2 points</b>
+              </button>
+              <button type="button" id="noHintsChazaraChoice" class="review-choice challenge-choice">
+                <span class="choice-icon">🏆</span><strong>No Hints Challenge</strong><span>No pictures or drawings</span><b>3 points</b>
+              </button>
+              <button type="button" id="practiceOnlyChoice" class="review-choice practice-choice">
+                <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
+              </button>
+            </div>
+            <div class="kid-review-actions">
+  <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
+</div>
+<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.</div>
+          </div>
+
+          <details class="review-options card-panel">
+            <summary>⚙️ Change My Cards</summary>
+            <div id="reviewSetup" class="review-setup">
+              <div class="review-track-intro"><div><b>What do you want to review?</b></div></div>
+              <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
+                <button type="button" class="review-track-btn active" data-review-track="shorashim" aria-pressed="true"><span class="track-title">🌱 Shorashim</span><span class="track-progress">No learned cards yet</span></button>
+                <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">➡️ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
+                <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
+              </div>
+              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button><button type="button" class="perek-filter-btn" data-review-perek="booklet">3rd Grade Booklet</button></div>
+              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="newest" selected>Newest learned first</option><option value="learned">Oldest learned first</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
+              <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
+              <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
+              <div id="reviewPicker" class="review-picker"></div>
+              <div class="review-start-row"><div><b>Review order:</b> <label><input type="radio" name="reviewOrderMode" value="order" checked> In order</label> <label><input type="radio" name="reviewOrderMode" value="shuffle"> Shuffle</label></div><button id="startReviewBtn" class="primary">Start Review</button></div>
+            </div>
+          </details>
+
+          <div id="reviewEmpty" class="card-panel empty-state">No learned cards yet. Learn your first card, then come back to review.</div>
+          <div id="reviewArea" class="hidden">
+            <div class="review-meta">
+              <span id="reviewCounter" class="pill"></span>
+              <span id="reviewProgressToday" class="pill subtle"></span>
+              <span id="reviewPasuk" class="muted"></span>
+            </div>
+            <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
+            <div id="activeReviewRecording" class="record-action-row">
+              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording — 2 Points</button>
+              <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
+              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Rabbi Cohen will check it.</span>
+            </div>
+            <div class="review-card-wrap">
+              <button id="reviewFlipCard" class="flashcard review-card" aria-label="Flip flashcard">
+                <div id="reviewSideLabel" class="card-label">FRONT</div>
+                <div id="reviewHebrew" class="review-hebrew"></div>
+                <div id="reviewExamples" class="review-examples"></div>
+                <div id="reviewArtLayer" class="review-art-layer"></div>
+                <img id="reviewDrawing" class="review-drawing hidden" alt="Student drawing" />
+                <div id="reviewEnglish" class="review-english hidden"></div>
+                <div id="reviewBackExamples" class="review-examples back hidden"></div>
+              </button>
+            </div>
+            <div class="review-nav">
+              <button id="chooseReviewCardsBtn" class="ghost">☰ Choose Different Cards</button>
+              <button id="prevReviewBtn" class="ghost">← Previous</button>
+              <button id="flipReviewBtn" class="primary">↑ Flip</button>
+              <button id="editReviewBtn" class="ghost">✏️ Edit Card</button>
+              <button id="nextReviewBtn" class="ghost">Next →</button>
+            </div>
+            <div class="keyboard-hint">Keyboard: <kbd>←</kbd> previous · <kbd>↑</kbd> flip · <kbd>→</kbd> next</div>
+          </div>
+        </section>
+
+        <section id="gamesScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Play whenever you like</div><h2>Practice Games</h2></div>
+          </div>
+          <div id="gamesLockedPanel" class="card-panel center-panel hidden">
+            <h3>🔒 Games are locked</h3>
+            <p>Finish today's full flashcard review first.</p>
+            <button class="primary" data-go="reviewScreen">Go to Flashcards</button>
+          </div>
+          <div id="gamesUnlockedPanel">
+            <div class="hero-grid two game-menu-grid">
+              <button class="feature-card game-choice" data-game="match"><span class="feature-icon">🧩</span><strong>Match</strong><span>8 pairs, timed. Beat your class leaderboard time.</span></button>
+              <button class="feature-card game-choice" data-game="shoot"><span class="feature-icon">🎯</span><strong>Target Shoot</strong><span>Aim and fire at moving targets with the correct meaning.</span></button>
+              <button class="feature-card game-choice" data-game="whack"><span class="feature-icon">🔨</span><strong>Whack-a-Word</strong><span>Whack the correct meaning before it disappears.</span></button>
+              <button class="feature-card game-choice" data-game="race"><span class="feature-icon">🏎️</span><strong>Word Race</strong><span>Answer quickly to race your car to the finish line.</span></button>
+            </div>
+            <div id="gameStage" class="card-panel game-stage hidden"></div>
+          </div>
+        </section>
+
+        <section id="galleryScreen" class="screen">
+          <div class="section-head"><button class="backBtn ghost">← Home</button><div><div class="eyebrow">Student creations</div><h2>My Card Gallery</h2></div></div>
+          <div id="galleryGrid" class="gallery-grid"></div>
+        </section>
+      </section>
+
+      <section id="teacherView" class="hidden">
+        <div class="section-head">
+          <div><div class="eyebrow">Teacher dashboard</div><h2>Class Progress</h2></div>
+          <div class="button-row"><button id="manageListBtn" class="primary">Manage Learning Lists</button><button id="seedDemoBtn" class="ghost">Add Demo Activity</button></div>
+        </div>
+
+        <div class="teacher-summary" id="teacherSummary"></div>
+        <div class="card-panel table-wrap">
+          <table class="teacher-table">
+            <thead><tr><th>Student</th><th>Shorashim</th><th>Affixes</th><th>Study time</th><th>Cards</th><th>Today's review</th><th>Last active</th></tr></thead>
+            <tbody id="teacherTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="teacherStudentDetail" class="hidden">
+          <div class="section-head subhead"><button id="closeStudentDetail" class="ghost">← Class</button><div><div class="eyebrow">Student details</div><h2 id="detailStudentName"></h2></div></div>
+          <div id="detailStats" class="stats-grid"></div>
+          <div class="card-panel"><h3>Learning history</h3><div id="detailHistory" class="history-list"></div></div>
+          <div class="card-panel"><h3>Card gallery</h3><div id="teacherCardGallery" class="gallery-grid"></div></div>
+        </div>
+
+        <div id="manageListPanel" class="hidden">
+          <div class="section-head subhead"><button id="closeManageList" class="ghost">← Dashboard</button><div><div class="eyebrow">Teacher controls</div><h2>Manage Learning Lists</h2></div></div>
+          <div class="card-panel manager-controls">
+            <label>List <select id="manageTrack"><option value="shorashim">Shorashim</option><option value="prefix">Prefixes</option><option value="suffix">Suffixes</option></select></label>
+            <button id="addCatalogItemBtn" class="primary">+ Add Item</button>
+            <label>Minimum time per reviewed card
+              <select id="minReviewTime"><option value="500" selected>0.5 seconds</option><option value="800">0.8 seconds</option><option value="1000">1 second</option><option value="1500">1.5 seconds</option><option value="2000">2 seconds</option></select>
+            </label>
+          </div>
+          <div id="catalogList" class="catalog-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="addStudentDialog"><form method="dialog" class="dialog-card" id="addStudentForm"><h3>Add test student</h3><label>Name <input id="newStudentName" autocomplete="off" required /></label><div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary" id="confirmAddStudent">Add</button></div></form></dialog>
+
+  <dialog id="catalogDialog">
+    <form method="dialog" class="dialog-card wide" id="catalogForm">
+      <h3 id="catalogDialogTitle">Edit item</h3>
+      <input id="catalogEditId" type="hidden" />
+      <label>Main Hebrew / symbol <input id="catalogFront" required /></label>
+      <label>English meaning <input id="catalogEnglish" required /></label>
+      <label>Pasuk / order note <input id="catalogPasuk" /></label>
+      <label id="catalogWordWrap">Word as it appears <input id="catalogWord" /></label>
+      <label id="catalogExamplesWrap">Examples (one per line: Hebrew | English)
+        <textarea id="catalogExamples" rows="5"></textarea>
+      </label>
+      <div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary" id="saveCatalogItemBtn">Save</button></div>
+    </form>
+  </dialog>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="../firebase-config.js?v=pr234-temp1"></script>
+  <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
+  <script src="app.js?v=20261020-follow-pointer1"></script>
+  <script src="review-categories.js?v=20261019-newest-review"></script>
+  <script src="../student-class.js?v=20261007-shared-account-v2"></script>
+  <script src="../b3-race.js?v=20261007"></script>
+  <script src="friends-race.js?v=20261007-shared-account-v2"></script>
+
+<script data-shorashim-workspace-ux="v1">
+(() => {
+  "use strict";
+
+  const TOOL_DEFS = [
+    { key: "text", label: "🅰 Text & Card" },
+    { key: "pictures", label: "🖼 Pictures" },
+    { key: "draw", label: "✏ Draw" }
+  ];
+
+  function editorIsOpen() {
+    const editor = document.getElementById("editorContent");
+    return !!editor && !editor.classList.contains("hidden");
+  }
+
+  function updateLearningBodyClass() {
+    const learnScreen = document.getElementById("learnScreen");
+    document.body.classList.toggle(
+      "shorashim-learning-active",
+      !!learnScreen && learnScreen.classList.contains("active")
+    );
+  }
+
+  function setupToolTabs(workspace) {
+    const toolColumns = workspace.querySelector(".tool-columns");
+    if (!toolColumns || toolColumns.dataset.uxReady === "1") return;
+
+    const toolboxes = Array.from(toolColumns.children)
+      .filter(el => el.classList.contains("toolbox"));
+
+    if (toolboxes.length < 3) return;
+
+    toolColumns.dataset.uxReady = "1";
+
+    toolboxes.slice(0, 3).forEach((box, i) => {
+      box.dataset.uxTool = TOOL_DEFS[i].key;
+    });
+
+    const tabs = document.createElement("div");
+    tabs.className = "ux-tool-tabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", "Card editing tools");
+
+    TOOL_DEFS.forEach((def, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ux-tool-tab";
+      btn.dataset.tool = def.key;
+      btn.textContent = def.label;
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", "false");
+      btn.addEventListener("click", () => selectTool(workspace, def.key));
+      tabs.appendChild(btn);
+    });
+
+    toolColumns.parentNode.insertBefore(tabs, toolColumns);
+
+    const remembered = sessionStorage.getItem("shorashim-editor-tool");
+    const initial = TOOL_DEFS.some(x => x.key === remembered) ? remembered : "pictures";
+    selectTool(workspace, initial);
+  }
+
+  function selectTool(workspace, key) {
+    const tabs = workspace.querySelectorAll(".ux-tool-tab");
+    tabs.forEach(btn => {
+      const active = btn.dataset.tool === key;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    workspace.querySelectorAll(".tool-columns > .toolbox").forEach(box => {
+      box.classList.toggle("ux-tool-active", box.dataset.uxTool === key);
+    });
+
+    // Give the Draw tool exclusive control of the card surface: while it's
+    // active, placed emoji/illustration stickers stop intercepting pointer
+    // events so a drag near one draws on the canvas instead of moving it.
+    workspace.classList.toggle("ux-drawing", key === "draw");
+
+    try {
+      sessionStorage.setItem("shorashim-editor-tool", key);
+    } catch (_) {}
+  }
+
+  function setupPathToggle(workspace) {
+    if (workspace.querySelector(".ux-path-toggle")) return;
+
+    const sidebar = workspace.querySelector(".word-list-panel");
+    const titleRow = sidebar?.querySelector(".panel-title-row");
+    if (!sidebar || !titleRow) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost small ux-path-toggle";
+    btn.textContent = "Hide path";
+    btn.title = "Give the card editor more room";
+
+    btn.addEventListener("click", () => {
+      const collapsed = workspace.classList.toggle("ux-path-collapsed");
+      btn.textContent = collapsed ? "Show path" : "Hide path";
+      btn.title = collapsed ? "Show your learning path" : "Give the card editor more room";
+    });
+
+    titleRow.appendChild(btn);
+  }
+
+  function setupQuickSave(workspace) {
+    if (workspace.querySelector(".ux-quick-save")) return;
+
+    const editorPanel = workspace.querySelector(".editor-panel");
+    const titleRow = editorPanel?.querySelector(":scope > .panel-title-row");
+    const originalSave = document.getElementById("saveCardBtn");
+    if (!titleRow || !originalSave) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ux-quick-save";
+    btn.textContent = "Save & Next →";
+    btn.title = "Save this card and continue";
+    btn.addEventListener("click", () => originalSave.click());
+    titleRow.appendChild(btn);
+
+    const sync = () => {
+      btn.hidden = !editorIsOpen() || originalSave.disabled;
+    };
+
+    sync();
+
+    const observer = new MutationObserver(sync);
+    const editorContent = document.getElementById("editorContent");
+    if (editorContent) {
+      observer.observe(editorContent, {
+        attributes: true,
+        attributeFilter: ["class"]
+      });
+    }
+    observer.observe(originalSave, {
+      attributes: true,
+      attributeFilter: ["disabled", "class"]
+    });
+  }
+
+  function setupWorkspace() {
+    const workspace = document.getElementById("learnWorkspace");
+    if (!workspace) return;
+
+    setupToolTabs(workspace);
+    setupPathToggle(workspace);
+    setupQuickSave(workspace);
+    updateLearningBodyClass();
+  }
+
+  function boot() {
+    setupWorkspace();
+    updateLearningBodyClass();
+
+    const observer = new MutationObserver(() => {
+      setupWorkspace();
+      updateLearningBodyClass();
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "disabled"]
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
+  }
+})();
+</script>
+
+
+<script data-shorashim-one-screen="v2">
+(() => {
+  "use strict";
+
+  function syncLearningMode() {
+    const learnScreen = document.getElementById("learnScreen");
+    const active = !!learnScreen && learnScreen.classList.contains("active");
+    document.body.classList.toggle("shorashim-learning-active", active);
+  }
+
+  function bootOneScreen() {
+    syncLearningMode();
+
+    const observer = new MutationObserver(syncLearningMode);
+    observer.observe(document.documentElement, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+
+    window.addEventListener("pageshow", syncLearningMode);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootOneScreen, { once: true });
+  } else {
+    bootOneScreen();
+  }
+})();
+</script>
+
+<script src="shorashim-skin.js?v=20261013-skin"></script>
+<style id="shorashim-single-card-v1">
+  /* One big centered card. The front is decorated; the back only shows the meaning when the card turns. */
+  #learnWorkspace .flip-stage{
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    gap:14px!important;grid-template-columns:none!important;
+    position:relative;perspective:1800px;min-height:0;
+  }
+  #learnWorkspace #editorContent .flip-stage{height:auto!important}
+  #learnWorkspace .flip-stage .sc-flipper{
+    position:relative;flex:0 0 auto;
+    width:300px; /* set by script to fit the space */
+    aspect-ratio:31/18;
+    transform-style:preserve-3d;transition:transform .9s ease;
+  }
+  #learnWorkspace .flip-stage .sc-flipper.sc-flipped{transform:rotateY(180deg)}
+  /* A fresh word settles into place. No rotating, zooming, or font enlargement. */
+  #learnWorkspace .flip-stage .sc-flipper.sc-arriving{
+    animation:scCardArrive .55s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes scCardArrive{
+    from{opacity:0;transform:translateY(12px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  #learnWorkspace .flip-stage .sc-flipper > .flashcard.editable{
+    position:absolute!important;inset:0!important;
+    width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;margin:0!important;
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  }
+  #learnWorkspace .flip-stage .sc-flipper > #backCard{transform:rotateY(180deg)!important;pointer-events:none!important}
+  #learnWorkspace .flip-stage .sc-flipper > #frontCard{transform:rotateY(0deg)!important}
+  #learnWorkspace .sc-flip-btn{
+    flex:0 0 auto;width:78px;height:78px;border-radius:50%;border:0;cursor:pointer;
+    background:#7c3aed;color:#fff;font:900 15px/1.1 inherit;box-shadow:0 6px 16px #7c3aed55;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  }
+  #learnWorkspace .sc-flip-btn span{font-size:26px;line-height:1}
+  #learnWorkspace .sc-flip-btn:hover{background:#6d28d9}
+  #learnWorkspace .sc-flip-btn:disabled{opacity:.5;cursor:default}
+  /* Back is not decorated, so hide the English-only style controls. */
+  #learnWorkspace label:has(#englishSize),
+  #learnWorkspace label:has(#englishFont),
+  #learnWorkspace .color-control:has(#englishColor){display:none!important}
+  @media (max-width:560px){
+    #learnWorkspace .sc-flip-btn{width:56px;height:56px;font-size:12px}
+    #learnWorkspace .sc-flip-btn span{font-size:20px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #learnWorkspace .flip-stage .sc-flipper.sc-arriving{animation:none}
+  }
+</style>
+<script data-shorashim-single-card="v1">
+(() => {
+  "use strict";
+  let flipper = null, btn = null, lastKey = null;
+
+  function setup() {
+    const stage = document.querySelector("#learnWorkspace .flip-stage");
+    const front = document.getElementById("frontCard");
+    const back = document.getElementById("backCard");
+    if (!stage || !front || !back || stage.querySelector(".sc-flipper")) return;
+
+    flipper = document.createElement("div");
+    flipper.className = "sc-flipper";
+    flipper.appendChild(front);   // moving keeps ids, listeners and the drawing
+    flipper.appendChild(back);
+    stage.appendChild(flipper);
+
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sc-flip-btn";
+    btn.innerHTML = "<span>↻</span>Flip";
+    btn.setAttribute("aria-label", "Flip the card");
+    btn.addEventListener("click", () => {
+      flipper.classList.remove("sc-arriving");
+      flipper.classList.toggle("sc-flipped");
+    });
+    stage.appendChild(btn);
+
+    const fit = () => {
+      const editor = document.getElementById("editorContent");
+      const isGrid = editor && getComputedStyle(editor).display === "grid";
+      const h = isGrid ? stage.clientHeight - 6 : Math.min(window.innerHeight * 0.56, 540);
+      const w = stage.clientWidth - btn.offsetWidth - 20;
+      const size = Math.max(200, Math.min(w, h * 31 / 18, 980));
+      flipper.style.width = Math.floor(size) + "px";
+    };
+    new ResizeObserver(fit).observe(stage);
+    window.addEventListener("resize", fit);
+    requestAnimationFrame(fit);
+
+    flipper.addEventListener("animationend", event => {
+      if (event.target === flipper) flipper.classList.remove("sc-arriving");
+    });
+
+    // Using any decorating tool turns the card back to the front.
+    const ws = document.getElementById("learnWorkspace");
+    ws.addEventListener("pointerdown", e => {
+      if (e.target.closest(".tool-columns, .ux-tool-tabs")) flipper.classList.remove("sc-flipped");
+    }, true);
+  }
+
+  function showNewWord() {
+    if (!flipper) return;
+    flipper.classList.remove("sc-flipped", "sc-arriving");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    void flipper.offsetWidth; // restart the gentle transition for this word
+    flipper.classList.add("sc-arriving");
+  }
+
+  function check() {
+    setup();
+    const editor = document.getElementById("editorContent");
+    const title = document.getElementById("editorTitle");
+    const word = document.getElementById("hebrewText");
+    if (!editor || editor.classList.contains("hidden")) { lastKey = null; return; }
+    const key = (title ? title.textContent : "") + "|" + (word ? word.textContent : "");
+    if (!word || !word.textContent.trim()) return;   // wait until the word is drawn
+    if (key !== lastKey) { lastKey = key; showNewWord(); }
+  }
+
+  function boot() {
+    check();
+    const editor = document.getElementById("editorContent");
+    const obs = new MutationObserver(check);
+    obs.observe(document.getElementById("learnWorkspace") || document.body, {
+      subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"]
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+  else boot();
+})();
+</script>
+
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261020-follow-pointer1"></script>
+</body>
+</html>
+

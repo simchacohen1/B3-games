@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://funtorahtools.com",
+      "https://www.funtorahtools.com",
+      "https://simchacohen1.github.io"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type", "Content-Length"],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -134,3 +134,31 @@ test('browser keeps student identity per tab and never sends credentials to othe
   await window.B3PaidApi.fetch(url, { method: 'POST' });
   assert.equal(sent.headers.get('Authorization'), 'Bearer teacher-token'); assert.equal(sent.headers.get('X-B3-Student-Pin'), null);
 });
+test('translation results populate the student cache, including existing private results', async () => {
+  const s = student(); let calls = 0;
+  const levels = [{ chunks: [{ hebrew: 'שלום', translations: ['peace'] }] }];
+  const handler = runtime(s).paidHandler('generateTranslationChunks', 'generation', async (req, res) => {
+    calls++; res.status(200).json({ levels });
+  });
+  const req = { method: 'POST', ip: 'test', headers, body: { posukText: 'שלום', posukTranslation: 'peace' } };
+  await handler(req, response());
+  const key = 'Vayeira_19_1', path = 'posukPractice/translationChunks/' + key;
+  await handler({ ...req, body: { ...req.body, translationCacheKey: key } }, response());
+  assert.equal(calls, 1);
+  assert.deepEqual(s.values.get(path).levels, levels);
+  s.values.delete(path);
+  await handler({ ...req, headers: {}, body: { ...req.body, translationCacheKey: key } }, response());
+  assert.equal(s.values.has(path), false);
+});
+test('empty comprehension results cannot permanently block generation retries',async()=>{
+ const s=student();let calls=0;
+ const req={method:'POST',ip:'test',headers,body:{posukText:'test'}};
+ const {hash}=require('../backend/functions/paid-api-core.cjs');
+ const key=hash('generateComprehensionQuestions:phrases_v7:'+JSON.stringify(req.body));
+ s.values.set('b3Private/paidApiCache/generateComprehensionQuestions/'+key,{value:{items:[]}});
+ const handler=runtime(s).paidHandler('generateComprehensionQuestions','generation',async(req,res)=>{
+  calls++;res.status(200).json({items:calls===1?[]:[{question:'Who?'}]});
+ });
+ await handler(req,response());await handler(req,response());await handler(req,response());
+ assert.equal(calls,2);
+});

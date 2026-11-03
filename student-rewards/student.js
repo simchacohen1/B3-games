@@ -5,6 +5,7 @@ const C=window.StudentRewardsCommon;
 C.ensureFirebase();
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(state.busy)e.preventDefault();});
 let teacherPreview=false;
 const teacherAccountReady=new Promise(resolve=>{
   const deadline=Date.now()+10000;
@@ -67,7 +68,7 @@ function cooldownText(until){
 function personalCooldown(r){const until=timeMs(r?.cooldownUntil),active=until>Date.now();return {until,active,label:active?`Available again in ${cooldownText(until)}`:''}}
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
-async function websiteEnabled(){const r=await fetch(window.B3_FIREBASE_CONFIG.databaseURL+'/'+ROOT+'/settings/studentWebsiteEnabled.json',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw new Error('Could not check Student Rewards access.');return String(await r.json())!=='false'}
+async function websiteEnabled(){const url=new URL(window.B3_FIREBASE_CONFIG.databaseURL);url.pathname=url.pathname.replace(/\/+$/,'')+'/'+ROOT+'/settings/studentWebsiteEnabled.json';const r=await fetch(url.href,{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw new Error('Could not check Student Rewards access.');return String(await r.json())!=='false'}
 function own(path){return db.ref(`${ROOT}/${path}/${state.studentId}`)}
 async function loadActivityPointHistory(){
   const user=auth.currentUser;
@@ -201,6 +202,8 @@ function subscribe(){
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
   db.ref(`${ROOT}/classRewardContributionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.contributions=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/refundRequests/${state.studentId}`).on('value',s=>{if(state.root){state.root.refundRequests=s.val()||{};render()}},()=>{});
+  const classId=String(state.student?.classId||'');
+  if(classId)db.ref(`${ROOT}/classRewardCatalog`).on('value',s=>{if(state.root){state.root.classRewardCatalog=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/rewards`).on('value',s=>{if(state.root){state.root.rewards=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();if(!state.teacherStore)state.storeOpen=s.val()===true||String(s.val())==='true';render()}},()=>{});
 }
@@ -334,13 +337,13 @@ function pointHistoryRows(){
   for(const item of state.activityPointHistory||[]){
     const amount=Number(item.actualAmount??item.amount??0);
     if(!amount)continue;
-    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
+    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','chazara-reject':'Chazara approval reversed','shorashim-recording':'Shorashim · Recorded Chazara','shorashim-no-hints':'Shorashim · No Hints Challenge','rashi-recording':'Rashi Letters · Recorded reading','teacher-adjustment':'Teacher adjustment','class-reward-contribution':'Class reward contribution'};
     rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:historyTime(item.reviewedAt||item.createdAt)});
   }
   for(const [cid,dates] of Object.entries(state.root.awards||{})){
     for(const [date,award] of Object.entries(dates||{})){
-      const amount=Number(award?.points||0);if(!amount)continue;
-      rows.push({amount,title:'Daily class points',detail:'Saved school day',when:new Date(`${date}T12:00:00`).getTime()});
+      const when=new Date(`${date}T12:00:00`).getTime();
+      for(const part of C.dailyAwardParts(award))rows.push({amount:part.points,title:part.category?`Daily Points · ${part.category}`:'Daily class points',detail:part.category?`${part.rating} · Saved school day`:'Saved school day',when});
     }
   }
   for(const p of Object.values(state.root.redemptions||{})){

@@ -29,18 +29,35 @@
     if(!context)throw new Error('The browser could not prepare the cropped lesson view.');
     context.imageSmoothingEnabled=true;if('imageSmoothingQuality' in context)context.imageSmoothingQuality='high';
     const stream=canvas.captureStream(8);const outputTrack=stream.getVideoTracks?.()[0];if(outputTrack&&'contentHint' in outputTrack){try{outputTrack.contentHint='text'}catch{}}
-    let base={x:0,y:0,w:1,h:1},view={...base},zoom=1,raf=0,lastFrame=0,stopped=false,panMode=false,dragPointer=null,lastDrag=null,selection={...base},selectStart=null;
-    function renderFrame(time){
-      if(stopped)return;
-      if(time-lastFrame>=120&&source.readyState>=2){
-        const sx=view.x*sourceWidth,sy=view.y*sourceHeight,sw=view.w*sourceWidth,sh=view.h*sourceHeight;
-        context.fillStyle='#151a23';context.fillRect(0,0,canvas.width,canvas.height);
-        try{context.drawImage(source,sx,sy,sw,sh,0,0,canvas.width,canvas.height)}catch{}
-        lastFrame=time;
-      }
-      raf=requestAnimationFrame(renderFrame);
+    let stopTicker=()=>{},base={x:0,y:0,w:1,h:1},view={...base},zoom=1,stopped=false,panMode=false,dragPointer=null,lastDrag=null,selection={...base},selectStart=null;
+    // Browsers do not run animation frames for a hidden tab or a covered window. Teaching from another tab
+    // (sharing a browser tab makes the teacher switch to it) used to freeze this picture, so students saw black.
+    // A worker's timer keeps ticking, and frames are read straight from the capture track when the browser allows it.
+    function startTicker(fn,ms){
+      try{
+        const url=URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},'+ms+')'],{type:'text/javascript'}));
+        const worker=new Worker(url);worker.onmessage=fn;
+        return()=>{worker.terminate();URL.revokeObjectURL(url)};
+      }catch{const id=setInterval(fn,ms);return()=>clearInterval(id)}
     }
-    raf=requestAnimationFrame(renderFrame);
+    const capture=(typeof ImageCapture==='function'&&rawTrack)?new ImageCapture(rawTrack):null;
+    let drawing=false;
+    async function renderFrame(){
+      if(stopped||drawing)return;
+      drawing=true;
+      let frame=null;
+      try{
+        if(capture){try{frame=await capture.grabFrame()}catch{frame=null}}
+        if(stopped)return;
+        if(frame||source.readyState>=2){
+          const fw=frame?frame.width:sourceWidth,fh=frame?frame.height:sourceHeight;
+          const sx=view.x*fw,sy=view.y*fh,sw=view.w*fw,sh=view.h*fh;
+          context.fillStyle='#151a23';context.fillRect(0,0,canvas.width,canvas.height);
+          try{context.drawImage(frame||source,sx,sy,sw,sh,0,0,canvas.width,canvas.height)}catch{}
+        }
+      }finally{if(frame&&frame.close)frame.close();drawing=false}
+    }
+    stopTicker=startTicker(renderFrame,120);
 
     const shareButton=document.getElementById('shareScreen'),controls=document.createElement('div');controls.className='controls share-view-controls';
     const areaButton=makeButton('Choose shared area'),fullButton=makeButton('Share full screen'),zoomOut=makeButton('Zoom −'),zoomIn=makeButton('Zoom +'),moveButton=makeButton('Move view');
@@ -136,7 +153,7 @@
     return{
       stream,active:true,
       stop(){
-        if(stopped)return;stopped=true;cancelAnimationFrame(raf);setPanMode(false);stage.classList.remove('viewport-panning');
+        if(stopped)return;stopped=true;stopTicker();setPanMode(false);stage.classList.remove('viewport-panning');
         listeners.forEach(remove=>remove());
         controls.remove();dialog.remove();source.srcObject=null;stream.getTracks().forEach(track=>track.stop());rawStream.getTracks().forEach(track=>track.stop());
       }

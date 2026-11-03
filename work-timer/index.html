@@ -1,28 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
   <meta charset="UTF-8" />
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#111827" />
   <title>Work Timer</title>
@@ -214,6 +197,7 @@
   </dialog>
 
   <script src="app.js?v=20261007-tab-login"></script>
+<script async src="../teacher-global-bootstrap.js?v=20261020"></script>
 </body>
 </html>
 

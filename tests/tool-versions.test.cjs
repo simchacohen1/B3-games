@@ -12,6 +12,10 @@ test('each dual-version tool offers teacher and student routes with the selected
   const bars=render(path+'/teacher.html?class=other');assert.equal(bars.length,1,path);
   const links=bars[0].children;assert.deepEqual(links.map(x=>x.textContent),['Teacher version','Student version']);
   assert.equal(new URL(links[1].href).searchParams.get('class'),'other');assert.equal(new URL(links[1].href).searchParams.get('demo'),'1');
+  // Student Version is a teacher-authenticated preview link, not an
+  // intercepted demo-student impersonation that changes Firebase identity.
+  assert.equal(links[1].onclick,undefined,path);
+  assert.match(links[1].title,/teacher login/i);
  }
 });
 test('regular students and impersonated students do not receive teacher version links',()=>{assert.equal(render('yiddish/index.html',{authorized:false}).length,0);assert.equal(render('yiddish/index.html',{acting:true}).length,0);});

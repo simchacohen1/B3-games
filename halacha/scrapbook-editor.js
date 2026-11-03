@@ -41,7 +41,7 @@ window.studioHistory=async(id,direction)=>{
 };
 function applyBackground(id,i){
  const p=pageAt(id,i),bg=(S[id+'_studio_bg']||[])[i];if(!p)return;
- p.className='page '+(S[id+'_theme']||'');p.dataset.studioBg=bg||'';
+ p.className='page '+(S[id+'_theme']||'');p.dataset.studioBg=bg||'';p.style.backgroundColor=/^#[\da-f]{6}$/i.test(bg||'')?bg:'';
 }
 function toolbar(id,i){
  return `<div class="studio-page-label">Page ${i+1}</div><div class="page-tools studio-tools" aria-label="Page ${i+1} drawing tools">
@@ -49,15 +49,62 @@ function toolbar(id,i){
  <div class="studio-tool-row studio-palette">${palette.map(([n,c])=>`<button class="studio-swatch" style="--swatch:${c}" title="${n}" aria-label="${n}" data-color="${c}" aria-pressed="${n==='Blue'}" onclick="studioColor('${id}',${i},'${c}')"></button>`).join('')}<label>Size <select aria-label="Brush size" onchange="this.closest('.page').dataset.size=this.value"><option value="3">Small</option><option value="8" selected>Medium</option><option value="18">Big</option></select></label></div>
  </div>`;
 }
+/* Right-hand scrapbook drawing panel. Original page drawing layers and save format are unchanged. */
+function drawingRail(id){
+ const modes=[['select','✥ Move'],['pen','✏️ Pencil'],['marker','🖍 Marker'],['erase','⌫ Eraser'],['fill','🪣 Fill'],['line','╱ Line'],['rect','▢ Box'],['circle','◯ Circle']];
+ return '<aside class="studio-draw-rail" data-active-page="0" role="toolbar" aria-label="Drawing tools next to the scrapbook">'
+ +'<strong class="studio-rail-title">🎨 Draw</strong><span class="studio-rail-subtitle">Page</span>'
+ +'<div class="studio-rail-pages" role="group" aria-label="Choose scrapbook page">'
+ +[0,1].map(i=>'<button type="button" data-rail-page="'+i+'" aria-pressed="'+(i===0)+'" onclick="studioRailPage(\''+id+'\','+i+')">'+(i+1)+'</button>').join('')
+ +'</div><div class="studio-rail-modes" role="group" aria-label="Drawing tool">'
+ +modes.map(([mode,label])=>'<button type="button" data-rail-mode="'+mode+'" aria-pressed="'+(mode==='select')+'" onclick="studioRailMode(\''+id+'\',\''+mode+'\')">'+label+'</button>').join('')
+ +'</div><div class="studio-rail-palette" role="group" aria-label="Drawing color">'
+ +palette.map(([name,color])=>'<button type="button" class="studio-rail-swatch" data-rail-color="'+color+'" aria-label="'+name+'" title="'+name+'" aria-pressed="'+(name==='Blue')+'" style="--swatch:'+color+'" onclick="studioRailColor(\''+id+'\',\''+color+'\')"></button>').join('')
+ +'</div><label class="studio-rail-size">Size<select aria-label="Drawing size" onchange="studioRailSize(\''+id+'\',this.value)"><option value="3">Small</option><option value="8" selected>Medium</option><option value="18">Big</option></select></label>'
+ +'<p class="studio-rail-hint">Choose the page you want to draw on.</p></aside>';
+}
+function railFor(id){return document.querySelector('#'+id+' .studio-draw-rail');}
+function syncDrawingRail(id){
+ const rail=railFor(id);if(!rail)return;
+ const i=Number(rail.dataset.activePage||0),p=pageAt(id,i);if(!p)return;
+ const mode=p.classList.contains('drawing')?(p.dataset.drawMode||'pen'):'select';
+ rail.querySelectorAll('[data-rail-page]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.railPage)===i)));
+ rail.querySelectorAll('[data-rail-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.railMode===mode)));
+ rail.querySelectorAll('[data-rail-color]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.railColor===(p.dataset.pen||'#1e88e5'))));
+ rail.querySelector('.studio-rail-size select').value=String(p.dataset.size||8);
+}
+window.studioRailPage=(id,i)=>{
+ if(readonly()||!pageAt(id,i))return;
+ const rail=railFor(id);if(!rail)return;
+ pages(id).forEach((p,n)=>{if(n!==i)p.classList.remove('drawing');});
+ rail.dataset.activePage=String(i);syncDrawingRail(id);
+};
+window.studioRailMode=(id,mode)=>{
+ if(readonly())return;const rail=railFor(id);if(!rail)return;
+ const i=Number(rail.dataset.activePage||0);
+ studioMode(id,i,mode);syncDrawingRail(id);
+};
+window.studioRailColor=(id,color)=>{
+ if(readonly())return;const rail=railFor(id);if(!rail)return;
+ studioColor(id,Number(rail.dataset.activePage||0),color);syncDrawingRail(id);
+};
+window.studioRailSize=(id,size)=>{
+ if(readonly()||!['3','8','18'].includes(String(size)))return;
+ const rail=railFor(id);if(!rail)return;
+ const p=pageAt(id,Number(rail.dataset.activePage||0));if(!p)return;
+ p.dataset.size=String(size);syncDrawingRail(id);
+};
 window.studioMode=(id,i,mode)=>{
  if(readonly())return;const p=pageAt(id,i);if(!p||(p.querySelector('.draw-layer')._loading||p.querySelector('.draw-layer')._loadFailed))return;
  p.dataset.drawMode=mode;p.classList.toggle('drawing',mode!=='select');
  p.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
+ syncDrawingRail(id);
 };
 window.studioColor=(id,i,color)=>{
  if(readonly())return;const p=pageAt(id,i);p.dataset.pen=color;
  p.querySelectorAll('[data-color]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.color===color));
  if(!p.classList.contains('drawing'))studioMode(id,i,'pen');
+ syncDrawingRail(id);
 };
 function resetContext(c){const ctx=c.getContext('2d');ctx.setTransform(c.width/c.clientWidth,0,0,c.height/c.clientHeight,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';return ctx;}
 async function restoreDrawing(id,i){
@@ -138,10 +185,53 @@ const svgBody={
  "heart": "<g filter=\"url(#shadow)\"><path d=\"M80 138Q17 100 21 63Q22 20 59 28q14 2 21 19q7-17 21-19q37-8 38 35q4 37-59 75z\" fill=\"url(#rose)\" stroke=\"#fff\" stroke-width=\"10\"/><path d=\"M80 138Q17 100 21 63Q22 20 59 28q14 2 21 19q7-17 21-19q37-8 38 35q4 37-59 75z\" fill=\"url(#rose)\" stroke=\"#bb4c6a\" stroke-width=\"2\"/><path d=\"M34 65q-1-22 18-22\" fill=\"none\" stroke=\"#ffe1e9\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M94 113q27-23 31-44\" fill=\"none\" stroke=\"#d75277\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"m137 19-3 5 3 5 3-5zM13 108l-3 5 3 5 3-5z\" fill=\"#e7b75a\"/></g>",
  "sunrise": "<g filter=\"url(#shadow)\"><circle cx=\"80\" cy=\"78\" r=\"36\" fill=\"url(#gold)\" stroke=\"#fff\" stroke-width=\"8\"/><g stroke=\"#f0b449\" stroke-width=\"5\" stroke-linecap=\"round\"><path d=\"M80 16v15M38 29l9 12m-30 24 15 4m90-40-9 12m30 24-15 4\"/></g><circle cx=\"80\" cy=\"78\" r=\"36\" fill=\"url(#gold)\" stroke=\"#d59b39\" stroke-width=\"1.5\"/><path d=\"M19 100q15-14 32 0q15-14 31 0q16-14 31 0q15-14 28 0v34H19z\" fill=\"url(#water)\" stroke=\"#fff\" stroke-width=\"5\" stroke-linejoin=\"round\"/><path d=\"M28 113q15-7 29 0t28 0t28 0t20 0M35 126q13-6 24 0t23 0t23 0t19 0\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".75\" stroke-width=\"3\" stroke-linecap=\"round\"/><path d=\"M61 62q9-13 25-12\" fill=\"none\" stroke=\"#fff0bc\" stroke-width=\"5\" stroke-linecap=\"round\"/></g>"
 };
+// A Siman Aleph palette uses familiar morning and home objects instead of the
+// unrelated all-purpose set. Existing saved artwork and sticker keys are kept.
+Object.assign(svgBody,{
+ home:'<g stroke="#805b3e" stroke-width="4" stroke-linejoin="round"><path d="M22 76 80 26l58 50v61H22z" fill="#fff5dc"/><path d="M14 77 80 20l66 57" fill="none" stroke="#bc6e51" stroke-width="10"/><rect x="67" y="91" width="29" height="46" rx="3" fill="#9b7050"/><rect x="35" y="84" width="23" height="23" rx="3" fill="#bde8f2"/><rect x="103" y="84" width="23" height="23" rx="3" fill="#bde8f2"/><path d="M46 84v23m-11-11h23m56-12v23m-11-12h23" stroke="#fff" stroke-width="3"/></g>',
+ chair:'<g stroke="#805b3e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M48 40v59h66V40M42 99h78M53 101l-8 46m64-46 8 46M56 62h50"/><rect x="44" y="83" width="74" height="17" rx="5" fill="#d7a764" stroke="#805b3e"/></g>',
+ table:'<g stroke="#805b3e" stroke-width="5" stroke-linejoin="round"><path d="M24 66q56-18 112 0v18q-56 16-112 0z" fill="#d6a363"/><path d="M37 86v59m86-59v59" fill="none" stroke-linecap="round"/><path d="M37 108h86" fill="none" stroke="#ae744b"/></g>',
+ plant:'<g stroke="#628454" stroke-width="4" stroke-linecap="round" fill="none"><path d="M80 110V41m0 40Q54 52 48 31q28 1 32 34m0 31q27-22 34-46-29 4-34 33m0-26Q62 52 62 20q23 12 18 43"/><path d="M53 108h54l-7 40H60z" fill="#df9174" stroke="#a76756"/></g>',
+ toybox:'<g stroke="#985c42" stroke-width="4" stroke-linejoin="round"><path d="M30 75h100v69H30z" fill="#efb24e"/><path d="M25 67h110v17H25z" fill="#d57b55"/><path d="M48 66V45h22l10 12 10-12h22v21" fill="#94c5e5"/><path d="M43 99h74" stroke="#fff2cc" stroke-width="6"/></g>',
+ window:'<g stroke="#765f4a" stroke-width="5" stroke-linejoin="round"><rect x="26" y="27" width="108" height="108" rx="7" fill="#ccecf5"/><path d="M80 29v104M29 81h102" stroke="#fff" stroke-width="8"/><path d="M30 31h100v100H30z" fill="none"/></g>'
+});
 const stickerNames={torah:'Torah',tzedakah:'Tzedakah',challah:'Challah',kiddush:'Kiddush cup',washing:'Washing cup',siddur:'Siddur',shofar:'Shofar',star:'Gold star',heart:'Kindness',sunrise:'New day'};
+Object.assign(stickerNames,{home:'Home',chair:'Chair',table:'Table',plant:'Plant',toybox:'Toy box',window:'Window'});
 const stickerSrc=k=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><defs><linearGradient id="gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff0b4"/><stop offset=".4" stop-color="#edbf53"/><stop offset=".65" stop-color="#ffda76"/><stop offset="1" stop-color="#bc842f"/></linearGradient><linearGradient id="velvet"><stop stop-color="#182c58"/><stop offset=".4" stop-color="#345487"/><stop offset=".75" stop-color="#223760"/><stop offset="1" stop-color="#11284d"/></linearGradient><linearGradient id="silver"><stop stop-color="#7f94ad"/><stop offset=".22" stop-color="#f7fbff"/><stop offset=".45" stop-color="#ccd9e5"/><stop offset=".6" stop-color="#fff"/><stop offset="1" stop-color="#8d9fb8"/></linearGradient><linearGradient id="wood"><stop stop-color="#936134"/><stop offset=".45" stop-color="#dab178"/><stop offset="1" stop-color="#86502d"/></linearGradient><linearGradient id="teal"><stop stop-color="#318f86"/><stop offset=".4" stop-color="#60c7b4"/><stop offset="1" stop-color="#328e80"/></linearGradient><linearGradient id="bread" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#ffe09a"/><stop offset=".45" stop-color="#e9ac50"/><stop offset="1" stop-color="#be7937"/></linearGradient><linearGradient id="book"><stop stop-color="#85314d"/><stop offset=".45" stop-color="#bd5b6d"/><stop offset="1" stop-color="#87334d"/></linearGradient><linearGradient id="horn" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#f9dfb1"/><stop offset=".5" stop-color="#d3a56c"/><stop offset="1" stop-color="#a97946"/></linearGradient><linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b7eff9"/><stop offset="1" stop-color="#59add2"/></linearGradient><linearGradient id="rose" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#ffb0bc"/><stop offset=".5" stop-color="#ed7e99"/><stop offset="1" stop-color="#cc577c"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#344766" flood-opacity=".2"/></filter></defs>'+svgBody[k]+'</svg>');
 window.studioSticker=(id,key)=>{if(readonly()||!svgBody[key])return;const e=add(id,'photo','<img alt="'+stickerNames[key]+'" src="'+stickerSrc(key)+'">',studioTarget(id));e.classList.add('studio-sticker','clear');e.style.width='160px';persist(id);};
+// The same illustrated picture-sticker collection is available in every
+// Halacha lesson, on either of the student's two scrapbook pages.
+const halachaPictureStickers=[
+ ['bed-window','Bedroom'],['book','Sefer'],['boy-walking','Chayol'],['globe','World'],
+ ['heart','Heart'],['house','Home'],['lamp','Study lamp'],['shtender','Shtender'],
+ ['speech','Kind words'],['table-chair','Table & chair'],['thought','Think'],['toybox','Toy box']
+];
+const halachaPictureLookup=new Map(halachaPictureStickers);
+window.studioPictureSticker=(id,key)=>{
+ if(readonly()||!halachaPictureLookup.has(key))return;
+ const target=window.studioTarget(id);
+ const src='art/stickers/'+key+'.jpg?v=20261019-illustrated-library1';
+ // Keep both scrapbook pages and their existing saved state. Only append the
+ // image to the specific page chosen in the sidebar, never auto-seed pages.
+ const piece=add(id,'photo','<img alt="'+halachaPictureLookup.get(key)+'" src="'+src+'">',target);
+ if(!piece)return;
+ piece.classList.add('studio-sticker','hal-illustrated-piece');
+ piece.style.width='145px';
+ if(typeof persist==='function')persist(id);
+ const message=document.querySelector('#'+id+' .studio-sticker-status');
+ if(message)message.textContent='Added '+halachaPictureLookup.get(key)+' to Page '+(target+1)+' ✓';
+};
 window.studioTarget=id=>+(document.querySelector('#'+id+' .studio-target')?.value||0);
+// Delegated listener survives restored scrapbook DOM, which can replace the
+// illustrated sticker buttons after account data loads. One click adds once.
+document.addEventListener('click',ev=>{
+ const target=ev.target;
+ const btn=target && target.closest && target.closest('.studio-picture-library [data-illustrated-sticker]');
+ if(!btn)return;
+ const section=btn.closest('.section');
+ if(section)window.studioPictureSticker(section.id,btn.dataset.illustratedSticker);
+});
+
 window.studioText=id=>{
  if(readonly())return;pages(id).forEach((p,i)=>studioMode(id,i,'select'));
  const e=add(id,'textbox','<div class="tb-move">✥ Move</div><div class="tb-text" contenteditable="true" data-ph="Type your idea…"></div>',studioTarget(id));e.querySelector('.tb-text').focus();
@@ -167,8 +257,20 @@ function upgrade(id){
  const side=sec.querySelector('.side');side.querySelector('h3').textContent='✨ My Halacha Studio';
  const intro=document.createElement('div');intro.className='studio-intro';intro.innerHTML='<b>Create something wonderful!</b><span>Move • Draw • Decorate</span>';side.querySelector('h3').after(intro);
  const actions=document.createElement('div');actions.className='studio-actions';actions.innerHTML=`<button data-history="undo" onclick="studioHistory('${id}','undo')">↶ Undo</button><button data-history="redo" onclick="studioHistory('${id}','redo')">↷ Redo</button><label>Add to <select class="studio-target" aria-label="Page for new pieces"><option value="0">Page 1</option><option value="1">Page 2</option></select></label>`;intro.after(actions);
- const themes=side.querySelector('.themeRow');themes.className='studio-backgrounds';themes.innerHTML='<b>Backgrounds</b>'+[['paper','📜 Paper'],['sky','☁ Sky'],['garden','🌿 Garden'],['stars','✨ Stars'],['blank','⬜ White']].map(([k,n])=>`<button onclick="studioBackground('${id}','${k}')">${n}</button>`).join('');
- const stickers=document.createElement('div');stickers.className='studio-stickers';stickers.innerHTML='<b>Torah stickers</b><div>'+Object.keys(svgBody).map(k=>`<button title="${stickerNames[k]}" onclick="studioSticker('${id}','${k}')"><img alt="" src="${stickerSrc(k)}"><span>${stickerNames[k]}</span></button>`).join('')+'</div>';themes.after(stickers);
+ const themes=side.querySelector('.themeRow');themes.className='studio-backgrounds';themes.innerHTML='<b>Page styles</b>'+[['paper','📜 Paper'],['parchment','🟨 Parchment'],['notebook','📓 Notebook'],['photo','🖼 Photo album'],['craft','✂️ Arts & crafts'],['elegant','✨ Elegant'],['sky','☁ Sky'],['garden','🌿 Garden'],['stars','⭐ Stars'],['blank','⬜ White']].map(([k,n])=>`<button onclick="studioBackground('${id}','${k}')">${n}</button>`).join('');
+ const customBg=document.createElement('label');customBg.className='studio-custom-bg';customBg.innerHTML='Choose a background color <input type="color" value="#fffaf0" aria-label="Choose a background color">';customBg.querySelector('input').addEventListener('input',ev=>studioBackground(id,ev.target.value));themes.appendChild(customBg);
+ const stickerPacks={a:['home','chair','table','plant','toybox','window','heart'],b:['sunrise','heart','washing','siddur'],c:['heart','sunrise','home','window'],d:['sunrise','heart','home','toybox'],e:['sunrise','star','heart'],f:['home','washing','sunrise','heart'],a6:['siddur','star','home','window'],a7:['siddur','heart','star','home']};
+ const stickerKeys=stickerPacks[id]||Object.keys(svgBody);
+ const stickerButton=k=>`<button title="${stickerNames[k]}" onclick="studioSticker('${id}','${k}')"><img alt="" src="${stickerSrc(k)}"><span>${stickerNames[k]}</span></button>`;
+ const primaryStickers=stickerKeys.filter(k=>svgBody[k]).map(stickerButton).join('');
+ const moreStickers=Object.keys(svgBody).filter(k=>!stickerKeys.includes(k)).map(stickerButton).join('');
+ const stickers=document.createElement('div');stickers.className='studio-stickers';
+ const illustrated=halachaPictureStickers.map(([key,name])=>
+  '<button type="button" data-illustrated-sticker="'+key+'" title="Add '+name+' to selected scrapbook page"><img alt="" loading="lazy" src="art/stickers/'+key+'.jpg?v=20261019-illustrated-library1"><span>'+name+'</span></button>'
+ ).join('');
+ stickers.innerHTML='<b>Illustrated stickers — every lesson</b><p class="studio-sticker-guide">Choose Page 1 or 2 above, then tap a picture.</p><div class="studio-picture-library">'+illustrated+'</div><p class="studio-sticker-status" role="status" aria-live="polite"></p><details class="studio-more-stickers"><summary>More drawings and decorations</summary><div>'+primaryStickers+moreStickers+'</div></details>';
+ themes.before(stickers); // Keep the illustrated choices visible above the page-style controls.
+ // Click handling is delegated globally to survive cloud re-renders.
  const textBtn=side.querySelector('[onclick^="addTextBox"]');if(textBtn)textBtn.setAttribute('onclick',`studioText('${id}')`);
  const addRow=textBtn&&textBtn.closest('.step');if(addRow)actions.after(addRow);
  const help=side.querySelector('p:last-child');if(help)help.innerHTML='<small>Pick Move to edit pieces. Drag the blue dots to resize. Click a piece to change its style. Fill colors your drawings; stickers keep their own colors.</small>';
@@ -177,7 +279,12 @@ function upgrade(id){
   p.querySelector('.page-tools').outerHTML=toolbar(id,i);applyBackground(id,i);
   if(readonly()){p.querySelectorAll('.tb-text').forEach(t=>t.contentEditable='false');p.querySelectorAll('.scrap').forEach(e=>{e.onpointerdown=e.onpointermove=e.onpointerup=null;});}
  });
- if(readonly())sec.querySelectorAll('.side button,.side select,.side input,.page-tools button,.page-tools select').forEach(b=>b.disabled=true);
+ const book=sec.querySelector('.book');
+ if(book&&!book.querySelector('.studio-draw-rail')){
+  book.insertAdjacentHTML('beforeend',drawingRail(id));
+  syncDrawingRail(id);
+ }
+ if(readonly())sec.querySelectorAll('.side button,.side select,.side input,.page-tools button,.page-tools select,.studio-draw-rail button,.studio-draw-rail select').forEach(b=>b.disabled=true);
  seed(id);updateHistory(id);
 }
 const originalRender=render;render=function(l){originalRender(l);upgrade(l.id);};

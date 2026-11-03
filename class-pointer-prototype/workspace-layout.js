@@ -10,15 +10,14 @@
     tabs.className='cp-workspace-tabs';
     tabs.setAttribute('aria-label','Classroom sections');
     const items=[
-      ['teach','✏️','Teach'],
-      ['screens','🖥️','Screens'],
-      ['whiteboards','🎨','Whiteboards'],
-      ['students','👥','Students']
+      ['teach','✏️','My screen'],
+      ['screens','🖥️','Student screens'],
+      ['whiteboards','🎨','Student whiteboards']
     ];
     const buttons=new Map();
     for(const [id,icon,name] of items){
       const b=document.createElement('button');
-      b.type='button';b.className='cp-workspace-tab';
+      b.type='button';b.className='cp-workspace-tab';b.dataset.workspace=id;
       b.innerHTML='<span class="cp-tab-icon" aria-hidden="true">'+icon+'</span><span>'+name+'</span>';
       b.setAttribute('aria-selected',String(id==='teach'));
       b.setAttribute('aria-label',name);
@@ -30,23 +29,13 @@
     function activate(id){
       const launch=document.getElementById('studentBoards');
       if((id==='screens'||id==='whiteboards')&&(!launch||launch.disabled))return;
+      // Use the real gallery state machine, not repeated clicks on hidden
+      // toggles. Hiding a workspace must preserve screen capture and board data.
+      const navigate=window.ClassPointerBoards?.navigateWorkspace;
+      if(!navigate||navigate(id)!==true)return;
+      document.dispatchEvent(new CustomEvent('class-pointer-workspace',{detail:id}));
       for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
-      if(id==='students'){
-        const menu=document.getElementById('tbStudentsMenu');
-        if(menu?.hidden)document.getElementById('tbStudentsBtn')?.click();
-      }else if(id==='screens'||id==='whiteboards'){
-        const boards=document.getElementById('studentBoards');
-        if(boards&&!boards.disabled){
-          /* Open the existing Screens/Whiteboards workspace. Teacher chooses
-             screen or board mode there; do not silently change class mode. */
-          if(boards.getAttribute('aria-pressed')!=='true')boards.click();
-          const gallery=document.getElementById('boardsView');
-          const chooser=[...gallery?.querySelectorAll('button')||[]].find(b=>b.textContent.trim()===(id==='screens'?'🖥 Screens':'📝 Whiteboards'));
-          if(chooser)chooser.click();
-        }
-      }else{
-        document.querySelector('.tb-mode[data-mode="point"]')?.click();
-      }
+      if(id==='teach')document.querySelector('.tb-mode[data-mode="point"]')?.click();
     }
     // Primary tabs replace the extra quick-launch buttons, not their underlying functions.
     // Keep their original DOM nodes for existing code and observers.
@@ -57,7 +46,7 @@
       if(menu){
         menu.setAttribute('aria-label','Student permissions');
         const handle=menu.querySelector('.tb-roster-handle');
-        if(handle&&handle.textContent!=='⠿ Student permissions — drag to reposition')handle.textContent='⠿ Student permissions — drag to reposition';
+        if(handle&&handle.textContent!=='Student permissions')handle.textContent='Student permissions';
       }
     }
     organize();

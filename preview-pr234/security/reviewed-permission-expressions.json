@@ -1,0 +1,500 @@
+{
+  "description": "Exact reviewed permission expressions in the October 16, 2026 repository rules. This is a drift tripwire, not a security clearance: existing public grants are unsafe and must be removed in a separate verified migration. Any rules change must update this baseline in the same reviewed PR.",
+  "permissions": [
+    {
+      "path": "/",
+      "permission": ".read",
+      "expression": false
+    },
+    {
+      "path": "/",
+      "permission": ".write",
+      "expression": false
+    },
+    {
+      "path": "/b3Games/admins",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true"
+    },
+    {
+      "path": "/b3Games/classGalleryPresence",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/b3Games/classGalleryPresenceSettings",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/b3Games/classGalleryTag",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/b3Games/siteSettings",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games/students/$studentId/halacha",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId"
+    },
+    {
+      "path": "/b3Games/students/$studentId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games/teachers",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/access",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/classPointerSessions",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true))"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/halachaAccess",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/halacha').val() == true)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/posukPracticeLimit",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/resources",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/siteEnabled",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/b3Games",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/b3Private",
+      "permission": ".read",
+      "expression": false
+    },
+    {
+      "path": "/b3Private",
+      "permission": ".write",
+      "expression": false
+    },
+    {
+      "path": "/b3Quiz",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/b3Quiz",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/classGallery",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/classGallery",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/allowedStudents/$studentId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/posukPractice/allowedStudents",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/attempts/$studentId",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/attempts",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/chazara/$section/$studentId",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/chazara",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/classroomTranslations",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/classroomTranslations",
+      "permission": ".write",
+      "expression": false
+    },
+    {
+      "path": "/posukPractice/generatedQuestions",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/generatedQuestions",
+      "permission": ".write",
+      "expression": false
+    },
+    {
+      "path": "/posukPractice/settings/$other",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/settings/accessLocked",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/settings/accessLockMessage",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/settings/appEnabled",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/settings/practiceLimit",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/settings",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/shorashimLearning",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/shorashimLearning",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/students/$studentId",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/students",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/translationChunks",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/posukPractice/translationChunks",
+      "permission": ".write",
+      "expression": false
+    },
+    {
+      "path": "/questionSets",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/questionSets",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/matchRooms/$room",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/matchRooms",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/progress/$studentId",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/progress",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/settings",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/rashiLetters/settings",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/studentRewards/audit",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/audit",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/categories",
+      "permission": ".read",
+      "expression": "auth != null"
+    },
+    {
+      "path": "/studentRewards/categories",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/classes",
+      "permission": ".read",
+      "expression": "auth != null"
+    },
+    {
+      "path": "/studentRewards/classes",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/classRewardCatalog",
+      "permission": ".read",
+      "expression": "auth != null"
+    },
+    {
+      "path": "/studentRewards/classRewardCatalog",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/commentsByStudent/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/commentsByStudent",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/commentsByStudent",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyAttendance/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/dailyAttendance",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyAttendance",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyAwards/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/dailyAwards",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyAwards",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyRatings/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/dailyRatings",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/dailyRatings",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/enrollments",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/enrollments",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/meta",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/meta",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/pointAdjustments",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/pointAdjustments",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/privateAuth",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/privateAuth",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/redemptionsByStudent/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/redemptionsByStudent",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/redemptionsByStudent",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/rewards",
+      "permission": ".read",
+      "expression": "auth != null"
+    },
+    {
+      "path": "/studentRewards/rewards",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/settings/studentWebsiteEnabled",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/studentRewards/settings",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/settings",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/students/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || auth.token.studentRewardsStudentId == $studentId)"
+    },
+    {
+      "path": "/studentRewards/students",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards/students",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/studentRewards",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+    },
+    {
+      "path": "/tentTrailTrivia",
+      "permission": ".read",
+      "expression": true
+    },
+    {
+      "path": "/tentTrailTrivia",
+      "permission": ".write",
+      "expression": true
+    },
+    {
+      "path": "/b3Private/classPointerSharePermissions/$workspaceId/$classId/$roomId",
+      "permission": ".write",
+      "expression": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))"
+    }
+  ]
+}

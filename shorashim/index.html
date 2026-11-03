@@ -1,31 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>
-  (function() {
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          window.currentUserSession = getAll.result[0].value;
-          document.addEventListener('DOMContentLoaded', function() {
-            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            modals.forEach(m => m.style.display = 'none');
-          });
-        }
-      };
-    };
-  })();
-</script>
+
   <meta charset="utf-8" />
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../guest-mode.js?v=20261011-guest"></script>
-  <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="shorashim"></script>
+  <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="shorashim"></script>
   <title>Shorashim Learning Lab</title>
   <style>
 :root{
@@ -1171,12 +1155,26 @@ body.shorashim-review-active .review-card-wrap{flex:0 1 auto!important;min-heigh
 body.shorashim-review-active #reviewScreen .review-card{height:min(620px,calc(100dvh - 250px))!important;min-height:0!important;max-height:none!important;width:min(760px,92vw)!important}
 body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px!important}
 </style>
-<script defer src="../gallery-share.js?v=20261011b"></script>
+<script defer src="../gallery-share.js?v=20261022-pointer2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
+<style id="shorashim-perek-menu-styles">
+  .perek-choice-grid{margin:26px auto 0}
+  .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
+  .perek-choice:hover,.perek-choice:focus-visible{border-color:#4f46e5;background:#eef2ff;outline-offset:3px}
+  .perek-choice .perek-number{font-size:52px;line-height:1;font-weight:900;color:#4338ca}
+  .perek-choice strong{font-size:clamp(23px,2.8vw,29px)}
+  .perek-choice .perek-progress{font-size:15px;font-weight:800;color:#475569}
+  .perek-choice-hint{text-align:center;color:#475569;font-size:15px;font-weight:700;margin:20px 0}
+  .hero-grid.two.perek-choice-grid{max-width:1150px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .perek-choice .perek-number{flex:0 0 auto}
+  .booklet-week-wrap{display:flex;flex-direction:column;gap:7px;font-weight:800;margin:14px 0;color:#172033}
+  .booklet-week-wrap select{font-size:17px;font-weight:700;width:100%;border:2px solid #c7d2fe}
+  @media(max-width:900px){.hero-grid.two.perek-choice-grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1232,15 +1230,15 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <strong>Review Shorashim</strong>
               <span>Review what you learned — and record your Chazara for points!</span>
             </button>
-            <button class="feature-card learn" data-go="learnScreen" data-track="shorashim">
+            <button class="feature-card learn" data-go="shorashimPerekScreen" data-track="shorashim">
               <span class="feature-icon">✏️</span>
               <strong>Learn New Shorashim</strong>
               <span>Learn new roots and make picture clues.</span>
             </button>
-            <button id="gamesHomeCard" class="feature-card games locked" data-go="gamesScreen">
+            <button id="gamesHomeCard" class="feature-card games" data-go="gamesScreen">
               <span class="feature-icon">🎮</span>
               <strong>Games</strong>
-              <span id="gamesHomeMessage">Finish today's flashcard review to unlock.</span>
+              <span id="gamesHomeMessage">Choose a practice game.</span>
             </button>
             <button class="feature-card gallery" data-go="galleryScreen">
               <span class="feature-icon">🖼️</span>
@@ -1256,6 +1254,32 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           <div class="stats-grid" id="studentStats"></div>
         </section>
 
+        <section id="shorashimPerekScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Shorashim List</h2></div>
+          </div>
+          <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="18">
+              <span class="perek-number" lang="he" dir="rtl">י״ח</span>
+              <strong>Perek 18 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="19">
+              <span class="perek-number" lang="he" dir="rtl">י״ט</span>
+              <strong>Perek 19 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="booklet">
+              <span class="perek-number" aria-hidden="true">📘</span>
+              <strong>3rd Grade Shoroshim Booklet</strong>
+              <span>30 weeks • 6 words each</span>
+              <span class="perek-progress">180 words</span>
+            </button>
+          </div>
+          <p class="perek-choice-hint">Choose a list. No words need to be learned in order.</p>
+        </section>
+
         <section id="affixHomeScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
@@ -1263,10 +1287,10 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
           <div class="hero-grid two">
             <button class="feature-card affix" data-go="learnScreen" data-track="prefix">
-              <span class="feature-icon">前</span><strong>Prefixes</strong><span>Learn prefixes in order, with examples.</span>
+              <span class="feature-icon">前</span><strong>Prefixes</strong><span>Choose any prefix and learn it with examples.</span>
             </button>
             <button class="feature-card affix" data-go="learnScreen" data-track="suffix">
-              <span class="feature-icon">🔚</span><strong>Suffixes</strong><span>Learn suffixes in order, with examples.</span>
+              <span class="feature-icon">🔚</span><strong>Suffixes</strong><span>Choose any suffix and learn it with examples.</span>
             </button>
           </div>
         </section>
@@ -1278,6 +1302,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <div class="eyebrow">Learn and customize</div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
+            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change List</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1294,7 +1319,42 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                   <h3 id="pathTitle">Your Learning Path</h3>
                   <span id="availableCount" class="pill"></span>
                 </div>
-                <p class="mini-note">New items unlock strictly in order. Any learned card can always be opened here and edited; future items stay locked.</p>
+                <p class="mini-note">Choose any word in any order. All available words are open; select a learned card any time to edit it.</p>
+                <label id="bookletWeekWrap" class="booklet-week-wrap hidden" for="bookletWeekSelect">Booklet week
+                  <select id="bookletWeekSelect" aria-label="Choose booklet week">
+                    <option value="all">All 30 Weeks</option>
+                    <option value="1">Week 1</option>
+                    <option value="2">Week 2</option>
+                    <option value="3">Week 3</option>
+                    <option value="4">Week 4</option>
+                    <option value="5">Week 5</option>
+                    <option value="6">Week 6</option>
+                    <option value="7">Week 7</option>
+                    <option value="8">Week 8</option>
+                    <option value="9">Week 9</option>
+                    <option value="10">Week 10</option>
+                    <option value="11">Week 11</option>
+                    <option value="12">Week 12</option>
+                    <option value="13">Week 13</option>
+                    <option value="14">Week 14</option>
+                    <option value="15">Week 15</option>
+                    <option value="16">Week 16</option>
+                    <option value="17">Week 17</option>
+                    <option value="18">Week 18</option>
+                    <option value="19">Week 19</option>
+                    <option value="20">Week 20</option>
+                    <option value="21">Week 21</option>
+                    <option value="22">Week 22</option>
+                    <option value="23">Week 23</option>
+                    <option value="24">Week 24</option>
+                    <option value="25">Week 25</option>
+                    <option value="26">Week 26</option>
+                    <option value="27">Week 27</option>
+                    <option value="28">Week 28</option>
+                    <option value="29">Week 29</option>
+                    <option value="30">Week 30</option>
+                  </select>
+                </label>
                 <div id="wordList" class="word-list"></div>
               </aside>
 
@@ -1428,8 +1488,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">➡️ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
                 <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
               </div>
-              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button></div>
-              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
+              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button><button type="button" class="perek-filter-btn" data-review-perek="booklet">3rd Grade Booklet</button></div>
+              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="newest" selected>Newest learned first</option><option value="learned">Oldest learned first</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
               <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
               <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
               <div id="reviewPicker" class="review-picker"></div>
@@ -1475,7 +1535,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         <section id="gamesScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Unlocked after today's review</div><h2>Practice Games</h2></div>
+            <div><div class="eyebrow">Play whenever you like</div><h2>Practice Games</h2></div>
           </div>
           <div id="gamesLockedPanel" class="card-panel center-panel hidden">
             <h3>🔒 Games are locked</h3>
@@ -1553,12 +1613,16 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   </dialog>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20261011-guest"></script>
-  <script src="review-categories.js?v=20260917-picturefix1"></script>
+  <script src="../firebase-config.js?v=20261029-staging-config"></script>
+  <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
+  <script src="app.js?v=20261020-follow-pointer1"></script>
+  <script src="review-categories.js?v=20261019-newest-review"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
-  <script src="../b3-race.js?v=20261007"></script>
+  <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
+  <script src="../b3-race.js?v=teacher-player-20261029-1"></script>
   <script src="friends-race.js?v=20261007-shared-account-v2"></script>
 
 <script data-shorashim-workspace-ux="v1">
@@ -1905,7 +1969,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 })();
 </script>
 
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 

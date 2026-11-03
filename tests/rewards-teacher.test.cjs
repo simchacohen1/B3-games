@@ -26,10 +26,12 @@ test('a teacher sees only their own Student Rewards class, created from Teacher 
 test('classes without Student Rewards turned on are refused',async()=>{const d=seed();await assert.rejects(call(d,OTHER,{action:'load'}),{code:403})});
 test('non-Google or unverified accounts are refused',async()=>{const d=seed();await assert.rejects(call(d,{...T,firebase:{sign_in_provider:'custom'}},{action:'load'}),{code:403})});
 test('saving daily points records the day and adds only the change to the balance',async()=>{const d=seed();const {root}=await call(d,T,{action:'load'});const [a,b]=Object.keys(root.students);
- await call(d,T,{action:'saveDaily',classId:'b3_sc',date:'2026-10-02',rows:[{studentId:a,ratings:{Behavior:'Excellent'},award:10},{studentId:b,absent:true}]});
- assert.equal(d.tree.studentRewards.students[a].rewardBalance,10);assert.equal(d.tree.studentRewards.dailyRatings[a].b3_sc['2026-10-02'].Behavior.points,110);assert.equal(d.tree.studentRewards.dailyAttendance[b].b3_sc['2026-10-02'].status,'absent');
- await call(d,T,{action:'saveDaily',classId:'b3_sc',date:'2026-10-02',rows:[{studentId:a,ratings:{Behavior:'Good'},award:15}]});
- assert.equal(d.tree.studentRewards.students[a].rewardBalance,15)});
+ await call(d,T,{action:'saveDaily',classId:'b3_sc',date:'2026-10-02',rows:[{studentId:a,ratings:{Behavior:'Excellent',Davening:'Good'},award:999},{studentId:b,absent:true}]});
+ assert.equal(d.tree.studentRewards.students[a].rewardBalance,7);
+ assert.deepEqual(d.tree.studentRewards.dailyAwards[a].b3_sc['2026-10-02'].byCategory,{Behavior:{category:'Behavior',rating:'Excellent',points:4},Davening:{category:'Davening',rating:'Good',points:3}});
+ assert.equal(d.tree.studentRewards.dailyAwards[b].b3_sc['2026-10-02'].points,0);assert.equal(d.tree.studentRewards.dailyRatings[a].b3_sc['2026-10-02'].Behavior.points,110);assert.equal(d.tree.studentRewards.dailyAttendance[b].b3_sc['2026-10-02'].status,'absent');
+ await call(d,T,{action:'saveDaily',classId:'b3_sc',date:'2026-10-02',rows:[{studentId:a,ratings:{Behavior:'Fair',Davening:'Good'}}]});
+ assert.equal(d.tree.studentRewards.students[a].rewardBalance,5)});
 test('a teacher cannot award points outside their class or with bad values',async()=>{const d=seed();const {root}=await call(d,T,{action:'load'});const a=Object.keys(root.students)[0];
  await assert.rejects(call(d,T,{action:'adjust',classId:'b3_sc',studentId:'old_levi',amount:5}),{code:403});
  await assert.rejects(call(d,T,{action:'adjust',classId:'b3_wt',studentId:a,amount:5}),{code:403});

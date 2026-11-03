@@ -1,0 +1,330 @@
+:root{font-family:system-ui,sans-serif;color:#172033;background:#f4f7fb}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:1100px;margin:24px auto;padding:24px;background:white;border:1px solid #dce4ef;border-radius:16px}h1{margin:0 0 8px}h2{font-size:19px}p{line-height:1.5;color:#526075}.controls,form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0}button,input,select{font:inherit;border-radius:8px;padding:10px 12px;border:1px solid #cbd5e1}button{background:#edf2fa;cursor:pointer;font-weight:600}button:disabled{opacity:.5;cursor:not-allowed}#startClass,#joinClass,#shareScreen{background:#2557d6;color:white}#joinLink{flex:1;min-width:220px}#invitePanel{background:#f3f6fb;padding:12px;border-radius:10px}#connectionStatus{min-height:24px;font-weight:600}#error{background:#fff0f0;color:#972626;padding:12px;border-radius:8px}.roster-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #edf2fa}.roster-row span{min-width:150px}.roster-row input{margin-right:6px}#stage{position:relative;width:100%;aspect-ratio:16/9;background:#151a23;border-radius:12px;overflow:hidden;display:grid;place-items:center;cursor:crosshair}video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}#placeholder{text-align:center;color:#dce4ef;padding:24px;pointer-events:none}#pointerLayer{position:absolute;inset:0;pointer-events:none}.pointer{position:absolute;width:16px;height:16px;border:2px solid var(--color);border-radius:50%;background:color-mix(in srgb,var(--color) 18%,transparent);box-shadow:0 0 0 1px white;transform:translate(-50%,-50%)}.pointer .name{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:#172033d9;color:white;white-space:nowrap;border-radius:5px;padding:2px 5px;font-size:11px}.pointer.arrow{border:0;background:none;box-shadow:none}.pointer.arrow:before{content:'➤';color:var(--color);font-size:24px;position:absolute;top:-10px;left:0;text-shadow:0 1px 2px #000}footer{margin-top:24px;font-size:14px}@media(max-width:650px){main{margin:0;padding:16px;border-radius:0}.controls button{padding:9px}#stage{border-radius:6px}}
+/* Small, colorful tools keep the teaching material readable. */
+body{background:linear-gradient(135deg,#eef5ff,#f6f0ff 60%,#edfafa)}
+main{box-shadow:0 12px 40px #233f7310}
+header{padding-bottom:12px;border-bottom:2px solid #edf1fa}
+h1{color:#234ea8}button{transition:background .15s,box-shadow .15s}button:hover:enabled{box-shadow:0 2px 8px #244b9e25;background:#e1ebfb}
+#startClass:hover:enabled,#joinClass:hover:enabled,#shareScreen:hover:enabled{background:#1746bd}
+#pointerLayer{z-index:3}#focusLayer{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+#spotlightCircle{position:absolute;width:150px;height:150px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2000px #07152966;border:1px solid #ffffff60}
+.pointer:not(.target){border:0;background:none;box-shadow:none}.pointer.arrow:before{content:none}
+.pointer-icon{position:absolute;width:32px;height:32px;left:-8px;top:-8px;color:var(--color);filter:drop-shadow(0 1px 1px #18243b99)}
+.pointer-icon svg{display:block;width:100%;height:100%}
+.pointer.label-above .name{top:auto;bottom:20px}.pointer.label-right .name{left:0;transform:none}.pointer.label-left .name{left:auto;right:0;transform:none}
+#stage{touch-action:pan-y}
+#highlightLayer{position:absolute;z-index:1;pointer-events:none;overflow:hidden}
+#stage:has(#highlightLayer){touch-action:none}
+#stage:fullscreen,#stage.lesson-fullscreen{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+#stage.lesson-fullscreen{position:fixed;inset:0;z-index:10000}
+body.lesson-expanded{overflow:hidden}
+#exitFullScreenLesson{position:absolute;top:12px;right:12px;z-index:4;background:#172033e6;color:white;border-color:#ffffff70;font-size:14px;cursor:pointer;touch-action:manipulation}
+#exitFullScreenLesson:hover{background:#334155}
+
+.share-view-controls{margin-top:-6px;padding:10px 12px;background:#f6f8fc;border:1px solid #dce4ef;border-radius:10px}
+.share-view-controls .zoom-label{min-width:54px;text-align:center;font-weight:700;color:#334155}
+.share-view-controls button.active{background:#2557d6;color:white;border-color:#2557d6}
+#stage.viewport-pan-mode{cursor:grab}
+#stage.viewport-panning{cursor:grabbing}
+.share-area-dialog{width:min(94vw,1200px);max-width:none;border:0;border-radius:16px;padding:18px;box-shadow:0 24px 80px #0006}
+.share-area-dialog::backdrop{background:#0f172acc}
+.share-area-dialog h2{margin-top:0;color:#234ea8}
+.share-area-preview{position:relative;width:100%;max-height:72vh;background:#111827;overflow:hidden;border-radius:12px;touch-action:none;cursor:crosshair}
+.share-area-video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
+.share-area-shade{position:absolute;inset:0;background:transparent;pointer-events:none}
+.share-area-selection{position:absolute;border:3px solid #ffcc00;box-shadow:0 0 0 9999px #07152966,0 0 0 1px #fff6;border-radius:6px;pointer-events:none}
+
+/* Full-screen teaching controls stay inside the fullscreen stage so the teacher never has to exit to change tools. */
+.fullscreen-teacher-toolbar{position:absolute;top:10px;left:10px;right:92px;z-index:6;background:#101827e8;color:white;border:1px solid #ffffff38;border-radius:12px;box-shadow:0 8px 28px #0007;backdrop-filter:blur(10px);padding:8px;pointer-events:auto}
+.fullscreen-toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 6px}
+.fullscreen-toolbar-top strong{font-size:13px;letter-spacing:.02em}
+.fullscreen-toolbar-collapse{padding:5px 9px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
+.fullscreen-toolbar-body{display:flex;flex-wrap:wrap;align-items:end;gap:6px}
+.fullscreen-toolbar-control{display:flex;align-items:center;gap:4px;margin:0;color:#e8eef8;font-size:11px}
+.fullscreen-toolbar-control>span{white-space:nowrap}
+.fullscreen-toolbar-control select,.fullscreen-toolbar-control button{min-height:32px;padding:5px 8px;border-radius:7px;font-size:12px;background:#f8fafc;color:#172033;border-color:#cbd5e1}
+.fullscreen-toolbar-control select{max-width:135px}
+.fullscreen-toolbar-control input[type=checkbox]{width:16px;height:16px;margin:0}
+.fullscreen-toolbar-control button.active{background:#2557d6;color:white;border-color:#7ba2ff}
+.fullscreen-toolbar-control button.danger{background:#8f2630;color:white;border-color:#d7646e}
+.fullscreen-zoom-readout{align-self:center;min-width:40px;text-align:center;font-size:12px;font-weight:700;color:#dbeafe}
+.fullscreen-teacher-toolbar.collapsed{right:auto;min-width:190px}
+.fullscreen-teacher-toolbar.collapsed .fullscreen-toolbar-top{padding-bottom:0}
+#stage:fullscreen .share-area-dialog,#stage.lesson-fullscreen .share-area-dialog{z-index:20}
+@media(max-width:850px){
+  .fullscreen-teacher-toolbar{right:74px;max-height:42vh;overflow:auto}
+  .fullscreen-toolbar-control select,.fullscreen-toolbar-control button{font-size:11px;padding:4px 6px}
+}
+
+.drawing-owner-label{position:absolute;z-index:5;pointer-events:none;background:#172033ee;color:white;border:1px solid #ffffff55;border-radius:6px;padding:4px 7px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px #0005;transform:translateY(-100%)}
+
+/* Friendly, uncluttered classroom controls */
+:root{font-family:Inter,ui-rounded,"Segoe UI",system-ui,sans-serif;color:#20304a;background:#f4f7ff}
+body{background:radial-gradient(ellipse at top left,#e4f5ff 0,transparent 42%),radial-gradient(ellipse at top right,#f5eaff 0,transparent 38%),#f7f9ff}
+main{max-width:1180px;margin:24px auto;padding:clamp(18px,3vw,34px);border:1px solid #e3eafb;border-radius:24px;box-shadow:0 18px 55px #324a7818}
+.app-header{display:flex;align-items:center;gap:16px;padding:0 0 20px;border-bottom:1px solid #e8edf7}
+.header-badge{display:grid;place-items:center;width:54px;height:54px;flex:none;border-radius:18px;background:linear-gradient(135deg,#ffe68e,#ffd1e7);font-size:28px;box-shadow:0 4px 12px #f0b7b744}
+h1{margin:0;color:#234ea8;font-size:clamp(26px,4vw,36px);letter-spacing:-.03em}
+.app-header p{margin:5px 0 0;color:#65728a}
+h2{margin:0 0 5px;color:#2a477c;font-size:19px}
+.tool-card{margin:18px 0;padding:18px 20px;background:linear-gradient(145deg,#fff,#fbfcff);border:1px solid #e3eaf5;border-radius:18px;box-shadow:0 5px 18px #3450780b}
+.helper{margin:0;color:#6a768b;font-size:14px}
+.session-controls{padding:16px 0 2px}
+.controls,form{gap:10px;margin:12px 0}
+button,input,select{border:1px solid #d5deec;border-radius:12px;padding:10px 14px;background:#fff;color:#23334e}
+button{font-weight:700;box-shadow:0 2px 5px #283b5c0a}
+button:hover:enabled{background:#eff5ff;box-shadow:0 3px 9px #244b9e20}
+#startClass,#joinClass,#shareScreen{border-color:transparent;background:linear-gradient(135deg,#3268e8,#6a64e8);color:white}
+#startClass:hover:enabled,#joinClass:hover:enabled,#shareScreen:hover:enabled{background:linear-gradient(135deg,#2758ce,#574fce)}
+.tool-controls{align-items:end}
+.field{display:grid;gap:5px;color:#66748b;font-size:12px;font-weight:750;letter-spacing:.02em}
+.field select{min-width:150px;color:#263650;font-size:14px;font-weight:650;letter-spacing:0}
+.field optgroup{font-weight:700;color:#586783}
+.check-control{display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:12px;background:#f4f7ff;color:#45536c;font-size:14px;font-weight:650}
+.check-control input{accent-color:#5367db}
+.access-card .controls{margin-bottom:0}
+#roster{margin-top:12px}
+.roster-row{margin:0;padding:12px 0;border-color:#edf1f8}
+.roster-row span{font-weight:700;color:#34445f}
+.roster-row label{display:inline-flex;align-items:center;gap:4px;padding:7px 10px;border-radius:10px;background:#f3f6fc;font-size:13px;color:#4a5870}
+.roster-row label input{accent-color:#5367db}
+#invitePanel{margin-top:12px;padding:16px;background:#f4f7ff;border:1px solid #e2e9f5;border-radius:15px}
+#invitePanel>p{font-size:14px}
+#joinForm{padding:18px;background:#f7f9ff;border:1px solid #e5ebf7;border-radius:16px}
+#joinForm label{font-weight:750;color:#334766}
+#studentPanel>p{padding:10px 12px;border-radius:12px;background:#f4f7ff}
+#stage{margin-top:8px;border:3px solid #e0e8f5;border-radius:18px;box-shadow:0 10px 30px #15284616}
+.lesson-hint{margin-top:10px}
+#connectionStatus{padding:9px 12px;border-radius:12px;background:#f3f6fc;color:#475876}
+#error{border-radius:12px}
+footer{padding-top:8px;border-top:1px solid #e9edf5;color:#738098}
+.pointer-icon{width:37px;height:37px;left:-10px;top:-10px}
+.pointer.heart .pointer-icon,.pointer.paw .pointer-icon,.pointer.sparkle .pointer-icon{width:38px;height:38px}
+#highlightLayer [data-tool="pencil"]{opacity:.94!important}
+#highlightLayer [data-tool="crayon"]{opacity:.78!important;stroke-dasharray:8 4}
+@media(max-width:720px){main{margin:10px;padding:16px;border-radius:18px}.tool-card{padding:15px}.tool-controls{align-items:stretch}.field{width:100%}.field select{width:100%}.roster-row{gap:8px}}
+
+/* Student tools remain inside the shared lesson, including native fullscreen. */
+.student-floating-toolbar{right:auto;width:max-content;max-width:calc(100% - 24px);max-height:calc(100% - 24px);overflow:auto;background:#fffffff2;color:#23334e;border:2px solid #b9cbff;box-shadow:0 6px 24px #17203340}
+.student-floating-toolbar .fullscreen-toolbar-top{cursor:move;touch-action:none;color:#234ea8}
+.student-floating-toolbar .fullscreen-toolbar-control{color:#45536c}
+.student-floating-toolbar .fullscreen-toolbar-body{gap:8px}
+.student-floating-toolbar .fullscreen-toolbar-collapse{background:#e8efff!important;color:#234ea8!important}
+.student-floating-toolbar.collapsed{min-width:0}
+.student-floating-toolbar .fullscreen-toolbar-control select{max-width:125px}
+
+/* Student roster inside the full-screen teacher toolbar. */
+.fullscreen-toolbar-top{flex-wrap:wrap}
+.fullscreen-roster-toggle{margin-left:auto;padding:5px 10px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
+.fullscreen-roster-toggle.active{background:#2557d6!important}
+.fullscreen-roster-toggle.alert{background:#d97706!important;border-color:#fcd34d!important;animation:rosterPulse 1.2s ease-in-out infinite}
+@keyframes rosterPulse{50%{box-shadow:0 0 0 4px #fbbf2466}}
+.fullscreen-roster-panel{margin-top:8px;background:#f8fafc;color:#172033;border-radius:10px;padding:8px 12px;max-height:45vh;overflow:auto}
+.fullscreen-roster-panel>strong{display:block;font-size:12px;color:#34445f;margin-bottom:2px}
+.fullscreen-roster-panel #roster{margin-top:0;font-size:13px}
+.fullscreen-roster-panel .roster-row{padding:6px 0;gap:8px}
+.fullscreen-roster-panel .roster-row span{min-width:120px}
+.fullscreen-roster-panel .roster-row button{padding:5px 9px;font-size:12px}
+.fullscreen-roster-panel .roster-row label{padding:4px 8px;font-size:12px}
+
+/* Teacher dock: one compact toolbar directly above the lesson; floats inside the lesson in full screen. */
+.session-controls{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+.session-controls button.quiet{background:#fff;color:#56637a;font-weight:650}
+body.teacher-view .lesson-actions{display:none}
+body.teacher-view #pointerStatus{display:none}
+body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
+.teacher-dock{position:sticky;top:8px;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;padding:6px;background:#ffffffee;border:1px solid #dbe3f2;border-radius:16px;box-shadow:0 6px 20px #23355a1a;backdrop-filter:blur(8px)}
+.teacher-dock button,.teacher-dock select{box-shadow:none}
+.tb-group{display:flex;align-items:center;gap:3px;padding:2px;background:#f3f6fc;border-radius:12px}
+.tb-spacer{flex:1}
+.tb-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 11px;border:0;border-radius:10px;background:transparent;color:#2a3a57;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.tb-btn:hover:enabled{background:#e4ecfb}
+.tb-btn[aria-pressed="true"]{background:#3268e8;color:#fff;box-shadow:0 2px 6px #3268e855}
+.tb-btn[aria-pressed="true"]:hover{background:#2758ce}
+.tb-ico{font-size:17px;line-height:1}
+.tb-caret{padding:6px 7px;margin-left:-4px;font-size:12px}
+.tb-swatches button{width:26px;height:26px;min-height:0;padding:0;margin:0 1px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px #c9d3e4;cursor:pointer}
+.tb-swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px #23334e;transform:scale(1.08)}
+.tb-sizes button{display:grid;place-items:center;width:32px;height:34px;min-height:0;padding:0;border:0;border-radius:9px;background:transparent;cursor:pointer}
+.tb-sizes i{display:block;width:var(--d);height:var(--d);border-radius:50%;background:#2a3a57}
+.tb-sizes button[aria-pressed="true"]{background:#dfe8fb}
+.tb-sizes.dim{opacity:.45}
+.tb-toggle{gap:4px;cursor:pointer;user-select:none}
+.tb-toggle input{position:absolute;opacity:0;pointer-events:none}
+.tb-toggle:has(input:checked){background:#ffe58a;color:#4a3b00}
+.tb-toggle:has(input:focus-visible){outline:2px solid #3268e8}
+.tb-menu-wrap{position:relative;display:inline-flex}
+.tb-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;display:grid;gap:2px;min-width:190px;padding:6px;background:#fff;border:1px solid #dbe3f2;border-radius:14px;box-shadow:0 14px 40px #1a284633;color:#23334e}
+.tb-menu-right{left:auto;right:0}
+.tb-menu>button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;border-radius:9px;background:transparent;text-align:left;font-size:14px;font-weight:650;cursor:pointer}
+.tb-menu>button:hover:enabled{background:#eef3fd}
+.tb-menu>button.active{background:#e3ebfd;color:#234ea8}
+.tb-menu>button span{width:20px;text-align:center}
+.tb-menu>button.danger{color:#b4232f}
+.tb-menu>button.danger:hover:enabled{background:#fdecee}
+.tb-menu small{padding:8px 11px 2px;color:#7a869b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.tb-view-menu{min-width:260px}
+.tb-view-menu .share-view-controls{margin:0;padding:4px;background:none;border:0;display:flex;flex-wrap:wrap;gap:6px}
+.tb-view-menu .share-view-controls button{padding:8px 10px;font-size:13px}
+.tb-students{width:min(420px,88vw);max-height:min(60vh,520px);overflow:auto;padding:12px}
+.tb-students .field{margin-bottom:6px}
+.tb-students .field select{width:100%}
+.tb-students #roster{margin-top:6px;font-size:14px;color:#56637a}
+.tb-students .roster-row{padding:8px 0;gap:8px}
+.tb-students .roster-row span{min-width:110px}
+.tb-students .roster-row button{padding:6px 10px;font-size:13px}
+.tb-students .roster-row label{padding:5px 8px;font-size:12px}
+#tbStudentsBtn.alert{background:#f59e0b;color:#fff;animation:rosterPulse 1.2s ease-in-out infinite}
+.tb-collapse{display:none}
+.teacher-dock.floating{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 20px);margin:0;background:#ffffffeb;z-index:8}
+.teacher-dock.floating .tb-collapse{display:inline-flex}
+.teacher-dock.floating.collapsed>*:not(.tb-group:last-child),.teacher-dock.floating.collapsed .tb-group:last-child>*:not(.tb-collapse):not(#tbFullscreen){display:none}
+.teacher-dock.floating.collapsed .tb-collapse::after{content:' Tools'}
+.teacher-dock.floating.collapsed .tb-collapse{font-size:0}
+.teacher-dock.floating.collapsed .tb-collapse::after{font-size:14px;content:'🛠 Tools'}
+#stage{margin-top:10px}
+@media(max-width:900px){.tb-text{display:none}.tb-btn{padding:6px 9px}}
+@media(max-width:560px){.teacher-dock{gap:4px}.tb-swatches button{width:22px;height:22px}}
+.tb-swatches button:hover:enabled{background:var(--c)}
+.tb-sizes button:hover:enabled{background:#e4ecfb}
+
+body.student-dock-view .student-tool-card,body.student-dock-view .lesson-actions{display:none}
+body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
+.teacher-dock.floating.collapsed .tb-group:last-child [id$="tbFullscreen"]{display:inline-flex}
+
+.tab-controls{display:inline-flex;flex-wrap:wrap;gap:8px}
+.tab-controls[hidden]{display:none}
+#tabScroll[aria-pressed="true"]{background:#e8f0ff;color:#1f4fbf;border-color:#1f4fbf}
+#stage.tab-scrolling{outline:3px dashed #1f4fbf;outline-offset:-3px}
+
+/* PDF mode: the teacher's PDF is shown inside the lesson for everyone. */
+#stage.pdf-open:not(.lesson-fullscreen):not(:fullscreen){aspect-ratio:auto;height:min(80vh,920px);min-height:320px}
+#pdfView{position:absolute;inset:0;z-index:1;overflow:auto;background:#4b4f58;touch-action:none;cursor:crosshair;overscroll-behavior:contain}
+#pdfView[hidden]{display:none}
+#pdfContent{position:relative;margin:0 auto;touch-action:none;-webkit-user-select:none;user-select:none}
+.pdf-page{position:absolute;left:0;width:100%;background:#fff;box-shadow:0 0 0 1px #0003,0 2px 10px #0005;overflow:hidden}
+.pdf-page canvas{display:block;width:100%;height:100%;pointer-events:none}
+#pdfInk{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+#pdfNote{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80%;padding:14px 20px;border-radius:12px;background:#172033ee;color:#fff;font-size:20px;font-weight:700;text-align:center;pointer-events:none}
+#pdfNav{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;max-width:calc(100% - 24px);padding:10px 12px;background:#101827ee;border:1px solid #ffffff38;border-radius:16px;box-shadow:0 8px 28px #0008;cursor:default;color:#fff}
+#pdfNav[hidden]{display:none}
+#pdfNav .pdf-btn{min-height:48px;min-width:48px;padding:8px 16px;border-radius:12px;font-size:18px;font-weight:800;background:#f8fafc;color:#172033;border:2px solid #cbd5e1;cursor:pointer;touch-action:manipulation}
+#pdfNav .pdf-btn:hover{background:#e0ebff}
+#pdfNav .pdf-zoom{min-width:56px;font-size:26px;line-height:1;padding:6px 12px}
+#pdfNav .pdf-close{background:#8f2630;color:#fff;border-color:#d7646e}
+#pdfNav .pdf-close:hover{background:#a8303b}
+#pdfNav .pdf-jump{display:inline-flex;align-items:center;gap:6px;font-size:18px;font-weight:700}
+#pdfNav .pdf-label{color:#dbeafe}
+#pdfNav .pdf-page-input{width:84px;min-height:48px;padding:6px 8px;border-radius:12px;font-size:20px;font-weight:800;text-align:center;background:#fff;color:#172033;border:2px solid #cbd5e1}
+#pdfNav .pdf-page-total{color:#dbeafe;white-space:nowrap}
+#pdfNav .pdf-zoom-label{min-width:64px;text-align:center;font-size:20px;font-weight:800;color:#dbeafe}
+#pdfNav .pdf-sep{width:1px;align-self:stretch;background:#ffffff40;margin:0 4px}
+@media(max-width:720px){#pdfNav{gap:6px;padding:8px}#pdfNav .pdf-btn{min-height:44px;padding:6px 10px;font-size:16px}}
+#pdfNav .pdf-toggle{background:#334155;color:#fff;border-color:#ffffff40}
+#pdfNav.min{padding:6px;left:12px;transform:none;bottom:12px}
+#pdfNav.min>:not(.pdf-toggle){display:none}
+#pdfNav.min .pdf-toggle{min-height:40px;font-size:15px}
+#pdfView.follow{overflow:hidden}
+.pdf-page img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
+.pdf-page[data-label]:not([data-label='']):before{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;color:#7b8498;font-size:22px;font-weight:700}
+#pdfNav .pdf-btn.on{background:#2557d6;color:#fff;border-color:#7ba2ff}
+#pdfNav .pdf-btn[hidden]{display:none}
+.lesson-webpage{position:absolute;left:0;top:0;border:0;transform-origin:top left;pointer-events:none;background:white}
+.webpage-measure{position:fixed;left:-20000px;top:0;visibility:hidden;transform:none}
+#webpageDialog{max-width:620px;width:calc(100% - 40px);border:1px solid #cbd5e1;border-radius:16px;padding:24px;color:#172033}
+#webpageDialog::backdrop{background:#17203399}
+#webpageDialog input[type=url]{display:block;width:100%;margin:8px 0 16px;box-sizing:border-box}
+#webpageDialog p{font-size:14px;line-height:1.5;color:#56637a}
+#pdfNav [hidden]{display:none!important}
+#stage.mouse-navigation #pdfView,#stage.mouse-navigation #pdfContent{cursor:grab}
+#stage.mouse-navigation #pdfContent:active{cursor:grabbing}
+#navigationHint{margin:8px 0;font-size:14px}
+
+/* Fullscreen teacher tools: narrow, movable side rail instead of a top banner. */
+#stage .teacher-dock.floating{
+  top:12px;left:12px;right:auto;bottom:auto;transform:none;
+  width:fit-content;max-width:190px;max-height:calc(100% - 24px);
+  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  overflow:visible;
+}
+#stage .teacher-dock.floating>.tb-group{justify-content:center;flex-wrap:wrap}
+#stage .teacher-dock.floating>.tb-spacer{display:none}
+#stage .teacher-dock.floating .tb-menu{top:0;left:calc(100% + 6px);right:auto;max-height:75vh;overflow:auto}
+#stage .teacher-dock.floating.collapsed{width:auto;max-width:190px}
+#stage .teacher-dock.floating.collapsed>.tb-move-handle{display:inline-flex}
+#stage .teacher-dock.floating.collapsed .tb-group:last-child{display:flex}
+#stage .teacher-dock.floating.collapsed .tb-menu{display:none}
+
+
+/* Compact full-screen side tab: one toolbar, no duplicate top controls. */
+#stage .teacher-dock.floating.collapsed {
+  top:12px;
+  left:0;
+  right:auto;
+  width:44px;
+  max-width:44px;
+  padding:5px;
+  border-radius:0 12px 12px 0;
+  gap:0;
+}
+#stage .teacher-dock.floating.collapsed > .tb-move-handle,
+#stage .teacher-dock.floating.collapsed > .tb-group {display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child {display:flex!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > * {display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .tb-collapse {
+  display:inline-flex!important;
+  width:34px;
+  min-width:34px;
+  min-height:38px;
+  justify-content:center;
+  padding:4px;
+}
+#stage .teacher-dock.floating.collapsed .tb-collapse::after {content:'☰'!important;font-size:22px}
+#stage .teacher-dock.floating.collapsed .tb-collapse {font-size:0}
+#stage .teacher-dock.floating.collapsed .tb-menu {display:none!important}
+#stage:has(.teacher-dock.floating) > #fullscreenTeacherToolbar {display:none!important}
+
+/* One tool-permission preset shared by every selected pupil. */
+.tb-students .permission-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:12px;background:#edf5ff;color:#142942}
+.tb-students .permission-tools strong{flex-basis:100%;font-size:14px}
+.tb-students .permission-tools label{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #bed1ec;border-radius:8px;background:#fff;font-weight:700;cursor:pointer}
+.tb-students .permission-tools input{width:17px;height:17px;accent-color:#2361b2}
+.tb-students .pointer-bulk-actions{display:flex;gap:8px;margin:10px 0}
+.tb-students .pointer-bulk-actions button{flex:1;padding:9px 12px;font-weight:750;border-radius:8px}
+.tb-students .roster-row label{margin-left:auto;display:flex;align-items:center;gap:6px}
+.tb-students .roster-row label input{width:18px;height:18px}
+
+/* 2026-10-13: Edge-friendly maximized teaching, without browser Fullscreen API. */
+body.lesson-expanded #stage.lesson-fullscreen{position:fixed;inset:0;width:100%;height:100dvh;z-index:10000;border-radius:0}
+.tb-students{max-width:min(94vw,560px)!important;max-height:min(75dvh,650px)!important;min-width:min(330px,94vw);overflow:auto!important;resize:both;overscroll-behavior:contain}
+.tb-students #roster{max-height:55dvh;overflow-y:auto}
+.tb-roster-handle{cursor:grab;touch-action:none;background:#e8efff;color:#173c77;padding:9px 12px;border-radius:9px;font-weight:750;user-select:none}
+.tb-roster-handle:active{cursor:grabbing}
+.teacher-dock .tb-menu-wrap{position:relative}
+@media(max-width:700px){.tb-students{max-height:70dvh!important;width:min(94vw,420px)}}
+
+/* Clean teaching workspace: no extra vertical space consumed by secondary controls. */
+body.teacher-view main{max-width:none;margin:0 auto;padding:10px 16px 18px;border-radius:0}
+body.teacher-view .app-header{padding:0 0 7px;gap:10px}
+body.teacher-view .header-badge{width:38px;height:38px;font-size:22px;border-radius:10px}
+body.teacher-view h1{font-size:20px}
+body.teacher-view .app-header p:last-child{display:none}
+body.teacher-view .session-controls{padding:2px 0;gap:6px;margin:3px 0}
+body.teacher-view .session-controls>button:not(#endClass),body.teacher-view .session-controls #tabControls{display:none}
+body.teacher-view #stage{width:100%;height:min(76dvh,calc(100vw * .5625));max-height:none;margin:4px 0;aspect-ratio:auto}
+body.teacher-view #pointerStatus,body.teacher-view footer{display:none}
+body.teacher-view #joinInstructions{margin:3px 0;padding:4px 8px;border:1px solid #dce4ef;border-radius:8px;font-size:13px}
+body.teacher-view #joinInstructions>summary{cursor:pointer;font-weight:650}
+body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
+
+.pointer-class-picker{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}.pointer-class-picker select{min-width:105px;max-width:180px;padding:6px 8px;font-size:13px}
+
+/* Keep the restart control visible when the classroom has ended; the compact
+   teacher workspace otherwise hides its original action buttons. */
+body.teacher-view .session-controls>#startClass:not([hidden]){display:inline-flex!important;align-items:center;background:#1d4ed8;color:white}
+
+
+/* Teacher sharing is enabled or disabled; room lifecycle is automatic. */
+body.teacher-view #endClass{display:none!important}
+body.teacher-view .session-controls>#cpShareEnabled{display:inline-flex!important;align-items:center;border-radius:10px;padding:9px 15px;font-weight:800;background:#e9f1ff;color:#164b97;border:1px solid #aec9f2}
+body.teacher-view #cpShareEnabled.cp-sharing-on{background:#eaf7ee;color:#12633a;border-color:#9ed4b4}
+body.teacher-view #cpShareEnabled:disabled{opacity:.52;cursor:not-allowed}

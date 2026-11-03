@@ -12,6 +12,11 @@ on:
       - 'backend/functions/student-auth.js'
       - 'tests/halacha-saving.test.cjs'
       - '.github/workflows/halacha-saving.yml'
+# Newer runs on the same PR/branch cancel superseded ones (including main,
+# where only the latest commit is what gets deployed).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest

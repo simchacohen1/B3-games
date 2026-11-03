@@ -1,0 +1,164 @@
+name: Unattended staging tests
+
+# Issue #390. Runs against the isolated staging site
+# (https://fun-torah-tools-staging.web.app) with fictional accounts only.
+# Never touches production Firebase, real students, scorer or Nigri sync.
+#
+#   every 30 min  public smoke: pages load, staging guard, no production calls
+#   every 2 hours signed-in student/teacher/principal checks (needs the
+#                 FTT_STAGING_CREDENTIALS_JSON secret; NOT VERIFIED without it)
+#   nightly       smoke + signed-in + full node regression and rules audit
+#
+# Failures open or update one GitHub issue per suite (label
+# automated-test-failure). Frequent runs stay green and report through the
+# issue so an outage does not send an email every 30 minutes; the nightly,
+# manual and PR runs turn red on any failure.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+    - cron: '23 */2 * * *'
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Which checks to run'
+        type: choice
+        options: [smoke, auth, nightly]
+        default: smoke
+  pull_request:
+    paths:
+      - 'e2e-staging/**'
+      - 'playwright.staging.config.ts'
+      - 'scripts/staging-test-report.cjs'
+      - 'tests/staging-test-report.test.cjs'
+      - '.github/workflows/staging-unattended.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per tier at a time; a late run queues instead of piling up.
+  group: staging-unattended-${{ github.event.schedule || inputs.tier || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TIER: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || github.event.schedule == '23 */2 * * *' && 'auth' || github.event.schedule == '41 4 * * *' && 'nightly' || 'smoke' }}
+  # Issues are filed only for scheduled and manual runs on main, never from PRs.
+  FILE_ISSUES: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  staging:
+    name: Staging checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Playwright
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Reporter self-test
+        run: node --test tests/staging-test-report.test.cjs
+
+      - name: Public smoke (anonymous)
+        if: env.TIER == 'smoke' || env.TIER == 'nightly'
+        continue-on-error: true
+        run: npx playwright test -c playwright.staging.config.ts --grep @smoke
+        env:
+          CI: 'true'
+      - name: Report public smoke
+        if: always() && (env.TIER == 'smoke' || env.TIER == 'nightly')
+        id: smoke
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mv staging-results/results.json staging-results/smoke.json 2>/dev/null || true
+          node scripts/staging-test-report.cjs --suite staging-smoke --title "Staging public smoke" \
+            --playwright staging-results/smoke.json \
+            --repro "1. Open https://fun-torah-tools-staging.web.app and the page named in the failing check (no sign-in).
+          2. Watch the browser console and network tab for errors or requests to production hosts (b3-games, onrender, funtorahtools.com).
+          3. Locally: npx playwright test -c playwright.staging.config.ts --grep @smoke" \
+            ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
+
+      - name: Signed-in student and teacher checks
+        if: env.TIER == 'auth' || env.TIER == 'nightly'
+        continue-on-error: true
+        run: |
+          if [ -z "$FTT_STAGING_CREDENTIALS_JSON" ]; then
+            echo "::warning title=Signed-in staging tests NOT VERIFIED::Secret FTT_STAGING_CREDENTIALS_JSON is not configured, so every signed-in check is skipped (not passed)."
+          fi
+          npx playwright test -c playwright.staging.config.ts --grep @auth
+        env:
+          CI: 'true'
+          FTT_STAGING_CREDENTIALS_JSON: ${{ secrets.FTT_STAGING_CREDENTIALS_JSON }}
+      - name: Report signed-in checks
+        if: always() && (env.TIER == 'auth' || env.TIER == 'nightly')
+        id: auth
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only so the reporter can redact these values; it never prints them.
+          FTT_STAGING_CREDENTIALS_JSON: ${{ secrets.FTT_STAGING_CREDENTIALS_JSON }}
+        run: |
+          mv staging-results/results.json staging-results/auth.json 2>/dev/null || true
+          node scripts/staging-test-report.cjs --suite staging-auth --title "Staging signed-in tests" \
+            --playwright staging-results/auth.json \
+            --repro "1. Open https://fun-torah-tools-staging.web.app and sign in as the fictional student or adult named in the failing check (credentials are in the staging credentials file, never in GitHub).
+          2. Open the tool named in the failing check and compare with the expected result in the error.
+          3. Locally: set FTT_STAGING_CREDENTIALS_FILE to staging/test-credentials.local.json and run npx playwright test -c playwright.staging.config.ts --grep @auth" \
+            ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
+
+      - name: Nightly regression suite and rules audit
+        if: env.TIER == 'nightly'
+        continue-on-error: true
+        run: |
+          set +e
+          npm ci --prefix backend/functions --ignore-scripts --no-audit --no-fund
+          node scripts/security-rule-audit.cjs --ci 2>&1 | tee staging-results/rules-audit.txt
+          audit=${PIPESTATUS[0]}
+          node --test --test-reporter=tap "tests/**/*.test.cjs" > staging-results/node.tap 2>&1 || true
+          if [ "$audit" != "0" ]; then echo "not ok 999 - Firebase rules audit (scripts/security-rule-audit.cjs --ci)" >> staging-results/node.tap; fi
+      - name: Report nightly regression
+        if: always() && env.TIER == 'nightly'
+        id: regression
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/staging-test-report.cjs --suite nightly-regression --title "Nightly regression and rules audit" \
+            --node-tap staging-results/node.tap \
+            --repro "1. Check out main.
+          2. npm ci && npm ci --prefix backend/functions --ignore-scripts
+          3. node --test \"tests/**/*.test.cjs\" and node scripts/security-rule-audit.cjs --ci" \
+            ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
+
+      - name: Upload failure evidence
+        if: always() && (steps.smoke.outputs.failed != '0' || steps.auth.outputs.failed != '0' || steps.regression.outputs.failed != '0')
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-evidence-${{ env.TIER }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 7
+          # Screenshots and JSON reports only: traces and videos are off
+          # because they would record typed passcodes.
+          path: |
+            staging-results/**/*.png
+            staging-results/*.json
+            staging-results/*.tap
+            staging-results/*.txt
+
+      - name: Final result
+        if: always()
+        run: |
+          failed=$(( ${{ steps.smoke.outputs.failed || 0 }} + ${{ steps.auth.outputs.failed || 0 }} + ${{ steps.regression.outputs.failed || 0 }} ))
+          echo "Tier: $TIER, failing checks: $failed"
+          if [ "$failed" != "0" ]; then
+            echo "::error title=Staging checks failed::$failed failing check(s). See the run summary and the automated-test-failure issue."
+            if [ "$TIER" = "nightly" ] || [ "${{ github.event_name }}" != "schedule" ]; then exit 1; fi
+          fi

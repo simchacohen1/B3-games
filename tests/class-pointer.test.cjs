@@ -6,7 +6,7 @@ function teacherFixture(){
   const elements=new Map();
   function element(){return {value:'nobody',hidden:false,dataset:{},style:{setProperty(){}},classList:{toggle(){}},events:{},setAttribute(){},append(){},appendChild(){},replaceChildren(){},remove(){},addEventListener(type,fn){this.events[type]=fn},getBoundingClientRect(){return{left:0,top:0,width:800,height:450}}}}
   const document={addEventListener(){},dispatchEvent(){},getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},createElement:element,createTextNode:text=>({textContent:text})};
-  const context=vm.createContext({document,window:{ClassPointerCore:C,addEventListener(){},ClassPointerDashboard:{ready:new Promise(()=>{})}},location:{href:'https://example.test/classroom.html?dashboard=teacher'},URL,ResizeObserver:class{observe(){}},setTimeout:()=>1,clearTimeout(){},Date,console});
+  const context=vm.createContext({document,window:{ClassPointerCore:C,addEventListener(){},ClassPointerDashboard:{ready:new Promise(()=>{})}},location:{href:'https://example.test/classroom.html?dashboard=teacher'},URL,CustomEvent:class{constructor(type,options={}){this.type=type;this.detail=options.detail}},ResizeObserver:class{observe(){}},setTimeout:()=>1,clearTimeout(){},Date,console});
   vm.runInContext('openingClass=false',context);
   vm.runInContext(fs.readFileSync(require.resolve('../class-pointer-prototype/classroom.js'),'utf8'),context);
   const connection=new EventEmitter();connection.peer='student-a';connection.open=true;connection.sent=[];connection.send=message=>connection.sent.push(structuredClone(message));connection.close=()=>connection.emit('close');context.connection=connection;
@@ -46,12 +46,12 @@ test('teacher rejects network pointer messages until admission and permission',(
   assert.equal(f.run('Object.keys(state.points).length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='selected'");f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run('Object.keys(state.points).length'),0);
-  f.run("members.get('student:student-a').allowed=true");f.connection.emit('data',{type:'point',id:'teacher',name:'Teacher',point:{x:0.25,y:0.75,tool:'arrow'}});
+  f.run("applyLevel(members.get('student:student-a'),'point')");f.connection.emit('data',{type:'point',id:'teacher',name:'Teacher',point:{x:0.25,y:0.75,tool:'arrow'}});
   assert.equal(f.run('state.points.teacher'),undefined);assert.equal(f.run("state.points['student:student-a'].x"),0.25);
   assert.equal(f.run("state.points['student:student-a'].tool"),'arrow');
 });
 test('revoking access removes student pointers while preserving teacher position',()=>{
-  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;members.get('student:student-a').allowed=true;state.mode='selected';state.points={'student:student-a':{x:0.2,y:0.2},teacher:{x:0.7,y:0.7}}");
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;applyLevel(members.get('student:student-a'),'point');state.mode='selected';state.points={'student:student-a':{x:0.2,y:0.2},teacher:{x:0.7,y:0.7}}");
   f.elements.get('accessMode').value='nobody';f.elements.get('accessMode').events.change();
   assert.equal(f.run("state.points['student:student-a']"),undefined);assert.equal(f.run('state.points.teacher.x'),0.7);
   f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});assert.equal(f.run("state.points['student:student-a']"),undefined);
@@ -85,7 +85,7 @@ test('a queued hover cannot restore a cleared pointer or survive stopped sharing
   f.run("pendingPoint={x:0.2,y:0.2};hoverTimer=1;stopSharing();sendHover()");assert.equal(f.run('state.points.teacher'),undefined);
 });
 test('network hover keeps the final position and never restores it after hiding',()=>{
-  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;members.get('student:student-a').allowed=true;state.sharing=true;state.mode='selected'");
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;applyLevel(members.get('student:student-a'),'point');state.sharing=true;state.mode='selected'");
   f.connection.emit('data',{type:'point',point:{x:0.1,y:0.2}});
   f.connection.emit('data',{type:'point',point:{x:0.7,y:0.2}});f.connection.emit('data',{type:'point',point:{x:0.9,y:0.2}});
   assert.equal(f.run("members.get('student:student-a').pendingPoint.x"),0.9);
@@ -107,7 +107,7 @@ test('highlight messages enforce admission and permission and ignore forged owne
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("state.mode='everyone';members.get('student:student-a').writeAllowed=false");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
-  f.run("state.mode='selected';state.tools.highlight=true;members.get('student:student-a').allowed=true");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
+  f.run("state.mode='selected';state.tools.highlight=true;applyLevel(members.get('student:student-a'),'highlight')");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
   f.run("highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]})");
   f.connection.emit('data',{type:'edit-highlights',action:'all',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),2);
   f.connection.emit('data',{type:'edit-highlights',action:'clear',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),1);assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
@@ -123,7 +123,7 @@ test('highlight messages enforce admission and permission and ignore forged owne
   f.run('state.sharing=true');
   f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run('Object.keys(state.points).length'),0);
-  f.run("state.mode='selected';members.get('student:student-a').allowed=true");
+  f.run("state.mode='selected';applyLevel(members.get('student:student-a'),'point')");
   f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run("state.points['student:student-a'].x"),0.5);
  });
@@ -159,33 +159,11 @@ test('student connection IDs are generated locally without a server ID request',
 
 
 
-test('activity share request waits for permission and shows dismissible centered consent once',()=>{
- const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
- assert.match(script,/cancel\.addEventListener\('click'/);
- assert.match(script,/choose\.addEventListener\('click',event=>\{if\(active&&!busy\)return beginShare\(event\)\}/);
- const start=script.indexOf('function routeTeacherRequest(session)');
- const end=script.indexOf('function stop()',start);
- assert.ok(start>0&&end>start,'student request handler is present');
- const handled=new Map(),visible=[];
- const now=Date.now(),roomId='class-pointer-00000000-0000-0000-0000-000000000000';
- const context=vm.createContext({
-   id:'student-a',loadedAt:now-2000,active:null,stream:null,inviteKey:'share:class',
-   Date,Number,sessionStorage:{getItem:k=>handled.get(k),setItem:(k,v)=>handled.set(k,v)},
-   location:{assign:url=>visible.push('navigate:'+url)},root:new URL('https://example.test/'),
-   showPrompt:()=>visible.push('prompt')
- });
- vm.runInContext(script.slice(start,end),context);
- const request={roomId,destinationRequest:{mode:'screens',at:now}};
- context.request=request;
- vm.runInContext('routeTeacherRequest(request)',context);
- assert.equal(visible.length,0,'disabled screen-sharing never shows a dialog');
- assert.equal(handled.size,0,'disabled requests are not consumed');
- context.active={roomId};
- vm.runInContext('routeTeacherRequest(request)',context);
- assert.deepEqual(visible,['prompt'],'enabled invitation opens centered consent');
- vm.runInContext('routeTeacherRequest(request)',context);
- assert.deepEqual(visible,['prompt'],'same invitation does not trap a student in repeated popups');
- context.request={...request,destinationRequest:{mode:'screens',at:now+1},screenSharingDenied:{'student-a':true}};
- vm.runInContext('routeTeacherRequest(request)',context);
- assert.deepEqual(visible,['prompt'],'denied students receive no invitation');
+test('activity share button waits for class permission without showing a second dialog',()=>{
+  const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
+  assert.ok(script.includes("const shareable=next?.studentScreenSharing===true&&permission?.screenSharingDenied!==true?next:null"));
+  assert.ok(script.includes("holder.style.display=active?'flex':'none'"));
+  assert.ok(script.includes("btn.addEventListener('click',beginShare)"));
+  assert.ok(script.includes('navigator.mediaDevices.getDisplayMedia'));
+  for(const removed of ['fttShareRequestOverlay','Open Sharing Window','routeTeacherRequest','showPrompt'])assert.ok(!script.includes(removed));
 });

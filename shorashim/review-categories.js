@@ -36,7 +36,7 @@
   function cardsForReviewTrack(track = reviewTrack, s = student(), applyPerekFilter = true) {
     let cards = learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
     if (track === 'shorashim' && applyPerekFilter && typeof reviewPerekFilter !== 'undefined' && reviewPerekFilter !== 'all') {
-      cards = cards.filter(c => itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
+      cards = cards.filter(c => reviewPerekFilter === 'booklet' ? !!getItem(c.itemKey)?.bookletWeek : itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
     }
     return cards;
   }
@@ -102,11 +102,13 @@
 
   reviewSortedCards = function categoryAwareReviewSortedCards() {
     let arr = cardsForReviewTrack().slice();
-    const mode = document.getElementById('reviewSort')?.value || 'learned';
+    const mode = document.getElementById('reviewSort')?.value || 'newest';
     if (mode === 'alpha') {
       arr.sort((a, b) => (getItem(a.itemKey)?.front || '').localeCompare(getItem(b.itemKey)?.front || '', 'he'));
     } else if (mode === 'manual') {
       arr.sort((a, b) => (a.reviewOrder ?? a.learnedAt) - (b.reviewOrder ?? b.learnedAt));
+    } else if (mode === 'newest') {
+      arr.sort((a, b) => b.learnedAt - a.learnedAt);
     } else {
       arr.sort((a, b) => a.learnedAt - b.learnedAt);
     }

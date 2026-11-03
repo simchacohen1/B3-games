@@ -1,5 +1,5 @@
 'use strict';
-const {randomUUID}=require('node:crypto');
+const {randomUUID,randomBytes,createHash}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const tools=require('./student-tool-policy.js');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
@@ -102,6 +102,32 @@ async function manageStudents(store,identity,body,now=Date.now()){
  if(body.action==='list'){
   const passcodes={};for(const id of Object.keys(cls.members||{}).filter(key))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
   return {ok:true,passcodes};
+ }
+ // Each teacher's own demo student: a real student account (profile, private
+ // passcode, class membership) so every tool saves progress exactly as it
+ // does for children. The ID is derived from the teacher's UID, so it is the
+ // same account in every class and can never collide with a real student.
+ if(body.action==='demoStudent'){
+  const id='demo_'+createHash('sha256').update('b3-demo-student:'+identity.uid).digest('hex').slice(0,32);
+  const profilePath='b3Games/students/'+id+'/profile',memberPath=root+'/classes/'+classId+'/members/'+id,updates={};
+  let profile=await store.get(profilePath);
+  if(profile&&profile.demoOwner!==identity.uid)fail(409,'Demo student could not be created.');
+  if(!profile){
+   const base=(String(identity.name||'').trim()||String(identity.email||'Teacher').split('@')[0]).slice(0,80);
+   profile={id,name:base+' (demo)',active:true,demo:true,demoOwner:identity.uid,createdAt:now,createdBy:identity.uid,passcodeUpdatedAt:now};
+   updates[profilePath]=profile;
+   updates[PRIVATE+id]={passcode:randomBytes(12).toString('base64url'),updatedAt:now};
+  }else if(profile.active===false)updates[profilePath+'/active']=true;
+  const member=cls.members?.[id];
+  if(!member||member.active===false){
+   updates[memberPath]={studentId:id,name:profile.name,active:true,demo:true};
+   updates['b3Games/students/'+id+'/memberships/b3-2026_'+classId]={workspaceId:'b3-2026',classId,active:true};
+  }
+  if(Object.keys(updates).length){
+   updates[root+'/classes/'+classId+'/managementAudit/'+randomUUID()]={action:'demoStudent',studentId:id,teacherUid:identity.uid,at:now};
+   await store.update(updates);
+  }
+  return {ok:true,studentId:id,name:profile.name};
  }
  let id=body.studentId,profile;
  if(body.action==='create')id='student_'+randomUUID().replaceAll('-','');

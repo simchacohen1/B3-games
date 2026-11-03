@@ -27,13 +27,13 @@ function studentFixture({verified=true,enabled=true,classEnabled=true,classLocke
  vm.runInContext(source('dashboard-core.js'),context);
  return {run:()=>vm.runInContext(source('dashboard.js'),context),element,get listener(){return listener},get redirect(){return redirect},get stored(){return stored},get request(){return request}};
 }
-test('dashboard verifies existing sign-in, reads canonical name and joins only its class lesson without a PIN in the handoff',async()=>{
- const f=studentFixture();await f.run();assert.equal(f.request.action,'verify');assert.equal(f.element('welcome').textContent,'Hello, Canonical Boy.');
- f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
- assert.equal(f.stored.name,'Canonical Boy');assert.equal(f.stored.classId,'one');assert.equal(f.stored.pin,undefined);assert.match(f.redirect,/dashboard=student&room=/);
-});
-test('dashboard does not join when sign-in, grant or membership is unavailable',async()=>{
- for(const options of [{verified:false},{granted:false},{member:false}]){const f=studentFixture(options);await f.run();assert.equal(f.listener,undefined);assert.equal(f.redirect,undefined);assert.ok(f.element('message').textContent)}
+test('student Pointer entry returns to the student dashboard without opening a separate classroom',async()=>{
+  for(const options of [{},{verified:false},{granted:false},{member:false}]){
+    const f=studentFixture(options);await f.run();
+    assert.equal(f.redirect,'https://example.test/index.html');
+    assert.equal(f.listener,undefined,'students stay in their regular activity pages');
+    assert.equal(f.request,undefined,'no Pointer-only authentication flow');
+  }
 });
 test('teacher publishes and removes only its own random room and registers disconnect cleanup first',async()=>{
  const writes=[],C=core(),classId='one';let auth;
@@ -42,13 +42,19 @@ test('teacher publishes and removes only its own random room and registers disco
  const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
  await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.requestScreenSharing();await context.window.ClassPointerDashboard.end();
- assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'update');assert.equal(writes[3][0],'remove');assert.equal(writes[2][2].studentScreenSharing,true);assert.equal(writes[2][2].shareRequest.at,database.ServerValue.TIMESTAMP);for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');
+ const sessionPath='b3Games/workspaces/b3-2026/classes/one/classPointerSessions/'+room;
+ const policyPath='b3Private/classPointerSharePermissions/b3-2026/one/'+room;
+ assert.deepEqual(writes.filter(([op])=>op==='disconnect').map(([,path])=>path),[sessionPath,policyPath]);
+ assert.equal(writes.find(([op,path])=>op==='set'&&path===sessionPath)[2].teacherUid,'test-teacher');
+ const request=writes.find(([op,path])=>op==='update'&&path===sessionPath)[2];
+ assert.equal(request.studentScreenSharing,true);assert.equal(request.shareRequest.at,database.ServerValue.TIMESTAMP);
+ assert.deepEqual(writes.filter(([op])=>op==='remove').map(([,path])=>path),[sessionPath,policyPath]);
+ assert.deepEqual(writes.filter(([op])=>op==='cancel').map(([,path])=>path),[sessionPath,policyPath]);
 });
 
-test('Class Pointer joins during global and class game locks',async()=>{
- for(const options of [{enabled:false},{classEnabled:false},{classLocked:true},{enabled:false,classEnabled:false,classLocked:true}]){
-  const f=studentFixture(options);await f.run();assert.equal(typeof f.listener,'function');
-  f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
-  assert.match(f.redirect,/dashboard=student&room=/);
- }
+test('student Pointer cannot unexpectedly reopen during global or class locks',async()=>{
+  for(const options of [{enabled:false},{classEnabled:false},{classLocked:true},{enabled:false,classEnabled:false,classLocked:true}]){
+    const f=studentFixture(options);await f.run();assert.equal(f.redirect,'https://example.test/index.html');
+    assert.equal(f.listener,undefined);
+  }
 });

@@ -1,0 +1,77 @@
+name: Sefer HaMitzvos coloring QA
+
+# Always create the required check for every pull request. Keep the full
+# coloring suite mandatory whenever Sefer assets, code, tests, or this workflow changes.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coloring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect Sefer files that need coloring QA
+        id: scope
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "run_coloring=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$PR_BASE_SHA" HEAD > /tmp/coloring-changed-files.txt
+          run_coloring=false
+          while IFS= read -r file; do
+            case "$file" in
+              sefer-hamitzvos/*|tests/sefer-hamitzvos*.cjs|.github/workflows/sefer-coloring-qa.yml)
+                run_coloring=true
+                break
+                ;;
+            esac
+          done < /tmp/coloring-changed-files.txt
+          echo "run_coloring=$run_coloring" >> "$GITHUB_OUTPUT"
+          if [[ "$run_coloring" == "false" ]]; then
+            echo "No Sefer changes: coloring test is not applicable to this PR."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run_coloring == 'true'
+        with:
+          node-version: '22'
+      - name: Check scripts compile
+        if: steps.scope.outputs.run_coloring == 'true'
+        run: |
+          node --check sefer-hamitzvos/fill.js
+          node --check sefer-hamitzvos/mask-worker.js
+          node --check sefer-hamitzvos/region-groups.js
+          node --check tests/sefer-hamitzvos-objects.test.cjs
+          node --check sefer-hamitzvos/tools/verify-coloring.cjs
+          node --check tests/sefer-hamitzvos-regions.test.cjs
+      - name: Region, access, and calendar tests
+        if: steps.scope.outputs.run_coloring == 'true'
+        run: node --test tests/sefer-hamitzvos-regions.test.cjs tests/sefer-hamitzvos-fill.test.cjs tests/sefer-hamitzvos-calendar.test.cjs tests/sefer-hamitzvos.test.cjs tests/sefer-hamitzvos-objects.test.cjs
+      - name: Install test-only native canvas
+        if: steps.scope.outputs.run_coloring == 'true'
+        run: npm install --prefix /tmp/sefer-canvas --no-audit --no-fund @napi-rs/canvas
+      - name: Real rendering, navigation, persistence and undo (synthetic account)
+        if: steps.scope.outputs.run_coloring == 'true'
+        env:
+          FTT_CANVAS_MODULE: /tmp/sefer-canvas/node_modules/@napi-rs/canvas
+        run: node sefer-hamitzvos/tools/verify-coloring.cjs
+      - name: Install Chromium browser test dependencies
+        if: steps.scope.outputs.run_coloring == 'true'
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Browser navigation and painting on actual DOM
+        if: steps.scope.outputs.run_coloring == 'true'
+        run: npx playwright test e2e/sefer-coloring-focus.spec.ts e2e/sefer-object-fill.spec.ts e2e/sefer-week-20261025.spec.ts --project=chromium --reporter=line

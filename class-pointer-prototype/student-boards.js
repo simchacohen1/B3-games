@@ -11,8 +11,8 @@
 (function(){
   const B=window.ClassPointerBridge;
   if(!B)return;
-  const $=id=>document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
-  const PALETTE=[['#1f2937','Black'],['#1d4ed8','Blue'],['#c62828','Red'],['#2e7d32','Green'],['#7b1fa2','Purple'],['#ef6c00','Orange']];
+  const $=id=>id==='stage'&&B.embedded?B.embeddedStage:document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
+  const PALETTE=[['#1f2937','Black'],['#777777','Gray'],['#ffffff','White'],['#1d4ed8','Blue'],['#29b6f6','Sky Blue'],['#4dd0e1','Turquoise'],['#009688','Teal'],['#c62828','Red'],['#ff7043','Coral'],['#ef6c00','Orange'],['#ffc107','Gold'],['#fff176','Yellow'],['#cddc39','Lime'],['#8bc34a','Light Green'],['#2e7d32','Green'],['#a5d6a7','Mint'],['#7b1fa2','Purple'],['#ab47bc','Violet'],['#b39ddb','Lavender'],['#ec407a','Pink'],['#f48fb1','Light Pink'],['#795548','Brown'],['#bcaaa4','Tan'],['#ffd1a9','Peach']];
   const COLORS=PALETTE.map(item=>item[0]);
   const SIZES=[[0.003,'Thin',5],[0.006,'Medium',9],[0.012,'Thick',14],[0.03,'Color',22]];
   const SIZE_VALUES=SIZES.map(item=>item[0]);
@@ -274,7 +274,7 @@
   // The teacher may pause ("block") one student; then that student sees a short message instead.
   // =====================================================================
   if(!isTeacher){
-    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null;
+    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null;
     const view=el('div','boards-view student-board');view.id='myBoard';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','My whiteboard');
     const bar=el('div','boards-bar'),title=el('strong','boards-title'),drawGroup=el('span','boards-group');
     const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');
@@ -286,15 +286,26 @@
       button('🗑 Clear','Clear everything I drew',()=>{if(board.strokes.some(s=>s.by==='student')&&confirm('Clear everything you drew on your board?'))act({type:'board-clear'})},'danger'));
     const editWord=wordEditor(bar,()=>board,text=>act({type:'board-text',text}),tools);
     const full=button('⛶ Full screen','Full screen',()=>(expanded()?$('exitFullScreenLesson'):$('fullScreenLesson'))?.click());
-    bar.append(el('span','boards-spacer'),full);
+    bar.append(el('span','boards-spacer'));
+    if(!B.embedded)bar.append(full);
+    else{
+      const back=button('↩ Back to Activity','Hide the whiteboard without losing your drawing',()=>{
+        stage.style.display='none';returnBoard.hidden=false;
+      });
+      const returnBoard=button('📝 Show My Whiteboard','Return to your whiteboard',()=>{
+        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw()}
+      });
+      returnBoard.id='fttReturnPointerBoard';
+      returnBoard.hidden=true;
+      returnBoard.style.cssText='position:fixed;bottom:16px;left:16px;z-index:2147483640;background:#245ce4;color:white;border:2px solid white;border-radius:12px;padding:12px 18px;font:700 15px system-ui;box-shadow:0 6px 22px #0004';
+      document.body.append(returnBoard);bar.append(back);
+      stage.addEventListener('classpointer:board-state',()=>{returnBoard.hidden=true});
+    }
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
-    const shareBtn=button('🖥 Share entire screen','Choose Entire screen in the browser preview picker',()=>stream?stopShare(true):startShare('screen'),'board-share-btn');
-    const tabBtn=button('🌐 Share a browser tab','Choose any browser tab in the browser preview picker',()=>stream?stopShare(true):startShare('tab'),'board-share-btn board-share-tab');
-    const shareChoices=el('div','board-share-choices');
-    shareChoices.append(tabBtn,shareBtn);
-    sharePanel.append(shareText,shareChoices,preview,shareNote);
+    const shareBtn=button('🖥 Share My Screen','Open the persistent Share My Screen / Stop Sharing window; your screen continues to share as you visit other activities',()=>stream?stopShare(true):openShareWindow(),'board-share-btn');
+    sharePanel.append(shareText,shareBtn,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
     surface.appendChild(canvas);focus.append(surface,sharePanel,pausedPanel);view.append(bar,focus);stage.appendChild(view);shield(view);
@@ -304,33 +315,38 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Your selected tab or screen is being shared with your teacher.':'Choose what to share. Your browser will show visual previews before you approve.';
-      shareBtn.textContent=stream?'⏹ Stop sharing':'🖥 Share entire screen';shareBtn.classList.toggle('sharing',!!stream);
-      tabBtn.textContent=stream?'⏹ Stop sharing':'🌐 Share a browser tab';tabBtn.classList.toggle('sharing',!!stream);
+      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
+      shareBtn.textContent=stream?'⏹ Stop Sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share My Screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
     const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){fit(focus,surface);paint(canvas,board,drawer?.draft())}});
+    function openShareWindow(){
+      if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
+      const url=new URL('student-share-window.html?pointerShare=1',location.href);
+      shareWindow=window.open(url.href,'classPointerStudentShare');
+      if(shareWindow){shareNote.textContent='Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';shareWindow.focus?.();return}
+      shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
+      void startShare('screen');
+    }
     function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
     drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
 
-    async function startShare(kind='tab'){
+    async function startShare(){
       shareNote.textContent='';
       if(!navigator.mediaDevices?.getDisplayMedia||!B.callTeacher){shareNote.textContent='Screen sharing works on a computer in Chrome or Edge.';return}
-      shareBtn.disabled=true;tabBtn.disabled=true;
+      shareBtn.disabled=true;
       try{
-        // The browser controls the visual picker and requires a direct student click.
-        // Hints cannot force a source; inspect the returned track to avoid presenting
-        // a tab when the student explicitly chose the entire-screen action (or vice versa).
-        const options={video:{frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,
-          preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'};
-        options.video.displaySurface=kind==='screen'?'monitor':'browser';
-        if(kind==='screen')options.preferCurrentTab=false;
-        const s=await navigator.mediaDevices.getDisplayMedia(options);
+        // The browser still requires a student click and controls its native picker.
+        // Ask for a monitor capture and reject a tab/window if the browser reports one.
+        const s=await navigator.mediaDevices.getDisplayMedia({
+          video:{displaySurface:'monitor',frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},
+          audio:false,selfBrowserSurface:'exclude',surfaceSwitching:'exclude',monitorTypeSurfaces:'include'
+        });
         const surface=s.getVideoTracks()[0]?.getSettings?.().displaySurface;
-        if((kind==='screen'&&surface&&surface!=='monitor')||(kind==='tab'&&surface&&surface!=='browser')){
+        if(surface&&surface!=='monitor'){
           s.getTracks().forEach(t=>t.stop());
-          shareNote.textContent=kind==='tab'?'Please choose a browser tab in the preview window.':'Please choose Entire Screen in the preview window.';
+          shareNote.textContent='Please choose Entire Screen in the browser preview window.';
           return;
         }
         if(!on||mode!=='screens'||blocked){s.getTracks().forEach(t=>t.stop());return}
@@ -342,7 +358,7 @@
         c.on?.('close',()=>{if(call===c)stopShare(false)});c.on?.('error',()=>{if(call===c){stopShare(false);shareNote.textContent='The connection to your teacher failed. Try sharing again.'}});
         B.sendTeacher({type:'board-screen',sharing:true});
       }catch(error){shareNote.textContent=error?.name==='NotAllowedError'?'Sharing was canceled. Click the button to try again.':'Could not share your screen. Try again.'}
-      finally{shareBtn.disabled=false;tabBtn.disabled=false;redraw()}
+      finally{shareBtn.disabled=false;redraw()}
     }
     function stopShare(tell){
       const s=stream,c=call;stream=null;call=null;
@@ -352,6 +368,7 @@
     }
     function show(next){
       view.hidden=!next;document.body.classList.toggle('boards-on',next);
+      if(B.embedded){stage.style.display=next?'block':'none';stage.dispatchEvent(new Event('classpointer:board-state'))}
       if(next)stage.dispatchEvent(new PointerEvent('pointerleave'));
       redraw();
     }
@@ -364,7 +381,9 @@
         if(!on||mode!=='screens'||blocked)stopShare(false);
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text):emptyBoard();
-        show(on);
+        // In embedded mode, screens are shared via the existing activity button;
+        // never cover Shorashim with the old Pointer screen-sharing panel.
+        show(on&&!(B.embedded&&mode==='screens'));
         if(!on){if(was)B.status('Your teacher closed the boards. Back to the lesson.')}
         else if(blocked){if(!wasBlocked)B.status('Your teacher paused your board for now.')}
         else if(!was||wasMode!==mode||wasBlocked)B.status(mode==='screens'?'Your teacher asked you to share your screen. Click Share my screen.':'Your teacher opened your own whiteboard. Draw with the pen. Your teacher can see your board.');
@@ -380,7 +399,9 @@
   // Teacher page: a grid of every student's board or shared screen, plus the shared whiteboard button.
   // =====================================================================
   const boards=new Map(),tiles=new Map(),blocked=new Set();
-  let on=false,mode='screens',focusId=null,drawer=null,gridSize='';
+  let on=false,mode='screens',focusId=null,drawer=null,gridSize='',suspended=false;
+  // Switching workspaces hides this gallery, not the student's approved screen capture.
+  let screenPermissionEnabled=false,workspaceRevision=0;
   // Separate, default-allow permissions: a teacher can exclude one boy without
   // changing classmates' access or his independent Pointer/Highlight settings.
   const denied={screens:new Set(),boards:new Set()};
@@ -399,6 +420,8 @@
   function updatePermission(id,kind,allowed){
     if(!id)return;
     if(allowed)denied[kind].delete(id);else denied[kind].add(id);
+    // Allowing from the Students panel also lifts a tile Pause for him.
+    if(allowed&&kind==='screens')for(const m of admitted())if(personId(m)===id)blocked.delete(keyFor(m));
     renderPermissions();
     for(const m of admitted())if(personId(m)===id){if(on)sendMode(m);dirty(m.id)}
     if(on)syncTiles();
@@ -425,6 +448,7 @@
     permissionsPanels.push(list);return outer;
   }
   function renderPermissions(){
+    document.dispatchEvent(new CustomEvent('classpointer:sharing-permissions'));
     const students=classStudents.length?classStudents:admitted().map(m=>({id:personId(m),name:m.name})).filter(m=>m.id);
     for(const list of permissionsPanels){
       list.replaceChildren();
@@ -454,13 +478,13 @@
   const toggle=$('studentBoards');
   // Teacher can bring the whole signed-in class directly to screens or boards.
   // These same controls remain available from the Students menu in full screen.
-  const sendScreens=button('📣 Send to Screen Sharing','Bring this class to Classroom Pointer screens; each student must approve sharing',()=>void sendEveryone('screens'));
-  const sendBoards=button('📝 Send to Whiteboards','Bring this class to individual Classroom Pointer whiteboards',()=>void sendEveryone('boards'));
+  const sendScreens=button('📣 Send to Screen Sharing','Ask students to share from their current activity; each student must approve sharing',()=>void sendEveryone('screens'));
+  const sendBoards=button('📝 Send to Whiteboards','Open a whiteboard over each student’s current activity',()=>void sendEveryone('boards'));
   toggle?.after(sendScreens,sendBoards);
   const dockLaunch=el('div','pointer-bulk-actions');
   dockLaunch.style.cssText='display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #cbd5e1';
   const dockScreens=button('🖥 Send screens','Ask the class to share their screens',()=>void sendEveryone('screens'));
-  const dockBoards=button('📝 Send whiteboards','Open individual whiteboards for the class',()=>void sendEveryone('boards'));
+  const dockBoards=button('📝 Send whiteboards','Open individual whiteboards without leaving student activities',()=>void sendEveryone('boards'));
   dockLaunch.append(dockScreens,dockBoards);
   document.getElementById('tbStudentsMenu')?.prepend(dockLaunch);
   const menuPermissions=createPermissionsPanel();
@@ -497,8 +521,61 @@
     sendActivity({kind:'word',text:value,instruction:instructionInput.value});
   });
   const sendImage=button('🖼 Coloring page','Upload a picture or coloring page for every student to color',()=>imageFile.click());
+  // Explicit clipboard action for teachers: preview before replacing each student's
+  // common background. Every boy's own drawing layer remains independent.
+  const pasteAll=button('📋 Paste to All Boards','Paste copied words or an image on every student whiteboard',()=>void readClipboardForClass());
+  const pastePreview=el('div','boards-paste-preview');pastePreview.hidden=true;
+  pastePreview.setAttribute('role','dialog');pastePreview.setAttribute('aria-label','Preview paste to all whiteboards');
+  pastePreview.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
+  const previewPanel=el('div','boards-paste-panel');previewPanel.style.cssText='background:white;color:#142642;border-radius:15px;padding:18px;max-width:min(650px,95vw);max-height:85vh;overflow:auto;box-shadow:0 16px 55px #0005';
+  const previewTitle=el('h3',null,'Send to every whiteboard?'),previewBody=el('div','boards-paste-content');
+  previewBody.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;margin:12px 0';
+  const confirmPaste=button('✓ Send to all boards','Replace the common background on every student board',()=>void commitPaste());
+  const cancelPaste=button('Cancel','Close the paste preview',()=>closePreview());
+  previewPanel.append(previewTitle,previewBody,confirmPaste,cancelPaste);pastePreview.append(previewPanel);stage.appendChild(pastePreview);
+  let pendingPaste=null;
+  function closePreview(){pendingPaste=null;pastePreview.hidden=true;pastePreview.style.display='none';previewBody.replaceChildren()}
+  function showPaste(value){
+    pendingPaste=value;previewBody.replaceChildren();
+    if(value.kind==='word')previewBody.append(el('p',null,value.text));
+    else{
+      const img=el('img');img.src=URL.createObjectURL(value.file);img.alt='Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
+      img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
+      previewBody.append(img);
+    }
+    pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
+  }
+  async function commitPaste(){
+    const item=pendingPaste;if(!item)return;
+    closePreview();
+    if(item.kind==='image')await sendImageFile(item.file);
+    else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
+  }
+  async function readClipboardForClass(){
+    if(!on||mode!=='boards'){B.status('Open Student whiteboards before pasting.');return}
+    try{
+      if(navigator.clipboard?.read){
+        const entries=await navigator.clipboard.read();
+        for(const entry of entries){
+          const kind=entry.types.find(t=>/^image\/(png|jpeg|webp|gif)$/.test(t));
+          if(kind){showPaste({kind:'image',file:await entry.getType(kind)});return}
+          if(entry.types.includes('text/plain')){
+            const text=(await (await entry.getType('text/plain')).text()).trim();
+            if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
+          }
+        }
+      }
+      if(navigator.clipboard?.readText){
+        const text=(await navigator.clipboard.readText()).trim();
+        if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
+      }
+      B.status('Nothing to paste. Copy a picture or some text first.');
+    }catch(error){
+      B.status('Clipboard access was blocked. Click the whiteboard area and press Ctrl+V to paste instead.');
+    }
+  }
   const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
+  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
@@ -565,7 +642,7 @@
   // Focus bar: one student large.
   const focusBar=el('div','boards-bar'),who=el('strong','boards-title'),drawGroup=el('span','boards-group');focusBar.hidden=true;
   const focusBlock=button('','',()=>{const m=focusMember();if(m)toggleBlock(m)});
-  focusBar.append(button('◀ All students','Back to all students',()=>setFocus(null)),who,focusBlock,drawGroup);
+  focusBar.append(button('◀ Back to gallery','Back to all students (sharing continues)',()=>setFocus(null)),who,focusBlock,drawGroup);
   const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');focus.hidden=true;
   canvas.setAttribute('aria-label','Student board. Your marks appear on the student’s screen.');
   surface.appendChild(canvas);
@@ -582,7 +659,16 @@
   const grid=el('div','boards-grid'),empty=el('p','boards-empty','No students have joined yet. Their tiles appear here as they join.');
   view.append(gridBar,gridPermissions,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
 
-  const admitted=()=>Array.from(B.members().values()).filter(m=>m.admitted);
+  // Include students verified by the background activity connection without
+  // sending them to a separate Pointer page. Choose one tab per student.
+  const admitted=()=>{
+    const joined=Array.from(B.members().values()).filter(m=>m.admitted);
+    const seen=new Set(joined.map(m=>m.studentId||m.name.toLocaleLowerCase()));
+    const remote=Array.from(B.presence?.().values()||[]).filter(m=>m.admitted&&m.connection?.open)
+      .sort((a,b)=>Number(a.activity==='Screen sharing window')-Number(b.activity==='Screen sharing window')||b.connectedAt-a.connectedAt);
+    for(const m of remote){const key=m.studentId||m.name.toLocaleLowerCase();if(!seen.has(key)){seen.add(key);joined.push(m)}}
+    return joined;
+  };
   // A board belongs to a student name, so a student who refreshes or rejoins gets his board (and block) back.
   function keyFor(m){
     if(!m.boardKey){const base='name:'+String(m.name||'student').toLowerCase();m.boardKey=admitted().some(o=>o!==m&&o.boardKey===base)?base+'#'+m.id:base}
@@ -590,12 +676,12 @@
   }
   function boardFor(m){const key=keyFor(m);let b=boards.get(key);if(!b){b=emptyBoard();boards.set(key,b)}return b}
   const isBlocked=m=>blocked.has(keyFor(m));
-  const focusMember=()=>focusId?B.members().get(focusId)||null:null;
+  const focusMember=()=>focusId?admitted().find(m=>m.id===focusId)||null:null;
   const focusBoard=()=>{const m=focusMember();return m?boardFor(m):null};
   const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   function closeScreen(m){const c=m.screenCall;m.screenCall=null;m.screenStream=null;try{c?.close()}catch(_){}}
   function sendMode(m){
-    if(!on||excluded(m,mode)){closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
+    if(!on||suspended||excluded(m,mode)){if(!on||excluded(m,mode))closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
     if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes;message.text=b.text}}
@@ -607,24 +693,32 @@
   function dirty(id){dirtySet.add(id);if(!frame)frame=requestAnimationFrame(flush)}
   function dirtyAll(){for(const id of tiles.keys())dirtySet.add(id);if(focusId)dirtySet.add(focusId);if(!frame)frame=requestAnimationFrame(flush)}
   function setVideo(video,stream){if(video.srcObject!==stream){video.srcObject=stream||null;if(stream)video.play().catch(()=>{})}}
+  // A student's live screen. A boy who joined Pointer shares by a direct call (m.screenStream). A boy sharing from
+  // Shorashim or another activity is not joined to Pointer: his verified screen is held by activity-screen-teacher.js.
+  function streamOf(m){
+    if(m.screenStream)return m.screenStream;
+    const shares=window.ClassPointerActivityShares;if(!shares?.streamFor)return null;
+    const id=personId(m);
+    return (id&&shares.streamFor(id))||(m.studentId&&shares.streamFor(m.studentId))||null;
+  }
   function flush(){
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
-      const m=B.members().get(id);if(!m)continue;
-      const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id);
+      const m=admitted().find(entry=>entry.id===id);if(!m)continue;
+      const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id),live=screens?streamOf(m):null;
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
-        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!m.screenStream?'Waiting for his screen…':'';
-        tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!m.screenStream;
-        setVideo(tile.video,screens&&!paused?m.screenStream:null);
+        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for his screen…':'';
+        tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
+        setVideo(tile.video,screens&&!paused?live:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
       }
       if(id===focusId){
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
-        if(screens&&!paused){setVideo(screenVideo,m.screenStream);screenVideo.hidden=!m.screenStream;screenNote.hidden=!!m.screenStream;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
+        if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
         else setVideo(screenVideo,null);
         if(!surface.hidden){fit(focus,surface);paint(canvas,boardFor(m),drawer?.draft())}
       }
@@ -644,11 +738,16 @@
     return{node,canvas:c,video:v,note,block};
   }
   function syncTiles(){
-    const list=admitted(),ids=new Set(list.map(m=>m.id));
+    const present=admitted();
+    // Screen tiles exist only for streams that are actually live. One stream
+    // therefore fills the available gallery; tiles shrink as more join.
+    const list=mode==='screens'?present.filter(m=>!excluded(m,'screens')&&!!streamOf(m)):present.filter(m=>!excluded(m,'boards'));
+    const ids=new Set(list.map(m=>m.id));
     for(const [id,tile] of tiles)if(!ids.has(id)){tile.video.srcObject=null;tile.node.remove();tiles.delete(id)}
     for(const m of list)if(!tiles.has(m.id)){const tile=makeTile(m);grid.appendChild(tile.node);tiles.set(m.id,tile);dirty(m.id)}
     const paused=list.filter(isBlocked).length;
-    count.textContent=list.length?list.length+(list.length===1?' student':' students')+(paused?' · '+paused+' paused':''):'';
+    count.textContent=list.length?list.length+(list.length===1?(mode==='screens'?' screen':' whiteboard'):(mode==='screens'?' screens':' whiteboards'))+(paused?' · '+paused+' paused':''):'';
+    empty.textContent=mode==='screens'?'Waiting for students to share their screens…':'Waiting for students to join their whiteboards…';
     if(focusId&&!ids.has(focusId)){setFocus(null);return}
     grid.hidden=!!focusId||!list.length;empty.hidden=!!focusId||!!list.length;
     layoutGrid();
@@ -685,18 +784,20 @@
     B.status(item?.kind==='word'?'The word is on every boy\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every boy\'s board. Watch them color in real time.':'All boards are blank.');
   }
   function setFocus(id){
-    drawer?.cancel();focusId=id&&B.members().get(id)?id:null;const m=focusMember();
+    drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();
     focusBar.hidden=!m;gridBar.hidden=!!m;activityBar.hidden=!!m||mode!=='boards';focus.hidden=!m;focusWord.root.hidden=!m||mode!=='boards'||activity?.kind!=='word';if(m)who.textContent=m.name+(mode==='screens'?'’s screen':'’s board');
     if(!m)setVideo(screenVideo,null);
     controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
   }
   function setOn(next){
     if(next&&!B.started())return;
-    on=next;drawer?.cancel();focusId=null;gridSize='';
+    on=next;suspended=false;if(!next)++workspaceRevision;drawer?.cancel();focusId=null;gridSize='';
+    screenPermissionEnabled=next?(screenPermissionEnabled||mode==='screens'):false;
     for(const m of admitted())sendMode(m);
     view.hidden=!on;
     if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student screens':'🖥 Student Screens'}
-    window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
+    // Only an explicit close disables capture; selecting Whiteboards must not.
+    if(!on||mode==='screens')window.ClassPointerDashboard?.setStudentScreenSharing(screenPermissionEnabled).catch(error=>B.status('Could not update screen sharing permission: '+error.message));
     document.dispatchEvent(new Event('classpointer:sharing-state'));
     if(on){stage.dispatchEvent(new PointerEvent('pointerleave'));setFocus(null);B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles.':'Student whiteboards are open. Click a board to see it large and write on it. Use 🖥 Screens to see students’ screens instead.')}
     else B.status('Student boards closed. Everyone is back to the lesson. Whiteboards are kept until the class ends.');
@@ -704,7 +805,10 @@
   function setMode(next){
     if(next===mode)return;
     mode=next;drawer?.cancel();
-    window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
+    if(mode==='screens'){
+      screenPermissionEnabled=true;
+      window.ClassPointerDashboard?.setStudentScreenSharing(true).catch(error=>B.status('Could not update screen sharing permission: '+error.message));
+    }
     document.dispatchEvent(new Event('classpointer:sharing-state'));
     for(const m of admitted())sendMode(m);
     setFocus(focusId);
@@ -713,7 +817,7 @@
   // Teacher-facing sharing switch. Session availability and sharing permission are
   // separate: closing the gallery is no longer necessary to revoke permission.
   window.ClassPointerSharing={
-    enabled:()=>on&&mode==='screens',
+    enabled:()=>screenPermissionEnabled,
     enable(){
       if(!B.started())return false;
       if(!on)setOn(true);
@@ -722,35 +826,60 @@
     },
     disable(){
       if(on&&mode==='screens')setOn(false);
-      else window.ClassPointerDashboard?.setStudentScreenSharing(false)?.catch(error=>B.status('Could not disable sharing: '+error.message));
+      else{
+        screenPermissionEnabled=false;
+        window.ClassPointerDashboard?.setStudentScreenSharing(false)?.catch(error=>B.status('Could not disable sharing: '+error.message));
+        document.dispatchEvent(new Event('classpointer:sharing-state'));
+      }
       return true;
     }
   };
   async function sendEveryone(destination){
     if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return}
+    const revision=++workspaceRevision;
     const buttons=[sendScreens,sendBoards,dockScreens,dockBoards];
     buttons.forEach(b=>b.disabled=true);
     try{
-      // Publish the right mode before directing students to the classroom.
+      // Publish the right mode without navigating students out of their activities.
       // Students already connected receive board-mode immediately; new arrivals
       // receive it from studentJoined() once they enter the same class.
       if(!on){mode=destination;setOn(true)}
       else if(mode!==destination)setMode(destination);
+      suspended=false;view.hidden=false;gridSize='';setFocus(null);
+      for(const m of admitted())sendMode(m);
+      document.dispatchEvent(new Event('classpointer:sharing-state'));
       const dashboard=window.ClassPointerDashboard;
       if(!dashboard?.requestStudentDestination)throw Error('Classroom broadcast is not ready.');
       await loadPermissionsRoster();
       await permissionsWrite;
+      // If another workspace was selected while roster/policy was loading,
+      // do not publish an obsolete request over the user's latest selection.
+      if(revision!==workspaceRevision)return;
       await dashboard.requestStudentDestination(destination,policy());
       B.status(destination==='screens'
         ?'Sent this class to Screen Sharing. Each boy clicks Share my screen and approves the browser prompt.'
-        :'Sent this class to individual Whiteboards. Their boards will appear here as they join.');
+        :'Opened individual whiteboards over the students’ current activities. Their work appears here.');
     }catch(error){
       B.fail('Could not send the class: '+(error?.message||'Please try again.'));
     }finally{buttons.forEach(b=>b.disabled=false)}
   }
+  function hideWorkspace(){
+    ++workspaceRevision;
+    if(!on||suspended)return;
+    suspended=true;view.hidden=true;focusId=null;gridSize='';
+    setVideo(screenVideo,null);
+    for(const tile of tiles.values())setVideo(tile.video,null);
+    // Hide student whiteboards so My Screen can appear, without revoking any
+    // student's ongoing screen capture or erasing board contents.
+    for(const m of admitted())B.send(m.connection,{type:'board-mode',on:false});
+    document.dispatchEvent(new Event('classpointer:sharing-state'));
+  }
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
     drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);
+    // A student sharing from Shorashim or another activity is not joined to Pointer, so hiding his video is not enough:
+    // record the pause as a screen-sharing permission so his browser stops capturing and the teacher stops receiving.
+    if(mode==='screens'){const person=personId(m);if(person)updatePermission(person,'screens',!blocked.has(key))}
     B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
@@ -760,14 +889,34 @@
 
   document.addEventListener('classpointer:send-to-whiteboards',()=>void sendEveryone('boards'));
   document.addEventListener('classpointer:send-to-screens',()=>void sendEveryone('screens'));
+  // A boy sharing from Shorashim (or another activity) connected, changed or stopped: refresh the tiles and the large viewer.
+  document.addEventListener('classpointer:activity-screens',()=>{if(on){syncTiles();dirtyAll()}});
   toggle?.addEventListener('click',()=>setOn(!on));
   setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
   controls();renderPermissions();void loadPermissionsRoster();
 
+  // Read/write access for the teacher's Students table (teacher-dashboard.js).
+  window.ClassPointerSharingPermissions={
+    students:()=>(classStudents.length?classStudents:admitted().map(m=>({id:personId(m),name:m.name})).filter(m=>m.id)).map(p=>({id:p.id,name:p.name})),
+    loaded:()=>classStudents.length>0,
+    personId:m=>personId(m),
+    allowed:(id,kind)=>!!id&&!denied[kind]?.has(id),
+    set:(id,kind,on)=>{if(denied[kind])updatePermission(id,kind,!!on)},
+    bulk:(kind,on)=>{if(denied[kind])bulkPermission(kind,!!on)},
+    load:()=>loadPermissionsRoster()
+  };
   window.ClassPointerBoards={
+    navigateWorkspace(destination){
+      if(destination==='teach'){hideWorkspace();return true}
+      if(destination!=='screens'&&destination!=='whiteboards')return false;
+      if(!B.started())return false;
+      void sendEveryone(destination==='screens'?'screens':'boards');
+      return true;
+    },
     fromStudent(m,message){
       if(!on)return;
+      if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
       if(mode!=='boards'||isBlocked(m)||excluded(m,'boards'))return;
       if(applyOp(boardFor(m),message,'student'))dirty(m.id);
@@ -789,7 +938,7 @@
       // The enclosing classroom ends by deleting the entire Firebase session.
       // Do not send an asynchronous child update here: it could recreate an
       // orphan studentScreenSharing flag after the session is removed.
-      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';controls();
+      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';suspended=false;screenPermissionEnabled=false;++workspaceRevision;controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
       if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🖥 Student Screens';toggle.disabled=true}
@@ -803,7 +952,7 @@
     const c=document.createElement('canvas');c.width=1600;c.height=900;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
     try{
       const ok=await window.ClassPointerPdf.openSnapshot(c.toDataURL('image/jpeg',0.92),c.width,c.height,{name:'Whiteboard',label:'whiteboard',kind:'whiteboard',
-        status:'Whiteboard open for everyone. Use ✒️ Pen to write. Students with Writing allowed can write too. Close whiteboard is at the bottom.'});
+        status:'Whiteboard open for everyone. Use ✒️ Pen to write. Students with Writing allowed can write too. Use the red Stop button when you are done.'});
       if(!ok)return;
       const tool=$('teacherTool'),color=$('teacherColor');
       if(tool.value!=='pen'){tool.value='pen';tool.dispatchEvent(new Event('change',{bubbles:true}))}
@@ -811,4 +960,3 @@
     }catch(error){B.fail(error?.message||'Could not open the whiteboard.')}
   });
 })();
-

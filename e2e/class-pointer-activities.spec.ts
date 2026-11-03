@@ -207,7 +207,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await expect(levi.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
 
     // A pasted image from another application opens the coloring activity.
-    await teacher.getByRole('button', { name: '◀ All students' }).click();
+    await teacher.getByRole('button', { name: '◀ Back to gallery' }).click();
     teacher.on('dialog', async dialog => await dialog.accept());
     await teacher.evaluate(async () => {
       const c = document.createElement('canvas'); c.width = 80; c.height = 60;
@@ -244,7 +244,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
 test('screen exclusions close active video, preserve classmates, and remain independent of boards', async ({ page }) => {
   await openBoard(page, true);
   await page.locator('#studentBoards').click();
-  await expect(page.locator('.board-tile')).toHaveCount(2);
+  await expect(page.locator('.board-tile')).toHaveCount(0);
   await page.evaluate(() => {
     const events: Record<string, Function> = {};
     const call = {
@@ -260,7 +260,11 @@ test('screen exclusions close active video, preserve classmates, and remain inde
     events.stream(stream);
   });
   expect(await page.evaluate(() => (window as any).__accepted)).toBe(true);
+  await expect(page.locator('.board-tile')).toHaveCount(1);
   await expect.poll(() => page.locator('.board-tile video').evaluateAll((videos: HTMLVideoElement[]) => videos.filter(v => v.srcObject).length)).toBe(1);
+  const initial=await page.locator('.board-tile').first().boundingBox();
+  expect(initial!.width).toBeGreaterThan(700);
+  expect(initial!.height).toBeGreaterThan(380);
   await page.getByLabel('Screen sharing for Ari', {exact:true}).first().uncheck();
   expect(await page.evaluate(() => (window as any).__closed)).toBe(true);
   await expect(page.getByLabel('Screen sharing for Levi', {exact:true}).first()).toBeChecked();
@@ -280,4 +284,118 @@ test('screen exclusions close active video, preserve classmates, and remain inde
   });
   await expect(page.getByLabel('Screen sharing for Ari', {exact:true}).first()).toBeChecked();
   await expect(page.getByLabel('Board sharing for Ari', {exact:true}).first()).toBeChecked();
+});
+
+
+test('student receives a whiteboard over existing work without opening Pointer',async({page})=>{
+  await page.setViewportSize({width:1280,height:850});
+  await page.setContent('<!doctype html><html><body><input id="studentWork" value="Not lost"><div id="embeddedStage" style="position:fixed;inset:0;display:none"></div></body></html>');
+  await page.addStyleTag({path:'class-pointer-prototype/student-boards.css'});
+  await page.evaluate(()=>{
+    (window as any).__boardOperations=[];
+    (window as any).ClassPointerBridge={
+      isTeacher:false,embedded:true,embeddedStage:document.getElementById('embeddedStage'),
+      sendTeacher:(m:any)=>(window as any).__boardOperations.push(m),status:()=>{}
+    };
+  });
+  await page.addScriptTag({path:'class-pointer-prototype/student-boards.js'});
+  await page.evaluate(()=>(window as any).ClassPointerBoards.fromTeacher({type:'board-mode',on:true,mode:'boards',blocked:false,strokes:[]}));
+  await expect(page.locator('#embeddedStage')).toBeVisible();
+  await expect(page.locator('#myBoard canvas')).toBeVisible();
+  expect(await page.locator('#studentWork').inputValue()).toBe('Not lost');
+  const rect=await page.locator('#myBoard canvas').boundingBox();
+  await page.mouse.move(rect!.x+rect!.width*.2,rect!.y+rect!.height*.4);
+  await page.mouse.down();
+  await page.mouse.move(rect!.x+rect!.width*.75,rect!.y+rect!.height*.4,{steps:8});
+  await page.mouse.up();
+  expect(await page.evaluate(()=>(window as any).__boardOperations.some((m:any)=>m.type==='board-add'))).toBeTruthy();
+  await page.getByRole('button',{name:'↩ Back to Activity'}).click();
+  await expect(page.locator('#embeddedStage')).toBeHidden();
+  expect(await page.locator('#studentWork').inputValue()).toBe('Not lost');
+  await page.getByRole('button',{name:'📝 Show My Whiteboard'}).click();
+  await expect(page.locator('#myBoard canvas')).toBeVisible();
+  await page.evaluate(()=>(window as any).ClassPointerBoards.fromTeacher({type:'board-mode',on:false,mode:'boards'}));
+  await expect(page.locator('#embeddedStage')).toBeHidden();
+});
+
+test('gallery sizes one live screen large and shrinks automatically as streams join',async({page})=>{
+  await openBoard(page,true);
+  await page.evaluate(()=>{
+    (window as any).__members.clear();
+    const presence=new Map();
+    for(const [id,name] of [['a','Ari'],['b','Levi']]){
+      presence.set(id,{id,studentId:id,name,admitted:true,connectedAt:Date.now(),connection:{open:true,id}});
+    }
+    (window as any).ClassPointerBridge.presence=()=>presence;
+    (window as any).__screenStreams=new Map();
+    (window as any).ClassPointerActivityShares={streamFor:(id:string)=>(window as any).__screenStreams.get(id)||null};
+  });
+  await page.locator('#studentBoards').click();
+  await expect(page.locator('.board-tile')).toHaveCount(0);
+  const join=async(id:string)=>await page.evaluate(key=>{
+    const canvas=document.createElement('canvas');canvas.width=480;canvas.height=270;
+    const stream=canvas.captureStream(2);
+    (window as any).__screenStreams.set(key,stream);
+    document.dispatchEvent(new Event('classpointer:activity-screens'));
+  },id);
+  await join('a');
+  await expect(page.locator('.board-tile')).toHaveCount(1);
+  const big=await page.locator('.board-tile').first().boundingBox();
+  expect(big!.width).toBeGreaterThan(700);
+  await join('b');
+  await expect(page.locator('.board-tile')).toHaveCount(2);
+  const small=await page.locator('.board-tile').first().boundingBox();
+  expect(small!.width).toBeLessThan(big!.width);
+  expect(small!.width).toBeGreaterThan(250);
+  await page.evaluate(()=>{
+    for(const stream of (window as any).__screenStreams.values())stream.getTracks().forEach((t:MediaStreamTrack)=>t.stop());
+    (window as any).__screenStreams.clear();
+    document.dispatchEvent(new Event('classpointer:activity-screens'));
+  });
+  await expect(page.locator('.board-tile')).toHaveCount(0);
+});
+
+
+test('teacher can cycle My screen, Student screens and Student whiteboards repeatedly without losing live capture',async({page})=>{
+  await openBoard(page,true);
+  await page.evaluate(()=>{
+    const teacher=document.createElement('div');teacher.id='teacherPanel';document.body.append(teacher);
+    const dock=document.createElement('div');dock.id='teacherDock';document.body.append(dock);
+    const src=document.createElement('canvas');src.width=480;src.height=270;
+    const stream=src.captureStream(2);
+    (window as any).__persistentStudentStream=stream;
+    (window as any).ClassPointerActivityShares={
+      streamFor:(id:string)=>id==='a'?stream:null,closeAll:()=>{throw Error('Switched tabs must not close capture')}
+    };
+    (window as any).__sharingFlags=[];
+    (window as any).__destinationCalls=[];
+    (window as any).ClassPointerDashboard.setStudentScreenSharing=async(on:boolean)=>(window as any).__sharingFlags.push(on);
+    (window as any).ClassPointerDashboard.requestStudentDestination=async(mode:string)=>(window as any).__destinationCalls.push(mode);
+  });
+  await page.addScriptTag({path:'class-pointer-prototype/workspace-layout.js'});
+  const screens=page.getByRole('button',{name:'Student screens',exact:true});
+  const boards=page.getByRole('button',{name:'Student whiteboards',exact:true});
+  const teach=page.getByRole('button',{name:'My screen',exact:true});
+  await screens.click();
+  await expect(page.locator('#boardsView')).toBeVisible();
+  await expect(page.locator('.board-tile')).toHaveCount(1);
+  for(let cycle=0;cycle<3;cycle++){
+    await boards.click();
+    await expect(page.locator('.board-tile')).toHaveCount(2);
+    await expect(boards).toHaveAttribute('aria-selected','true');
+    await expect.poll(()=>page.evaluate(()=>(window as any).__destinationCalls.filter((mode:string)=>mode==='boards').length)).toBe(cycle+1);
+    await teach.click();
+    await expect(page.locator('#boardsView')).toBeHidden();
+    await expect(teach).toHaveAttribute('aria-selected','true');
+    await screens.click();
+    await expect(page.locator('#boardsView')).toBeVisible();
+    await expect(screens).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('.board-tile')).toHaveCount(1);
+    // Tile creation precedes the animation frame that reattaches its video.
+    // Verify the actual MediaStream, not merely that a tile was created.
+    await expect.poll(()=>page.locator('.board-tile video').evaluate((v:HTMLVideoElement)=>v.srcObject===(window as any).__persistentStudentStream)).toBe(true);
+    await expect.poll(()=>page.evaluate(()=>(window as any).__destinationCalls.filter((mode:string)=>mode==='screens').length)).toBe(cycle+2);
+  }
+  expect(await page.evaluate(()=>(window as any).__sharingFlags)).not.toContain(false);
+  await page.evaluate(()=>(window as any).__persistentStudentStream.getTracks().forEach((track:MediaStreamTrack)=>track.stop()));
 });

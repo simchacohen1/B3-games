@@ -6,17 +6,9 @@ const DEFAULT_CATALOG = {
 
 const ILLUSTRATIONS = {"1-raah":[{"src":"assets/illustrations/seeing-binoculars.svg","label":"Looking through binoculars"}],"1-eilon":[{"src":"assets/illustrations/grove.svg","label":"A grove of trees"}],"1-yashav":[{"src":"assets/illustrations/sitting.svg","label":"A person sitting"}],"1-petach":[{"src":"assets/illustrations/entrance.svg","label":"A doorway entrance"}],"1-ohel":[{"src":"assets/illustrations/tent.svg","label":"A tent"}],"1-chom":[{"src":"assets/illustrations/heat.svg","label":"Hot sun and thermometer"}],"1-yom":[{"src":"assets/illustrations/day.svg","label":"A bright daytime scene"}],"2-nasa":[{"src":"assets/illustrations/carrying.svg","label":"A person carrying a box"}],"2-ayin":[{"src":"assets/illustrations/eye.svg","label":"A close-up eye"}],"2-shalosh":[{"src":"assets/illustrations/three-people.svg","label":"Three people"}]};
 
-/* ===== Firebase classroom connection (same b3-games project as Posuk Practice) ===== */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+/* ===== Firebase classroom connection; firebase-config.js selects the environment. ===== */
+const FIREBASE_CONFIG = window.B3_FIREBASE_CONFIG;
+if(FIREBASE_CONFIG && !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
 const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
@@ -24,7 +16,7 @@ const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
 // Every other class gets its own separate lists, students and leaderboards
 // under classes/<classId>, and starts empty until its teacher adds words.
 let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
-let classSpaceId = '';
+let classSpaceId = '', resolvedStudentClassId='';
 const LEGACY_CLASS_IDS = ['et','wt'];
 function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}
 async function resolveStudentSpace(studentId){
@@ -37,12 +29,13 @@ async function resolveStudentSpace(studentId){
     const match=valid.find(m=>m.classId===stored)||valid.find(m=>LEGACY_CLASS_IDS.includes(m.classId))||valid[0];
     classId=match?String(match.classId):'';
   }catch(err){console.warn('Could not read class membership',err);}
+  resolvedStudentClassId=classId;
   const isClassSpace=!!classId&&!LEGACY_CLASS_IDS.includes(classId)&&/^[A-Za-z0-9_-]{1,100}$/.test(classId);
   const nextRoot=isClassSpace?`${SHORASHIM_BASE_ROOT}/classes/${classId}`:SHORASHIM_BASE_ROOT;
   classSpaceId=isClassSpace?classId:'';
   if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
 }
-const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+const STUDENT_REWARDS_AUTO_AWARD_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 let studentSiteOpen=true;
 function applyStudentSiteOpen(open){
   studentSiteOpen=teacherPreview||open!==false;
@@ -79,7 +72,18 @@ function recomputeSiteOpen(){
 let studentSiteWatchRef=null;
 function startStudentSiteWatcher(){
   if(studentSiteWatchRef)studentSiteWatchRef.off();
-  studentSiteWatchRef=cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`);
+  let path=`${CLOUD_ROOT}/settings/studentSiteOpen`;
+  if(!classSpaceId&&LEGACY_CLASS_IDS.includes(resolvedStudentClassId)){
+    const classPath=`${SHORASHIM_BASE_ROOT}/classes/${resolvedStudentClassId}/settings/studentSiteOpen`;
+    const classRef=cloudDb.ref(classPath),baseRef=cloudDb.ref(`${SHORASHIM_BASE_ROOT}/settings/studentSiteOpen`);
+    let classValue,baseValue,ready=0;
+    const apply=()=>{if(ready<2)return;ownSettingOpen=classValue!==undefined?classValue!==false:baseValue!==false;ownWatcherReady=true;recomputeSiteOpen();};
+    classRef.on('value',snap=>{classValue=snap.exists()?snap.val():undefined;ready++;apply();},()=>{classValue=undefined;ready++;apply();});
+    baseRef.on('value',snap=>{baseValue=snap.val();ready++;apply();},()=>{baseValue=true;ready++;apply();});
+    studentSiteWatchRef={off(){classRef.off();baseRef.off();}};
+    return;
+  }
+  studentSiteWatchRef=cloudDb.ref(path);
   studentSiteWatchRef.on('value',snap=>{
     ownSettingOpen = snap.exists()?snap.val():true;
     ownWatcherReady = true;
@@ -113,6 +117,8 @@ let teacherPreview = false;
 let cloudSaveTimer = null;
 let appStarted = false;
 let classMatchLeaderboard = {};
+let matchLeaderboardRef = null;
+let matchLeaderboardHandler = null;
 let cloudListenersStarted = false;
 
 const DB_KEY = 'shorashimLearningLabV2';
@@ -148,6 +154,8 @@ const DEFAULT_STUDENTS = ['Levik Bendet','Menachem Epstein','Binyomin Fischer','
 let db = loadDB();
 let currentStudent = db.currentStudent || Object.keys(db.students)[0];
 let currentTrack = 'shorashim';
+let learningPerek = 18; // A student chooses Perek 18, Perek 19, or the 3rd grade booklet.
+let bookletWeek = 1; // Each of the booklet's 30 weeks has six choices.
 let selectedItemKey = null;
 let selectedArtEl = null;
 let canvas, ctx, drawing = false, erasing = false, drawHistory = [];
@@ -204,11 +212,14 @@ async function saveGlobalConfig(){
 function student(){return db.students[currentStudent];}
 function keyFor(track,id){return `${track}:${id}`;}
 function splitKey(key){const i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)];}
-function getItem(key){const [track,id]=splitKey(key);return (db.catalog[track]||[]).find(x=>x.id===id)||null;}
+function bookletCatalog(){return Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM:[];}
+function getItem(key){const [track,id]=splitKey(key);return (db.catalog[track]||[]).find(x=>x.id===id)||(track==='shorashim'?bookletCatalog().find(x=>x.id===id):null)||null;}
 function commonnessOf(item){const n=Number(item?.commonness??item?.commonnessScore??item?.frequency);return Number.isFinite(n)?Math.max(1,Math.min(10,Math.round(n))):null;}
 function isTeacherApproved(item){const score=commonnessOf(item);return !score||score>=6||item?.teacherApproved===true||item?.approved===true;}
 function isStudentAvailable(item){return !!item&&!item.hidden&&isTeacherApproved(item);}
 function visibleCatalog(track){return (db.catalog[track]||[]).filter(isStudentAvailable);}
+function learningCatalog(track=currentTrack){const list=visibleCatalog(track);if(track!=='shorashim')return list;if(learningPerek==='booklet')return bookletCatalog().filter(item=>isStudentAvailable(item)&&(bookletWeek==='all'||item.bookletWeek===bookletWeek));return list.filter(item=>itemPerek(item)===learningPerek&&!item.bookletWeek);}
+function nextLearningUncreated(track=currentTrack,s=student()){return learningCatalog(track).find(item=>!s.cards[keyFor(track,item.id)])||null;}
 function labelTrack(track){return track==='shorashim'?'Shorashim':track==='prefix'?'Prefixes':'Suffixes';}
 function singularTrack(track){return track==='shorashim'?'Shoresh':track==='prefix'?'Prefix':'Suffix';}
 function fmtDuration(sec){sec=Math.max(0,Math.round(sec||0));const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);if(h)return `${h}h ${m}m`;if(m)return `${m}m`;return `${sec}s`;}
@@ -219,7 +230,7 @@ function learnedCards(s=student(),track=null,includeHidden=true){return Object.v
 function eligibleLearnedCards(s=student()){return learnedCards(s,null,false).filter(c=>!!getItem(c.itemKey));}
 function nextUncreated(track=currentTrack,s=student()){return visibleCatalog(track).find(item=>!s.cards[keyFor(track,item.id)])||null;}
 function isSessionNew(key,s=student()){return !!s.activeSession?.newCardIds.includes(key);}
-function canEditItem(key,s=student()){const [track]=splitKey(key),card=s.cards[key];if(track!==currentTrack)return false;if(card?.learnedAt)return true;return keyFor(track,nextUncreated(track,s)?.id||'')===key;}
+function canEditItem(key,s=student()){const [track]=splitKey(key),item=getItem(key);if(track!==currentTrack||!item)return false;return isStudentAvailable(item)||!!s.cards[key]?.learnedAt;}
 function recentCount(s,days=7){const cut=Date.now()-days*86400000;return Object.values(s.cards).filter(c=>c.learnedAt&&c.learnedAt>=cut&&!getItem(c.itemKey)?.hidden).length;}
 
 const COLOR_SWATCHES=['#1f2937','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#6366f1','#a855f7','#ec4899','#92400e','#ffffff'];
@@ -251,17 +262,32 @@ async function checkStudentAccess(name,pin){
   return {ok:true,slug,displayName:String(profile.name||name)};
 }
 
-async function loadClassLeaderboard(){
-  try{const snap=await cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).once('value');classMatchLeaderboard=snap.val()||{};}catch(err){console.warn('Could not load leaderboard',err);classMatchLeaderboard={};}
+// Only subscribe to the leaderboard for the Match game being played.
+function stopMatchLeaderboard(){
+  if(matchLeaderboardRef && matchLeaderboardHandler)matchLeaderboardRef.off('value',matchLeaderboardHandler);
+  matchLeaderboardRef=null;matchLeaderboardHandler=null;
+}
+function startMatchLeaderboard(pairCount){
+  stopMatchLeaderboard();
+  if(!cloudEnabled||!cloudStudentId)return;
+  const key=String(pairCount),ref=cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${key}`);
+  matchLeaderboardRef=ref;
+  matchLeaderboardHandler=snap=>{
+    if(matchLeaderboardRef!==ref)return;
+    classMatchLeaderboard[key]=snap.val()||{};
+    const panel=document.getElementById('matchLeaderboard');
+    if(panel&&activeScreenId==='gamesScreen'&&matchState?.pairCount===pairCount)panel.innerHTML=matchLeaderboardHTML(pairCount);
+  };
+  ref.on('value',matchLeaderboardHandler,err=>console.warn('Could not load Match leaderboard',err));
 }
 function startCloudListeners(){
   if(cloudListenersStarted)return;cloudListenersStarted=true;
   cloudDb.ref(`${CLOUD_ROOT}/catalog`).on('value',snap=>{const v=snap.val();if(!v)return;db.catalog=normalizeCatalogUnits(v);saveRaw(db);if(appStarted)renderAll();});
   cloudDb.ref(`${CLOUD_ROOT}/settings`).on('value',snap=>{const v=snap.val();if(!v)return;db.settings={minReviewMs:500,studentSiteOpen:true,...v};saveRaw(db);const sel=document.getElementById('minReviewTime');if(sel)sel.value=String(db.settings.minReviewMs||500);if(appStarted)renderAll();});
-  cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).on('value',snap=>{classMatchLeaderboard=snap.val()||{};if(matchState&&document.getElementById('matchLeaderboard'))document.getElementById('matchLeaderboard').innerHTML=matchLeaderboardHTML(matchState.pairCount);});
 }
 async function enterCloudStudent(name,studentId){
   setLoginMsg('Opening your cards…');setCloudStatus('☁️ Connecting…','syncing');
+  stopMatchLeaderboard();classMatchLeaderboard={};
   await resolveStudentSpace(studentId);
   // A class with its own lists must never fall back to B3's built-in words or this browser's cached copy.
   const cachedCatalog=classSpaceId?emptyCatalog():clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(classSpaceId?{}:(db.settings||{}))},cachedStudent=!classSpaceId&&db.students?.[name]?clone(db.students[name]):null;
@@ -276,7 +302,17 @@ async function enterCloudStudent(name,studentId){
   if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
   document.getElementById('loginGate').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('signedInStudentName').textContent=name;
   if(!appStarted){init();appStarted=true;}else{populateStudents();renderAll();goScreen('studentHome');}
-  showMode('student');setCloudStatus('☁️ Saved');scheduleCloudStudentSave();startCloudListeners();await loadClassLeaderboard();renderGamesLock();
+  showMode('student');startCloudListeners();renderGamesLock();
+  // Do not rewrite a student's entire cards/history just to mark a sign-in.
+  try{
+    const studentRef=cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`);
+    if(studentSnap.exists())await studentRef.update({name:s.name,lastActive:s.lastActive});
+    else await studentRef.set(s); // First login initializes a complete record once.
+    setCloudStatus('☁️ Saved');
+  }catch(err){
+    console.warn('Could not update Shorashim sign-in activity',err);
+    setCloudStatus('☁️ Save problem','error');
+  }
 }
 async function trySavedStudent(){
   const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
@@ -363,26 +399,68 @@ function bindCloudLogin(){
   waitForAccount();
 }
 
+// Follow destinations use the existing screens and never replace student records.
+const FOLLOW_SHORASHIM_SECTIONS=Object.freeze({review:'reviewScreen',learn:'shorashimPerekScreen',games:'gamesScreen',gallery:'galleryScreen',affixes:'affixHomeScreen'});
+function followAllowsScreen(id,track=currentTrack){
+  const section=window.FTTFollowStudent?.activityPolicy('shorashim')?.subdestination;
+  if(!section)return true;
+  if(section==='learn')return id==='shorashimPerekScreen'||id==='learnScreen'&&track==='shorashim';
+  if(section==='affixes')return id==='affixHomeScreen'||id==='learnScreen'&&['prefix','suffix'].includes(track);
+  return id===FOLLOW_SHORASHIM_SECTIONS[section];
+}
+function currentFollowSection(){
+  if(activeScreenId==='learnScreen')return currentTrack==='shorashim'?'learn':'affixes';
+  return Object.keys(FOLLOW_SHORASHIM_SECTIONS).find(key=>FOLLOW_SHORASHIM_SECTIONS[key]===activeScreenId)||'';
+}
+function applyFollowSection(section){
+  if(!Object.prototype.hasOwnProperty.call(FOLLOW_SHORASHIM_SECTIONS,section))return false;
+  const screen=FOLLOW_SHORASHIM_SECTIONS[section];
+  if(!screen||!followAllowsScreen(screen,section==='learn'?'shorashim':currentTrack))return false;
+  if(section==='learn')currentTrack='shorashim';
+  if(section==='review')currentTrack='shorashim';
+  goScreen(screen);
+  const url=new URL(location.href);url.searchParams.set('section',section);history.replaceState(null,'',url);
+  return true;
+}
+function initializeFollowDestination(){
+  window.FTTFollowActivities=window.FTTFollowActivities||{};
+  window.FTTFollowActivities.shorashim={currentSection:currentFollowSection,applySection:applyFollowSection};
+  applyFollowSection(new URL(location.href).searchParams.get('section'));
+}
+window.addEventListener('ftt:before-follow-navigation',event=>{
+  const cloudStatus=document.getElementById('cloudStatus');
+  if((activeScreenId==='learnScreen'&&window.__shorashimEditorDirty) || shorashimRecorder ||
+      document.getElementById('saveCardBtn')?.disabled ||
+      (cloudEnabled&&cloudStatus?.matches('.syncing,.error')))event.preventDefault();
+});
 function init(){
-  populateStudents();bindNavigation();bindModes();bindStudentDialog();bindSession();bindEditor();bindReview();bindGames();bindTeacher();initCanvas();bindActivityTracking();renderAll();startTicker();
+  populateStudents();bindNavigation();bindModes();bindStudentDialog();bindSession();bindEditor();bindReview();bindGames();bindTeacher();initCanvas();bindActivityTracking();renderAll();startTicker();initializeFollowDestination();
 }
 function populateStudents(){const sel=document.getElementById('studentSelect');sel.innerHTML='';Object.keys(db.students).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});if(!db.students[currentStudent])currentStudent=Object.keys(db.students)[0];sel.value=currentStudent;sel.onchange=()=>{currentStudent=sel.value;selectedItemKey=null;reviewDeck=[];saveDB();renderAll();goScreen('studentHome');};}
 function bindNavigation(){
   document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>{
-    const requested=btn.dataset.track;if(requested){currentTrack=requested;}
+    if(!followAllowsScreen(btn.dataset.go,btn.dataset.track||currentTrack))return;
+    const requested=btn.dataset.track;if(requested&&requested!==currentTrack){currentTrack=requested;selectedItemKey=null;}
     goScreen(btn.dataset.go);
   }));
   document.querySelectorAll('.backBtn').forEach(b=>b.onclick=()=>goScreen('studentHome'));
+  document.querySelectorAll('[data-learning-perek]').forEach(btn=>btn.onclick=()=>chooseLearningPerek(btn.dataset.learningPerek));
+  const changePerek=document.getElementById('changeLearningPerekBtn');
+  if(changePerek)changePerek.onclick=()=>goScreen('shorashimPerekScreen');
+  const weekSelect=document.getElementById('bookletWeekSelect');
+  if(weekSelect)weekSelect.onchange=()=>{bookletWeek=weekSelect.value==='all'?'all':Number(weekSelect.value);selectedItemKey=null;renderLearningScreen();};
 }
-function goScreen(id){if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
+function goScreen(id){if(!followAllowsScreen(id))return;if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
 function bindModes(){document.getElementById('studentModeBtn').onclick=()=>showMode('student');document.getElementById('teacherModeBtn').onclick=()=>showMode('teacher');}
 function showMode(mode){const studentMode=mode==='student';document.getElementById('studentView').classList.toggle('hidden',!studentMode);document.getElementById('teacherView').classList.toggle('hidden',studentMode);document.getElementById('studentModeBtn').classList.toggle('active',studentMode);document.getElementById('teacherModeBtn').classList.toggle('active',!studentMode);if(!studentMode)renderTeacher();}
 function bindStudentDialog(){const dlg=document.getElementById('addStudentDialog');document.getElementById('addStudentBtn').onclick=()=>dlg.showModal();document.getElementById('confirmAddStudent').onclick=e=>{e.preventDefault();const inp=document.getElementById('newStudentName'),name=inp.value.trim();if(!name)return;if(!db.students[name])db.students[name]=blankStudent();currentStudent=name;inp.value='';dlg.close();saveDB();populateStudents();renderAll();};}
 
 function bindSession(){}
-function renderLearningScreen(){document.getElementById('learnHeading').textContent=`Learn & Edit ${labelTrack(currentTrack)}`;document.getElementById('pathTitle').textContent=`Your ${labelTrack(currentTrack)}`;renderSession();renderWordList();if(!selectedItemKey){const next=nextUncreated(currentTrack);if(next)loadEditorItem(keyFor(currentTrack,next.id));else{const learned=learnedCards(student(),currentTrack,false);if(learned.length)loadEditorItem(learned[learned.length-1].itemKey);else showNoMoreItems();}}}
+function renderPerekChoices(){const s=student(),list=visibleCatalog('shorashim');document.querySelectorAll('[data-learning-perek]').forEach(btn=>{const value=btn.dataset.learningPerek,words=value==='booklet'?bookletCatalog():list.filter(item=>itemPerek(item)===Number(value)),learned=words.filter(item=>s.cards[keyFor('shorashim',item.id)]?.learnedAt).length,count=btn.querySelector('.perek-progress');if(count)count.textContent=words.length?`${learned} of ${words.length} learned`:'No words assigned yet';});}
+function chooseLearningPerek(value){if(!followAllowsScreen('learnScreen','shorashim'))return;const choice=value==='booklet'?'booklet':Number(value);if(choice!=='booklet'&&choice!==18&&choice!==19)return;currentTrack='shorashim';learningPerek=choice;selectedItemKey=null;goScreen('learnScreen');}
+function renderLearningScreen(){const isShorashim=currentTrack==='shorashim',isBooklet=isShorashim&&learningPerek==='booklet',label=isBooklet?`3rd Grade Booklet • ${bookletWeek==='all'?'All Weeks':`Week ${bookletWeek}`}`:isShorashim?`Perek ${learningPerek===19?'י״ט':'י״ח'} Shorashim`:labelTrack(currentTrack);document.getElementById('learnHeading').textContent=`Learn & Edit ${label}`;document.getElementById('pathTitle').textContent=`Your ${label}`;document.getElementById('changeLearningPerekBtn')?.classList.toggle('hidden',!isShorashim);document.getElementById('bookletWeekWrap')?.classList.toggle('hidden',!isBooklet);const weekSelect=document.getElementById('bookletWeekSelect');if(weekSelect&&isBooklet)weekSelect.value=String(bookletWeek);const list=learningCatalog(currentTrack);if(selectedItemKey&&!list.some(item=>keyFor(currentTrack,item.id)===selectedItemKey))selectedItemKey=null;renderSession();renderWordList();if(!selectedItemKey){const next=nextLearningUncreated(currentTrack);if(next)loadEditorItem(keyFor(currentTrack,next.id));else{const learned=list.filter(item=>student().cards[keyFor(currentTrack,item.id)]?.learnedAt);if(learned.length)loadEditorItem(keyFor(currentTrack,learned[learned.length-1].id));else showNoMoreItems();}}}
 function renderSession(){document.getElementById('startSessionPanel')?.classList.add('hidden');document.getElementById('learnWorkspace')?.classList.remove('hidden');const status=document.getElementById('sessionStatus');if(status)status.textContent='Cards save as you go';const footer=document.querySelector('#learnWorkspace .session-footer');if(footer)footer.classList.add('hidden');}
-function renderWordList(){const box=document.getElementById('wordList'),s=student(),list=db.catalog[currentTrack]||[],visible=list.filter(isStudentAvailable),next=nextUncreated(currentTrack,s),created=visible.filter(i=>s.cards[keyFor(currentTrack,i.id)]).length;document.getElementById('availableCount').textContent=`${created} / ${visible.length} learned`;box.innerHTML='';list.forEach(item=>{if(!isStudentAvailable(item))return;const key=keyFor(currentTrack,item.id),c=s.cards[key],isNext=next?.id===item.id,editable=canEditItem(key,s),b=document.createElement('button');b.type='button';let cls='word-row',status='🔒 Locked';if(c?.learnedAt){cls+=' learned';status='Learned • Edit';}else if(isNext){cls+=' current';status='NEXT';}else cls+=' locked';if(selectedItemKey===key)cls+=' active';b.className=cls;b.disabled=!editable;b.innerHTML=`<div class="hebrew">${escapeHTML(item.front)}</div><div class="meta"><span>${escapeHTML(item.english)}${currentTrack==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span><span>${status}</span></div>`;if(editable)b.onclick=()=>loadEditorItem(key);box.appendChild(b);});}
+function renderWordList(){const box=document.getElementById('wordList'),s=student(),list=learningCatalog(currentTrack),created=list.filter(i=>s.cards[keyFor(currentTrack,i.id)]?.learnedAt).length;document.getElementById('availableCount').textContent=`${created} / ${list.length} learned`;box.innerHTML='';list.forEach(item=>{const key=keyFor(currentTrack,item.id),c=s.cards[key],b=document.createElement('button');b.type='button';let cls='word-row',status='Choose • Learn';if(c?.learnedAt){cls+=' learned';status='Learned • Edit';}else{cls+=' available';}if(selectedItemKey===key)cls+=' active';b.className=cls;b.innerHTML=`<div class="hebrew">${escapeHTML(item.front)}</div><div class="meta"><span>${escapeHTML(item.english)}${currentTrack==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span><span>${status}</span></div>`;b.onclick=()=>loadEditorItem(key);box.appendChild(b);});}
 
 function markShorashimEditorDirty(){window.__shorashimEditorDirty=true;}
 function bindEditor(){
@@ -449,7 +527,8 @@ function setExamples(item){const teach=document.getElementById('exampleTeachingB
 function highlightExample(x){let h=escapeHTML(x.hebrew);if(!x.highlight)return h;const mark=escapeHTML(x.highlight);const idx=h.indexOf(mark);if(idx<0)return h;return h.slice(0,idx)+`<span class="affix-mark">${mark}</span>`+h.slice(idx+mark.length);}
 function pictureSvg(kind,label){const drawings={cane:'<path d="M62 18c22 0 22 27 3 27H50v49"/><path d="M50 94h-9"/>',door:'<path d="M28 92V18h48v74M38 92V29h28v63"/><circle cx="60" cy="60" r="2"/>',eye:'<path d="M12 55s15-25 38-25 38 25 38 25-15 25-38 25S12 55 12 55Z"/><circle cx="50" cy="55" r="11"/>',tree:'<path d="M50 88V57"/><path d="M50 62c-21 8-33-12-19-23-5-20 23-29 31-12 21-5 29 22 12 33-7 5-16 5-24 2Z"/>',water:'<path d="M50 12C38 31 25 45 25 62a25 25 0 0 0 50 0c0-17-13-31-25-50Z"/>',sun:'<circle cx="50" cy="50" r="19"/><path d="M50 8v13M50 79v13M8 50h13M79 50h13M20 20l9 9M71 71l9 9M80 20l-9 9M29 71l-9 9"/>',book:'<path d="M12 22c18-5 30 1 38 9v55c-8-8-20-14-38-9ZM88 22c-18-5-30 1-38 9v55c8-8 20-14 38-9Z"/>',arrow:'<path d="M13 50h68M62 31l19 19-19 19"/>',clock:'<circle cx="50" cy="50" r="36"/><path d="M50 28v23l16 10"/>',home:'<path d="M12 49 50 17l38 32M24 44v43h52V44M42 87V63h16v24"/>',speech:'<path d="M14 18h72v52H48L28 86V70H14Z"/><path d="M29 39h42M29 51h30"/>',default:'<circle cx="50" cy="50" r="34"/><path d="m31 52 12 12 27-31"/>'};const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#fff8dc"/><g fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${drawings[kind]||drawings.default}</g></svg>`;return{src:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg),label};}
 function semanticIllustrations(item){const text=`${item?.english||''} ${item?.front||''}`.toLowerCase(),out=[];const add=(kind,label)=>{if(!out.some(x=>x.label===label))out.push(pictureSvg(kind,label));};if(/old|aged|זק/.test(text))add('cane','Walking stick');if(/door|gate|entrance|פתח|דלת/.test(text))add('door','Doorway');if(/see|look|eye|ראה|עין/.test(text))add('eye','Eye');if(/tree|grove|wood|עץ|אלון/.test(text))add('tree','Tree');if(/water|wash|rain|מים|רחץ/.test(text))add('water','Water drop');if(/sun|day|heat|שמש|יום|חם/.test(text))add('sun','Sun');if(/book|learn|read|ספר/.test(text))add('book','Open book');if(/go|come|pass|return|toward|הלך|בא|עבר|שב/.test(text))add('arrow','Direction arrow');if(/time|hour|עת/.test(text))add('clock','Clock');if(/house|home|tent|בית|אהל/.test(text))add('home','Home');if(/say|speak|call|אמר|דבר|קרא/.test(text))add('speech','Speech bubble');if(!out.length)add('default','Simple symbol');return out;}
-function renderArtChoices(item){const emojis=document.getElementById('emojiChoices'),ills=document.getElementById('illustrationChoices');emojis.innerHTML='';ills.innerHTML='';(item.art||[]).forEach(value=>{const b=document.createElement('button');b.type='button';b.className='art-choice';b.textContent=value;b.title='Emoji picture';b.onclick=()=>addArtToEditor({kind:'emoji',value,label:value});emojis.appendChild(b);});const choices=[...(item.id?ILLUSTRATIONS[item.id]||[]:[]),...semanticIllustrations(item)];choices.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='art-choice';b.title=a.label;b.innerHTML=`<img src="${a.src}" alt="${escapeHTML(a.label)}">`;b.onclick=()=>addArtToEditor({kind:'illustration',value:a.src,label:a.label});ills.appendChild(b);});}
+function isTeacherScreenshotArt(value){try{const url=new URL(String(value||''));return url.protocol==='https:'&&url.hostname==='firebasestorage.googleapis.com'&&url.pathname.startsWith('/v0/b/b3-games.firebasestorage.app/o/shorashim-teacher-pictures%2F');}catch(_){return false;}}
+function renderArtChoices(item){const emojis=document.getElementById('emojiChoices'),ills=document.getElementById('illustrationChoices');emojis.innerHTML='';ills.innerHTML='';(item.art||[]).forEach(value=>{const b=document.createElement('button');b.type='button';b.className='art-choice';if(isTeacherScreenshotArt(value)){b.title='Teacher screenshot';const img=document.createElement('img');img.src=value;img.alt='Teacher screenshot';b.appendChild(img);b.onclick=()=>addArtToEditor({kind:'illustration',value,label:'Teacher screenshot'});ills.appendChild(b);}else{b.textContent=value;b.title='Emoji picture';b.onclick=()=>addArtToEditor({kind:'emoji',value,label:value});emojis.appendChild(b);}});const choices=[...(item.id?ILLUSTRATIONS[item.id]||[]:[]),...semanticIllustrations(item)];choices.forEach(a=>{const b=document.createElement('button');b.type='button';b.className='art-choice';b.title=a.label;b.innerHTML=`<img src="${a.src}" alt="${escapeHTML(a.label)}">`;b.onclick=()=>addArtToEditor({kind:'illustration',value:a.src,label:a.label});ills.appendChild(b);});}
 function renderEditorArts(arts){const layer=document.getElementById('approvedArtLayer');layer.innerHTML='';selectedArtEl=null;(arts||[]).forEach(a=>addArtToEditor(a,true));}
 function addArtToEditor(spec,fromSaved=false){const layer=document.getElementById('approvedArtLayer'),count=layer.children.length,presets=[[50,70],[28,68],[72,68],[38,80],[62,80]],p=presets[count%presets.length];const a={kind:spec.kind||'emoji',value:spec.value||'',label:spec.label||'',left:spec.left??p[0],top:spec.top??p[1],size:spec.size??(spec.kind==='illustration'?180:126)};const el=document.createElement('div');el.className='art-item '+a.kind;el.dataset.kind=a.kind;el.dataset.value=a.value;el.dataset.label=a.label;el.dataset.size=a.size;el.style.left=a.left+'%';el.style.top=a.top+'%';if(a.kind==='illustration'){const img=document.createElement('img');img.src=a.value;img.alt=a.label;img.draggable=false;img.style.pointerEvents='none';el.appendChild(img);}else el.textContent=a.value;applyArtSize(el);el.style.touchAction='none';el.style.cursor='grab';makeDraggable(el,document.getElementById('frontCard'),()=>selectArt(el));el.onclick=e=>{selectArt(el);e.stopPropagation();};layer.appendChild(el);if(!fromSaved)selectArt(el);}
 function selectArt(el){document.querySelectorAll('#approvedArtLayer .art-item').forEach(x=>x.classList.remove('selected'));selectedArtEl=el;const control=document.getElementById('artSize');if(control){control.disabled=!el;if(el)control.value=String(el.dataset.size||84);}if(el)el.classList.add('selected');}
@@ -496,7 +575,7 @@ s.cards[selectedItemKey]={itemKey:selectedItemKey,itemType:existing?.itemType||c
 s.lastActive=Date.now();saveDB();renderWordList();renderStudentStats();window.__shorashimEditorDirty=false;
 if(isGuestPreview()&&!nextUncreated('shorashim')&&!nextUncreated('prefix')&&!nextUncreated('suffix'))setTimeout(()=>window.B3Guest.unlock('Sign in to unlock','You tried all the free sample cards. Sign in to learn the full list of shorashim.'),700);
 if(redesigning){document.getElementById('sessionStatus').textContent='Changes saved ✓';renderGallery();return;}
-const next=nextUncreated(currentTrack,s);if(next)loadEditorItem(keyFor(currentTrack,next.id));else showNoMoreItems();
+const list=learningCatalog(currentTrack),index=list.findIndex(x=>x.id===item.id),following=[...list.slice(index+1),...list.slice(0,index+1)];const next=following.find(x=>!s.cards[keyFor(currentTrack,x.id)]);if(next)loadEditorItem(keyFor(currentTrack,next.id));else showNoMoreItems();
 }finally{btn.disabled=false;btn.textContent=oldLabel;}
 }
 function resetCurrentDesign(){if(!selectedItemKey)return;const item=getItem(selectedItemKey),d=defaultDesign();document.getElementById('hebrewSize').value=d.hebrewSize;document.getElementById('hebrewFont').value=d.hebrewFont;document.getElementById('hebrewColor').value=d.hebrewColor;document.getElementById('englishSize').value=d.englishSize;document.getElementById('englishFont').value=d.englishFont;document.getElementById('englishColor').value=d.englishColor;document.getElementById('backgroundColor').value=d.backgroundColor;document.getElementById('hebrewText').style.left=d.hebrewPos.left+'%';document.getElementById('hebrewText').style.top=d.hebrewPos.top+'%';document.getElementById('englishText').style.left=d.englishPos.left+'%';document.getElementById('englishText').style.top=d.englishPos.top+'%';renderEditorArts([]);clearCanvas(false);applyEditorControls();setExamples(item);}
@@ -512,8 +591,8 @@ function undoDrawing(){const src=drawHistory.pop();if(src===undefined)return;ctx
 function loadDrawing(src){if(!src)return;const img=new Image();img.crossOrigin='anonymous';img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);img.src=src;}
 
 let reviewPerekFilter='all';
-function itemPerek(item){return Number(item?.perek)||18;}
-function reviewFilterLabel(item){return itemPerek(item)===19?'Perek י״ט':'Perek י״ח';}
+function itemPerek(item){return item?.bookletWeek?0:Number(item?.perek)||18;}
+function reviewFilterLabel(item){return item?.bookletWeek?`Week ${item.bookletWeek}`:itemPerek(item)===19?'Perek י״ט':'Perek י״ח';}
 function ensureDailyReview(s=student()){const t=todayKey();if(s.dailyReview?.date!==t)s.dailyReview={date:t,seen:{},completedAt:null};else if(!s.dailyReview.seen)s.dailyReview.seen={};return s.dailyReview;}
 function dailyProgress(s=student()){const dr=ensureDailyReview(s),keys=eligibleLearnedCards(s).map(c=>c.itemKey),seen=keys.filter(k=>dr.seen[k]).length,complete=keys.length>0&&seen===keys.length;if(complete&&!dr.completedAt)dr.completedAt=Date.now();return {seen,total:keys.length,complete};}
 function gamesUnlocked(s=student()){return true;}
@@ -536,7 +615,7 @@ function bindReview(){
   document.getElementById('reviewSort').onchange=renderReviewPicker;document.getElementById('selectAllReview').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=true);updateReviewSelectionCount();};document.getElementById('clearReviewSelection').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=false);updateReviewSelectionCount();};
   document.addEventListener('keydown',e=>{if(activeScreenId!=='reviewScreen'||document.getElementById('reviewArea').classList.contains('hidden')||!reviewDeck.length)return;if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();moveReview(1);}else if(e.key==='ArrowLeft'){e.preventDefault();moveReview(-1);}else if(e.key==='ArrowUp'){e.preventDefault();flipReview();}});
 }
-function reviewSortedCards(){let arr=eligibleLearnedCards().slice();if(reviewPerekFilter!=='all')arr=arr.filter(c=>c.itemType==='shorashim'&&itemPerek(getItem(c.itemKey))===Number(reviewPerekFilter));let mode=document.getElementById('reviewSort')?.value||'learned';if(mode==='alpha')arr.sort((a,b)=>(getItem(a.itemKey)?.front||'').localeCompare(getItem(b.itemKey)?.front||'','he'));else if(mode==='manual')arr.sort((a,b)=>(a.reviewOrder??a.learnedAt)-(b.reviewOrder??b.learnedAt));else arr.sort((a,b)=>a.learnedAt-b.learnedAt);return arr;}
+function reviewSortedCards(){let arr=eligibleLearnedCards().slice();if(reviewPerekFilter!=='all')arr=arr.filter(c=>c.itemType==='shorashim'&&(reviewPerekFilter==='booklet'?!!getItem(c.itemKey)?.bookletWeek:itemPerek(getItem(c.itemKey))===Number(reviewPerekFilter)));let mode=document.getElementById('reviewSort')?.value||'newest';if(mode==='alpha')arr.sort((a,b)=>(getItem(a.itemKey)?.front||'').localeCompare(getItem(b.itemKey)?.front||'','he'));else if(mode==='manual')arr.sort((a,b)=>(a.reviewOrder??a.learnedAt)-(b.reviewOrder??b.learnedAt));else if(mode==='newest')arr.sort((a,b)=>b.learnedAt-a.learnedAt);else arr.sort((a,b)=>a.learnedAt-b.learnedAt);return arr;}
 function renderReviewPicker(){const box=document.getElementById('reviewPicker'),arr=reviewSortedCards(),manual=document.getElementById('reviewSort').value==='manual';box.innerHTML='';arr.forEach(c=>{const item=getItem(c.itemKey),row=document.createElement('div');row.className='review-pick-row'+(manual?' manual-draggable':'');row.dataset.key=c.itemKey;row.draggable=manual;row.innerHTML=`<label><input class="review-pick-check" type="checkbox" data-key="${escapeHTML(c.itemKey)}" checked> <b class="hebrew">${escapeHTML(item.front)}</b><span>${escapeHTML(item.english)}${c.itemType==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span>${manual?'<span class="review-drag-hint">↕ Drag to reorder</span>':''}</label>`;box.appendChild(row);});box.querySelectorAll('.review-pick-check').forEach(x=>x.onchange=updateReviewSelectionCount);if(manual)bindReviewDragDrop(box);updateReviewSelectionCount();}
 function bindReviewDragDrop(box){let dragged=null;box.querySelectorAll('.review-pick-row').forEach(row=>{row.addEventListener('dragstart',e=>{if(e.target.closest('input')){e.preventDefault();return}dragged=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.key)});row.addEventListener('dragend',()=>{row.classList.remove('dragging');box.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));dragged=null});row.addEventListener('dragover',e=>{if(!dragged||dragged===row)return;e.preventDefault();row.classList.add('drag-over')});row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-over');if(!dragged||dragged===row)return;const rows=[...box.querySelectorAll('.review-pick-row')],from=rows.indexOf(dragged),to=rows.indexOf(row);if(from<to)row.after(dragged);else row.before(dragged);saveManualReviewOrderFromGrid(box)});});}
 function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pick-row')].forEach((row,n)=>{const c=student().cards[row.dataset.key];if(c)c.reviewOrder=n});saveDB();}
@@ -622,7 +701,10 @@ async function toggleShorashimRecording(){
         await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
 
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
-        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
+        const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
+        if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');
+        const idToken=await user.getIdToken();
+        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
         const awardData=await awardResp.json().catch(()=>({}));
         if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
@@ -664,12 +746,12 @@ function bindGames(){document.querySelectorAll('.game-choice').forEach(b=>b.oncl
 function renderGamesLock(){const unlocked=gamesUnlocked();document.getElementById('gamesLockedPanel').classList.toggle('hidden',unlocked);document.getElementById('gamesUnlockedPanel').classList.toggle('hidden',!unlocked);if(!unlocked){cleanupGameRuntime();document.getElementById('gameStage').classList.add('hidden');}}
 function focusGameStage(){requestAnimationFrame(()=>document.getElementById('gameStage')?.scrollIntoView({block:'start'}));}
 function renderHomeGameState(){const card=document.getElementById('gamesHomeCard'),msg=document.getElementById('gamesHomeMessage');if(card)card.classList.remove('locked');if(msg)msg.textContent='Choose a practice game.';}
-function cleanupGameRuntime(){if(gameTimer){clearInterval(gameTimer);gameTimer=null;}if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}if(whackState?.moleTimer){clearTimeout(whackState.moleTimer);whackState.moleTimer=null;}if(gameAnimationFrame){cancelAnimationFrame(gameAnimationFrame);gameAnimationFrame=null;}const stage=document.getElementById('gameStage');if(stage){stage.onpointermove=null;stage.onpointerdown=null;}}
+function cleanupGameRuntime(){stopMatchLeaderboard();if(gameTimer){clearInterval(gameTimer);gameTimer=null;}if(raceQuestionTimer){clearInterval(raceQuestionTimer);raceQuestionTimer=null;}if(whackState?.moleTimer){clearTimeout(whackState.moleTimer);whackState.moleTimer=null;}if(gameAnimationFrame){cancelAnimationFrame(gameAnimationFrame);gameAnimationFrame=null;}const stage=document.getElementById('gameStage');if(stage){stage.onpointermove=null;stage.onpointerdown=null;}}
 function formatGameTime(ms){const sec=Math.max(0,ms)/1000;return sec<60?`${sec.toFixed(1)}s`:`${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}.${Math.floor((sec%1)*10)}`;}
 function finishGame(){student().gamesPlayed++;student().lastActive=Date.now();saveDB();renderStudentStats();}
 
 const MATCH_PAIR_COUNT=8;
-function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};renderMatchGame();focusGameStage();startMatchClock();}
+function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};startMatchLeaderboard(pairCount);renderMatchGame();focusGameStage();startMatchClock();}
 function startMatchClock(){if(gameTimer)clearInterval(gameTimer);gameTimer=setInterval(()=>{const el=document.getElementById('matchTimer');if(el&&matchState&&!matchState.finished)el.textContent=formatGameTime(performance.now()-matchState.startedAt);},100);}
 function matchLeaderboardHTML(pairCount){const rows=classMatchLeaderboard[String(pairCount)]||{};const entries=Object.entries(rows).map(([id,x])=>({id,name:x.name||id,time:Number(x.time)})).filter(x=>Number.isFinite(x.time)).sort((a,b)=>a.time-b.time).slice(0,8);if(!entries.length)return '<div class="mini-note">No leaderboard times yet. Finish a round to set the first time!</div>';return `<div class="leaderboard"><div class="leaderboard-title">🏆 ${pairCount}-pair class leaderboard</div>${entries.map((x,i)=>`<div class="leaderboard-row${x.id===cloudStudentId?' current':''}"><span>${i+1}. ${escapeHTML(x.name)}</span><b>${formatGameTime(x.time)}</b></div>`).join('')}</div>`;}
 function saveMatchBest(pairCount,time){const s=student(),k=String(pairCount),old=s.gameBests.match[k],improved=!Number.isFinite(old)||time<old;if(improved)s.gameBests.match[k]=time;if(improved&&cloudEnabled&&cloudStudentId){classMatchLeaderboard[k]=classMatchLeaderboard[k]||{};classMatchLeaderboard[k][cloudStudentId]={name:cloudStudentName||currentStudent,time,updatedAt:Date.now()};cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${k}/${cloudStudentId}`).set(classMatchLeaderboard[k][cloudStudentId]).catch(err=>console.warn('Leaderboard save failed',err));}}
@@ -700,7 +782,7 @@ function answerRace(card,b){if(raceState.locked)return;raceState.locked=true;if(
 function finishRaceGame(){if(raceState.finished)return;raceState.finished=true;cleanupGameRuntime();const won=raceState.studentPos>=100||raceState.studentPos>raceState.computerPos,stage=document.getElementById('gameStage');stage.innerHTML=`<div class="game-finish"><div class="finish-icon">${won?'🏆':'🏁'}</div><h3>${won?'You won the race!':'Race finished!'}</h3><p>You: <b>${Math.round(raceState.studentPos)}%</b> • Computer: <b>${Math.round(raceState.computerPos)}%</b></p><button id="raceAgain" class="primary">Race Again</button></div>`;document.getElementById('raceAgain').onclick=startRaceGame;finishGame();}
 
 function renderStudentStats(){const s=student(),p=dailyProgress(s),sh=learnedCards(s,'shorashim',false).length,aff=learnedCards(s,'prefix',false).length+learnedCards(s,'suffix',false).length;document.getElementById('studentStats').innerHTML=[[`Shorashim learned`,sh],[`Prefixes & suffixes`,aff],[`Reviewed today`,p.total?`${p.seen}/${p.total}`:'0'],[`Games`,'Available']].map(([l,v])=>`<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');renderHomeGameState();}
-function openRedesignCard(itemKey){const s=student(),card=s.cards[itemKey];if(!card?.learnedAt)return;currentTrack=card.itemType;window.__shorashimRedesignMode=true;window.__shorashimRedesignKey=itemKey;selectedItemKey=itemKey;goScreen('learnScreen');}
+function openRedesignCard(itemKey){const s=student(),card=s.cards[itemKey];if(!card?.learnedAt||!followAllowsScreen('learnScreen',card.itemType))return;currentTrack=card.itemType;if(currentTrack==='shorashim'){const item=getItem(itemKey);learningPerek=item?.bookletWeek?'booklet':itemPerek(item);if(item?.bookletWeek)bookletWeek=item.bookletWeek;}window.__shorashimRedesignMode=true;window.__shorashimRedesignKey=itemKey;selectedItemKey=itemKey;goScreen('learnScreen');}
 function renderGallery(target='galleryGrid',s=student()){const box=document.getElementById(target);if(!box)return;const cards=Object.values(s.cards).sort((a,b)=>b.createdAt-a.createdAt);if(!cards.length){box.innerHTML='<div class="card-panel empty-state">No cards created yet.</div>';return;}const studentGallery=target==='galleryGrid';box.innerHTML=cards.map(c=>galleryHTML(c,studentGallery)).join('');if(studentGallery)box.querySelectorAll('[data-redesign-key]').forEach(btn=>btn.onclick=()=>openRedesignCard(btn.dataset.redesignKey));}
 function galleryHTML(c,allowRedesign=false){const item=getItem(c.itemKey);if(!item)return '';const d=normalizeDesign(c.design),ex=(item.examples||[]).slice(0,2).map(x=>escapeHTML(x.hebrew)).join('<br>'),edit=allowRedesign&&c.learnedAt?`<button type="button" class="ghost small" data-redesign-key="${escapeHTML(c.itemKey)}">✏️ Redesign</button>`:'';return `<div class="gallery-item"><div class="gallery-card" style="background:${d.backgroundColor}"><div class="g-hebrew" style="font-family:${d.hebrewFont};color:${d.hebrewColor};left:${d.hebrewPos.left}%;top:${d.hebrewPos.top}%">${escapeHTML(item.front)}</div><div class="g-examples">${ex}</div><div class="gallery-art-layer">${galleryArtsHTML(d.arts)}</div>${d.drawing?`<img class="g-drawing" src="${d.drawing}" alt="drawing">`:''}</div><div class="g-meta"><span>${singularTrack(c.itemType)}${c.itemType==='shorashim'?` • ${reviewFilterLabel(item)}`:''}${item.pasuk?` • Pasuk ${item.pasuk}`:''}</span><span>${c.learnedAt?'Learned '+fmtDate(c.learnedAt):'New'}</span></div>${edit}</div>`;}
 function galleryArtsHTML(arts){return (arts||[]).map(a=>{const size=(a.size||84)*.52,common=`left:${a.left??50}%;top:${a.top??66}%;`;if(a.kind==='illustration')return `<div class="art-item illustration" style="${common}width:${size}px;height:${size*.68}px"><img src="${escapeHTML(a.value)}" alt="${escapeHTML(a.label||'illustration')}"></div>`;return `<div class="art-item emoji" style="${common}font-size:${size}px">${a.value||''}</div>`;}).join('');}

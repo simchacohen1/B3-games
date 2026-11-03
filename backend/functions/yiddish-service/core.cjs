@@ -4,7 +4,7 @@ const words=require('./words.json');
 const studentTools=require('../student-tool-policy.js');
 const vm=require('node:vm'),fs=require('node:fs');
 const sandbox={window:{},Intl,Date,console};vm.runInNewContext(fs.readFileSync(__dirname+'/site-policy.js','utf8'),sandbox);const policy=sandbox.window.B3SiteSettings;
-const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
+const fail=(code,message,details)=>{throw Object.assign(new Error(message),{code},details?{details}:{})};
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
 const random=()=>crypto.randomBytes(24).toString('hex');
 const defaults=()=>({version:0,unlocked:{et:0,wt:0},sections:[0,1,2,3].map((g)=>({start:g*300,end:g===3?1194:(g+1)*300,first:[0,10,17,26][g],last:[9,16,25,35][g],verified:false,words:words.filter(w=>w.group===g).map(w=>w.id)}))});
@@ -12,6 +12,12 @@ const WORKSPACE='b3-2026';
 const validKey=v=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v);
 
 function validateConfig(c){if(!c||!Number.isInteger(c.version)||c.version<0||!Array.isArray(c.sections)||c.sections.length!==4)fail(400,'Invalid lesson settings.');for(const t of Object.keys(c.unlocked||{}))if(!Number.isInteger(c.unlocked?.[t])||c.unlocked[t]<0||c.unlocked[t]>4)fail(400,'Choose 0–4 open sections.');let end=0,last=-1;const ids=new Set();c.sections.forEach((s,i)=>{if(!Number.isFinite(s.start)||!Number.isFinite(s.end)||s.start!==end||s.end<=s.start||s.end>1194||!Number.isInteger(s.first)||!Number.isInteger(s.last)||s.first!==last+1||s.last<s.first||s.last>35||typeof s.verified!=='boolean'||!Array.isArray(s.words)||s.words.length<1||s.words.length>12)fail(400,'Sections must be continuous, with valid audio times, paragraphs, and 1–12 words.');s.words.forEach(id=>{if(!words.some(w=>w.id===id)||ids.has(id))fail(400,'Each word may be assigned only once.');ids.add(id)});if(Object.values(c.unlocked||{}).some(n=>n>i)&&!s.verified)fail(400,'Check the audio and words before unlocking this section.');end=s.end;last=s.last});if(end!==1194||last!==35)fail(400,'Sections must include the complete recording and transcript.');const totalSteps=c.sections.reduce((n,s)=>n+Math.max(1,Math.ceil(s.words.length/4)),0);for(const t of Object.keys(c.unlockedSteps||{}))if(!Number.isInteger(c.unlockedSteps[t])||c.unlockedSteps[t]<0||c.unlockedSteps[t]>totalSteps)fail(400,'Choose a valid number of open steps.');return c}
+const stepsInSection=s=>Math.max(1,Math.ceil(((s&&s.words)||[]).length/4));
+// Open steps for one track. unlockedSteps is authoritative; older records only
+// have unlocked (whole sections), so derive the steps from those.
+function stepsOpen(c,track){const n=c.unlockedSteps&&c.unlockedSteps[track];if(Number.isInteger(n))return n;let s=0;const secs=Array.isArray(c.sections)?c.sections:[];for(let k=0;k<Math.min(Number(c.unlocked?.[track])||0,secs.length);k++)s+=stepsInSection(secs[k]);return s}
+// Number of sections a student must be able to enter to reach the given step.
+function sectionsForSteps(sections,steps){let s=0,k=0;while(k<sections.length&&s<steps){s+=stepsInSection(sections[k]);k++}return k}
 function publicRound(r){if(!r)return null;return {id:r.id,group:r.group,part:Number.isInteger(r.part)?r.part:null,index:r.index,total:r.items.length,finished:r.index===r.items.length,question:r.items[r.index]||null}}
 function makeService(store,verifyTeacher,now=Date.now){
 const get=async p=>(await store.get(p));
@@ -37,6 +43,7 @@ function validateTimes(starts,ends){
  return {starts:r(starts),ends:r(ends)};
 }
 const storyGranted=async c=>legacy(c)||(validKey(c)&&(await get('b3Games/workspaces/'+WORKSPACE+'/contentGrants/'+c+'/'+STORY_GRANT))===true);
+const freshConfig=c=>{const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 const cfg=async c=>{const saved=await get(configPath(c));if(saved)return saved;const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 async function teacher(token,classId){
  const t=await verifyTeacher(token).catch(()=>null);
@@ -99,12 +106,69 @@ return async function handle(b,ip='unknown'){
    await store.set(TIMES_PATH,{...v,updatedAt:now()});
    return {ok:true,storyTimes:await storyTimes()};
   }
+  // IMPORTANT (Realtime Database transactions): the update function is first
+  // called with the server's *locally cached* value, which in Cloud Functions
+  // is usually null. Returning undefined aborts the transaction on the spot,
+  // without ever asking the server. Deciding "conflict" from that first pass
+  // made every lesson save fail with a false "Settings changed elsewhere".
+  // So these handlers never abort: on a conflict or validation problem they
+  // return the value they were given unchanged. Firebase then compares it with
+  // the real server value and re-runs the function with that value; only the
+  // decision from the final (committed) pass is used.
   if(b.action==='teacherSave'){
+   // Saves the lesson content (audio sections and words). Unlock levels are
+   // never written here; they are saved one track at a time with
+   // teacherSetUnlock so ET and WT stay independent.
    if(!await storyGranted(classId))fail(403,'The admin has not given this class a Yiddish story yet.');
-   const c=validateConfig(b.config);
-   if(!legacy(classId)&&(Object.keys(c.unlocked).length!==1||!Object.hasOwn(c.unlocked,classId)))fail(400,'Settings must belong to the selected class.');
-   let conflict=false;await store.tx(configPath(classId),old=>{conflict=false;old=old||{...defaults(),unlocked:legacy(classId)?defaults().unlocked:{[classId]:0}};if(old.version!==c.version){conflict=true;return undefined}return {...c,version:c.version+1}});
-   if(conflict)fail(409,'Settings changed elsewhere. Reload before saving.');return {config:await cfg(classId)};
+   const input=b.config;
+   if(!input||!Number.isInteger(input.version)||input.version<0||!Array.isArray(input.sections))fail(400,'Invalid lesson settings.');
+   const unlockKeys=['unlocked','unlockedSteps'].filter(k=>input[k]!==undefined);
+   let outcome=null;
+   await store.tx(configPath(classId),cur=>{
+    outcome=null;
+    const base=cur||freshConfig(classId);
+    if(base.version!==input.version){outcome={code:409,message:'Another session changed these lesson settings. Refresh to see them before saving lesson edits.'};return cur}
+    // Pages loaded before this fix still send both ET and WT unlock levels
+    // with every lesson save. Never let those stale values overwrite the
+    // per-track settings saved elsewhere.
+    for(const t of new Set(unlockKeys.flatMap(k=>Object.keys(input[k]||{})))){
+     if(stepsOpen(base,t)!==stepsOpen({sections:input.sections,unlocked:input.unlocked||{},unlockedSteps:input.unlockedSteps},t)){outcome={code:409,message:'This page is out of date. Refresh the page, then change the steps again.'};return cur}
+    }
+    const next={...base,sections:input.sections,version:base.version+1};
+    try{validateConfig(next)}catch(e){outcome={code:e.code||400,message:e.message};return cur}
+    return next;
+   });
+   if(outcome)fail(outcome.code,outcome.message);
+   return {config:await cfg(classId)};
+  }
+  if(b.action==='teacherSetUnlock'){
+   // Changes the open steps of exactly one track. It does not bump the lesson
+   // version, so students' practice rounds in progress are not interrupted.
+   if(!await storyGranted(classId))fail(403,'The admin has not given this class a Yiddish story yet.');
+   const track=String(b.track||''),steps=b.steps,expected=b.expectedSteps;
+   if(!validKey(track))fail(400,'Choose a valid track.');
+   if(!legacy(classId)&&track!==classId)fail(400,'Settings must belong to the selected class.');
+   if(legacy(classId)&&!legacy(track))fail(400,'Choose ET or WT.');
+   if(!Number.isInteger(steps)||steps<0)fail(400,'Choose a valid number of open steps.');
+   if(expected!==undefined&&expected!==null&&!Number.isInteger(expected))fail(400,'Choose a valid number of open steps.');
+   let outcome=null;
+   await store.tx(configPath(classId),cur=>{
+    outcome=null;
+    const base=cur||freshConfig(classId);
+    if(!Object.hasOwn(base.unlocked||{},track)){outcome={code:400,message:'This track is not part of these lesson settings.'};return cur}
+    const current=stepsOpen(base,track);
+    if(current===steps)return cur; // already saved (also covers retries)
+    if(Number.isInteger(expected)&&current!==expected){outcome={code:409,message:'Changed in another session.',current};return cur}
+    const next=structuredClone(base);
+    next.unlockedSteps={...(next.unlockedSteps||{}),[track]:steps};
+    next.unlocked={...next.unlocked,[track]:sectionsForSteps(next.sections,steps)};
+    try{validateConfig(next)}catch(e){outcome={code:e.code||400,message:e.message};return cur}
+    return next;
+   });
+   if(outcome)fail(outcome.code,outcome.message,outcome.current===undefined?undefined:{track,current:outcome.current});
+   const saved=await cfg(classId);
+   if(stepsOpen(saved,track)!==steps)fail(500,'Could not confirm the save. Please try again.');
+   return {config:saved,track,steps};
   }
   fail(400,'Unknown teacher action.');
  }
@@ -131,4 +195,4 @@ return async function handle(b,ip='unknown'){
  if(b.action==='answer'){let result,error;await store.tx(path,p=>{error=null;result=null;p=p||{};p.rounds=p.rounds||{};const r=(p.round&&p.round.id===b.roundId)?p.round:p.rounds[b.roundId];if(!r){error='This practice round could not be found. Press Practice this section to start again.';return p}if(r.responses?.[b.requestId]){result={...r.responses[b.requestId],progress:r.responses[b.requestId].progress||{}};return p}try{allowed(c,who,r.group)}catch(e){error=e.message;return p}if(r.version!==c.version){error='Your teacher changed this lesson. Start a new round.';return p}const q=r.items[r.index];if(!q||b.index!==r.index||!q.choices.includes(b.answer)||!/^[a-f0-9-]{20,64}$/.test(b.requestId||'')){error='This answer is no longer current.';return p}r.results=r.results||{};r.responses=r.responses||{};const correct=b.answer===q.wordId;r.results[q.wordId]=r.results[q.wordId]||{wrong:[],firstTry:true};const a=r.results[q.wordId];a.wrong=a.wrong||[];if(!correct){if(!a.wrong.includes(b.answer))a.wrong.push(b.answer);a.firstTry=false}else{r.index++;if(r.index===r.items.length){p.words=p.words||{};for(const item of r.items){const id=item.wordId,v=p.words[id]||{credits:0,rounds:0};v.rounds++;if(r.results[id]?.firstTry)v.credits=Math.min(2,v.credits+1);v.lastSeen=now();p.words[id]=v}p.lastActive=now()}}result={correct,firstTry:a.firstTry,round:publicRound(r),progress:p.words||{}};r.responses[b.requestId]=result;p.rounds[r.id]=r;if(p.round&&p.round.id===r.id)p.round=r;if(r.index===r.items.length){for(const id of Object.keys(p.rounds)){if(id!==r.id&&p.rounds[id]?.index===p.rounds[id]?.items?.length)delete p.rounds[id]}}return p});if(error)fail(409,error);return result}
  fail(400,'Unknown action.');
 }}
-module.exports={makeService,defaults,validateConfig,hash,publicRound};
+module.exports={makeService,defaults,validateConfig,hash,publicRound,stepsOpen,sectionsForSteps};
