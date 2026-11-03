@@ -3,3 +3,36 @@
 .countdown{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:#10243dcc;color:white;font-size:min(42vw,240px);font-weight:1000}.countdown[hidden]{display:none}
 .game-title-art{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.3em;margin-right:.3em}.game-title-art svg{width:100%;height:100%;display:block}
 #board:empty,#actions:empty{display:none}
+/* Uno table: matches the glossy blue Uno tile on the Arcade home page. */
+.play-area.uno-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#0745a3 4%,#1aa4ff 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #0a3a86,0 18px 28px #12315b40;overflow:hidden}
+.uno-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.uno-mode #roomCode,.uno-mode #players{display:none}.uno-mode .room-top .muted{margin:0;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.uno-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.uno-room{font-weight:900;background:#ffffff33;border-radius:999px;padding:6px 14px;font-size:14px;border:2px solid #ffffff66}
+.uno-color{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#a60f1d;border-radius:999px;padding:7px 16px;font-weight:1000;box-shadow:0 4px 0 #0003}.uno-color b{width:20px;height:20px;border-radius:50%;background:#ccc;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px #ccc}
+.uno-color.red b{background:#e3202c;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px #e3202c}.uno-color.yellow{color:#8a5a00}.uno-color.yellow b{background:#f2b705;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px #f2b705}.uno-color.green{color:#0b6b30}.uno-color.green b{background:#139a4a;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px #139a4a}.uno-color.blue{color:#0e4fa8}.uno-color.blue b{background:#1d7fe0;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px #1d7fe0}
+.uno-players{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px}
+.uno-p{display:flex;align-items:center;gap:8px;background:#0a3a8670;border:3px solid #ffffff55;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900}
+.uno-p i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,#ffd23f,#ff8a1f);color:#7a2d00;font-style:normal;box-shadow:inset 0 1px 2px #fff9}
+.uno-p small{display:block;font-size:11px;font-weight:800;opacity:.9}
+.uno-p.turn{background:#fff;color:#0a3a86;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66,0 0 22px #ffd23f}
+.uno-mid{display:flex;justify-content:center;align-items:center;gap:34px;margin:16px 0 6px;flex-wrap:wrap}
+.uno-mode .pile{text-align:center;font-weight:900;font-size:13px;text-shadow:0 1px 2px #0006}.uno-mode .pile .lbl{margin-top:8px}.uno-mode .pile .disc+.lbl{margin-top:16px}
+.ucard{--c:#e3202c;--d:#a60f1d;position:relative;width:86px;height:124px;border-radius:12px;background:#fff;padding:5px;box-shadow:0 5px 0 #0003,0 10px 16px #0004;flex:0 0 auto;box-sizing:border-box;text-align:left}
+.ucard .face{position:relative;width:100%;height:100%;border-radius:8px;background:linear-gradient(160deg,var(--c),var(--d));overflow:hidden}
+.ucard .oval{position:absolute;left:50%;top:50%;width:68%;height:80%;background:#fff;border-radius:50%;transform:translate(-50%,-50%) rotate(24deg)}
+.ucard .big{position:absolute;inset:0;display:grid;place-items:center;font-size:52px;font-weight:1000;font-style:italic;color:var(--c);font-family:system-ui,sans-serif;text-shadow:0 2px 0 #0002}.ucard .big.sym{font-size:40px}
+.ucard .c1,.ucard .c2{position:absolute;color:#fff;font-weight:1000;font-style:italic;font-size:17px;text-shadow:0 1px 2px #0005}.ucard .c1{left:6px;top:3px}.ucard .c2{right:6px;bottom:3px;transform:rotate(180deg)}
+.ucard.red{--c:#e3202c;--d:#a60f1d}.ucard.green{--c:#139a4a;--d:#0b6b30}.ucard.blue{--c:#1d7fe0;--d:#0e4fa8}.ucard.yellow{--c:#f2b705;--d:#c98600}.ucard.yellow .big{color:#c98600}
+.ucard.wild .face{background:conic-gradient(from 45deg,#e3202c 0 25%,#1d7fe0 0 50%,#139a4a 0 75%,#f2b705 0)}.ucard.wild .big{color:#222}
+.ucard.back .face{background:linear-gradient(160deg,#2a2a35,#0f0f16)}.ucard.back .oval{background:linear-gradient(145deg,#e3202c,#a60f1d);transform:translate(-50%,-50%) rotate(-24deg)}.ucard.back .big{color:#ffd23f;font-size:30px}
+.ucard.disc{transform:rotate(-6deg) scale(1.2)}
+.uno-msg{text-align:center;margin:10px 0 0;font-size:20px;font-weight:1000;text-shadow:0 2px 3px #0005}.uno-msg small{display:block;font-size:13px;font-weight:800;opacity:.95;margin-top:2px}
+.uno-hand{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 0;margin:22px 0 4px;padding:14px 14px 8px}
+.ucard-button{appearance:none;border:0;background:none;padding:0;margin:0 -6px;font:inherit;color:inherit;cursor:pointer;border-radius:12px}.ucard-button:disabled{cursor:default}
+.ucard-button .ucard{transition:transform .15s,box-shadow .15s}
+.ucard-button .ucard.ok{transform:translateY(-14px);box-shadow:0 5px 0 #0003,0 0 0 3px #ffd23f,0 0 18px #ffd23f}.ucard-button:not(:disabled):hover .ucard.ok{transform:translateY(-26px) scale(1.05)}.ucard-button:hover{z-index:3;position:relative}
+.ucard-button .ucard.no{filter:saturate(.55) brightness(.82)}.ucard-button .ucard.picked{transform:translateY(-26px) scale(1.08);box-shadow:0 5px 0 #0003,0 0 0 4px #fff,0 0 22px #fff}
+.ucard-button:focus-visible{outline:4px solid #fff;outline-offset:3px}
+.uno-mode .actions{margin-top:8px}.uno-mode .actions .btn.uno-btn{border:0;border-radius:999px;padding:13px 28px;font-weight:1000;font-size:17px;color:#7a2d00;background:linear-gradient(180deg,#ffe066,#ffb400);box-shadow:0 5px 0 #b57700,0 10px 16px #0004}.uno-mode .actions .btn.uno-btn:disabled{opacity:.6}
+.uno-pick{border:0;border-radius:999px;padding:12px 18px;min-width:96px;font:inherit;font-weight:1000;color:#fff;cursor:pointer;box-shadow:0 4px 0 #0004;border:3px solid #fff}.uno-pick.red{background:#e3202c}.uno-pick.green{background:#139a4a}.uno-pick.blue{background:#1d7fe0}.uno-pick.yellow{background:#f2b705;color:#5a3b00}
+@media(max-width:560px){.ucard{width:68px;height:98px}.ucard .big{font-size:40px}.ucard .big.sym{font-size:32px}.ucard-button{margin:0 -9px}.play-area.uno-mode{padding:12px}}
+@media(prefers-reduced-motion:reduce){.ucard-button .ucard{transition:none}}

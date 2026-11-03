@@ -169,8 +169,8 @@
       if (gameKey === 'dominoes' && room.turn === studentId) actions.append(button('Draw a tile', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
       if (gameKey === 'uno-style' && room.turn === studentId) {
         const label = room.drawPending ? `Draw ${room.drawPending} cards` : 'Draw a card';
-        actions.append(button(label, () => call('move', { move: { type: room.drawPending ? 'draw-penalty' : 'draw' } }).catch(showError), 'btn', pending));
-        if (selectedUno != null) for (const color of ['red','yellow','green','blue']) actions.append(button(color, () => call('move', { move: { type: 'play', index: selectedUno, color } }).then(() => { selectedUno = null; }).catch(showError), 'quiet', pending));
+        actions.append(button(label, () => call('move', { move: { type: room.drawPending ? 'draw-penalty' : 'draw' } }).catch(showError), 'btn uno-btn', pending));
+        if (selectedUno != null) for (const color of ['red','yellow','green','blue']) actions.append(button(UNO_COLOR_NAMES[color], () => call('move', { move: { type: 'play', index: selectedUno, color } }).then(() => { selectedUno = null; }).catch(showError), 'uno-pick ' + color, pending));
       }
       if (gameKey === 'ludo' && room.turn === studentId) {
         if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn', pending));
@@ -413,21 +413,75 @@
       }
       board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.bookCounts?.[player.studentId] || 0} books · ${room.handCounts?.[player.studentId] || 0} cards`).join(' · ')));
     } else if (gameKey === 'uno-style') {
-      const ownTurn = room.turn === studentId && !room.finished, top = room.topCard;
-      board.append(text('div', 'game-result', 'Current color: ' + (room.color || '—')), text('div', 'player-turn', 'Top card: ' + (top ? `${top.color || 'wild'} ${top.value}` : '—')));
-      if (room.drawPending) board.appendChild(text('div', 'player-turn', 'Draw ' + room.drawPending + ' cards before your turn.'));
-      const hand = text('div', 'card-hand');
-      privateHand.forEach((card, index) => hand.appendChild(button(`${card.color || 'Wild'} · ${card.value}`, () => {
-        if (!ownTurn) return;
-        if (card.kind === 'wild' || card.kind === 'wild4') { selectedUno = index; drawActions(); return; }
-        call('move', { move: { type: 'play', index } }).catch(showError);
-      }, 'playing-card card-' + (card.color || 'wild'), pending || !ownTurn || !!room.drawPending)));
-      board.appendChild(hand);
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.handCounts?.[player.studentId] || 0} cards`).join(' · ')));
+      drawUnoTable(board);
     }
+  }
+  const UNO_SYMBOLS = { skip: '⊘', reverse: '⇄', draw2: '+2', wild: '★', wild4: '+4' };
+  const UNO_COLOR_NAMES = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' };
+  function unoCardFace(card, extraClass) {
+    const symbol = UNO_SYMBOLS[card.kind] || String(card.value);
+    const isWild = card.kind === 'wild' || card.kind === 'wild4';
+    const node = text('div', 'ucard ' + (isWild ? 'wild' : (card.color || 'wild')) + (extraClass ? ' ' + extraClass : ''));
+    const face = text('div', 'face');
+    if (!isWild) face.appendChild(text('span', 'c1', symbol));
+    face.appendChild(text('div', 'oval'));
+    face.appendChild(text('div', 'big' + (symbol.length > 1 || UNO_SYMBOLS[card.kind] ? ' sym' : ''), symbol));
+    if (!isWild) face.appendChild(text('span', 'c2', symbol));
+    node.appendChild(face);
+    return node;
+  }
+  function unoCardName(card) {
+    const names = { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw two', wild: 'Wild', wild4: 'Wild draw four' };
+    return (card.color ? (UNO_COLOR_NAMES[card.color] || card.color) + ' ' : '') + (names[card.kind] || card.value);
+  }
+  function drawUnoTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished, top = room.topCard;
+    const bar = text('div', 'uno-bar');
+    bar.append(text('span', 'uno-room', 'Room ' + roomCode));
+    const ring = text('span', 'uno-color ' + (room.color || ''));
+    ring.dataset.color = room.color || ''; if (top) ring.dataset.top = String(top.value);
+    ring.append(text('b', ''), document.createTextNode('Color: ' + (UNO_COLOR_NAMES[room.color] || '—')));
+    bar.appendChild(ring);
+    const players = text('div', 'uno-players');
+    (room.players || []).forEach(player => {
+      const mine = player.studentId === studentId, turn = player.studentId === room.turn && !room.finished;
+      const badge = text('div', 'uno-p' + (turn ? ' turn' : ''));
+      const label = text('div', '', player.name + (mine ? ' (you)' : ''));
+      const count = room.handCounts?.[player.studentId] || 0;
+      label.appendChild(text('small', '', count + (count === 1 ? ' card' : ' cards') + (turn ? (mine ? ' · your turn!' : ' · playing') : '')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const mid = text('div', 'uno-mid');
+    const drawPile = text('div', 'pile'), back = text('div', 'ucard back'), backFace = text('div', 'face');
+    backFace.append(text('div', 'oval'), text('div', 'big', '★')); back.appendChild(backFace);
+    drawPile.append(back, text('div', 'lbl', 'Draw pile'));
+    const discard = text('div', 'pile');
+    discard.append(top ? unoCardFace(top, 'disc') : text('div', 'ucard back'), text('div', 'lbl', 'Top card'));
+    mid.append(drawPile, discard);
+    const msg = text('div', 'uno-msg', room.drawPending && ownTurn ? 'Draw ' + room.drawPending + ' cards before your turn.' : '');
+    if (ownTurn && !room.drawPending) msg.appendChild(text('small', '', 'Glowing cards can be played.'));
+    const hand = text('div', 'uno-hand');
+    privateHand.forEach((card, index) => {
+      const isWild = card.kind === 'wild' || card.kind === 'wild4';
+      const playable = ownTurn && !room.drawPending && (isWild || card.color === room.color || (top && card.value === top.value));
+      const node = button('', () => {
+        if (!ownTurn) return;
+        if (isWild) { selectedUno = index; drawActions(); draw(); return; }
+        call('move', { move: { type: 'play', index } }).catch(showError);
+      }, 'ucard-button', pending || !ownTurn || !!room.drawPending);
+      node.setAttribute('aria-label', unoCardName(card));
+      node.dataset.color = card.color || 'wild'; node.dataset.value = String(card.value);
+      const face = unoCardFace(card, (playable ? 'ok' : 'no') + (selectedUno === index ? ' picked' : ''));
+      face.setAttribute('aria-hidden', 'true');
+      node.appendChild(face);
+      hand.appendChild(node);
+    });
+    board.append(bar, players, mid, msg, hand);
   }
   function draw() {
     if (!room) return;
+    el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
