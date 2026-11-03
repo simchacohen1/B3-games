@@ -196,3 +196,13 @@ test('wrong-passcode limiter: guessing is stopped, success resets, lock is short
   await assert.rejects(good(T1 + 100, '9.9.9.9'), { code: 429 });
   await good(T1 + 100, '8.8.8.8');
 });
+
+test('minutes homework can be handed in without a note, even with no minutes target', async () => {
+  const store = makeStore(seed());
+  const created = await homeworkApi(store, T(), { action: 'create', classId: 'et', type: 'shorashim', title: 'Practice', details: 'x', assignedAt: 0, targetUnit: 'minutes', dueAt: 1000 }, 500, newId);
+  await homeworkApi(store, T(), { action: 'publish', classId: 'et', assignmentId: created.id }, 501, newId);
+  const r = await homeworkApi(store, {}, { action: 'submit', ...stu('s1', 'Sam One', '1111'), assignmentId: created.id, answer: '', progress: 5 }, 600);
+  assert.equal(r.ok, true);
+  const mine = (await list(store, 's1', 'Sam One', '1111', 700)).assignments.find(a => a.id === created.id);
+  assert.equal(mine.status, 'submitted');
+});
