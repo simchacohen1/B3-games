@@ -3,6 +3,24 @@
   var WORKSPACE = root.B3_WORKSPACE_ID || (root.B3_APP_CONTEXT && root.B3_APP_CONTEXT.workspaceId) || 'b3-2026';
   var VALID_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
+  var functionsReady = null;
+  // Older game pages load Firebase without the Functions library. Load the same version from the same host on demand.
+  function ensureFunctions() {
+    if (root.firebase && typeof root.firebase.functions === 'function') return Promise.resolve();
+    if (!root.firebase || !root.document) return Promise.reject(new Error('The class access service is unavailable.'));
+    if (functionsReady) return functionsReady;
+    var version = String(root.firebase.SDK_VERSION || '');
+    var file = parseInt(version, 10) <= 8 ? 'firebase-functions.js' : 'firebase-functions-compat.js';
+    functionsReady = new Promise(function (resolve, reject) {
+      var script = root.document.createElement('script');
+      script.src = 'https://www.gstatic.com/firebasejs/' + version + '/' + file;
+      script.onload = function () { typeof root.firebase.functions === 'function' ? resolve() : reject(new Error('The class access service is unavailable.')); };
+      script.onerror = function () { reject(new Error('The class access service is unavailable.')); };
+      root.document.head.appendChild(script);
+    }).catch(function (error) { functionsReady = null; throw error; });
+    return functionsReady;
+  }
+
   async function resolve(db, user, requestedClassId, requestedStudentId) {
     if (!db || !user) throw new Error('Sign in to play.');
     var token = await user.getIdTokenResult();
@@ -12,7 +30,7 @@
       participantId = String(claims.b3StudentId);
       classId = String(claims.b3ClassId);
       if (requestedStudentId && requestedStudentId !== participantId) throw new Error('Your student sign-in has changed. Sign in again.');
-      if (!root.firebase || typeof root.firebase.functions !== 'function') throw new Error('The class access service is unavailable.');
+      await ensureFunctions();
       var response = await root.firebase.app().functions('us-central1').httpsCallable('multiplayerGameAction')({
         action: 'identity', workspaceId: WORKSPACE
       });

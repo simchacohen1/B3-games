@@ -585,7 +585,7 @@ function moveUno(state, playerId, move, ids) {
   if ((card.kind === 'wild' || card.kind === 'wild4') && !['red','yellow','green','blue'].includes(move.color)) reject('Choose a color for your wild card.');
   hand.splice(move.index, 1); state.discard.push(card); state.moves += 1;
   if (!hand.length) { state.winner = playerId; state.finished = true; return state; }
-  if (card.kind === 'wild' || card.kind === 'wild4') state.color = move.color;
+  state.color = card.kind === 'wild' || card.kind === 'wild4' ? move.color : card.color;
   if (card.kind === 'draw2' || card.kind === 'wild4') { state.drawPending = card.kind === 'draw2' ? 2 : 4; advanceTurn(state, ids); }
   else if (card.kind === 'skip') advanceTurn(state, ids, 2);
   else if (card.kind === 'reverse') { state.direction *= -1; advanceTurn(state, ids, ids.length === 2 ? 2 : 1); }
