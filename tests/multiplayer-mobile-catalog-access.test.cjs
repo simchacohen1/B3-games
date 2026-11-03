@@ -35,7 +35,6 @@ test('access warning offers sign-in return without bypassing class checks', () =
 
 test('floating Gallery button is absent on Arcade catalog but not game pages', () => {
   const gallery = read('gallery-share.js');
-  const match = gallery.match(/if \((\/\\\/multiplayer\\\/(?:\(\?:index\\\.html\))?\?\$\/i)\.test\(location\.pathname\)\) return;/);
   // Match the narrowly scoped pathname guard without changing other activity captures.
   assert.ok(gallery.includes('if (/\\/multiplayer\\/(?:index\\.html)?$/i.test(location.pathname)) return;'));
   assert.ok(!gallery.includes('if (/\\/multiplayer\\/.*game'));
