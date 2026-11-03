@@ -177,13 +177,14 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     'the signed-in student auth route recognizes only the staging Homework preview host');
   assert.match(homeSource, /return "https:\/\/us-central1-b3-games\.cloudfunctions\.net\/funTorahStudentAuth"/,
     'student auth keeps the production function target on production hosts');
-  // firebase-config.js stays deferred (it must run after the deferred Firebase SDK so test and
-  // preview wrappers can patch it); the staging bootstrap is a parser-blocking script, so it
-  // always runs first.
-  assert.ok(homeSource.indexOf('/staging/preview-bootstrap.js') >= 0 &&
-    homeSource.indexOf('/staging/preview-bootstrap.js') < homeSource.indexOf('firebase-config.js'),
-    'the staging bootstrap loads before the home page Firebase config');
-  assert.doesNotMatch(homeSource, /<script[^>]*preview-bootstrap[^>]*defer/,
+  // The live pages never load the staging bootstrap. The preview copy gets it from
+  // scripts/inject-preview-bootstrap.cjs, as a parser-blocking script ahead of the Firebase config.
+  assert.doesNotMatch(homeSource, /preview-bootstrap/, 'the real home page never loads the staging bootstrap');
+  const injected = require('../scripts/inject-preview-bootstrap.cjs').inject(homeSource);
+  assert.ok(injected.indexOf('/staging/preview-bootstrap.js') >= 0 &&
+    injected.indexOf('/staging/preview-bootstrap.js') < injected.indexOf('firebase-config.js'),
+    'in the preview copy the staging bootstrap loads before the home page Firebase config');
+  assert.doesNotMatch(injected, /<script[^>]*preview-bootstrap[^>]*defer/,
     'the staging bootstrap must not be deferred');
   assert.match(homeSource, /<script src="backend\/functions\/student-tool-policy\.js"><\/script>/,
     'the shared student access policy must load before inline dashboard code uses it');
@@ -243,9 +244,13 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   assert.doesNotMatch(deploy, /--project\s+['"]?b3-games/i);
   assert.doesNotMatch(deploy, /deploy['"]?,\s*['"]--only['"],\s*['"]hosting['"]/);
   const stagingPages = ['index.html', 'weekly-quiz/index.html', 'chazara/index.html', 'shorashim/index.html', 'record_pesukim/student.html', 'rashi-letters/student.html', 'yiddish/index.html', 'game-show/player.html', 'class-gallery/index.html', 'student-rewards/index.html', 'halacha/index.html', 'teacher-home.html', 'student-report/index.html', 'assignment-center/teacher.html', 'assignment-center/student.html'];
-  for (const file of stagingPages) {
+  const injector = require('../scripts/inject-preview-bootstrap.cjs');
+  assert.deepEqual([...injector.PAGES].sort(), [...new Set([...stagingPages, 'assignment-center/student.html', 'assignment-center/teacher.html'])].sort(),
+    'the preview copy covers exactly the pages that need the staging guard');
+  for (const file of injector.PAGES) {
     const html = fs.readFileSync(__dirname + '/../' + file, 'utf8');
-    assert.match(html, /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} must load the staging guard before app scripts`);
+    assert.doesNotMatch(html, /preview-bootstrap/, `${file} must not load the staging bootstrap on the live site`);
+    assert.match(injector.inject(html), /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} gets the staging guard in the preview copy`);
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
   assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites');

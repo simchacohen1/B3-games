@@ -26,3 +26,4 @@ staging-results/
 /staging-build/
 /\.firebase/
 /staging/*.local.json
+.preview-build/

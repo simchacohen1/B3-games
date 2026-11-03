@@ -15,7 +15,7 @@
   ],
   "hosting": {
     "site": "fun-torah-tools-staging",
-    "public": ".",
+    "public": ".preview-build",
     "ignore": [
       "firebase.json",
       "firebase.*.json",

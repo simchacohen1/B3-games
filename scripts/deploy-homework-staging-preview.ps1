@@ -100,6 +100,23 @@ function Prepare-StagingBootstrap {
   }
 }
 
+# The preview is deployed from a COPY of the site. Only the copy gets the staging
+# bootstrap <script>; the real pages (and so the live site) never load it.
+function Build-PreviewSite {
+  $build = Join-Path $repoRoot '.preview-build'
+  if (Test-Path -LiteralPath $build) { Remove-Item -LiteralPath $build -Recurse -Force }
+  New-Item -ItemType Directory -Path $build | Out-Null
+  $skipDirs = @('.git', 'node_modules', '_worktrees', '.preview-build', 'staging-results', 'playwright-report', 'test-results',
+    'preview-pointer-repair', 'preview-pr234', 'tests', 'e2e', 'e2e-staging', 'docs', 'backup-*')
+  & robocopy $repoRoot $build /E /NFL /NDL /NJH /NJS /NP /XD @skipDirs | Out-Null
+  if ($LASTEXITCODE -ge 8) { throw "Copying the site for the preview failed (robocopy exit code $LASTEXITCODE)." }
+  $toolPolicy = Join-Path $build 'backend\functions'
+  New-Item -ItemType Directory -Path $toolPolicy -Force | Out-Null
+  Copy-Item -LiteralPath (Join-Path $repoRoot 'backend\functions\student-tool-policy.js') -Destination $toolPolicy -Force
+  & node (Join-Path $repoRoot 'scripts\inject-preview-bootstrap.cjs') $build
+  if ($LASTEXITCODE -ne 0) { throw 'Adding the staging bootstrap to the preview copy failed; refusing to deploy.' }
+}
+
 Push-Location $repoRoot
 $previousUpdateCheck = $env:FIREBASE_CLI_DISABLE_UPDATE_CHECK
 $previousDiscoveryTimeout = $env:FUNCTIONS_DISCOVERY_TIMEOUT
@@ -134,6 +151,8 @@ try {
   if (-not $SkipFunction) {
     Invoke-FirebaseDeploy @('deploy', '--only', 'functions:homework-staging', '--project', $projectId, '--config', $firebaseConfig, '--non-interactive') 'Staging homework function deploy'
   }
+
+  Build-PreviewSite
 
   Invoke-FirebaseDeploy @('hosting:channel:deploy', $channelId, '--project', $projectId, '--config', $firebaseConfig, '--expires', '7d', '--non-interactive') 'Staging preview-channel deploy'
 } finally {
