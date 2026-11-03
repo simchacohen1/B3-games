@@ -1,0 +1,42 @@
+name: Principal account checks
+on:
+  pull_request:
+    paths:
+      - 'owner-admin.html'
+      - 'teacher-home.html'
+      - 'principal-scope.js'
+      - 'site-settings.js'
+      - 'backend/functions/teacher-claim-core.cjs'
+      - 'tests/principal-scope.test.cjs'
+      - '.github/workflows/principal-access.yml'
+permissions:
+  contents: read
+jobs:
+  principal-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate principal JavaScript
+        run: |
+          node --check principal-scope.js
+          node --check site-settings.js
+          node --check backend/functions/teacher-claim-core.cjs
+          node --check tests/principal-scope.test.cjs
+      - name: Validate owner and principal page scripts
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          for (const name of ['owner-admin.html', 'teacher-home.html']) {
+            const html = fs.readFileSync(name, 'utf8');
+            const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+            for (const match of scripts) if (match[1].trim()) new vm.Script(match[1], {filename:name});
+            console.log(name+': '+scripts.length+' inline scripts validated');
+          }
+          NODE
+      - name: Principal and teacher onboarding security regressions
+        run: node --test tests/principal-scope.test.cjs tests/direct-teacher-onboarding.test.cjs
