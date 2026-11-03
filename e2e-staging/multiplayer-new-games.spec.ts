@@ -6,7 +6,7 @@ const students = credentials?.studentAccounts.filter(row => row.classId === 'TES
 const games = [
   { key: 'connect-four', title: 'Connect 4' }, { key: 'tic-tac-toe', title: 'Tic Tac Toe' },
   { key: 'memory-match', title: 'Memory Match' }, { key: 'checkers', title: 'Checkers' },
-  { key: 'reversi', title: 'Reversi' }, { key: 'bingo', title: 'Bingo' },
+  { key: 'reversi', title: 'Othello' }, { key: 'bingo', title: 'Bingo' },
   { key: 'math-race', title: 'Math Race' }, { key: 'set', title: 'Set' },
   { key: 'ludo', title: 'Ludo' }, { key: 'dominoes', title: 'Dominoes' },
   { key: 'go-fish', title: 'Go Fish' }, { key: 'uno-style', title: 'Uno-style Cards' },
