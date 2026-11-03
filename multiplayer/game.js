@@ -216,6 +216,7 @@
       } else notice('Your game is finished, but the coin score is still saving. Refresh this game to try again.', true);
     });
   }
+  const COMPUTER_WAIT_MS = 30000;
   async function quickPlay() {
     const supportsComputer = game?.computerOpponent === true;
     let searchCancelled = false;
@@ -239,13 +240,25 @@
         const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', result.roomCode); url.searchParams.set('b3Multiplayer', 'join');
         location.assign(url.href); return;
       }
-      notice(supportsComputer ? 'Looking for a classmate…' : 'Looking for a classmate. This game needs another student to play.');
-      actions.replaceChildren(button('Cancel search', cancelSearch, 'quiet'));
-      const deadline = Date.now() + (supportsComputer ? 8000 : Number.POSITIVE_INFINITY);
-      while (Date.now() < deadline && !room) {
+      // Wait for a classmate; computer-capable games fall back to the computer after COMPUTER_WAIT_MS or when the student asks.
+      const deadline = Date.now() + (supportsComputer ? COMPUTER_WAIT_MS : Number.POSITIVE_INFINITY);
+      let playNow = false;
+      // Poll without call(): call() redraws the actions area, which would remove the buttons below on every check.
+      const pollQuickPlay = () => callable({ action: 'quick-play', gameKey, workspaceId: classInfo.workspaceId, classId: classInfo.classId }).then(response => response.data || {});
+      const showWait = () => notice(supportsComputer
+        ? 'Looking for a classmate… ' + Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) + ' seconds left, then you play the computer.'
+        : 'Looking for a classmate. This game needs another student to play.');
+      actions.replaceChildren(...(supportsComputer ? [button('Play the computer now', () => { playNow = true; }, 'btn')] : []), button('Cancel search', cancelSearch, 'quiet'));
+      showWait();
+      let lastPoll = Date.now();
+      while (Date.now() < deadline && !playNow && !room) {
         if (searchCancelled) return;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const poll = await call('quick-play');
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (searchCancelled) return;
+        showWait();
+        if (playNow || Date.now() - lastPoll < 1000) continue;
+        lastPoll = Date.now();
+        const poll = await pollQuickPlay();
         if (poll.roomCode) {
           const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', poll.roomCode); url.searchParams.set('b3Multiplayer', 'join');
           location.assign(url.href); return;
@@ -253,6 +266,7 @@
       }
       if (!room && !searchCancelled && supportsComputer) {
         try {
+          actions.replaceChildren(); notice('Starting a game against the computer…');
           const cancelled = await call('cancel-quick-play');
           if (cancelled.roomCode) {
             const url = new URL(location.href); url.searchParams.set('b3MultiplayerRoom', cancelled.roomCode); url.searchParams.set('b3Multiplayer', 'join');
