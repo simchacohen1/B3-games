@@ -2,8 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const Module = require('node:module');
 const core = require('../backend/functions/multiplayer-games-core.cjs');
-const { mutateRoom } = require('../backend/functions/multiplayer-games')._test;
+const originalLoad = Module._load;
+Module._load = function(request, parent, isMain) {
+  if (request === 'firebase-admin') return { apps: [{}], initializeApp() {}, database() { throw new Error('Unexpected Firebase access in unit test'); } };
+  if (request === 'firebase-functions/v2/https') return { onCall: (_options, handler) => handler, HttpsError: class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } } };
+  return originalLoad.call(this, request, parent, isMain);
+};
+const { mutateRoom, reserveMatchmakingRoom, publishMatchmakingMirror } = require('../backend/functions/multiplayer-games')._test;
+Module._load = originalLoad;
 
 const workspaceId = 'test-workspace';
 const classId = 'test-class';
@@ -35,6 +43,47 @@ function databaseWith(room) {
 function actor(studentId, name) {
   return { studentId, name, classId, workspaceId };
 }
+
+test('concurrent matchmaking room reservations preserve the first room state', async () => {
+  const path = '/private/match/123456';
+  let current = null;
+  let serial = Promise.resolve();
+  const db = { ref: requestedPath => {
+    assert.equal(requestedPath, path);
+    return { transaction: update => {
+      const run = serial.then(() => {
+        const next = update(structuredClone(current));
+        if (next !== undefined) current = next;
+        return { committed: next !== undefined, snapshot: { val: () => structuredClone(current) } };
+      });
+      serial = run.then(() => undefined);
+      return run;
+    } };
+  } };
+  const initial = { roomCode: '123456', gameKey: 'tic-tac-toe', host: 'avi', matchmaking: true, state: 'lobby', players: { avi: { active: true } } };
+  const changed = { ...initial, state: 'playing', players: { ...initial.players, benny: { active: true } } };
+  const [first, retry] = await Promise.all([
+    reserveMatchmakingRoom(db, path, initial, 'tic-tac-toe', 'avi'),
+    reserveMatchmakingRoom(db, path, changed, 'tic-tac-toe', 'avi'),
+  ]);
+  assert.equal(first.created, true);
+  assert.equal(retry.created, false);
+  assert.deepEqual(current, initial);
+});
+
+test('matchmaking retry repairs a missing mirror and rejects stale mirror state', async () => {
+  let current = null;
+  const db = { ref: () => ({ transaction: async update => {
+    const next = update(structuredClone(current));
+    if (next !== undefined) current = next;
+    return { committed: next !== undefined, snapshot: { val: () => structuredClone(current) } };
+  } }) };
+  await publishMatchmakingMirror(db, '/public/match', { state: 'lobby', updatedAt: 10 }, 10);
+  assert.deepEqual(current, { state: 'lobby', updatedAt: 10 });
+  await publishMatchmakingMirror(db, '/public/match', { state: 'playing', updatedAt: 20 }, 20);
+  await publishMatchmakingMirror(db, '/public/match', { state: 'lobby', updatedAt: 10 }, 10);
+  assert.deepEqual(current, { state: 'playing', updatedAt: 20 });
+});
 
 test('a student can leave and rejoin a playing room without losing private cards or game progress', async () => {
   const players = {

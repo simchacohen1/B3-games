@@ -38,7 +38,8 @@ if (-not $pin) {
   $usedPins = Invoke-RestMethod -Method Get -Uri "$databaseUrl/b3Private/passcodes.json" -Headers $headers
   do {
     $bytes = [byte[]]::new(4)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     $pin = (100000 + ([BitConverter]::ToUInt32($bytes, 0) % 900000)).ToString()
   } while (@($usedPins.PSObject.Properties | Where-Object { $_.Value.passcode -eq $pin }).Count -gt 0)
 }
@@ -56,7 +57,20 @@ Write-StagingJson "b3Games/students/$studentId/memberships/${workspaceId}_${clas
 Write-StagingJson "b3Games/workspaces/$workspaceId/classes/$classId/members/$studentId" $member
 Write-StagingJson "b3Private/passcodes/$studentId" $passcode
 Invoke-RestMethod -Method Patch -Uri "$databaseUrl/b3Games/workspaces/$workspaceId/classes/$classId/toolGrants.json?print=silent" -Headers $headers -ContentType $contentType -Body '{"multiplayer-center":true}' | Out-Null
-$credentials.studentAccounts = @($credentials.studentAccounts | Where-Object { $_.name -ne $studentName }) + @([pscustomobject]@{ name = $studentName; passcode = $pin; classId = $classId })
+$studentAccounts = @($credentials.studentAccounts | Where-Object {
+  -not ($_.name -eq $studentName -and $_.classId -eq $classId)
+})
+$studentAccounts += [pscustomobject]@{
+  name = $studentName
+  passcode = [string]$pin
+  classId = $classId
+}
+$credentials.studentAccounts = $studentAccounts
 $serializedCredentials = ConvertTo-Json -InputObject $credentials -Depth 12 -Compress
 [System.IO.File]::WriteAllText($credentialsPath, $serializedCredentials, [System.Text.UTF8Encoding]::new($false))
+$savedCredentials = Get-Content -LiteralPath $credentialsPath -Raw | ConvertFrom-Json
+$savedStudent = @($savedCredentials.studentAccounts | Where-Object {
+  $_.name -eq $studentName -and $_.classId -eq $classId -and $_.passcode -eq [string]$pin
+})
+if ($savedStudent.Count -ne 1) { throw 'The fictional student credentials were not saved correctly.' }
 Write-Output "Provisioned $StudentName as a fictional TEST-ALEF student and enabled Multiplayer Center for this staging class."

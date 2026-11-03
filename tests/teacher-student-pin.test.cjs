@@ -29,7 +29,7 @@ test('saved student session is verified server-side and restored into its active
     {action:'verify',studentId:'synthetic_student',pin:'synthetic-pin'},
     {action:'login',name:'Synthetic Student',pin:'synthetic-pin'}
   ]);
-  assert.deepEqual(JSON.parse(JSON.stringify(f.entered)),[{id:'synthetic_student',name:'Synthetic Student',classId:'alpha'}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.entered)),[{id:'synthetic_student',name:'Synthetic Student',classId:'alpha',classState:null}]);
   assert.equal(f.saved.get('b3Games_classPin'),'synthetic-pin');
 });
 

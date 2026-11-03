@@ -8,6 +8,22 @@ const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
 const normalize=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
 
+// Only send the signed-in student the class fields the homepage needs before
+// it can render. Never copy the full class record (which contains other
+// students' membership rows) into the Auth response.
+function studentClassBootstrap(cls,studentId){
+ if(!cls||!key(studentId))return null;
+ const snapshot={
+  name:String(cls.name||studentId),
+  active:cls.active!==false,
+  members:{[studentId]:{active:true}}
+ };
+ for(const field of ['siteEnabled','access','toolGrants']){
+  if(Object.prototype.hasOwnProperty.call(cls,field))snapshot[field]=cls[field];
+ }
+ return snapshot;
+}
+
 async function rateLimit(store,ip,now){
  const path='b3Private/studentLoginLimits/'+hash(ip||'unknown');
  let blocked=false;
@@ -93,4 +109,4 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
  }
  fail(400,'Unknown action.');
 }
-module.exports={studentAuth};
+module.exports={studentAuth,studentClassBootstrap};

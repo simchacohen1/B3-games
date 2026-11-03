@@ -35,12 +35,14 @@ if (-not $apiKey) { throw 'The staging Web app config has no Firebase API key.' 
 
 function New-TestPassword {
   $bytes = [byte[]]::new(24)
-  [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+  $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+  try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
   return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 function New-TestPin {
   $bytes = [byte[]]::new(4)
-  [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+  $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+  try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
   return (100000 + ([BitConverter]::ToUInt32($bytes, 0) % 900000)).ToString()
 }
 function Invoke-AdminAuthPost([string]$Path, $Body) {
