@@ -5,7 +5,14 @@ import fs from 'node:fs';
 // These tests only ever talk to the isolated staging project and its
 // fictional accounts. Nothing here may point at production.
 
-export const SITE = 'https://fun-torah-tools-staging.web.app';
+const BASE_SITE = 'https://fun-torah-tools-staging.web.app';
+const requestedSite = (process.env.FTT_STAGING_SITE || BASE_SITE).replace(/\/$/, '');
+if (!/^https:\/\/(?:fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app)$/.test(requestedSite)) {
+  throw new Error('FTT_STAGING_SITE must be the staging live site or the exact issue #406 preview channel.');
+}
+const isHomeworkPreview = requestedSite !== BASE_SITE;
+export const SITE = isHomeworkPreview ? BASE_SITE : requestedSite;
+export const HOMEWORK_SITE = requestedSite;
 export const STAGING_PROJECT = 'fun-torah-tools-staging';
 
 export const FORBIDDEN_HOSTS = [
@@ -21,7 +28,7 @@ export const FORBIDDEN_HOSTS = [
 ];
 
 // Student tool pages that must load on staging for an anonymous visitor.
-export const TOOL_PAGES = [
+export const TOOL_PAGES: { name: string; path: string; previewOnly?: boolean }[] = [
   { name: 'Home / sign-in', path: '/' },
   { name: 'Weekly Quiz', path: '/weekly-quiz/index.html' },
   { name: 'Chazara Chart', path: '/chazara/index.html' },
@@ -35,6 +42,8 @@ export const TOOL_PAGES = [
   { name: 'Halacha', path: '/halacha/index.html' },
   { name: 'Teacher Home', path: '/teacher-home.html' },
   { name: 'Student Report', path: '/student-report/index.html' },
+  { name: 'Homework teacher center', path: '/assignment-center/teacher.html', previewOnly: true },
+  { name: 'Homework student center', path: '/assignment-center/student.html', previewOnly: true },
 ];
 
 export type StagingCredentials = {
@@ -88,7 +97,12 @@ export function resetFirebaseTraffic(watch: PageWatch) {
 
 // The staging guard, banner and Firebase target that every page must show.
 export async function expectStagingIsolation(page: Page) {
-  await expect(page.locator('script[data-b3-staging-guard]')).toHaveCount(1);
+  const homeworkGuard = page.locator('script[data-b3-homework-guard]');
+  if (await homeworkGuard.count()) {
+    await expect(homeworkGuard).toHaveCount(1);
+  } else {
+    await expect(page.locator('script[data-b3-staging-guard]')).toHaveCount(1);
+  }
   await expect(page.locator('.b3-staging-notice')).toBeVisible({ timeout: 15000 });
   const state = await page.evaluate(() => {
     const w = window as any;
@@ -127,8 +141,8 @@ export async function stagingFunctionAvailable(name: string): Promise<boolean> {
   }
 }
 
-export async function signInStudent(page: Page, student: { name: string; passcode: string }) {
-  await page.goto(SITE + '/', { waitUntil: 'domcontentloaded' });
+export async function signInStudent(page: Page, student: { name: string; passcode: string }, site = SITE) {
+  await page.goto(site + '/', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#studentSignInBtn')).toBeVisible({ timeout: 30000 });
   await page.locator('#studentNameInput').fill(student.name);
   await page.locator('#classPinInput').fill(student.passcode);
@@ -137,8 +151,8 @@ export async function signInStudent(page: Page, student: { name: string; passcod
   await expect(page.locator('#studentBar')).toBeVisible({ timeout: 45000 });
 }
 
-export async function signInAdult(page: Page, adult: { email: string; password: string }) {
-  await page.goto(SITE + '/?adminPage=1', { waitUntil: 'domcontentloaded' });
+export async function signInAdult(page: Page, adult: { email: string; password: string }, site = SITE) {
+  await page.goto(site + '/?adminPage=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!(window as any).firebase?.auth, null, { timeout: 30000 });
   await page.evaluate(async ({ email, password }) => {
     await (window as any).firebase.auth().signInWithEmailAndPassword(email, password);

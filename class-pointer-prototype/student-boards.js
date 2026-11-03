@@ -952,7 +952,7 @@
     const c=document.createElement('canvas');c.width=1600;c.height=900;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
     try{
       const ok=await window.ClassPointerPdf.openSnapshot(c.toDataURL('image/jpeg',0.92),c.width,c.height,{name:'Whiteboard',label:'whiteboard',kind:'whiteboard',
-        status:'Whiteboard open for everyone. Use ✒️ Pen to write. Students with Writing allowed can write too. Close whiteboard is at the bottom.'});
+        status:'Whiteboard open for everyone. Use ✒️ Pen to write. Students with Writing allowed can write too. Use the red Stop button when you are done.'});
       if(!ok)return;
       const tool=$('teacherTool'),color=$('teacherColor');
       if(tool.value!=='pen'){tool.value='pen';tool.dispatchEvent(new Event('change',{bubbles:true}))}
