@@ -123,3 +123,59 @@ test('revoking a teacher or removing their class while a tool stays open locks i
     }
   } finally { await browser.close(); server.close(); }
 });
+
+// Review follow-up on #441: late or out-of-order answers must never reopen a closed tool.
+const TEACHER_PATH = 'b3Games/workspaces/b3-2026/teachers/teacher_et';
+async function openAllowed(browser, port) {
+  const o = await H.openAs(browser, port, 'teacherET', 'chazara/teacher.html?class=et', { settleMs: 0 });
+  await o.page.waitForFunction(() => document.documentElement.dataset.b3Gate === 'allowed', null, { timeout: 15000 });
+  return o;
+}
+async function assertStaysClosed(page, label) {
+  await page.waitForTimeout(600);
+  const s = await H.snapshot(page);
+  assert.equal(s.locked, true, label + ': tool must stay locked');
+  assert.equal(s.visibleControlsOutsideGate, 0, label + ': no tool controls may be visible');
+  assert.deepEqual(s.writes, [], label + ': no database writes');
+}
+
+test('sign out while a tool is open: a late answer for the old account cannot reopen it', { timeout: 120000 }, async () => {
+  const server = await H.startServer(), port = server.address().port, browser = await H.chromium.launch();
+  try {
+    const { page, context } = await openAllowed(browser, port);
+    await page.evaluate(p => { window.__hold(p); window.__setTree(p + '/note', 'x'); }, TEACHER_PATH); // recheck starts, answer held
+    await page.evaluate(() => window.__signInAs(null));
+    await page.waitForFunction(() => document.documentElement.dataset.b3Gate !== 'allowed', null, { timeout: 5000 });
+    assert.equal(await page.evaluate(p => window.__watcherCount(p), TEACHER_PATH), 0, 'old account listener removed');
+    await page.evaluate(p => window.__releaseAll(p), TEACHER_PATH); // the old, still-authorized answer arrives late
+    await assertStaysClosed(page, 'sign-out');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('teacher A to teacher B on the same page: A\'s late answer cannot unlock the tool', { timeout: 120000 }, async () => {
+  const server = await H.startServer(), port = server.address().port, browser = await H.chromium.launch();
+  try {
+    const { page, context } = await openAllowed(browser, port);
+    await page.evaluate(p => { window.__hold(p); window.__setTree(p + '/note', 'x'); }, TEACHER_PATH);
+    await page.evaluate(id => window.__signInAs(id), H.IDENTITIES.teacherNew); // B has no access to class et
+    await page.waitForFunction(() => document.documentElement.dataset.b3Gate !== 'allowed', null, { timeout: 5000 });
+    assert.equal(await page.evaluate(p => window.__watcherCount(p), TEACHER_PATH), 0, 'teacher A listener removed');
+    await page.evaluate(p => window.__releaseAll(p), TEACHER_PATH);
+    await assertStaysClosed(page, 'account switch');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('out-of-order access reads: an older grant answer cannot undo a newer revocation', { timeout: 120000 }, async () => {
+  const server = await H.startServer(), port = server.address().port, browser = await H.chromium.launch();
+  try {
+    const { page, context } = await openAllowed(browser, port);
+    await page.evaluate(p => { window.__hold(p); window.__setTree(p + '/note', 'x'); }, TEACHER_PATH); // older check, held (would say allowed)
+    await page.evaluate(p => window.__setTree(p + '/active', false), TEACHER_PATH); // newer check answers at once: revoked
+    await page.waitForFunction(() => document.documentElement.dataset.b3Gate !== 'allowed', null, { timeout: 5000 });
+    await page.evaluate(p => window.__releaseAll(p), TEACHER_PATH);
+    await assertStaysClosed(page, 'out-of-order');
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});

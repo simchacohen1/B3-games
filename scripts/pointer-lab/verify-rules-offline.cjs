@@ -2,7 +2,7 @@
 // Offline version of verify-rules.cjs: evaluates a rules FILE against the same 25 scenarios with the
 // "targaryen" rules simulator, so it needs no emulator, no Java, no network and no real data.
 // Usage:  node scripts/pointer-lab/verify-rules-offline.cjs [rules-file ...]
-// Default: runs firebase-rules.json (live rules + Pointer additions) and firebase-rules.hardened.json.
+// Default: runs firebase-rules.json (live rules + explicitly approved additions) and firebase-rules.hardened.json.
 // Requires:  npm install --no-save targaryen@3.1.0
 // Exit code 0 only if the HARDENED file passes everything; the live file is reported for comparison.
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');

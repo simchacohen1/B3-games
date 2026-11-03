@@ -8,7 +8,7 @@ const { compare, parse, stripComments } = require('../scripts/rules-additive-che
 const live = () => parse(fs.readFileSync('tests/fixtures/firebase-rules.main-20261017.json', 'utf8'));
 const candidate = () => JSON.parse(fs.readFileSync('firebase-rules.json', 'utf8'));
 
-test('firebase-rules.json is the main/live baseline plus only the approved Pointer additions', () => {
+test('firebase-rules.json is the main/live baseline plus only approved additions', () => {
   assert.deepEqual(compare(live(), candidate()), []);
 });
 test('the additive-step CLI config deploys firebase-rules.json, never the hardened file', () => {
@@ -36,7 +36,7 @@ test('an unapproved new top-level node is caught', () => {
   const c = candidate(); c.rules.somethingNew = { '.read': true };
   assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/somethingNew')));
 });
-test('live rules that predate the Halacha Siman rule are accepted: only Pointer + halachaAccess are added', () => {
+test('live rules that predate the Halacha Siman rule accept the approved multiplayer and Pointer additions', () => {
   const l = live();
   delete l.rules.b3Games.workspaces.$workspaceId.classes.$classId.halachaAccess;
   assert.deepEqual(compare(l, candidate()), []);

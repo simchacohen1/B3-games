@@ -12,7 +12,10 @@ test('legacy Shorashim teacher loads only its assigned roster and students',()=>
   assert.match(teacher,/scopedStudentIds=selected\.studentIds\|\|\[\]/);
   assert.match(teacher,/scopedStudentIds\.map\(id=>db\.ref\(`\$\{ROOT\}\/students\/\$\{id\}`\)/);
   assert.match(teacher,/scopedStudentIds\.map\(id=>db\.ref\(`\$\{ROOT\}\/leaderboards\/match\/8\/\$\{id\}`\)/);
-  assert.match(teacher,/function bindFullScopeListener\(\)\{[\s\S]*?if\(legacyScoped\(\)\|\|fullScopeListenerBound\)return;[\s\S]*?db\.ref\(SPACE\)\.on\('value'/);
+  assert.match(teacher,/function bindFullScopeListener\(\)\{[\s\S]*?if\(legacyScoped\(\)\|\|fullScopeListenerBound\)return;/);
+  assert.doesNotMatch(teacher,/db\.ref\(SPACE\)\.on\('value'/,'teacher must not resubscribe to the complete Shorashim tree');
+  assert.match(teacher,/db\.ref\(`\$\{SPACE\}\/students`\)[\s\S]*?\.on\('child_changed'/);
+  assert.match(teacher,/db\.ref\(`\$\{SPACE\}\/leaderboards\/match`\)[\s\S]*?\.on\('child_changed'/);
   assert.match(teacher,/loadShorashimRecordings\(\);\s*bindFullScopeListener\(\);/);
 });
 

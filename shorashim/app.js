@@ -6,17 +6,9 @@ const DEFAULT_CATALOG = {
 
 const ILLUSTRATIONS = {"1-raah":[{"src":"assets/illustrations/seeing-binoculars.svg","label":"Looking through binoculars"}],"1-eilon":[{"src":"assets/illustrations/grove.svg","label":"A grove of trees"}],"1-yashav":[{"src":"assets/illustrations/sitting.svg","label":"A person sitting"}],"1-petach":[{"src":"assets/illustrations/entrance.svg","label":"A doorway entrance"}],"1-ohel":[{"src":"assets/illustrations/tent.svg","label":"A tent"}],"1-chom":[{"src":"assets/illustrations/heat.svg","label":"Hot sun and thermometer"}],"1-yom":[{"src":"assets/illustrations/day.svg","label":"A bright daytime scene"}],"2-nasa":[{"src":"assets/illustrations/carrying.svg","label":"A person carrying a box"}],"2-ayin":[{"src":"assets/illustrations/eye.svg","label":"A close-up eye"}],"2-shalosh":[{"src":"assets/illustrations/three-people.svg","label":"Three people"}]};
 
-/* ===== Firebase classroom connection (same b3-games project as Posuk Practice) ===== */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+/* ===== Firebase classroom connection; firebase-config.js selects the environment. ===== */
+const FIREBASE_CONFIG = window.B3_FIREBASE_CONFIG;
+if(FIREBASE_CONFIG && !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
 const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
@@ -43,7 +35,7 @@ async function resolveStudentSpace(studentId){
   classSpaceId=isClassSpace?classId:'';
   if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
 }
-const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+const STUDENT_REWARDS_AUTO_AWARD_URL=window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging'?'':'https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 let studentSiteOpen=true;
 function applyStudentSiteOpen(open){
   studentSiteOpen=teacherPreview||open!==false;
