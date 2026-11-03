@@ -18,6 +18,7 @@
 <script src="../student-class.js"></script>
 <script src="identity.js?v=teacher-player-20261029-1"></script>
 <script src="../backend/functions/student-tool-policy.js"></script>
+<script src="art.js?v=game-art-20261102-1"></script>
 <script defer src="game.js?v=teacher-player-20261029-1"></script>
 </head>
 <body>
@@ -27,6 +28,7 @@
   <p id="gameHint" class="intro">Wait for your classmates and start when everyone is ready.</p>
   <section id="message" class="notice" role="status" aria-live="polite">Checking your Fun Torah Tools sign-in…</section>
   <section id="room" class="play-area" hidden>
+    <div id="countdown" class="countdown" role="status" aria-live="assertive" hidden></div>
     <div class="room-top"><div><strong id="roomCode"></strong><div id="roomState" class="muted"></div></div><div id="players" class="player-list"></div></div>
     <div id="board" aria-label="Game board"></div>
     <div id="actions" class="actions"></div>

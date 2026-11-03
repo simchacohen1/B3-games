@@ -50,10 +50,10 @@
 <script src="student-tool-controls.js"></script>
 </head><body>
 <button id="signOut" class="signout-pill hidden">Sign out</button>
-<h1>Fun Torah Tools</h1>
-<div class="subtitle">Learning games and practice tools</div>
+<h1 id="homeTitle">Fun Torah Tools</h1>
+<div id="homeSubtitle" class="subtitle">Learning games and practice tools</div>
 <div id="gate" class="gate">Checking your teacher account…</div>
-<div id="app" class="hidden"><div class="teacher-bar"><strong id="who"></strong><div class="sub">Choose a class or open one of the tools enabled for it.</div></div><div id="classes" class="classes"></div></div>
+<div id="app" class="hidden"><div class="teacher-bar"><strong id="who"></strong><div class="sub">Choose a class or open one of the tools enabled for it.</div><div id="principalSummary"></div></div><div id="classes" class="classes"></div></div>
 <script>
 (function(){
 const api=window.B3SiteSettings,WS=api.workspaceId||"b3-2026";
@@ -81,6 +81,8 @@ let renderGeneration=0,previewActive=false;
 function previewHref(tool,classId){const p=new URLSearchParams({previewTeacher:previewTeacherId,previewType:previewParams.get('previewType')||'teacher',class:classId,tool});return 'teacher-preview-tool.html?'+p.toString();}
 function showTeacherSignIn(message){
  q('app').classList.add('hidden');q('gate').classList.remove('hidden');
+ q('classes').replaceChildren();q('principalSummary').replaceChildren();
+ q('signOut').classList.add('hidden');
  q('gate').innerHTML='<h2>Teacher &amp; administrator sign in</h2><p id="teacherSignInStatus" role="status"></p><button type="button" class="sign" id="login">Sign in with Google</button>';
  q('teacherSignInStatus').textContent=message||'Use your authorized teacher or administrator Google account.';
  q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in…';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
@@ -106,6 +108,11 @@ async function render(user,access){
    if(generation!==renderGeneration)return;
    access={...access,classIds:Object.keys(allClasses).filter(id=>allClasses[id]&&allClasses[id].active!==false)};
  }
+ const principal=access.accountType==="principal"&&!previewActive;
+ q("homeTitle").textContent=principal?"Principal Center":"Fun Torah Tools";
+ q("homeSubtitle").textContent=principal?"Teachers, supervised classes and learning tools":"Your classes and teaching tools";
+ const supervised=principal?Object.values(access.supervisedTeachers||{}):[];
+ q("principalSummary").innerHTML=principal?'<p><b>Supervised teachers:</b> '+(supervised.map(t=>esc(t.name)).join(", ")||"No teachers assigned")+'</p><p class="sub" style="color:#64748b">You have teacher-level access to your supervised classes. Adding staff and changing platform-wide settings remain owner-only.</p>':"";
  q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
  if(access.claimPending){const pending=document.createElement("p");pending.textContent="Your invitation is recognized. The owner still needs to deploy teacher account linking before class changes can be saved.";q("who").parentElement.appendChild(pending);}
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value"))),siteSettings=access.role!=="admin"&&ids.some(id=>id==="et"||id==="wt")?(await db.ref("b3Games/siteSettings").once("value")).val()||{}:{};
@@ -130,7 +137,7 @@ async function render(user,access){
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2><div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+'<div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
@@ -143,10 +150,39 @@ async function render(user,access){
 }
 q("classes").onclick=e=>{if(e.target.closest&&e.target.closest("[data-act-as-student]"))api.openActAsStudentPicker();};
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
+let principalAccessRef=null,principalAccessHandler=null;
+function stopPrincipalAccessWatch(){
+ if(principalAccessRef&&principalAccessHandler)principalAccessRef.off("value",principalAccessHandler);
+ principalAccessRef=null;principalAccessHandler=null;
+}
+function watchPrincipalAccess(user,access){
+ stopPrincipalAccessWatch();
+ if(!user?.uid||access?.accountType!=="principal"||previewTeacherId)return;
+ const ref=db.ref("b3Games/workspaces/"+WS+"/teachers/"+user.uid);
+ const handle=snapshot=>{
+  if(principalAccessRef!==ref)return;
+  render(user,window.B3PrincipalScope.accessFromPrincipalRecord(snapshot.val()));
+ };
+ const failed=()=>{
+  if(principalAccessRef!==ref)return;
+  q("classes").replaceChildren();q("principalSummary").replaceChildren();
+  q("signOut").classList.add("hidden");
+  q("app").classList.add("hidden");q("gate").classList.remove("hidden");
+  q("gate").textContent="Supervised class access could not be refreshed. Sign in again to continue.";
+ };
+ principalAccessRef=ref;principalAccessHandler=handle;
+ ref.on("value",handle,failed);
+}
+window.addEventListener("pagehide",stopPrincipalAccessWatch,{once:true});
 // The gate already says “Checking your teacher account…”. Keep that neutral
 // state until Firebase has restored the saved Google session and verified access.
 // Calling showTeacherSignIn() before this callback flashes the login unnecessarily.
-api.onAuthStateChanged((user,authorized,access)=>render(user,access||{authorized}));
+api.onAuthStateChanged((user,authorized,access)=>{
+ const resolved=access||{authorized};
+ const done=render(user,resolved);
+ watchPrincipalAccess(user,resolved);
+ return done;
+});
 })();
 </script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="← Fun Torah Tools"></script></body></html>
 
