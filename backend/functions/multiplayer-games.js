@@ -264,6 +264,18 @@ async function quickPlay(db, actor, gameKey) {
   const base = `b3Private/multiplayerGames/workspaces/${actor.workspaceId}/classes/${actor.classId}`;
   const queuePath = `${base}/quickPlay/${gameKey}`;
   const nowAt = now();
+  // A finished (or long-abandoned) earlier match must not keep sending the student back to that old room.
+  const mine = (await db.ref(`${queuePath}/${actor.studentId}`).get()).val();
+  if (mine?.status === 'matched' && mine.roomCode) {
+    const old = (await db.ref(paths(actor.workspaceId, actor.classId, mine.roomCode).privateRoom).get()).val();
+    const over = old ? (old.state === 'finished' || old.state === 'closed') : nowAt - Number(mine.matchedAt || mine.createdAt || 0) > matchmaking.QUEUE_TTL_MS;
+    if (over) {
+      await db.ref(queuePath).transaction(entries => {
+        if (entries && entries[actor.studentId]?.roomCode === mine.roomCode) delete entries[actor.studentId];
+        return entries;
+      });
+    }
+  }
   const proposedRoomCode = crypto.randomInt(100000, 1000000).toString();
   const queueTx = await db.ref(queuePath).transaction(entries => {
     entries ||= {};
