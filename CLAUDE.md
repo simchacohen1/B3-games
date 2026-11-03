@@ -18,3 +18,5 @@ Each copy of B3-games is about 0.5 GB and his C: drive is nearly full. Every cod
 - Never run `npm install` or `npm ci` in a worktree that does not need it (for example when only editing HTML, docs or notes).
 - Never delete a worktree you did not create, and never delete one with uncommitted work, without asking him first.
 - Worktrees he still needs (never remove): multiplayer-center, ftt-staging-site-368, firebase-cost-audit.
+
+- Teacher home Learning Island (2026-11-03, issue 410): LIVE on the real site (funtorahtools.com/teacher-home.html matches main, home-island.css loads). Every teacher sees their classes as the Learning Island groups with only the tools turned on for that class, plus a Teacher Tools box; no owner-only links. New classes really start with no tools (Owner Admin "Add class" saves only name + active); the tools seen in "Testing" were turned on earlier (live data not checked). Four extra tests added in tests/teacher-dashboard.test.cjs (no page change).
