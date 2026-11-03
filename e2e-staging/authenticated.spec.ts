@@ -178,8 +178,8 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherPage.getByRole('button', { name: /My Assignments/ })).toBeVisible();
     await teacherPage.getByRole('button', { name: /Preview Student View/ }).click();
     await expect(teacherPage.locator('#screenPreview')).toContainText('Fictional sample');
-    await expect(teacherPage.locator('#screenPreview button')).toHaveCount(2);
-    await expect(teacherPage.locator('#screenPreview button').first()).toBeDisabled();
+    await expect(teacherPage.locator('#fakeStudent button')).toHaveCount(2);
+    await expect(teacherPage.locator('#fakeStudent button').first()).toBeDisabled();
     await teacherPage.locator('#screenPreview .backHome').click();
     await teacherPage.getByRole('button', { name: /Create Homework/ }).click();
     await teacherPage.locator('#type').selectOption('shorashim');
@@ -196,7 +196,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await teacherPage.locator('#targetUnit').selectOption('minutes');
     await expect(teacherPage.locator('#createPreview')).toContainText(title);
     await teacherPage.getByRole('button', { name: 'Save Draft' }).click();
-    await expect(teacherPage.locator('#formMsg')).toContainText('Draft saved.');
+    await expect(teacherPage.locator('#listNotice')).toContainText('Draft saved.');
     created = true;
     teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
     assignmentId = await teacherCard.getAttribute('data-assignment-id') || '';
@@ -227,19 +227,20 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await activityPage.close();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     studentCard = studentPage.locator('#list .card').filter({ hasText: title });
-    await expect(studentCard).toContainText('Not started');
+    await expect(studentCard).toContainText('Ready to start');
 
     await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes.');
     await studentCard.getByRole('button', { name: 'Hand In Homework' }).click();
     await expect(studentCard).toContainText('Handed in');
     await studentPage.getByRole('tab', { name: /Handed In/ }).click();
     studentCard = studentPage.locator('#section-handed .card').filter({ hasText: title });
+    await studentCard.getByRole('button', { name: /Message your teacher|Read messages/ }).click();
     await studentCard.locator('.home-conversation textarea').fill('Could you check my answer?');
     await studentCard.getByRole('button', { name: 'Send message' }).click();
     await expect(studentCard).toContainText('Could you check my answer?');
 
     const studentVoice = await studentPage.evaluate(async assignmentId => {
-      const audio = 'data:audio/webm;base64,GkXfo0AgQoaBAUL3gQFCw==';
+      const audio = 'data:audio/webm;base64,GkXfowcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
       const body = { action: 'comment', assignmentId, voiceDataURL: audio,
         studentId: sessionStorage.getItem('b3Games_studentId'), studentName: sessionStorage.getItem('b3Games_studentName'),
         pin: sessionStorage.getItem('b3Games_classPin'), classId: sessionStorage.getItem('b3Games_studentClass') };
@@ -262,7 +263,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherCard).toContainText('Yes—please add one more example.');
     const signedInStudentId = await studentPage.evaluate(() => sessionStorage.getItem('b3Games_studentId') || '');
     const teacherVoice = await teacherPage.evaluate(async ({ assignmentId, studentId }) => {
-      const audio = 'data:audio/webm;base64,GkXfo0AgQoaBAUL3gQFCw==';
+      const audio = 'data:audio/webm;base64,GkXfowcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
       const token = await firebase.auth().currentUser.getIdToken();
       const response = await fetch('https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -280,24 +281,25 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     }, { assignmentId, messageId: teacherVoice.data.message.id });
     expect(studentVoiceRead.ok, JSON.stringify(studentVoiceRead.data)).toBe(true);
     expect(studentVoiceRead.data.voiceDataURL).toBe(teacherVoice.audio);
-    await teacherCard.getByLabel('Feedback for the student').fill('Please add one more example.');
+    await teacherCard.getByLabel('Feedback for ' + student.name).fill('Please add one more example.');
     await teacherCard.getByRole('button', { name: 'Return for Corrections' }).click();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     studentCard = studentPage.locator('#section-todo .card').filter({ hasText: title });
     await expect(studentCard).toContainText('Please add one more example.');
-    await studentCard.locator('textarea').fill('Fictional student practiced five minutes and added one more example.');
+    await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes and added one more example.');
     await studentCard.getByRole('button', { name: 'Fix and Hand In Again' }).click();
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
     await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     await teacherCard.getByRole('button', { name: 'Approve work by ' + student.name }).click();
-    await expect(teacherCard).toContainText('Completed');
+    await expect(teacherCard).toHaveCount(0);
 
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     studentCard = studentPage.locator('#list .card').filter({ hasText: title });
     await expect(studentCard).toContainText('Finished');
 
+    await teacherPage.locator('#screenCheck .backHome').first().click();
     await teacherPage.getByRole('button', { name: /My Assignments/ }).click();
     teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
     teacherPage.once('dialog', dialog => dialog.accept());

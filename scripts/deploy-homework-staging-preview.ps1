@@ -86,7 +86,12 @@ function Prepare-StagingBootstrap {
       $existing = [System.IO.File]::ReadAllText($path)
       $normalizedExisting = ($existing -replace "`r`n", "`n").TrimEnd("`n")
       $normalizedContent = ($content -replace "`r`n", "`n").TrimEnd("`n")
-      if ($normalizedExisting -cne $normalizedContent) {
+      # The tracked guard file may be newer than the hosted one (it gains
+      # staging-only test flags); accept it only if it passes the same checks.
+      $localGuardOk = $asset.Name -eq 'staging-config.js' -and
+        $existing -match "REQUIRED_PROJECT\s*=\s*'fun-torah-tools-staging'" -and
+        $existing -match 'installNetworkGuards' -and $existing -match 'installFirebaseGuard'
+      if ($normalizedExisting -cne $normalizedContent -and -not $localGuardOk) {
         throw "Refusing to overwrite existing local staging asset '$($asset.Name)'."
       }
     } else {
