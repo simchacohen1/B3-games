@@ -293,6 +293,8 @@ async function studentDo(store, body, now, ip, newId) {
   const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
     () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   const sid = student.id, classId = student.classId;
+  // A class named by the browser must be the student's own active class (checked here so shared sign-in code stays untouched).
+  if (body.classId && String(body.classId) !== classId) fail(403, 'Choose an active class on the main site first.');
   if (!key(sid) || !key(classId)) fail(403, 'Choose your class and sign in again.');
   const actor = { id: sid, role: 'student', authenticated: true };
   const ctx = ctxFor(classId, sid, sid, 'student');

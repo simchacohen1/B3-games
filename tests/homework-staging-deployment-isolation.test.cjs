@@ -9,10 +9,20 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const file = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('general production Functions index does not expose staging homework', () => {
+test('live Functions index exposes the live homework function, staging keeps its own copy', () => {
   const index = file('backend/functions/index.js');
-  assert.doesNotMatch(index, /exports\.homeworkPortal\s*=/);
+  assert.match(index, /exports\.homeworkPortal\s*=\s*require\("\.\/homework"\)\.homeworkPortal/);
+  assert.doesNotMatch(file('backend/functions/homework.js'), /fun-torah-tools-staging/);
   assert.match(file('backend/functions/homework-staging/index.js'), /homework/);
+  assert.doesNotMatch(file('backend/functions/homework-staging/homework.js'), /funtorahtools\.com/);
+});
+
+test('live homework function accepts only Google teachers, staging also accepts verified email teachers', () => {
+  const live = file('backend/functions/homework-core.cjs');
+  const staging = file('backend/functions/homework-staging/homework-core.cjs');
+  assert.doesNotMatch(live, /'password'/);
+  assert.match(live, /sign_in_provider !== 'google\.com'/);
+  assert.match(staging, /\['google\.com', 'password'\]/);
 });
 
 test('homework deploy script and configuration remain staging preview only', () => {

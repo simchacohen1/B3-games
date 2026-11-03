@@ -6,6 +6,9 @@
   var cfg = root.B3_STAGING_FIREBASE_CONFIG || root.B3_FIREBASE_CONFIG || null;
   var hostOk = host === 'fun-torah-tools-staging.web.app' ||
     /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(host);
+  // The live site (b3-games on the live hosts) uses its own config; this guard only protects staging.
+  var liveHosts = ['funtorahtools.com', 'www.funtorahtools.com', 'simchacohen1.github.io'];
+  if (liveHosts.indexOf(host) !== -1 && cfg && cfg.projectId === 'b3-games') return;
   var valid = hostOk && cfg && cfg.projectId === project;
   root.__B3_STAGING_BLOCKED__ = !valid;
   root.B3_STAGING_FIREBASE_CONFIG = valid ? cfg : null;

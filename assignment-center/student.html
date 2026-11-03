@@ -33,7 +33,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 (function(){'use strict';
 var H=window.HomeworkCommon,el=H.el;
 var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
-if(!H.isStagingRuntime()){statusBox.textContent='This assignment preview only connects to the isolated staging Firebase project.';return}
+if(!H.isAllowedRuntime()){statusBox.textContent='Homework is not available on this site.';return}
 function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
 var auth={studentId:ss('b3Games_studentId'),studentName:ss('b3Games_studentName'),pin:ss('b3Games_classPin'),classId:ss('b3Games_studentClass')};
 if(!auth.studentId||!auth.pin){

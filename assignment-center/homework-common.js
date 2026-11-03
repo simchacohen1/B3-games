@@ -10,11 +10,14 @@
     root.location.search.indexOf('local-staging=1') !== -1;
   var isStagingRuntime = projectId === STAGING_PROJECT &&
     (host === STAGING_HOST || STAGING_PREVIEW_HOST.test(host) || localPreview);
+  var LIVE_PROJECT = 'b3-games';
+  var LIVE_HOSTS = ['funtorahtools.com', 'www.funtorahtools.com', 'simchacohen1.github.io'];
+  var isLiveRuntime = projectId === LIVE_PROJECT && LIVE_HOSTS.indexOf(host) !== -1;
   var API = isStagingRuntime
     ? (localPreview && /^http:\/\/(localhost|127\.0\.0\.1):5001\//.test(root.B3_HOMEWORK_API_URL || '')
       ? root.B3_HOMEWORK_API_URL
       : 'https://us-central1-' + STAGING_PROJECT + '.cloudfunctions.net/homeworkPortal')
-    : '';
+    : isLiveRuntime ? 'https://us-central1-' + LIVE_PROJECT + '.cloudfunctions.net/homeworkPortal' : '';
   var TYPES = {
     shorashim: 'Shorashim practice', weeklyQuiz: 'Weekly Quiz', rashiLetters: 'Rashi Letters',
     posuk: 'Posuk Practice', chazara: 'Chazara', workbook: 'Workbook page',
@@ -35,7 +38,7 @@
     return n;
   }
   async function call(body, token) {
-    if (!API) throw new Error('This assignment preview is locked to the isolated staging site.');
+    if (!API) throw new Error('Homework is not available on this site.');
     var headers = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = 'Bearer ' + token;
     var res;
@@ -168,7 +171,7 @@
     return box;
   }
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
-    isStagingRuntime: function () { return isStagingRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
+    isStagingRuntime: function () { return isStagingRuntime; }, isAllowedRuntime: function () { return isStagingRuntime || isLiveRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
     dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
     teacherStatusCounts: teacherStatusCounts };
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;

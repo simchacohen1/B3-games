@@ -26,7 +26,7 @@ main .screen[hidden],.wizard-step[hidden]{display:none!important}.classbar{posit
 </style></head><body>
 <header><strong>📚 Homework – Teacher</strong><span><span id="who"></span> <button class="sec" id="signout" style="display:none">Sign out</button></span></header>
 <main>
-<div id="signin" class="card"><p>Sign in with your authorized teacher account. Fictional staging teachers may also sign in on the staging homepage.</p><button id="go">Sign in with Google</button><div id="signinMsg" class="msg err"></div></div>
+<div id="signin" class="card"><p>Sign in with your authorized teacher account.</p><button id="go">Sign in with Google</button><div id="signinMsg" class="msg err"></div></div>
 <div id="app" style="display:none">
   <div class="classbar"><label for="cls">Your class</label><select id="cls" aria-label="Choose an authorized class"></select></div>
   <section class="screen" id="screenHome" aria-labelledby="homeTitle"><h1 id="homeTitle">What would you like to do?</h1><p class="muted">Choose one task. Your class is <span id="homeClass"></span>.</p>
@@ -63,7 +63,7 @@ main .screen[hidden],.wizard-step[hidden]{display:none!important}.classbar{posit
 (function(){'use strict';
 var H=window.HomeworkCommon,el=H.el,$=function(i){return document.getElementById(i)};
 var WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
-if(!H.isStagingRuntime()){$('signinMsg').textContent='This prototype only connects to the isolated staging Firebase project.';$('go').disabled=true;return}
+if(!H.isAllowedRuntime()){$('signinMsg').textContent='Homework is not available on this site.';$('go').disabled=true;return}
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 var auth=firebase.auth();
 var state={classId:'',data:null,editing:null,editingPublication:null,filter:'all',createStep:1};

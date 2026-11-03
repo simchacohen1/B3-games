@@ -7,8 +7,10 @@
   var host = location.hostname.toLowerCase();
   var projectId = window.B3_FIREBASE_CONFIG && window.B3_FIREBASE_CONFIG.projectId;
   var stagingPreview = /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(host);
-  if ((host !== 'fun-torah-tools-staging.web.app' && !stagingPreview) || projectId !== 'fun-torah-tools-staging') return;
-  var API = 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal';
+  var live = ['funtorahtools.com', 'www.funtorahtools.com', 'simchacohen1.github.io'].indexOf(host) !== -1 && projectId === 'b3-games';
+  var staging = (host === 'fun-torah-tools-staging.web.app' || stagingPreview) && projectId === 'fun-torah-tools-staging';
+  if (!live && !staging) return;
+  var API = 'https://us-central1-' + projectId + '.cloudfunctions.net/homeworkPortal';
   var bar = document.getElementById('studentBar');
   if (!bar) return;
   var done = '';

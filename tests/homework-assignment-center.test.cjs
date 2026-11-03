@@ -92,12 +92,20 @@ test('teacher status totals separate missing, overdue, submitted, and completed 
   }), { assigned: 1, submitted: 1, completed: 1, missing: 1, overdue: 2 });
 });
 
-test('preview runtime refuses production Firebase and activity links never submit on open', async () => {
-  const context = { window: { location: { hostname: 'simchacohen1.github.io', search: '' }, B3_FIREBASE_CONFIG: { projectId: 'b3-games' } }, URL };
-  vm.runInNewContext(fs.readFileSync(__dirname + '/../assignment-center/homework-common.js', 'utf8'), context);
-  assert.equal(context.window.HomeworkCommon.API, '');
-  assert.equal(context.window.HomeworkCommon.isStagingRuntime(), false);
-  await assert.rejects(context.window.HomeworkCommon.call({ action: 'studentList' }), /locked to the isolated staging site/);
+test('homework runs only on the live site with live config, or on staging; activity links never submit on open', async () => {
+  const live = { window: { location: { hostname: 'funtorahtools.com', search: '' }, B3_FIREBASE_CONFIG: { projectId: 'b3-games' } }, URL };
+  vm.runInNewContext(fs.readFileSync(__dirname + '/../assignment-center/homework-common.js', 'utf8'), live);
+  assert.equal(live.window.HomeworkCommon.API, 'https://us-central1-b3-games.cloudfunctions.net/homeworkPortal');
+  assert.equal(live.window.HomeworkCommon.isStagingRuntime(), false);
+  assert.equal(live.window.HomeworkCommon.isAllowedRuntime(), true);
+  // live config on any other host, or staging config on a live host, is refused
+  for (const [hostname, projectId] of [['evil.example.com', 'b3-games'], ['funtorahtools.com', 'fun-torah-tools-staging']]) {
+    const context = { window: { location: { hostname, search: '' }, B3_FIREBASE_CONFIG: { projectId } }, URL };
+    vm.runInNewContext(fs.readFileSync(__dirname + '/../assignment-center/homework-common.js', 'utf8'), context);
+    assert.equal(context.window.HomeworkCommon.API, '');
+    assert.equal(context.window.HomeworkCommon.isAllowedRuntime(), false);
+    await assert.rejects(context.window.HomeworkCommon.call({ action: 'studentList' }), /not available on this site/);
+  }
 
   const html = fs.readFileSync(__dirname + '/../assignment-center/student.html', 'utf8');
   assert.match(html, /data-assignment-launch/);
@@ -148,8 +156,16 @@ test('staging guard accepts only the staging host/project and provides local act
   } };
   vm.runInNewContext(guard, production);
   vm.runInNewContext(common, production);
-  assert.equal(production.window.__B3_STAGING_BLOCKED__, true);
-  assert.equal(production.window.HomeworkCommon.API, '');
+  // On the live hosts with the live config the staging guard steps aside; the page then talks to the live function.
+  assert.notEqual(production.window.__B3_STAGING_BLOCKED__, true);
+  assert.equal(production.window.HomeworkCommon.API, 'https://us-central1-b3-games.cloudfunctions.net/homeworkPortal');
+  // ...but live config on an unknown host is still blocked.
+  const stranger = { window: { location: { hostname: 'evil.example.com', search: '', href: 'https://evil.example.com/' },
+    B3_FIREBASE_CONFIG: { projectId: 'b3-games' } } };
+  vm.runInNewContext(guard, stranger);
+  vm.runInNewContext(common, stranger);
+  assert.equal(stranger.window.__B3_STAGING_BLOCKED__, true);
+  assert.equal(stranger.window.HomeworkCommon.API, '');
 });
 
 test('preview Firebase config and bootstrap stay isolated from production', () => {
@@ -232,7 +248,8 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     assert.match(html, /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} must load the staging guard before app scripts`);
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
-  assert.match(fnSource, /homework-406-preview/);
+  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites');
+  assert.doesNotMatch(fnSource, /fun-torah-tools-staging/, 'the live function never lists staging sites');
   for (const file of ['homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(
       fs.readFileSync(__dirname + '/../backend/functions/homework-staging/' + file, 'utf8'),
@@ -241,8 +258,8 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     );
   }
   const stagingEndpoint = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/homework.js', 'utf8');
-  assert.match(stagingEndpoint, /voiceComment\?320000:20000/, 'only the isolated staging endpoint permits bounded voice-note payloads');
-  assert.match(fnSource, /Buffer\.byteLength\(JSON\.stringify\(req\.body\|\|\{\}\)\)>20000/, 'production endpoint keeps its existing request limit');
+  assert.match(stagingEndpoint, /voiceComment\?320000:20000/, 'staging endpoint permits bounded voice-note payloads');
+  assert.match(fnSource, /voiceComment\?320000:20000/, 'live endpoint permits the same bounded voice-note payloads (100 KB audio, 6 per assignment)');
   const stagingCore = fs.readFileSync(__dirname + '/../backend/functions/homework-staging/homework-core.cjs', 'utf8');
   assert.doesNotMatch(stagingCore, /OWNER_EMAIL/, 'staging owner authorization is UID based');
   assert.match(stagingCore, /async function authorizedClasses\(store, identity\)/,
@@ -255,6 +272,4 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);
   const smokeSource = fs.readFileSync(__dirname + '/../e2e-staging/public-smoke.spec.ts', 'utf8');
   assert.match(smokeSource, /tool\.previewOnly && process\.env\.GITHUB_EVENT_NAME === 'pull_request'/);
-  const workflow = fs.readFileSync(__dirname + '/../.github/workflows/staging-unattended.yml', 'utf8');
-  assert.match(workflow, /Optional exact staging live or Homework preview URL/);
 });

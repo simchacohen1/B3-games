@@ -1,17 +1,15 @@
 'use strict';
-// Homework Portal endpoint. Deploy only to fun-torah-tools-staging for issue #406.
+// Homework Portal endpoint (live site). The staging copy lives in homework-staging/ and is deployed separately.
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {homeworkApi}=require('./homework-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.homeworkPortal=onRequest({region:'us-central1',cors:[
- 'https://fun-torah-tools-staging.web.app',
- /^https:\/\/fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/
-],maxInstances:5,timeoutSeconds:30,memory:'256MiB'},async(req,res)=>{
+exports.homeworkPortal=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:5,timeoutSeconds:30,memory:'256MiB'},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method==='GET')return res.json({ok:true,ready:true,version:1});
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
- if(Buffer.byteLength(JSON.stringify(req.body||{}))>20000)return res.status(413).json({error:'Request too large.'});
+ const voiceComment=req.body?.action==='comment'&&typeof req.body?.voiceDataURL==='string';
+ if(Buffer.byteLength(JSON.stringify(req.body||{}))>(voiceComment?320000:20000))return res.status(413).json({error:'Request too large.'});
  try{
   const db=admin.database();
   const store={
