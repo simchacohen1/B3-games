@@ -36,13 +36,13 @@ const IDENTITIES = {
 function stubSource(identity) {
   const user = identity ? { ...identity } : null;
   return `(()=>{
- const T=${JSON.stringify(TREE)},U=${JSON.stringify(user)},reads=[],writes=[],watchers={};
+ const T=${JSON.stringify(TREE)},holds={},U=${JSON.stringify(user)},reads=[],writes=[],watchers={};
  const USER=U?Object.assign({},U,{getIdToken:async()=> 'token-'+U.uid}):null;
  const at=p=>p.split('/').filter(Boolean).reduce((v,k)=>v==null?undefined:v[k],T);
  const snap=v=>({val:()=>v==null?null:structuredClone(v),exists:()=>v!=null,forEach:()=>false,numChildren:()=>0,key:null});
  const ref=p=>{const r={
-  once:async()=>{reads.push(p);return snap(at(p))},get:async()=>{reads.push(p);return snap(at(p))},
-  on:(e,cb)=>{reads.push(p);(watchers[p]=watchers[p]||[]).push(cb);setTimeout(()=>{try{cb&&cb(snap(at(p)))}catch(x){}},0);return cb},off:()=>{},
+  once:async()=>{reads.push(p);const v=snap(at(p));const h=holds[p];if(h&&h.length){await new Promise(res=>h.shift()(res))}return v},get:async()=>{reads.push(p);return snap(at(p))},
+  on:(e,cb)=>{reads.push(p);(watchers[p]=watchers[p]||[]).push(cb);setTimeout(()=>{try{cb&&cb(snap(at(p)))}catch(x){}},0);return cb},off:(e,cb)=>{const a=watchers[p];if(a){const i=a.indexOf(cb);if(i>=0)a.splice(i,1)}},
   set:async()=>{writes.push(p)},update:async()=>{writes.push(p)},remove:async()=>{writes.push(p)},transaction:async()=>{writes.push(p);return{committed:false,snapshot:snap(null)}},
   push:()=>ref(p+'/pushed'),child:c=>ref(p+'/'+c),orderByChild:()=>r,orderByKey:()=>r,equalTo:()=>r,limitToLast:()=>r,limitToFirst:()=>r,startAt:()=>r,endAt:()=>r,
   onDisconnect:()=>({set:async()=>{},remove:async()=>{},cancel:async()=>{}}),key:p.split('/').pop(),parent:null};return r};
@@ -54,6 +54,9 @@ function stubSource(identity) {
  const rememberedApp={auth:()=>remembered,delete:async()=>{}};
  const firebase={apps:[{}],initializeApp(){return rememberedApp},app:n=>{if(n==='FTTRememberedTeacher')return rememberedApp;return{auth:()=>auth,database:()=>db}},database:Object.assign(()=>db,{ServerValue:{TIMESTAMP:{'.sv':'timestamp'}}}),auth:Object.assign(()=>auth,{Auth:{Persistence:{LOCAL:'local',SESSION:'session',NONE:'none'}},GoogleAuthProvider}),storage:()=>({ref:()=>({put:async()=>{},getDownloadURL:async()=>''})}),functions:()=>({httpsCallable:()=>async()=>({data:{}})})};
  window.__setTree=(p,v)=>{const k=p.split('/').filter(Boolean),last=k.pop();let o=T;for(const x of k)o=o[x]=o[x]||{};if(v===undefined)delete o[last];else o[last]=v;for(const w of Object.keys(watchers)){if(w===p||w.startsWith(p+'/')||p.startsWith(w+'/'))for(const cb of watchers[w])try{cb(snap(at(w)))}catch(x){}}};
+ window.__hold=(p)=>{(holds[p]=holds[p]||[]).push(r=>{window.__release=window.__release||{};(window.__release[p]=window.__release[p]||[]).push(r)})};window.__releaseAll=(p)=>{for(const r of (window.__release&&window.__release[p])||[])r();if(window.__release)window.__release[p]=[]};
+ window.__watcherCount=p=>(watchers[p]||[]).length;
+ window.__signInAs=(u)=>{auth.currentUser=u?Object.assign({},u,{getIdToken:async()=>'token-'+u.uid}):null;for(const cb of listeners.slice())try{cb(auth.currentUser)}catch(x){}};
  window.firebase=firebase;window.__reads=reads;window.__writes=writes;
  })();`;
 }

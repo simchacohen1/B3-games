@@ -115,27 +115,57 @@
   }
   // Revocation while the page stays open: site-settings only reads access when sign-in changes,
   // so watch this teacher's own records and re-decide the moment they change.
-  var watchedUid = null;
+  // Every decision (sign-in change or record change) takes a new generation number. A slower, older
+  // result, or one for an account that is no longer signed in, is dropped and can never reopen the tool.
+  var watchedUid = null, unwatchAccess = null, decisionGen = 0;
+  function currentUid() {
+    try { var u = window.firebase.auth().currentUser; return u && u.uid ? u.uid : null; } catch (e) { return null; }
+  }
+  function stopWatching() {
+    var off = unwatchAccess; unwatchAccess = null; watchedUid = null;
+    if (off) { try { off(); } catch (e) { /* nothing left to clean up */ } }
+  }
   function watchAccess(user) {
     try {
       var api = window.B3SiteSettings, fb = window.firebase;
       if (!user || !user.uid || watchedUid === user.uid || !fb || !fb.database || !api) return;
+      stopWatching();
       if (String(user.email || "").toLowerCase() === "simcha5770@gmail.com") return; // owner is fixed by email
       var db = fb.database(), ws = "b3Games/workspaces/" + (api.workspaceId || "b3-2026");
       var adminRef = db.ref("b3Games/admins/" + user.uid), teacherRef = db.ref(ws + "/teachers/" + user.uid);
-      watchedUid = user.uid;
-      var first = { a: true, t: true };
+      var uid = user.uid, live = true, first = { a: true, t: true };
+      watchedUid = uid;
+      function stillCurrent(gen) { return live && watchedUid === uid && gen === decisionGen && currentUid() === uid; }
       function recheck() {
+        if (!live) return;
+        var gen = ++decisionGen;
         Promise.all([adminRef.once("value"), teacherRef.once("value")]).then(function (s) {
+          if (!stillCurrent(gen)) return;
           var admin = s[0].val(), teacher = s[1].val();
           if (admin && admin.active !== false) return onDecision(user, true, { authorized: true, role: "admin", classIds: ["*"] });
           var ids = teacher && teacher.active !== false && teacher.classIds ? Object.keys(teacher.classIds).filter(function (k) { return k !== "*" && teacher.classIds[k] === true; }) : [];
           onDecision(user, ids.length > 0, ids.length ? { authorized: true, role: "teacher", classIds: ids } : { authorized: false, role: "", classIds: [] });
-        }).catch(function () { onDecision(user, false, { authorized: false, role: "", classIds: [] }); });
+        }).catch(function () {
+          if (stillCurrent(gen)) onDecision(user, false, { authorized: false, role: "", classIds: [] });
+        });
       }
-      adminRef.on("value", function () { if (first.a) { first.a = false; return; } recheck(); });
-      teacherRef.on("value", function () { if (first.t) { first.t = false; return; } recheck(); });
+      var onAdmin = function () { if (first.a) { first.a = false; return; } recheck(); };
+      var onTeacher = function () { if (first.t) { first.t = false; return; } recheck(); };
+      adminRef.on("value", onAdmin);
+      teacherRef.on("value", onTeacher);
+      unwatchAccess = function () {
+        live = false;
+        try { adminRef.off("value", onAdmin); } catch (e) { /* ignore */ }
+        try { teacherRef.off("value", onTeacher); } catch (e) { /* ignore */ }
+      };
     } catch (e) { /* the sign-in-time check above still stands */ }
+  }
+  // A sign-in change is the newest word: it voids pending rechecks and drops the old account's listeners.
+  function onAuthDecision(user, authorized, access) {
+    if (user && user.uid && currentUid() && user.uid !== currentUid()) return; // late answer for an account that is gone
+    decisionGen++;
+    if (!user || !user.uid || user.uid !== watchedUid) stopWatching();
+    onDecision(user, authorized, access);
   }
   function onDecision(user, authorized, access) {
     var d = decide(user, authorized, access);
@@ -187,7 +217,7 @@
     ensureSiteSettings().then(function () {
       var api = window.B3SiteSettings;
       if (!api || !api.onAuthStateChanged) throw new Error("Access check unavailable");
-      api.onAuthStateChanged(function (user, authorized, access) { clearTimeout(failTimer); onDecision(user, authorized, access); });
+      api.onAuthStateChanged(function (user, authorized, access) { clearTimeout(failTimer); onAuthDecision(user, authorized, access); });
     }).catch(function () {
       show("Could not check your access", "Please reload the page. Teacher tools stay closed until access is confirmed.", [{ label: "Reload", onClick: function () { location.reload(); } }, homeButton()]);
     });
