@@ -249,7 +249,7 @@
         if (r.qi >= list(data.questions).length) renderWaiting(); else countdown(); return;
       }
       if (r.shown === "waiting") { renderWaiting(); return; }
-      var old = box.querySelector("[data-b3r-board]"); if (old) old.replaceWith(board(data, false));
+      var old = box.querySelector("[data-b3r-board]"); if (old && !old.hasAttribute("data-b3r-final")) old.replaceWith(board(data, false)); /* never overwrite the final medal board */
     }
 
     function renderLobby(data, all) {
@@ -299,7 +299,7 @@
       });
     }
     function board(data, results) {
-      var total = list(data.questions).length || 1, b = el("div", "b3r-board"); b.setAttribute("data-b3r-board", "1");
+      var total = list(data.questions).length || 1, b = el("div", "b3r-board"); b.setAttribute("data-b3r-board", "1"); if (results) b.setAttribute("data-b3r-final", "1");
       ranked(data).forEach(function (x, i) {
         var id = x[0], p = x[1], row = el("div", "b3r-row" + (id === me ? " me" : "") + (p.left ? " left" : ""));
         var medal = results ? (["🥇", "🥈", "🥉"][i] || (i + 1) + ".") : (p.finishedAt ? "🏁" : (i + 1) + ".");
