@@ -5,7 +5,7 @@ const GAMES = Object.freeze({
   'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2 },
   'memory-match': { name: 'Memory Match', minPlayers: 2, maxPlayers: 4 },
   checkers: { name: 'Checkers', minPlayers: 2, maxPlayers: 2 },
-  reversi: { name: 'Reversi', minPlayers: 2, maxPlayers: 2 },
+  reversi: { name: 'Othello', minPlayers: 2, maxPlayers: 2 },
   bingo: { name: 'Bingo', minPlayers: 2, maxPlayers: 8 },
   'math-race': { name: 'Math Race', minPlayers: 2, maxPlayers: 8 },
   set: { name: 'Set', minPlayers: 2, maxPlayers: 6 },
@@ -173,7 +173,7 @@ function applyMove(gameKey, state, playerId, move, players) {
   if (gameKey === 'connect-four') return moveConnectFour(state, playerId, move);
   if (gameKey === 'tic-tac-toe') return moveTicTacToe(state, playerId, move);
   if (gameKey === 'checkers') return moveCheckers(state, playerId, move);
-  if (gameKey === 'reversi') return moveReversi(state, playerId, move);
+  if (gameKey === 'reversi') return moveOthello(state, playerId, move);
   reject('This multiplayer game is not available yet.');
 }
 
@@ -298,14 +298,14 @@ function reversiFlips(board, index, color) {
   }
   return flips;
 }
-function finishReversi(state) {
+function finishOthello(state) {
   const red = state.board.filter(value => value === 'red').length, yellow = state.board.filter(value => value === 'yellow').length;
   state.scores = { [state.playersOrder[0]]: red, [state.playersOrder[1]]: yellow };
   if (red === yellow) state.draw = true;
   else state.winner = state.playersOrder[red > yellow ? 0 : 1];
   state.finished = true;
 }
-function moveReversi(state, playerId, move) {
+function moveOthello(state, playerId, move) {
   const color = playerId === state.playersOrder[0] ? 'red' : 'yellow';
   if (move.type === 'pass') {
     if (state.board.some((value, index) => reversiFlips(state.board, index, color).length)) reject('You have a legal move; choose a square.');
@@ -320,7 +320,7 @@ function moveReversi(state, playerId, move) {
   const nextId = state.playersOrder.find(id => id !== playerId), nextColor = nextId === state.playersOrder[0] ? 'red' : 'yellow';
   const canPlay = state.board.some((value, index) => reversiFlips(state.board, index, nextColor).length);
   const canRepeat = state.board.some((value, index) => reversiFlips(state.board, index, color).length);
-  if (state.board.every(Boolean) || state.passes >= 2 || !canPlay && !canRepeat) finishReversi(state);
+  if (state.board.every(Boolean) || state.passes >= 2 || !canPlay && !canRepeat) finishOthello(state);
   else state.turn = canPlay ? nextId : playerId;
   return state;
 }
