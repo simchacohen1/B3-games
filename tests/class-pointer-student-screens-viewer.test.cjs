@@ -202,23 +202,16 @@ async function dashboardFixture({search='?teacher=1',classes={et:{name:'ET',acti
   return{nodes,history,welcomeTexts,assigned,signIn:(access=({authorized:true,role:'admin'}))=>authCallback({uid:'t'},access.authorized,access),dom};
 }
 
-test('regular teacher entry opens the class automatically and never shows the class chooser',async()=>{
+test('regular teacher entry never opens a class before the teacher confirms one',async()=>{
   const f=await dashboardFixture();
-  assert.equal(f.nodes.teacherChoice.hidden,true,'chooser is hidden from the first moment');
   await f.signIn();
-  assert.equal(f.assigned.length,1,'opens one class');
-  assert.match(f.assigned[0],/classroom\.html\?dashboard=teacher&class=et$/);
-  assert.equal(f.nodes.teacherChoice.hidden,true,'chooser never became visible');
-  assert.ok(!f.history.includes(false),'chooser visibility was never switched on');
-  assert.ok(!f.welcomeTexts.some(text=>/Choose a class/.test(text)),'"Choose a class" text never flashed');
-  assert.match(f.nodes.message.textContent,/Opening ET/);
+  assert.equal(f.assigned.length,0,'no class is opened quietly');
 });
 
-test('the last used class is opened automatically',async()=>{
+test('a last used class is not opened automatically either',async()=>{
   const f=await dashboardFixture({classes:{et:{name:'ET',active:true},wt:{name:'WT',active:true}},saved:'wt'});
   await f.signIn();
-  assert.match(f.assigned[0],/class=wt$/);
-  assert.equal(f.nodes.teacherChoice.hidden,true);
+  assert.equal(f.assigned.length,0);
 });
 
 test('the chooser still appears when a class cannot open by itself',async()=>{
