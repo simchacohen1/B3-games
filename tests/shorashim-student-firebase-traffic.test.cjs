@@ -60,6 +60,6 @@ test('normal Shorashim sign-in avoids leaderboard downloads and full progress re
 });
 
 test('normal learning still saves student progress',()=>{
-  assert.match(sourceOf('scheduleCloudStudentSave'),/\.set\(payload\)/);
+  assert.match(sourceOf('flushCloudStudentSave'),/\.set\(payload\)/);
   assert.match(sourceOf('saveDB'),/scheduleCloudStudentSave\(\)/);
 });
