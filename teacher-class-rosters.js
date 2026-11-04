@@ -62,8 +62,13 @@
     if (!classes.length) throw new Error("No active classes are assigned to this teacher.");
     // All classes share the same ordering, regardless of their IDs.
     classes.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    // Never start on a class quietly: the teacher confirms one first.
+    const names = {}; classes.forEach(c => { names[c.id] = c.name; });
+    const selectedId = window.B3ClassGate
+      ? await window.B3ClassGate.choose({ ids: classes.map(c => c.id), names, requested: requested || "-" })
+      : (requested || classes[0].id);
     return {
-      classes, selectedId: requested || classes[0].id,
+      classes, selectedId,
       uid: session.user.uid, role: session.access.role
     };
   }

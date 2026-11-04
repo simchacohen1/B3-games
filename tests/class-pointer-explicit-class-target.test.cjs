@@ -46,17 +46,13 @@ async function chooser(mode,{saved=null,classIds=['et','wt']}={}){
   if(mode)assert.equal(navigated,null,'screen and whiteboard requests must never be sent without an explicit class choice');
   return {buttons,store,get navigated(){return navigated},message:elements.message.textContent};
 }
-test('Class Pointer teacher classroom opens directly in an authorized class (last used, else ET)',async()=>{
-  // Approved change (PR #161): Teacher Tools > Classroom Pointer skips the intro chooser.
-  const fresh=await chooser();
-  assert.match(fresh.navigated,/classroom\.html\?dashboard=teacher&class=et$/);
-  assert.doesNotMatch(fresh.navigated,/sendEveryone/);
-  const last=await chooser(undefined,{saved:'wt'});
-  assert.match(last.navigated,/class=wt$/);
-  // A remembered class the teacher is no longer assigned to is never opened.
-  const revoked=await chooser(undefined,{saved:'other',classIds:['wt']});
-  assert.match(revoked.navigated,/class=wt$/);
-  assert.equal(revoked.store.get('classPointerLastTeacherClass'),'wt');
+test('Class Pointer teacher classroom never opens a class until the teacher confirms one',async()=>{
+  // Teacher request: no page may quietly start on a class (not last used, not ET).
+  for(const opts of [undefined,{saved:'wt'},{saved:'other',classIds:['wt']}]){
+    const c=await chooser(undefined,opts);
+    assert.equal(c.navigated,null,'nothing opens before the teacher confirms');
+    assert.match(c.message,/Nothing starts until you choose a class/);
+  }
 });
 test('Teacher Tools screen-sharing action targets only chosen class',async()=>{
   const c=await chooser('sendEveryoneShare');

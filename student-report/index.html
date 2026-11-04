@@ -98,6 +98,7 @@ button:disabled{opacity:.55;cursor:wait}
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../yiddish/api.js"></script>
 <script src="quiz-history.js?v=20261026-simple-csv"></script>
@@ -559,8 +560,8 @@ async function start(u,authorized,acc){
  try{
   classes=await classIdsFor(access,u);
   if(!classes.length){$('gate').textContent='No classes are assigned to this teacher account yet.';return}
-  const want=new URLSearchParams(location.search).get('class');
-  current=classes.some(c=>c.id===want)?want:classes[0].id;
+  const names={};classes.forEach(c=>{names[c.id]=c.name});
+  current=await B3ClassGate.choose({ids:classes.map(c=>c.id),names});
   $('gate').style.display='none';$('app').style.display='';
   drawTabs();show(false);
   const sid=new URLSearchParams(location.search).get('student');if(sid)openId=sid;
