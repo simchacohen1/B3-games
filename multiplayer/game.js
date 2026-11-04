@@ -318,20 +318,7 @@
       const scores = (room.players || []).map(player => `${player.name}: ${player.score || 0}`).join(' · ');
       board.append(grid, text('div', 'player-turn', scores));
     } else if (gameKey === 'checkers') {
-      const grid = text('div', 'board strategy-board');
-      const ownTurn = room.turn === studentId && !room.finished;
-      for (let index = 0; index < 64; index += 1) {
-        const piece = room.board?.[index] || '', own = piece.startsWith(room.playersOrder?.[0] === studentId ? 'red' : 'yellow');
-        const label = piece ? (piece.endsWith('-king') ? '♛' : '●') : '';
-        const square = (Math.floor(index / 8) + index % 8) % 2 ? 'dark-square ' : 'light-square ';
-        const color = piece ? (piece.startsWith('red') ? 'piece-red' : 'piece-yellow') : '';
-        const selected = selectedChecker === index ? ' selected-square' : '';
-        grid.appendChild(cell(label, square + color + selected, () => {
-          if (own) { selectedChecker = index; draw(); return; }
-          if (selectedChecker != null) { const from = selectedChecker; selectedChecker = null; call('move', { move: { type: 'move', from, to: index } }).catch(showError); }
-        }, !ownTurn || (!own && selectedChecker == null)));
-      }
-      board.append(grid);
+      drawCheckersTable(board);
     } else if (gameKey === 'reversi') {
       const grid = text('div', 'board strategy-board');
       const ownTurn = room.turn === studentId && !room.finished;
@@ -636,12 +623,51 @@
     const hint = text('div', 'gf-hint', ownTurn ? (askRank != null ? 'Asking for ' + FISH_RANKS[askRank] + 's — tap a player.' : 'Pick a card to ask for.') : '');
     board.append(players, pond, hand, hint);
   }
+  function drawCheckersTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    const redId = room.playersOrder?.[0];
+    const mySide = redId === studentId ? 'red' : 'yellow';
+    const pieces = room.board || Array(64).fill(null);
+    if (selectedChecker != null && (!ownTurn || !String(pieces[selectedChecker] || '').startsWith(mySide))) selectedChecker = null;
+    const counts = { red: 0, yellow: 0 };
+    pieces.forEach(piece => { if (piece) counts[String(piece).startsWith('red') ? 'red' : 'yellow'] += 1; });
+    const players = text('div', 'ck-players');
+    (room.players || []).forEach(player => {
+      const side = player.studentId === redId ? 'red' : 'yellow';
+      const badge = text('div', 'ck-p' + (player.studentId === room.turn && !room.finished ? ' turn' : ''));
+      const label = text('div', '', player.name + (player.studentId === studentId ? ' (you)' : ''));
+      label.appendChild(text('small', '', (side === 'red' ? 'Red' : 'Dark') + ' · ' + counts[side] + (counts[side] === 1 ? ' piece' : ' pieces')));
+      badge.append(text('i', side === 'red' ? 'r' : 'd'), label);
+      players.appendChild(badge);
+    });
+    const grid = text('div', 'ck-board');
+    for (let index = 0; index < 64; index += 1) {
+      const piece = pieces[index] || '';
+      const darkSquare = (Math.floor(index / 8) + index % 8) % 2 === 1;
+      const own = !!piece && piece.startsWith(mySide);
+      const target = ownTurn && selectedChecker != null && !piece && darkSquare;
+      const node = button('', () => {
+        if (own) { selectedChecker = selectedChecker === index ? null : index; draw(); return; }
+        if (selectedChecker != null) { const from = selectedChecker; selectedChecker = null; call('move', { move: { type: 'move', from, to: index } }).catch(showError); }
+      }, 'board-cell ck-sq ' + (darkSquare ? 'd' : 'l') + (target ? ' tgt' : ''), pending || !ownTurn || (!own && selectedChecker == null));
+      node.setAttribute('aria-label', piece ? (piece.startsWith('red') ? 'Red ' : 'Dark ') + (piece.endsWith('-king') ? 'king' : 'piece') + (selectedChecker === index ? ', selected' : '') : 'Empty square');
+      if (piece) {
+        const disc = text('span', 'pc ' + (piece.startsWith('red') ? 'r' : 'y') + (selectedChecker === index ? ' sel' : own && ownTurn ? ' go' : ''));
+        if (piece.endsWith('-king')) disc.appendChild(text('b', '', '♛'));
+        node.appendChild(disc);
+      }
+      grid.appendChild(node);
+    }
+    const hint = text('div', 'ck-hint', ownTurn ? (selectedChecker != null ? 'Tap a gold spot to move there.' : 'Tap one of your glowing pieces.') : '');
+    board.append(players, grid, hint);
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
     el('room').classList.toggle('ludo-mode', gameKey === 'ludo');
     el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
     el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
+    el('room').classList.toggle('checkers-mode', gameKey === 'checkers');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
