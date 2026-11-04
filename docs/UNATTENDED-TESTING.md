@@ -8,7 +8,7 @@ owner's computer is off. They use only the isolated staging site
 
 | When | Workflow | What it checks |
 |---|---|---|
-| Every 30 minutes | Unattended staging tests (smoke) | 13 staging pages load; staging guard and banner present; Firebase points only at `fun-torah-tools-staging`; audio upload, Posuk scoring and Nigri sync are off; no requests to production hosts; no page errors; sign-in form shows; anonymous visitors cannot read student, class or private data. |
+| Every 30 minutes | Unattended staging tests (smoke) | 15 staging pages load; staging guard and banner present; Firebase points only at `fun-torah-tools-staging`; audio upload, Posuk scoring and Nigri sync are off; no requests to production hosts; no page errors; sign-in form shows; anonymous visitors cannot read student, class or private data. |
 | Every 2 hours | Unattended staging tests (auth) | Fictional student A1 signs in and opens Weekly Quiz, Chazara, Shorashim, Rashi Letters, Posuk Practice, Yiddish, Student Rewards, Game Show; cannot read another class. Owner, both teachers and principal can read only the classes they should. |
 | Nightly 04:41 UTC | Unattended staging tests (nightly) | Smoke + auth, the whole node test suite (`tests/**/*.test.cjs`) and the Firebase rules audit. |
 | Nightly 06:17 UTC | Overnight reliability (existing) | Emulator rules tests and synthetic multi-teacher classroom journeys. Its scheduled failures are now filed as issues too. |

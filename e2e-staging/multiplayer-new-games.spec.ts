@@ -112,7 +112,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         await hostCells.nth(0).click(); await expect(guestCells.nth(0)).not.toHaveText('?');
         await hostCells.nth(1).click(); await expect(guestCells.nth(1)).not.toHaveText('?');
       } else if (game.key === 'checkers') {
-        await hostCells.nth(40).click(); await hostCells.nth(33).click(); await expect(guestCells.nth(33)).toHaveText('●');
+        await hostCells.nth(40).click(); await hostCells.nth(33).click(); await expect(guestCells.nth(33).locator('.pc')).toHaveCount(1);
       } else if (game.key === 'reversi') {
         await hostCells.nth(20).click(); await expect(guest.locator('#board .piece-red')).toHaveCount(4);
       } else if (game.key === 'bingo') {
@@ -175,7 +175,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
               return next?.lastRoll != null || next?.turn !== activeId;
             }, { timeout: 15000 }).toBe(true);
           } else {
-            const token = active!.locator('#board .ludo-token:not([disabled])').first();
+            const token = active!.locator('#board .pawn.go:not([disabled])').first();
             await expect(token).toBeEnabled({ timeout: 15000 });
             await token.click();
             await expect.poll(async () => {
@@ -186,37 +186,43 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
           }
         }
         expect(movedPage,'one of the seeded rolls permits a token move').not.toBeNull();
-        await expect(movedPage!.locator('#board')).toContainText(/Token 1: Track \d+/);
+        await expect(movedPage!.locator('#board .pawn[aria-label*="token 1: on the track"], #board .pawn[aria-label*="token 1: in the home lane"]').first()).toBeVisible();
       } else if (game.key === 'dominoes') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        const active=guest, buttons=active.locator('#board .playing-card:not([disabled])');
-        const table=await active.locator('#board .domino-line').textContent()||''; const ends=Array.from(table.matchAll(/(\d+)\s*\|\s*(\d+)/g)).flatMap(m=>[Number(m[1]),Number(m[2])]);
-        let played=false;
-        for(const b of await buttons.all()){const m=(await b.textContent()||'').match(/(\d+)\s*\|\s*(\d+)/);if(m&&(ends.includes(Number(m[1]))||ends.includes(Number(m[2])))){await b.click();played=true;break;}}
-        if(!played){await active.getByRole('button',{name:'Draw a tile'}).click();await expect(active.locator('#board .card-hand .playing-card')).toHaveCount(8);} else await expect(host.locator('#board .domino-line')).toContainText(/\|/);
+        const active=guest, playable=active.locator('#board .dtile-button:not([disabled])');
+        if(await playable.count()){
+          await playable.first().click();
+          const ends=active.locator('#actions .dm-end:not([disabled])');
+          if(await ends.count())await ends.first().click();
+          await expect(host.locator('#board .dchain .dt')).toHaveCount(2);
+        } else {
+          await active.getByRole('button',{name:'Draw a tile'}).click();
+          await expect(active.locator('#board .dtile-button')).toHaveCount(8);
+        }
       } else if (game.key === 'go-fish') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        await host.locator('#board .playing-card').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
+        await host.locator('#board .gcard-button:not([disabled])').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
         await expect(host.locator('#board')).toContainText('Books collected:'); await expect(guest.locator('#board')).toContainText('Books collected:');
       } else if (game.key === 'uno-style') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        const boardText=await host.locator('#board').innerText();
-        const currentColor=boardText.match(/Current color:\s*(\w+)/)?.[1]?.toLowerCase()||'';
-        const topValue=boardText.match(/Top card:\s*(?:red|yellow|green|blue|wild)\s+([\w-]+)/i)?.[1]?.toLowerCase()||'';
-        const hand=host.locator('#board .playing-card:not([disabled])'), labels=await hand.allTextContents();
+        const ring=host.locator('#board .uno-color');
+        const currentColor=(await ring.getAttribute('data-color')||'').toLowerCase();
+        const topValue=(await ring.getAttribute('data-top')||'').toLowerCase();
+        const hand=host.locator('#board .ucard-button:not([disabled])');
+        const labels=await hand.evaluateAll(nodes=>nodes.map(node=>(node.dataset.color||'')+' · '+(node.dataset.value||'')));
         const playable=labels.findIndex(label=>{
           const [color='',value='']=label.split(' · ').map(text=>text.trim().toLowerCase());
           return value===topValue || color===currentColor && !['wild','wild4'].includes(value) || color==='wild' && value==='wild';
         });
-        const beforeCount=Number(boardText.match(/Test Student A1:\s*(\d+) cards/)?.[1]||7);
+        const beforeCount=Number(((await host.locator('#board .uno-p').filter({hasText:'Test Student A1'}).innerText()).match(/(\d+) cards?/)||[])[1]||7);
         if(playable>=0){
           await hand.nth(playable).click();
           const colors=host.locator('#actions').getByRole('button',{name:/^(red|yellow|green|blue)$/});
           if(await colors.count())await colors.first().click();
         } else await host.getByRole('button',{name:'Draw a card'}).click();
         const expectedCount=beforeCount+(playable>=0?-1:1);
-        await expect(host.locator('#board')).toContainText(new RegExp(`:\\s*${expectedCount} cards`));
-        await expect(guest.locator('#board')).toContainText(new RegExp(`:\\s*${expectedCount} cards`));
+        await expect(host.locator('#board .uno-p').filter({hasText:'Test Student A1'})).toContainText(new RegExp(`${expectedCount} cards?`));
+        await expect(guest.locator('#board .uno-p').filter({hasText:'Test Student A1'})).toContainText(new RegExp(`${expectedCount} cards?`));
       }
       await expect.poll(() => publicPlayerNames(host)).toEqual([students[0].name, students[1].name]);
       await expect(host.locator('#players')).toContainText(students[0].name);

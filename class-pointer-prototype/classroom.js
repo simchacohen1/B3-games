@@ -740,7 +740,7 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
-window.ClassPointerBridge={isTeacher,send,fail,
+window.ClassPointerBridge={isTeacher,send,fail,ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   sendTeacher:message=>send(teacherConnection,message),started:()=>started,
   // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
   callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,presence:()=>presence,sharing:()=>state.sharing,stopSharing,

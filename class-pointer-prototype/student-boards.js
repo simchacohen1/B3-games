@@ -623,7 +623,7 @@
       try{
         classStudents=await window.ClassPointerDashboard?.students()||[];
       }catch(error){B.fail('Could not load class roster for sharing permissions: '+(error?.message||'Try again.'))}
-      renderPermissions();
+      renderPermissions();renderWaiting();
     })();
     return permissionsLoad;
   }
@@ -810,7 +810,9 @@
     button('🗑 Clear board','Erase this whole board, including the student’s work',()=>{const m=focusMember();if(m&&confirm('Erase '+m.name+'’s whole board?'))act({type:'board-clear',all:true})},'danger'));
 
   const grid=el('div','boards-grid'),empty=el('p','boards-empty','No students have joined yet. Their tiles appear here as they join.');
-  view.append(gridBar,gridPermissions,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
+  // Screens mode: who is in the class but has not started sharing yet (live; see renderWaiting).
+  const waiting=el('div','boards-waiting');waiting.hidden=true;waiting.setAttribute('role','status');waiting.setAttribute('aria-live','polite');
+  view.append(gridBar,gridPermissions,waiting,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
 
   // Include students verified by the background activity connection without
   // sending them to a separate Pointer page. Choose one tab per student.
@@ -896,6 +898,36 @@
     node.addEventListener('keydown',event=>{if(event.target===node&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setFocus(m.id)}});
     return{node,canvas:c,video:v,note,block,toClass};
   }
+  // "Who has not started sharing?" Every boy on the class roster who may share his screen is either sharing (live
+  // stream) or listed here. Boys who are connected to the class show in orange; boys not connected show in grey.
+  let waitingKey='';
+  function renderWaiting(){
+    if(!on||mode!=='screens'||focusId||view.hidden){if(!waiting.hidden){waiting.hidden=true;waitingKey=''}return}
+    const present=admitted(),people=[];
+    if(classStudents.length){
+      for(const person of classStudents){
+        const m=present.find(entry=>personId(entry)===person.id);
+        people.push({name:person.name,member:m||null,off:denied.screens.has(person.id)});
+      }
+    }else for(const m of present)people.push({name:m.name,member:m,off:excluded(m,'screens')});
+    const eligible=people.filter(p=>!p.off),sharing=eligible.filter(p=>p.member&&streamOf(p.member)),notYet=eligible.filter(p=>!(p.member&&streamOf(p.member)));
+    const key=JSON.stringify([sharing.length,notYet.map(p=>[p.name,!!p.member,!!(p.member&&isBlocked(p.member))])]);
+    if(key===waitingKey&&!waiting.hidden)return;
+    waitingKey=key;
+    if(!eligible.length){waiting.hidden=true;return}
+    waiting.hidden=false;waiting.classList.toggle('all-sharing',!notYet.length);
+    const head=el('div','boards-waiting-head');
+    head.append(el('strong',null,notYet.length?'⏳ '+notYet.length+' not sharing yet':'✅ Everyone is sharing'),
+      el('span','boards-waiting-count',sharing.length+' of '+eligible.length+' sharing'));
+    const chips=el('div','boards-waiting-list');
+    for(const p of notYet){
+      const here=!!p.member,paused=here&&isBlocked(p.member);
+      const chip=el('span','boards-waiting-chip'+(here?' here':' away'),p.name+(paused?' (paused)':here?'':' (not connected)'));
+      chip.title=paused?p.name+' is paused':here?p.name+' is in the class but has not started sharing':p.name+' is not connected to the class right now';
+      chips.append(chip);
+    }
+    waiting.replaceChildren(head,chips);
+  }
   function syncTiles(){
     const present=admitted();
     // Screen tiles exist only for streams that are actually live. One stream
@@ -909,6 +941,7 @@
     empty.textContent=mode==='screens'?'Waiting for students to share their screens…':'Waiting for students to join their whiteboards…';
     if(focusId&&!ids.has(focusId)){setFocus(null);return}
     grid.hidden=!!focusId||!list.length;empty.hidden=!!focusId||!!list.length;
+    renderWaiting();
     layoutGrid();
   }
   function layoutGrid(){

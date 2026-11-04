@@ -204,3 +204,6 @@
     root.B3_STAGING_READY = true;
   }
 })(typeof window !== 'undefined' ? window : globalThis);
+
+// Opt-in local fixtures for no-cost staging E2E runs.
+if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') window.B3_STAGING_TEST_FIXTURES = true;
