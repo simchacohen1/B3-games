@@ -385,19 +385,7 @@
     } else if (gameKey === 'dominoes') {
       drawDominoTable(board);
     } else if (gameKey === 'go-fish') {
-      const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'], groups = new Map();
-      privateHand.forEach(card => groups.set(card.rank, (groups.get(card.rank) || 0) + 1));
-      board.append(text('div', 'game-result', 'Your cards'), text('div', 'player-turn', 'Books collected: ' + (room.bookCounts?.[studentId] || 0) + ' · Cards in the pond: ' + room.deckCount));
-      const hand = text('div', 'card-hand');
-      [...groups.entries()].forEach(([rank, count]) => hand.appendChild(button(`${ranks[rank]} (${count})`, () => { askRank = rank; drawBoard(); }, 'playing-card' + (askRank === rank ? ' selected-card' : ''), room.turn !== studentId || pending)));
-      board.appendChild(hand);
-      if (askRank != null && room.turn === studentId) {
-        board.appendChild(text('div', 'player-turn', 'Ask a classmate for ' + ranks[askRank]));
-        const targets = text('div', 'card-hand');
-        (room.players || []).filter(player => player.studentId !== studentId && (room.handCounts?.[player.studentId] || 0) > 0).forEach(player => targets.appendChild(button('Ask ' + player.name, () => call('move', { move: { type: 'ask', rank: askRank, target: player.studentId } }).then(() => { askRank = null; }).catch(showError), 'btn', pending)));
-        board.appendChild(targets);
-      }
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.bookCounts?.[player.studentId] || 0} books · ${room.handCounts?.[player.studentId] || 0} cards`).join(' · ')));
+      drawGoFishTable(board);
     } else if (gameKey === 'uno-style') {
       drawUnoTable(board);
     }
@@ -603,11 +591,57 @@
     const hint = text('div', 'dm-hint', ownTurn ? (selectedDom != null ? 'Choose which end to play on.' : 'Glowing tiles can be played.') : '');
     board.append(players, felt, pile, hand, hint);
   }
+  const FISH_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const FISH_SUITS = [['o', '#ffba2c', '#d97a0f'], ['b', '#328ddd', '#2368ad'], ['g', '#3fc47e', '#1a7f4b'], ['p', '#a063d6', '#7434ad']];
+  function fishSvg(fill, stroke) {
+    const holder = text('span', 'fish');
+    holder.innerHTML = '<svg viewBox="0 0 70 50" aria-hidden="true"><path d="M12 25Q27 3 46 25Q27 47 12 25L2 14v22z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2"/><circle cx="38" cy="22" r="3" fill="#14263e"/><path d="M20 26q8 5 14 0" fill="none" stroke="' + stroke + '" stroke-width="2"/></svg>';
+    return holder;
+  }
+  function drawGoFishTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    const groups = new Map();
+    privateHand.forEach(card => { const group = groups.get(card.rank) || { count: 0, suit: card.suit || 0 }; group.count += 1; groups.set(card.rank, group); });
+    if (askRank != null && (!ownTurn || !groups.has(askRank))) askRank = null;
+    const players = text('div', 'gf-players');
+    (room.players || []).forEach(player => {
+      const mine = player.studentId === studentId, turn = player.studentId === room.turn && !room.finished;
+      const cards = room.handCounts?.[player.studentId] || 0, books = room.bookCounts?.[player.studentId] || 0;
+      const askable = !mine && ownTurn && askRank != null && cards > 0;
+      const label = text('div', '', (askable ? 'Ask ' : '') + player.name + (mine ? ' (you)' : ''));
+      label.appendChild(text('small', '', cards + (cards === 1 ? ' card' : ' cards') + ' · ' + books + (books === 1 ? ' book' : ' books')));
+      const badge = askable
+        ? button('', () => call('move', { move: { type: 'ask', rank: askRank, target: player.studentId } }).then(() => { askRank = null; }).catch(showError), 'gf-p ask', pending)
+        : text('div', 'gf-p' + (turn ? ' turn' : ''));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const pond = text('div', 'gf-pond');
+    const books = text('div', 'gf-books'); books.appendChild(text('span', '', 'Books collected: ' + (room.bookCounts?.[studentId] || 0)));
+    const water = text('div', 'water'); water.append(text('b', '', 'Pond'), text('b', '', (room.deckCount || 0) + ' cards'));
+    pond.append(books, water);
+    const hand = text('div', 'gf-hand');
+    [...groups.entries()].forEach(([rank, group]) => {
+      const [tone, fill, stroke] = FISH_SUITS[group.suit % 4];
+      const node = button('', () => { askRank = askRank === rank ? null : rank; draw(); }, 'gcard-button', !ownTurn || pending);
+      node.setAttribute('aria-label', FISH_RANKS[rank] + (group.count > 1 ? ', ' + group.count + ' cards' : ''));
+      node.dataset.rank = String(rank);
+      const card = text('div', 'fc ' + tone + (askRank === rank ? ' sel' : ownTurn ? ' can' : ''));
+      const face = text('div', 'face');
+      face.append(text('span', 'r', FISH_RANKS[rank]), fishSvg(fill, stroke), text('span', 'r2', FISH_RANKS[rank]));
+      card.appendChild(face);
+      if (group.count > 1) card.appendChild(text('span', 'n', '×' + group.count));
+      node.appendChild(card); hand.appendChild(node);
+    });
+    const hint = text('div', 'gf-hint', ownTurn ? (askRank != null ? 'Asking for ' + FISH_RANKS[askRank] + 's — tap a player.' : 'Pick a card to ask for.') : '');
+    board.append(players, pond, hand, hint);
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
     el('room').classList.toggle('ludo-mode', gameKey === 'ludo');
     el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
+    el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }

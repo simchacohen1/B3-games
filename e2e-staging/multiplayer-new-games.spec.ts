@@ -201,7 +201,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         }
       } else if (game.key === 'go-fish') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        await host.locator('#board .playing-card').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
+        await host.locator('#board .gcard-button:not([disabled])').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
         await expect(host.locator('#board')).toContainText('Books collected:'); await expect(guest.locator('#board')).toContainText('Books collected:');
       } else if (game.key === 'uno-style') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
