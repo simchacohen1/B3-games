@@ -18,3 +18,5 @@ Each copy of B3-games is about 0.5 GB and his C: drive is nearly full. Every cod
 - Never run `npm install` or `npm ci` in a worktree that does not need it (for example when only editing HTML, docs or notes).
 - Never delete a worktree you did not create, and never delete one with uncommitted work, without asking him first.
 - Worktrees he still needs (never remove): multiplayer-center, ftt-staging-site-368, firebase-cost-audit.
+
+- Teacher home Learning Island (2026-11-03, issue 410; page already in main, PR 548 adds 4 tests only): every teacher sees their classes as the Learning Island groups with only the tools turned on for that class, plus a Teacher Tools box; no owner-only links. New classes really start with no tools (Owner Admin "Add class" saves only name + active; test added); the tools seen in "Testing" were turned on earlier (live data not checked). Deployed to staging only (hosting, fun-torah-tools-staging.web.app, build via staging/package-site.cjs with the staging web config) and owner checked it with a test teacher: looks good. NOT deployed to the real site. Worktree B3-games-_wt-410 can be removed after PR 548 is merged.
