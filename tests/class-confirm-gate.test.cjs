@@ -32,5 +32,5 @@ test('"All my classes" works only where a page asks for it (Chazara)',()=>{
   const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
   assert.match(read('chazara/teacher.html'),/'b3-2026',true\)/);
   for(const f of ['assignment-center/teacher.html','student-report/index.html','follow-teacher/teacher.js','student-rewards/teacher.js','teacher-class-rosters.js','gematria/teacher.html','class-pointer-prototype/dashboard.js','rashi-letters/teacher.html','shorashim/teacher.js','record_pesukim/teacher.html','weekly-quiz/teacher.html'])
-    assert.doesNotMatch(read(f),/allowAll/,f+' must require one class');
+    assert.doesNotMatch(read(f),/B3ClassGate[^\n]*allowAll|requireInUrl\([^\n]*,\s*true\s*\)/,f+' must require one class');
 });
