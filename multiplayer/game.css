@@ -69,3 +69,34 @@
 .ludo-mode .actions .player-turn{color:#fff;text-shadow:0 2px 3px #0005;margin:0}.ludo-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
 @media(max-width:560px){.play-area.ludo-mode{padding:12px 8px 18px}.lt-p{padding-right:10px}}
 @media(prefers-reduced-motion:reduce){.pawn.go{animation:none}}
+/* Dominoes table: matches the Dominoes tile on the Arcade home page. */
+.play-area.dominoes-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#683415 4%,#c68542 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #4a2410,0 18px 28px #12315b40;overflow:hidden}
+.dominoes-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.dominoes-mode #roomCode,.dominoes-mode #players{display:none}.dominoes-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.dm-players{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+.dm-p{display:flex;align-items:center;gap:8px;background:#4a241080;border:3px solid #ffffff55;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900}
+.dm-p i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,#ffd23f,#ff8a1f);color:#7a2d00;font-style:normal;box-shadow:inset 0 1px 2px #fff9}
+.dm-p small{display:block;font-size:11px;font-weight:800;opacity:.9}
+.dm-p.turn{background:#fff;color:#4a2410;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66,0 0 22px #ffd23f}
+.felt{background:radial-gradient(circle at 50% 40%,#2f8f55,#17633a);border-radius:20px;padding:22px 10px;box-shadow:inset 0 4px 14px #0007;display:flex;align-items:center;min-height:130px;overflow-x:auto}
+.dchain{display:flex;align-items:center;margin:0 auto}
+.dt{display:flex;width:74px;height:38px;border-radius:8px;background:linear-gradient(135deg,#fff,#e6e2d5);border:2px solid #ccbfa8;box-shadow:0 3px 0 #0004,0 6px 8px #0006;margin-right:2px;flex:0 0 auto;box-sizing:border-box}
+.dt .h{flex:1}.dt .sep{width:2px;background:#4a4a4a;margin:5px 0}
+.dt.dbl{width:38px;height:74px;flex-direction:column;margin:0 3px}.dt.dbl .sep{width:auto;height:2px;margin:0 5px}
+.dt.v{flex-direction:column;width:38px;height:74px;margin:0}.dt.v .sep{width:auto;height:2px;margin:0 5px}
+.dt .pips{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:100%;height:100%;padding:15%;box-sizing:border-box}
+.dt .pips b{width:80%;height:80%;border-radius:50%;background:#1d2433;place-self:center;box-shadow:inset 0 -1px 2px #000a}.dt .pips b.off{visibility:hidden}
+.dt.open{box-shadow:0 0 0 3px #ffd23f,0 0 14px #ffd23f,0 3px 0 #0004}
+.dpile{display:flex;justify-content:center;align-items:center;gap:16px;margin:14px 0 4px;font-weight:900;text-shadow:0 1px 2px #0006}
+.dback{width:34px;height:68px;border-radius:7px;background:linear-gradient(160deg,#2a2a35,#0f0f16);border:2px solid #fff;box-shadow:0 3px 0 #0005;display:grid;place-items:center;color:#ffd23f;font-size:16px;box-sizing:border-box}
+.dhand{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:22px 0 4px;min-height:96px;align-items:flex-end}
+.dtile-button{appearance:none;border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;border-radius:10px}.dtile-button:disabled{cursor:default}
+.dtile-button .dt{transition:transform .15s,box-shadow .15s}
+.dtile-button .dt.go{box-shadow:0 0 0 3px #ffd23f,0 0 16px #ffd23f,0 3px 0 #0004;transform:translateY(-12px)}.dtile-button:not(:disabled):hover .dt.go{transform:translateY(-20px)}
+.dtile-button .dt.no{filter:brightness(.78)}.dtile-button .dt.picked{transform:translateY(-20px) scale(1.08);box-shadow:0 0 0 4px #fff,0 0 22px #fff}
+.dtile-button:focus-visible{outline:4px solid #fff;outline-offset:3px}
+.dm-hint{text-align:center;font-weight:900;text-shadow:0 2px 3px #0005;font-size:13px;min-height:1em}
+.dominoes-mode .actions{margin-top:10px}.dominoes-mode .actions .btn.uno-btn{border:0;border-radius:999px;padding:13px 28px;font-weight:1000;font-size:17px;color:#7a2d00;background:linear-gradient(180deg,#ffe066,#ffb400);box-shadow:0 5px 0 #b57700,0 10px 16px #0004}.dominoes-mode .actions .btn.uno-btn:disabled{opacity:.6}
+.uno-pick.dm-end{background:#fff;color:#4a2410;border:3px solid #ffd23f}.uno-pick.dm-end:disabled{opacity:.5}
+.dominoes-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.dominoes-mode{padding:12px 8px 18px}.dt{width:60px;height:31px}.dt.dbl,.dt.v{width:31px;height:60px}}
+@media(prefers-reduced-motion:reduce){.dtile-button .dt{transition:none}}

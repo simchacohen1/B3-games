@@ -189,11 +189,16 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         await expect(movedPage!.locator('#board .pawn[aria-label*="token 1: on the track"], #board .pawn[aria-label*="token 1: in the home lane"]').first()).toBeVisible();
       } else if (game.key === 'dominoes') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        const active=guest, buttons=active.locator('#board .playing-card:not([disabled])');
-        const table=await active.locator('#board .domino-line').textContent()||''; const ends=Array.from(table.matchAll(/(\d+)\s*\|\s*(\d+)/g)).flatMap(m=>[Number(m[1]),Number(m[2])]);
-        let played=false;
-        for(const b of await buttons.all()){const m=(await b.textContent()||'').match(/(\d+)\s*\|\s*(\d+)/);if(m&&(ends.includes(Number(m[1]))||ends.includes(Number(m[2])))){await b.click();played=true;break;}}
-        if(!played){await active.getByRole('button',{name:'Draw a tile'}).click();await expect(active.locator('#board .card-hand .playing-card')).toHaveCount(8);} else await expect(host.locator('#board .domino-line')).toContainText(/\|/);
+        const active=guest, playable=active.locator('#board .dtile-button:not([disabled])');
+        if(await playable.count()){
+          await playable.first().click();
+          const ends=active.locator('#actions .dm-end:not([disabled])');
+          if(await ends.count())await ends.first().click();
+          await expect(host.locator('#board .dchain .dt')).toHaveCount(2);
+        } else {
+          await active.getByRole('button',{name:'Draw a tile'}).click();
+          await expect(active.locator('#board .dtile-button')).toHaveCount(8);
+        }
       } else if (game.key === 'go-fish') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
         await host.locator('#board .playing-card').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
