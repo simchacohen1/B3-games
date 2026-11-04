@@ -258,7 +258,7 @@ test('teacher panel shows student, class, section, audio, and approve / try agai
     w.firebase = { apps: [{}], initializeApp() {}, database: () => ({ ref }), auth: () => ({ currentUser: { getIdToken: async () => 't' } }) };
     w.B3SiteSettings = { onAuthStateChanged: (cb: any) => setTimeout(() => cb({ uid: 'o' }, true, { authorized: true, role: 'admin' }), 0), signInWithGoogle() {} };
   });
-  await page.goto(SITE + '/rashi-letters/teacher.html?tab=recordings');
+  await page.goto(SITE + '/rashi-letters/teacher.html?class=et&tab=recordings');
   const items = page.locator('.rec-item');
   await expect(items).toHaveCount(2);
   const first = items.first();
