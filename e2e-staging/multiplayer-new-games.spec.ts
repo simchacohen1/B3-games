@@ -112,7 +112,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         await hostCells.nth(0).click(); await expect(guestCells.nth(0)).not.toHaveText('?');
         await hostCells.nth(1).click(); await expect(guestCells.nth(1)).not.toHaveText('?');
       } else if (game.key === 'checkers') {
-        await hostCells.nth(40).click(); await hostCells.nth(33).click(); await expect(guestCells.nth(33)).toHaveText('●');
+        await hostCells.nth(40).click(); await hostCells.nth(33).click(); await expect(guestCells.nth(33).locator('.pc')).toHaveCount(1);
       } else if (game.key === 'reversi') {
         await hostCells.nth(20).click(); await expect(guest.locator('#board .piece-red')).toHaveCount(4);
       } else if (game.key === 'bingo') {
@@ -201,7 +201,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         }
       } else if (game.key === 'go-fish') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        await host.locator('#board .playing-card').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
+        await host.locator('#board .gcard-button:not([disabled])').first().click(); await host.getByRole('button',{name:'Ask Test Student A2'}).click();
         await expect(host.locator('#board')).toContainText('Books collected:'); await expect(guest.locator('#board')).toContainText('Books collected:');
       } else if (game.key === 'uno-style') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
