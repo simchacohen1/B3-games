@@ -21,59 +21,84 @@ async function teacherAccess(store,identity){
  const email=String(identity.email||'').toLowerCase();
  const admin=await store.get('b3Games/admins/'+identity.uid);
  const owner=email===ADMIN_EMAIL||Boolean(admin&&admin.active!==false);
- const classes=await store.get('b3Games/workspaces/'+WS+'/classes')||{};
- const granted=id=>classes[id]&&classes[id].active!==false&&classes[id].toolGrants?.['student-rewards']===true;
- let ids;
- if(owner)ids=Object.keys(classes).filter(granted);
- else{
+ const classRoot='b3Games/workspaces/'+WS+'/classes',granted=cls=>cls&&cls.active!==false&&cls.toolGrants?.['student-rewards']===true;
+ let workspaceClasses;
+ if(owner){
+  const classes=await store.get(classRoot)||{};
+  workspaceClasses=Object.fromEntries(Object.entries(classes).filter(([,cls])=>granted(cls)));
+ }else{
   const row=await store.get('b3Games/workspaces/'+WS+'/teachers/'+identity.uid);
   if(!row||row.active===false)fail(403,'Your teacher account is not active.');
-  ids=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true&&granted(id));
+  const ids=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
+  const assigned=await Promise.all(ids.map(async id=>[id,await store.get(classRoot+'/'+id)]));
+  workspaceClasses=Object.fromEntries(assigned.filter(([,cls])=>granted(cls)));
  }
- if(!ids.length)fail(403,'Student Rewards is not turned on for your classes.');
- return {email,owner,workspaceClasses:Object.fromEntries(ids.map(id=>[id,classes[id]]))};
+ if(!Object.keys(workspaceClasses).length)fail(403,'Student Rewards is not turned on for your classes.');
+ return {email,owner,workspaceClasses};
 }
 
 // Make sure each teacher class has a rewards class, and every active class
 // member has a rewards account enrolled in it (same ids the student login uses).
 async function syncClasses(store,access){
- const rewardStudents=await store.get(SR+'/students')||{};
- const byB3={};for(const [rid,row] of Object.entries(rewardStudents))if(row?.b3StudentId&&row.active!==false)(byB3[row.b3StudentId]??=[]).push(rid);
- const updates={},rewardClassIds=[];
- for(const [cid,cls] of Object.entries(access.workspaceClasses)){
-  const rcid='b3_'+cid;rewardClassIds.push(rcid);
-  if(!await store.get(SR+'/classes/'+rcid))updates[SR+'/classes/'+rcid]={id:rcid,name:cls.name||cid,active:true,b3ClassId:cid};
-  const enrolled=await store.get(SR+'/enrollments/'+rcid)||{};
+ const updates={},enrollments={},classRows=Object.entries(access.workspaceClasses);
+ const syncRows=await Promise.all(classRows.map(async([cid,cls])=>{
+  const rcid='b3_'+cid;
+  const [rewardClass,enrolled]=await Promise.all([store.get(SR+'/classes/'+rcid),store.get(SR+'/enrollments/'+rcid)]);
+  if(!rewardClass)updates[SR+'/classes/'+rcid]={id:rcid,name:cls.name||cid,active:true,b3ClassId:cid};
+  enrollments[rcid]=enrolled||{};
+  return {cid,cls,rcid,rewardClass:rewardClass||updates[SR+'/classes/'+rcid],enrolled:enrollments[rcid]};
+ }));
+ const rewardClassIds=syncRows.map(({rcid})=>rcid);
+ const rewardClasses=Object.fromEntries(syncRows.map(({rcid,rewardClass})=>[rcid,rewardClass]));
+ // Reuse the class enrollment index to load only the student records in the
+ // teacher's scope. A full student-root scan is retained as a compatibility
+ // fallback for legacy accounts not yet present in an authorized enrollment.
+ let rewardStudents={};
+ const enrolledIds=[...new Set(Object.values(enrollments).flatMap(e=>Object.keys(e).filter(id=>e[id]===true)))];
+ await Promise.all(enrolledIds.map(async rid=>{const row=await store.get(SR+'/students/'+rid);if(row)rewardStudents[rid]=row;}));
+ const byB3={};
+ const indexStudent=(rid,row)=>{if(row?.b3StudentId&&row.active!==false)(byB3[row.b3StudentId]??=[]).push(rid);};
+ for(const [rid,row] of Object.entries(rewardStudents))indexStudent(rid,row);
+ const activeMembers=syncRows.flatMap(({cls})=>Object.entries(cls.members||{}).filter(([sid,m])=>key(sid)&&m?.active!==false).map(([sid,m])=>({sid,m})));
+ const needsLegacyLookup=activeMembers.filter(({sid})=>!byB3[sid]?.length);
+ const deterministicIds=new Map(needsLegacyLookup.map(({sid})=>[sid,'b3_'+sha(sid).slice(0,28)]));
+ await Promise.all([...new Set(deterministicIds.values())].map(async rid=>{if(rewardStudents[rid])return;const row=await store.get(SR+'/students/'+rid);if(row){rewardStudents[rid]=row;indexStudent(rid,row);}}));
+ if(activeMembers.some(({sid})=>!byB3[sid]?.length)){
+  rewardStudents=await store.get(SR+'/students')||{};
+  for(const sid of Object.keys(byB3))delete byB3[sid];
+  for(const [rid,row] of Object.entries(rewardStudents))indexStudent(rid,row);
+ }
+ for(const {cid,cls,rcid,enrolled} of syncRows){
   for(const [sid,m] of Object.entries(cls.members||{})){
    if(!key(sid)||m?.active===false)continue;
    let rid=(byB3[sid]||[])[0];
    if(!rid){
-    rid='b3_'+sha(sid).slice(0,28);
+    rid=deterministicIds.get(sid)||'b3_'+sha(sid).slice(0,28);
     if(!rewardStudents[rid]){const name=String(m?.name||sid);updates[SR+'/students/'+rid]={id:rid,b3StudentId:sid,name,initials:initials(name),classId:rcid,rewardBalance:0,active:true};rewardStudents[rid]=updates[SR+'/students/'+rid];}
     byB3[sid]=[rid];
    }
-   if(enrolled[rid]!==true)updates[SR+'/enrollments/'+rcid+'/'+rid]=true;
+   if(enrolled[rid]!==true){updates[SR+'/enrollments/'+rcid+'/'+rid]=true;enrolled[rid]=true;}
   }
  }
  if(Object.keys(updates).length)await store.update(updates);
- return rewardClassIds;
+ return {rewardClassIds,rewardClasses,enrollments,students:rewardStudents};
 }
 
 async function scopeFor(store,access){
- const rewardClassIds=await syncClasses(store,access);
- const enrollments=pick(await store.get(SR+'/enrollments')||{},rewardClassIds);
+ const {rewardClassIds,rewardClasses,enrollments,students}=await syncClasses(store,access);
  const studentIds=[...new Set(Object.values(enrollments).flatMap(e=>Object.keys(e||{}).filter(id=>e[id]===true)))];
- return {rewardClassIds,enrollments,studentIds};
+ return {rewardClassIds,rewardClasses,enrollments,studentIds,students};
 }
 function requireClass(scope,classId){if(!scope.rewardClassIds.includes(classId))fail(403,'This class is not one of your Student Rewards classes.');}
 function requireStudent(scope,classId,studentId){requireClass(scope,classId);if(scope.enrollments[classId]?.[studentId]!==true)fail(403,'This student is not in your class.');}
 
 async function loadRoot(store,scope){
- const {rewardClassIds,enrollments,studentIds}=scope;
- const [classes,students,categories,rewards,catalog,settings,requests,adjustments,rounds]=await Promise.all(
-  ['classes','students','categories','rewards','classRewardCatalog','settings','pointRequests','pointAdjustments','classRewardRounds'].map(p=>store.get(SR+'/'+p)));
+ const {rewardClassIds,rewardClasses,enrollments,studentIds,students:allStudents}=scope;
+ const [categories,rewards,catalog,settings,requests,adjustments,...roundRows]=await Promise.all(
+  ['categories','rewards','classRewardCatalog','settings','pointRequests','pointAdjustments',...rewardClassIds.map(id=>`classRewardRounds/${id}`)].map(p=>store.get(SR+'/'+p)));
+ const rounds=Object.fromEntries(rewardClassIds.map((id,index)=>[id,roundRows[index]]).filter(([,round])=>round!==null&&round!==undefined));
  const ids=new Set(studentIds),root={
-  classes:pick(classes||{},rewardClassIds),enrollments,students:pick(students||{},studentIds),
+  classes:rewardClasses,enrollments,students:pick(allStudents||{},studentIds),
   categories:categories||{},
   // Each teacher class has its own store: only that class's items.
   rewards:Object.fromEntries(Object.entries(rewards||{}).filter(([,r])=>rewardClassIds.includes(r?.ownerClassId))),
@@ -83,7 +108,7 @@ async function loadRoot(store,scope){
    classRewardAvailability:Object.fromEntries(Object.entries(settings?.classRewardAvailability||{}).filter(([id])=>rewardClassIds.includes(catalog?.[id]?.ownerClassId)))},
   pointRequests:Object.fromEntries(Object.entries(requests||{}).filter(([,r])=>ids.has(String(r?.rewardStudentId||'')))),
   pointAdjustments:Object.fromEntries(Object.entries(adjustments||{}).filter(([,r])=>ids.has(String(r?.studentId||'')))),
-  classRewardRounds:pick(rounds||{},rewardClassIds),
+  classRewardRounds:rounds,
   dailyRatings:{},dailyAwards:{},dailyAttendance:{},commentsByStudent:{},redemptionsByStudent:{},classRewardContributionsByStudent:{}
  };
  const ownRewards=new Set(Object.keys(root.rewards));
