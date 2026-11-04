@@ -112,8 +112,8 @@ body.boards-on #studentDock{display:none!important}
 /* Activity-page overlay must respect hidden controls without classroom.css. */
 #fttEmbeddedPointerStage [hidden]{display:none!important}
 /* Screens mode: who has not started sharing yet. Words carry the meaning, not just colour. */
-.boards-waiting{padding:8px 12px;background:#fff7e6;border-bottom:1px solid #f0d9a8;color:#5a3d00}
-.boards-waiting.all-sharing{background:#e9f8ee;border-bottom-color:#b9e3c6;color:#14532d}
+.boards-waiting{position:absolute;left:10px;right:10px;bottom:10px;z-index:8;max-height:30%;overflow:auto;padding:6px 12px;border-radius:12px;background:#fff7e6;border:1px solid #f0d9a8;box-shadow:0 2px 10px #17203340;color:#5a3d00}
+.boards-waiting.all-sharing{background:#e9f8ee;border-color:#b9e3c6;color:#14532d}
 .boards-waiting-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;font-size:15px}
 .boards-waiting-count{font-size:13px;font-weight:650;opacity:.85}
 .boards-waiting-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
