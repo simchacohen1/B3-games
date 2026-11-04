@@ -1,13 +1,13 @@
 'use strict';
 // Homework "Notes with this student" box: voice-only, text-only, and the empty-send warning.
-const { test, expect } = require('@playwright/test');
+const { test, expect, chromium } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }, permissions: ['microphone'] });
-
-test('voice-only, text-only and empty send behave correctly', async ({ page, browserName }) => {
+test('voice-only, text-only and empty send behave correctly', async ({ browserName }) => {
   test.skip(browserName !== 'chromium', 'Fake microphone flags are Chromium-only');
+  const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  const page = await (await browser.newContext({ permissions: ['microphone'] })).newPage();
   await page.route('https://notes.test/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body><div id="host"></div></body></html>' }));
   await page.goto('https://notes.test/');
   await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, '..', 'assignment-center', 'homework-common.js'), 'utf8') });
@@ -36,4 +36,5 @@ test('voice-only, text-only and empty send behave correctly', async ({ page, bro
   await page.click('.conversation-send');
   await expect(page.locator('.conversation-feedback')).toHaveText('Message sent.');
   expect((await page.evaluate(() => window.sent[1]))).toMatchObject({ action: 'comment', text: 'Well done' });
+  await browser.close();
 });
