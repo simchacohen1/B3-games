@@ -166,7 +166,11 @@
       actions.append(text('div', 'player-turn', statusText()));
       if (game?.maxPlayers === 2 && room.allowSpectators && room.winnerQueue?.length) actions.append(text('div', 'player-turn', room.winnerQueue.length + ' classmate(s) are waiting to play the winner.'));
       if (gameKey === 'bingo' && room.host === studentId) actions.append(button('Draw next number', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
-      if (gameKey === 'dominoes' && room.turn === studentId) actions.append(button('Draw a tile', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
+      if (gameKey === 'dominoes' && room.turn === studentId) {
+        actions.append(button('Draw a tile', () => { selectedDom = null; call('move', { move: { type: 'draw' } }).catch(showError); }, 'btn uno-btn', pending));
+        const picked = selectedDom != null ? privateHand[selectedDom] : null;
+        if (picked) for (const end of ['left', 'right']) actions.append(button(end === 'left' ? '← Left end (' + room.ends[0] + ')' : 'Right end (' + room.ends[1] + ') →', () => { const index = selectedDom; selectedDom = null; call('move', { move: { type: 'play', index, end } }).catch(showError); }, 'uno-pick dm-end', pending || !domSides(picked)[end]));
+      }
       if (gameKey === 'uno-style' && room.turn === studentId) {
         const label = room.drawPending ? `Draw ${room.drawPending} cards` : 'Draw a card';
         actions.append(button(label, () => call('move', { move: { type: room.drawPending ? 'draw-penalty' : 'draw' } }).catch(showError), 'btn uno-btn', pending));
@@ -379,15 +383,7 @@
     } else if (gameKey === 'ludo') {
       drawLudoTable(board);
     } else if (gameKey === 'dominoes') {
-      const ownTurn = room.turn === studentId && !room.finished;
-      board.append(text('div', 'game-result', 'Table'), text('div', 'domino-line', (room.layout || []).map(tile => `${tile.a} | ${tile.b}`).join('   ·   ')));
-      board.appendChild(text('div', 'player-turn', 'Tiles left to draw: ' + (room.boneyardCount || 0)));
-      const hand = text('div', 'card-hand');
-      privateHand.forEach((tile, index) => {
-        for (const end of ['left','right']) hand.appendChild(button(`${tile.a} | ${tile.b} ${end === 'left' ? '←' : '→'}`, () => call('move', { move: { type: 'play', index, end } }).catch(showError), 'playing-card', pending || !ownTurn));
-      });
-      board.appendChild(hand);
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.handCounts?.[player.studentId] || 0} tiles`).join(' · ')));
+      drawDominoTable(board);
     } else if (gameKey === 'go-fish') {
       const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'], groups = new Map();
       privateHand.forEach(card => groups.set(card.rank, (groups.get(card.rank) || 0) + 1));
@@ -541,10 +537,77 @@
     }
     board.append(bar, grid, roll);
   }
+  let selectedDom = null;
+  const DOM_PIPS = { 0: [], 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  function domHalf(value) {
+    const half = text('div', 'h'), pips = text('div', 'pips');
+    for (let i = 0; i < 9; i += 1) pips.appendChild(text('b', DOM_PIPS[value]?.includes(i) ? '' : 'off'));
+    half.appendChild(pips); return half;
+  }
+  function domTile(left, right, className) {
+    const node = text('div', 'dt ' + (className || '') + (left === right ? ' dbl' : ''));
+    node.append(domHalf(left), text('div', 'sep'), domHalf(right));
+    return node;
+  }
+  function domChain(layout) {
+    const lefts = [], rights = [];
+    let first = null;
+    layout.forEach((tile, index) => {
+      if (index === 0 && !tile.end) { first = [tile.a, tile.b]; return; }
+      if (tile.end === 'left') lefts.unshift(tile.flipped ? [tile.a, tile.b] : [tile.b, tile.a]);
+      else rights.push(tile.flipped ? [tile.b, tile.a] : [tile.a, tile.b]);
+    });
+    return [...lefts, ...(first ? [first] : []), ...rights];
+  }
+  function domSides(tile) {
+    const ends = room.ends || [];
+    return { left: ends.length === 2 && (tile.a === ends[0] || tile.b === ends[0]), right: ends.length === 2 && (tile.a === ends[1] || tile.b === ends[1]) };
+  }
+  function drawDominoTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    if (!ownTurn) selectedDom = null;
+    const players = text('div', 'dm-players');
+    (room.players || []).forEach(player => {
+      const turn = player.studentId === room.turn && !room.finished, mine = player.studentId === studentId;
+      const count = room.handCounts?.[player.studentId] || 0;
+      const badge = text('div', 'dm-p' + (turn ? ' turn' : ''));
+      const label = text('div', '', player.name + (mine ? ' (you)' : ''));
+      label.appendChild(text('small', '', count + (count === 1 ? ' tile' : ' tiles') + (turn ? (mine ? ' · your turn!' : ' · playing') : '')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label); players.appendChild(badge);
+    });
+    const felt = text('div', 'felt'), chain = text('div', 'dchain');
+    const tiles = domChain(room.layout || []);
+    tiles.forEach(([left, right], index) => {
+      const open = index === 0 || index === tiles.length - 1;
+      const node = domTile(left, right, open && tiles.length > 1 ? 'open' : '');
+      node.dataset.a = String(left); node.dataset.b = String(right);
+      chain.appendChild(node);
+    });
+    felt.appendChild(chain);
+    const pile = text('div', 'dpile');
+    pile.append(text('div', 'dback', '★'), text('div', '', 'Draw pile: ' + (room.boneyardCount || 0) + ' tiles'));
+    const hand = text('div', 'dhand');
+    privateHand.forEach((tile, index) => {
+      const sides = domSides(tile), playable = ownTurn && (sides.left || sides.right);
+      const node = button('', () => {
+        if (!playable) return;
+        if (sides.left && sides.right) { selectedDom = index; draw(); return; }
+        selectedDom = null;
+        call('move', { move: { type: 'play', index, end: sides.left ? 'left' : 'right' } }).catch(showError);
+      }, 'dtile-button', pending || !playable);
+      node.setAttribute('aria-label', 'Tile ' + tile.a + ' and ' + tile.b + (playable ? '' : ', cannot be played now'));
+      node.dataset.a = String(tile.a); node.dataset.b = String(tile.b);
+      node.appendChild(domTile(tile.a, tile.b, 'v ' + (playable ? 'go' : 'no') + (selectedDom === index ? ' picked' : '')));
+      hand.appendChild(node);
+    });
+    const hint = text('div', 'dm-hint', ownTurn ? (selectedDom != null ? 'Choose which end to play on.' : 'Glowing tiles can be played.') : '');
+    board.append(players, felt, pile, hand, hint);
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
     el('room').classList.toggle('ludo-mode', gameKey === 'ludo');
+    el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
