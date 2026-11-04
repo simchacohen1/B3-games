@@ -173,8 +173,8 @@
         if (selectedUno != null) for (const color of ['red','yellow','green','blue']) actions.append(button(UNO_COLOR_NAMES[color], () => call('move', { move: { type: 'play', index: selectedUno, color } }).then(() => { selectedUno = null; }).catch(showError), 'uno-pick ' + color, pending));
       }
       if (gameKey === 'ludo' && room.turn === studentId) {
-        if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn', pending));
-        else actions.append(text('div', 'player-turn', 'You rolled ' + room.lastRoll + '. Choose a token.'));
+        if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn uno-btn', pending));
+        else actions.append(text('div', 'player-turn', 'Tap a glowing token.'));
       }
       actions.append(button('Leave game', leaveRoom, 'quiet', pending));
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
@@ -377,17 +377,7 @@
       });
       board.append(grid, text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} sets`).join(' · ')));
     } else if (gameKey === 'ludo') {
-      const list = text('div', 'ludo-list');
-      (room.players || []).forEach(player => {
-        const own = player.studentId === studentId;
-        const row = text('div', 'ludo-row'); row.appendChild(text('strong', '', player.name));
-        (room.tokens?.[player.studentId] || [-1,-1,-1,-1]).forEach((position, index) => {
-          const label = position < 0 ? 'Home' : position >= 51 ? `Home ${position - 50}/7` : `Track ${position + 1}`;
-          row.appendChild(button(`Token ${index + 1}: ${label}`, () => call('move', { move: { type: 'token', token: index } }).catch(showError), 'ludo-token', pending || !own || room.turn !== studentId || room.lastRoll == null || !!room.finished));
-        });
-        list.appendChild(row);
-      });
-      board.appendChild(list);
+      drawLudoTable(board);
     } else if (gameKey === 'dominoes') {
       const ownTurn = room.turn === studentId && !room.finished;
       board.append(text('div', 'game-result', 'Table'), text('div', 'domino-line', (room.layout || []).map(tile => `${tile.a} | ${tile.b}`).join('   ·   ')));
@@ -479,9 +469,82 @@
     });
     board.append(bar, players, mid, msg, hand);
   }
+  const LUDO_COLORS = ['red', 'yellow', 'green', 'blue'], LUDO_NAMES = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' };
+  const LUDO_SAFE = [8, 21, 34, 47];
+  const LUDO_RING = (() => {
+    const ring = [], add = (c, r) => ring.push([c, r]);
+    for (let c = 1; c <= 5; c += 1) add(c, 6);
+    for (let r = 5; r >= 0; r -= 1) add(6, r);
+    add(7, 0); add(8, 0);
+    for (let r = 1; r <= 5; r += 1) add(8, r);
+    for (let c = 9; c <= 14; c += 1) add(c, 6);
+    add(14, 7); add(14, 8);
+    for (let c = 13; c >= 9; c -= 1) add(c, 8);
+    for (let r = 9; r <= 14; r += 1) add(8, r);
+    add(7, 14); add(6, 14);
+    for (let r = 13; r >= 9; r -= 1) add(6, r);
+    for (let c = 5; c >= 0; c -= 1) add(c, 8);
+    add(0, 7); add(0, 6);
+    return ring;
+  })();
+  const LUDO_LANE = { red: i => [1 + i, 7], yellow: i => [7, 1 + i], green: i => [13 - i, 7], blue: i => [7, 13 - i] };
+  function ludoPosition(color, index, position) {
+    return position < 51 ? LUDO_RING[(index * 13 + position) % 52] : LUDO_LANE[color](position - 51);
+  }
+  function ludoCanMove(position, roll) { return position < 0 ? roll === 6 : position + roll <= 57; }
+  function drawLudoTable(board) {
+    const ids = (room.playersOrder && room.playersOrder.length ? room.playersOrder : (room.players || []).map(player => player.studentId));
+    const colorOf = id => LUDO_COLORS[Math.max(0, ids.indexOf(id)) % 4];
+    const ownTurn = room.turn === studentId && !room.finished, rolled = room.lastRoll;
+    const nameOf = id => (room.players || []).find(player => player.studentId === id)?.name || 'Player';
+    const bar = text('div', 'ludo-players');
+    ids.forEach(id => {
+      const tokens = room.tokens?.[id] || [-1, -1, -1, -1], color = colorOf(id), turn = id === room.turn && !room.finished;
+      const done = tokens.filter(position => position === 57).length, yard = tokens.filter(position => position < 0).length;
+      const badge = text('div', 'lt-p ' + color + (turn ? ' turn' : ''));
+      const dot = text('i', ''), label = text('div', '', nameOf(id) + (id === studentId ? ' (you)' : ''));
+      label.appendChild(text('small', '', done + ' home · ' + yard + ' in the yard' + (turn ? (id === studentId ? ' · your turn!' : ' · playing') : '')));
+      badge.append(dot, label); bar.appendChild(badge);
+    });
+    const grid = text('div', 'lboard'), cellAt = {};
+    const place = (c, r, cls) => { const node = text('div', 'lc ' + (cls || '')); node.style.gridColumn = String(c + 1); node.style.gridRow = String(r + 1); grid.appendChild(node); cellAt[c + ',' + r] = node; return node; };
+    const slots = {};
+    [['red', 0, 0], ['yellow', 9, 0], ['blue', 0, 9], ['green', 9, 9]].forEach(([color, c, r]) => {
+      const yard = text('div', 'yard ' + color); yard.style.gridColumn = (c + 1) + ' / span 6'; yard.style.gridRow = (r + 1) + ' / span 6';
+      const pad = text('div', 'pad'); slots[color] = [];
+      for (let i = 0; i < 4; i += 1) { const slot = text('div', 'slot'); slots[color].push(slot); pad.appendChild(slot); }
+      yard.appendChild(pad); grid.appendChild(yard);
+    });
+    LUDO_RING.forEach(([c, r], i) => place(c, r, (i % 13 === 0 ? 'st-' + LUDO_COLORS[i / 13] : '') + (LUDO_SAFE.includes(i) ? ' safe' : '')));
+    LUDO_COLORS.forEach(color => { for (let i = 0; i < 6; i += 1) { const [c, r] = LUDO_LANE[color](i); place(c, r, 't-' + color); } });
+    const center = text('div', 'lcenter'); center.style.gridColumn = '7 / span 3'; center.style.gridRow = '7 / span 3'; grid.appendChild(center);
+    ids.forEach(id => {
+      const color = colorOf(id), index = ids.indexOf(id) % 4;
+      (room.tokens?.[id] || [-1, -1, -1, -1]).forEach((position, tokenIndex) => {
+        const mine = id === studentId, movable = mine && ownTurn && rolled != null && ludoCanMove(position, rolled);
+        const where = position < 0 ? 'in the yard' : position >= 57 ? 'home' : position >= 51 ? 'in the home lane' : 'on the track';
+        const pawn = button(String(tokenIndex + 1), () => { if (movable) call('move', { move: { type: 'token', token: tokenIndex } }).catch(showError); },
+          'pawn ' + color + (movable ? ' go' : ''), pending || !movable);
+        pawn.setAttribute('aria-label', nameOf(id) + ' token ' + (tokenIndex + 1) + ': ' + where);
+        pawn.dataset.token = String(tokenIndex);
+        if (position < 0) slots[color][tokenIndex].appendChild(pawn);
+        else if (position >= 57) { pawn.classList.add('finished'); center.appendChild(pawn); }
+        else { const [c, r] = ludoPosition(color, index, position); cellAt[c + ',' + r].appendChild(pawn); }
+      });
+    });
+    const roll = text('div', 'lt-roll');
+    if (rolled != null) {
+      const die = text('div', 'die'); die.setAttribute('aria-hidden', 'true');
+      const dots = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }[rolled] || [];
+      for (let i = 0; i < 9; i += 1) { const dot = text('b', ''); if (!dots.includes(i)) dot.style.visibility = 'hidden'; die.appendChild(dot); }
+      roll.append(die, text('div', 'lt-hint', (nameOf(room.turn) + ' rolled a ' + rolled)));
+    }
+    board.append(bar, grid, roll);
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
+    el('room').classList.toggle('ludo-mode', gameKey === 'ludo');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
