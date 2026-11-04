@@ -231,6 +231,33 @@ test('class ZIP: one quiz PDF per student in selected class, none from other cla
 });
 
 
+test('class ZIP preserves all PDFs when sanitized names and truncated IDs collide', async ({ page }) => {
+  await mockQuizExportLibraries(page);
+  const errors = await openReport(page, { authorized: true, role: 'teacher', classIds: ['et'] }, '?class=et');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.evaluate(async () => {
+      const prefix = 'student_' + 'x'.repeat(40);
+      const students = ['first', prefix + 'A', prefix + 'B'].map(id => ({
+        id, name: 'Same Name', practice: [],
+        history: {
+          summary: { assigned: 0, completed: 0, inProgress: 0, notStarted: 0,
+            avg: null, pointsEarned: 0, pointsPossible: 0 },
+          quizzes: [], unavailable: [],
+        },
+      }));
+      await (window as any).B3QuizExports.saveZip(students, 'Synthetic Class', 'All time');
+    }),
+  ]);
+  const names: string[] = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+  expect(names).toHaveLength(3);
+  expect(new Set(names).size).toBe(3);
+  expect(names[0]).toBe('Same-Name-quizzes.pdf');
+  expect(names[1]).toMatch(/^Same-Name-student_x+-quizzes\.pdf$/);
+  expect(names[2]).toMatch(/^Same-Name-student_x+-2-quizzes\.pdf$/);
+  expect(errors).toEqual([]);
+});
+
 test('quizzes-only PDF pagination keeps multiple pages', async ({ page }) => {
   await mockQuizExportLibraries(page);
   const errors = await openReport(page, { authorized: true, role: 'admin' }, '?class=et');
