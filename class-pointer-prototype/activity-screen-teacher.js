@@ -42,7 +42,39 @@
   }
   function close(call){try{call.close()}catch{}}
   // Tell the Student Screens gallery (student-boards.js) that a student's live screen changed.
-  function notify(){document.dispatchEvent(new CustomEvent('classpointer:activity-screens'))}
+  function notify(){
+    // The boy stopped sharing (or was turned off): his screen must leave the whole class at once.
+    const shared=window.ClassPointerClassShare?.current();
+    if(shared&&!students.get(shared.studentId)?.calls.some(item=>item.stream))window.ClassPointerClassShare.stop();
+    document.dispatchEvent(new CustomEvent('classpointer:activity-screens'));
+  }
+
+  // ---------- Show one student's screen to the whole class (teacher's choice only) ----------
+  // One clear red Stop bar stays on the lesson (also in full screen) for as long as it is on.
+  const classBar=document.createElement('div');
+  classBar.id='classShareBar';classBar.dataset.stageUi='true';classBar.hidden=true;classBar.setAttribute?.('role','status');
+  classBar.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;max-width:calc(100% - 24px);padding:10px 14px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 10px 30px #0006;color:#7c2d12;font:700 16px system-ui;pointer-events:auto';
+  const classBarText=document.createElement('span'),classBarStop=document.createElement('button');
+  classBarStop.type='button';classBarStop.style.cssText='min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #b91c1c;background:#dc2626;color:#fff;font:800 15px system-ui;cursor:pointer';
+  classBarStop.onclick=()=>window.ClassPointerClassShare?.stop();
+  classBar.append(classBarText,classBarStop);stage.appendChild(classBar);
+  ['pointerdown','pointermove','pointerup','click'].forEach(type=>classBar.addEventListener?.(type,event=>event.stopPropagation()));
+  function shareToClass(studentId,name){
+    const entry=students.get(studentId);
+    const stream=entry?.calls[entry.calls.length-1]?.stream;
+    if(!stream||!window.ClassPointerClassShare)return false;
+    return window.ClassPointerClassShare.start(studentId,name||entry.name,stream);
+  }
+  document.addEventListener?.('classpointer:class-share',event=>{
+    const on=event.detail;
+    classBar.hidden=!on;
+    if(on){classBarText.textContent='🔴 The whole class is seeing '+on.name+'’s screen.';classBarStop.textContent='Stop showing '+on.name+'’s screen'}
+    for(const [id,entry] of students){
+      const mine=!!on&&on.studentId===id;
+      entry.showClass.textContent=mine?'Showing to class ✓':'📣 Show to whole class';
+      entry.showClass.disabled=mine;
+    }
+  });
 
   // ---------- Enlarged view: one student's screen fills the lesson area ----------
   // Only the layout changes; every connection stays open.
@@ -89,8 +121,13 @@
     dismiss.title='Close this student’s screen (he can share again)';
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
     dismiss.onclick=()=>closeStudent(studentId);
-    card.append(top,video,dismiss);tray.appendChild(card);
-    entry={card,video,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    const showClass=document.createElement('button');showClass.type='button';showClass.textContent='📣 Show to whole class';
+    showClass.title='Let every student in this class see '+name+'’s screen. You can stop it at any time.';
+    showClass.style.cssText=BUTTON+';background:#c2410c';
+    showClass.onclick=()=>{shareToClass(studentId)};
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center';row.append(dismiss,showClass);
+    card.append(top,video,row);tray.appendChild(card);
+    entry={card,video,heading,enlarge,name,showClass,calls:[]};students.set(studentId,entry);
     setFocus(focused);
     return entry;
   }
@@ -142,6 +179,7 @@
     return true;
   }
   window.ClassPointerActivityShares={incomingCall,
+    showToClass:shareToClass,
     enlarge:studentId=>{if(!students.has(studentId))return false;setFocus(studentId);return true},
     showAll:()=>setFocus(null),
     count:()=>students.size,
