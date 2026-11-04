@@ -102,6 +102,7 @@
   var gameIllustration = window.FTT_GAME_ART.illustration;
   // Keep every game visible at its full app-tile size from the first render.
   var readyToPlay = false;
+  var accessLabel = "Checking access…";
   var categoriesEl = document.getElementById("gameCategories");
   var gameResultsSummary = document.getElementById("gameResultsSummary");
   function drawGameCard(game) {
@@ -114,17 +115,17 @@
     var details = make("span", "game-details");
     details.append(make("span", "game-name", game.name), make("span", "game-description", game.description));
     var footer = make("span", "game-launch-footer");
-    footer.append(make("span", "game-type", CATEGORIES.find(function (c) { return c.key === category; }).label), make("span", "game-play-label", "Play  ›"));
+    footer.append(make("span", "game-type", CATEGORIES.find(function (c) { return c.key === category; }).label), make("span", "game-play-label", accessLabel));
     button.append(picture, details, footer);
     button.type = "button";
     button.disabled = !readyToPlay;
-    button.setAttribute("aria-label", "Start Game: " + game.name);
+    button.setAttribute("aria-label", (readyToPlay ? "Start Game: " : accessLabel + ": ") + game.name);
     button.addEventListener("click", function () { route(game, game.mode); });
     card.appendChild(button);
     return card;
   }
   function drawCategoryHome() {
-    document.getElementById("gamesHeading").textContent = "All 17 games, ready to play";
+    document.getElementById("gamesHeading").textContent = readyToPlay ? "All 17 games, ready to play" : "Explore all 17 games";
     categoriesEl.replaceChildren();
     categoriesEl.className = "category-shelf";
     CATEGORIES.filter(function (category) { return category.key !== "all"; }).forEach(function (category) {
@@ -144,7 +145,7 @@
       group.append(heading, gameGrid);
       categoriesEl.appendChild(group);
     });
-    gameResultsSummary.textContent = "All 17 games are ready to browse. Choose a game to play with your classmates.";
+    gameResultsSummary.textContent = readyToPlay ? "All 17 games are ready to play with your classmates." : "Browse all 17 games. A verified class sign-in is required to play.";
   }
   function declinedRooms() {
     try { return new Set(JSON.parse(sessionStorage.getItem("fttMultiplayerDeclined:" + scopeKey) || "[]")); }
@@ -242,6 +243,28 @@
         invitationSummary.textContent = "Waiting games are temporarily unavailable. You can still start a new class game.";
       });
   }
+  function showAccessError(message, label) {
+    // Never unlock game actions when the Firebase user or class changes.
+    readyToPlay = false;
+    accessLabel = label || "Sign in to play";
+    classInfo = null;
+    scopeKey = "";
+    roomsCallable = null;
+    clearInterval(roomsPollTimer);
+    roomsPollTimer = null;
+    roomsRequest += 1;
+    invitationSection.hidden = true;
+    leaderboardSection.hidden = true;
+    statusBox.className = "notice error";
+    statusBox.replaceChildren(document.createTextNode(message + " "));
+    var signInLink = make("a", "", "Return to sign in");
+    signInLink.href = "../index.html";
+    signInLink.addEventListener("click", function () {
+      try { sessionStorage.setItem("b3StudentReturnTo", "multiplayer/index.html"); } catch (e) {}
+    });
+    statusBox.appendChild(signInLink);
+    drawCategoryHome();
+  }
   function start() {
     drawCategoryHome();
     try {
@@ -249,24 +272,17 @@
       sessionName = String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student");
     } catch (e) {}
     if (!window.firebase || !window.B3_FIREBASE_CONFIG) {
-      statusBox.className = "notice error";
-      statusBox.replaceChildren(document.createTextNode("Sign in on Fun Torah Tools first. "));
-      var link = make("a", "", "Go to sign in");
-      link.href = "../index.html";
-      link.addEventListener("click", function () {
-        try { sessionStorage.setItem("b3StudentReturnTo", "multiplayer/index.html"); } catch (e) {}
-      });
-      statusBox.appendChild(link); return;
+      showAccessError("The class sign-in service could not load. Return to Fun Torah Tools and try again.", "Access unavailable"); return;
     }
     try {
       if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       db = firebase.database();
     } catch (e) {
-      statusBox.className = "notice error"; statusBox.textContent = "Could not connect to multiplayer right now. Try again in a moment."; return;
+      showAccessError("Could not connect to the Multiplayer Arcade. Return to Fun Torah Tools and try again.", "Access unavailable"); return;
     }
     firebase.auth().onAuthStateChanged(async function (user) {
       if (!user) {
-        statusBox.className = "notice error"; statusBox.textContent = "Your saved sign-in has expired. Please sign in on Fun Torah Tools again."; return;
+        showAccessError("Your saved sign-in has expired. Please sign in on Fun Torah Tools again.", "Sign in to play"); return;
       }
       try {
         var params = new URLSearchParams(location.search);
@@ -290,6 +306,7 @@
         statusBox.className = "notice good";
         statusBox.textContent = (classInfo.role === "teacher" ? "Playing as teacher " : "Signed in as ") + sessionName + " · " + classInfo.className + ". Showing games for this class.";
         readyToPlay = true;
+        accessLabel = "Play  ›";
         drawCategoryHome();
         if (classInfo.role === "student" && typeof firebase.functions === "function") {
           leaderboardSection.hidden = false;
@@ -303,8 +320,11 @@
         roomsPollTimer = setInterval(loadRooms, 5000);
       } catch (e) {
         console.warn("Multiplayer Center: class access check failed", e);
-        statusBox.className = "notice error";
-        statusBox.textContent = "A class sign-in is required to use the Multiplayer Center. Please sign in again or ask your teacher to check your class access.";
+        var accessDenied = /not enabled|not assigned|tool access|permission.denied|permission denied|unauthorized/i.test(String(e && e.message || ""));
+        showAccessError(accessDenied
+          ? "The Multiplayer Arcade is not available for your current class. Ask your teacher to check class access."
+          : "We could not verify your class sign-in. Please sign in again, or ask your teacher if this continues.",
+          accessDenied ? "Class access needed" : "Sign in to play");
       }
     });
   }
