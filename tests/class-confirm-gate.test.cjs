@@ -25,3 +25,12 @@ test('every teacher class page uses the gate and no longer defaults to the first
     assert.match(read(f),/B3ClassGate/,f+' must use the confirm-class gate');
   assert.doesNotMatch(read('teacher-global-controls.js'),/ids\[0\]/,'quick bar must not default to the first class');
 });
+test('"All my classes" works only where a page asks for it (Chazara)',()=>{
+  assert.deepEqual(gate.plan(['et','wt'],'all','et',true),{mode:'explicit',id:'all'});
+  assert.deepEqual(gate.plan(['et','wt'],'all','',false),{mode:'choose'});
+  assert.deepEqual(gate.plan(['et','wt'],'all','et'),{mode:'continue',id:'et'});
+  const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+  assert.match(read('chazara/teacher.html'),/'b3-2026',true\)/);
+  for(const f of ['assignment-center/teacher.html','student-report/index.html','follow-teacher/teacher.js','student-rewards/teacher.js','teacher-class-rosters.js','gematria/teacher.html','class-pointer-prototype/dashboard.js','rashi-letters/teacher.html','shorashim/teacher.js','record_pesukim/teacher.html','weekly-quiz/teacher.html'])
+    assert.doesNotMatch(read(f),/allowAll/,f+' must require one class');
+});

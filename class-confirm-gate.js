@@ -14,15 +14,18 @@
   'use strict';
   var KEY = 'b3LastConfirmedClass';
   var SAFE = /^[A-Za-z0-9_-]{1,100}$/;
+  var ALL = 'all';
 
   function readLast() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
   function writeLast(id) { try { localStorage.setItem(KEY, id); } catch (e) {} }
   function labelOf(id, names) { return (names && names[id]) || String(id).toUpperCase(); }
 
   // Pure decision, unit-tested: what should the screen show?
-  function plan(ids, requested, last) {
+  // allowAll is only for Chazara: it adds an "All my classes" choice (id 'all').
+  function plan(ids, requested, last, allowAll) {
     ids = (ids || []).filter(function (id) { return SAFE.test(id); });
     if (!ids.length) return { mode: 'none' };
+    if (allowAll && requested === ALL) return { mode: 'explicit', id: ALL };
     if (requested && ids.indexOf(requested) >= 0) return { mode: 'explicit', id: requested };
     if (last && ids.indexOf(last) >= 0) return { mode: 'continue', id: last };
     return { mode: 'choose' };
@@ -32,7 +35,7 @@
   function choose(opts) {
     // Ask once per page load; later sign-in refreshes reuse the answer.
     if (memo) return memo.then(function (id) {
-      if ((opts && opts.ids || []).indexOf(id) >= 0) return id;
+      if ((opts && opts.ids || []).indexOf(id) >= 0 || (opts && opts.allowAll && id === ALL)) return id;
       memo = null; return choose(opts);
     });
     memo = choose1(opts);
@@ -44,8 +47,8 @@
     var ids = opts.ids || [], names = opts.names || {};
     var requested = opts.requested === undefined
       ? (new URLSearchParams(root.location.search).get('class') || '').trim() : opts.requested;
-    var p = plan(ids, requested, readLast());
-    if (p.mode === 'explicit') { writeLast(p.id); return Promise.resolve(p.id); }
+    var p = plan(ids, requested, readLast(), opts.allowAll);
+    if (p.mode === 'explicit') { if (p.id !== ALL) writeLast(p.id); return Promise.resolve(p.id); }
     return new Promise(function (resolve, reject) {
       if (p.mode === 'none') { reject(new Error('No classes are assigned to this account.')); return; }
       var doc = root.document, body = doc.body;
@@ -74,7 +77,7 @@
         return b;
       }
       function finish(id) {
-        writeLast(id);
+        if (id !== ALL) writeLast(id);
         held.forEach(function (h) {
           if (!h[1]) h[0].removeAttribute('inert');
           h[0].removeAttribute('aria-hidden');
@@ -100,6 +103,7 @@
         sel.setAttribute('aria-label', 'Choose a class');
         sel.style.cssText = 'width:100%;padding:12px;font-size:17px;border-radius:10px;border:2px solid #94a3b8';
         var ph = doc.createElement('option'); ph.value = ''; ph.textContent = 'Choose a class\u2026'; sel.appendChild(ph);
+        if (opts.allowAll) { var oa = doc.createElement('option'); oa.value = ALL; oa.textContent = 'All my classes'; sel.appendChild(oa); }
         ids.forEach(function (id) {
           if (!SAFE.test(id)) return;
           var o = doc.createElement('option'); o.value = id; o.textContent = labelOf(id, names); sel.appendChild(o);
@@ -135,7 +139,7 @@
   // with no class in the link, ask first, then reload the page with the choice.
   // get(path) must return the value at a database path. Never resolves when it
   // asks (the page reloads); resolves when the link already names a class.
-  function requireInUrl(get, access, workspace) {
+  function requireInUrl(get, access, workspace, allowAll) {
     var q = (new URLSearchParams(root.location.search).get('class') || '').trim();
     if (q) return Promise.resolve(q);
     var base = 'b3Games/workspaces/' + (workspace || 'b3-2026') + '/classes';
@@ -149,7 +153,7 @@
       return Promise.all(ids.map(function (id) { return get(base + '/' + id + '/name').catch(function () { return null; }); }))
         .then(function (list) {
           var names = {}; ids.forEach(function (id, i) { names[id] = list[i] || String(id).toUpperCase(); });
-          return choose({ ids: ids, names: names, requested: '-', reload: true });
+          return choose({ ids: ids, names: names, requested: '-', reload: true, allowAll: !!allowAll });
         });
     });
   }
