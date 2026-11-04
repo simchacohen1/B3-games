@@ -13,6 +13,8 @@
     dominoes: { name: 'Dominoes', icon: '🁣', minPlayers: 2 },
     'go-fish': { name: 'Go Fish', icon: '🐟', minPlayers: 2 },
     'uno-style': { name: 'Uno-style Cards', icon: '🃏', minPlayers: 2 },
+    chess: { name: 'Chess', icon: '♞', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
+    'chess-5min': { name: 'Chess: 5 Minutes', icon: '♞', minPlayers: 2, maxPlayers: 2, columns: 8, rows: 8 },
   };
   const params = new URLSearchParams(location.search);
   const gameKey = params.get('game') || '';
@@ -90,7 +92,9 @@
   function statusText() {
     if (!room) return 'Connecting…';
     if (room.state === 'lobby') return room.host === studentId ? 'Waiting for classmates. You start the game when everyone is ready.' : 'Waiting for the host to start.';
+    if ((gameKey === 'chess' || gameKey === 'chess-5min') && (room.finished || room.state === 'finished')) return chessResultText();
     if (room.finished || room.state === 'finished') return room.draw ? 'It’s a draw!' : (room.winner === studentId ? 'You won! Great game.' : ((room.players || []).find(p => p.studentId === room.winner)?.name || 'A classmate') + ' won this game.');
+    if (gameKey === 'chess' || gameKey === 'chess-5min') return chessStatusText();
     if (gameKey === 'math-race') return 'Solve the question with your classmates.';
     if (gameKey === 'set') return 'Find a set of three cards.';
     if (gameKey === 'bingo') return room.host === studentId ? 'Draw numbers for the class.' : 'Your card marks called numbers automatically.';
@@ -367,6 +371,8 @@
         }, pending || !!room.finished));
       });
       board.append(grid, text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} sets`).join(' · ')));
+    } else if (gameKey === 'chess' || gameKey === 'chess-5min') {
+      drawChessTable(board);
     } else if (gameKey === 'ludo') {
       drawLudoTable(board);
     } else if (gameKey === 'dominoes') {
@@ -661,6 +667,117 @@
     const hint = text('div', 'ck-hint', ownTurn ? (selectedChecker != null ? 'Tap a gold spot to move there.' : 'Tap one of your glowing pieces.') : '');
     board.append(players, grid, hint);
   }
+    // ---- Chess ----
+  const CHESS_NAMES = { Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight' };
+  let selectedChess = null, promotionPending = null, chessClockTimer = null, chessTimeoutAt = 0;
+  function chessMyColor() { return room?.playersOrder?.[1] === studentId ? 'b' : 'w'; }
+  function chessName(id) { return (room?.players || []).find(player => player.studentId === id)?.name || 'A classmate'; }
+  function chessClockText(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  }
+  function chessResultText() {
+    const [whiteId, blackId] = room.playersOrder || [];
+    const score = id => room.points?.[id] || 0;
+    if (room.endReason === 'time') {
+      const line = score(whiteId) + ' to ' + score(blackId);
+      if (room.draw) return 'Time is up! Equal points (' + score(whiteId) + ' each). It is a draw.';
+      const winnerPoints = score(room.winner), loserPoints = score(room.winner === whiteId ? blackId : whiteId);
+      return 'Time is up! ' + (room.winner === studentId ? 'You win' : chessName(room.winner) + ' wins') + ' with more points: ' + winnerPoints + ' to ' + loserPoints + '.';
+    }
+    if (room.endReason === 'checkmate') return 'Checkmate! ' + (room.winner === studentId ? 'You win!' : chessName(room.winner) + ' wins.');
+    if (room.endReason === 'stalemate') return 'Stalemate. The player to move has no legal move, so it is a draw.';
+    if (room.endReason === 'insufficient') return 'Draw. Neither player has enough pieces left to checkmate.';
+    if (room.endReason === 'fifty-move') return 'Draw. Fifty moves passed with no capture or pawn move.';
+    return room.draw ? 'It is a draw!' : (room.winner === studentId ? 'You win!' : chessName(room.winner) + ' wins.');
+  }
+  function chessStatusText() {
+    if (room.finished || room.state === 'finished') return chessResultText();
+    const mine = room.turn === studentId;
+    const who = mine ? 'Your turn!' : chessName(room.turn) + ' is thinking.';
+    return who + (room.check ? (mine ? ' Check! Protect your king.' : ' Check!') : '');
+  }
+  function chessSend(from, to, promotion) {
+    selectedChess = null; promotionPending = null;
+    return call('move', { move: Object.assign({ type: 'move', from, to }, promotion ? { promotion } : {}) }).catch(showError);
+  }
+  function chessTick() {
+    const clock = document.getElementById('chessClock');
+    if (!room || !clock || !room.endsAt) return;
+    const left = room.endsAt - Date.now();
+    clock.textContent = '⏱ ' + chessClockText(left);
+    clock.classList.toggle('low', left <= 30000 && left > 0);
+    if (left <= 0 && !room.finished && room.state === 'playing' && Date.now() - chessTimeoutAt > 2000) {
+      chessTimeoutAt = Date.now();
+      clock.textContent = '⏱ 0:00';
+      callable({ action: 'move', gameKey, workspaceId: classInfo.workspaceId, classId: classInfo.classId, roomCode, move: { type: 'timeout' } }).catch(() => {});
+    }
+  }
+  function drawChessTable(board) {
+    const art = window.FTT_GAME_ART;
+    const ownTurn = room.turn === studentId && !room.finished;
+    const mine = chessMyColor(), pieces = room.board || [], legal = room.legal || {};
+    if (selectedChess != null && (!ownTurn || !legal['s' + selectedChess])) selectedChess = null;
+    const checkedKing = room.check ? (room.turn === room.playersOrder?.[0] ? 'wK' : 'bK') : '';
+    const targets = new Set(selectedChess != null ? (legal['s' + selectedChess] || []) : []);
+    if (room.endsAt && !room.finished) {
+      const clock = text('b', '', ''); clock.id = 'chessClock';
+      const strip = text('div', 'ch-timer');
+      strip.append(clock, text('span', '', '5-minute game · most captured points wins at time'));
+      board.appendChild(strip);
+    }
+    const bar = text('div', 'ch-players');
+    (room.playersOrder || []).forEach((id, index) => {
+      const color = index === 0 ? 'w' : 'b';
+      const badge = text('div', 'ch-p' + (room.turn === id && !room.finished ? ' turn' : ''));
+      const icon = text('span', 'ch-icon'); icon.appendChild(art.chessPiece('K', color));
+      const label = text('div', '', chessName(id) + (id === studentId ? ' (you)' : '') + ' · ' + (color === 'w' ? 'White' : 'Dark'));
+      const small = text('small', '', 'Points: ' + (room.points?.[id] || 0) + ' ');
+      const captured = text('span', 'ch-cap');
+      (room.captured?.[color] || []).slice().sort((a, b) => 'PNBRQ'.indexOf(a) - 'PNBRQ'.indexOf(b)).forEach(type => captured.appendChild(art.chessPiece(type, color === 'w' ? 'b' : 'w')));
+      small.appendChild(captured); label.appendChild(small);
+      badge.append(icon, label); bar.appendChild(badge);
+    });
+    board.appendChild(bar);
+    const grid = text('div', 'ch-board');
+    for (let displayIndex = 0; displayIndex < 64; displayIndex += 1) {
+      const index = mine === 'w' ? displayIndex : 63 - displayIndex;
+      const piece = pieces[index] || '', row = index >> 3, col = index & 7;
+      const own = !!piece && piece[0] === mine, movable = own && ownTurn && !!legal['s' + index];
+      const isTarget = targets.has(index);
+      const classes = 'board-cell ch-sq ' + ((row + col) % 2 ? 'd' : 'l') + (room.lastMove && (room.lastMove.from === index || room.lastMove.to === index) ? ' last' : '')
+        + (checkedKing && piece === checkedKing ? ' chk' : '') + (isTarget ? ' tgt' + (piece ? ' cap' : '') : '') + (selectedChess === index ? ' sel' : '');
+      const node = button('', () => {
+        if (promotionPending) return;
+        if (movable) { selectedChess = selectedChess === index ? null : index; draw(); return; }
+        if (isTarget && selectedChess != null) {
+          const from = selectedChess, mover = pieces[from];
+          if (mover && mover[1] === 'P' && (row === 0 || row === 7)) { promotionPending = { from, to: index }; draw(); return; }
+          chessSend(from, index);
+        }
+      }, classes, pending || !ownTurn || (!movable && !isTarget));
+      const file = 'abcdefgh'[col], rank = 8 - row;
+      node.setAttribute('aria-label', (piece ? (piece[0] === 'w' ? 'White ' : 'Dark ') + { P: 'pawn', N: 'knight', B: 'bishop', R: 'rook', Q: 'queen', K: 'king' }[piece[1]] + ' on ' : 'Empty square ') + file + rank + (selectedChess === index ? ', selected' : '') + (isTarget ? ', you can move here' : ''));
+      node.dataset.index = String(index);
+      if (piece) node.appendChild(art.chessPiece(piece[1], piece[0]));
+      grid.appendChild(node);
+    }
+    board.appendChild(grid);
+    if (promotionPending) {
+      const pick = text('div', 'ch-promo');
+      pick.appendChild(text('b', '', 'Promote your pawn to:'));
+      ['Q', 'R', 'B', 'N'].forEach(type => {
+        const choice = button('', () => chessSend(promotionPending.from, promotionPending.to, type), 'ch-promo-btn', pending);
+        choice.setAttribute('aria-label', CHESS_NAMES[type]);
+        choice.append(art.chessPiece(type, mine), text('span', '', CHESS_NAMES[type]));
+        pick.appendChild(choice);
+      });
+      pick.appendChild(button('Cancel', () => { promotionPending = null; draw(); }, 'quiet'));
+      board.appendChild(pick);
+    } else board.appendChild(text('div', 'ch-hint', ownTurn ? (selectedChess != null ? 'Tap a gold spot to move there.' : 'Tap one of your glowing pieces.') : ''));
+    clearInterval(chessClockTimer); chessClockTimer = null;
+    if (room.endsAt && !room.finished) { chessTick(); chessClockTimer = setInterval(chessTick, 500); }
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
@@ -668,6 +785,7 @@
     el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
     el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
     el('room').classList.toggle('checkers-mode', gameKey === 'checkers');
+    el('room').classList.toggle('chess-mode', gameKey === 'chess' || gameKey === 'chess-5min');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }

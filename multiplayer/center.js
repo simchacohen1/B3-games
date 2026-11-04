@@ -9,6 +9,8 @@
     { key: "connect-four", name: "Connect 4", icon: "🟡", description: "Drop colored discs and connect four in a row.", url: "game.html?game=connect-four", mode: "start" },
     { key: "tic-tac-toe", name: "Tic Tac Toe", icon: "⭕", description: "Take turns and make three in a row.", url: "game.html?game=tic-tac-toe", mode: "start" },
     { key: "memory-match", name: "Memory Match", icon: "🧠", description: "Flip cards and find matching pairs with your class.", url: "game.html?game=memory-match", mode: "start" },
+    { key: "chess", name: "Chess", icon: "♞", description: "Outsmart your classmate. Checkmate wins.", url: "game.html?game=chess", mode: "start" },
+    { key: "chess-5min", name: "Chess: 5 Minutes", icon: "♞", description: "Fast chess! After 5 minutes, most captured points wins.", url: "game.html?game=chess-5min", mode: "start" },
     { key: "checkers", name: "Checkers", icon: "♟️", description: "Jump opposing checkers and crown your kings.", url: "game.html?game=checkers", mode: "start" },
     { key: "reversi", name: "Othello", icon: "⚫", description: "Flip discs and finish with the most of your color.", url: "game.html?game=reversi", mode: "start" },
     { key: "bingo", name: "Bingo", icon: "🎱", description: "Mark called numbers and complete a line.", url: "game.html?game=bingo", mode: "start" },
@@ -95,7 +97,7 @@
   ];
   var GAME_CATEGORIES = {
     shorashim: "torah", yiddish: "torah", gematria: "torah", "weekly-quiz": "torah", "rashi-letters": "torah",
-    "connect-four": "strategy", "tic-tac-toe": "strategy", checkers: "strategy", reversi: "strategy", ludo: "strategy",
+    "connect-four": "strategy", "tic-tac-toe": "strategy", checkers: "strategy", chess: "strategy", "chess-5min": "strategy", reversi: "strategy", ludo: "strategy",
     "memory-match": "cards", set: "cards", dominoes: "cards", "go-fish": "cards", "uno-style": "cards",
     bingo: "challenges", "math-race": "challenges"
   };
