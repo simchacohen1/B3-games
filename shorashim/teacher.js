@@ -963,6 +963,14 @@ if(CLASS_MODE){
       return;
     }
     const ids=access.classIds||[];
+    if(!CLASS_ID){
+      // Never start on a class quietly: ask, then reopen this page with that class.
+      $('teacherGoogleSignIn').classList.add('hidden');
+      $('teacherGateMsg').textContent='Choose your class.';
+      window.B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,window.B3_APP_CONTEXT?.workspaceId)
+        .catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
+      return;
+    }
     activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
     if(isSiteAdmin){
       document.querySelector('.topbar h1').textContent='Shorashim Learning Lab';
