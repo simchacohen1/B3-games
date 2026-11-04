@@ -56,14 +56,31 @@
     for(const picture of boardPictures)ctx.drawImage(picture.image,picture.x*W,picture.y*H,picture.w*W,picture.h*H);
     // Match the document ink's coordinate system, widths and opacity.
     const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes;
+    // Same as the live SVG ink: transparency is applied once per owner and tool group,
+    // so a person's overlapping highlights stay one flat layer in the video students see.
+    const penTools=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
+    const groups=new Map();
     for(const stroke of all){
       if(!stroke.points?.length)continue;
-      const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
-      ctx.globalAlpha=stroke.tool==='pen'?1:stroke.tool==='pencil'?0.94:stroke.tool==='crayon'?0.78:0.32;
-      ctx.strokeStyle=ctx.fillStyle=stroke.color;ctx.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);ctx.lineCap=ctx.lineJoin='round';
-      if(stroke.tool==='box'){ctx.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
-      const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
-      ctx.beginPath();pts.forEach((point,index)=>{ctx[index?'lineTo':'moveTo'](point.x*W,point.y*H)});ctx.stroke();
+      const kind=penTools.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight');
+      const key=(stroke.owner||'')+'|'+kind;
+      if(!groups.has(key))groups.set(key,{kind,list:[]});
+      groups.get(key).list.push(stroke);
+    }
+    const layer=document.createElement('canvas');layer.width=canvas.width;layer.height=canvas.height;
+    const lc=layer.getContext('2d');
+    for(const {kind,list} of groups.values()){
+      lc.setTransform(1,0,0,1,0,0);lc.clearRect(0,0,layer.width,layer.height);lc.setTransform(ctx.getTransform());
+      for(const stroke of list){
+        const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
+        lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);lc.lineCap=lc.lineJoin='round';
+        if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
+        const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
+        lc.beginPath();pts.forEach((point,index)=>{lc[index?'lineTo':'moveTo'](point.x*W,point.y*H)});lc.stroke();
+      }
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha=kind==='pen'?1:kind==='pencil'?0.94:kind==='crayon'?0.78:0.32;
+      ctx.drawImage(layer,0,0);ctx.restore();
     }
     ctx.globalAlpha=1;
   }
