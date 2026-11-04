@@ -234,6 +234,21 @@ async function teacherDo(store, identity, body, now, newId) {
     return { ok: true };
   }
 
+  if (body.action === 'deletePermanently') {
+    // Explicit, teacher-confirmed removal of one homework from THIS class only (def came from this
+    // class's own definitions, and teacherAccess already proved the teacher belongs to the class).
+    // Removes the student records (answers, notes, voice recordings, feedback, stars) first and the
+    // assignment last, so a failed half-way run can simply be repeated.
+    if (body.confirm !== true) fail(400, 'Please confirm the delete.');
+    for (const sid of Object.keys(allRecords)) {
+      if (!key(sid)) continue;
+      if (allRecords[sid]?.assignments && has(allRecords[sid].assignments, def.id))
+        await store.set(recordPath(classId, sid, def.id), null);
+    }
+    await store.set(base(classId) + '/definitions/' + def.id, null);
+    return { ok: true };
+  }
+
   if (body.action === 'delete') {
     // Unpublishing does not undo publication: preserve every student's work and history.
     // The record check also covers legacy definitions without a publishedAt marker,
@@ -382,7 +397,7 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return authorizedClasses(store, auth.identity);
   }
-  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return'].includes(a)) {
+  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'deletePermanently', 'approve', 'return'].includes(a)) {
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
