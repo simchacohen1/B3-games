@@ -200,23 +200,24 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
         await expect(host.locator('#board')).toContainText('Books collected:'); await expect(guest.locator('#board')).toContainText('Books collected:');
       } else if (game.key === 'uno-style') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
-        const boardText=await host.locator('#board').innerText();
-        const currentColor=boardText.match(/Current color:\s*(\w+)/)?.[1]?.toLowerCase()||'';
-        const topValue=boardText.match(/Top card:\s*(?:red|yellow|green|blue|wild)\s+([\w-]+)/i)?.[1]?.toLowerCase()||'';
-        const hand=host.locator('#board .playing-card:not([disabled])'), labels=await hand.allTextContents();
+        const ring=host.locator('#board .uno-color');
+        const currentColor=(await ring.getAttribute('data-color')||'').toLowerCase();
+        const topValue=(await ring.getAttribute('data-top')||'').toLowerCase();
+        const hand=host.locator('#board .ucard-button:not([disabled])');
+        const labels=await hand.evaluateAll(nodes=>nodes.map(node=>(node.dataset.color||'')+' · '+(node.dataset.value||'')));
         const playable=labels.findIndex(label=>{
           const [color='',value='']=label.split(' · ').map(text=>text.trim().toLowerCase());
           return value===topValue || color===currentColor && !['wild','wild4'].includes(value) || color==='wild' && value==='wild';
         });
-        const beforeCount=Number(boardText.match(/Test Student A1:\s*(\d+) cards/)?.[1]||7);
+        const beforeCount=Number(((await host.locator('#board .uno-p').filter({hasText:'Test Student A1'}).innerText()).match(/(\d+) cards?/)||[])[1]||7);
         if(playable>=0){
           await hand.nth(playable).click();
           const colors=host.locator('#actions').getByRole('button',{name:/^(red|yellow|green|blue)$/});
           if(await colors.count())await colors.first().click();
         } else await host.getByRole('button',{name:'Draw a card'}).click();
         const expectedCount=beforeCount+(playable>=0?-1:1);
-        await expect(host.locator('#board')).toContainText(new RegExp(`:\\s*${expectedCount} cards`));
-        await expect(guest.locator('#board')).toContainText(new RegExp(`:\\s*${expectedCount} cards`));
+        await expect(host.locator('#board .uno-p').filter({hasText:'Test Student A1'})).toContainText(new RegExp(`${expectedCount} cards?`));
+        await expect(guest.locator('#board .uno-p').filter({hasText:'Test Student A1'})).toContainText(new RegExp(`${expectedCount} cards?`));
       }
       await expect.poll(() => publicPlayerNames(host)).toEqual([students[0].name, students[1].name]);
       await expect(host.locator('#players')).toContainText(students[0].name);
