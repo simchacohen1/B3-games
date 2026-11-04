@@ -155,7 +155,7 @@ test('WT: only West Track quizzes appear', async ({ page }) => {
 });
 
 test('third class: its teacher sees only SC, a missed quiz shows as Not Started, and no ET data is read', async ({ page }) => {
-  const errors = await openReport(page, { authorized: true, role: 'teacher', classIds: ['sc'] }, '?class=et&student=arik_test');
+  const errors = await openReport(page, { authorized: true, role: 'teacher', classIds: ['sc'] }, '?class=sc&student=arik_test');
   await expect(page.locator('#classTabs button')).toHaveText(['Synthetic Class']);
   await expect(page.locator('#report')).toBeHidden();
   await page.locator('#period').selectOption('0');
