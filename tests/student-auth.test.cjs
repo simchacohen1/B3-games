@@ -27,8 +27,99 @@ test('legacy-only student keeps the historic 5770 default and gets a profile',as
 test('wrong passcode, blocked student and duplicate matches are refused',async()=>{const d=seed();await assert.rejects(login(d,'Moshe Levi','0000'),{code:401});await assert.rejects(login(d,'Blocked Boy','2222'),{code:401});d.tree.b3Games.students.twin={profile:{name:'Moshe Levi',passcode:'1111',active:true}};await assert.rejects(login(d,'Moshe Levi','1111'),{code:409})});
 test('login responses never include a passcode',async()=>{const d=seed();assert.equal(JSON.stringify(await login(d,'Moshe Levi','1111')).includes('1111'),false)});
 test('verify accepts the current passcode and rejects a changed one',async()=>{const d=seed();assert.ok((await studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'})).ok);d.tree.b3Private={passcodes:{moshe:{passcode:'8888'}}};await assert.rejects(studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'}),{code:401})});
-test('remembered-session verification is rate limited too',async()=>{const d=seed();for(let i=0;i<40;i++)await studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'},'synthetic-ip',1000);await assert.rejects(studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'},'synthetic-ip',1000),{code:429})});
 test('too many sign-in attempts are slowed down',async()=>{const d=seed();for(let i=0;i<40;i++)await login(d,'Moshe Levi','0000').catch(()=>{});await assert.rejects(login(d,'Moshe Levi','1111'),{code:429})});
+
+// ---- Issue #421: correct sign-ins must never lock students out; guessing still must ----
+const verify=(d,ip,now=1000,studentId='moshe',pin='1111')=>studentAuth(d,{action:'verify',studentId,pin},ip,now);
+const limiterText=d=>JSON.stringify([d.tree.b3Private?.studentLoginFailures,d.tree.b3Private?.studentLoginVolume]);
+
+test('a classroom on one shared address can sign in far more than 40 times without any lockout',async()=>{
+ const d=seed(),ip='classroom-ip';
+ for(let i=0;i<60;i++)assert.ok((await studentAuth(d,{action:'login',name:['Moshe Levi','Dovid','Yossi'][i%3],pin:['1111','3333','5770'][i%3]},ip,1000)).ok);
+ for(let i=0;i<150;i++)assert.ok((await verify(d,ip,1000)).ok);
+});
+test('dozens of correct sign-ins happening at the same moment all succeed',async()=>{
+ const d=seed();
+ const results=await Promise.all(Array.from({length:50},(_,i)=>studentAuth(d,{action:'login',name:i%2?'Dovid':'Moshe Levi',pin:i%2?'3333':'1111'},'shared-ip',1000)));
+ assert.equal(results.every(r=>r.ok),true);
+});
+test('correct sign-ins and checks do not use up the wrong-passcode allowance',async()=>{
+ const d=seed(),ip='ip-a';
+ for(let i=0;i<7;i++)await login(d,'Moshe Levi','0000').catch(()=>{});          // 7 slips, still under the limit of 8
+ for(let i=0;i<30;i++){await login(d,'Moshe Levi','1111');await verify(d,ip)}   // many correct uses in between
+ assert.equal((await studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},'1.2.3.4',1000)).id,'moshe');
+});
+test('repeated wrong guesses for one student are still blocked, even if the next try is correct',async()=>{
+ const d=seed();
+ for(let i=0;i<8;i++)await assert.rejects(login(d,'Moshe Levi','000'+i),{code:401});
+ await assert.rejects(login(d,'Moshe Levi','1111'),{code:429});
+ await assert.rejects(login(d,'Moshe Levi','0000'),{code:429});
+});
+test('one boy fumbling his passcode does not block his classmates on the same address',async()=>{
+ const d=seed();
+ for(let i=0;i<8;i++)await login(d,'Moshe Levi','000'+i).catch(()=>{});
+ await assert.rejects(login(d,'Moshe Levi','1111'),{code:429});
+ assert.equal((await login(d,'Dovid','3333')).id,'dovid');
+ assert.equal((await login(d,'Yossi','5770')).id,'yossi');
+});
+test('wrong guesses spread across many names from one address are capped',async()=>{
+ const d=seed();
+ for(let i=0;i<100;i++)await assert.rejects(login(d,'Nobody'+i,'0000'),{code:401});
+ await assert.rejects(login(d,'Dovid','3333'),{code:429});
+});
+test('a different address is not affected by someone else being blocked',async()=>{
+ const d=seed();
+ for(let i=0;i<8;i++)await login(d,'Moshe Levi','000'+i).catch(()=>{});
+ await assert.rejects(login(d,'Moshe Levi','1111'),{code:429});
+ assert.equal((await studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},'other-home-ip',1000)).id,'moshe');
+});
+test('the block ends by itself after ten minutes',async()=>{
+ const d=seed();
+ for(let i=0;i<8;i++)await login(d,'Moshe Levi','000'+i).catch(()=>{});
+ await assert.rejects(login(d,'Moshe Levi','1111'),{code:429});
+ assert.equal((await studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},'1.2.3.4',1000+600001)).id,'moshe');
+});
+test('wrong checks of a remembered session are counted per student, not as free guesses',async()=>{
+ const d=seed();
+ for(let i=0;i<8;i++)await assert.rejects(verify(d,'ip-v',1000,'moshe','000'+i),{code:401});
+ await assert.rejects(verify(d,'ip-v',1000,'moshe','1111'),{code:429});
+ assert.ok((await verify(d,'ip-v',1000,'dovid','3333')).ok);
+});
+test('missing or malformed credentials are not counted as guesses',async()=>{
+ const d=seed();
+ for(let i=0;i<200;i++)await assert.rejects(studentAuth(d,{action:'verify',studentId:'',pin:''},'1.2.3.4',1000),{code:401});
+ for(let i=0;i<200;i++)await assert.rejects(studentAuth(d,{action:'login',name:'',pin:''},'1.2.3.4',1000),{code:400});
+ assert.equal((await login(d,'Moshe Levi','1111')).id,'moshe');
+});
+test('unknown names and wrong passcodes get the same message and both count toward the limit',async()=>{
+ const d=seed();
+ const unknown=await login(d,'Nobody Here','1111').catch(e=>e),wrong=await login(d,'Moshe Levi','0000').catch(e=>e);
+ assert.equal(unknown.code,401);assert.equal(wrong.code,401);assert.equal(unknown.message,wrong.message);
+ for(let i=0;i<7;i++)await login(d,'Nobody Here','1111').catch(()=>{});
+ await assert.rejects(login(d,'Nobody Here','1111'),{code:429});
+});
+test('a student who is turned off or has a duplicate name is told so without using up the allowance',async()=>{
+ const d=seed();d.tree.b3Games.students.twin={profile:{name:'Moshe Levi',passcode:'1111',active:true}};
+ for(let i=0;i<20;i++)await assert.rejects(login(d,'Moshe Levi','1111'),{code:409});
+ assert.equal((await login(d,'Dovid','3333')).id,'dovid');
+});
+test('runaway traffic from one address is still stopped by the high volume cap',async()=>{
+ const d=seed();
+ for(let i=0;i<1000;i++)await verify(d,'bot-ip');
+ await assert.rejects(verify(d,'bot-ip'),{code:429});
+ assert.ok((await verify(d,'real-ip')).ok);
+});
+test('the limiter stores only hashes: no names, ids or passcodes',async()=>{
+ const d=seed();
+ await login(d,'Moshe Levi','0000').catch(()=>{});await verify(d,'1.2.3.4',1000,'moshe','9999').catch(()=>{});
+ const text=limiterText(d).toLowerCase();
+ for(const secret of ['moshe','levi','0000','9999','1.2.3.4'])assert.equal(text.includes(secret),false,secret);
+});
+test('choosing a PIN also counts only wrong passcodes',async()=>{
+ const d=seed();
+ for(let i=0;i<7;i++)await assert.rejects(choose(d,'4567',{pin:'000'+i}),{code:401});
+ assert.equal((await choose(d)).requiresPinChange,false);
+});
 
 const owner={uid:'o',email:'simcha5770@gmail.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
 const teacher={uid:'t',email:'t@x',email_verified:true,firebase:{sign_in_provider:'google.com'}};
