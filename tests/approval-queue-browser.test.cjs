@@ -58,11 +58,12 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
       historyReads:window.__reads.filter(p=>p.startsWith('posukPractice/attempts')||p.startsWith('posukPractice/chazara/students'))}));
     assert.equal(state.reviewOnly,true,'opens in pending-only view');
     assert.equal(state.panelVisible,true,'pending point approvals visible without the full dashboard');
-    assert.deepEqual(state.rows.sort(),['c-et','c-wt'],'Chazara only: no Posuk milestone, no Shorashim');
-    assert.equal(state.count,'2 pending');
+    // The owner now confirms one class (here ET, named in the link) instead of seeing every class at once.
+    assert.deepEqual(state.rows.sort(),['c-et'],'Chazara only, ET only: no Posuk milestone, no Shorashim, no WT');
+    assert.equal(state.count,'1 pending');
     assert.equal(state.approveAllVisible,true);
     assert.equal(state.recordingsApproveAllVisible,true);
-    assert.equal(state.recordingsApproveAll,'Approve All Pending Points (2)');
+    assert.equal(state.recordingsApproveAll,'Approve All Pending Points (1)');
     assert.equal(state.reviewFilter,'needs');
     assert.deepEqual(state.historyReads,[],'historical data not loaded initially');
     await page.waitForFunction(()=>true);await page.waitForTimeout(300);
@@ -72,7 +73,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     await page.click('#approveAllBtn');
     await page.waitForFunction(()=>!document.getElementById('approveAllBtn').disabled);
     await page.waitForTimeout(300);
-    assert.deepEqual(approvals.filter(id=>id.startsWith('c-')).sort(),['c-et','c-wt']);
+    assert.deepEqual(approvals.filter(id=>id.startsWith('c-')).sort(),['c-et']);
     assert.ok(!approvals.includes('s-et'),'Shorashim recordings are not bulk-approved here');
     // History loads only on request.
     await page.click('#showFullDashboard');
