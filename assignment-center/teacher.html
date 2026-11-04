@@ -68,6 +68,8 @@ button.sec{background:#fff;color:var(--navy);border:1.5px solid var(--border)}
 button.sec:hover{background:var(--bg);border-color:var(--blue)}
 button.bad{background:var(--red);color:#fff}
 button.bad:hover{background:#c53c3c}
+button.sec.danger{color:var(--red);border-color:var(--red)}
+button.sec.danger:hover{background:var(--red-bg);border-color:var(--red)}
 button:disabled{opacity:.45;cursor:default;transform:none}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 
@@ -487,7 +489,8 @@ function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(s
   var ed=el('button','Edit','sec');ed.disabled=p==='archived';ed.onclick=function(){startEdit(a)};
   var pub=el('button',p==='published'?'Unpublish':'Publish to Students',p==='published'?'sec':'');pub.disabled=p==='archived';var actMsg=el('div',null,'msg');actMsg.setAttribute('role','status');pub.onclick=async function(){pub.disabled=true;try{await api({action:p==='published'?'unpublish':'publish',assignmentId:a.id});await load();notice(p==='published'?'Unpublished. Students can no longer see “'+a.title+'”.':'Published. Students can see “'+a.title+'” now.',true)}catch(e){say(actMsg,e.message);pub.disabled=false}};
   var arc=el('button',p==='archived'?'Archived':'Archive','sec');arc.disabled=p==='archived';arc.onclick=async function(){if(!confirm('Archive "'+a.title+'"? Student work will be kept.'))return;arc.disabled=true;try{await api({action:'archive',assignmentId:a.id});await load();notice('Archived “'+a.title+'”. Student work is kept.',true)}catch(e){say(actMsg,e.message);arc.disabled=false}};
-  var actions=el('div',null,'detail-actions');actions.append(ed,pub,arc,actMsg);card.append(actions);root.append(card);
+  var del=el('button','Delete','sec danger');del.onclick=async function(){if(!confirm('Delete this homework? This also removes all the boys’ work and messages for it, and can’t be undone.'))return;del.disabled=true;try{await api({action:'deletePermanently',assignmentId:a.id,confirm:true});state.openAssignmentId=null;await load();renderReports();showScreen('screenAssignments');notice('Deleted “'+a.title+'” and all student work for it.',true)}catch(e){say(actMsg,e.message);del.disabled=false}};
+  var actions=el('div',null,'detail-actions');actions.append(ed,pub,arc,del,actMsg);card.append(actions);root.append(card);
   var ids=Object.keys(a.students||{}),tableCard=el('div',null,'card'),tools=el('div',null,'table-tools');tools.append(el('h2','Students'));
   var sortLabel=el('label',null,'sort-box');sortLabel.append(document.createTextNode('Sort: '));var sortSel=el('select');[['name','Student name (A–Z)'],['status','Status']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];sortSel.append(op)});sortSel.value=state.detailSort;sortSel.setAttribute('aria-label','Sort students');sortSel.onchange=function(){state.detailSort=sortSel.value;renderAssignmentDetail()};sortLabel.append(sortSel);tools.append(sortLabel);tableCard.append(tools);
   if(!ids.length){tableCard.append(el('p','No students are assigned yet.','muted'));root.append(tableCard);return}
