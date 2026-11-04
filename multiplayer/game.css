@@ -36,3 +36,36 @@
 .uno-pick{border:0;border-radius:999px;padding:12px 18px;min-width:96px;font:inherit;font-weight:1000;color:#fff;cursor:pointer;box-shadow:0 4px 0 #0004;border:3px solid #fff}.uno-pick.red{background:#e3202c}.uno-pick.green{background:#139a4a}.uno-pick.blue{background:#1d7fe0}.uno-pick.yellow{background:#f2b705;color:#5a3b00}
 @media(max-width:560px){.ucard{width:68px;height:98px}.ucard .big{font-size:40px}.ucard .big.sym{font-size:32px}.ucard-button{margin:0 -9px}.play-area.uno-mode{padding:12px}}
 @media(prefers-reduced-motion:reduce){.ucard-button .ucard{transition:none}}
+/* Ludo table: matches the Ludo tile on the Arcade home page. */
+.play-area.ludo-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#0b6b3a 4%,#5fcf6a 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #0a4f2b,0 18px 28px #12315b40;overflow:hidden}
+.ludo-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.ludo-mode #roomCode,.ludo-mode #players{display:none}.ludo-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.ludo-mode .red{--c:#e63946;--d:#9d1320}.ludo-mode .yellow{--c:#f7c21b;--d:#c58a00}.ludo-mode .green{--c:#22a85a;--d:#0f6b36}.ludo-mode .blue{--c:#2f7de0;--d:#1448a8}
+.ludo-players{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:0 0 12px}
+.lt-p{display:flex;align-items:center;gap:8px;background:#0a4f2b80;border:3px solid #ffffff55;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900}
+.lt-p i{width:30px;height:30px;border-radius:50%;background:linear-gradient(150deg,var(--c),var(--d));box-shadow:inset 0 -3px 4px #0004,inset 0 2px 3px #fff9;border:2px solid #fff}
+.lt-p small{display:block;font-size:11px;font-weight:800;opacity:.9}
+.lt-p.turn{background:#fff;color:#0a4f2b;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66,0 0 22px #ffd23f}
+.lboard{position:relative;width:min(100%,480px);aspect-ratio:1;margin:0 auto;background:#fff;border-radius:18px;padding:8px;box-sizing:border-box;box-shadow:0 6px 0 #0004,0 14px 20px #0005;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);color:#1b2a41}
+.lc{position:relative;background:#fff;border:1px solid #cfd6e4;box-sizing:border-box}
+.lc.t-red{background:#f9b3b8}.lc.t-yellow{background:#fde58a}.lc.t-green{background:#a6e6bd}.lc.t-blue{background:#a9ccf6}
+.lc.st-red{background:#e63946}.lc.st-yellow{background:#f7c21b}.lc.st-green{background:#22a85a}.lc.st-blue{background:#2f7de0}
+.lc.safe::after{content:"\2605";position:absolute;inset:0;display:grid;place-items:center;color:#0006;font-size:clamp(9px,2.6vw,17px);pointer-events:none}
+.yard{position:relative;display:grid;place-items:center;border-radius:14px;margin:2px;background:linear-gradient(150deg,var(--c),var(--d));box-shadow:inset 0 2px 4px #fff7,inset 0 -3px 6px #0004}
+.yard .pad{width:62%;height:62%;background:#ffffffe8;border-radius:12px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;place-items:center;padding:6%;gap:8%;box-sizing:border-box}
+.slot{width:100%;height:100%;border-radius:50%;background:#0000001f;box-shadow:inset 0 2px 3px #0004;position:relative}
+.lcenter{border-radius:6px;background:conic-gradient(from 45deg,#f7c21b 0 25%,#22a85a 0 50%,#2f7de0 0 75%,#e63946 0);display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:2px;position:relative;padding:4px;box-sizing:border-box}
+.lcenter::after{content:"\2605";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:clamp(14px,4vw,26px);text-shadow:0 1px 3px #0008;pointer-events:none}.lcenter:has(.pawn)::after{display:none}
+.pawn{position:absolute;inset:8%;border-radius:50%;background:radial-gradient(circle at 34% 28%,#fff 0,#fff0 34%),linear-gradient(150deg,var(--c),var(--d));border:2px solid #fff;box-shadow:0 3px 0 #0005,0 5px 8px #0006;z-index:2;font:inherit;padding:0;color:#fff;font-weight:1000;font-size:clamp(8px,2.3vw,14px);display:grid;place-items:center;opacity:1;cursor:default}
+.pawn:disabled{opacity:1;color:#fff}
+.lc .pawn+.pawn{transform:translate(4px,-4px)}.lcenter .pawn.finished{position:static;width:36%;height:36%;min-width:0}
+.pawn.go{box-shadow:0 0 0 3px #ffd23f,0 0 16px 4px #ffd23f,0 3px 0 #0005;animation:ludobob 1s ease-in-out infinite;cursor:pointer;z-index:3}
+.pawn:focus-visible{outline:4px solid #fff;outline-offset:2px}
+@keyframes ludobob{50%{transform:translateY(-3px)}}
+.lt-roll{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:16px;flex-wrap:wrap;min-height:64px}
+.die{width:64px;height:64px;border-radius:14px;background:#fff;box-shadow:0 5px 0 #0004,0 10px 14px #0005;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:9px;box-sizing:border-box;transform:rotate(-8deg)}
+.die b{width:11px;height:11px;border-radius:50%;background:#1b2a41;place-self:center}
+.lt-hint{font-weight:900;font-size:18px;text-shadow:0 2px 3px #0005}
+.ludo-mode .actions{margin-top:8px}.ludo-mode .actions .btn.uno-btn{border:0;border-radius:999px;padding:13px 28px;font-weight:1000;font-size:17px;color:#7a2d00;background:linear-gradient(180deg,#ffe066,#ffb400);box-shadow:0 5px 0 #b57700,0 10px 16px #0004}.ludo-mode .actions .btn.uno-btn:disabled{opacity:.6}
+.ludo-mode .actions .player-turn{color:#fff;text-shadow:0 2px 3px #0005;margin:0}.ludo-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.ludo-mode{padding:12px 8px 18px}.lt-p{padding-right:10px}}
+@media(prefers-reduced-motion:reduce){.pawn.go{animation:none}}

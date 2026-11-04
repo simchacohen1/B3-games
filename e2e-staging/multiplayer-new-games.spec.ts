@@ -175,7 +175,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
               return next?.lastRoll != null || next?.turn !== activeId;
             }, { timeout: 15000 }).toBe(true);
           } else {
-            const token = active!.locator('#board .ludo-token:not([disabled])').first();
+            const token = active!.locator('#board .pawn.go:not([disabled])').first();
             await expect(token).toBeEnabled({ timeout: 15000 });
             await token.click();
             await expect.poll(async () => {
@@ -186,7 +186,7 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
           }
         }
         expect(movedPage,'one of the seeded rolls permits a token move').not.toBeNull();
-        await expect(movedPage!.locator('#board')).toContainText(/Token 1: Track \d+/);
+        await expect(movedPage!.locator('#board .pawn[aria-label*="token 1: on the track"], #board .pawn[aria-label*="token 1: in the home lane"]').first()).toBeVisible();
       } else if (game.key === 'dominoes') {
         expect(await otherHandDenied(guest),'a student cannot read the host private hand').toBe(true);
         const active=guest, buttons=active.locator('#board .playing-card:not([disabled])');
