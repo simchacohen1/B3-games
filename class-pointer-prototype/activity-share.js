@@ -198,12 +198,15 @@
       const b=picture();
       for(const layer of [markLayer,pointerLayer,hitLayer])Object.assign(layer.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
       markLayer.replaceChildren();pointerLayer.replaceChildren();
+      // Transparency is applied once per owner and tool group (like the teacher's own screen), so overlapping
+      // highlights stay one flat layer instead of getting darker where strokes cross.
+      const markGroups=new Map();
       for(const stroke of [...(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]),...(lessonDraft?[lessonDraft]:[])]){
         if(!stroke||!Array.isArray(stroke.points)||!stroke.points.length||stroke.points.length>256)continue;
         const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
         if(!points.length)continue;
         const color=/^#[0-9a-fA-F]{6}$/.test(stroke.color)?stroke.color:'#57b8ff';
-        const alpha=['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
+        const alpha=1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
         const a=points[0],b=points[points.length-1],x1=a.x*1000,y1=a.y*1000,x2=b.x*1000,y2=b.y*1000;
         const x=Math.min(x1,x2),y=Math.min(y1,y2),w=Math.abs(x2-x1),h=Math.abs(y2-y1);
         const attrs={stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',opacity:alpha};
@@ -216,7 +219,10 @@
         else if(stroke.tool==='pen-arrow'){mark=svg('g',{});mark.append(svg('line',{x1,y1,x2,y2,...attrs}));const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(width*3,10);mark.append(svg('path',{d:`M${x2-radius*Math.cos(angle-.5)} ${y2-radius*Math.sin(angle-.5)} L${x2} ${y2} L${x2-radius*Math.cos(angle+.5)} ${y2-radius*Math.sin(angle+.5)}`,...attrs}));}
         else if(stroke.tool==='text'){mark=svg('text',{x:x1,y:y1,'font-size':Math.max(16,width*2.2),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
         else {const drawn=stroke.tool==='underline'?[a,{x:b.x,y:a.y}]:points;mark=svg('path',{d:drawn.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' '),...attrs})}
-        markLayer.appendChild(mark);
+        {const kind=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=String(stroke.owner||stroke.by||'')+'|'+kind;
+          let group=markGroups.get(key);
+          if(!group){group=svg('g',{opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});markGroups.set(key,group);markLayer.appendChild(group)}
+          group.appendChild(mark)}
       }
       for(const [id,point] of Object.entries(lessonMarks.points||{})){
         if(!Number.isFinite(point?.x)||!Number.isFinite(point?.y)||point.x<0||point.x>1||point.y<0||point.y>1)continue;
