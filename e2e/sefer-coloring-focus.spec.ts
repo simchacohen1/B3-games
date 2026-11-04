@@ -3,8 +3,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
-// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25-31 2026.
+// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25 - November 2026.
 const APPROVED_ART_SHA256: Record<string, string> = {
+  '499': '421e90758fa1314ad4fa7cadddcdc04258ebd0376eab8f04bbd4b6edc50c3c42',
   '500': '886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81',
   '501': 'c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f',
   '502': '47451e6ffff2eb7183484cb517355caa11bc99285556c96e1d730a7b89e0c879',

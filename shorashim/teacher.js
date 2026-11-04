@@ -4,7 +4,8 @@ if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);const db=fireba
 // plain link keep the original shared lists. Any other class has its own separate
 // lists, students and leaderboards, starts empty, and needs a Google teacher sign-in.
 const CLASS_ID=(new URLSearchParams(location.search).get('class')||'').trim();
-const CLASS_MODE=!!CLASS_ID&&!['et','wt'].includes(CLASS_ID);
+const LEGACY_CLASS_IDS=['et','wt'];
+const CLASS_MODE=!!CLASS_ID&&!LEGACY_CLASS_IDS.includes(CLASS_ID);
 // Firebase drops empty lists, so a brand-new class may come back with no tracks at all.
 function withAllTracks(c){c=c||{};['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
 const CLASS_ID_VALID=/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID);
@@ -532,15 +533,30 @@ function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
   fullScopeListenerBound=true;
-  db.ref(SPACE).on('value',snap=>{
-    if($('teacherApp').classList.contains('hidden'))return;
-    const v=snap.val()||{};
-    if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
-    if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
-    if(v.students)state.students=v.students;
-    if(v.leaderboards)state.leaderboards=v.leaderboards;
-    renderAll()
+  const visible=()=>!$('teacherApp').classList.contains('hidden');
+  db.ref(`${SPACE}/catalog`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.catalog=withAllTracks(snap.val());renderAll();
   });
+  db.ref(`${SPACE}/settings`).on('value',snap=>{
+    if(!visible()||!snap.exists())return;
+    state.settings={minReviewMs:500,studentSiteOpen:true,...snap.val()};
+    renderStudentSiteControl();renderAll();
+  });
+  const studentsRef=db.ref(`${SPACE}/students`);
+  const applyStudent=snap=>{if(!visible()||!snap.key)return;state.students[snap.key]=snap.val()||{};renderAll();};
+  studentsRef.on('child_added',applyStudent);
+  studentsRef.on('child_changed',applyStudent);
+  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();});
+  state.leaderboards.match=state.leaderboards.match||{};
+  const leaderboardsRef=db.ref(`${SPACE}/leaderboards/match`);
+  const applyLeaderboard=snap=>{
+    if(!visible()||!snap.key)return;
+    state.leaderboards.match[snap.key]=snap.val()||{};renderLeaderboard();
+  };
+  leaderboardsRef.on('child_added',applyLeaderboard);
+  leaderboardsRef.on('child_changed',applyLeaderboard);
+  leaderboardsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.leaderboards.match[snap.key];renderLeaderboard();});
 }
 function bindLegacyScopedListeners(initialGlobalSettings={}){
   let globalSettings=initialGlobalSettings,classSettings=state.settings;
@@ -916,6 +932,17 @@ async function checkClassTeacher(user,access){
   document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${cls.name||CLASS_ID}`;
   openTeacherApp();
 }
+function openOwnClass(ids){
+  const go=id=>{const u=new URL(location.href);u.searchParams.set('class',id);u.searchParams.delete('v');location.replace(u.href)};
+  const own=(ids||[]).filter(id=>id&&id!=='*');
+  if(own.length===1){$('teacherGateMsg').textContent='Opening your class…';go(own[0]);return}
+  $('teacherGateMsg').textContent='Choose your class.';
+  window.B3TeacherClassRosters.load().then(r=>{
+    const rows=(r.classes||[]).filter(c=>own.includes(c.id));
+    $('teacherGateMsg').innerHTML=rows.map(c=>`<button type="button" class="primary" style="margin:6px" data-pick-class="${esc(c.id)}">${esc(c.name||c.id)}</button>`).join('')||'You have no class assigned. Ask the admin.';
+    $('teacherGateMsg').querySelectorAll('[data-pick-class]').forEach(b=>b.onclick=()=>go(b.dataset.pickClass));
+  }).catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
+}
 if(CLASS_MODE){
   // Class teachers and B3 teachers use the same verified Google sign-in flow.
   $('teacherGateMsg').textContent='Sign in with your teacher Google account.';
@@ -936,6 +963,14 @@ if(CLASS_MODE){
       return;
     }
     const ids=access.classIds||[];
+    if(!CLASS_ID){
+      // Never start on a class quietly: ask, then reopen this page with that class.
+      $('teacherGoogleSignIn').classList.add('hidden');
+      $('teacherGateMsg').textContent='Choose your class.';
+      window.B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,window.B3_APP_CONTEXT?.workspaceId)
+        .catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
+      return;
+    }
     activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
     if(isSiteAdmin){
       document.querySelector('.topbar h1').textContent='Shorashim Learning Lab';
@@ -946,7 +981,10 @@ if(CLASS_MODE){
       $('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');
       openTeacherApp();
     }else if(!CLASS_ID){
-      $('teacherGateMsg').textContent='Open Shorashim from the class you teach in Teacher Center.';
+      // Already signed in as a teacher but this link names no class: go to the teacher's class
+      // instead of leaving the sign-in card on screen (issue 410).
+      $('teacherGoogleSignIn').classList.add('hidden');
+      openOwnClass(ids);
     }else{
       $('teacherGateMsg').textContent='This Google account is not assigned to the B3 Shorashim classes.';
     }
