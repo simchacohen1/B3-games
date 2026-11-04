@@ -590,7 +590,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
-<script src="../firebase-config.js"></script>
+<script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 
 <script>
@@ -814,6 +814,14 @@ document.getElementById('enterBtn').textContent='Sign in with Google';
 document.getElementById('enterBtn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(error=>document.getElementById('gateMsg').textContent=error.message);
 B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
   teacherAccess=access||{authorized:false,role:'',classIds:[]};
+  if(authorized&&!requestedTeacherClass){
+    // Never start on a class (or all classes) quietly: ask, then reopen with it.
+    document.getElementById('gate').style.display='none';
+    document.getElementById('dashboard').style.display='none';
+    B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,teacherWorkspace)
+      .catch(error=>{document.getElementById('gate').style.display='block';document.getElementById('gateMsg').textContent=error.message});
+    return;
+  }
   const allowed=authorized&&(access.role==='admin'||!requestedTeacherClass||access.classIds.includes(requestedTeacherClass));
   document.getElementById('gate').style.display=allowed?'none':'block';
   document.getElementById('dashboard').style.display=allowed?'block':'none';

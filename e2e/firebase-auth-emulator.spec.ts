@@ -33,6 +33,20 @@ test('legacy app-before-Auth loading still uses only the demo emulator',async({p
   }finally{await closeSyntheticSite(server);}
 });
 
+test('Student Rewards reads its public access switch with the emulator namespace intact',async({page})=>{
+  const {server,origin}=await serveSyntheticSite();
+  const responses:number[]=[];
+  try{
+    await configureBrowser(page,[],[]);
+    page.on('response',response=>{
+      if(response.url().includes('/studentRewards/settings/studentWebsiteEnabled.json'))responses.push(response.status());
+    });
+    await page.goto(`${origin}/student-rewards/student.html`);
+    await expect.poll(()=>responses.length,{timeout:15000}).toBe(1);
+    expect(responses).toEqual([200]);
+  }finally{await closeSyntheticSite(server);}
+});
+
 // Pages that used to open Firebase's IndexedDB before Auth (removed after PR 349).
 // In a brand-new browser Auth must be able to create its own database with its
 // object store; the old scanner left it empty and blocked Auth's repair.

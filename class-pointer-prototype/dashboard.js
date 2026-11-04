@@ -57,13 +57,12 @@
           });
           buttons.appendChild(btn);
         }
-        // Open the teacher workspace directly for the regular classroom entry.
-        // Use a previously selected authorized class; otherwise prefer ET, then the first authorized class.
-        // The class picker remains available on the workspace itself.
-        if(mode==='lesson'&&classChoices.length){
-          let saved='';try{saved=localStorage.getItem('classPointerLastTeacherClass')||''}catch{}
-          // Only classes this teacher is authorized for are in classChoices.
-          const chosen=classChoices.find(choice=>choice.id===saved)||classChoices.find(choice=>choice.id==='et')||classChoices[0];
+        // Never open a class quietly: the teacher confirms one first
+        // ("Continue with ET?" if used last time, else "Choose a class…").
+        if(mode==='lesson'&&classChoices.length&&window.B3ClassGate){
+          const names={};classChoices.forEach(choice=>{names[choice.id]=choice.name});
+          const id=await window.B3ClassGate.choose({ids:classChoices.map(choice=>choice.id),names,requested:'-'});
+          const chosen=classChoices.find(choice=>choice.id===id);
           if(chosen){message('Opening '+chosen.name+'…');chosen.btn.click();return}
         }
         reveal();

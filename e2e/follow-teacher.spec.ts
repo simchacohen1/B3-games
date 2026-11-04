@@ -6,6 +6,7 @@ const ROOT=path.resolve(__dirname,'..');
 const core=fs.readFileSync(path.join(ROOT,'follow-teacher/core.js'),'utf8');
 const student=fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8');
 const teacher=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.js'),'utf8');
+const gate=fs.readFileSync(path.join(ROOT,'class-confirm-gate.js'),'utf8');
 
 test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   const raw=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.html'),'utf8');
@@ -13,7 +14,7 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
   await page.route('http://localhost:8099/**',route=>route.fulfill({
     status:200,contentType:'text/html',body:'<!doctype html><html><head><style>.hidden{display:none!important}</style></head><body>'+body+'</body></html>'
   }));
-  await page.goto('http://localhost:8099/follow-teacher/teacher.html');
+  await page.goto('http://localhost:8099/follow-teacher/teacher.html?class=et');
   await page.evaluate(()=>{
     const listeners=new Map<string,Function>();
     const user={uid:'teacher1'};
@@ -36,6 +37,7 @@ test('teacher chooses Locked then Unlock for an assigned class',async({page})=>{
     }};
   });
   await page.addScriptTag({content:core});
+  await page.addScriptTag({content:gate});
   await page.addScriptTag({content:teacher});
   await expect(page.locator('#app')).toBeVisible();
   // Independent mode was intentionally restored (commit 828761ba); it must exist but not be the default.

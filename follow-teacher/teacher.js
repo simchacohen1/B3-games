@@ -193,9 +193,9 @@
       // Class selection stays available inside the Follow Teacher panel.
       q('classSelect').disabled = false;
       q('classSelect').title = '';
+      const id = await B3ClassGate.choose({ids: assigned});
+      q('classSelect').value = id;
       q('gate').classList.add('hidden');q('app').classList.remove('hidden');
-      const preferred = new URLSearchParams(location.search).get('class');
-      const id = preferred && assigned.includes(preferred) ? preferred : assigned[0];
       current = id; await loadClass(id);
     } catch (e) {
       ++generation;endWatching();
