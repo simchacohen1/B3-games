@@ -105,7 +105,8 @@ exports.studentRewardsLogin = onRequest(
       const pin=String(req.body?.pin || "").trim();
       if(enteredName || suppliedB3Id){
         const get=async path=>(await rtdb.ref(path).get()).val();
-        const identity=await resolveStudent(get,{...req.body,name:enteredName,pin,b3StudentId:suppliedB3Id});
+        const limiterStore={get,set:(p,v)=>rtdb.ref(p).set(v),tx:(p,fn)=>rtdb.ref(p).transaction(fn)};
+        const identity=await resolveStudent(get,{...req.body,name:enteredName,pin,b3StudentId:suppliedB3Id},{store:limiterStore,ip:req.ip});
         const b3StudentId=identity.id,allowed=identity.profile,classId=identity.classId;
         if(!studentTools.allowed(identity.cls,b3StudentId,'student-rewards'))return res.status(403).json({error:'Your teacher has turned off Student Rewards for you.'});
         if(!['et','wt'].includes(classId)&&identity.cls.toolGrants?.['student-rewards']!==true)

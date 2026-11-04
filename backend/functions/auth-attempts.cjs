@@ -12,9 +12,9 @@ const norm = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g
 const tooMany = () => Object.assign(new Error('Too many wrong passcodes. Please wait a few minutes and try again.'), { code: 429 });
 const root = 'b3Private/authAttempts/';
 
-async function blocked(store, path, now) {
+async function lookup(store, path, now) {
   const row = await store.get(path);
-  return !!(row && row.until && row.until > now);
+  return { row, blocked: !!(row && row.until && row.until > now) };
 }
 async function bump(store, path, now, max, windowMs) {
   await store.tx(path, cur => {
@@ -28,10 +28,12 @@ async function bump(store, path, now, max, windowMs) {
 async function guarded(store, { ip, studentKey }, now, run) {
   const sPath = root + 's_' + sha(norm(studentKey));
   const iPath = ip ? root + 'i_' + sha(ip) : null;
-  if (await blocked(store, sPath, now) || (iPath && await blocked(store, iPath, now))) throw tooMany();
+  const sState = await lookup(store, sPath, now);
+  const iState = iPath ? await lookup(store, iPath, now) : { blocked: false };
+  if (sState.blocked || iState.blocked) throw tooMany();
   try {
     const result = await run();
-    await store.set(sPath, null);
+    if (sState.row) await store.set(sPath, null); // nothing to clear (and no database write) for a normal sign-in
     return result;
   } catch (e) {
     if (e && (e.code === 401 || e.code === 409)) {

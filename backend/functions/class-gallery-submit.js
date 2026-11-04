@@ -31,12 +31,14 @@ exports.classGallerySubmit = onRequest({
     const approx = Buffer.byteLength(JSON.stringify(body));
     if (approx > 1400000) invalid(413, 'This screenshot is too large. Try a smaller window.');
     const get = async path => (await admin.database().ref(path).once('value')).val();
+    const dbRef = admin.database();
+    const limiterStore = { get, set: (p, v) => dbRef.ref(p).set(v), tx: (p, fn) => dbRef.ref(p).transaction(fn) };
     const student = await resolveStudent(get, {
       b3StudentId: body.studentId,
       name: body.studentName,
       pin: body.pin,
       classId: body.classId
-    });
+    }, { store: limiterStore, ip: req.ip });
     if (!validKey(student.id) || !validKey(student.classId)) invalid(403, 'Choose your class and sign in again.');
     const title = cleanText(body.title, 70);
     if (!title) invalid(400, 'Please give your work a title.');
