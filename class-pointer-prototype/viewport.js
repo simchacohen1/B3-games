@@ -29,7 +29,7 @@
     if(!context)throw new Error('The browser could not prepare the cropped lesson view.');
     context.imageSmoothingEnabled=true;if('imageSmoothingQuality' in context)context.imageSmoothingQuality='high';
     const stream=canvas.captureStream(8);const outputTrack=stream.getVideoTracks?.()[0];if(outputTrack&&'contentHint' in outputTrack){try{outputTrack.contentHint='text'}catch{}}
-    let stopTicker=()=>{},base={x:0,y:0,w:1,h:1},view={...base},zoom=1,stopped=false,panMode=false,dragPointer=null,lastDrag=null,selection={...base},selectStart=null;
+    let stopTicker=()=>{},base={x:0,y:0,w:1,h:1},view={...base},zoom=1,stopped=false,panMode=false,dragPointer=null,lastDrag=null,selection={...base},selectStart=null,boxMode=false,boxDrag=null,boxEl=null;
     // Browsers do not run animation frames for a hidden tab or a covered window. Teaching from another tab
     // (sharing a browser tab makes the teacher switch to it) used to freeze this picture, so students saw black.
     // A worker's timer keeps ticking, and frames are read straight from the capture track when the browser allows it.
@@ -60,10 +60,10 @@
     stopTicker=startTicker(renderFrame,120);
 
     const shareButton=document.getElementById('shareScreen'),controls=document.createElement('div');controls.className='controls share-view-controls';
-    const areaButton=makeButton('Choose shared area'),fullButton=makeButton('Share full screen'),zoomOut=makeButton('Zoom −'),zoomIn=makeButton('Zoom +'),moveButton=makeButton('Move view');
-    areaButton.id='viewChooseArea';fullButton.id='viewShareFull';zoomOut.id='viewZoomOut';zoomIn.id='viewZoomIn';moveButton.id='viewMove';
+    const areaButton=makeButton('Choose shared area'),fullButton=makeButton('Share full screen'),zoomOut=makeButton('Zoom −'),zoomIn=makeButton('Zoom +'),moveButton=makeButton('Move view'),boxButton=makeButton('Zoom to box'),resetButton=makeButton('Reset zoom');
+    areaButton.id='viewChooseArea';fullButton.id='viewShareFull';zoomOut.id='viewZoomOut';zoomIn.id='viewZoomIn';moveButton.id='viewMove';boxButton.id='viewZoomBox';resetButton.id='viewZoomReset';boxButton.title='Drag a box on the lesson to zoom in on it';resetButton.title='Back to 100%';
     const zoomLabel=document.createElement('span');zoomLabel.id='viewZoomLabel';zoomLabel.className='zoom-label';zoomLabel.setAttribute('aria-live','polite');
-    moveButton.setAttribute('aria-pressed','false');controls.append(areaButton,fullButton,zoomOut,zoomLabel,zoomIn,moveButton);
+    moveButton.setAttribute('aria-pressed','false');boxButton.setAttribute('aria-pressed','false');controls.append(areaButton,fullButton,zoomOut,zoomLabel,zoomIn,resetButton,boxButton,moveButton);
     if(shareButton?.parentElement)shareButton.parentElement.insertAdjacentElement('afterend',controls);
 
     const dialog=document.createElement('dialog');dialog.className='share-area-dialog';
@@ -77,7 +77,12 @@
     const useArea=makeButton('Use selected area'),cancelArea=makeButton('Cancel');dialogControls.append(useArea,cancelArea);
     dialog.append(title,help,preview,dialogControls);stage.appendChild(dialog);
 
+    function setBoxMode(next){
+      boxMode=!!next;boxButton.setAttribute('aria-pressed',String(boxMode));boxButton.classList.toggle('active',boxMode);stage.classList.toggle('viewport-box-mode',boxMode);
+      if(!boxMode){boxDrag=null;if(boxEl){boxEl.remove();boxEl=null}}
+    }
     function setPanMode(next){
+      if(next&&boxMode)setBoxMode(false);
       panMode=!!next&&zoom>1;moveButton.setAttribute('aria-pressed',String(panMode));moveButton.classList.toggle('active',panMode);stage.classList.toggle('viewport-pan-mode',panMode);
       if(!panMode){
         const pointer=dragPointer;dragPointer=null;lastDrag=null;
@@ -86,7 +91,7 @@
       }
     }
     function updateControls(){
-      zoomLabel.textContent=Math.round(zoom*100)+'%';zoomOut.disabled=zoom<=1.001;zoomIn.disabled=zoom>=5.99;moveButton.disabled=zoom<=1.001;
+      zoomLabel.textContent=Math.round(zoom*100)+'%';zoomOut.disabled=zoom<=1.001;zoomIn.disabled=zoom>=5.99;boxButton.disabled=zoom>=5.99;moveButton.disabled=zoom<=1.001;resetButton.disabled=zoom<=1.001;
       if(zoom<=1.001)setPanMode(false);
       fullButton.disabled=base.x===0&&base.y===0&&base.w===1&&base.h===1&&zoom===1;
     }
@@ -95,6 +100,16 @@
       const value=V.clamp(next,1,6);if(Math.abs(value-zoom)<0.001)return;
       resetOverlays();const center={x:view.x+view.w/2,y:view.y+view.h/2};zoom=value;view=V.zoomRegion(base,zoom,center);updateControls();
       say('Shared lesson zoom: '+Math.round(zoom*100)+'%.'+(zoom>1?' Turn on Move view and drag the lesson to pan.':''));
+    }
+    function applyZoom(result,message){
+      if(!result)return;resetOverlays();zoom=result.zoom;view=result.view;updateControls();say(message||('Shared lesson zoom: '+Math.round(zoom*100)+'%.'));
+    }
+    function stagePicture(){
+      const rect=stage.getBoundingClientRect(),box=C?.pictureBox?.(rect.width,rect.height,lesson.videoWidth,lesson.videoHeight);
+      return{rect,left:box?.left||0,top:box?.top||0,w:box?.w||rect.width,h:box?.h||rect.height};
+    }
+    function picturePoint(event){
+      const pic=stagePicture();return{x:V.clamp((event.clientX-pic.rect.left-pic.left)/pic.w,0,1),y:V.clamp((event.clientY-pic.rect.top-pic.top)/pic.h,0,1)};
     }
     function showSelection(){
       selectionBox.style.left=(selection.x*100)+'%';selectionBox.style.top=(selection.y*100)+'%';selectionBox.style.width=(selection.w*100)+'%';selectionBox.style.height=(selection.h*100)+'%';
@@ -125,13 +140,50 @@
     areaButton.addEventListener('click',openDialog);
     fullButton.addEventListener('click',()=>{resetOverlays();base={x:0,y:0,w:1,h:1};zoom=1;view={...base};updateControls();say('Sharing the full selected screen again.')});
     zoomOut.addEventListener('click',()=>zoomTo(zoom/1.25));zoomIn.addEventListener('click',()=>zoomTo(zoom*1.25));
+    resetButton.addEventListener('click',()=>{if(zoom<=1.001)return;applyZoom(V.zoomAt(base,view,1,{x:0.5,y:0.5}),'Zoom reset to 100%.')});
+    boxButton.addEventListener('click',()=>{setBoxMode(!boxMode);if(boxMode){setPanMode(false);resetOverlays();say('Zoom to box is on. Drag a box on the lesson to zoom in on it.')}else say('Zoom to box is off.')});
     moveButton.addEventListener('click',()=>{if(zoom<=1)return;setPanMode(!panMode);if(panMode){resetOverlays();say('Move view is on. Drag the lesson to pan around the zoomed screen.')}else say('Move view is off.')});
 
     const listeners=[];
     function listen(target,type,handler,capture=false){target.addEventListener(type,handler,capture);listeners.push(()=>target.removeEventListener(type,handler,capture))}
     // Choosing a lesson tool returns input to the pointer/highlighter handlers.
     const teacherTool=document.getElementById('teacherTool');
-    if(teacherTool)listen(teacherTool,'change',()=>{if(panMode){setPanMode(false);say('Move view is off. Hover to point, or drag with a highlighting tool.')}});
+    if(teacherTool)listen(teacherTool,'change',()=>{if(panMode){setPanMode(false);say('Move view is off. Hover to point, or drag with a highlighting tool.')}if(boxMode)setBoxMode(false)});
+    // Ctrl/Cmd + wheel (also a trackpad pinch) zooms around the mouse; wheel alone pans while Move view is on.
+    listen(stage,'wheel',event=>{
+      if(!lessonEvent(event))return;
+      if(event.ctrlKey||event.metaKey){
+        event.preventDefault();const p=picturePoint(event),factor=Math.exp(-event.deltaY*0.0025);
+        const next=V.clamp(zoom*factor,1,6);if(Math.abs(next-zoom)<0.002)return;
+        applyZoom(V.zoomAt(base,view,next,p));
+      }else if(panMode){
+        event.preventDefault();const pic=stagePicture();resetOverlays();
+        view=V.panRegion(base,view,event.deltaX/pic.w*view.w,event.deltaY/pic.h*view.h);
+      }
+    },false);
+    listen(stage,'pointerdown',event=>{
+      if(!boxMode||panMode||!lessonEvent(event)||event.button!==0)return;stopStageEvent(event);
+      const pic=stagePicture();boxDrag={start:picturePoint(event),pic,pointerId:event.pointerId,end:picturePoint(event)};
+      boxEl=document.createElement('div');boxEl.className='viewport-box-selection';boxEl.setAttribute('data-stage-ui','');stage.appendChild(boxEl);stage.setPointerCapture?.(event.pointerId);
+    },true);
+    function drawBox(){
+      if(!boxDrag||!boxEl)return;const a=boxDrag.start,b=boxDrag.end,pic=boxDrag.pic;
+      boxEl.style.left=(pic.left+Math.min(a.x,b.x)*pic.w)+'px';boxEl.style.top=(pic.top+Math.min(a.y,b.y)*pic.h)+'px';
+      boxEl.style.width=(Math.abs(a.x-b.x)*pic.w)+'px';boxEl.style.height=(Math.abs(a.y-b.y)*pic.h)+'px';
+    }
+    listen(stage,'pointermove',event=>{
+      if(!boxMode||!boxDrag||event.pointerId!==boxDrag.pointerId)return;stopStageEvent(event);boxDrag.end=picturePoint(event);drawBox();
+    },true);
+    function endBox(event){
+      if(!boxDrag||event.pointerId!==boxDrag.pointerId)return;stopStageEvent(event);
+      const a=boxDrag.start,b=boxDrag.end;try{stage.releasePointerCapture?.(event.pointerId)}catch{}
+      boxDrag=null;if(boxEl){boxEl.remove();boxEl=null}
+      const box={x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)};
+      if(box.w<0.02&&box.h<0.02)return;
+      applyZoom(V.zoomToBox(base,view,zoom,box),'Zoomed to the box. Use Reset zoom to go back.');setBoxMode(false);
+    }
+    listen(stage,'pointerup',endBox,true);listen(stage,'pointercancel',endBox,true);
+    listen(stage,'click',event=>{if(boxMode&&lessonEvent(event))stopStageEvent(event)},true);
     function lessonEvent(event){return !event.target?.closest?.('[data-stage-ui],button')}
     function stopStageEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation?.()}
     listen(stage,'pointerdown',event=>{
@@ -153,7 +205,7 @@
     return{
       stream,active:true,
       stop(){
-        if(stopped)return;stopped=true;stopTicker();setPanMode(false);stage.classList.remove('viewport-panning');
+        if(stopped)return;stopped=true;stopTicker();setPanMode(false);setBoxMode(false);stage.classList.remove('viewport-panning');
         listeners.forEach(remove=>remove());
         controls.remove();dialog.remove();source.srcObject=null;stream.getTracks().forEach(track=>track.stop());rawStream.getTracks().forEach(track=>track.stop());
       }

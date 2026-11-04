@@ -77,7 +77,7 @@
     if(entry){if(name&&entry.name!==name){entry.name=name;entry.heading.textContent=name+' · Live screen'}return entry}
     const card=document.createElement('div');card.className='cp-activity-screen';card.dataset.studentId=studentId;
     const top=document.createElement('div');top.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
-    const heading=document.createElement('strong');heading.textContent=name+' · Live screen';heading.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const heading=document.createElement('strong');heading.textContent=name+' · Live screen';heading.style.cssText='flex:1;min-width:0;overflow-wrap:anywhere;white-space:normal';
     const enlarge=document.createElement('button');enlarge.type='button';enlarge.className='cp-screen-enlarge';enlarge.style.cssText=BUTTON;
     enlarge.onclick=()=>setFocus(focused===studentId?null:studentId);
     top.append(heading,enlarge);

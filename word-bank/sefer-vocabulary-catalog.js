@@ -620,5 +620,6 @@
 };
  const idOf=he=>'word:'+he.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he');
  function forRef(ref){return (entries[ref]||[]).map(([hebrew,english])=>({id:idOf(hebrew),hebrew,english,source:'sefer-hamitzvos',topic:'direct'}));}
- root.FTTSeferVocabulary={topic:()=> 'direct',forRef,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
+ const all=()=>Object.keys(entries).flatMap(forRef);
+ root.FTTSeferVocabulary={topic:()=> 'direct',forRef,all,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
 })(typeof window==='object'?window:globalThis);

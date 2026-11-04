@@ -130,7 +130,7 @@ body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .pointer-bulk-actions{
 .cp-student-body{max-height:none}
 .cp-student-empty{grid-column:1/-1;margin:4px 0;font-size:13px;color:var(--cp-muted)}
 .cp-student-name{display:flex;align-items:center;gap:6px;min-width:0}
-.cp-name-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cp-name-text{white-space:normal;overflow-wrap:anywhere;line-height:1.2;min-width:0}
 .cp-dot{width:9px;height:9px;flex-shrink:0;border-radius:50%;background:#b8c0cf}
 .cp-dot.cp-dot-on{background:#16a34a}
 .cp-level{font-size:13px;min-height:36px;padding:4px 4px;width:100%}
