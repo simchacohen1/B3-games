@@ -1,7 +1,7 @@
 /* Simplified teacher workspace: top bar, picker in the empty stage, students drawer on the right.
    Presentation only; original controls keep their handlers. */
 .teacher-dashboard-source,.teacher-dashboard-menu-trigger{display:none!important}
-body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:360px;background:#eef1f6}
+body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:440px;background:#eef1f6}
 
 /* ---------- Top bar ---------- */
 body.cp-simple .app-header.cp-header{display:block;padding:0;margin:0 0 12px;border:0}
@@ -248,3 +248,36 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 .board-picture-bar .board-picture-done{min-height:44px;padding:0 18px;border:0;border-radius:11px;background:#16a34a;color:#fff;font:800 16px system-ui;cursor:pointer;white-space:nowrap}
 .board-picture-bar .board-picture-done:hover{background:#15803d}
 @media(max-width:640px){.board-picture-bar .board-picture-help{display:none}}
+
+.cp-share-state{min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #6b7894;background:#2a3a5c;color:#fff;font-weight:800;font-size:15px;margin:0;cursor:pointer}
+.cp-share-state.cp-share-on{background:#16a34a;border-color:#bbf7d0}
+.cp-share-state.cp-share-off{background:#dc2626;border-color:#fecaca}
+.cp-share-state:disabled{opacity:.6;cursor:not-allowed}
+.cp-share-state[hidden]{display:none}
+
+/* Fullscreen toolbar: red Stop button for the live PDF / whiteboard / webpage / shared screen */
+#teacherDock .cp-dock-stop{background:#dc2626;color:#fff;font-weight:700;border:1px solid #b91c1c;justify-content:center}
+#teacherDock .cp-dock-stop:hover:enabled{background:#b91c1c}
+#teacherDock .cp-dock-stop svg{stroke:currentColor}
+#teacherDock .cp-dock-stop[hidden]{display:none}
+
+/* One Stop button: the red one in the toolbar (also in full screen). The top-right copy and the PDF bar's Close button are hidden duplicates. */
+body.cp-simple.teacher-view .cp-live-wrap>.cp-stop-btn{display:none}
+body.cp-simple.teacher-view #pdfNav .pdf-close{display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .cp-dock-stop:not([hidden]){display:inline-flex!important}
+#teacherDock .cp-dock-stop{min-height:44px;padding-left:16px;padding-right:16px;font-size:15px}
+
+/* Reminder that the whiteboard is still on. Sits above full screen; never closes anything by itself. */
+.cp-board-reminder{position:fixed;z-index:10002;top:14px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;max-width:calc(100vw - 24px);padding:12px 16px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 12px 36px #0006;color:#7c2d12;font:700 16px system-ui}
+.cp-board-reminder[hidden]{display:none}
+.cp-board-reminder button{min-height:44px;padding:0 16px;border-radius:10px;font:800 15px system-ui;cursor:pointer;border:2px solid #b91c1c}
+.cp-board-reminder .cp-reminder-stop{background:#dc2626;color:#fff}
+.cp-board-reminder .cp-reminder-keep{background:#fff;color:#7c2d12;border-color:#c2410c}
+
+/* Students panel: show every boy's full name and where he is. Names wrap instead of being cut off;
+   "in Home" sits on its own line under the name; a long list scrolls inside the panel. */
+.cp-student-body{grid-template-columns:minmax(0,1fr) 96px 42px 42px}
+.cp-student-name{flex-wrap:wrap;row-gap:2px;align-items:center}
+.cp-student-name .cp-name-text{flex:1 1 0;min-width:8ch;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere;font-weight:600}
+.cp-student-name .cp-where{flex:1 0 100%!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;padding-left:15px}
+.cp-permissions-sidebar{overflow-y:auto}
