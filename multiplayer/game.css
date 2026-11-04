@@ -126,3 +126,29 @@ button.gf-p.ask{cursor:pointer;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f
 .gofish-mode .actions{margin-top:10px}.gofish-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
 @media(max-width:560px){.play-area.gofish-mode{padding:12px 8px 18px}.fc{width:64px;height:92px}.fc .fish{width:50px;height:36px}.gf-p{padding-right:10px}}
 @media(prefers-reduced-motion:reduce){.fc{transition:none}}
+/* Checkers table: matches the Checkers tile on the Arcade home page. */
+.play-area.checkers-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#5b1fc4 4%,#c084fc 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #45198f,0 18px 28px #12315b40;overflow:hidden}
+.checkers-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.checkers-mode #roomCode,.checkers-mode #players{display:none}.checkers-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.ck-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.ck-p{display:flex;align-items:center;gap:8px;background:#45198f90;border:3px solid #ffffff66;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900;color:#fff}
+.ck-p i{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 0 #0004;box-sizing:border-box}
+.ck-p i.r{background:radial-gradient(circle at 35% 28%,#ffb9aa,#df493a 48%,#9f1239)}.ck-p i.d{background:radial-gradient(circle at 35% 28%,#e2e8f0,#475569 48%,#1e293b)}
+.ck-p small{display:block;font-size:11px;font-weight:800;opacity:.95}
+.ck-p.turn{background:#fff;color:#45198f;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66,0 0 22px #ffd23f}
+.ck-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));max-width:500px;margin:0 auto;border:8px solid #5a361f;border-radius:14px;box-shadow:0 6px 0 #3d2412,0 14px 22px #0006,inset 0 0 0 2px #00000030;overflow:hidden;background:#5a361f}
+.checkers-mode .ck-sq{position:relative;display:grid;place-items:center;aspect-ratio:1;min-width:0;padding:0;border:0;border-radius:0;font:inherit;opacity:1;cursor:pointer}
+.checkers-mode .ck-sq:disabled{cursor:default;opacity:1}
+.checkers-mode .ck-sq.l,.checkers-mode .ck-sq.l:hover:not(:disabled){background:#f8ead2}.checkers-mode .ck-sq.d,.checkers-mode .ck-sq.d:hover:not(:disabled){background:#794b32;box-shadow:inset 0 2px 5px #0005}
+.checkers-mode .ck-sq:focus-visible{outline:4px solid #ffd23f;outline-offset:-4px}
+.pc{position:relative;display:grid;place-items:center;width:78%;height:78%;border-radius:50%;border:4px solid #fff;box-sizing:border-box;box-shadow:0 4px 0 #0005,0 7px 8px #0005;transition:transform .15s}
+.pc.r{background:radial-gradient(circle at 35% 28%,#ffb9aa,#df493a 48%,#9f1239)}.pc.y{background:radial-gradient(circle at 35% 28%,#e2e8f0,#475569 48%,#1e293b)}
+.pc:after{content:"";position:absolute;inset:18%;border-radius:50%;border:2px solid #ffffff55}
+.pc b{position:relative;z-index:1;font-size:clamp(14px,4vw,24px);line-height:1;color:#ffe066;text-shadow:0 1px 2px #0007}
+.pc.go{box-shadow:0 0 0 3px #ffd23f,0 0 14px #ffd23f,0 4px 0 #0005}
+.pc.sel{transform:translateY(-4px) scale(1.08);box-shadow:0 0 0 5px #ffd23f,0 0 22px #ffd23f,0 6px 0 #0005}
+.checkers-mode .ck-sq.tgt:before{content:"";width:34%;height:34%;border-radius:50%;background:#ffd23fcc;box-shadow:0 0 12px #ffd23f}
+.checkers-mode .ck-sq.tgt:hover:before{background:#ffd23f;transform:scale(1.2)}
+.ck-hint{text-align:center;font-weight:900;text-shadow:0 2px 3px #0005;margin-top:12px;font-size:14px;min-height:1em}
+.checkers-mode .actions{margin-top:10px}.checkers-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.checkers-mode{padding:12px 8px 18px}.ck-board{border-width:6px}.pc{border-width:3px}}
+@media(prefers-reduced-motion:reduce){.pc{transition:none}}
