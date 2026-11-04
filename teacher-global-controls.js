@@ -196,12 +196,14 @@
   function syncClassPicker() {
     if (!select) return;
     select.replaceChildren();
+    var blank = el('option','','Choose a class\u2026'); blank.value=''; select.appendChild(blank);
     classes.forEach(function(row){
       var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
     });
     select.value = selected;
     if (modalClassSelect) {
       modalClassSelect.replaceChildren();
+      var blank2 = el('option','','Choose a class\u2026'); blank2.value=''; modalClassSelect.appendChild(blank2);
       classes.forEach(function(row) { var opt = el('option','',row.name);opt.value=row.id;modalClassSelect.appendChild(opt); });
       modalClassSelect.value = selected;
     }
@@ -428,7 +430,9 @@
       var requested = new URLSearchParams(location.search).get('class');
       var preferred = getPreferred();
       var ids=rows.map(function(row){return row.id;});
-      remember(ids.includes(requested)?requested:ids.includes(preferred)?preferred:ids[0]);
+      // Never start on a class quietly: only a class named in the link is
+      // pre-selected; otherwise the bar shows "Choose a class\u2026".
+      selected = ids.includes(requested) ? requested : '';
       authorized=true;
       setupUi();
       syncClassPicker();

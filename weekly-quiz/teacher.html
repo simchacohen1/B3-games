@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="../firebase-config.js"></script>
+<script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js"></script>
 <style>
   /* ===== B3 Weekly Quiz — Teacher (2026-10 redesign) ===== */
@@ -927,7 +927,7 @@ const QUIZ_HISTORY_REFRESH_MS=60*1000;
 let resultsStudentShowAll=false;
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
 let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
-let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
+let liveClassId=CLASS_SPACE||['et','wt'].includes(WQ_CLASS)?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
 let liveLaunchRef=null,liveResponseRef=null,liveCompletionRef=null;
 let resultsLaunchId='';
 let modalContext=null;
@@ -1007,10 +1007,18 @@ if (!CLASS_SPACE) {
       lockErrorB3.textContent = !user ? 'Sign in with your teacher Google account.'
         : 'The original B3 Weekly Quiz is for the owner account. Open Weekly Quiz from your Teacher Home so it opens your own class.';
     }
+    if (owner && !WQ_CLASS) {
+      // Never start on ET quietly: ask which class, then reopen with it.
+      lockErrorB3.textContent = 'Choose your class…';
+      window.B3ClassGate.requireInUrl(path => db.ref(path).once('value').then(x => x.val()), access, 'b3-2026')
+        .catch(err => { lockErrorB3.textContent = (err && err.message) || 'Could not load classes.'; });
+      return;
+    }
     if (owner) {
       document.getElementById('lockOverlay').style.display = 'none';
       document.getElementById('mainContent').classList.remove('hidden');
       window.weeklyQuizOwnerUnlocked = true;
+      { const lc = document.getElementById('liveClassSelect'); if (lc && lc.querySelector('option[value="' + liveClassId + '"]')) lc.value = liveClassId; }
       if (typeof attachQuizListeners === 'function') attachQuizListeners();
     } else if (window.weeklyQuizOwnerUnlocked) {
       document.getElementById('lockOverlay').style.display = '';
@@ -2232,7 +2240,7 @@ function openMakeupFromResults(){
 
   document.getElementById('launchDeliveryType').value='makeup';
   document.getElementById('launchTargetType').value='multiple';
-  document.getElementById('launchClass').value=base.classId||(CLASS_SPACE?WQ_CLASS:'et');
+  document.getElementById('launchClass').value=base.classId||(CLASS_SPACE||['et','wt'].includes(WQ_CLASS)?WQ_CLASS:'et');
   document.getElementById('launchShowScore').checked=base.showScore===true;
   document.getElementById('launchNote').value='Make-up from '+((base.quizSnapshot&&base.quizSnapshot.title)||'original test');
   updateLaunchTargetUI();

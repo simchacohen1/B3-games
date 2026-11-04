@@ -263,7 +263,11 @@ async function loadRoot(){
     const entries=await Promise.all(Object.entries(paths).map(async([key,path])=>[key,await adminRead(path)]));
     state.root=Object.fromEntries(entries.map(([key,value])=>[key,value||{}]));
   }
-  if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";
+  if(!state.classId||!state.root.classes?.[state.classId]?.active){
+    const list=activeClasses(),names={};list.forEach(c=>{names[c.id]=c.name});
+    const wanted=requestedClassId();
+    state.classId=await B3ClassGate.choose({ids:list.map(c=>c.id),names,requested:wanted||"-"});
+  }
   prepareDraft();renderClassSelect();setHeader();buildNav();
   setTimeout(()=>{sweepAutomaticPosukPoints()},0);
 }

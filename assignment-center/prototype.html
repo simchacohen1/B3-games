@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Assignment Center • Design Prototype</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172b4d;background:#f2f6fb}*{box-sizing:border-box}body{margin:0}header{background:#123762;color:white;padding:19px 25px;display:flex;justify-content:space-between;align-items:center;gap:12px}header strong{font-size:22px}.tag{border:1px solid #d5e1ed;border-radius:18px;padding:5px 11px;font-size:12px;background:#eaf1f8;color:#173c60}main{max-width:1060px;margin:26px auto;padding:0 16px}.notice{padding:13px 16px;border-left:4px solid #c98b14;background:#fff7dd;border-radius:8px;margin-bottom:18px}.tabs{display:flex;gap:8px;margin-bottom:17px}.tabs button{border:1px solid #c7d7e6;background:white;padding:11px 19px;border-radius:9px;cursor:pointer}.tabs button[aria-selected=true]{background:#174e7e;color:white}.panel{background:white;border-radius:16px;border:1px solid #dce5ee;padding:22px;box-shadow:0 3px 12px #102b4510;margin-bottom:15px}.panel h2{margin:0 0 15px;font-size:20px}label{display:block;font-weight:600;margin:13px 0 5px}input,select,textarea{font:inherit;width:100%;padding:11px;border:1px solid #bfcfdf;border-radius:8px}textarea{min-height:76px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{text-align:center;background:#eaf2fa;border-radius:12px;padding:15px}.stat strong{font-size:25px;display:block}.task{padding:15px;border:1px solid #d9e5ef;border-radius:10px;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:15px}.task p{margin:4px 0;color:#51667a}.primary{background:#18588f;color:white;border:0;padding:11px 18px;border-radius:9px;font-weight:600;cursor:pointer}.secondary{background:white;color:#18588f;border:1px solid #18588f;padding:10px 15px;border-radius:9px;cursor:pointer}.float{position:fixed;right:20px;bottom:20px;box-shadow:0 4px 20px #0003;z-index:2}.hidden{display:none}.muted{color:#5b6b7b}.empty{padding:25px;text-align:center;color:#5b6b7b}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;border-bottom:1px solid #e1e8ef}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #eea62b;outline-offset:2px}@media(max-width:600px){.grid{grid-template-columns:1fr}.task{align-items:flex-start;flex-direction:column}header{align-items:flex-start;flex-direction:column}main{margin-bottom:80px}}
+</style></head><body>
+<header><strong>📚 Assignment Center</strong><span class="tag">Prototype — no live student data</span></header>
+<main>
+<div class="notice"><strong>Safe design preview.</strong> Assignments stay in this browser only, are not sent to Firebase, and are not visible to students. Existing tools and accounts are untouched.</div>
+<div class="tabs" role="tablist" aria-label="Preview mode"><button id="teacherTab" role="tab" aria-selected="true" aria-controls="teacher">Teacher preview</button><button id="studentTab" role="tab" aria-selected="false" aria-controls="student">Student preview</button></div>
+<section id="teacher" role="tabpanel" aria-labelledby="teacherTab">
+<div class="panel"><h2>Create assignment draft</h2>
+<label for="type">Activity</label><select id="type"><option value="shorashim">Shorashim — practice time</option><option value="posuk">Posuk Practice — complete specified posuk</option><option value="chazara">Chazara — review specified posuk</option><option value="workbook">Workbook — submit photograph</option><option value="audio">Submit audio recording</option><option value="video">Submit video</option><option value="other">Other tool or teacher instruction</option></select>
+<label for="title">Assignment title</label><input id="title" maxlength="120" placeholder="e.g. Shorashim review">
+<label for="details">Instructions / target (minutes, posuk, workbook page)</label><textarea id="details" maxlength="1200" placeholder="e.g. Practice Shorashim for 10 minutes"></textarea>
+<label for="audience">Assigned to</label><select id="audience"><option value="class">Entire selected class (integration pending)</option><option value="selected">Selected students (integration pending)</option></select>
+<label for="due">Due date (optional)</label><input id="due" type="date">
+<p class="muted">Drafting only. Assignment targeting and completion require authenticated server integration.</p>
+<button class="primary" id="add">Add to local preview</button></div>
+<div class="panel"><h2>Assignment drafts <span id="count" class="tag">0</span></h2><div id="drafts" aria-live="polite" class="empty">No drafts yet. Create one above.</div></div>
+<div class="panel"><h2>Teacher monitoring (planned)</h2><div class="grid"><div class="stat"><strong>—</strong>Assigned</div><div class="stat"><strong>—</strong>Submitted</div><div class="stat"><strong>—</strong>Needs review</div></div><p class="muted">Actual counts will come from per-student assignment records. No completion data is inferred in this preview.</p></div>
+</section>
+<section id="student" class="hidden" role="tabpanel" aria-labelledby="studentTab">
+<div class="panel"><h2>My Assignments — sample presentation</h2><p class="muted">This preview shows drafts from this browser, not assignments delivered to a student. Students will see only their own work after integration.</p><div id="studentTasks"></div></div>
+</section>
+</main><button id="reminder" class="primary float" aria-label="Show assignment reminder">🔔 Assignments: <span id="reminderCount">0</span></button>
+<script>
+(function(){'use strict';
+const KEY='funTorahAssignmentCenterPrototypeV1';
+const $=id=>document.getElementById(id);
+let drafts=[];
+try {const parsed=JSON.parse(localStorage.getItem(KEY)||'[]'); if(Array.isArray(parsed))drafts=parsed.filter(x=>x&&typeof x.title==='string').slice(0,100);} catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(drafts));}catch(e){alert('Browser storage is unavailable. Drafts will not persist.');}};
+function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
+function render(){ $('count').textContent=drafts.length;$('reminderCount').textContent=drafts.length;
+const teacher=$('drafts'),student=$('studentTasks');teacher.replaceChildren();student.replaceChildren();
+if(!drafts.length){teacher.append(el('p','No drafts yet. Create one above.','empty'));student.append(el('p','No sample assignments yet.','empty'));return;}
+drafts.forEach((d,i)=>{const row=el('div',undefined,'task');const info=el('div');info.append(el('strong',d.title),el('p',d.details||'No instructions'),el('p',d.type+' • '+(d.audience==='class'?'Class':'Selected students')+(d.due?' • Due '+d.due:'')));row.append(info);
+const remove=el('button','Remove','secondary');remove.type='button';remove.addEventListener('click',()=>{drafts.splice(i,1);save();render();});row.append(remove);teacher.append(row);
+const sample=el('div',undefined,'task');const text=el('div');text.append(el('strong',d.title),el('p',d.details||'No instructions'),el('p','Not assigned — demonstration only'));sample.append(text);student.append(sample);});}
+$('add').addEventListener('click',()=>{const type=$('type').value,details=$('details').value.trim(),title=$('title').value.trim()||$('type').selectedOptions[0].text;if(drafts.length>=100){alert('Prototype limit of 100 drafts reached.');return;}drafts.unshift({type,title,details,audience:$('audience').value,due:$('due').value});save();render();$('title').value='';$('details').value='';});
+function show(mode){const t=mode==='teacher';$('teacher').classList.toggle('hidden',!t);$('student').classList.toggle('hidden',t);$('teacherTab').setAttribute('aria-selected',String(t));$('studentTab').setAttribute('aria-selected',String(!t));}
+$('teacherTab').addEventListener('click',()=>show('teacher'));$('studentTab').addEventListener('click',()=>show('student'));$('reminder').addEventListener('click',()=>{show('student');$('student').scrollIntoView({behavior:'smooth'});});render();
+})();
+</script></body></html>
