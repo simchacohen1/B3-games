@@ -44,7 +44,7 @@ test('Chazara teacher default view: Approve All present, Posuk milestones automa
     if(body.action==='approve-point-request'){approvals.push(body.requestId);return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,status:'approved',actualAmount:1})})}
     return r.fulfill({contentType:'application/json',body:'{"ok":true}'});
   });
-    await page.goto(`http://127.0.0.1:${port}/chazara/teacher.html`);
+    await page.goto(`http://127.0.0.1:${port}/chazara/teacher.html?class=et`);
     await page.waitForFunction(()=>document.querySelectorAll('#approvalList .request-row').length>0,null,{timeout:15000});
     const state=await page.evaluate(()=>({
       reviewOnly:document.getElementById('teacherApp').classList.contains('review-only'),
