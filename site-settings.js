@@ -423,8 +423,11 @@
   // have no provider. A student identity must never keep a teacher tab from
   // restoring the teacher (it can leak in via browser-wide LOCAL persistence).
   function isGoogleUser(user) {
+    // Staging only: fictional teacher test accounts sign in with email/password.
+    // Students still use custom tokens (no provider), so they are never matched.
+    const stagingPassword = window.B3_STAGING_MODE === true;
     return Boolean(user && Array.isArray(user.providerData) &&
-      user.providerData.some(function (p) { return p && p.providerId === "google.com"; }));
+      user.providerData.some(function (p) { return p && (p.providerId === "google.com" || (stagingPassword && p.providerId === "password")); }));
   }
 
   // The compat Firebase build used here has no authStateReady(); its first
@@ -970,9 +973,10 @@
     return { open: !locked, reason: locked ? "Automatic schedule: LOCKED period" : "Automatic schedule: open" };
   }
 
-  function signInWithGoogle() {
+  function signInWithGoogle(googleChosen) {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
+    if (window.B3_STAGING_MODE === true && googleChosen !== true) return signInWithStagingAccount(services);
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
@@ -1007,6 +1011,67 @@
         return result.user;
       });
     });
+  }
+
+  // Staging only: lets the tester choose normal Google sign-in or one of the
+  // fictional email/password test accounts, in a real form (no browser prompts).
+  function askStagingSignIn() {
+    return new Promise(function (resolve, reject) {
+      const cancel = function () { reject(Object.assign(new Error("Staging sign-in was cancelled."), { code: "auth/cancelled-popup-request" })); };
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif";
+      overlay.innerHTML = '<form style="background:#fff;color:#111;border-radius:12px;padding:20px;width:min(360px,92vw);box-shadow:0 8px 30px rgba(0,0,0,.3)">' +
+        '<h3 style="margin:0 0 6px">Staging sign-in</h3>' +
+        '<p style="margin:0 0 12px;font-size:13px;color:#444">Test site only. Use Google, or a fictional staging test account.</p>' +
+        '<button type="button" data-google style="width:100%;padding:10px;font-size:15px;font-weight:700;cursor:pointer">Sign in with Google</button>' +
+        '<p style="text-align:center;margin:10px 0;font-size:12px;color:#666">or staging test account</p>' +
+        '<input data-email type="email" autocomplete="username" placeholder="Staging test email" style="width:100%;box-sizing:border-box;padding:8px;margin-bottom:8px">' +
+        '<input data-password type="password" autocomplete="current-password" placeholder="Staging test password" style="width:100%;box-sizing:border-box;padding:8px;margin-bottom:10px">' +
+        '<div style="display:flex;gap:8px"><button type="submit" style="flex:1;padding:9px;font-weight:700;cursor:pointer">Sign in</button><button type="button" data-cancel style="padding:9px;cursor:pointer">Cancel</button></div></form>';
+      const done = function (value) { overlay.remove(); resolve(value); };
+      overlay.querySelector("[data-google]").onclick = function () { done({ google: true }); };
+      overlay.querySelector("[data-cancel]").onclick = function () { overlay.remove(); cancel(); };
+      overlay.querySelector("form").onsubmit = function (event) {
+        event.preventDefault();
+        const email = overlay.querySelector("[data-email]").value.trim();
+        const password = overlay.querySelector("[data-password]").value;
+        if (!email || !password) return;
+        done({ email: email, password: password });
+      };
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-google]").focus();
+    });
+  }
+
+  function signInWithStagingAccount(services) {
+    return askStagingSignIn().then(function (choice) {
+      if (choice.google) return signInWithGoogle(true);
+      return signInWithStagingPassword(services, choice.email, choice.password);
+    });
+  }
+
+  function signInWithStagingPassword(services, email, password) {
+    const savedAuth = getRememberedTeacherAuth();
+    return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
+      .then(function () { return savedAuth.signInWithEmailAndPassword(email, password); })
+      .then(function (result) {
+        return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+          .then(function () { return services.auth.updateCurrentUser(result.user); })
+          .then(function () { return readUserAccess(result.user); })
+          .then(function (access) {
+            currentAccess = access;
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { showToolVersions(access); }, { once: true });
+            else showToolVersions(access);
+            if (!access.authorized) {
+              return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
+                const error = new Error("This staging account has no assigned Fun Torah Tools role.");
+                error.code = "b3/unauthorized-user";
+                throw error;
+              });
+            }
+            return result.user;
+          });
+      });
   }
 
   function signOut() {

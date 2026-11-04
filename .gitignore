@@ -9,6 +9,7 @@ node_modules/
 firebase-debug.log*
 database-debug.log
 /playwright/.auth/
+/staging/test-credentials.local.json
 
 firebase_idb.json
 auth.json
