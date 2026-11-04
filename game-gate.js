@@ -574,6 +574,8 @@
     }
 
     if(verifiedTeacherAccess&&verifiedTeacherAccess.authorized){
+      // Opt-in (multiplayer pages): the page's own teacher check (identity.js) picks the class, and its game links carry no ?class=. Students are still gated.
+      if(scriptEl&&scriptEl.hasAttribute("data-teachers-open")){showOpen();return;}
       var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
       if(!(verifiedTeacherAccess.classIds||[]).includes(selected)){
         if(gameId==="class-gallery"){showGalleryClassChoices();return;}
