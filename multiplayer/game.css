@@ -152,3 +152,21 @@ button.gf-p.ask{cursor:pointer;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f
 .checkers-mode .actions{margin-top:10px}.checkers-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
 @media(max-width:560px){.play-area.checkers-mode{padding:12px 8px 18px}.ck-board{border-width:6px}.pc{border-width:3px}}
 @media(prefers-reduced-motion:reduce){.pc{transition:none}}
+/* Set table: matches the Set tile on the Arcade home page. */
+.play-area.set-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#53228e 4%,#ae59ee 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #3a1768,0 18px 28px #12315b40;overflow:hidden}
+.set-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.set-mode #roomCode,.set-mode #players{display:none}.set-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.st-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.st-p{display:flex;align-items:center;gap:8px;background:#3a176890;border:3px solid #ffffff66;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900;color:#fff}
+.st-p i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,#ffd23f,#ff8a1f);color:#7a2d00;font-style:normal;box-shadow:inset 0 1px 2px #fff9}
+.st-p small{display:block;font-size:11px;font-weight:800;opacity:.95}
+.st-p.me{background:#fff;color:#3a1768;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66}
+.st-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:560px;margin:0 auto}
+.set-mode .st-card{aspect-ratio:3/4;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6%;padding:8% 0;border:0;border-radius:14px;background:#fff;box-shadow:0 5px 0 #0003,0 10px 16px #0004;transition:transform .15s;font-size:0}
+.set-mode .st-card:hover:not(:disabled){background:#fffdf0;border:0}.set-mode .st-card:disabled{opacity:1;cursor:default}
+.set-mode .st-card svg{width:62%;height:auto;display:block}
+.set-mode .st-card.sel,.set-mode .st-card.sel:hover{background:#fffbe6;transform:translateY(-8px) scale(1.04);box-shadow:0 0 0 4px #ffd23f,0 0 22px #ffd23f,0 5px 0 #0003}
+.set-mode .st-card:focus-visible{outline:4px solid #ffd23f;outline-offset:3px}
+.st-hint{text-align:center;font-weight:900;text-shadow:0 2px 3px #0005;margin-top:14px;font-size:14px;min-height:1em}
+.set-mode .actions{margin-top:10px}.set-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.set-mode{padding:12px 8px 18px}.st-grid{gap:8px}}
+@media(prefers-reduced-motion:reduce){.set-mode .st-card{transition:none}}

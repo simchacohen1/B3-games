@@ -353,20 +353,7 @@
       }
       board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} points`).join(' · ')));
     } else if (gameKey === 'set') {
-      const grid = text('div', 'board set-board');
-      (room.cards || []).forEach((card, index) => {
-        const shape = ['●','◆','■'][card.props[0]], color = ['🔴','🟣','🟢'][card.props[1]], fill = ['○','◍','●'][card.props[2]];
-        const label = Array(card.props[3] + 1).fill(shape + color + fill).join('  ');
-        const selected = selectedSet.includes(index);
-        grid.appendChild(cell(label, selected ? 'set-selected' : '', () => {
-          selectedSet = selected ? selectedSet.filter(item => item !== index) : selectedSet.length < 3 ? [...selectedSet, index] : [index];
-          if (selectedSet.length === 3) {
-            const indices = selectedSet.slice(); selectedSet = [];
-            call('move', { move: { type: 'claim', indices } }).catch(showError);
-          } else draw();
-        }, pending || !!room.finished));
-      });
-      board.append(grid, text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} sets`).join(' · ')));
+      drawSetTable(board);
     } else if (gameKey === 'ludo') {
       drawLudoTable(board);
     } else if (gameKey === 'dominoes') {
@@ -661,6 +648,42 @@
     const hint = text('div', 'ck-hint', ownTurn ? (selectedChecker != null ? 'Tap a gold spot to move there.' : 'Tap one of your glowing pieces.') : '');
     board.append(players, grid, hint);
   }
+  const SET_COLORS = ['#e0334f', '#7b3fc9', '#1f9d5c'];
+  const SET_COLOR_NAMES = ['red', 'purple', 'green'], SET_SHAPE_NAMES = ['oval', 'diamond', 'squiggle'], SET_FILL_NAMES = ['empty', 'striped', 'solid'];
+  const SET_SHAPES = ['<ellipse cx="30" cy="11" rx="26" ry="9"/>', '<path d="M4 11 30 2l26 9-26 9z"/>', '<path d="M5 13C5 2 20 0 30 6s25 4 25-4v8c0 11-15 13-25 7S5 23 5 13z"/>'];
+  function setSymbol(props) {
+    const color = SET_COLORS[props[1]], fill = props[2] === 2 ? color : props[2] === 1 ? 'url(#setstripe' + props[1] + ')' : 'none';
+    return '<svg viewBox="0 0 60 22" aria-hidden="true"><defs><pattern id="setstripe' + props[1] + '" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1.6" fill="' + color + '"/></pattern></defs><g fill="' + fill + '" stroke="' + color + '" stroke-width="2.4">' + SET_SHAPES[props[0]] + '</g></svg>';
+  }
+  function drawSetTable(board) {
+    const players = text('div', 'st-players');
+    (room.players || []).forEach(player => {
+      const badge = text('div', 'st-p' + (player.studentId === studentId ? ' me' : ''));
+      const label = text('div', '', player.name + (player.studentId === studentId ? ' (you)' : ''));
+      const score = player.score || 0;
+      label.appendChild(text('small', '', score + (score === 1 ? ' set' : ' sets')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const grid = text('div', 'st-grid');
+    (room.cards || []).forEach((card, index) => {
+      const selected = selectedSet.includes(index);
+      const node = button('', () => {
+        selectedSet = selected ? selectedSet.filter(item => item !== index) : selectedSet.length < 3 ? [...selectedSet, index] : [index];
+        if (selectedSet.length === 3) {
+          const indices = selectedSet.slice(); selectedSet = [];
+          call('move', { move: { type: 'claim', indices } }).catch(showError);
+        } else draw();
+      }, 'board-cell st-card' + (selected ? ' set-selected sel' : ''), pending || !!room.finished);
+      const count = card.props[3] + 1;
+      node.dataset.props = card.props.join(',');
+      node.setAttribute('aria-label', count + ' ' + SET_COLOR_NAMES[card.props[1]] + ' ' + SET_FILL_NAMES[card.props[2]] + ' ' + SET_SHAPE_NAMES[card.props[0]] + (count > 1 ? 's' : '') + (selected ? ', selected' : ''));
+      node.innerHTML = setSymbol(card.props).repeat(count);
+      grid.appendChild(node);
+    });
+    const hint = text('div', 'st-hint', room.finished ? '' : selectedSet.length ? selectedSet.length + (selectedSet.length === 1 ? ' card' : ' cards') + ' picked — pick ' + (3 - selectedSet.length) + ' more.' : 'Pick three cards that make a set.');
+    board.append(players, grid, hint);
+  }
   function draw() {
     if (!room) return;
     el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
@@ -668,6 +691,7 @@
     el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
     el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
     el('room').classList.toggle('checkers-mode', gameKey === 'checkers');
+    el('room').classList.toggle('set-mode', gameKey === 'set');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
