@@ -83,6 +83,13 @@ const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const targets = (def, members) => def.audience === 'all' ? Object.keys(members) : (def.audience || []).filter(s => has(members, s));
 const publicationState = def => def.publicationState || 'published'; // older definitions stay visible
 
+// Messages as one side sees them. "unread" = sent by the other side after this side last read the thread.
+function publicMessages(rec, viewer) {
+  const readAt = Number(rec?.readAt?.[viewer]) || 0;
+  return Array.isArray(rec?.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
+    text: message.text || '', voice: !!message.voice, createdAt: message.createdAt,
+    unread: message.role !== viewer && Number(message.createdAt) > readAt })) : [];
+}
 function present(def, rec, now) {
   return {
     id: def.id, type: def.type, title: def.title, details: def.details, assignedAt: def.assignedAt ?? def.createdAt,
@@ -92,8 +99,7 @@ function present(def, rec, now) {
     draft: rec.draft || '', progress: rec.progress || 0, answer: rec.answer || '',
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
     updatedAt: rec.updatedAt || null,
-    messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
-      text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : []
+    messages: publicMessages(rec, 'student')
   };
 }
 
@@ -128,11 +134,16 @@ async function addMessage(store, path, message) {
     return { ...(cur || {}),
     messages: [...messages,
       { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: message.createdAt }],
+    readAt: { ...(cur?.readAt || {}), [message.role]: message.createdAt },
     ...(message.voiceData ? { voiceNotes: { ...(cur?.voiceNotes || {}), [message.id]: message.voiceData } } : {})
   };
   });
   if (limit) fail(429, message.voiceData ? 'This homework has reached its voice-note limit.' : 'This homework has reached its comment limit.');
   if (!tx || tx.committed === false) fail(409, 'The note could not be saved. Please try again.');
+}
+async function markRead(store, path, role, now) {
+  await store.tx(path, cur => cur ? { ...cur, readAt: { ...(cur.readAt || {}), [role]: now } } : undefined);
+  return { ok: true };
 }
 
 // ---- teacher actions -------------------------------------------------------
@@ -156,8 +167,7 @@ async function teacherDo(store, identity, body, now, newId) {
         if (late) counts.missing++;
         students[sid] = { name: members[sid].name, status: rec.status, late, answer: rec.answer || '',
           progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-          messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
-            text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : [] };
+          messages: publicMessages(rec, 'teacher') };
       }
       rows.push({ id: def.id, type: def.type, title: def.title, details: def.details,
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
@@ -198,10 +208,11 @@ async function teacherDo(store, identity, body, now, newId) {
   const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
   if (!def) fail(404, 'That assignment was not found.');
 
-  if (body.action === 'comment' || body.action === 'voiceRead') {
+  if (body.action === 'comment' || body.action === 'voiceRead' || body.action === 'markRead') {
     const sid = body.studentId;
     if (!key(sid) || !has(members, sid) || !targets(def, members).includes(sid)) fail(404, 'That student is not assigned this homework.');
     const path = recordPath(classId, sid, def.id);
+    if (body.action === 'markRead') return markRead(store, path, 'teacher', now);
     if (body.action === 'comment') {
       const message = messageInput(body, 'teacher', now, newId);
       await addMessage(store, path, message);
@@ -330,6 +341,7 @@ async function studentDo(store, body, now, ip, newId) {
     await addMessage(store, path, message);
     return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
   }
+  if (body.action === 'markRead') return markRead(store, path, 'student', now);
   if (body.action === 'voiceRead') {
     const rec = await store.get(path), message = (rec?.messages || []).find(item => item.id === body.messageId && item.voice);
     if (!message) fail(404, 'That voice note is no longer available.');
@@ -388,9 +400,9 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
-  if (['comment', 'voiceRead'].includes(a) && auth && auth.identity)
+  if (['comment', 'voiceRead', 'markRead'].includes(a) && auth && auth.identity)
     return teacherDo(store, auth.identity, body, now, newId);
-  if (['studentList', 'save', 'submit', 'comment', 'voiceRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
+  if (['studentList', 'save', 'submit', 'comment', 'voiceRead', 'markRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };
