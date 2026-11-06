@@ -10,6 +10,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script>
 <script src="principal-scope.js?v=20261025"></script>
+<script src="shorashim/units.js?v=20261106-units-1"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -86,7 +87,11 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="toolList"></div>
 <h3 class="tools-title">Class Content</h3>
 <p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
-<div id="resourceList"></div></section>
+<div id="resourceList"></div>
+<h3 class="tools-title">Give a teacher Shorashim words</h3>
+<p class="hint">Each teacher has their own Shorashim library under their own account. New teachers start with an empty library. Choose a teacher, then tick which of your lists to copy into their library. It is a copy: your own classes are not changed, and the teacher decides which of their classes get the words.</p>
+<select id="libraryTeacherSelect"><option value="">Choose teacher</option></select>
+<div id="libraryGrant"></div></section>
 </div>
 <div id="status" class="toast"></div>
 </main>
@@ -173,6 +178,7 @@ async function load(){
  const assignmentLines=[];
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
+ q("libraryTeacherSelect").innerHTML='<option value="">Choose teacher</option>'+Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).map(([id,v])=>'<option value="'+safe(id)+'">'+safe(v.name||v.email)+'</option>').join("");q("libraryGrant").innerHTML="";
  renderPrincipalAssignments();
  await renderToolGrants();
 }
@@ -291,6 +297,38 @@ async function renderResources(classId){
   }catch(err){console.error(err);q("copyShorashimMsg").textContent="Could not copy. Please try again.";q("copyShorashim").disabled=false}
  };
 }
+// Shorashim: copy chosen lists from the owner's own words into one teacher's library.
+async function renderLibraryGrant(){
+ const inviteId=q("libraryTeacherSelect").value,box=q("libraryGrant"),U=window.B3ShorashimUnits;
+ if(!inviteId){box.innerHTML="";return}
+ const t=teacherData[inviteId]||{},name=safe(t.name||t.email);
+ box.innerHTML="<small>Loading…</small>";
+ const uid=await teacherUidFor(inviteId);
+ if(!U.validUid(uid)){box.innerHTML='<div class="entry"><small>'+name+' has not signed in yet. Ask them to sign in once with Google, then come back here.</small></div>';return}
+ const [catSnap,setSnap,libSnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/catalog").once("value"),db.ref(SHORASHIM_ROOT+"/settings").once("value"),db.ref(U.libraryPath(uid)).once("value")]);
+ const mine=U.withAllTracks(catSnap.val()),mySettings=setSnap.val()||{},labels=mySettings.unitLabels||{},lib=libSnap.val()||{},libCount=U.countWords(lib.catalog);
+ const rows=U.unitsFor(mine.shorashim,labels).map(u=>["shorashim|"+u.key,"🌳 "+u.label,u.count]);
+ if(mine.prefix.length)rows.push(["prefix|*","Prefixes",mine.prefix.length]);
+ if(mine.suffix.length)rows.push(["suffix|*","Suffixes",mine.suffix.length]);
+ box.innerHTML='<div class="entry"><b>'+name+'</b><small>'+(libCount?libCount+" words in their library now.":"Their library is empty.")+'</small>'+
+  (rows.length?rows.map(([v,label,n])=>'<label class="tool" style="display:block"><input type="checkbox" data-grant-choice="'+safe(v)+'"> '+safe(label)+' <small>('+n+' words)</small></label>').join(""):'<small>You have no Shorashim words to give yet.</small>')+
+  '<button id="grantLibrary" style="margin-top:8px"'+(rows.length?'':' disabled')+'>Copy into '+name+'\'s library</button><small id="grantLibraryMsg"></small></div>';
+ if(!rows.length)return;
+ q("grantLibrary").onclick=async()=>{
+  const chosen=new Set([...box.querySelectorAll("[data-grant-choice]:checked")].map(x=>x.dataset.grantChoice));
+  if(!chosen.size){q("grantLibraryMsg").textContent="Tick at least one list.";return}
+  q("grantLibrary").disabled=true;q("grantLibraryMsg").textContent="Copying…";
+  const include=(item,track)=>chosen.has(track==="shorashim"?"shorashim|"+U.unitKey(item):track+"|*");
+  let added=0;
+  try{
+   // Only labels for the chosen units travel with the words.
+   const grantedLabels={};Object.keys(labels).forEach(k=>{if([...chosen].some(c=>U.labelStorageKey(c.split("|")[1])===k))grantedLabels[k]=labels[k]});
+   await db.ref(U.libraryPath(uid)).transaction(cur=>{cur=cur||{};const m=U.mergeCatalogById(cur.catalog,mine,include);added=m.added;return {...cur,catalog:m.catalog,settings:U.mergeSettings(cur.settings,{namedLists:mySettings.namedLists,unitLabels:grantedLabels}),updatedAt:Date.now(),grantedBy:auth.currentUser&&auth.currentUser.uid||null}});
+   await renderLibraryGrant();q("grantLibraryMsg").textContent="Copied ✓ "+added+" new word"+(added===1?"":"s")+". Words they already had were left as they are.";
+  }catch(err){console.error(err);q("grantLibraryMsg").textContent="Could not copy. Please try again.";q("grantLibrary").disabled=false}
+ };
+}
+q("libraryTeacherSelect").onchange=renderLibraryGrant;
 q("toolClassSelect").onchange=renderToolGrants;
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});

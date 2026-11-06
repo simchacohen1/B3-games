@@ -73,8 +73,10 @@ const PEREK19_SHORASHIM=[[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two
   autoArt:true,
   hidden:false
 }));
-function perekOf(i){return Number(i?.perek)||18}
-function perekLabel(i){return perekOf(i)===19?'Perek י״ט':'Perek י״ח'}
+// Any perek (or none) and any list/category. See units.js; nothing is hardcoded.
+function perekOf(i){return window.B3ShorashimUnits.perekValue(i)}
+function perekLabel(i){return perekOf(i)===null?'No perek':window.B3ShorashimUnits.itemUnitLabel(i,state.settings.unitLabels)}
+function perekMatches(i,filter){return filter==='all'||(filter==='none'?perekOf(i)===null:String(perekOf(i))===String(filter))}
 function vocalizedCatalogKey(i){return String(i?.front||'').normalize('NFC')}
 function ensurePerekUnitsAnd19(){
   state.catalog=state.catalog||{};
@@ -521,6 +523,7 @@ async function loadAll(){
   renderAll();
   loadShorashimRecordings();
   bindFullScopeListener();
+  loadTeacherLibrary();
   const updates=[];
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
@@ -530,6 +533,106 @@ async function loadAll(){
   applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
+/* ===== Perakim, lists and labels: all teacher-configurable ===== */
+function refreshPerekFilter(){
+  const sel=$('teacherPerekFilter');if(!sel)return;
+  const wanted=sel.value||'all',words=state.catalog.shorashim||[];
+  const perakim=[...new Set(words.map(perekOf).filter(n=>n!==null))].sort((a,b)=>a-b);
+  const opts=[['all','All Perakim'],...perakim.map(n=>[String(n),window.B3ShorashimUnits.unitLabel('perek:'+n,state.settings.unitLabels)])];
+  if(words.some(i=>perekOf(i)===null))opts.push(['none','No perek']);
+  sel.innerHTML=opts.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('');
+  sel.value=opts.some(([v])=>v===wanted)?wanted:'all';
+  const rename=$('teacherRenameUnit');if(rename)rename.classList.toggle('hidden',currentTrack!=='shorashim'||legacyScoped());
+}
+function renderBookletControl(){
+  const wrap=$('teacherBookletWrap'),box=$('teacherShowBooklet');if(!wrap||!box)return;
+  wrap.classList.toggle('hidden',currentTrack!=='shorashim'||legacyScoped());
+  box.checked=state.settings.showBooklet!==false;
+}
+async function renameUnitLabel(){
+  const U=window.B3ShorashimUnits,pf=$('teacherPerekFilter')?.value||'all',list=$('teacherListName')?.value||U.DEFAULT_LIST;
+  const key=/^\d+$/.test(pf)?'perek:'+pf:'list:'+list;
+  const current=U.unitLabel(key,state.settings.unitLabels),fallback=U.defaultUnitLabel(key);
+  const scope=key.startsWith('perek:')?`all Perek ${pf} words`:`words in “${list}” that have no perek`;
+  const answer=prompt(`Name students see for ${scope}.\nLeave blank to use “${fallback}”.`,current===fallback?'':current);
+  if(answer===null)return;
+  const label=answer.trim().slice(0,80);
+  state.settings.unitLabels={...(state.settings.unitLabels||{})};
+  if(label)state.settings.unitLabels[U.labelStorageKey(key)]=label;else delete state.settings.unitLabels[U.labelStorageKey(key)];
+  status('☁️ Saving…','syncing');
+  await db.ref(`${teacherSettingsPath()}/unitLabels/${U.labelStorageKey(key)}`).set(label||null);
+  status('☁️ Saved');renderCatalog();
+}
+async function setShowBooklet(show){
+  state.settings.showBooklet=!!show;
+  status('☁️ Saving…','syncing');
+  await db.ref(`${teacherSettingsPath()}/showBooklet`).set(!!show);
+  status('☁️ Saved');
+}
+
+/* ===== Each teacher's own library =====
+   Stored at shorashimLibraries/<teacher uid>, separate from every other teacher and
+   from the owner. A class only sees what its teacher copies into the class. */
+let teacherLibrary={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{}},teacherLibraryUid='';
+function libraryAvailable(){return CLASS_MODE&&CLASS_ID_VALID&&window.B3ShorashimUnits.validUid(teacherLibraryUid);}
+function libraryRef(){return db.ref(window.B3ShorashimUnits.libraryPath(teacherLibraryUid));}
+function renderLibraryStatus(note=''){
+  const box=$('teacherLibraryStatus');if(!box)return;
+  const U=window.B3ShorashimUnits,c=teacherLibrary.catalog,n=U.countWords(c);
+  const units=U.unitsFor(c.shorashim,teacherLibrary.settings.unitLabels).map(u=>`${u.label} (${u.count})`);
+  box.textContent=(n?`${n} word${n===1?'':'s'} in your library${units.length?': '+units.join(', '):''}.`:"Your library is empty. Save this class's words into it, or ask the owner to give you a list.")+(note?' '+note:'');
+}
+async function loadTeacherLibrary(){
+  const user=firebase.auth().currentUser;teacherLibraryUid=user?.uid||'';
+  const panel=$('teacherLibraryPanel');
+  if(!libraryAvailable()){if(panel)panel.classList.add('hidden');return;}
+  panel?.classList.remove('hidden');
+  try{
+    const v=(await libraryRef().once('value')).val()||{};
+    teacherLibrary={catalog:window.B3ShorashimUnits.withAllTracks(v.catalog),settings:v.settings||{}};
+    // One-time, copy-only migration: a teacher who already built words in this class
+    // gets them in their own library. Nothing in the class is moved or changed.
+    if(!window.B3ShorashimUnits.countWords(teacherLibrary.catalog)&&window.B3ShorashimUnits.countWords(state.catalog)){
+      const added=await saveClassToLibrary();
+      renderLibraryStatus(added?`(${added} word${added===1?' was':'s were'} copied from this class to start your library.)`:'');return;
+    }
+    renderLibraryStatus();
+  }catch(err){console.error('Could not load teacher library',err);if($('teacherLibraryStatus'))$('teacherLibraryStatus').textContent='Could not load your library. Please reload the page.';}
+}
+async function saveClassToLibrary(){
+  const U=window.B3ShorashimUnits;let added=0;
+  const result=await libraryRef().transaction(cur=>{
+    cur=cur||{};const merged=U.mergeCatalogById(cur.catalog,state.catalog);added=merged.added;
+    return {...cur,catalog:merged.catalog,settings:U.mergeSettings(cur.settings,{namedLists:state.settings.namedLists,unitLabels:state.settings.unitLabels}),updatedAt:Date.now()};
+  });
+  if(result.committed){const v=result.snapshot.val()||{};teacherLibrary={catalog:U.withAllTracks(v.catalog),settings:v.settings||{}};}
+  return added;
+}
+function openLibraryDialog(){
+  const U=window.B3ShorashimUnits,c=teacherLibrary.catalog,labels=teacherLibrary.settings.unitLabels;
+  if(!U.countWords(c))return alert('Your library is empty.');
+  const rows=U.unitsFor(c.shorashim,labels).map(u=>[`shorashim|${u.key}`,`🌳 ${u.label}`,u.count]);
+  if(c.prefix.length)rows.push(['prefix|*','Prefixes',c.prefix.length]);
+  if(c.suffix.length)rows.push(['suffix|*','Suffixes',c.suffix.length]);
+  $('teacherLibraryChoices').innerHTML=rows.map(([v,t,n])=>`<label style="display:block;margin:6px 0"><input type="checkbox" data-library-choice="${esc(v)}"> ${esc(t)} <span class="mini-note">(${n} word${n===1?'':'s'})</span></label>`).join('');
+  $('teacherLibraryDialog').showModal();
+}
+async function copyLibraryToClass(e){
+  e.preventDefault();
+  const U=window.B3ShorashimUnits;
+  const chosen=new Set([...$('teacherLibraryChoices').querySelectorAll('[data-library-choice]:checked')].map(x=>x.dataset.libraryChoice));
+  if(!chosen.size)return alert('Choose at least one list.');
+  const include=(item,track)=>chosen.has(track==='shorashim'?`shorashim|${U.unitKey(item)}`:`${track}|*`);
+  status('☁️ Adding words to this class…','syncing');
+  let added=0;
+  const result=await db.ref(`${SPACE}/catalog`).transaction(cur=>{const m=U.mergeCatalogById(cur,teacherLibrary.catalog,include);added=m.added;return m.catalog;});
+  const nextSettings=U.mergeSettings(state.settings,{namedLists:teacherLibrary.settings.namedLists,unitLabels:teacherLibrary.settings.unitLabels});
+  await db.ref(teacherSettingsPath()).update({namedLists:nextSettings.namedLists||null,unitLabels:nextSettings.unitLabels||null});
+  state.settings={...state.settings,namedLists:nextSettings.namedLists,unitLabels:nextSettings.unitLabels};
+  if(result.committed)state.catalog=withAllTracks(result.snapshot.val()||state.catalog);
+  $('teacherLibraryDialog').close();renderAll();
+  status(`☁️ Saved • ${added} word${added===1?'':'s'} added to this class`);
+}
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
   fullScopeListenerBound=true;
@@ -584,10 +687,12 @@ async function toggleTeacherApproval(id){const item=(state.catalog[currentTrack]
 function renderCatalog(){
   currentTrack=$('teacherTrack').value;
   refreshNamedLists();
+  refreshPerekFilter();
+  renderBookletControl();
   const chosen=$('teacherListName')?.value||'Main List',
         perekFilter=$('teacherPerekFilter')?.value||'all',
         all=state.catalog[currentTrack]||[],
-        list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekFilter==='all'||perekOf(i)===Number(perekFilter));
+        list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,perekFilter));
   const perekWrap=$('teacherPerekWrap');if(perekWrap)perekWrap.classList.toggle('hidden',currentTrack!=='shorashim');
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
@@ -735,7 +840,7 @@ async function removePictureChoice(id,artValue){
   await saveCatalog();
 }
 
-async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||pf==='all'||perekOf(i)===Number(pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
+async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
@@ -753,7 +858,7 @@ function openEdit(id=null){
   $('tEditId').value=i?.id||'';
   $('tListName').value=i?listNameOf(i):($('teacherListName')?.value||'Main List');
   const selectedPerek=$('teacherPerekFilter')?.value;
-  $('tPerek').value=String(i?perekOf(i):(selectedPerek&&selectedPerek!=='all'?selectedPerek:19));
+  $('tPerek').value=i?String(perekOf(i)??''):(/^\d+$/.test(selectedPerek||'')?selectedPerek:'');
   $('tFront').value=i?.front||'';
   $('tEnglish').value=i?.english||'';
   $('tPasuk').value=i?.pasuk||'';
@@ -767,6 +872,8 @@ function openEdit(id=null){
 async function saveEdit(e){
   e.preventDefault();
   const l=state.catalog[currentTrack],id=$('tEditId').value;
+  const perekInput=window.B3ShorashimUnits.parsePerekInput($('tPerek').value);
+  if(currentTrack==='shorashim'&&!perekInput.ok){alert(`Perek must be a whole number from 1 to ${window.B3ShorashimUnits.MAX_PEREK}, or blank for no perek.`);return;}
   let i=id?l.find(x=>x.id===id):null;
   if(!i){
     i={id:`custom-${currentTrack}-${Date.now()}`,art:[],autoArt:currentTrack==='shorashim',hidden:false};
@@ -782,7 +889,7 @@ async function saveEdit(e){
   i.english=$('tEnglish').value.trim();
   i.pasuk=$('tPasuk').value.trim();
   if(currentTrack==='shorashim'){
-    i.perek=Number($('tPerek').value)||18;
+    if(perekInput.value===null)delete i.perek;else i.perek=perekInput.value;
     i.hebrew=$('tWord').value.trim();
     // Fill only missing artwork; editing a translation never replaces a teacher's existing choices.
     if(!sanitizeClassArt(i.art).length){
@@ -865,9 +972,12 @@ $('teacherNewList').onclick=async()=>{
 };
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
+  // The perek is chosen explicitly in the dialog. It is never guessed from the filter
+  // (the filter only pre-fills it), so "All Perakim" can no longer save words to the wrong perek.
   const pf=$('teacherPerekFilter')?.value||'all';
-  $('bulkPerekLabel').textContent=currentTrack==='shorashim'?(pf==='18'?'Perek י״ח':'Perek י״ט'):'';
-  $('bulkPerekLabel').style.display=currentTrack==='shorashim'?'inline-block':'none';
+  $('bulkPerek').value=/^\d+$/.test(pf)?pf:'';
+  $('bulkPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim');
+  $('bulkPerekLabel').style.display='none';
   $('bulkItems').value='';
   $('teacherBulkDialog').showModal();
 };
@@ -876,7 +986,9 @@ $('saveBulkItems').onclick=async e=>{
   const name=$('teacherListName').value||'Main List',
         lines=$('bulkItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),
         l=state.catalog[currentTrack],
-        added=[];
+        added=[],
+        bulkPerek=window.B3ShorashimUnits.parsePerekInput($('bulkPerek').value);
+  if(currentTrack==='shorashim'&&!bulkPerek.ok){alert(`Perek must be a whole number from 1 to ${window.B3ShorashimUnits.MAX_PEREK}, or blank for no perek.`);return;}
   for(const line of lines){
     const parts=line.split('|').map(x=>x.trim());
     if(parts.length<2||!parts[0]||!parts[1])continue;
@@ -892,8 +1004,7 @@ $('saveBulkItems').onclick=async e=>{
       hidden:false
     };
     if(isShoreshim){
-      const pf=$('teacherPerekFilter')?.value||'all';
-      item.perek=pf==='18'?18:19;
+      if(bulkPerek.value!==null)item.perek=bulkPerek.value;
       item.hebrew=parts[2]||parts[0];
       item.pasuk=parts[3]||'';
     }
@@ -913,6 +1024,12 @@ $('saveBulkItems').onclick=async e=>{
 $('toggleStudentSite').onclick=toggleStudentSite;
 $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(teacherSettingsPath()).set(state.settings)};
 $('teacherAddItem').onclick=()=>openEdit();
+$('teacherRenameUnit').onclick=renameUnitLabel;
+$('teacherShowBooklet').onchange=e=>setShowBooklet(e.target.checked);
+$('teacherLibraryFromClass').onclick=async()=>{status('☁️ Saving to your library…','syncing');const n=await saveClassToLibrary();renderLibraryStatus();status(`☁️ Saved • ${n} new word${n===1?'':'s'} added to your library`);};
+$('teacherLibraryToClass').onclick=openLibraryDialog;
+$('cancelLibraryCopy').onclick=()=>$('teacherLibraryDialog').close();
+$('saveLibraryCopy').onclick=copyLibraryToClass;
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
 $('tSaveItem').onclick=saveEdit;

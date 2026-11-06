@@ -1260,17 +1260,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Shorashim List</h2></div>
           </div>
           <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
-            <button type="button" class="feature-card learn perek-choice" data-learning-perek="18">
-              <span class="perek-number" lang="he" dir="rtl">י״ח</span>
-              <strong>Perek 18 Shorashim</strong>
-              <span class="perek-progress">See your words</span>
-            </button>
-            <button type="button" class="feature-card learn perek-choice" data-learning-perek="19">
-              <span class="perek-number" lang="he" dir="rtl">י״ט</span>
-              <strong>Perek 19 Shorashim</strong>
-              <span class="perek-progress">See your words</span>
-            </button>
-            <button type="button" class="feature-card learn perek-choice" data-learning-perek="booklet">
+            <!-- Filled from this class's own words: any perek, any list, any label the teacher chooses. -->
+            <div id="perekUnitChoices" style="display:contents"></div>
+            <button type="button" class="feature-card learn perek-choice" id="bookletUnitChoice" data-learning-perek="booklet">
               <span class="perek-number" aria-hidden="true">📘</span>
               <strong>3rd Grade Shoroshim Booklet</strong>
               <span>30 weeks • 6 words each</span>
@@ -1488,7 +1480,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">➡️ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
                 <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
               </div>
-              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button><button type="button" class="perek-filter-btn" data-review-perek="booklet">3rd Grade Booklet</button></div>
+              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><span id="reviewUnitFilters" style="display:contents"></span><button type="button" class="perek-filter-btn" id="reviewBookletFilter" data-review-perek="booklet">3rd Grade Booklet</button></div>
               <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="newest" selected>Newest learned first</option><option value="learned">Oldest learned first</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
               <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
               <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
@@ -1618,8 +1610,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
   <script src="../firebase-config.js?v=20261029-staging-config"></script>
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
-  <script src="app.js?v=20261020-follow-pointer1"></script>
-  <script src="review-categories.js?v=20261019-newest-review"></script>
+  <script src="units.js?v=20261106-units-1"></script>
+  <script src="app.js?v=20261106-units-1"></script>
+  <script src="review-categories.js?v=20261106-units-1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
   <script src="../b3-race.js?v=teacher-player-20261029-1"></script>
