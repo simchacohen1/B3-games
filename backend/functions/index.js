@@ -174,16 +174,33 @@ function cleanSefariaEnglishText(value) {
     .trim();
 }
 
-async function fetchPosukPracticeKehotReference(perekNum, posukStart, posukEnd) {
+// Posuk Practice offers all five seforim. The reference translations must come
+// from the SAME sefer as the posuk being graded; before this, every lookup used
+// Genesis, so a Shemos 3:5 answer was compared with Bereishis 3:5.
+// A request with no sefer (an older cached page) keeps the old Genesis default;
+// an unrecognised sefer gets no reference at all rather than a wrong one.
+const POSUK_PRACTICE_BOOKS = {
+  Bereishis: 'Genesis', Shemos: 'Exodus', Vayikra: 'Leviticus', Bamidbar: 'Numbers', Devarim: 'Deuteronomy',
+};
+function posukPracticeBook(sefer) {
+  const s = String(sefer || '').trim();
+  if (!s) return 'Genesis';
+  if (Object.prototype.hasOwnProperty.call(POSUK_PRACTICE_BOOKS, s)) return POSUK_PRACTICE_BOOKS[s];
+  return Object.values(POSUK_PRACTICE_BOOKS).includes(s) ? s : '';
+}
+
+async function fetchPosukPracticeKehotReference(perekNum, posukStart, posukEnd, sefer) {
+  const book = posukPracticeBook(sefer);
+  if (!book) return '';
   const perek = Number(perekNum);
   const start = Number(posukStart);
   const end = Number(posukEnd || posukStart);
   if (!Number.isInteger(perek) || !Number.isInteger(start) || start < 1) return '';
   const safeEnd = Number.isInteger(end) && end >= start ? end : start;
-  const cacheKey = String(perek);
+  const cacheKey = book + ' ' + perek;
   let chapter = posukPracticeKehotCache.get(cacheKey);
   if (!chapter) {
-    const sectionRef = 'Genesis ' + perek;
+    const sectionRef = book + ' ' + perek;
     const url = 'https://www.sefaria.org/api/v3/texts/' +
       encodeURIComponent(sectionRef) + '?version=' +
       encodeURIComponent('english|' + POSUK_PRACTICE_KEHOT_VERSION);
@@ -194,7 +211,7 @@ async function fetchPosukPracticeKehotReference(perekNum, posukStart, posukEnd) 
     chapter = version && Array.isArray(version.text)
       ? version.text.map(cleanSefariaEnglishText)
       : [];
-    if (!chapter.length) throw new Error('Kehot chapter text unavailable for Genesis ' + perek);
+    if (!chapter.length) throw new Error('Kehot chapter text unavailable for ' + sectionRef);
     posukPracticeKehotCache.set(cacheKey, chapter);
   }
   const selected = [];
@@ -594,7 +611,9 @@ const TORAH_UMESORAH_REFERENCE = {
   }
 };
 
-function fetchPosukPracticeTorahUmesorahReference(perekNum, posukStart, posukEnd) {
+function fetchPosukPracticeTorahUmesorahReference(perekNum, posukStart, posukEnd, sefer) {
+  // The Torah Umesorah worksheets on file are Bereishis only.
+  if (posukPracticeBook(sefer) !== 'Genesis') return '';
   const perek = Number(perekNum);
   const start = Number(posukStart);
   const end = Number(posukEnd || posukStart);
@@ -1061,12 +1080,12 @@ exports.gradeComprehension = onRequest(
     const { posukText, posukTranslation, clarifyQuestion, originalTranscript, perekNum, posukNum, endPosukNum } = fields;
     let classroomReferenceTranslation = fields.classroomReferenceTranslation || '';
     if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
-      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum);
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum, fields.sefer);
     }
     let kehotReferenceTranslation = fields.kehotReferenceTranslation || '';
     if (!kehotReferenceTranslation.trim() && perekNum && posukNum) {
       try {
-        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum);
+        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum, fields.sefer);
       } catch (err) {
         console.warn('Could not fetch Kehot reference server-side for comprehension', err);
       }
@@ -1208,6 +1227,8 @@ PRONUNCIATION: your feedback text is read aloud by a text-to-speech voice, so sp
           // so the per-call cost difference adds up fast at classroom
           // scale. Revert to claude-sonnet-4-6 if grading quality regresses.
           model: "claude-haiku-4-5-20251001",
+          // Same answer, same answer key -> same verdict on every retry.
+          temperature: 0,
           max_tokens: 300,
           // systemPrompt is long (multiple paragraphs of grading rules) and
           // IDENTICAL across every call to this endpoint except for the
@@ -1381,12 +1402,12 @@ exports.generateTranslationChunks = onRequest(
       : [];
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
     if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
-      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum, (req.body || {}).sefer);
     }
     let kehotReferenceTranslation = '';
     if (perekNum && posukNum) {
       try {
-        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, posukNum);
+        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, posukNum, (req.body || {}).sefer);
       } catch (err) {
         console.warn('Could not fetch Kehot reference for translation chunk generation', err);
       }
@@ -1578,12 +1599,12 @@ exports.gradeTranslationChunk = onRequest(
     const { chunkHebrew, acceptedTranslations, perekNum, posukNum } = fields;
     let classroomReferenceTranslation = fields.classroomReferenceTranslation || '';
     if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
-      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum, fields.sefer);
     }
     let kehotReferenceTranslation = '';
     if (perekNum && posukNum) {
       try {
-        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, posukNum);
+        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, posukNum, fields.sefer);
       } catch (err) {
         console.warn('Could not fetch Kehot reference for translation grading', err);
       }
@@ -1629,7 +1650,6 @@ PROPER NOUNS (names of people and places) — TOP PRIORITY, applies before any s
 The student's answer is transcribed by speech recognition, which often mishears Biblical names (for example, "Sodom" may appear as "Saddam", or "Avraham" as "Abraham" or "a bro ham"). When the correct translation includes a name of a person or a place, be EXTREMELY lenient:
 - Count the name as correct if the transcribed word sounds even roughly similar to the real name, or if it is a different spelling of it.
 - Never deduct points for a proper noun that was garbled, misspelled, or replaced by a similar-sounding word.
-- If a word in the student's answer sits in the same spot as a name in the correct translation, assume the student said the name.
 - Only mark a name wrong if the student clearly said a different name or skipped that part of the posuk entirely.
 
 NAME RECOGNITION: You receive the recognizer's first transcript and ranked alternatives for each consecutive audio segment. These alternatives come from the SAME recording, not from the answer key. Review them before rejecting a person/place name that appears as a similar-sounding English phrase. Accept normal Ashkenazi pronunciation and spelling variants of the SAME name. An alternative may resolve a locally garbled name when it is phonetically plausible and the surrounding words agree. Do NOT pick an alternative merely because it matches the answer key. Do NOT use alternatives to repair tense, pronouns, number, omitted content, or other substantive errors. A coherent DIFFERENT person's/place's name remains wrong; never replace it with the expected name just because that would make the answer correct. Do not invent unheard words. Grade the first transcript unless there is specific recognition evidence for a local name mishearing. The name hints are vocabulary aids, not evidence of what the child said.
@@ -1672,6 +1692,8 @@ Respond with ONLY a JSON object, no preamble, no markdown fences: {"verdict":"co
           // that doesn't need Sonnet-level reasoning. Revert to
           // claude-sonnet-4-6 if grading quality regresses.
           model: "claude-haiku-4-5-20251001",
+          // Same answer, same answer key -> same verdict on every retry.
+          temperature: 0,
           max_tokens: 250,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
@@ -1824,7 +1846,7 @@ exports.generateComprehensionQuestions = onRequest(
     const questionLimit = Math.max(1, Math.min(20, Number((req.body || {}).questionLimit) || 5));
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
     if (!String(classroomReferenceTranslation).trim() && perekNum && posukNum) {
-      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum, (req.body || {}).sefer);
     }
     if (!posukTranslation || !String(posukTranslation).trim()) {
       res.status(400).json({ error: "posukTranslation is required" });
@@ -2114,12 +2136,12 @@ exports.gradeQuestionAnswer = onRequest(
     const { question, expectedAnswer, posukTranslation, posukText, perekNum, posukNum, endPosukNum } = fields;
     let classroomReferenceTranslation = fields.classroomReferenceTranslation || '';
     if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
-      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum);
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum, fields.sefer);
     }
     let kehotReferenceTranslation = fields.kehotReferenceTranslation || '';
     if (!kehotReferenceTranslation.trim() && perekNum && posukNum) {
       try {
-        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum);
+        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum, fields.sefer);
       } catch (err) {
         console.warn('Could not fetch Kehot reference server-side for question grading', err);
       }
@@ -2153,7 +2175,6 @@ PROPER NOUNS (names of people and places) — TOP PRIORITY, applies before any s
 The student's answer is transcribed by speech recognition, which often mishears Biblical names (for example, "Sodom" may appear as "Saddam", or "Avraham" as "Abraham" or "a bro ham"). When the correct translation includes a name of a person or a place, be EXTREMELY lenient:
 - Count the name as correct if the transcribed word sounds even roughly similar to the real name, or if it is a different spelling of it.
 - Never deduct points for a proper noun that was garbled, misspelled, or replaced by a similar-sounding word.
-- If a word in the student's answer sits in the same spot as a name in the correct translation, assume the student said the name.
 - Only mark a name wrong if the student clearly said a different name or skipped that part of the posuk entirely.
 
 FUNDAMENTAL ASSUMPTION â€” the student is always trying to give a correct answer, not nonsense: if the transcript looks garbled or doesn't parse as a clean sentence, actively work backward from the accepted translation below and ask whether a plausible speech-recognition mishearing (homophone, mangled name, dropped/slurred word) could turn a correct answer into this fragment. If you can construct a plausible path from a correct answer to this transcript, grade it as CORRECT â€” do not penalize transcription artifacts.
@@ -2193,6 +2214,8 @@ Respond with ONLY a JSON object, no preamble, no markdown fences: {"verdict":"co
           // doesn't need Sonnet-level reasoning. Revert to
           // claude-sonnet-4-6 if grading quality regresses.
           model: "claude-haiku-4-5-20251001",
+          // Same answer, same answer key -> same verdict on every retry.
+          temperature: 0,
           max_tokens: 250,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
