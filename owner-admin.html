@@ -87,6 +87,22 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <h3 class="tools-title">Class Content</h3>
 <p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
 <div id="resourceList"></div></section>
+
+<section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
+<p class="hint">Upload a CSV to add teachers, principals, students, and classes all at once. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
+<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>type</code> (teacher / principal / student / class), <code>name</code>, <code>email</code> (teachers &amp; principals), <code>password</code> (students), <code>class</code> (class name to assign to). One row per person or class.</p>
+<div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Preview</button></div>
+<div id="bulkPreviewArea" style="display:none;margin-top:12px">
+  <div id="bulkSummary" style="margin-bottom:10px;font-weight:700;font-size:16px"></div>
+  <div id="bulkTable" style="overflow-x:auto;font-size:15px"></div>
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <button id="bulkImport" type="button" style="background:#16a34a">&#x2705; Import all</button>
+    <button id="bulkCancel" type="button" style="background:#fff;color:#b91c1c;border:1px solid #fecaca">Cancel</button>
+  </div>
+</div>
+<div id="bulkProgress" style="display:none;margin-top:12px;font-weight:700;font-size:16px"></div>
+<div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:220px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
+</section>
 </div>
 <div id="status" class="toast"></div>
 </main>
@@ -292,6 +308,161 @@ async function renderResources(classId){
  };
 }
 q("toolClassSelect").onchange=renderToolGrants;
+
+// ---- Bulk upload -------------------------------------------------------
+const BULK_TEMPLATE_ROWS=[
+  "type,name,email,password,class",
+  "teacher,Rabbi Cohen,rabbicohen@gmail.com,,",
+  "principal,Mrs. Levi,mrslevi@gmail.com,,",
+  "class,Grade 5,,,",
+  "student,Moshe Goldberg,,pass123,Grade 5",
+  "student,Chana Stern,,pass456,Grade 5",
+];
+document.getElementById("bulkDownloadTemplate").onclick=function(e){
+  e.preventDefault();
+  var blob=new Blob([BULK_TEMPLATE_ROWS.join("\n")],{type:"text/csv"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="bulk-upload-template.csv";a.click();
+};
+function parseBulkCSV(text){
+  var lines=text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n").filter(function(l){return l.trim();});
+  if(!lines.length)return[];
+  var header=lines[0].split(",").map(function(h){return h.trim().toLowerCase();});
+  function col(k){return header.indexOf(k);}
+  return lines.slice(1).map(function(line,i){
+    var fields=[],cur="",inQ=false;
+    for(var ci=0;ci<line.length;ci++){
+      var ch=line[ci];
+      if(ch==='"'){inQ=!inQ;}else if(ch===","&&!inQ){fields.push(cur.trim());cur="";}else cur+=ch;
+    }
+    fields.push(cur.trim());
+    function get(k){return col(k)>=0?String(fields[col(k)]||"").trim():"";}
+    return{row:i+2,type:get("type").toLowerCase(),name:get("name"),email:get("email").toLowerCase(),password:get("password"),cls:get("class")};
+  }).filter(function(r){return r.type;});
+}
+function bulkValidate(rows){
+  var errors=[];
+  rows.forEach(function(r){
+    if(!["teacher","principal","student","class"].includes(r.type)){errors.push("Row "+r.row+": unknown type \""+r.type+"\"");return;}
+    if(!r.name){errors.push("Row "+r.row+": missing name");return;}
+    if((r.type==="teacher"||r.type==="principal")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))errors.push("Row "+r.row+": "+r.type+" needs a valid email");
+  });
+  return errors;
+}
+document.getElementById("bulkPreview").onclick=function(){
+  var file=document.getElementById("bulkFile").files[0];
+  if(!file){q("status").textContent="Choose a CSV file first.";return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var rows=parseBulkCSV(e.target.result);
+    if(!rows.length){q("status").textContent="No data rows found in CSV.";return;}
+    var errors=bulkValidate(rows);
+    var tc=rows.filter(function(r){return r.type==="teacher";}).length;
+    var pc=rows.filter(function(r){return r.type==="principal";}).length;
+    var cc=rows.filter(function(r){return r.type==="class";}).length;
+    var sc=rows.filter(function(r){return r.type==="student";}).length;
+    var summary=tc+" teacher(s), "+pc+" principal(s), "+cc+" class(es), "+sc+" student(s)";
+    var errHtml=errors.length?'<span style="color:#b91c1c">&#x26A0;&#xFE0F; '+errors.length+' issue(s) found:</span><ul style="margin:6px 0 0;padding-left:18px">'+errors.map(function(e){return'<li>'+safe(e)+'</li>';}).join("")+'</ul><br>':"";
+    document.getElementById("bulkSummary").innerHTML=errHtml+"Found: "+safe(summary);
+    var hdr=["Row","Type","Name","Email / Password","Class"];
+    var tbody=rows.map(function(r){return'<tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+r.row+'</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+safe(r.type)+'</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+safe(r.name)+'</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+(r.type==="student"?safe(r.password||"—"):safe(r.email||"—"))+'</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+safe(r.cls||"—")+'</td></tr>';}).join("");
+    document.getElementById("bulkTable").innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr>'+hdr.map(function(h){return'<th style="text-align:left;padding:7px 10px;background:#f1f5f9;border-bottom:2px solid #e2e8f0">'+h+'</th>';}).join("")+'</tr></thead><tbody>'+tbody+'</tbody></table>';
+    document.getElementById("bulkPreviewArea").style.display="";
+    document.getElementById("bulkLog").style.display="none";
+    document.getElementById("bulkProgress").style.display="none";
+    document.getElementById("bulkImport").disabled=errors.length>0;
+    document.getElementById("bulkFile")._parsedRows=rows;
+  };
+  reader.readAsText(file);
+};
+document.getElementById("bulkCancel").onclick=function(){
+  document.getElementById("bulkPreviewArea").style.display="none";
+  document.getElementById("bulkFile").value="";
+  delete document.getElementById("bulkFile")._parsedRows;
+};
+document.getElementById("bulkImport").onclick=async function(){
+  var rows=document.getElementById("bulkFile")._parsedRows;
+  if(!rows){q("status").textContent="Preview the CSV first.";return;}
+  document.getElementById("bulkImport").disabled=true;
+  document.getElementById("bulkCancel").disabled=true;
+  var prog=document.getElementById("bulkProgress"),logEl=document.getElementById("bulkLog");
+  prog.style.display="";logEl.style.display="";logEl.innerHTML="";
+  var root="b3Games/workspaces/"+WS;
+  var done=0,total=rows.length,log=[];
+  function addLog(msg,ok){log.push((ok?"&#x2705; ":"&#x26A0;&#xFE0F; ")+msg);logEl.innerHTML=log.map(safe).join("<br>");logEl.scrollTop=logEl.scrollHeight;}
+  prog.textContent="Importing... 0 / "+total;
+  // Build class name->id map from live DB
+  var liveClasses=(await db.ref(root+"/classes").once("value")).val()||{};
+  var classNameToId={};
+  Object.entries(liveClasses).forEach(function(e2){if(e2[1]&&e2[1].name)classNameToId[String(e2[1].name).trim().toLowerCase()]=e2[0];});
+  // Classes first
+  var csvClassRows=rows.filter(function(r){return r.type==="class";});
+  for(var r of csvClassRows){
+    prog.textContent="Importing... "+done+" / "+total;
+    var lk=r.name.trim().toLowerCase();
+    if(classNameToId[lk]){addLog("Class \""+r.name+"\" already exists (skipped)",true);done++;continue;}
+    var cid=key(r.name);
+    if(liveClasses[cid]||(await db.ref(root+"/classes/"+cid).once("value")).exists())cid+="_"+Date.now().toString().slice(-4);
+    try{
+      await db.ref(root+"/classes/"+cid).set({name:r.name,active:true});
+      classNameToId[lk]=cid;
+      addLog("Class \""+r.name+"\" created (id: "+cid+")",true);
+    }catch(err){addLog("Class \""+r.name+"\": "+err.message,false);}
+    done++;
+  }
+  // Teachers
+  var csvTeacherRows=rows.filter(function(r){return r.type==="teacher";});
+  for(var r of csvTeacherRows){
+    prog.textContent="Importing... "+done+" / "+total;
+    var invKey=key(r.email);
+    var existing=(await db.ref(root+"/teacherInvites/"+invKey).once("value")).val();
+    if(existing){addLog("Teacher "+r.email+" already exists (skipped)",true);done++;continue;}
+    try{
+      var classId=r.cls?classNameToId[r.cls.trim().toLowerCase()]:"";
+      var classIds=classId?{[classId]:true}:{};
+      await db.ref(root+"/teacherInvites/"+invKey).set({email:r.email,name:r.name||r.email,role:"teacher",active:!!classId,classIds:classId?classIds:null,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+      if(classId)await db.ref(root+"/classes/"+classId+"/teacherIds/"+invKey).set(true);
+      addLog("Teacher "+r.name+" ("+r.email+")"+(classId?" assigned to "+r.cls:"")+" added",true);
+    }catch(err){addLog("Teacher "+r.email+": "+err.message,false);}
+    done++;
+  }
+  // Principals
+  var csvPrincipalRows=rows.filter(function(r){return r.type==="principal";});
+  for(var r of csvPrincipalRows){
+    prog.textContent="Importing... "+done+" / "+total;
+    var invKey=key(r.email);
+    var existing=(await db.ref(root+"/teacherInvites/"+invKey).once("value")).val();
+    if(existing){addLog("Principal "+r.email+" already exists (skipped)",true);done++;continue;}
+    try{
+      await db.ref(root+"/teacherInvites/"+invKey).set({email:r.email,name:r.name||r.email,role:"principal",accountType:"principal",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+      addLog("Principal "+r.name+" ("+r.email+") added",true);
+    }catch(err){addLog("Principal "+r.email+": "+err.message,false);}
+    done++;
+  }
+  // Students
+  var csvStudentRows=rows.filter(function(r){return r.type==="student";});
+  for(var r of csvStudentRows){
+    prog.textContent="Importing... "+done+" / "+total;
+    var classId=r.cls?classNameToId[r.cls.trim().toLowerCase()]:"";
+    if(!classId&&r.cls){addLog("Student "+r.name+": class \""+r.cls+"\" not found (skipped)",false);done++;continue;}
+    try{
+      var sid=key(r.name)+"_"+Date.now().toString().slice(-6)+"_"+Math.random().toString(36).slice(2,6);
+      var profile={name:r.name,active:true,createdAt:firebase.database.ServerValue.TIMESTAMP};
+      if(r.password)profile.password=r.password;
+      var updates={"b3Games/students/"+sid+"/profile":profile};
+      if(classId){
+        updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]={classId:classId,workspaceId:WS,active:true,joinedAt:firebase.database.ServerValue.TIMESTAMP};
+        updates[root+"/classes/"+classId+"/members/"+sid]={name:r.name,active:true};
+      }
+      await db.ref().update(updates);
+      addLog("Student "+r.name+(classId?" added to "+r.cls:"")+" added",true);
+    }catch(err){addLog("Student "+r.name+": "+err.message,false);}
+    done++;
+  }
+  prog.textContent="Done! "+done+" rows processed.";
+  await load();
+};
+// ---- End bulk upload ---------------------------------------------------
+
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
 })();
