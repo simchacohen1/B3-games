@@ -93,9 +93,9 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await expect(page.locator('#cls')).toHaveValue('TEST-ALEF');
   await page.screenshot({ path: testInfo.outputPath('homework-teacher-home.png'), fullPage: true });
 
-  await expect(page.getByRole('button', { name: /Create Homework/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Check Homework/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /My Assignments/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Create Assignment/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Check Assignments/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Reports/ })).toBeVisible();
 
   await page.getByRole('button', { name: /Preview Student View/ }).click();
   await expect(page.locator('#screenPreview')).toContainText('Fictional sample');
@@ -104,14 +104,14 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await expect(page.locator('#fakeStudent button').nth(1)).toBeDisabled();
   await page.locator('#screenPreview .backHome').click();
 
-  await page.getByRole('button', { name: /Create Homework/ }).click();
+  await page.getByRole('button', { name: /Create Assignment/ }).click();
   await page.locator('#title').fill('Fictional guided assignment');
   await expect(page.locator('#createStep1')).toBeVisible();
   await expect(page.getByRole('button', { name: /Next: Choose students/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('homework-teacher-create.png'), fullPage: true });
   await page.getByRole('button', { name: /Next: Choose students/ }).click();
   await expect(page.locator('#createStep2')).toBeVisible();
-  await page.getByRole('button', { name: /Next: Check homework/ }).click();
+  await page.getByRole('button', { name: /Next: Review before sharing/ }).click();
   await expect(page.locator('#createStep3')).toBeVisible();
   await expect(page.locator('#createPreview')).toContainText('Fictional guided assignment');
   await expect(page.getByRole('button', { name: /Save Draft/ })).toBeVisible();
@@ -119,7 +119,7 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await page.screenshot({ path: testInfo.outputPath('homework-teacher-review.png'), fullPage: true });
   await page.locator('#screenCreate > .screen-head .backHome').click();
 
-  await page.getByRole('button', { name: /Check Homework/ }).click();
+  await page.getByRole('button', { name: /Check Assignments/ }).click();
   await expect(page.locator('#reviewList')).toContainText('Aviva Gold');
   await expect(page.locator('#reviewList')).toContainText('I practiced five minutes.');
   await expect(page.locator('#reviewList')).toContainText('Did I write this correctly?');
@@ -127,19 +127,26 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await expect(page.getByRole('button', { name: 'Approve work by Aviva Gold' })).toBeVisible();
   await page.locator('#screenCheck .backHome').click();
 
-  await page.getByRole('button', { name: /My Assignments/ }).click();
-  const summary = page.locator('#summary');
-  for (const label of ['Not started', 'Submitted', 'Completed', 'Missing', 'Overdue']) {
-    await expect(summary).toContainText(label);
-  }
-  await expect(summary.locator('.summary-tile').filter({ hasText: 'Missing' }).locator('strong')).toHaveText('1');
-  await expect(summary.locator('.summary-tile').filter({ hasText: 'Overdue' }).locator('strong')).toHaveText('2');
-  await page.locator('#list details summary').first().click();
-  await expect(page.locator('#list')).toContainText('Maya Levin · Not started · Missing · Overdue');
-  await expect(page.locator('#list')).toContainText('Noam Cohen · In progress · Overdue');
-  await expect(page.locator('#list')).toContainText('Aviva Gold · Submitted');
-  await expect(page.locator('#list')).toContainText('Eli Weiss · Completed ✓');
-  await page.screenshot({ path: testInfo.outputPath('homework-teacher-assignments.png'), fullPage: true });
+  await page.getByRole('button', { name: /^Reports/ }).click();
+  await expect(page.locator('#reportSummary')).toHaveText('1 assignment · 1 student waiting for your check');
+  const row = page.locator('#list .report-row').filter({ hasText: 'Fictional Shorashim practice' });
+  await expect(row).toContainText('Homework');
+  await expect(row).toContainText('2 of 4 students handed in');
+  await expect(row).not.toContainText('Great work!');
+  await page.screenshot({ path: testInfo.outputPath('homework-teacher-reports.png'), fullPage: true });
+  await row.click();
+  const detail = page.locator('#oneAssignment');
+  await expect(detail).toContainText('1 approved · 1 waiting for your check · 2 students not done and past the due date');
+  const rowFor = (name: string) => detail.locator('tbody tr').filter({ hasText: name });
+  await expect(rowFor('Maya Levin')).toContainText('Not started');
+  await expect(rowFor('Maya Levin')).toContainText('Past due');
+  await expect(rowFor('Noam Cohen')).toContainText('Working on it');
+  await expect(rowFor('Aviva Gold')).toContainText('Waiting for your check');
+  await expect(rowFor('Eli Weiss')).toContainText('Done ✓');
+  await expect(rowFor('Eli Weiss')).toContainText('Great work!');
+  await page.screenshot({ path: testInfo.outputPath('homework-teacher-assignment-report.png'), fullPage: true });
+  await rowFor('Eli Weiss').getByRole('button', { name: 'Eli Weiss' }).click();
+  await expect(page.locator('#oneStudent')).toContainText('Done (approved): 1 of 1 assignment');
 
   expect(watch.productionRequests).toEqual([]);
   expect(watch.pageErrors).toEqual([]);
