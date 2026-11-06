@@ -396,6 +396,7 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
 <script src="backend/functions/student-tool-policy.js"></script>
+<script src="test-login-link.js?v=20261106-testlink"></script>
 <script src="student-tool-controls.js" defer></script>
 <script defer src="assignment-center/home-link.js?v=20261027-staging"></script>
 <script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
@@ -626,6 +627,14 @@ document.addEventListener("DOMContentLoaded",function(){
   const pageParams=new URLSearchParams(window.location.search);
   const previewStudentId=String(pageParams.get("previewStudent")||"").trim();
   const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
+  // Quick sign-in link for a fictional test student (#ftt-test=..., issue #619).
+  // Take it out of the address bar at once so it is not left in history or shared.
+  let pendingTestLogin=null,testLinkAuthKnown=false;
+  try{
+    pendingTestLogin=isStudentPreview?null:(window.FTTTestLoginLink?.readHash(location.hash)||null);
+    if(/^#ftt-test=/.test(location.hash))history.replaceState(null,"",location.pathname+location.search);
+    if(pendingTestLogin)["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
+  }catch(e){pendingTestLogin=null;}
   // Keep the whole B3 classroom identity available to every mini-app.
   // ET/WT are still the student's within-class track, not this workspace ID.
   try{sessionStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
@@ -1152,6 +1161,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("gamesArea").classList.add("hidden");
     el("teacherToolsSection").classList.add("hidden");
   }
+  // Runs once, only after Firebase has said whether someone is already signed in.
+  function startTestLinkSignIn(){
+    if(!pendingTestLogin||!testLinkAuthKnown)return;
+    const login=pendingTestLogin;pendingTestLogin=null;
+    // Never swap a signed-in teacher's session for a test student.
+    if(isAuthorizedTeacher||currentUser?.email){setLoginMsg("This test student link must be opened in a private (incognito) window.");return;}
+    el("studentNameInput").value=login.name;el("classPinInput").value=login.passcode;
+    setTimeout(()=>studentSignIn({testLink:true}),0);
+  }
 
   function studentHasOverride(gameId,studentId=myStudentId){
     if(!studentId||!gameId)return false;
@@ -1663,10 +1681,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   async function studentSignIn(){
     const btn=el("studentSignInBtn");
     if(btn.disabled)return;
+    // startTestLinkSignIn passes {testLink:true}; clicks pass an Event.
+    const testLink=arguments[0]?.testLink===true;
     btn.disabled=true;setLoginMsg("Checking…");
     try{
       const studentName=el("studentNameInput").value;
       const r=await checkStudentAccess(studentName,el("classPinInput").value);
+      if(testLink&&!r.ok)el("classPinInput").value="";
+      // Quick sign-in links are for test classes only, never real students.
+      if(testLink&&r.ok&&!window.FTTTestLoginLink?.onlyTestClasses(studentClassChoices,r.classId)){
+        el("classPinInput").value="";el("studentNameInput").value="";
+        setLoginMsg("This quick sign-in link only works for test students.");return;
+      }
       if(!r.ok){
         let message=r.reason;
         if(r.status===401){
@@ -2442,7 +2468,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // A verified teacher always wins over a guest preview.
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
+    testLinkAuthKnown=true;
     renderStudentAccess();renderAdminPanel();
+    startTestLinkSignIn();
     if(authorized){
       if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();
       Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);
