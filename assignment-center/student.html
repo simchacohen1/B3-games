@@ -243,7 +243,7 @@ function card(a){
   var activityUrl=H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='noopener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
   if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
-  c.append(H.conversation({role:'student',collapsed:true,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh}));
+  c.append(H.conversation({role:'student',collapsed:true,threadKey:a.id,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh}));
   if(a.status==='approved'){
     if(a.stars)c.append(el('p','★'.repeat(a.stars)+'☆'.repeat(5-a.stars)));
     if(a.feedback)c.append(el('div','💬 Teacher says: '+a.feedback,'note'));
