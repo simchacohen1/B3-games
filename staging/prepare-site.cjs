@@ -58,6 +58,17 @@ function listFiles(dir) {
   return result;
 }
 
+// firebase-config.js also defines window.B3_APP_CONTEXT (workspace id) and the
+// path helpers that teacher pages read. Replacing the whole file dropped them,
+// so keep everything from the app-context block onward.
+function appContextTail(productionConfig) {
+  const at = productionConfig.indexOf('window.B3_APP_CONTEXT');
+  if (at < 0) throw new Error('firebase-config.js has no window.B3_APP_CONTEXT block to keep.');
+  const start = productionConfig.lastIndexOf('/*', at);
+  const from = start >= 0 && !productionConfig.slice(start, at).includes('*/') ? start : at;
+  return '\n' + productionConfig.slice(from);
+}
+
 function stageSource(siteRoot, env = process.env) {
   const root = path.resolve(siteRoot);
   const config = configFromEnvironment(env);
