@@ -27,3 +27,6 @@ staging-results/
 /\.firebase/
 /staging/*.local.json
 .preview-build/
+
+# Quick sign-in .bat files for test students contain passcodes (#619)
+*.local.bat
