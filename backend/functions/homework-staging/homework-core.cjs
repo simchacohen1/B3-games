@@ -13,6 +13,14 @@ const { guarded } = require('./auth-attempts.cjs');
 const WS = 'b3-2026';
 const key = s => typeof s === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(s);
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }); };
+// Assignment label shown to teachers: 'homework' (default) or 'classwork' (Class Assignment).
+const LABELS = ['homework', 'classwork'];
+const labelOf = def => (def && def.label === 'classwork' ? 'classwork' : 'homework');
+const cleanLabel = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (!LABELS.includes(value)) fail(400, 'Choose Homework or Class Assignment.');
+  return value;
+};
 const text = (s, n) => String(s == null ? '' : s).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f<>]/g, '').trim().slice(0, n);
 const base = classId => 'assignmentCenter/workspaces/' + WS + '/classes/' + classId;
 const OPEN = ['assigned', 'in_progress', 'returned'];
@@ -167,11 +175,11 @@ async function teacherDo(store, identity, body, now, newId) {
           progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
           messages: publicMessages(rec, 'teacher') };
       }
-      rows.push({ id: def.id, type: def.type, title: def.title, details: def.details,
+      rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details,
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
-        publicationState: publicationState(def), createdAt: def.createdAt, counts, students });
+        publicationState: publicationState(def), createdAt: def.createdAt, publishedAt: def.publishedAt ?? null, counts, students });
     }
     return { ok: true, students: members, assignments: rows };
   }
@@ -185,6 +193,7 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit || (body.type === 'shorashim' ? 'minutes' : body.type === 'weeklyQuiz' ? 'questions' : ''));
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
+    const label = cleanLabel(body.label, 'homework');
     const assignedAt = body.assignedAt == null ? now : Number(body.assignedAt);
     if (!Number.isSafeInteger(assignedAt) || assignedAt < 0) fail(400, 'Choose a valid assigned date.');
     if (def.dueAt != null && def.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -196,7 +205,7 @@ async function teacherDo(store, identity, body, now, newId) {
     }
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
-    const full = { id, ...def, assignedAt, targetAmount, targetUnit,
+    const full = { id, ...def, label, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
     await store.set(base(classId) + '/definitions/' + id, full);
@@ -263,6 +272,7 @@ async function teacherDo(store, identity, body, now, newId) {
       next = policy.cleanDefinition({ type: def.type, title: body.title ?? def.title, details: body.details ?? def.details,
         dueAt: body.dueAt === undefined ? def.dueAt : body.dueAt });
     } catch (e) { fail(400, 'Check the title, instructions and due date.'); }
+    const label = cleanLabel(body.label, labelOf(def));
     const assignedAt = body.assignedAt === undefined ? def.assignedAt : Number(body.assignedAt);
     if (assignedAt != null && (!Number.isSafeInteger(assignedAt) || assignedAt < 0)) fail(400, 'Choose a valid assigned date.');
     if (next.dueAt != null && assignedAt != null && next.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -271,7 +281,7 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit === undefined ? def.targetUnit || (def.targetMinutes ? 'minutes' : '') : body.targetUnit);
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
-    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, assignedAt, targetAmount,
+    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, label, assignedAt, targetAmount,
       targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
     return { ok: true };
   }

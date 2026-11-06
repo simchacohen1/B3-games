@@ -347,5 +347,6 @@
     isStagingRuntime: function () { return isStagingRuntime; }, isAllowedRuntime: function () { return isStagingRuntime || isLiveRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
     dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
     unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts };
+  if (root.document && root.document.head) addConversationStyles(); // "N new" tags can show before any notes box
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);

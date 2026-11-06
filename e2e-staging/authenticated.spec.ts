@@ -173,21 +173,21 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherPage.locator('#app')).toBeVisible({ timeout: 45000 });
     await expect(teacherPage.locator('#cls')).toHaveValue('TEST-ALEF');
     await teacherPage.screenshot({ path: testInfo.outputPath('homework-teacher.png'), fullPage: true });
-    await expect(teacherPage.getByRole('button', { name: /Create Homework/ })).toBeVisible();
-    await expect(teacherPage.getByRole('button', { name: /Check Homework/ })).toBeVisible();
-    await expect(teacherPage.getByRole('button', { name: /My Assignments/ })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: /Create Assignment/ })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: /Check Assignments/ })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: /^Reports/ })).toBeVisible();
     await teacherPage.getByRole('button', { name: /Preview Student View/ }).click();
     await expect(teacherPage.locator('#screenPreview')).toContainText('Fictional sample');
     await expect(teacherPage.locator('#fakeStudent button')).toHaveCount(2);
     await expect(teacherPage.locator('#fakeStudent button').first()).toBeDisabled();
     await teacherPage.locator('#screenPreview .backHome').click();
-    await teacherPage.getByRole('button', { name: /Create Homework/ }).click();
+    await teacherPage.getByRole('button', { name: /Create Assignment/ }).click();
     await teacherPage.locator('#type').selectOption('shorashim');
     await teacherPage.locator('#title').fill(title);
     await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
     await teacherPage.getByRole('button', { name: /Next: Choose students/ }).click();
     await expect(teacherPage.locator('#createStep2')).toBeVisible();
-    await teacherPage.getByRole('button', { name: /Next: Check homework/ }).click();
+    await teacherPage.getByRole('button', { name: /Next: Review before sharing/ }).click();
     await expect(teacherPage.locator('#createStep3')).toBeVisible();
     await teacherPage.locator('.optional-settings > summary').click();
     await teacherPage.locator('#assigned').fill(localDate(0));
@@ -253,7 +253,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
 
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
-    await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
+    await teacherPage.getByRole('button', { name: /Check Assignments/ }).click();
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     await expect(teacherCard).toContainText('Could you check my answer?');
@@ -289,7 +289,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes and added one more example.');
     await studentCard.getByRole('button', { name: 'Fix and Hand In Again' }).click();
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
-    await teacherPage.getByRole('button', { name: /Check Homework/ }).click();
+    await teacherPage.getByRole('button', { name: /Check Assignments/ }).click();
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     await teacherCard.getByRole('button', { name: 'Approve work by ' + student.name }).click();
@@ -300,8 +300,9 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(studentCard).toContainText('Finished');
 
     await teacherPage.locator('#screenCheck .backHome').first().click();
-    await teacherPage.getByRole('button', { name: /My Assignments/ }).click();
-    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+    await teacherPage.getByRole('button', { name: /^Reports/ }).click();
+    await teacherPage.locator('#list .report-row').filter({ hasText: title }).click();
+    teacherCard = teacherPage.locator('#oneAssignment > .card').first();
     teacherPage.once('dialog', dialog => dialog.accept());
     await teacherCard.getByRole('button', { name: 'Archive' }).click();
     await expect(teacherCard).toContainText('Archived');
@@ -311,8 +312,9 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
       try {
         if (!teacherCard) teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
         await teacherPage.reload({ waitUntil: 'domcontentloaded' });
-        await teacherPage.getByRole('button', { name: /My Assignments/ }).click();
-        teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
+        await teacherPage.getByRole('button', { name: /^Reports/ }).click();
+        await teacherPage.locator('#list .report-row').filter({ hasText: title }).click({ timeout: 5000 });
+        teacherCard = teacherPage.locator('#oneAssignment > .card').first();
         teacherPage.once('dialog', dialog => dialog.accept());
         await teacherCard.getByRole('button', { name: 'Archive' }).click({ timeout: 5000 });
       } catch (_) { /* Preserve the original test failure; staging data is fictional and scoped to TEST-ALEF. */ }
