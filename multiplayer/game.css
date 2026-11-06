@@ -152,3 +152,30 @@ button.gf-p.ask{cursor:pointer;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f
 .checkers-mode .actions{margin-top:10px}.checkers-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
 @media(max-width:560px){.play-area.checkers-mode{padding:12px 8px 18px}.ck-board{border-width:6px}.pc{border-width:3px}}
 @media(prefers-reduced-motion:reduce){.pc{transition:none}}
+/* Chess table: matches the Chess tile on the Arcade home page. */
+.play-area.chess-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#1b2d5e 4%,#4f7bd6 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #121f44,0 18px 28px #12315b40;overflow:hidden}
+.chess-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.chess-mode #roomCode,.chess-mode #players{display:none}.chess-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0006}
+.ch-timer{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-weight:900}
+.ch-timer b{background:#ffd23f;color:#5a3a00;border-radius:999px;padding:6px 16px;font-size:20px;font-variant-numeric:tabular-nums;box-shadow:0 3px 0 #b57700}.ch-timer b.low{background:#ff5470;color:#fff;box-shadow:0 3px 0 #a3213a}
+.ch-timer span{background:#fff;color:#121f44;border-radius:999px;padding:6px 14px;font-size:13px;box-shadow:0 3px 0 #0004}
+.ch-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.ch-p{display:flex;align-items:center;gap:8px;background:#121f4490;border:3px solid #ffffff66;border-radius:18px;padding:5px 14px 5px 8px;font-weight:900;color:#fff}
+.ch-icon svg{width:34px;height:34px;display:block}.ch-p small{display:flex;align-items:center;flex-wrap:wrap;gap:2px;font-size:11px;font-weight:800;min-height:20px}.ch-cap{display:inline-flex;flex-wrap:wrap;margin-left:4px}.ch-cap svg{width:18px;height:18px}
+.ch-p.turn{background:#fff;color:#121f44;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66,0 0 22px #ffd23f}
+.ch-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));max-width:500px;margin:0 auto;border:8px solid #0e1733;border-radius:14px;box-shadow:0 6px 0 #070d20,0 14px 22px #0006;overflow:hidden;background:#0e1733}
+.chess-mode .ch-sq{position:relative;display:grid;place-items:center;aspect-ratio:1;min-width:0;padding:0;border:0;border-radius:0;font:inherit;opacity:1;cursor:pointer}
+.chess-mode .ch-sq:disabled{cursor:default;opacity:1}
+.chess-mode .ch-sq.l,.chess-mode .ch-sq.l:hover:not(:disabled){background:#e9eefb}.chess-mode .ch-sq.d,.chess-mode .ch-sq.d:hover:not(:disabled){background:#5b7fc7}
+.chess-mode .ch-sq.last{box-shadow:inset 0 0 0 100px #ffd23f55}
+.chess-mode .ch-sq.chk{background:radial-gradient(circle,#ff5470 0,#ff5470 45%,transparent 78%),#e9eefb}
+.chess-mode .ch-sq.sel{box-shadow:inset 0 0 0 4px #ffd23f,inset 0 0 0 100px #ffd23f66}
+.chess-mode .ch-sq:not(:disabled):not(.tgt):not(.sel) .chess-piece{filter:drop-shadow(0 0 3px #ffd23f) drop-shadow(0 2px 1.5px #0007)}
+.chess-mode .ch-sq:focus-visible{outline:4px solid #ffd23f;outline-offset:-4px}
+.ch-sq .chess-piece{width:90%;height:90%;display:block;filter:drop-shadow(0 2px 1.5px #0007)}
+.chess-mode .ch-sq.tgt:before{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:#ffd23fcc;box-shadow:0 0 12px #ffd23f;z-index:1}
+.chess-mode .ch-sq.tgt.cap:before{width:86%;height:86%;background:transparent;border:5px solid #ffd23f;box-shadow:0 0 14px #ffd23f}
+.ch-hint{text-align:center;font-weight:900;text-shadow:0 2px 3px #0005;margin-top:12px;font-size:14px;min-height:1em}
+.ch-promo{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:12px;font-weight:900}
+.ch-promo-btn{display:flex;flex-direction:column;align-items:center;gap:2px;border:3px solid #ffd23f;border-radius:14px;background:#fff;color:#121f44;font:inherit;font-weight:900;font-size:12px;padding:6px 10px;cursor:pointer}.ch-promo-btn svg{width:44px;height:44px;background:#e9eefb;border-radius:10px}
+.chess-mode .actions{margin-top:10px}.chess-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.chess-mode{padding:12px 8px 18px}.ch-board{border-width:6px}.ch-cap svg{width:15px;height:15px}}

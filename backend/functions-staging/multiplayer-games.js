@@ -438,7 +438,7 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedI
         }
       }
       if (room.matchmaking === true && core.participantIds(room.players).length >= 2 && room.state === 'lobby') {
-        try { core.startGameState(gameKey, game, core.participantIds(room.players)); }
+        try { core.startGameState(gameKey, game, core.participantIds(room.players), now() + 3000); }
         catch (error) { operationError = error.message; return; }
         room.state = 'countdown';
         room.countdownAt = now() + 3000;
@@ -517,7 +517,7 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedI
       room.state = 'playing'; room.startedAt = now();
     } else if (action === 'move') {
       if (room.state !== 'playing') { operationError = 'Wait for the host to start the game.'; return; }
-      try { core.applyMove(gameKey, game, actor.studentId, move, room.players); }
+      try { core.applyMove(gameKey, game, actor.studentId, move, room.players, { now: now() }); }
       catch (error) { operationError = error.message; return; }
       if (!game.finished && room.computerOpponent === true && game.turn === room.computerId) {
         const botMove = core.computerMove(gameKey, game, room.computerId);
