@@ -15,6 +15,9 @@ const ALLOWED_NEW = [
   // Not Pointer: already on main since a804b7e (2026-10-11, owner) but never published to the live database.
   // Approved by the owner on 2026-10-18 to go live together with the Pointer additive step.
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'halachaAccess'],
+  // Issue #611 (PENDING OWNER REVIEW): per-teacher Shorashim libraries. New, private node only:
+  // each teacher reads/writes only their own uid; owner and active admins may read/write any.
+  ['shorashimLibraries'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
