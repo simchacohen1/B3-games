@@ -5,6 +5,10 @@
     "public": ".kriah-preview",
     "ignore": ["**/.*", "**/node_modules/**"],
     "headers": [{ "source": "**", "headers": [{ "key": "Cache-Control", "value": "no-store" }, { "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }],
-    "redirects": [{ "source": "/", "destination": "/kriah-assessment/index.html", "type": 302 }, { "source": "/index.html", "destination": "/kriah-assessment/index.html", "type": 302 }]
+    "redirects": [
+      { "source": "/", "destination": "/kriah-assessment/index.html", "type": 302 },
+      { "source": "/index.html", "destination": "/kriah-assessment/index.html", "type": 302 },
+      { "source": "/adventure", "destination": "/kriah-assessment/adventure.html", "type": 302 }
+    ]
   }
 }
