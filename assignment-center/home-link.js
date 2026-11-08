@@ -6,7 +6,7 @@
   'use strict';
   var host = location.hostname.toLowerCase();
   var projectId = window.B3_FIREBASE_CONFIG && window.B3_FIREBASE_CONFIG.projectId;
-  var stagingPreview = /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(host);
+  var stagingPreview = /^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/.test(host);
   var live = ['funtorahtools.com', 'www.funtorahtools.com', 'simchacohen1.github.io'].indexOf(host) !== -1 && projectId === 'b3-games';
   var staging = (host === 'fun-torah-tools-staging.web.app' || stagingPreview) && projectId === 'fun-torah-tools-staging';
   if (!live && !staging) return;

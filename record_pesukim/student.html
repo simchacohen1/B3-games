@@ -1779,6 +1779,7 @@ async function getGeneratedQuestionsForPart(part){
         posukText: part.text || '',
         posukTranslation: part.translation || '',
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
+        sefer: currentSefer,
         perekNum: currentPerekNum,
         posukNum: part.posukNum,
         questionLimit: 5
@@ -4208,6 +4209,11 @@ document.getElementById('comprehensionRetryBtn').onclick = () => {
    Sends the recording + the posuk's exact text to the scorer, which
    transcribes it and compares word-by-word. Shows a percentage plus a
    word-by-word breakdown, same as the standalone Kol Emes page. */
+// Section-break markers ({פ} open, {ס} closed) are layout, not words to read.
+function textForReadingScore(text){
+  return String(text || '').replace(/\{\s*[\u05e4\u05e1]\s*\}/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 async function scoreHebrewReading(){
   const gradingMsg = document.getElementById('hebrewGradingMsg');
   const resultEl = document.getElementById('hebrewResult');
@@ -4226,7 +4232,7 @@ async function scoreHebrewReading(){
   formData.append("name", studentName || "student");
   formData.append("perek", currentPerekNum || "");
   formData.append("posuk", currentPosukNum || "");
-  formData.append("posukText", currentPosukText);
+  formData.append("posukText", textForReadingScore(currentPosukText));
   formData.append("audio", currentAudio.hebrew, "recording." + currentAudioExt.hebrew);
 
   try{
@@ -4523,6 +4529,7 @@ async function gradeComprehensionAttempt(){
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
+    formData.append('sefer', currentSefer || '');
     formData.append('perekNum', String(currentPerekNum || ''));
     formData.append('posukNum', String(currentPosukNum || ''));
     formData.append('endPosukNum', String(currentPosukEndNum || currentPosukNum || ''));
@@ -5016,6 +5023,7 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
           posukText: part.text,
           posukTranslation: part.translation || '',
           classroomReferenceTranslation,
+          sefer: currentSefer,
           perekNum: currentPerekNum,
           posukNum: part.posukNum
         })
@@ -5561,6 +5569,7 @@ function gradeSingleTranslationSegment(idx, level){
       formData.append('audio', seg.blob, 'recording.' + seg.ext);
       formData.append('chunkHebrew', chunk.hebrew);
       formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+      formData.append('sefer', currentSefer || '');
       formData.append('perekNum', String(currentPerekNum || ''));
       formData.append('posukNum', String(chunk.posukNum || currentPosukNum || ''));
       try{
@@ -5875,6 +5884,7 @@ async function recordChunkFix(index, btnEl){
         formData.append('audio', blob, 'recording.' + ext);
         formData.append('chunkHebrew', chunk.hebrew);
         formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+        formData.append('sefer', currentSefer || '');
         formData.append('perekNum', String(currentPerekNum || ''));
         formData.append('posukNum', String(chunk.posukNum || currentPosukNum || ''));
         try{
