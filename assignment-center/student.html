@@ -193,10 +193,17 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   .home-intro h1{font-size:23px}
   .home-card{padding:16px}
 }
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.filter-bar span.filter-label{font-size:13px;font-weight:800;color:var(--muted);margin-right:4px}
+.filter-chip{display:inline-flex;align-items:center;border:1.5px solid var(--border);border-radius:20px;padding:5px 13px;font-size:13px;font-weight:700;background:#fff;color:var(--navy);cursor:pointer;transition:background .12s,border-color .12s}
+.filter-chip:hover{background:var(--bg);border-color:var(--blue)}
+.filter-chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.filter-section{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 </style></head><body>
 <header><strong>📚 My Homework</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
 <main>
 <div id="status" class="card muted">Loading your homework…</div>
+<div id="filterBar" class="filter-bar" hidden></div>
 <div id="list"></div>
 </main>
 <script src="../firebase-config.js"></script>
@@ -206,6 +213,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 (function(){'use strict';
 var H=window.HomeworkCommon,el=H.el;
 var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
+var filterBar=document.getElementById('filterBar');
+var activeFilters={subject:null,time:null,done:null};
 if(!H.isAllowedRuntime()){statusBox.textContent='Homework is not available on this site.';return}
 function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
 var auth={studentId:ss('b3Games_studentId'),studentName:ss('b3Games_studentName'),pin:ss('b3Games_classPin'),classId:ss('b3Games_studentClass')};
@@ -222,13 +231,54 @@ function saveLocal(id,v){try{sessionStorage.setItem(draftKey(id),v)}catch(e){}}
 function clearLocal(id){try{sessionStorage.removeItem(draftKey(id))}catch(e){}}
 function call(body){return H.call(Object.assign({},auth,body))}
 
+// Filter chips: subject, due today / this week, done / not done. Chips combine; tap again to turn one off.
+var allData=null,selectedTab='todo';
+function isDone(a){return a.status==='submitted'||a.status==='approved'}
+function startOfDay(t){var d=new Date(t);d.setHours(0,0,0,0);return d.getTime()}
+function dueMatches(a,time){
+  if(a.dueAt==null)return false;
+  var today=startOfDay(Date.now()),day=new Date(today);
+  if(time==='today'){day.setDate(day.getDate()+1);return a.dueAt>=today&&a.dueAt<day.getTime()}
+  day.setDate(day.getDate()-day.getDay());var weekStart=day.getTime();day.setDate(day.getDate()+7); // Sunday to Shabbos
+  return a.dueAt>=weekStart&&a.dueAt<day.getTime();
+}
+function applyFilters(list){
+  return list.filter(function(a){
+    if(activeFilters.subject&&(a.subject||'')!==activeFilters.subject)return false;
+    if(activeFilters.time&&!dueMatches(a,activeFilters.time))return false;
+    if(activeFilters.done==='done'&&!isDone(a))return false;
+    if(activeFilters.done==='notdone'&&isDone(a))return false;
+    return true;
+  });
+}
+function filtering(){return !!(activeFilters.subject||activeFilters.time||activeFilters.done)}
+function buildFilterBar(list){
+  filterBar.replaceChildren();
+  var subjects=[];list.forEach(function(a){if(a.subject&&subjects.indexOf(a.subject)<0)subjects.push(a.subject)});subjects.sort();
+  if(activeFilters.subject&&subjects.indexOf(activeFilters.subject)<0)activeFilters.subject=null; // that subject is gone now
+  filterBar.hidden=!list.length;if(!list.length)return;
+  function chip(text,kind,value){
+    var b=el('button',text,'filter-chip'+(activeFilters[kind]===value?' on':''));b.type='button';
+    b.setAttribute('aria-pressed',activeFilters[kind]===value?'true':'false');
+    b.onclick=function(){activeFilters[kind]=activeFilters[kind]===value?null:value;render(allData)};
+    return b;
+  }
+  function section(label,chips){var sec=el('div',null,'filter-section');sec.append(el('span',label,'filter-label'));chips.forEach(function(c){sec.append(c)});filterBar.append(sec)}
+  filterBar.setAttribute('role','group');filterBar.setAttribute('aria-label','Filter homework');
+  if(subjects.length)section('Subject',subjects.map(function(x){return chip(x,'subject',x)}));
+  section('Due',[chip('Today','time','today'),chip('This week','time','week')]);
+  section('Show',[chip('Not done','done','notdone'),chip('Done','done','done')]);
+  if(filtering()){var clear=el('button','✕ Clear filters','filter-chip');clear.type='button';clear.onclick=function(){activeFilters={subject:null,time:null,done:null};render(allData)};filterBar.append(clear)}
+}
 function render(data){
+  allData=data;
   listBox.replaceChildren();
   statusBox.style.display='none';
   var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'! 🌟'),el('p',!data.assignments.length?'No homework for you right now. Enjoy your free time!':data.openCount?'Here’s what you can work on today.':'You finished everything. Great job! 🎉'));listBox.append(intro);
   if(data.general)listBox.append(generalPanel(data.general.messages||[])); // older servers have no standalone messages yet
-  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
-  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 '};groups.forEach(function(g,i){var b=el('button',(tabIcons[g.id]||'')+g.name+' · '+g.items.length,'tab-'+g.id);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===0?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=i!==0;pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
+  buildFilterBar(data.assignments);listBox.append(filterBar);
+  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];applyFilters(data.assignments).forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
+  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 '};groups.forEach(function(g,i){var b=el('button',(tabIcons[g.id]||'')+g.name+' · '+g.items.length,'tab-'+g.id);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',g.id===selectedTab?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=g.id!==selectedTab;pane.append(el('h2',g.name));if(!g.items.length){var empty=filtering()?'No homework here matches your filters.':g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false;selectedTab=g.id};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
 }
 // Messages that are not about one assignment. Voice only, text only, or both; never needs a hand-in.
 function generalPanel(messages){
@@ -256,6 +306,7 @@ function cardBody(a){
   var stateLabel=a.status==='approved'?'Finished! 🌟':a.status==='submitted'?'Handed in — teacher will check it':a.status==='returned'?'Try again — see teacher note':a.status==='in_progress'?'Started — keep going':'Ready to start';
   var b=el('span',stateLabel,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
   meta.append(b,el('span',H.TYPES[a.type]||a.type,'badge'));
+  if(a.subject)meta.append(el('span',a.subject,'badge'));
   if(a.dueAt!=null)meta.append(el('span',(a.late?'Late – was due ':'Due ')+H.when(a.dueAt),'badge'+(a.late?' late':'')));
   if(a.assignedAt!=null)meta.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
   c.append(meta);

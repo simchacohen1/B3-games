@@ -100,7 +100,7 @@ function publicMessages(rec, viewer) {
 }
 function present(def, rec, now) {
   return {
-    id: def.id, type: def.type, title: def.title, details: def.details, assignedAt: def.assignedAt ?? def.createdAt,
+    id: def.id, type: def.type, title: def.title, details: def.details, subject: def.subject || '', assignedAt: def.assignedAt ?? def.createdAt,
     dueAt: def.dueAt ?? null, targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
     targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
     status: rec.status, late: isLate(def, rec, now),
@@ -233,7 +233,7 @@ async function teacherDo(store, identity, body, now, newId) {
           progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
           messages: publicMessages(rec, 'teacher') };
       }
-      rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details,
+      rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details, subject: def.subject || '',
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
@@ -256,6 +256,7 @@ async function teacherDo(store, identity, body, now, newId) {
     const targetUnit = String(body.targetUnit || (body.type === 'shorashim' ? 'minutes' : body.type === 'weeklyQuiz' ? 'questions' : ''));
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
     const label = cleanLabel(body.label, 'homework');
+    const subject = text(body.subject, 60); // optional, e.g. Chumash, Mishnayos
     const assignedAt = body.assignedAt == null ? now : Number(body.assignedAt);
     if (!Number.isSafeInteger(assignedAt) || assignedAt < 0) fail(400, 'Choose a valid assigned date.');
     if (def.dueAt != null && def.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -267,7 +268,7 @@ async function teacherDo(store, identity, body, now, newId) {
     }
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
-    const full = { id, ...def, label, assignedAt, targetAmount, targetUnit,
+    const full = { id, ...def, label, subject, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
     await store.set(base(classId) + '/definitions/' + id, full);
@@ -340,6 +341,7 @@ async function teacherDo(store, identity, body, now, newId) {
         dueAt: body.dueAt === undefined ? def.dueAt : body.dueAt });
     } catch (e) { fail(400, 'Check the title, instructions and due date.'); }
     const label = cleanLabel(body.label, labelOf(def));
+    const subject = body.subject === undefined ? def.subject || '' : text(body.subject, 60);
     const assignedAt = body.assignedAt === undefined ? def.assignedAt : Number(body.assignedAt);
     if (assignedAt != null && (!Number.isSafeInteger(assignedAt) || assignedAt < 0)) fail(400, 'Choose a valid assigned date.');
     if (next.dueAt != null && assignedAt != null && next.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -348,7 +350,7 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit === undefined ? def.targetUnit || (def.targetMinutes ? 'minutes' : '') : body.targetUnit);
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
-    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, label, assignedAt, targetAmount,
+    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, label, subject, assignedAt, targetAmount,
       targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
     return { ok: true };
   }
