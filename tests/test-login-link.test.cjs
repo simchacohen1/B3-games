@@ -28,6 +28,15 @@ test('only test classes are accepted', () => {
   assert.equal(links.onlyTestClasses([{ id: 'TEST-ALEF', name: 'Test Class Alef' }, { id: 'wt', name: 'WT' }], 'TEST-ALEF'), false, 'a test student also in a real class is refused');
   assert.equal(links.onlyTestClasses([], 'et'), false);
   assert.equal(links.onlyTestClasses([], 'testing'), true);
+  assert.equal(links.onlyTestClasses([{ id: 'p1', name: 'Principal Test Class' }], 'p1'), true);
+});
+
+test('"test" must start a word, so real classes like "Contest" are refused', () => {
+  assert.equal(links.isTestClass({ id: 'contest', name: 'Contest' }), false);
+  assert.equal(links.isTestClass({ id: 'abc', name: 'Attestation Group' }), false);
+  assert.equal(links.isTestClass({ id: 'latest', name: 'Latest' }), false);
+  assert.equal(links.onlyTestClasses([], 'contest'), false);
+  assert.equal(links.isTestClass({ id: 'TEST-BEIS', name: 'Test Class Beis' }), true);
 });
 
 test('bat file escapes % and opens a private window', () => {

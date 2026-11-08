@@ -12,7 +12,8 @@ Put it in a `.bat` file and double-click to open the student window.
   access than typing that name and passcode. A wrong or changed passcode shows the normal
   "Check your name and passcode" message.
 - **Test accounts only:** the page refuses the link unless every class the student is in
-  is a test class (class id or name contains "test", e.g. "Testing", "Test Class Alef").
+  is a test class (a word in the class id or name starts with "test", e.g. "Testing",
+  "Test Class Alef"; "Contest" does not count).
 - If a teacher is already signed in in that browser, the link does not replace the teacher;
   it asks for a private window. The `.bat` files open Chrome incognito for this reason.
 

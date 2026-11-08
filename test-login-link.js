@@ -44,8 +44,11 @@
     }catch(e){return null;}
   }
 
+  // "test" must start a word ("Testing", "TEST-ALEF", "Principal Test Class"),
+  // so a real class such as "Contest" or "Attestation" never counts.
+  var TEST_WORD=/\btest/i;
   function isTestClass(c){
-    return Boolean(c)&&(/test/i.test(String(c.id||""))||/test/i.test(String(c.name||"")));
+    return Boolean(c)&&(TEST_WORD.test(String(c.id||""))||TEST_WORD.test(String(c.name||"")));
   }
   // Every class the student can open must be a test class.
   function onlyTestClasses(classChoices,classId){
