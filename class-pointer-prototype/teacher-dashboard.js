@@ -53,6 +53,24 @@ function init(){
  topbar.append(el('span','cp-topbar-spacer'));
  const joined=el('span','cp-joined','No students yet');joined.setAttribute('role','status');
  topbar.append(joined);
+ /* Always-visible Student sharing switch; it mirrors and clicks the real #cpShareEnabled button. */
+ const shareState=el("button","cp-share-state","Student sharing");shareState.type="button";shareState.id="cpShareStateBtn";
+ function syncShareState(){
+  const real=$("cpShareEnabled");
+  if(!real){shareState.hidden=true;return}
+  shareState.hidden=false;
+  const on=real.getAttribute("aria-pressed")==="true";
+  shareState.disabled=real.disabled;
+  shareState.classList.toggle("cp-share-on",on&&!real.disabled);
+  shareState.classList.toggle("cp-share-off",!on&&!real.disabled);
+  shareState.textContent=real.disabled?"Student sharing: waiting for class":on?"Student sharing: ON · click to turn off":"Student sharing: OFF · click to turn on";
+  shareState.setAttribute("aria-pressed",String(on));
+ }
+ shareState.addEventListener("click",()=>{const real=$("cpShareEnabled");if(real&&!real.disabled)real.click();setTimeout(syncShareState,0)});
+ topbar.append(shareState);
+ {const real=$("cpShareEnabled");if(real)new MutationObserver(syncShareState).observe(real,{attributes:true,attributeFilter:["aria-pressed","disabled","class"]});}
+ document.addEventListener("classpointer:sharing-state",syncShareState);
+ syncShareState();
  const invite=iconButton('cp-topbar-btn','link','Invite students');invite.id='cpInviteBtn';
  invite.title='Copy the student join link';
  const inviteText=invite.querySelector('span');
@@ -261,6 +279,11 @@ function init(){
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
  liveWrap.append(switchWrap,stopBtn);
+ /* Full screen: the tabs row is hidden, so the floating toolbar gets its own red Stop button. */
+ const dockStop=iconButton('tb-btn cp-dock-stop','stop','Stop');dockStop.id='cpDockStop';dockStop.hidden=true;
+ dockStop.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
+ dockStop.addEventListener('click',()=>stopBtn.click());
+ {const fsBtn=$('tbFullscreen');if(fsBtn)fsBtn.before(dockStop);else $('teacherDock')?.append(dockStop)}
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
@@ -332,6 +355,31 @@ function init(){
  function syncLibrary(){library.hidden=!$('pointerPdfLibrary')}
  syncLibrary();setTimeout(syncLibrary,1500);
 
+ /* ---------- Reminder: whiteboard still on while nobody is using it ---------- */
+ const IDLE_MS=5*60*1000,AWAY_MS=30*1000;
+ const reminder=el('div','cp-board-reminder');reminder.hidden=true;reminder.setAttribute('role','alert');
+ const reminderStop=el('button','cp-reminder-stop','Stop whiteboard'),reminderKeep=el('button','cp-reminder-keep','Keep it on');
+ reminderStop.type='button';reminderKeep.type='button';
+ reminder.append(el('span',null,'The whiteboard is still on for your students. Close it when you are done.'),reminderStop,reminderKeep);
+ document.body.append(reminder);
+ const baseTitle=document.title;
+ let boardLive=false,idleTimer=null,hiddenAt=0;
+ function showReminder(){if(boardLive)reminder.hidden=false}
+ function resetIdle(){clearTimeout(idleTimer);idleTimer=boardLive?setTimeout(showReminder,IDLE_MS):null}
+ function syncReminder(live){
+  boardLive=live;
+  if(!live){reminder.hidden=true;clearTimeout(idleTimer);idleTimer=null;document.title=baseTitle;return}
+  if(!idleTimer)resetIdle();
+ }
+ reminderStop.addEventListener('click',()=>{reminder.hidden=true;stopBtn.click()});
+ reminderKeep.addEventListener('click',()=>{reminder.hidden=true;resetIdle()});
+ for(const type of ['pointerdown','pointermove','keydown','wheel'])stage?.addEventListener(type,()=>{if(boardLive&&reminder.hidden)resetIdle()},{passive:true});
+ document.addEventListener('visibilitychange',()=>{
+  if(!boardLive)return;
+  if(document.hidden){hiddenAt=Date.now();document.title='⚠ Whiteboard still on – '+baseTitle}
+  else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
+ });
+
  function syncLive(){
   const isLive=docOpen()||sharingScreen();
   const boards=document.body.classList.contains('boards-on');
@@ -340,6 +388,10 @@ function init(){
   liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
+  const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
+  dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
+  dockStop.dataset.short='Stop\n'+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc==='Whiteboard'?'board':'page'):'screen');
+  syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
   syncLibrary();
  }

@@ -34,11 +34,17 @@ function makeDb(initial){
 
 function setup(data,QROOT){
   const db=makeDb(data),alerts=[];
+  const refreshQuizLaunch=async lid=>{
+    const root=QROOT.split('/').reduce((o,k)=>o&&o[k],db.data)||{};
+    ctx.allResponses[lid]=structuredClone(root.responses?.[lid]||{});
+    ctx.completions[lid]=structuredClone(root.completions?.[lid]||{});
+  };
   const ctx={db,QROOT,alerts,note:'',firebase:{database:{ServerValue:{TIMESTAMP:{'.sv':'timestamp'}}}},
     roster:{s1:{name:'Student One'}},
     allLaunches:{L1:{classId:'et',quizSnapshot:{questions:[{q:'Q1',choices:['A','B'],correctIndex:1},{q:'Q2',choices:['A','B'],correctIndex:0},{q:'Q3',choices:['A','B'],correctIndex:0}]}}},
-    allResponses:{},liveResponses:{},activeLaunchId:'L1',liveLaunch:null,resultsLaunchId:'L1',modalContext:null,
+    allResponses:{},completions:{},liveResponses:{},activeLaunchId:'L1',liveLaunch:null,resultsLaunchId:'L1',modalContext:null,
     asArray:v=>Array.isArray(v)?v:(v&&typeof v==='object'?Object.values(v):[]),esc:s=>String(s),
+    refreshQuizLaunch,renderLaunchHistory(){},renderResults(){},renderStudentProgress(){},
     confirm:()=>true,alert:m=>alerts.push(m),console};
   ctx.document={getElementById:()=>({get value(){return ctx.note;},set value(v){},innerHTML:'',classList:{add(){},remove(){},toggle(){}}})};
   vm.createContext(ctx);

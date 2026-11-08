@@ -3,8 +3,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
-// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25-31 2026.
+// Owner-approved coloring pictures (sefer-hamitzvos/coloring-v2), October 25 - November 2026.
 const APPROVED_ART_SHA256: Record<string, string> = {
+  '499': '421e90758fa1314ad4fa7cadddcdc04258ebd0376eab8f04bbd4b6edc50c3c42',
   '500': '886be649f32896fe51cabf40e8da30719d4db469e5c9301c2f5e9cf9f3afab81',
   '501': 'c204988c31471c0d254db01dfdea69913be1d80bcad77e862b33de1ec122ea6f',
   '502': '47451e6ffff2eb7183484cb517355caa11bc99285556c96e1d730a7b89e0c879',
@@ -55,11 +56,13 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
     const match = new URL(response.url()).pathname.match(/\/coloring-v2\/(\d+)\.png$/);
     if (match) servedArt.set(match[1], crypto.createHash('sha256').update(await response.body()).digest('hex'));
   });
+  // Pin "today" inside the approved week so the test does not start failing when the
+  // real calendar moves past it. October 27, 2026 at noon in Kingston is card 501.
+  await page.clock.setFixedTime(new Date('2026-10-27T16:00:00Z'));
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
   await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
   const firstCard = await page.locator('#card').inputValue();
-  // Today's picture must be the owner-approved artwork, byte for byte. When a new
-  // week's art is approved, add its SHA-256 here.
+  // The pinned day's picture must be the owner-approved artwork, byte for byte.
   const todayArt = firstCard.padStart(3, '0');
   expect(APPROVED_ART_SHA256[todayArt], `today's card ${firstCard} has no approved artwork registered`).toBeTruthy();
   await expect(page.locator('#outline')).toHaveAttribute('src', new RegExp(`coloring-v2/${todayArt}\\.png(?:\\?|$)`));

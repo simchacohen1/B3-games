@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
 
 <meta charset="UTF-8">
@@ -394,8 +395,9 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
-<script src="backend/functions/student-tool-policy.js" defer></script>
+<script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js" defer></script>
+<script defer src="assignment-center/home-link.js?v=20261027-staging"></script>
 <script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
 <script src="guest-mode.js?v=20261011-guest" defer></script>
@@ -463,7 +465,8 @@ body > .subtitle::after {
             <section class="game-group island-place " data-game-group="challenge">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏆</span><div><div class="game-group-title">Challenge Playground</div><div class="game-group-subtitle">Quiz yourself or play a game</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a></div>
+<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+<a class="game-card" data-game-id="multiplayer-center" href="multiplayer/index.html"><span class="card-icon">🎲</span><span class="card-title">Multiplayer Center</span></a></div>
       </section>
     </div>
     <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
@@ -475,6 +478,7 @@ body > .subtitle::after {
     <div class="teacher-tools-container">
       <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
       <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
+      <a class="teacher-tool-card" id="homeworkCenterCard" href="assignment-center/teacher.html"><span class="card-icon">📚</span><span class="card-title">Homework &amp; Assignments</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
       <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
@@ -1436,7 +1440,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1503,12 +1507,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
-  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  function studentAuthUrl(){
+    const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/i.test(location.hostname);
+    if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
+    return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  }
   async function studentAuthCall(body){
     // Retry temporary function failures, never rejected credentials.
     for(let attempt=0;attempt<2;attempt++){
       try{
-        const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const response=await fetch(studentAuthUrl(),{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
         const data=await response.json().catch(()=>({}));
         if(!response.ok){
           const error=Object.assign(new Error(data.error||(response.status>=500?"Sign-in service is temporarily unavailable. Please try again.":"Could not check your login. Try again.")),{status:response.status});
@@ -2449,7 +2458,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 })();
 },{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
 
