@@ -199,3 +199,24 @@ test('RTDB adapter reports confirmed missing/conflicting records without overwri
   const conflict = { async transaction(update) { assert.equal(update(row), row); return { committed: true, snapshot: { val: () => row } }; } };
   await denied(changeRecord(conflict, () => { throw Object.assign(new Error('Revision conflict'), { code: 409 }); }), 409);
 });
+
+test('reject a 1-second decoded capture when microphone ran for 30 seconds', async () => {
+  let closed = 0;
+  class ShortDecoder { async decodeAudioData() { return { duration: 1 }; } async close() { closed++; } }
+  await assert.rejects(Recorder.verifyPlayableDuration(new Blob(['fictional']), 30, { Decoder: ShortDecoder }), /cut off/);
+  assert.equal(closed, 1);
+  class FullDecoder { async decodeAudioData() { return { duration: 29.5 }; } async close() {} }
+  const valid = await Recorder.verifyPlayableDuration(new Blob(['fictional']), 30, { Decoder: FullDecoder });
+  assert.equal(valid.checked, true);
+  class Unsupported { async decodeAudioData() { throw new Error('Codec not supported'); } async close() {} }
+  assert.equal((await Recorder.verifyPlayableDuration(new Blob(['fictional']), 30, { Decoder: Unsupported })).checked, false);
+});
+test('teacher audioRead refuses shortened private storage objects, without deleting original metadata', async () => {
+  const f = await fixture(), id = await assigned(f);
+  await send(f, 'studentA', 'submit', { id, audio: webm, type: 'audio/webm', duration: 30 });
+  const record = (await send(f, 'teacherA', 'get', { id })).record;
+  const original = f.audio.objects.get(record.audio.path);
+  original.bytes = original.bytes.subarray(0, original.bytes.length - 1);
+  await denied(send(f, 'teacherA', 'audioRead', { id }), 409);
+  assert.equal((await send(f, 'teacherA', 'get', { id })).record.audio.size, Buffer.from(webm, 'base64').length);
+});
