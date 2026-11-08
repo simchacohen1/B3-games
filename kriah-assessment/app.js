@@ -15,7 +15,15 @@
       const result = await API.call({ classId: state.classId, studentId: state.studentId || undefined, ...body }, options);
       if (gen !== state.generation) throw Object.assign(new Error('Class or account changed.'), { stale: true });
       return result;
-    } catch (error) { if (gen !== state.generation) error.stale = true; throw error; }
+    } catch (error) {
+      if (gen !== state.generation) error.stale = true;
+      else if ([401, 403].includes(error.status)) {
+        state.generation++; release(); state.records = []; state.library = []; state.students = [];
+        $('tabs').hidden = true; ['library', 'attempts', 'reports'].forEach(id => $(id).hidden = true);
+        $('attemptList').replaceChildren(); $('libraryList').replaceChildren(); $('reportBody').replaceChildren();
+      }
+      throw error;
+    }
   }
   function release() { state.recording?.cancel(); state.recording = null; state.urls.forEach(URL.revokeObjectURL); state.urls = []; state.blob = null; state.record = null; state.dirty = false; $('assessment').replaceChildren(); $('assessment').hidden = true; }
   function safeToLeave() { return !state.dirty && !state.blob && !['requesting', 'recording', 'stopping'].includes(state.recording?.state) || confirm('Leave this assessment? Recovery drafts stay on this device until submitted or cleared.'); }
@@ -168,17 +176,17 @@
     const retry = button('Retry recording', async () => {
       if (state.blob?.uploadStarted) throw new Error('Upload may already have started. Submit the same original bytes again.');
       if (state.blob && !confirm('Discard this local recording and try again?')) return;
-      recorder.cancel(); await API.draft(draftKey() + ':audio', null); state.blob = null; player.removeAttribute('src'); submit.disabled = true; recordButton.disabled = false; status('Ready to record again.');
+      recorder.cancel(); await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; player.removeAttribute('src'); submit.disabled = true; recordButton.disabled = false; status('Ready to record again.');
     }, 'secondary');
     const cancel = button('Cancel recording', () => { if (!['requesting', 'recording', 'stopping'].includes(recorder.state)) return; recorder.cancel(); stop.disabled = true; recordButton.disabled = !!state.blob?.uploadStarted; retry.disabled = !!state.blob?.uploadStarted; submit.disabled = !state.blob; status('Recording cancelled. Nothing was uploaded.'); }, 'secondary');
     const submit = button('Submit recording', async () => {
       if (!state.blob || !consent.checked) throw new Error('Record and confirm permission before submitting.');
       submit.disabled = true; retry.disabled = true; recordButton.disabled = true;
       try {
-        const captured = state.blob; captured.uploadStarted = true; await API.draft(draftKey() + ':audio', captured); const audio = await API.blob64(captured.blob);
+        const captured = state.blob; captured.uploadStarted = true; await API.draft(draftKey() + ':audio', captured).catch(() => {}); const audio = await API.blob64(captured.blob);
         if (gen !== state.generation) return;
         await call({ action: 'submit', id: record.id, audio, type: captured.blob.type, duration: captured.duration }, { progress: percent => { if (gen === state.generation) status('Uploading ' + percent + '% · Waiting for server confirmation…'); } });
-        await API.draft(draftKey() + ':audio', null); state.blob = null; await loadRecords(); await openAssessment(record.id); status('Recording submitted. Your original is preserved.');
+        await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; await loadRecords(); await openAssessment(record.id); status('Recording submitted. Your original is preserved.');
       } catch (error) {
         if (error.status === 400 && state.blob) { state.blob.uploadStarted = false; await API.draft(draftKey() + ':audio', state.blob); }
         throw error;
@@ -190,7 +198,7 @@
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
     state.recording = recorder; actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
-    const recovered = await API.draft(draftKey() + ':audio');
+    const recovered = await API.draft(draftKey() + ':audio').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
     if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); player.src = url; submit.disabled = false; retry.disabled = !!recovered.uploadStarted; recordButton.disabled = !!recovered.uploadStarted; timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
   }
@@ -268,18 +276,21 @@
     [feedback, recommendation, share, self, timing, confirmTiming].forEach(n => n.oninput = () => run(async () => { renderPassage(); renderMarks(); await persistGrade(); }));
     const saveActions = el('div', null, 'actions');
     async function save(final) {
+      // Freeze controls while saving so a later edit cannot be discarded when
+      // the earlier server response clears its recovery draft.
+      const controls = [...box.querySelectorAll('button,input,select,textarea')].map(n => [n, n.disabled]);
+      controls.forEach(([n]) => n.disabled = true);
       const payload = draftValue(); await draftQueue.catch(() => {});
-      saveActions.querySelectorAll('button').forEach(b => b.disabled = true);
       try {
         const result = await call({ action: 'grade', id: record.id, ...payload, final });
-        record.revision = result.record.revision; state.record = result.record; $('assessmentMeta').textContent = record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(result.record.status); state.dirty = false; await API.draft(draftKey() + ':grade', null); await loadRecords(); status(final ? 'Final assessment saved.' : 'Assessment draft saved to the server.');
-      } finally { if (gen === state.generation) saveActions.querySelectorAll('button').forEach(b => b.disabled = false); }
+        record.revision = result.record.revision; state.record = result.record; $('assessmentMeta').textContent = record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(result.record.status); state.dirty = false; await API.draft(draftKey() + ':grade', null).catch(() => {}); await loadRecords(); status(final ? 'Final assessment saved.' : 'Assessment draft saved to the server.');
+      } finally { if (gen === state.generation) controls.forEach(([n, disabled]) => n.disabled = disabled); }
     }
     saveActions.append(button('Save draft', () => save(false)), button('Finalize assessment', () => save(true)), button('Delete assessment & original audio', async () => {
       if (!confirm('Permanently delete this fictional assessment and its original recording?')) return;
-      await call({ action: 'delete', id: record.id, confirm: record.id }); await API.draft(draftKey() + ':grade', null); release(); await loadRecords(); status('Assessment and original recording deleted.');
+      await call({ action: 'delete', id: record.id, confirm: record.id }); await API.draft(draftKey() + ':grade', null).catch(() => {}); release(); await loadRecords(); status('Assessment and original recording deleted.');
     }, 'danger')); box.append(saveActions);
-    const recovered = await API.draft(draftKey() + ':grade');
+    const recovered = await API.draft(draftKey() + ':grade').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
     if (recovered) {
       if (recovered.revision === record.revision && confirm('Restore the unsaved marking draft from this device?')) {

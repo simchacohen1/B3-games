@@ -111,6 +111,7 @@ try:
         expect(teacher.locator('#status')).to_contain_text('draft saved to the server')
         teacher.get_by_role('button', name='Finalize assessment', exact=True).click()
         expect(teacher.locator('#status')).to_contain_text('Final assessment saved')
+        expect(teacher.locator('#assessmentMeta')).to_contain_text('Reviewed')
         teacher.screenshot(path=str(OUT / 'teacher-marking.png'), full_page=True)
         teacher.get_by_role('button', name='Progress reports', exact=True).click()
         expect(teacher.locator('#reportBody')).to_contain_text('Kamatz')
@@ -144,6 +145,13 @@ try:
         student.get_by_role('button', name='Record reading', exact=True).click()
         expect(student.locator('#status')).to_contain_text('Microphone permission was denied')
         expect(student.get_by_role('button', name='Record reading', exact=True)).to_be_enabled()
+        # Blocking local recovery storage must not prevent in-memory marking.
+        teacher.set_viewport_size({'width': 1280, 'height': 900})
+        teacher.evaluate("() => { KriahClient.draft = async () => { throw new Error('Fictional local storage unavailable'); }; }")
+        teacher.get_by_role('button', name='Assessments', exact=True).click()
+        teacher.get_by_role('button', name='Open assessment', exact=True).click()
+        expect(teacher.locator('#markPassage .cluster')).to_have_count(19)
+        expect(teacher.get_by_role('button', name='Save draft', exact=True)).to_be_enabled()
         # Server privacy is checked through direct calls, not hidden UI controls.
         listed = context.request.post(f'http://127.0.0.1:{PORT}/api/kriah', headers={'X-Kriah-Fixture-Actor': 'studentA'}, data={'action': 'list', 'classId': 'kriah-test-et', 'studentId': 'fictional-alef'}).json()
         rid = listed['records'][0]['id']
