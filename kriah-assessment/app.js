@@ -47,7 +47,7 @@
     $('fixtureLogin').hidden = !API.staging || !!API.uid();
     if (!API.uid()) { status('Sign in with a fictional staging account. Students use the staging homepage sign-in.'); return; }
     status('Checking your assigned classes…');
-    const result = await call({ action: 'classes' }); state.role = result.role;
+    const result = await call({ action: 'classes' }); state.role = result.role; document.body.dataset.role = state.role;
     state.studentId = result.studentId || '';
     options($('classSelect'), result.classes);
     state.classId = $('classSelect').value;
@@ -89,7 +89,7 @@
     const box = $('libraryList'); box.replaceChildren();
     if (!state.library.length) box.append(el('p', 'Create your first exercise, then assign it to one or more students.'));
     state.library.forEach(ex => {
-      const card = el('article', null, 'card'); card.append(el('h2', ex.title), el('p', ex.type + ' · ' + ex.level), el('p', ex.text, 'hebrew'));
+      const card = el('article', null, 'card'); card.append(el('div', ex.type === 'Letters' ? 'א ב' : ex.unitType === 'nekudah' ? 'אָ בֵּ' : 'אַבָּא', 'exercise-emblem')); card.append(el('h2', ex.title), el('p', ex.type + ' · ' + ex.level), el('p', ex.text, 'hebrew'));
       card.lastChild.dir = 'rtl'; card.lastChild.lang = 'he';
       card.append(button('Edit', () => editExercise(ex), 'secondary'), button('Assign', () => assignPanel(ex))); box.append(card);
     });
@@ -133,7 +133,7 @@
     if (!state.records.length) $('attemptList').append(el('p', 'No assessments assigned yet.'));
     state.records.forEach(r => {
       const row = el('article', null, 'row'), text = el('div');
-      text.append(el('strong', r.exercise.title), el('p', new Date(r.createdAt).toLocaleString() + ' · ' + r.exercise.level), el('span', statusLabel(r.status), 'tag'));
+      text.append(el('strong', r.exercise.title), el('p', new Date(r.createdAt).toLocaleString() + ' · ' + r.exercise.level), el('span', statusLabel(r.status), 'tag tag-' + r.status));
       row.append(text, button('Open assessment', () => openAssessment(r.id), 'secondary')); $('attemptList').append(row);
     });
   }
@@ -203,7 +203,7 @@
       stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = false; timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds · Listen before submitting.';
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
-    state.recording = recorder; actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
+    state.recording = recorder; recordButton.classList.add('record-primary'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
     const recovered = await API.draft(draftKey() + ':audio').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
     if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); player.src = url; submit.disabled = false; retry.disabled = !!recovered.uploadStarted; recordButton.disabled = !!recovered.uploadStarted; timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
