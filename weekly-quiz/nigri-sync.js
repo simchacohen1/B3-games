@@ -357,7 +357,10 @@
     const btn = document.createElement('button');
     btn.id = 'nigriOpenBtn'; btn.type = 'button'; btn.className = 'good'; btn.textContent = 'Send to Nigri';
     btn.addEventListener('click', openNigri);
+    // Hidden until the school check says this teacher's school syncs to Nigri (the owner always passes).
+    btn.hidden = true;
     controls.insertBefore(btn, controls.firstChild);
+    if (window.B3NigriGate) window.B3NigriGate.ready.then(r => { btn.hidden = !(r && r.allowed); });
   }
 
   // Show "Already sent to Nigri" on the button when this test was synced before.

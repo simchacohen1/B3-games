@@ -10,6 +10,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script>
 <script src="principal-scope.js?v=20261025"></script>
+<script src="school-scope.js?v=20261107"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -51,6 +52,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 .gate button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:900;font-size:17px;cursor:pointer}
 .hidden{display:none!important}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
+.schoolpick{flex:0 1 260px!important;width:auto!important;padding:8px 10px!important;font-size:15px!important}.entry .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.syncs{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}.card .syncs input{width:22px;height:22px;padding:0;accent-color:#16a34a}.noschool{color:#b45309!important;font-weight:700}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head><body>
@@ -60,14 +62,20 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="ownerArea" class="hidden">
 <div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
 
+<section class="card" id="schoolsCard"><div class="card-head"><h2>&#x1F3EB; Schools</h2></div>
+<p class="hint">Every teacher belongs to one school. Only you choose it. Teachers in a school with <b>Syncs to Nigri</b> on see the Nigri login and School Marks sync; everyone else never sees Nigri.</p>
+<div id="schoolMove"></div>
+<div class="formrow"><input id="schoolName" placeholder="New school name" maxlength="80"><button id="addSchool" type="button">Add school</button></div>
+<div class="listlabel">Your schools</div><div id="schools"></div></section>
+
 <section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
 <p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
-<div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
+<div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><select id="teacherSchool" aria-label="School"><option value="">Choose school</option></select><button id="addTeacher">Add teacher</button></div>
 <div class="listlabel">Your teachers</div><div id="teachers"></div></section>
 
 <section class="card"><div class="card-head"><h2>Principals</h2></div>
 <p class="hint">A principal signs in with Google and can use teacher tools for all classes taught by the teachers you select. Only you can add accounts, assign supervision or change platform-wide settings.</p>
-<div class="formrow"><input id="principalEmail" type="email" placeholder="Principal Google email"><input id="principalName" placeholder="Principal name"><button id="addPrincipal">Add principal</button></div>
+<div class="formrow"><input id="principalEmail" type="email" placeholder="Principal Google email"><input id="principalName" placeholder="Principal name"><select id="principalSchool" aria-label="School"><option value="">Choose school</option></select><button id="addPrincipal">Add principal</button></div>
 <div id="principals"></div></section>
 
 <section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
@@ -115,7 +123,7 @@ if(new URLSearchParams(location.search).get('embedded')==='1'){
  document.querySelector('.notice').textContent='Set up teachers and classes, assign teachers to classes, then choose the tools and content each class may use.';
 }
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
+const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={},schoolData={};
 const PLATFORM_TOOLS=[
  ["sefer-hamitzvos","Sefer HaMitzvos","dual"],
  ["halacha","Halacha","dual"],
@@ -170,7 +178,7 @@ async function reconcilePrincipals(invites,classes){
 function renderPrincipalAssignments(){
  const people=Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)&&t.active!==false);
  const principals=Object.entries(teacherData).filter(([,p])=>B3PrincipalScope.principal(p));
- q("principals").innerHTML=principals.map(([id,p])=>'<div class="entry"><div class="entry row"><span><b>'+safe(p.name||p.email)+'</b><small>'+safe(p.email)+'</small></span><button class="danger" data-delete-principal="'+safe(id)+'">Remove</button></div><small>Select supervised teachers. Their current classes are automatically granted to this principal.</small><div class="toolgrid">'+people.map(([tid,t])=>'<label class="tool"><input type="checkbox" data-principal="'+safe(id)+'" data-supervised-teacher="'+safe(tid)+'" '+(p.supervisedTeacherIds?.[tid]===true?'checked':'')+'><span>'+safe(t.name||t.email)+'</span></label>').join('')+'</div><small>'+(p.active?'Account can sign in.':'Assign at least one teacher with a class to activate sign-in.')+'</small></div>').join('')||'<p class="hint">No principals have been added yet.</p>';
+ q("principals").innerHTML=principals.map(([id,p])=>'<div class="entry"><div class="entry row"><span><b>'+safe(p.name||p.email)+'</b><small>'+safe(p.email)+'</small></span><span class="rowbtns">'+schoolPicker(id,p)+'<button class="danger" data-delete-principal="'+safe(id)+'">Remove</button></span></div><small>Select supervised teachers. Their current classes are automatically granted to this principal.</small><div class="toolgrid">'+people.map(([tid,t])=>'<label class="tool"><input type="checkbox" data-principal="'+safe(id)+'" data-supervised-teacher="'+safe(tid)+'" '+(p.supervisedTeacherIds?.[tid]===true?'checked':'')+'><span>'+safe(t.name||t.email)+'</span></label>').join('')+'</div><small>'+(p.active?'Account can sign in.':'Assign at least one teacher with a class to activate sign-in.')+'</small></div>').join('')||'<p class="hint">No principals have been added yet.</p>';
  q("principals").querySelectorAll("[data-supervised-teacher]").forEach(box=>box.onchange=async()=>{
    box.disabled=true;
    try{
@@ -180,26 +188,29 @@ function renderPrincipalAssignments(){
  });
 }
 async function load(){
- const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};schoolData=B3SchoolScope.normalizeSchools((await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val());
  await reconcilePrincipals(teacherData,classData);
  q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
- Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><button class="danger" data-delete-teacher="'+id+'">Delete</button></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
+ Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><span class="rowbtns">'+schoolPicker(id,v)+'<button class="danger" data-delete-teacher="'+id+'">Delete</button></span></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
  q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect").innerHTML='<option value="">Choose class</option>';
  Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
  const assignmentLines=[];
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  renderPrincipalAssignments();
+ renderSchools();
  await renderToolGrants();
 }
-q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
+q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}const schoolId=q("teacherSchool").value;if(!schoolData[schoolId]){q("status").textContent="Choose the teacher's school.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP,schoolId:schoolId});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
 q("addPrincipal").onclick=async()=>{
  const email=q("principalEmail").value.trim().toLowerCase(),name=q("principalName").value.trim();
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid principal Google email.";return}
  const root="b3Games/workspaces/"+WS,ref=db.ref(root+"/teacherInvites/"+key(email));
  if((await ref.once("value")).exists()){q("status").textContent="That account is already invited. Remove it before changing its account type.";return}
+ const schoolId=q("principalSchool").value;
+ if(!schoolData[schoolId]){q("status").textContent="Choose the principal's school.";return}
  try{
-   await ref.set({email,name:name||email,role:"principal",accountType:"principal",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+   await ref.set({email,name:name||email,role:"principal",accountType:"principal",active:false,schoolId,updatedAt:firebase.database.ServerValue.TIMESTAMP});
    q("principalEmail").value="";q("principalName").value="";q("status").textContent="Principal added. Select supervised teachers to activate.";
    await load();
  }catch(error){console.error(error);q("status").textContent="Could not add principal."}
@@ -216,6 +227,74 @@ async function deletePrincipal(id){
 }
 q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+// ---- Schools (owner only). One school per teacher, stored on the invitation. See school-scope.js. ----
+const SCHOOLS_PATH=()=>"b3Games/workspaces/"+WS+"/schools";
+function schoolOptions(selected,blank){return (blank?'<option value="">'+blank+'</option>':'')+Object.entries(schoolData).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,sc])=>'<option value="'+safe(id)+'"'+(id===selected?' selected':'')+'>'+safe(sc.name)+'</option>').join("")}
+function schoolPicker(inviteId,inv){const cur=inv&&inv.schoolId||"",known=!!schoolData[cur];return '<select class="schoolpick'+(known?'':' noschool')+'" data-school-for="'+safe(inviteId)+'" aria-label="School">'+(known?'':'<option value="" selected>No school</option>')+schoolOptions(cur)+'</select>'}
+function renderSchools(){
+ const counts=B3SchoolScope.countBySchool(teacherData),ids=Object.keys(schoolData).sort((a,b)=>schoolData[a].name.localeCompare(schoolData[b].name));
+ q("schools").innerHTML=ids.map(id=>{const sc=schoolData[id],n=counts[id]||0;return '<div class="entry row"><span><b>'+safe(sc.name)+'</b><small>'+n+' '+(n===1?'person':'people')+'</small></span><span class="rowbtns"><label class="syncs"><input type="checkbox" data-school-sync="'+safe(id)+'"'+(sc.syncsToNigri?' checked':'')+'> Syncs to Nigri</label><button type="button" data-school-rename="'+safe(id)+'" style="padding:8px 14px;font-size:15px">Rename</button><button type="button" class="danger" data-school-delete="'+safe(id)+'">Delete</button></span></div>'}).join("")||'<small>No schools yet.</small>';
+ ["teacherSchool","principalSchool"].forEach(sel=>{const keep=q(sel).value;q(sel).innerHTML=schoolOptions(keep,"Choose school");});
+ const plan=B3SchoolScope.planDefaultMove(teacherData,schoolData,0);
+ q("schoolMove").innerHTML=plan.assign.length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+plan.assign.length+' '+(plan.assign.length===1?'person has':'people have')+' no school yet.</b> Put them in <b>'+safe(plan.schoolName)+'</b>'+(plan.createSchool?' (a new school with Syncs to Nigri on)':'')+'? Nothing else about them changes.<div class="chips">'+plan.assign.map(a=>'<span class="chip" style="padding-right:14px">'+safe(a.name)+(a.principal?' (principal)':'')+(a.signedIn?'':' · not signed in yet')+'</span>').join("")+'</div><button type="button" id="schoolMoveGo" style="margin-top:12px">Move them now</button></div>':'';
+ if(plan.assign.length)q("schoolMoveGo").onclick=()=>moveEveryoneWithoutSchool().catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+}
+// Re-reads current data first so the move never overwrites a school chosen meanwhile.
+async function moveEveryoneWithoutSchool(){
+ const invites=(await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value")).val()||{};
+ const fresh=B3SchoolScope.planDefaultMove(invites,(await db.ref(SCHOOLS_PATH()).once("value")).val()||{},firebase.database.ServerValue.TIMESTAMP);
+ if(!fresh.assign.length){await load();return}
+ if(!confirm("Put "+fresh.assign.length+" "+(fresh.assign.length===1?"person":"people")+" in "+fresh.schoolName+"?"))return;
+ const updates={};Object.entries(fresh.updates).forEach(([k,v])=>{updates["b3Games/workspaces/"+WS+"/"+k]=v});
+ await db.ref().update(updates);q("status").textContent="Moved "+fresh.assign.length+" into "+fresh.schoolName+" ✓";await load();
+}
+q("addSchool").onclick=async()=>{
+ const name=B3SchoolScope.cleanName(q("schoolName").value);if(!name){q("status").textContent="Type the school's name.";return}
+ if(Object.values(schoolData).some(sc=>sc.name.toLowerCase()===name.toLowerCase())){q("status").textContent="A school with that name already exists.";return}
+ const id=B3SchoolScope.newSchoolId(name,schoolData),now=firebase.database.ServerValue.TIMESTAMP;
+ try{await db.ref(SCHOOLS_PATH()+"/"+id).set({name,syncsToNigri:false,createdAt:now,updatedAt:now});q("schoolName").value="";q("status").textContent="School added ✓";await load();}
+ catch(err){console.error(err);q("status").textContent="Could not save. Please try again."}
+};
+async function renameSchool(id){
+ const sc=schoolData[id];if(!sc)return;const name=B3SchoolScope.cleanName(prompt("New name for "+sc.name+":",sc.name)||"");
+ if(!name||name===sc.name)return;
+ if(Object.entries(schoolData).some(([o,x])=>o!==id&&x.name.toLowerCase()===name.toLowerCase())){q("status").textContent="A school with that name already exists.";return}
+ await db.ref(SCHOOLS_PATH()+"/"+id).update({name,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("status").textContent="Renamed ✓";await load();
+}
+// A school that still has people cannot be deleted, so nobody is ever left without a school.
+async function deleteSchool(id){
+ const sc=schoolData[id];if(!sc)return;
+ const n=B3SchoolScope.countBySchool((await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value")).val()||{})[id]||0;
+ if(n){alert(sc.name+" still has "+n+" "+(n===1?"person":"people")+". Move them to another school first.");return}
+ if(!confirm("Delete the school "+sc.name+"?"))return;
+ await db.ref(SCHOOLS_PATH()+"/"+id).remove();q("status").textContent="School deleted.";await load();
+}
+async function setSchoolSync(box){
+ const id=box.dataset.schoolSync,sc=schoolData[id];if(!sc)return;
+ if(!box.checked&&!confirm("Turn off Nigri sync for "+sc.name+"? Its teachers stop seeing Nigri. Their saved Nigri logins are kept but cannot be used until you turn it back on.")){box.checked=true;return}
+ box.disabled=true;
+ try{await db.ref(SCHOOLS_PATH()+"/"+id).update({syncsToNigri:box.checked,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("status").textContent="Saved ✓";await load();}
+ catch(err){console.error(err);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not save. Please try again."}
+}
+async function moveToSchool(sel){
+ const inviteId=sel.dataset.schoolFor,inv=teacherData[inviteId],to=sel.value;if(!inv||!schoolData[to])return;
+ const from=inv.schoolId&&schoolData[inv.schoolId];
+ if(from&&!confirm("Move "+(inv.name||inv.email)+" from "+from.name+" to "+schoolData[to].name+"? Their saved Nigri login (if any) will be removed. They can save it again if the new school syncs to Nigri.")){sel.value=inv.schoolId;return}
+ const plan=B3SchoolScope.planMoveTeacher(inviteId,inv,to,firebase.database.ServerValue.TIMESTAMP);if(!plan)return;
+ const updates={};Object.entries(plan).forEach(([k,v])=>{updates["b3Games/workspaces/"+WS+"/"+k]=v});
+ sel.disabled=true;
+ try{if(Object.keys(updates).length)await db.ref().update(updates);q("status").textContent="School saved ✓";await load();}
+ catch(err){console.error(err);sel.disabled=false;q("status").textContent="Could not save. Please try again."}
+}
+document.addEventListener("change",e=>{
+ const s=e.target.closest("[data-school-sync]"),m=e.target.closest("[data-school-for]");
+ if(s)setSchoolSync(s);if(m)moveToSchool(m);
+});
+document.addEventListener("click",e=>{
+ const r=e.target.closest("[data-school-rename]"),d=e.target.closest("[data-school-delete]");
+ const run=p=>p.catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+ if(r)run(renameSchool(r.dataset.schoolRename));if(d)run(deleteSchool(d.dataset.schoolDelete));
+});
 // ---- Unassign / delete (owner only; this page is gated to the owner account) ----
 const B3_CLASSES=["et","wt"];
 // A signed-in teacher's own record, found by their invitation's claimedUid or by matching email.
