@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '22'
       - name: Model, service, privacy and recorder tests
-        run: node --test tests/kriah-assessment.test.cjs
+        run: node --test tests/kriah-assessment.test.cjs tests/kriah-adventure.test.cjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
