@@ -248,6 +248,7 @@ function card(a){
   if(a.assignedAt!=null)meta.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
   c.append(meta);
   if(a.details)c.append(el('p',a.details));
+  if(a.instructionVoice)c.append(H.instructionPlayer(function(){return call({action:'instructionVoiceRead',assignmentId:a.id})}));
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
   var activityUrl=H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='noopener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
