@@ -157,8 +157,34 @@ function setActivityLesson(stream){
     else send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:false});
   }
 }
+// A student's screen shown to the whole class. Only the teacher's page can start it (from the teacher's own
+// controls, for one student at a time); it goes only to this lesson's server-admitted connections and
+// students accept it only from this teacher's room, so it cannot reach another class.
+let classShare=null;
+function closeShareCall(entry){const old=entry.shareCall;entry.shareCall=null;try{old?.close()}catch{}}
+function sendClassShare(entry){
+  if(!classShare||!started||presence.get(entry.id)!==entry||entry.studentId===classShare.studentId)return;
+  closeShareCall(entry);
+  send(entry.connection,{type:'class-share',id:classShare.id,active:true,name:classShare.name});
+  try{entry.shareCall=peer.call(entry.connection.peer,classShare.stream,{metadata:{kind:'class-share',shareId:classShare.id}})}catch{}
+}
+function stopClassShare(){
+  const old=classShare;classShare=null;
+  for(const entry of presence.values()){closeShareCall(entry);if(old)send(entry.connection,{type:'class-share',id:old.id,active:false})}
+  if(old)document.dispatchEvent(new CustomEvent('classpointer:class-share',{detail:null}));
+}
+function startClassShare(studentId,name,stream){
+  if(!isTeacher||!started||!stream||typeof studentId!=='string'||!studentId)return false;
+  window.ClassPointerBoards?.stopClassBoard?.();
+  stopClassShare();
+  classShare={id:crypto.randomUUID(),studentId,name:String(name||'A student').slice(0,60),stream};
+  for(const entry of presence.values())sendClassShare(entry);
+  document.dispatchEvent(new CustomEvent('classpointer:class-share',{detail:{studentId,name:classShare.name}}));
+  return true;
+}
+if(isTeacher)window.ClassPointerClassShare={start:startClassShare,stop:stopClassShare,current:()=>classShare?{studentId:classShare.studentId,name:classShare.name}:null};
 document.addEventListener('class-pointer-teacher-signed-out',()=>{
-  if(!isTeacher)return;activityTeacherAuthorized=false;activityTeacherEpoch++;stopSharing();window.ClassPointerPdf?.close(true);
+  if(!isTeacher)return;stopClassShare();activityTeacherAuthorized=false;activityTeacherEpoch++;stopSharing();window.ClassPointerPdf?.close(true);
   $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;$('openWhiteboard').disabled=true;
 });
 document.addEventListener('class-pointer-teacher-restored',()=>{
@@ -271,20 +297,20 @@ function admitPresence(connection,verified,activity){
   // the others), and the Students panel still lists him once.
   if(Array.from(presence.values()).filter(entry=>entry.studentId===studentId).length>=6||presence.size>=120){send(connection,{type:'full'});setTimeout(()=>connection.close(),300);return null}
   const entry={id:'presence:'+connection.peer,presence:true,admitted:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
-  applyLevel(entry,savedLevel(name));presence.set(entry.id,entry);send(connection,{type:'present'});send(connection,{type:'lesson-tools',level:levelOf(entry)});send(connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members});sendActivityLesson(entry);
+  applyLevel(entry,savedLevel(name));presence.set(entry.id,entry);send(connection,{type:'present'});send(connection,{type:'lesson-tools',level:levelOf(entry)});send(connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members});sendActivityLesson(entry);sendClassShare(entry);
   window.ClassPointerBoards?.studentJoined(entry);roster();
   return entry;
 }
 function dropPresence(entry,notice){
   if(presence.get(entry.id)!==entry)return;
-  presence.delete(entry.id);delete state.points[entry.id];highlightStore.edit(entry.id,'clear');publishHighlights();publish();closeActivityCall(entry);window.ClassPointerBoards?.studentLeft(entry);
+  closeShareCall(entry),presence.delete(entry.id);delete state.points[entry.id];highlightStore.edit(entry.id,'clear');publishHighlights();publish();closeActivityCall(entry);window.ClassPointerBoards?.studentLeft(entry);
   if(notice){send(entry.connection,{type:notice});setTimeout(()=>{try{entry.connection.close()}catch{}},300)}
   roster();
 }
 function removeStudentDeliberately(entry){
   // Only this path tells a student he was removed, and it keeps him out until the teacher allows him back.
   if(entry.studentId){removedStudents.add(entry.studentId);saveRemoved();window.ClassPointerActivityShares?.revokeStudents([entry.studentId])}
-  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});closeActivityCall(other);presence.delete(other.id);window.ClassPointerBoards?.studentLeft(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
+  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});closeActivityCall(other);closeShareCall(other),presence.delete(other.id);window.ClassPointerBoards?.studentLeft(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   for(const other of Array.from(members.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});removeMember(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   roster();
 }
@@ -352,7 +378,7 @@ async function startClass(){
     if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
   });
   peer.on('connection',receiveStudent);
-  if(window.ClassPointerJoinGate?.required)window.ClassPointerJoinGate.watch(()=>Array.from(members.values()).concat(Array.from(presence.values())),m=>{send(m.connection,{type:'removed'});if(m.presence){closeActivityCall(m);presence.delete(m.id)}else removeMember(m);roster();try{m.connection.close()}catch{}});peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
+  if(window.ClassPointerJoinGate?.required)window.ClassPointerJoinGate.watch(()=>Array.from(members.values()).concat(Array.from(presence.values())),m=>{send(m.connection,{type:'removed'});if(m.presence){closeActivityCall(m);closeShareCall(m),presence.delete(m.id)}else removeMember(m);roster();try{m.connection.close()}catch{}});peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 async function requestEveryoneToShare(){
   if(!isTeacher||!started)return;
@@ -488,6 +514,7 @@ async function shareScreen(preferTab=false){
 function endClass(){
   if(!isTeacher||closingClass)return endPromise;
   closingClass=true;
+  window.ClassPointerClassShare?.stop();
   window.ClassPointerActivityShares?.closeAll();
   window.ClassPointerBoards?.endClass();
   window.ClassPointerPdf?.close(true);

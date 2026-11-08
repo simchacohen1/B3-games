@@ -126,6 +126,53 @@
     return board;
   }
 
+  // ---------- Presenting one boy's whiteboard to the whole class ----------
+  // The teacher starts it for one boy. The teacher's page is the only hub: it checks every message, so a boy can
+  // write on the shared board only while the teacher or the presenter allowed him, and only boys already admitted
+  // to this class ever receive it. Presenter lines have ids "s…", teacher lines "t…", other boys' lines "g…".
+  const MAX_GUEST=200;
+  const cleanKey=value=>typeof value==='string'?value.slice(0,60):'';
+  function classModel(strokes,guest,text){
+    const model={strokes:[],guest:[],drafts:{student:null,teacher:null},guestDrafts:{},text:text?cleanWord(text):null};
+    for(const raw of Array.isArray(strokes)?strokes.slice(0,MAX_STROKES):[]){const s=cleanStroke(raw);if(s){s.by=raw.by==='teacher'?'teacher':'student';model.strokes.push(s)}}
+    for(const raw of Array.isArray(guest)?guest.slice(0,MAX_GUEST):[]){const s=cleanStroke(raw);if(s&&s.id[0]==='g'){s.by='guest';s.owner=cleanKey(raw.owner);model.guest.push(s)}}
+    return model;
+  }
+  // A line from a boy other than the presenter. A boy can only remove his own lines (owner is set by the teacher).
+  function applyGuestOp(model,op,from){
+    if(op.type==='board-draft'){
+      const s=op.stroke?cleanStroke(op.stroke):null;
+      if(s&&s.id[0]==='g'){if(model.guestDrafts[from]||Object.keys(model.guestDrafts).length<30)model.guestDrafts[from]=s;else return false}
+      else delete model.guestDrafts[from];
+      return true;
+    }
+    if(op.type==='board-add'){
+      const s=cleanStroke(op.stroke);
+      if(!s||s.id[0]!=='g'||model.guest.length>=MAX_GUEST||model.guest.some(item=>item.id===s.id))return false;
+      s.by='guest';s.owner=from;model.guest.push(s);delete model.guestDrafts[from];return true;
+    }
+    if(op.type==='board-remove'){
+      if(!Array.isArray(op.ids))return false;
+      const ids=new Set(op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string')),before=model.guest.length;
+      model.guest=model.guest.filter(s=>!(s.owner===from&&ids.has(s.id)));return model.guest.length!==before;
+    }
+    return false;
+  }
+  // Rebuilds an operation from known fields only, so nothing a student sends is passed on as it came.
+  function cleanRelayOp(op,by){
+    if(!op||typeof op.type!=='string')return null;
+    if(op.type==='board-draft')return{type:'board-draft',stroke:op.stroke?cleanStroke(op.stroke):null};
+    if(op.type==='board-add'){const s=cleanStroke(op.stroke);return s?{type:'board-add',stroke:s}:null}
+    if(op.type==='board-remove'&&Array.isArray(op.ids))return{type:'board-remove',ids:op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string').map(id=>id.slice(0,40))};
+    if(op.type==='board-clear'&&by!=='guest')return{type:'board-clear',all:op.all===true&&by==='teacher'};
+    if(op.type==='board-text'&&by!=='guest'){const text=cleanWord(op.text);return text?{type:'board-text',text}:null}
+    return null;
+  }
+  const ACCESS=['watch','everyone','some'];
+  const cleanAccess=value=>ACCESS.includes(value)?value:'watch';
+  const cleanIds=list=>Array.isArray(list)?list.slice(0,120).filter(id=>typeof id==='string').map(cleanKey):[];
+  const cleanRoster=list=>Array.isArray(list)?list.slice(0,80).filter(p=>p&&typeof p.id==='string'&&typeof p.name==='string').map(p=>({id:cleanKey(p.id),name:p.name.slice(0,60)})):[];
+
   // ---------- Drawing on a canvas ----------
   function strokeOn(ctx,s,w,h){
     const pts=s.points,width=Math.max(1,s.size*w);ctx.strokeStyle=s.color;ctx.fillStyle=s.color;
@@ -142,7 +189,8 @@
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);paintActivity(ctx,w,h,board);ctx.lineCap='round';ctx.lineJoin='round';
     for(const s of board.strokes)strokeOn(ctx,s,w,h);
-    for(const s of [board.drafts.student,board.drafts.teacher,local])if(s)strokeOn(ctx,s,w,h);
+    for(const s of board.guest||[])strokeOn(ctx,s,w,h);
+    for(const s of [board.drafts.student,board.drafts.teacher,local,...Object.values(board.guestDrafts||{})])if(s)strokeOn(ctx,s,w,h);
   }
   // Largest 16:9 board that fits inside the box.
   function fit(box,surface){
@@ -275,6 +323,8 @@
   // =====================================================================
   if(!isTeacher){
     let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null;
+    let cls=null,clsDrawer=null;
+    const presenterLocked=()=>cls?.role==='presenter'&&cls.locked===true;
     const view=el('div','boards-view student-board');view.id='myBoard';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','My whiteboard');
     const bar=el('div','boards-bar'),title=el('strong','boards-title'),drawGroup=el('span','boards-group');
     const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');
@@ -320,7 +370,10 @@
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
-    const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){fit(focus,surface);paint(canvas,board,drawer?.draft())}});
+    const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){
+      // While this boy presents, lines other boys write on his board are drawn over it.
+      board.guest=cls?.role==='presenter'?cls.model.guest:[];board.guestDrafts=cls?.role==='presenter'?cls.model.guestDrafts:{};
+      fit(focus,surface);paint(canvas,board,drawer?.draft())}});
     function openShareWindow(){
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
@@ -329,8 +382,8 @@
       shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
       void startShare('screen');
     }
-    function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
-    drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
+    function act(op){if(!on||mode!=='boards'||blocked||presenterLocked())return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
+    drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked&&!presenterLocked(),board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked&&!presenterLocked())B.sendTeacher(op)},redraw});
 
     async function startShare(){
       shareNote.textContent='';
@@ -372,8 +425,106 @@
       if(next)stage.dispatchEvent(new PointerEvent('pointerleave'));
       redraw();
     }
+    // ---------- The teacher is showing one boy's whiteboard to the whole class ----------
+    // "viewer": a full-page view that is writable only while the teacher or the presenter allowed him.
+    // "presenter": the boy whose board it is. His own board stays his drawing surface and a small panel lets
+    // him choose who may write (the teacher can always override). Only the teacher's room can start or change it.
+    const clsOverlay=el('section');clsOverlay.id='fttClassBoardOverlay';clsOverlay.setAttribute('role','status');
+    clsOverlay.style.cssText='position:fixed;inset:0;z-index:2147483639;background:#071426;display:none;flex-direction:column;font:700 18px system-ui,sans-serif;color:white';
+    const clsTitle=el('div'),clsBar=el('div','boards-bar'),clsNote=el('strong'),clsTools=el('span','boards-group'),clsFocus=el('div','boards-focus'),clsSurface=el('div','board-fit'),clsCanvas=el('canvas');
+    clsTitle.style.cssText='padding:12px 16px;background:#9a3412;text-align:center';clsNote.style.color='#172033';
+    clsCanvas.setAttribute('aria-label','The whiteboard your teacher is showing to the class');
+    clsSurface.appendChild(clsCanvas);clsFocus.appendChild(clsSurface);
+    const clsPen=makeTools(clsTools,COLORS[3],st=>{clsDrawer?.cancel();clsSurface.classList.toggle('erasing',st.tool==='eraser')});
+    clsTools.append(button('↶ Undo','Undo my last line',()=>{
+      const mine=cls?cls.model.guest.filter(s=>s.owner===cls.me):[],last=mine[mine.length-1];
+      if(last)clsAct({type:'board-remove',ids:[last.id]});
+    }));
+    clsBar.append(clsNote,clsTools);clsOverlay.append(clsTitle,clsBar,clsFocus);document.body.appendChild(clsOverlay);
+    const clsRedraw=scheduler(()=>{if(!cls||cls.role!=='viewer')return;fit(clsFocus,clsSurface);paint(clsCanvas,cls.model,clsDrawer?.draft())});
+    function clsAct(op){
+      if(!cls||cls.role!=='viewer'||!cls.canWrite)return;
+      if(applyGuestOp(cls.model,op,cls.me))B.sendTeacher({type:'board-class-write',id:cls.id,op});
+      clsRedraw();
+    }
+    clsDrawer=attachDrawing(clsCanvas,{by:'guest',tools:clsPen,enabled:()=>!!cls&&cls.role==='viewer'&&cls.canWrite,
+      board:()=>({strokes:cls?cls.model.guest.filter(s=>s.owner===cls.me):[],text:null}),apply:clsAct,
+      send:op=>{if(cls&&cls.role==='viewer'&&cls.canWrite)B.sendTeacher({type:'board-class-write',id:cls.id,op})},redraw:clsRedraw});
+    new ResizeObserver(clsRedraw).observe(clsFocus);
+    const pres=el('div');pres.id='fttClassBoardPresenter';pres.setAttribute('role','status');
+    pres.style.cssText='position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:2147483641;display:none;flex-direction:column;gap:8px;max-width:min(560px,calc(100vw - 24px));padding:12px 14px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 10px 30px #0006;color:#7c2d12;font:700 15px system-ui,sans-serif';
+    const presText=el('div'),presRow=el('div'),presList=el('div');
+    presRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px';presList.style.cssText='display:flex;flex-wrap:wrap;gap:6px 14px;max-height:160px;overflow:auto;font-weight:600';
+    const PRES_BUTTON='min-height:40px;padding:0 12px;border-radius:10px;border:2px solid #9a3412;color:#7c2d12;font:700 14px system-ui,sans-serif;cursor:pointer';
+    const presButtons=[['watch','👀 Just watch'],['everyone','✍️ Everyone can write'],['some','👥 Choose boys']].map(([key,label])=>{
+      const b=button(label,'',()=>presChoose(key));b.style.cssText=PRES_BUTTON;presRow.appendChild(b);return[key,b];
+    });
+    pres.append(presText,presRow,presList);document.body.appendChild(pres);
+    function sendAccess(){B.sendTeacher({type:'board-class-access',id:cls.id,access:cls.access,allowed:Array.from(cls.allowed)})}
+    function presChoose(access){
+      if(!cls||cls.role!=='presenter'||cls.locked)return;
+      cls.access=access;sendAccess();renderClass();
+    }
+    function renderClass(){
+      const viewer=!!cls&&cls.role==='viewer',presenter=!!cls&&cls.role==='presenter';
+      clsOverlay.style.display=viewer?'flex':'none';pres.style.display=presenter?'flex':'none';
+      if(viewer){
+        clsTitle.textContent='📋 '+cls.name+'’s whiteboard — your teacher is showing it to the class';
+        clsNote.textContent=cls.canWrite?'✍️ You may write on this board.':'👀 Watching — writing is not turned on for you.';
+        clsTools.style.display=cls.canWrite?'':'none';
+      }
+      if(presenter){
+        presText.textContent=cls.locked?'🔒 Your teacher is in control of the board right now.':'📣 You are showing your whiteboard to the whole class. Who may write on it?';
+        for(const [key,b] of presButtons){b.style.background=cls.access===key?'#fed7aa':'#fff';b.setAttribute('aria-pressed',String(cls.access===key));b.disabled=cls.locked}
+        const listOn=!cls.locked&&cls.access==='some';
+        presRow.style.display=cls.locked?'none':'flex';presList.replaceChildren();presList.style.display=listOn?'flex':'none';
+        if(listOn){
+          if(!cls.roster.length)presList.append(el('span',null,'No other boys are here yet.'));
+          for(const person of cls.roster){
+            const label=el('label'),box=el('input');box.type='checkbox';box.checked=cls.allowed.has(person.id);
+            box.addEventListener('change',()=>{if(box.checked)cls.allowed.add(person.id);else cls.allowed.delete(person.id);sendAccess()});
+            label.append(box,document.createTextNode(' '+person.name));presList.append(label);
+          }
+        }
+      }
+      clsRedraw();redraw();
+    }
+    function closeClassBoard(){cls=null;clsDrawer?.cancel();renderClass()}
+    function onClassMessage(message){
+      if(message.type==='board-class'){
+        if(message.active!==true){if(cls&&message.id===cls.id)closeClassBoard();return}
+        if(typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.name!=='string')return;
+        const presenter=message.role==='presenter';
+        cls={id:message.id,name:message.name.slice(0,60),role:presenter?'presenter':'viewer',canWrite:message.canWrite===true,locked:message.locked===true,
+          access:cleanAccess(message.access),allowed:new Set(cleanIds(message.allowed)),roster:cleanRoster(message.roster),me:cleanKey(message.me),
+          model:classModel(presenter?[]:message.strokes,message.guest,message.text)};
+        clsDrawer?.cancel();renderClass();
+        if(presenter)B.status('Your teacher is showing your whiteboard to the whole class.');
+        return;
+      }
+      if(!cls||message.id!==cls.id)return;
+      if(message.type==='board-class-perm'){
+        const wasLocked=cls.locked;
+        cls.canWrite=message.canWrite===true;cls.locked=message.locked===true;cls.access=cleanAccess(message.access);cls.allowed=new Set(cleanIds(message.allowed));
+        if(Array.isArray(message.roster))cls.roster=cleanRoster(message.roster);
+        if(!cls.canWrite)clsDrawer?.cancel();
+        if(cls.role==='presenter'&&cls.locked!==wasLocked){drawer.cancel();B.status(cls.locked?'Your teacher took control of the board.':'Your teacher gave the board back to you.')}
+        renderClass();return;
+      }
+      if(message.type==='board-class-op'){
+        const by=message.by,from=cleanKey(message.from),op=message.op;
+        if(!['student','teacher','guest'].includes(by)||!op||typeof op.type!=='string')return;
+        if(by==='guest'){if(from===cls.me)return;applyGuestOp(cls.model,op,from)}
+        else if(cls.role==='viewer'){
+          if(op.type==='board-text'){const text=cleanWord(op.text);if(text)cls.model.text=text}
+          else{applyOp(cls.model,op,by);if(by==='teacher'&&op.type==='board-clear'&&op.all===true){cls.model.guest=[];cls.model.guestDrafts={}}}
+        }else return;
+        clsRedraw();redraw();
+      }
+    }
     function fromTeacher(message){
       if(!message||typeof message.type!=='string'||!message.type.startsWith('board-'))return false;
+      if(message.type.startsWith('board-class')){onClassMessage(message);return true}
       if(message.type==='board-mode'){
         drawer.cancel();
         const was=on,wasMode=mode,wasBlocked=blocked;
@@ -391,7 +542,7 @@
       redraw();return true;
     }
     new ResizeObserver(redraw).observe(stage);document.addEventListener('fullscreenchange',redraw);
-    window.ClassPointerBoards={fromTeacher,reset(){drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false)}};
+    window.ClassPointerBoards={fromTeacher,reset(){closeClassBoard();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false)}};
     return;
   }
 
@@ -400,6 +551,7 @@
   // =====================================================================
   const boards=new Map(),tiles=new Map(),blocked=new Set();
   let on=false,mode='screens',focusId=null,drawer=null,gridSize='',suspended=false;
+  let cb=null,cbGone=0; // the whiteboard being presented to the whole class, if any
   // Switching workspaces hides this gallery, not the student's approved screen capture.
   let screenPermissionEnabled=false,workspaceRevision=0;
   // Separate, default-allow permissions: a teacher can exclude one boy without
@@ -422,7 +574,7 @@
     if(allowed)denied[kind].delete(id);else denied[kind].add(id);
     // Allowing from the Students panel also lifts a tile Pause for him.
     if(allowed&&kind==='screens')for(const m of admitted())if(personId(m)===id)blocked.delete(keyFor(m));
-    renderPermissions();
+    cbCheck();renderPermissions();
     for(const m of admitted())if(personId(m)===id){if(on)sendMode(m);dirty(m.id)}
     if(on)syncTiles();
     savePolicy();
@@ -430,7 +582,7 @@
   function bulkPermission(kind,allowed){
     const ids=classStudents.length?classStudents.map(person=>person.id):admitted().map(personId).filter(Boolean);
     for(const id of ids){if(allowed)denied[kind].delete(id);else denied[kind].add(id)}
-    renderPermissions();
+    cbCheck();renderPermissions();
     if(on){for(const m of admitted()){sendMode(m);dirty(m.id)}syncTiles()}
     savePolicy();
   }
@@ -642,7 +794,8 @@
   // Focus bar: one student large.
   const focusBar=el('div','boards-bar'),who=el('strong','boards-title'),drawGroup=el('span','boards-group');focusBar.hidden=true;
   const focusBlock=button('','',()=>{const m=focusMember();if(m)toggleBlock(m)});
-  focusBar.append(button('◀ Back to gallery','Back to all students (sharing continues)',()=>setFocus(null)),who,focusBlock,drawGroup);
+  const presentBtn=button('📣 Present to whole class','Show this boy’s whiteboard to every student in the class. You can stop it at any time.',()=>{const m=focusMember();if(m)startClassBoard(m)});
+  focusBar.append(button('◀ Back to gallery','Back to all students (sharing continues)',()=>setFocus(null)),who,focusBlock,presentBtn,drawGroup);
   const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');focus.hidden=true;
   canvas.setAttribute('aria-label','Student board. Your marks appear on the student’s screen.');
   surface.appendChild(canvas);
@@ -713,16 +866,20 @@
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
         tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for his screen…':'';
         tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
+        tile.toClass.hidden=screens?(paused||!live||!window.ClassPointerClassShare):paused;
+        tile.toClass.title=screens?'Show '+m.name+'’s screen to the whole class':'Present '+m.name+'’s whiteboard to the whole class';
+        tile.toClass.textContent=!screens&&isPresenter(m)?'✅':'📣';
         setVideo(tile.video,screens&&!paused?live:null);
-        if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
+        if(!screens){const b=withGuests(m,boardFor(m));paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
       }
       if(id===focusId){
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
+        presentBtn.hidden=screens||paused;presentBtn.textContent=isPresenter(m)?'✅ Showing to the class':'📣 Present to whole class';presentBtn.disabled=isPresenter(m);
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
         if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
         else setVideo(screenVideo,null);
-        if(!surface.hidden){fit(focus,surface);paint(canvas,boardFor(m),drawer?.draft())}
+        if(!surface.hidden){fit(focus,surface);paint(canvas,withGuests(m,boardFor(m)),drawer?.draft())}
       }
     }
     dirtySet.clear();
@@ -734,10 +891,12 @@
     node.tabIndex=0;node.setAttribute('role','button');node.title='Open '+m.name+'’s tile large';
     v.muted=true;v.autoplay=true;v.playsInline=true;v.hidden=true;
     const block=button('🚫','Pause '+m.name,event=>{event.stopPropagation();toggleBlock(m)},'board-block');
-    node.append(c,v,note,el('span','board-name',m.name),block);
+    const toClass=button('📣','Show '+m.name+'’s screen to the whole class',event=>{event.stopPropagation();if(mode==='boards'){startClassBoard(m);return}const id=personId(m)||m.studentId;if(id)window.ClassPointerActivityShares?.showToClass?.(id,m.name)},'board-block board-class-share');
+    toClass.hidden=true;
+    node.append(c,v,note,el('span','board-name',m.name),block,toClass);
     node.addEventListener('click',()=>setFocus(m.id));
     node.addEventListener('keydown',event=>{if(event.target===node&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setFocus(m.id)}});
-    return{node,canvas:c,video:v,note,block};
+    return{node,canvas:c,video:v,note,block,toClass};
   }
   // "Who has not started sharing?" Every boy on the class roster who may share his screen is either sharing (live
   // stream) or listed here. Boys who are connected to the class show in orange; boys not connected show in grey.
@@ -824,6 +983,7 @@
   }
   function setOn(next){
     if(next&&!B.started())return;
+    if(!next)stopClassBoard();
     on=next;suspended=false;if(!next)++workspaceRevision;drawer?.cancel();focusId=null;gridSize='';
     screenPermissionEnabled=next?(screenPermissionEnabled||mode==='screens'):false;
     for(const m of admitted())sendMode(m);
@@ -837,6 +997,7 @@
   }
   function setMode(next){
     if(next===mode)return;
+    if(next!=='boards')stopClassBoard();
     mode=next;drawer?.cancel();
     if(mode==='screens'){
       screenPermissionEnabled=true;
@@ -899,6 +1060,7 @@
   function hideWorkspace(){
     ++workspaceRevision;
     if(!on||suspended)return;
+    stopClassBoard();
     suspended=true;view.hidden=true;focusId=null;gridSize='';
     setVideo(screenVideo,null);
     for(const tile of tiles.values())setVideo(tile.video,null);
@@ -909,23 +1071,139 @@
   }
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
-    drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);
+    drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);cbCheck();
     // A student sharing from Shorashim or another activity is not joined to Pointer, so hiding his video is not enough:
     // record the pause as a screen-sharing permission so his browser stops capturing and the teacher stops receiving.
     if(mode==='screens'){const person=personId(m);if(person)updatePermission(person,'screens',!blocked.has(key))}
     B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
-  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;if(applyOp(boardFor(m),op,'teacher'))B.send(m.connection,op);dirty(m.id)}
+  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;if(applyOp(boardFor(m),op,'teacher')){B.send(m.connection,op);classTeacherOp(m,op)}dirty(m.id)}
   drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)},board:()=>focusBoard()||emptyBoard(),apply:act,
-    send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,op)},redraw:()=>{if(focusId)dirty(focusId)}});
+    send:op=>{const m=focusMember();if(m&&on&&mode==='boards'){B.send(m.connection,op);classTeacherOp(m,op)}},redraw:()=>{if(focusId)dirty(focusId)}});
+
+  // ---------- Present one boy's whiteboard to the whole class (the teacher's choice only) ----------
+  // Messages: board-class (start/stop, and a full copy for each boy), board-class-op (one line, rebuilt here from
+  // known fields), board-class-perm (who may write). Everything a boy draws reaches the others through this page,
+  // and only boys already admitted to this class are ever sent anything. One stays on the lesson for the teacher:
+  // a red Stop button (also in full screen). Choosing a different boy replaces the first.
+  const sidOf=m=>personId(m)||m.studentId||m.id;
+  const isPresenter=m=>!!cb&&keyFor(m)===cb.key;
+  const presenterMember=()=>cb?admitted().find(isPresenter)||null:null;
+  const cbCanWrite=m=>!!cb&&!isPresenter(m)&&(cb.access==='everyone'||(cb.access==='some'&&cb.allowed.has(sidOf(m))));
+  function cbRoster(){
+    const seen=new Set([cb.sid]),list=[];
+    for(const person of classStudents.length?classStudents:admitted().map(m=>({id:sidOf(m),name:m.name}))){
+      if(!person.id||seen.has(person.id))continue;seen.add(person.id);list.push({id:person.id,name:person.name});
+    }
+    return list.slice(0,80);
+  }
+  // Lines other boys wrote are drawn over the presenter's board on the teacher's tile too.
+  function withGuests(m,b){const mine=!!cb&&keyFor(m)===cb.key;b.guest=mine?cb.model.guest:[];b.guestDrafts=mine?cb.model.guestDrafts:{};return b}
+  function cbMessage(m){
+    const b=boards.get(cb.key)||emptyBoard(),presenter=isPresenter(m);
+    const strip=s=>({id:s.id,color:s.color,size:s.size,points:s.points,by:s.by});
+    const message={type:'board-class',active:true,id:cb.id,name:cb.name,role:presenter?'presenter':'viewer',access:cb.access,allowed:Array.from(cb.allowed),
+      canWrite:presenter?!cb.locked:cbCanWrite(m),locked:cb.locked,me:sidOf(m),guest:cb.model.guest.map(s=>({...strip(s),owner:s.owner})),text:b.text};
+    if(presenter)message.roster=cbRoster();else message.strokes=b.strokes.map(strip);
+    return message;
+  }
+  function cbPerm(m){
+    const presenter=isPresenter(m);
+    const message={type:'board-class-perm',id:cb.id,canWrite:presenter?!cb.locked:cbCanWrite(m),locked:cb.locked,access:cb.access,allowed:Array.from(cb.allowed)};
+    if(presenter)message.roster=cbRoster();
+    return message;
+  }
+  function sendPerms(){if(!cb)return;for(const m of admitted())B.send(m.connection,cbPerm(m));renderBar()}
+  function cbRelay(op,by,from,except){
+    if(!cb)return;
+    const message={type:'board-class-op',id:cb.id,by,from,op};
+    // The presenter already has his own and the teacher's lines; he needs only the other boys'.
+    for(const m of admitted()){if(m===except||(isPresenter(m)&&by!=='guest'))continue;B.send(m.connection,message)}
+  }
+  function classTeacherOp(m,op){
+    if(!cb||!isPresenter(m))return;
+    const clean=cleanRelayOp(op,'teacher');if(!clean)return;
+    if(clean.type==='board-clear'&&clean.all){cb.model.guest=[];cb.model.guestDrafts={}}
+    cbRelay(clean,'teacher','',null);
+  }
+  function classFromStudent(m,message){
+    if(!cb||message.id!==cb.id)return;
+    if(message.type==='board-class-access'){
+      // Only the presenter (and only while the teacher has not taken control) may change who writes.
+      if(!isPresenter(m)||cb.locked)return;
+      const known=new Set(cbRoster().map(person=>person.id));
+      cb.allowed=new Set(cleanIds(message.allowed).filter(id=>known.has(id)));cb.access=cleanAccess(message.access);
+      sendPerms();return;
+    }
+    if(message.type==='board-class-write'){
+      if(isPresenter(m)||!cbCanWrite(m)||isBlocked(m))return;
+      const op=cleanRelayOp(message.op,'guest'),from=sidOf(m);
+      if(!op||!applyGuestOp(cb.model,op,from))return;
+      cbRelay(op,'guest',from,m);
+      const pm=presenterMember();if(pm)dirty(pm.id);
+    }
+  }
+  const cbBar=el('div');cbBar.id='classBoardBar';cbBar.dataset.stageUi='true';cbBar.setAttribute('role','status');
+  cbBar.style.cssText='position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;align-items:center;gap:8px;width:max-content;max-width:calc(100% - 24px);padding:10px 14px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 10px 30px #0006;color:#7c2d12;font:700 16px system-ui;pointer-events:auto;display:none';
+  const cbText=el('div'),cbRow=el('div'),cbList=el('div'),cbStop=button('','',()=>stopClassBoard());
+  const CB_BUTTON='min-height:40px;padding:0 12px;border-radius:10px;border:2px solid #9a3412;color:#7c2d12;font:700 14px system-ui;cursor:pointer';
+  cbRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center';
+  cbList.style.cssText='display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;max-height:150px;overflow:auto;font-weight:600;font-size:14px';
+  const cbChoices=[['watch','👀 Just watch'],['everyone','✍️ Everyone can write'],['some','👥 Choose boys…']].map(([key,label])=>{
+    const b=button(label,'Who may write on this board',()=>{if(!cb)return;cb.access=key;sendPerms()});b.style.cssText=CB_BUTTON;return[key,b];
+  });
+  const cbLock=button('🔒 Take control','Take control: the boy cannot write until you give it back',()=>{if(!cb)return;cb.locked=!cb.locked;sendPerms()});cbLock.style.cssText=CB_BUTTON;
+  cbStop.style.cssText='min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #b91c1c;background:#dc2626;color:#fff;font:800 15px system-ui;cursor:pointer';
+  cbRow.append(...cbChoices.map(choice=>choice[1]),cbLock,cbStop);cbBar.append(cbText,cbRow,cbList);stage.appendChild(cbBar);shield(cbBar);
+  function renderBar(){
+    cbBar.style.display=cb?'flex':'none';if(!cb)return;
+    const n=cb.allowed.size;
+    cbText.textContent='🔴 The whole class is seeing '+cb.name+'’s whiteboard. '+(cb.locked?'You have control; '+cb.name+' cannot write.':cb.access==='everyone'?'Everyone may write.':cb.access==='some'?n+(n===1?' boy may':' boys may')+' write.':'Everyone is only watching.');
+    for(const [key,b] of cbChoices){b.style.background=cb.access===key?'#fed7aa':'#fff';b.setAttribute('aria-pressed',String(cb.access===key))}
+    cbLock.textContent=cb.locked?'🔓 Give control back':'🔒 Take control';
+    cbStop.textContent='Stop showing '+cb.name+'’s whiteboard';
+    cbList.replaceChildren();cbList.style.display=cb.access==='some'?'flex':'none';
+    if(cb.access==='some')for(const person of cbRoster()){
+      const label=el('label'),box=el('input');box.type='checkbox';box.checked=cb.allowed.has(person.id);
+      box.addEventListener('change',()=>{if(!cb)return;if(box.checked)cb.allowed.add(person.id);else cb.allowed.delete(person.id);sendPerms()});
+      label.append(box,document.createTextNode(' '+person.name));cbList.append(label);
+    }
+  }
+  function startClassBoard(m){
+    if(!on||mode!=='boards'||!m||isBlocked(m)||excluded(m,'boards')||!B.started())return false;
+    window.ClassPointerClassShare?.stop();
+    stopClassBoard();
+    cb={id:crypto.randomUUID(),key:keyFor(m),sid:sidOf(m),name:String(m.name||'A student').slice(0,60),access:'watch',allowed:new Set(),locked:false,model:{strokes:[],guest:[],drafts:{},guestDrafts:{}}};
+    for(const entry of admitted())B.send(entry.connection,cbMessage(entry));
+    renderBar();dirtyAll();
+    B.status('The whole class is now seeing '+cb.name+'’s whiteboard. Use the bar at the bottom to choose who may write, or to stop.');
+    return true;
+  }
+  function stopClassBoard(){
+    const old=cb;if(!old)return;
+    cb=null;clearTimeout(cbGone);cbGone=0;
+    for(const m of admitted())B.send(m.connection,{type:'board-class',active:false,id:old.id});
+    renderBar();dirtyAll();
+  }
+  // Stops by itself if the boy is paused or turned off, or if he has not been back for a while (a short gap while he
+  // moves between activity pages is normal).
+  function cbCheck(){
+    if(!cb)return;
+    if(!on||mode!=='boards'){stopClassBoard();return}
+    const m=presenterMember();
+    if(!m){if(!cbGone)cbGone=setTimeout(()=>{cbGone=0;if(cb&&!presenterMember())stopClassBoard()},25000);return}
+    clearTimeout(cbGone);cbGone=0;
+    if(isBlocked(m)||excluded(m,'boards'))stopClassBoard();
+  }
+  document.addEventListener('class-pointer-teacher-signed-out',()=>stopClassBoard());
 
   document.addEventListener('classpointer:send-to-whiteboards',()=>void sendEveryone('boards'));
   document.addEventListener('classpointer:send-to-screens',()=>void sendEveryone('screens'));
   // A boy sharing from Shorashim (or another activity) connected, changed or stopped: refresh the tiles and the large viewer.
   document.addEventListener('classpointer:activity-screens',()=>{if(on){syncTiles();dirtyAll()}});
   toggle?.addEventListener('click',()=>setOn(!on));
-  setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
+  setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles();cbCheck()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
   controls();renderPermissions();void loadPermissionsRoster();
 
@@ -940,6 +1218,8 @@
     load:()=>loadPermissionsRoster()
   };
   window.ClassPointerBoards={
+    stopClassBoard,
+    classBoard:()=>cb?{studentId:cb.sid,name:cb.name,access:cb.access,locked:cb.locked}:null,
     navigateWorkspace(destination){
       if(destination==='teach'){hideWorkspace();return true}
       if(destination!=='screens'&&destination!=='whiteboards')return false;
@@ -950,9 +1230,14 @@
     fromStudent(m,message){
       if(!on)return;
       if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
+      if(message.type==='board-class-access'||message.type==='board-class-write'){classFromStudent(m,message);return}
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
       if(mode!=='boards'||isBlocked(m)||excluded(m,'boards'))return;
-      if(applyOp(boardFor(m),message,'student'))dirty(m.id);
+      if(cb&&cb.locked&&isPresenter(m))return;
+      if(applyOp(boardFor(m),message,'student')){
+        dirty(m.id);
+        if(cb&&isPresenter(m)){const clean=cleanRelayOp(message,'student');if(clean)cbRelay(clean,'student','',m)}
+      }
     },
     // A student's screen arrives as a one-way media call (student → teacher). Only accepted in Screens mode.
     incomingCall(call){
@@ -964,10 +1249,10 @@
       call.on('close',end);call.on('error',end);
       call.answer();return true;
     },
-    studentJoined(m){const b=boardFor(m);b.drafts={student:null,teacher:null};renderPermissions();if(on){sendMode(m);syncTiles()}},
+    studentJoined(m){const b=boardFor(m);b.drafts={student:null,teacher:null};renderPermissions();if(on){sendMode(m);if(cb)B.send(m.connection,cbMessage(m));syncTiles()}},
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
-      drawer?.cancel();for(const m of B.members().values())closeScreen(m);
+      stopClassBoard();drawer?.cancel();for(const m of B.members().values())closeScreen(m);
       // The enclosing classroom ends by deleting the entire Firebase session.
       // Do not send an asynchronous child update here: it could recreate an
       // orphan studentScreenSharing flag after the session is removed.
