@@ -40,6 +40,33 @@
         throw new Error(error.name === 'NotAllowedError' ? 'Microphone permission was denied. Allow it in browser settings and try again.' : 'Could not start the microphone. Check the device and try again.');
       }
     }
+    // MediaRecorder's wall-clock timer is not proof that the encoded blob contains
+    // that much playable audio. Validate independently when the browser can decode.
+    // Unknown/unsupported codecs are left to the normal local preview, not rejected.
+    static async verifyPlayableDuration(blob, elapsed, { Decoder = root.AudioContext || root.webkitAudioContext } = {}) {
+      if (!Number.isFinite(elapsed) || elapsed < 3 || !Decoder) return { checked: false };
+      let decoder;
+      try {
+        decoder = new Decoder();
+        const samples = await blob.arrayBuffer();
+        // decodeAudioData may consume/detach its input buffer.
+        const audio = await decoder.decodeAudioData(samples);
+        const playable = audio.duration;
+        if (Number.isFinite(playable) && playable > 0) {
+          if (playable + Math.max(2, elapsed * 0.12) < elapsed) {
+            throw Object.assign(new Error('The recording appears cut off (' + Math.round(playable) + 's of ' + Math.round(elapsed) + 's). Please record again; it was not submitted.'), { kriahTruncated: true });
+          }
+          return { checked: true, playable };
+        }
+      } catch (error) {
+        if (error.kriahTruncated) throw error;
+        // Codec support varies between browsers, particularly Safari/MP4.
+        // A failed decode alone is not evidence of truncation.
+      } finally {
+        try { await decoder?.close(); } catch (_) {}
+      }
+      return { checked: false };
+    }
     stop() { if (this.state === 'recording') { this.state = 'stopping'; this.recorder.stop(); } }
     cleanup() { clearInterval(this.timer); this.timer = null; this.stream?.getTracks().forEach(t => { t.onended = null; t.stop(); }); this.stream = null; }
     cancel() { this.cancelled = true; this.session++; this.stop(); this.cleanup(); this.state = 'idle'; }
