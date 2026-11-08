@@ -372,6 +372,44 @@ if(guestPreview){
 }
 if(!sid){$('studentNameTop').textContent='Not signed in';$('switchStudentBtn').classList.add('hidden');$('noStudent').classList.remove('hidden');return}$('studentNameTop').textContent=sname;$('app').classList.remove('hidden');try{const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once('value'),db.ref('posukPractice/attempts/'+sid).once('value'),db.ref(EVENTS+sid).once('value')]);if(stateSnap.exists())d=norm(stateSnap.val());attemptsRoot=attemptSnap.val()||{};chazaraEvents=eventSnap.val()||{};rebuildUnlocked();renderRecordings();db.ref('posukPractice/attempts/'+sid).on('value',s=>{attemptsRoot=s.val()||{};rebuildUnlocked()});db.ref(EVENTS+sid).on('value',s=>{chazaraEvents=s.val()||{};render();renderRecordings()});retryPendingPointSyncs()}catch(e){console.warn(e);render();renderRecordings()}})();
 </script>
+<script src="../assignment-center/homework-mode.js?v=20261108-hw649"></script>
+<script>
+/* Homework mode (#649): ?hw=…&hwPerek=18&hwFrom=1&hwTo=3&hwTimes=2 shows only the assigned pesukim.
+   Chazaras save exactly as usual (same events, points and recordings). The "do the others first"
+   rotation only counts the assigned pesukim. The item ticks itself once every assigned posuk has
+   the assigned number of Chazaras since the homework was given. */
+(function(){
+  const HM=window.HomeworkMode;if(!HM||!HM.active)return;
+  const p=HM.params,perek=Number(p.get('hwPerek')),from=Number(p.get('hwFrom')),to=Number(p.get('hwTo')||from),times=Math.max(1,Math.min(5,Number(p.get('hwTimes'))||1));
+  if(!perek||!from||to<from)return;
+  const keys=[];for(let v=from;v<=to;v++)keys.push(K(perek,v));
+  const style=document.createElement('style');
+  style.textContent='html.b3-homework-mode #due{display:none!important}';
+  document.head.append(style);
+  displayPlan=function(){return [{p:perek,min:from,max:to}]};
+  const pool=dailyRotationPool;
+  dailyRotationPool=function(){return pool.apply(this,arguments).filter(k=>keys.includes(k))};
+  function counts(){
+    const out={};
+    Object.values(chazaraEvents||{}).forEach(e=>{
+      if(!e||e.reviewApplied!==true||e.removed===true||isRejectedEvent(e)||(Number(e.createdAt)||0)<HM.since)return;
+      const k=K(Number(e.perek),Number(e.posuk));if(keys.includes(k))out[k]=(out[k]||0)+1;
+    });
+    return out;
+  }
+  function check(){
+    if(!sid)return;
+    const c=counts(),left=keys.filter(k=>(c[k]||0)<times);
+    if(!left.length){HM.complete();return}
+    const locked=keys.filter(k=>!isChazaraUnlocked(k)).length;
+    HM.setStatus('Pesukim done: '+(keys.length-left.length)+' of '+keys.length+(times>1?' ('+times+' times each)':'')+
+      (locked?' · '+locked+' still locked: finish Reading + Translation in Posuk Practice first':''));
+  }
+  const draw=render;
+  render=function(){const out=draw.apply(this,arguments);check();return out};
+  render();
+})();
+</script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
