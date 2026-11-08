@@ -285,7 +285,7 @@ button.link:hover{background:none;color:var(--navy)}
     <div class="card create-card"><div class="create-intro"><span class="big-icon" aria-hidden="true">📝</span><div><h2 id="formTitle">Let's make an assignment!</h2><p>We'll do this together in three quick steps.</p></div></div>
     <div class="create-progress" aria-live="polite"><div class="progress-track"><span id="progressFill"></span></div><div class="step-caption" id="stepCaption">Step 1 of 3 · Assignment</div></div>
     <div class="create-step" id="createStep1"><div class="create-field"><span class="question-number" aria-hidden="true">1</span><div><span class="field-label" id="labelQuestion">What kind of assignment is it?</span><div class="label-choices" role="radiogroup" aria-labelledby="labelQuestion"><label class="label-choice"><input type="radio" name="label" value="homework" checked><span>Homework</span></label><label class="label-choice"><input type="radio" name="label" value="classwork"><span>Class Assignment</span></label></div></div></div>
-    <div class="create-field"><span class="question-number" aria-hidden="true">2</span><div><label for="type">What are they practicing?</label><p class="field-help">Pick the activity students should open.</p><select id="type"></select></div></div>
+    <div class="create-field"><span class="question-number" aria-hidden="true">2</span><div><span class="field-label" id="itemsQuestion">What are they practicing?</span><p class="field-help">Add one or more items. Each item opens the activity at exactly the right spot, for example Posuk Practice, perek 18, pesukim 12–14.</p><div id="itemsBuilder" role="group" aria-labelledby="itemsQuestion"></div><select id="type" hidden aria-hidden="true" tabindex="-1"></select></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">3</span><div><label for="title">Give it a short name</label><input id="title" maxlength="120" placeholder="For example: This week's Shorashim"></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">4</span><div><label for="details">What should students do?</label><textarea id="details" maxlength="1200" placeholder="Practice saying each word. Then come back here and hand it in."></textarea></div></div>
     <div class="step-actions"><button class="sec backHome">Cancel</button><button id="nextAudience" class="primary-action">Next: Choose students →</button></div></div>
@@ -312,6 +312,7 @@ button.link:hover{background:none;color:var(--navy)}
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="../class-confirm-gate.js"></script>
 <script src="homework-common.js"></script>
+<script src="homework-items.js"></script>
 <script>
 (function(){'use strict';
 var H=window.HomeworkCommon,el=H.el,$=function(i){return document.getElementById(i)};
@@ -332,9 +333,9 @@ $('openAssignments').onclick=function(){$('listNotice').textContent='';renderRep
 $('openPreview').onclick=function(){showScreen('screenPreview')};
 $('openMessages').onclick=function(){renderMessages();showScreen('screenMessages')};
 ['title','details','assigned','due'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
-function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
+function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';var pi=$('previewItems');if(!pi){pi=el('ol',null,'hwi-list');pi.id='previewItems';$('previewDetails').after(pi)}pi.replaceChildren();if(typeof itemsBox!=='undefined')itemsBox.get().forEach(function(item){var d=HI.describe(item);pi.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
 function goCreateStep(step){state.createStep=Math.max(1,Math.min(3,step));[1,2,3].forEach(function(n){$('createStep'+n).hidden=n!==state.createStep});$('stepCaption').textContent='Step '+state.createStep+' of 3 · '+['','Assignment','Students','Review & share'][state.createStep];$('progressFill').style.width=(state.createStep*100/3)+'%';if(state.createStep===3)updatePreview();window.scrollTo({top:0,behavior:'smooth'})}
-function continueToStudents(){if(!$('title').value.trim()){say($('formMsg'),'Add a short name for this assignment first.');$('title').focus();return}say($('formMsg'),'');goCreateStep(2)}
+function continueToStudents(){var ip=itemsProblem();if(ip){say($('formMsg'),ip);$('itemsBuilder').scrollIntoView({block:'center'});return}if(!$('title').value.trim()){say($('formMsg'),'Add a short name for this assignment first.');$('title').focus();return}say($('formMsg'),'');goCreateStep(2)}
 function continueToReview(){if(document.querySelector('input[name=aud]:checked').value==='some'&&!$('studentPick').querySelector('input:checked')){say($('formMsg'),'Pick at least one student, or choose everyone in your class.');$('studentPick').scrollIntoView({block:'center'});return}say($('formMsg'),'');goCreateStep(3)}
 $('nextAudience').onclick=continueToStudents;$('backToDetails').onclick=function(){goCreateStep(1)};$('nextReview').onclick=continueToReview;$('backToAudience').onclick=function(){goCreateStep(2)};
 function renderFictionalPreview(){var root=$('fakeStudent');root.replaceChildren();root.append(el('h2','Hi, Maya! Ready for homework?'));var tabs=el('div');['To Do','Handed In','Finished'].forEach(function(t){tabs.append(el('span',t,'badge'))});root.append(tabs);var c=el('div',null,'card');c.append(el('span','To Do','badge wait'),el('h3','Practice 5 minutes of Shorashim'),el('p','Read the words and practice saying each one. You still need to press Hand In when you finish.'));var b=el('button','Start Activity');b.disabled=true;b.setAttribute('aria-label','Sample only: Start Activity is disabled');c.append(b,el('button','Hand In','sec'));c.querySelectorAll('button').forEach(function(x){x.disabled=true});root.append(c,el('p','This example is only a picture of the student page. No real student information or homework is loaded.','muted'))}
@@ -342,6 +343,9 @@ renderFictionalPreview();
 Object.keys(H.TYPES).forEach(function(k){var label=H.TYPES[k];if(k==='audio'||k==='video')label+=' — not available yet';var o=el('option',label);o.value=k;if(k==='audio'||k==='video')o.disabled=true;$('type').append(o)});
 function syncType(){var t=$('type').value;$('targetWrap').style.display='';$('targetUnit').value=t==='shorashim'?'minutes':t==='weeklyQuiz'?'questions':$('targetUnit').value;var aud=document.getElementById('audBox');if(aud)aud.style.display=state.editing?'none':''}
 $('type').onchange=syncType;syncType();
+// Checklist items: one homework can hold several specific items (see homework-items.js).
+var HI=window.HomeworkItems,itemsBox=HI.builder($('itemsBuilder'),{onChange:function(items){if(items.length)$('type').value=items[0].type;syncType();updatePreview()}});
+function itemsProblem(){if(itemsBox.isEditing())return 'Finish the item you are adding first: press Add to homework, or Cancel.';if(!state.editing&&!itemsBox.get().length)return 'Add at least one item so students know exactly what to do.';return ''}
 
 $('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){say($('signinMsg'),e.message)})};
 $('signout').onclick=function(){auth.signOut()};
@@ -375,9 +379,10 @@ function buildPick(){
 }
 function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
 function resetForm(){state.editing=null;state.editingPublication=null;$('formTitle').textContent='Let’s make an assignment!';setLabel('homework');$('save').textContent='Save Draft';$('publishNow').textContent='Publish to Students';$('publishNow').hidden=false;$('cancelEdit').style.display='none';
-  ['title','details','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;syncType();updatePreview();goCreateStep(1)}
+  ['title','details','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;itemsBox.set([]);syncType();updatePreview();goCreateStep(1)}
 $('cancelEdit').onclick=resetForm;
 async function submitForm(publishRequested){
+  var ip=itemsProblem();if(ip){say($('formMsg'),ip);goCreateStep(1);return}
   if(!$('title').value.trim()){say($('formMsg'),'Please add a short assignment name.');$('title').focus();return}
   if(!$('assigned').value){say($('formMsg'),'Choose a start date.');document.querySelector('.optional-settings').open=true;$('assigned').focus();return}
   if($('due').value&&$('due').value<$('assigned').value){say($('formMsg'),'The due date needs to be the same as or later than the start date.');document.querySelector('.optional-settings').open=true;$('due').focus();return}
@@ -386,11 +391,12 @@ async function submitForm(publishRequested){
   try{
     var id=state.editing;
     if(wasEditing){
-      await api({action:'edit',assignmentId:id,label:chosenLabel(),title:$('title').value,details:$('details').value,
+      await api({action:'edit',assignmentId:id,label:chosenLabel(),title:$('title').value,details:$('details').value,items:itemsBox.get(),
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
         targetAmount:$('target').value,targetUnit:$('targetUnit').value});
     }else{
-      var body={action:'create',type:$('type').value,label:chosenLabel(),title:$('title').value.trim(),details:$('details').value,
+      var newItems=itemsBox.get();
+      var body={action:'create',type:newItems.length?newItems[0].type:$('type').value,items:newItems,label:chosenLabel(),title:$('title').value.trim(),details:$('details').value,
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
         targetAmount:$('target').value,targetUnit:$('targetUnit').value};
       if(document.querySelector('input[name=aud]:checked').value==='some')body.studentIds=Array.prototype.map.call($('studentPick').querySelectorAll('input:checked'),function(c){return c.value});
@@ -457,12 +463,13 @@ document.querySelectorAll('.backReports').forEach(function(b){b.onclick=function
 $('viewAssignments').onclick=function(){state.reportView='assignments';renderReports()};
 $('viewStudents').onclick=function(){state.reportView='students';renderReports()};
 $('reportSort').onchange=function(){state.reportSort=$('reportSort').value;renderReports()};
-function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
+function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;itemsBox.set(a.items||[]);setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
 function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(state.openAssignmentId);root.replaceChildren();if(!a){$('oneAssignmentHeading').textContent='Assignment';root.append(el('div','This assignment is no longer available.','card muted'));return}
   var p=pubOf(a),c=assignmentCounts(a);$('oneAssignmentHeading').textContent=a.title;
   var card=el('div',null,'card'),badges=el('div');badges.append(labelBadge(a),el('span',H.TYPES[a.type]||a.type,'badge'),el('span',p==='published'?'Published':p==='archived'?'Archived':'Draft · students can’t see it','badge '+(p==='published'?'ok':'state')));card.append(badges);
   var meta=el('div',null,'detail-meta');meta.append(el('span',p==='draft'?'Created '+H.when(a.createdAt):'Given '+H.when(givenAt(a))),el('span',a.dueAt!=null?'Due '+H.when(a.dueAt):'No due date'),el('span',c.total+' '+(c.total===1?'student':'students')+' assigned'));if(a.targetAmount)meta.append(el('span','Goal: '+a.targetAmount+' '+(a.targetUnit||'')));card.append(meta);
   if(a.details)card.append(el('p',a.details,'detail-instructions'));
+  if(a.items&&a.items.length){var il=el('ol',null,'hwi-list');a.items.forEach(function(item){var d=HI.describe(item);il.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});card.append(el('strong','Checklist ('+a.items.length+' items)'),il)}
   if(p!=='draft'){card.append(countLine(c),countDetail(c))}else card.append(el('p','Students can’t see this yet. Publish it to send it to them.','count-detail'));
   var ed=el('button','Edit','sec');ed.disabled=p==='archived';ed.onclick=function(){startEdit(a)};
   var pub=el('button',p==='published'?'Unpublish':'Publish to Students',p==='published'?'sec':'');pub.disabled=p==='archived';pub.onclick=async function(){pub.disabled=true;try{await api({action:p==='published'?'unpublish':'publish',assignmentId:a.id});await load()}catch(e){alert(e.message);pub.disabled=false}};
@@ -473,7 +480,7 @@ function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(s
   if(!ids.length){tableCard.append(el('p','No students are assigned yet.','muted'));root.append(tableCard);return}
   ids.sort(function(x,y){var sx=a.students[x],sy=a.students[y],byName=String(sx.name).localeCompare(String(sy.name));if(state.detailSort==='status'){var ox=STATUS_ORDER[sx.status]??9,oy=STATUS_ORDER[sy.status]??9;return ox-oy||(isPastDue(sy)?1:0)-(isPastDue(sx)?1:0)||byName}return byName});
   var wrap=el('div',null,'tablewrap'),t=el('table',null,'report-table'),hr=el('tr');['Student','Status','Handed in','Grade','Your comment','Notes'].forEach(function(x){hr.append(el('th',x))});var thead=el('thead');thead.append(hr);t.append(thead);var tb=el('tbody');
-  ids.forEach(function(id){var s=a.students[id],tr=el('tr'),nameTd=el('td'),nb=el('button',s.name,'link');nb.onclick=function(){openStudent(id)};nameTd.append(nb);var st=el('td');st.append(statusCell(s));var g=el('td',null,'grade');g.append(gradeCell(s));var cm=el('td');cm.append(commentCell(s));
+  ids.forEach(function(id){var s=a.students[id],tr=el('tr'),nameTd=el('td'),nb=el('button',s.name,'link');nb.onclick=function(){openStudent(id)};nameTd.append(nb);var st=el('td');st.append(statusCell(s));if(a.items&&a.items.length)st.append(HI.progressTag(a,s));var g=el('td',null,'grade');g.append(gradeCell(s));var cm=el('td');cm.append(commentCell(s));
     var n=(s.messages||[]).length,newNotes=H.unreadCount(s.messages,'teacher'),notesTd=el('td'),open=state.openNotes===id,nbtn=el('button',(open?'Hide':'Open')+(n?' ('+n+')':''),'sec');if(newNotes&&!open)nbtn.append(el('span',newNotes+' new','conversation-unread'));nbtn.setAttribute('aria-expanded',String(open));nbtn.setAttribute('aria-label',(open?'Hide':'Open')+' notes with '+s.name);nbtn.onclick=function(){state.openNotes=open?null:id;renderAssignmentDetail()};notesTd.append(nbtn);
     tr.append(nameTd,st,el('td',s.submittedAt?H.when(s.submittedAt):'—'),g,cm,notesTd);tb.append(tr);
     if(open){var nr=el('tr',null,'notes-row'),cell=el('td');cell.colSpan=6;if(s.answer)cell.append(el('p','Student work: '+s.answer));cell.append(H.conversation({role:'teacher',studentName:s.name,messages:s.messages||[],send:function(body){return api(Object.assign({assignmentId:a.id,studentId:id},body))},onSent:load}));nr.append(cell);tb.append(nr)}});

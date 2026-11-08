@@ -202,9 +202,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 <script src="../firebase-config.js"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="homework-common.js"></script>
+<script src="homework-items.js"></script>
 <script>
 (function(){'use strict';
-var H=window.HomeworkCommon,el=H.el;
+var H=window.HomeworkCommon,HI=window.HomeworkItems,el=H.el;
 var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
 if(!H.isAllowedRuntime()){statusBox.textContent='Homework is not available on this site.';return}
 function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
@@ -245,7 +246,7 @@ function card(a){
   var d=el('details',null,'card home-card home-fold '+bucket),sum=el('summary',null,'fold-sum');
   d.open=!!openCards[a.id];d.addEventListener('toggle',function(){if(d.open)openCards[a.id]=1;else delete openCards[a.id]});
   var head=body.firstChild,meta=head&&head.nextSibling;body.removeChild(head);
-  var tags=el('span',null,'fold-tags');if(meta){var first=meta.firstChild;if(first)tags.append(first.cloneNode(true));Array.prototype.forEach.call(meta.children,function(x){if(/Due|Late/.test(x.textContent))tags.append(x.cloneNode(true))})}
+  var tags=el('span',null,'fold-tags');if(meta){var first=meta.firstChild;if(first)tags.append(first.cloneNode(true));Array.prototype.forEach.call(meta.children,function(x){if(/Due|Late/.test(x.textContent))tags.append(x.cloneNode(true))})}if(a.items&&a.items.length)tags.append(HI.progressTag(a,a));
   sum.append(el('span',a.title,'fold-title'),tags);
   body.className='fold-body';d.append(sum,body);return d;
 }
@@ -261,7 +262,10 @@ function cardBody(a){
   c.append(meta);
   if(a.details)c.append(el('p',a.details));
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
-  var activityUrl=H.activityUrl(a.type);
+  // Checklist homework (#649): each item opens the activity in homework mode and ticks itself when finished.
+  var hasItems=!!(a.items&&a.items.length);
+  if(hasItems)c.append(HI.checklist(a,{canOpen:a.status!=='approved'&&a.status!=='submitted',markDone:function(item){return call({action:'itemDone',assignmentId:a.id,itemId:item.id}).then(refresh)}}));
+  var activityUrl=hasItems?'':H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='opener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
   if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
   c.append(H.conversation({role:'student',collapsed:true,threadKey:a.id,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh}));
@@ -276,7 +280,7 @@ function cardBody(a){
     c.append(el('label','Minutes I practiced'));
     mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
   }
-  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':'✏️ Tell your teacher what you did'));
+  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':hasItems?'✏️ Anything to tell your teacher? (optional once every item is done)':'✏️ Tell your teacher what you did'));
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
