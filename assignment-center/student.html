@@ -209,9 +209,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 <script src="../firebase-config.js"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="homework-common.js"></script>
+<script src="homework-items.js"></script>
 <script>
 (function(){'use strict';
-var H=window.HomeworkCommon,el=H.el;
+var H=window.HomeworkCommon,HI=window.HomeworkItems,el=H.el;
 var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
 var filterBar=document.getElementById('filterBar');
 var activeFilters={subject:null,time:null,done:null};
@@ -242,9 +243,10 @@ function dueMatches(a,time){
   day.setDate(day.getDate()-day.getDay());var weekStart=day.getTime();day.setDate(day.getDate()+7); // Sunday to Shabbos
   return a.dueAt>=weekStart&&a.dueAt<day.getTime();
 }
+function subjectKey(s){return String(s||'').trim().toLowerCase()} // "Chumash" and "chumash" are one subject
 function applyFilters(list){
   return list.filter(function(a){
-    if(activeFilters.subject&&(a.subject||'')!==activeFilters.subject)return false;
+    if(activeFilters.subject&&subjectKey(a.subject)!==activeFilters.subject)return false;
     if(activeFilters.time&&!dueMatches(a,activeFilters.time))return false;
     if(activeFilters.done==='done'&&!isDone(a))return false;
     if(activeFilters.done==='notdone'&&isDone(a))return false;
@@ -254,8 +256,9 @@ function applyFilters(list){
 function filtering(){return !!(activeFilters.subject||activeFilters.time||activeFilters.done)}
 function buildFilterBar(list){
   filterBar.replaceChildren();
-  var subjects=[];list.forEach(function(a){if(a.subject&&subjects.indexOf(a.subject)<0)subjects.push(a.subject)});subjects.sort();
-  if(activeFilters.subject&&subjects.indexOf(activeFilters.subject)<0)activeFilters.subject=null; // that subject is gone now
+  var seen={},subjects=[];list.forEach(function(a){var k=subjectKey(a.subject);if(k&&!seen[k]){seen[k]=1;subjects.push({key:k,name:a.subject.trim()})}});
+  subjects.sort(function(x,y){return x.key<y.key?-1:x.key>y.key?1:0});
+  if(activeFilters.subject&&!seen[activeFilters.subject])activeFilters.subject=null; // that subject is gone now
   filterBar.hidden=!list.length;if(!list.length)return;
   function chip(text,kind,value){
     var b=el('button',text,'filter-chip'+(activeFilters[kind]===value?' on':''));b.type='button';
@@ -265,7 +268,7 @@ function buildFilterBar(list){
   }
   function section(label,chips){var sec=el('div',null,'filter-section');sec.append(el('span',label,'filter-label'));chips.forEach(function(c){sec.append(c)});filterBar.append(sec)}
   filterBar.setAttribute('role','group');filterBar.setAttribute('aria-label','Filter homework');
-  if(subjects.length)section('Subject',subjects.map(function(x){return chip(x,'subject',x)}));
+  if(subjects.length)section('Subject',subjects.map(function(x){return chip(x.name,'subject',x.key)}));
   section('Due',[chip('Today','time','today'),chip('This week','time','week')]);
   section('Show',[chip('Not done','done','notdone'),chip('Done','done','done')]);
   if(filtering()){var clear=el('button','✕ Clear filters','filter-chip');clear.type='button';clear.onclick=function(){activeFilters={subject:null,time:null,done:null};render(allData)};filterBar.append(clear)}
@@ -289,13 +292,13 @@ function generalPanel(messages){
   return c;
 }
 // Each homework is one short row (title + status). Tap it to open the full card.
-var openCards={};
+var openCards={},typedMins={}; // typedMins keeps unsaved minutes when the list redraws (e.g. a filter chip is tapped)
 function card(a){
   var body=cardBody(a),bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';
   var d=el('details',null,'card home-card home-fold '+bucket),sum=el('summary',null,'fold-sum');
   d.open=!!openCards[a.id];d.addEventListener('toggle',function(){if(d.open)openCards[a.id]=1;else delete openCards[a.id]});
   var head=body.firstChild,meta=head&&head.nextSibling;body.removeChild(head);
-  var tags=el('span',null,'fold-tags');if(meta){var first=meta.firstChild;if(first)tags.append(first.cloneNode(true));Array.prototype.forEach.call(meta.children,function(x){if(/Due|Late/.test(x.textContent))tags.append(x.cloneNode(true))})}
+  var tags=el('span',null,'fold-tags');if(meta){var first=meta.firstChild;if(first)tags.append(first.cloneNode(true));Array.prototype.forEach.call(meta.children,function(x){if(/Due|Late/.test(x.textContent))tags.append(x.cloneNode(true))})}if(a.items&&a.items.length)tags.append(HI.progressTag(a,a));
   sum.append(el('span',a.title,'fold-title'),tags);
   body.className='fold-body';d.append(sum,body);return d;
 }
@@ -312,7 +315,10 @@ function cardBody(a){
   c.append(meta);
   if(a.details)c.append(el('p',a.details));
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
-  var activityUrl=H.activityUrl(a.type);
+  // Checklist homework (#649): each item opens the activity in homework mode and ticks itself when finished.
+  var hasItems=!!(a.items&&a.items.length);
+  if(hasItems)c.append(HI.checklist(a,{canOpen:a.status!=='approved'&&a.status!=='submitted',markDone:function(item){return call({action:'itemDone',assignmentId:a.id,itemId:item.id}).then(refresh)}}));
+  var activityUrl=hasItems?'':H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='opener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
   if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
   c.append(H.conversation({role:'student',collapsed:true,threadKey:a.id,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh}));
@@ -325,9 +331,9 @@ function cardBody(a){
   var mins=null;
   if(a.targetUnit==='minutes'){
     c.append(el('label','Minutes I practiced'));
-    mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
+    mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=typedMins[a.id]!=null?typedMins[a.id]:a.progress||0;mins.addEventListener('input',function(){typedMins[a.id]=mins.value});c.append(mins);
   }
-  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':'✏️ Tell your teacher what you did'));
+  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':hasItems?'✏️ Anything to tell your teacher? (optional once every item is done)':'✏️ Tell your teacher what you did'));
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
@@ -341,7 +347,7 @@ function cardBody(a){
   };
   sub.onclick=async function(){
     sub.disabled=true;
-    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);await refresh();}
+    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);delete typedMins[a.id];await refresh();}
     catch(e){say(msg,e.message);sub.disabled=false}
   };
   c.append(save,sub,msg);

@@ -6622,6 +6622,55 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
+<script src="../assignment-center/homework-mode.js?v=20261108-hw649"></script>
+<script>
+/* Homework mode (#649). The homework link opens this page with ?hw=…&perek=…&posuk=…&endPosuk=…&hwSkills=…
+   The normal deep link above loads those pesukim; here we lock the page to them and tick the homework item
+   once every assigned posuk has a saved try for every assigned skill (since the homework was given).
+   Tries save to posukPractice/attempts exactly as in normal practice. */
+(function(){
+  const HM=window.HomeworkMode;if(!HM||!HM.active)return;
+  const p=HM.params,sefer=p.get('sefer')||'Bereishis',perek=Number(p.get('perek')),from=Number(p.get('posuk')),to=Number(p.get('endPosuk')||from);
+  const skills=(p.get('hwSkills')||'reading').split(',').filter(s=>['reading','translate','understand'].includes(s));
+  if(!perek||!from||!skills.length)return;
+  const names={reading:'Reading',translate:'Translate',understand:'Understand'};
+  const lock=document.createElement('style');
+  lock.textContent='html.b3-homework-mode #selectionShell,html.b3-homework-mode #changeSelectionBtn,html.b3-homework-mode #prevPosukBtn,html.b3-homework-mode #nextPosukBtn{display:none!important}';
+  document.head.append(lock);
+  const has=v=>v!==null&&v!==undefined&&v!=='';
+  const filled=v=>!!(v&&typeof v==='object'&&Object.keys(v).length);
+  const did={
+    reading:a=>has(a.hebrewFinalScore)||has(a.hebrewScore),
+    translate:a=>filled(a.translationChunkResults)||has(a.translationScore),
+    understand:a=>filled(a.questionResults)||has(a.comprehensionScore)||has(a.questionScore)
+  };
+  const total=to-from+1;
+  function check(all){
+    const covered={};skills.forEach(k=>covered[k]=new Set());
+    Object.values(all||{}).forEach(tries=>Object.values(tries||{}).forEach(a=>{
+      if(!a||typeof a!=='object'||(Number(a.timestamp)||0)<HM.since)return;
+      if((a.sefer||'Bereishis')!==sefer||Number(a.perek)!==perek)return;
+      const start=Number(a.posukStart),end=Number(a.posukEnd||a.posukStart);
+      skills.forEach(k=>{if(did[k](a))for(let v=Math.max(start,from);v<=Math.min(end,to);v++)covered[k].add(v)});
+    }));
+    const left=skills.filter(k=>covered[k].size<total);
+    if(!left.length){HM.complete();return}
+    HM.setStatus('To do: '+skills.map(k=>names[k]+' '+covered[k].size+'/'+total).join(' · '));
+  }
+  HM.setStatus('To do: '+skills.map(k=>names[k]).join(', ')+' for '+(total>1?'pesukim '+from+'–'+to:'posuk '+from));
+  // Wait for the student's sign-in, then watch their saved tries.
+  const started=Date.now();let watching=false;
+  const wait=setInterval(()=>{
+    if(!watching&&studentId&&studentId!=='teacher_preview'&&studentId!=='guest_preview'){
+      watching=true;
+      db.ref('posukPractice/attempts/'+studentId).on('value',s=>check(s.val()),err=>console.warn('Homework progress check failed',err));
+    }
+    if(Date.now()-started>120000)clearInterval(wait);
+    const msg=document.getElementById('fetchMsg');
+    if(msg&&/not opened/.test(msg.textContent))HM.setStatus('Your teacher has not opened these pesukim in Posuk Practice yet. Ask your teacher.');
+  },500);
+})();
+</script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>
