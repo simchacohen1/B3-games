@@ -129,3 +129,15 @@ test('rules: each library is private to its teacher, the owner and active admins
     }
   }
 });
+
+test('library panel still loads when stricter rules refuse the class student list',()=>{
+  const loadAll=teacher.slice(teacher.indexOf('async function loadAll(){'),teacher.indexOf('function renderAll(){'));
+  // The student list read is allowed to fail without stopping the rest of the class load.
+  assert.match(loadAll,/\$\{SPACE\}\/students`\)\.once\('value'\)\.catch\(/);
+  assert.match(loadAll,/state\.students=\(c&&c\.val\(\)\)\|\|\{\}/);
+  // The library is set up after the class load whether it worked or failed, not inside it.
+  assert.doesNotMatch(loadAll,/loadTeacherLibrary\(\)/);
+  assert.match(teacher,/loadAll\(\)\.catch\([\s\S]{0,200}\)\.finally\(\(\)=>loadTeacherLibrary\(\)\)/);
+  // Live student listeners have a cancel callback, so a refusal is a warning, not an uncaught error.
+  assert.match(teacher,/studentsRef\.on\('child_added',applyStudent,studentsRefused\)/);
+});

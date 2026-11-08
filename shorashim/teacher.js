@@ -494,10 +494,13 @@ async function loadAll(){
     $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
     loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
   }
-  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
+  // Stricter database rules may refuse the whole class student list. That must not
+  // stop the words, settings or the teacher's library from loading.
+  let studentListBlocked=false;
+  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value').catch(err=>{studentListBlocked=true;console.warn('Could not read the class student list',err);return null;}),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
-  state.students=c.val()||{};
+  state.students=(c&&c.val())||{};
   state.leaderboards=d.val()||{};
   // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
   // so a word deleted later stays deleted even after page reloads or file updates.
@@ -523,8 +526,8 @@ async function loadAll(){
   renderAll();
   loadShorashimRecordings();
   bindFullScopeListener();
-  loadTeacherLibrary();
   const updates=[];
+  if(studentListBlocked)updates.push('student list not available');
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
@@ -666,9 +669,10 @@ function bindFullScopeListener(){
   });
   const studentsRef=db.ref(`${SPACE}/students`);
   const applyStudent=snap=>{if(!visible()||!snap.key)return;state.students[snap.key]=snap.val()||{};renderAll();};
-  studentsRef.on('child_added',applyStudent);
-  studentsRef.on('child_changed',applyStudent);
-  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();});
+  const studentsRefused=err=>console.warn('Live student updates are not available',err);
+  studentsRef.on('child_added',applyStudent,studentsRefused);
+  studentsRef.on('child_changed',applyStudent,studentsRefused);
+  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();},studentsRefused);
   state.leaderboards.match=state.leaderboards.match||{};
   const leaderboardsRef=db.ref(`${SPACE}/leaderboards/match`);
   const applyLeaderboard=snap=>{
@@ -1054,7 +1058,7 @@ $('tSaveItem').onclick=saveEdit;
 $('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
 bindTabs();
 let teacherAppOpened=false;
-function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
+function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll().catch(err=>{console.error('Could not load this class',err);status('⚠️ Could not load everything for this class. Please reload.','error');}).finally(()=>loadTeacherLibrary())}
 async function checkClassTeacher(user,access){
   if(!user||!access?.authorized){$('teacherGoogleSignIn').classList.remove('hidden');$('teacherGateMsg').textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return}
   activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
