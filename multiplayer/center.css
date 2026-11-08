@@ -108,3 +108,8 @@ footer{color:#526279;font-size:13px;margin:30px 0 8px}[hidden]{display:none!impo
 .game-go-fish{--a:#4c960c;--b:#b9e94a}
 .game-reversi{--a:#00602d;--b:#14a66c}
 @media(prefers-reduced-motion:reduce){.game-illustration{transition:none}}
+
+/* Arcade catalog: keep disabled artwork bright without enabling unauthorized play. */
+#gameCategories .game-launch:disabled{opacity:1;cursor:not-allowed}
+#gameCategories .game-launch:disabled .game-play-label{background:#64748b;box-shadow:none}
+#gameCategories .game-launch:disabled:hover{transform:none}
