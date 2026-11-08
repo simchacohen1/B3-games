@@ -43,6 +43,17 @@ function parsePerekInput(text){
   const n=perekValue(t);
   return n===null?{ok:false}:{ok:true,value:n};
 }
+// Bulk Add perek: the teacher must choose. Blank is refused. "No perek" is only an
+// explicit choice (noPerekChecked) and only where it is allowed: in B3's shared ET/WT
+// lists an untagged word is shown to students as Perek 18, so it is never allowed there.
+// Returns {ok:true,value:number|null} or {ok:false,error}.
+function bulkPerekChoice(text,{noPerekAllowed=false,noPerekChecked=false}={}){
+  if(noPerekAllowed&&noPerekChecked)return {ok:true,value:null};
+  const t=String(text??'').trim();
+  if(!t)return {ok:false,error:noPerekAllowed?'Choose a perek for these words, or tick "No perek".':'Choose a perek for these words before adding them.'};
+  const n=perekValue(t);
+  return n===null?{ok:false,error:`Perek must be a whole number from 1 to ${MAX_PEREK}.`}:{ok:true,value:n};
+}
 function listNameOf(item){return String(item?.listName||'').trim()||DEFAULT_LIST;}
 function unitKey(item){
   if(item?.bookletWeek)return 'booklet';
@@ -124,7 +135,7 @@ function countWords(catalog){const c=withAllTracks(catalog);return TRACKS.reduce
 function validUid(uid){return typeof uid==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(uid);}
 function libraryPath(uid){if(!validUid(uid))throw new Error('Invalid teacher account id.');return LIBRARY_ROOT+'/'+uid;}
 
-const api={TRACKS,LIBRARY_ROOT,MAX_PEREK,DEFAULT_LIST,hebrewNumeral,perekValue,parsePerekInput,listNameOf,unitKey,defaultUnitLabel,labelStorageKey,unitLabel,itemUnitLabel,unitsFor,withAllTracks,mergeCatalogById,mergeSettings,countWords,validUid,libraryPath};
+const api={TRACKS,LIBRARY_ROOT,MAX_PEREK,DEFAULT_LIST,hebrewNumeral,perekValue,parsePerekInput,bulkPerekChoice,listNameOf,unitKey,defaultUnitLabel,labelStorageKey,unitLabel,itemUnitLabel,unitsFor,withAllTracks,mergeCatalogById,mergeSettings,countWords,validUid,libraryPath};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 else root.B3ShorashimUnits=api;
 })(typeof window==='undefined'?globalThis:window);

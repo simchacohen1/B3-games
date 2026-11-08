@@ -81,7 +81,7 @@ test('teacher page: no hardcoded perek choices and Bulk Add never guesses a pere
   assert.doesNotMatch(teacher,/pf==='18'\?18:19/);
   assert.doesNotMatch(teacher,/Number\(\$\('tPerek'\)\.value\)\|\|18/);
   assert.doesNotMatch(teacher,/function perekOf\(i\)\{return Number\(i\?\.perek\)\|\|18\}/);
-  assert.match(teacher,/parsePerekInput\(\$\('bulkPerek'\)\.value\)/);
+  assert.match(teacher,/bulkPerekChoice\(\$\('bulkPerek'\)\.value/);
   assert.ok(teacherHtml.indexOf('units.js?v=')>0&&teacherHtml.indexOf('units.js?v=')<teacherHtml.indexOf('teacher.js?v='));
 });
 

@@ -994,11 +994,12 @@ $('teacherNewList').onclick=async()=>{
 };
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
-  // The perek is chosen explicitly in the dialog. It is never guessed from the filter
-  // (the filter only pre-fills it), so "All Perakim" can no longer save words to the wrong perek.
-  const pf=$('teacherPerekFilter')?.value||'all';
-  $('bulkPerek').value=/^\d+$/.test(pf)?pf:'';
+  // The perek must be chosen in the dialog every time (#571). It starts empty and is never
+  // taken from the filter, so words cannot silently land in the wrong perek.
+  $('bulkPerek').value='';
+  $('bulkNoPerek').checked=false;
   $('bulkPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim');
+  $('bulkNoPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim'||!CLASS_MODE);
   $('bulkPerekLabel').style.display='none';
   $('bulkItems').value='';
   $('teacherBulkDialog').showModal();
@@ -1009,8 +1010,8 @@ $('saveBulkItems').onclick=async e=>{
         lines=$('bulkItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),
         l=state.catalog[currentTrack],
         added=[],
-        bulkPerek=window.B3ShorashimUnits.parsePerekInput($('bulkPerek').value);
-  if(currentTrack==='shorashim'&&!bulkPerek.ok){alert(`Perek must be a whole number from 1 to ${window.B3ShorashimUnits.MAX_PEREK}, or blank for no perek.`);return;}
+        bulkPerek=window.B3ShorashimUnits.bulkPerekChoice($('bulkPerek').value,{noPerekAllowed:CLASS_MODE,noPerekChecked:$('bulkNoPerek').checked});
+  if(currentTrack==='shorashim'&&!bulkPerek.ok){alert(bulkPerek.error);$('bulkPerek').focus();return;}
   for(const line of lines){
     const parts=line.split('|').map(x=>x.trim());
     if(parts.length<2||!parts[0]||!parts[1])continue;
