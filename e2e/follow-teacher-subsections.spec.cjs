@@ -12,6 +12,8 @@ async function open(page,section){
     window.__lockedSection=null;
     window.FTTFollowStudent={activityPolicy:()=>window.__lockedSection?{subdestination:window.__lockedSection}:null};
   });
+  // app.js needs the shared perek/list helpers first, as on the real page.
+  await page.addScriptTag({path:path.join(root,'shorashim/units.js')});
   await page.addScriptTag({path:path.join(root,'shorashim/app.js')});
   await expect.poll(()=>page.evaluate(()=>!!window.FTTFollowActivities?.shorashim)).toBe(true);
 }
