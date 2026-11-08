@@ -167,6 +167,22 @@ function suggestionPoolOf(item){
   // Selected pictures always stay in the pool, listed first.
   return sanitizeSuggestionPool([...((item&&item.art)||[]),...((item&&item.artPool)||[])]);
 }
+// Pictures the teacher added (teacher-picture:<uid>/<id>), newest last.
+function customArtOf(item){
+  return [...new Set((Array.isArray(item?.customArt)?item.customArt:[]).filter(v=>window.B3ShorashimPictures.isTeacherPicture(v)))];
+}
+// Every option the teacher can tick. Students only ever see item.art (max ART_STUDENT_MAX).
+function pictureOptionsFor(item){
+  const P=window.B3ShorashimPictures;
+  const ticked=(Array.isArray(item?.art)?item.art:[]).map(x=>String(x||'').trim()).filter(Boolean);
+  return [...new Set([...ticked,...suggestionPoolOf(item),...P.builtInOptionsFor(item),...customArtOf(item)])]
+    .filter(v=>P.isImageValue(v)||P.isEmojiValue(v));
+}
+function pictureOptionHTML(value,on){
+  const P=window.B3ShorashimPictures,label=P.labelFor(value);
+  const face=P.isImageValue(value)?`<img ${P.imgAttrs(value)} alt="${esc(label)}" class="teacher-art-thumb" loading="lazy">`:`<span class="teacher-art-emoji">${esc(value)}</span>`;
+  return `<label class="teacher-art-option${on?' selected':''}" title="${esc(label)}"><input type="checkbox" data-a="art" data-art="${esc(value)}"${on?' checked':''}> ${face}</label>`;
+}
 
 // Perek 19: reliable, meaning-specific choices when the AI picture service is unavailable.
 // These are suggestions, not teacher approvals, and only fill currently missing artwork.
@@ -366,8 +382,7 @@ function smartArtCandidatesFor(english='',front=''){
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
   PEREK19_ART_RULES.forEach(([re,choices])=>{if(re.test(String(english||'').trim()))choices.forEach(add)});
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
-  // Keep the full pool here so Regenerate Pictures can deliberately choose
-  // alternatives that are different from the pictures already on the word.
+  // Keep the full pool so the teacher can choose from every matching suggestion.
   return sanitizeClassArtPool(found);
 }
 
@@ -427,21 +442,20 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
 }
 
 async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
-  // Automatically fill only missing artwork, including words a teacher already
-  // approved. Never replace selected pictures and never incur API costs on login.
-  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);
+  // Fill only missing suggestions. Nothing is ticked: students see a picture only after
+  // the teacher ticks it. Existing ticks are never changed and no paid call happens on login.
+  const targets=(items||[]).filter(i=>i&&!sanitizeSuggestionPool(i.artPool).length);
   if(!targets.length) return 0;
   const ai=useAI?await generateAiArtForItems(targets,onProgress):new Map();
   let changed=0;
   for(const item of targets){
-    // Recheck immediately before assignment so overlapping tasks cannot replace art.
-    if(sanitizeClassArt(item.art).length) continue;
+    if(sanitizeSuggestionPool(item.artPool).length) continue;
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
-    const art=sanitizeClassArt(pool);
-    if(art.length){
-      item.art=art; item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+    if(pool.length){
+      item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
       item.aiArtGeneratedAt=Date.now(); changed++;
-    }else item.autoArt=true;
+    }
+    if(!Array.isArray(item.art)) item.art=[];
   }
   return changed;
 }
@@ -460,6 +474,8 @@ function mergeCatalogWithoutReplacingPictures(current,local){
     }
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
+    const pool=sanitizeSuggestionPool(candidate.artPool);
+    if(existing&&!sanitizeSuggestionPool(existing.artPool).length&&pool.length)existing.artPool=pool;
     const art=sanitizeClassArt(candidate.art);
     if(existing&&!sanitizeClassArt(existing.art).length&&art.length){
       existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
@@ -508,7 +524,7 @@ async function loadAll(){
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
-  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);
+  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&!sanitizeSuggestionPool(i.artPool).length);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Checking matching pictures for ${needsArt.length} words…`,'syncing');
@@ -531,7 +547,7 @@ async function loadAll(){
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
-  if(repaired)updates.push(`${repaired} picture set${repaired===1?'':'s'} created`);
+  if(repaired)updates.push(`${repaired} word${repaired===1?'':'s'} got picture suggestions (none ticked)`);
   status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
   applyRequestedTeacherView();
 }
@@ -694,7 +710,7 @@ function bindLegacyScopedListeners(initialGlobalSettings={}){
 }
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
 function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
-function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
+function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img ${window.B3ShorashimPictures.imgAttrs(a.value)}></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${esc(a.value||'')}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
 function listNameOf(i){return i.listName||'Main List'}
 function namedLists(){
   state.settings.namedLists=state.settings.namedLists||{};
@@ -718,15 +734,13 @@ function renderCatalog(){
   const perekWrap=$('teacherPerekWrap');if(perekWrap)perekWrap.classList.toggle('hidden',currentTrack!=='shorashim');
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
-    const selectedArt=sanitizeClassArt(i.art||[]),pool=suggestionPoolOf(i);
-    const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click a picture to select or unselect it</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
+    const selectedArt=sanitizeClassArt(i.art||[]);
+    const options=pictureOptionsFor(i);
+    const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX}. Tick a picture to show it to students${selectedArt.length?'':'. None ticked, so students see no picture for this word'}.</div>`+options.map(a=>pictureOptionHTML(a,selectedArt.includes(a))).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
-      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
-         <div class="mini-actions">
-           <button data-a="regen" class="ghost">↻ Regenerate Pictures</button>
-         </div>`
+      ? `<div class="teacher-art-preview">${art}</div>`
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
@@ -760,42 +774,10 @@ function renderCatalog(){
     if(mergeDuplicate)mergeDuplicate.onclick=()=>mergeDuplicateWord(id);
     const dismissDuplicate=row.querySelector('[data-a=dismiss-duplicate]');
     if(dismissDuplicate)dismissDuplicate.onclick=()=>dismissDuplicateSuggestion(id);
-    const regen=row.querySelector('[data-a=regen]');
-    if(regen) regen.onclick=()=>regeneratePictures(id);
-    row.querySelectorAll('[data-a=art]').forEach(btn=>{
-      btn.onclick=()=>togglePictureChoice(id,btn.dataset.art);
+    row.querySelectorAll('[data-a=art]').forEach(box=>{
+      box.onchange=()=>togglePictureChoice(id,box.dataset.art);
     });
   });
-}
-
-async function regeneratePictures(id){
-  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
-  if(!item)return;
-  const selected=sanitizeClassArt(item.art||[]);
-  const oldPool=suggestionPoolOf(item);
-  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
-  status('☁️ Looking for more matching pictures…','syncing');
-
-  const ai=await generateAiArtForItems([item]);
-  const candidates=sanitizeClassArtPool([
-    ...(ai.get(String(item.id))||[]),
-    ...smartArtCandidatesFor(item.english,item.front)
-  ]);
-  const fresh=candidates.filter(x=>!oldPool.includes(x));
-
-  if(!fresh.length){
-    status('☁️ No different matching pictures found');
-    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current suggestions were kept.`);
-    return;
-  }
-  // Teacher's selections first, then new suggestions, then older ones (max 20).
-  // Regenerating never changes what students see.
-  item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);
-  item.aiArtGenerated=ai.has(String(item.id));
-  item.aiArtGeneratedAt=Date.now();
-  renderCatalog();
-  await saveCatalog();
-  status(`☁️ Saved • ${fresh.length} new suggestion${fresh.length===1?'':'s'}`);
 }
 
 function englishDuplicateKey(value){
@@ -1315,11 +1297,13 @@ async function togglePictureChoice(id,artValue){
   if(!item)return;
   const v=String(artValue);
   const selected=sanitizeClassArt(item.art||[]);
-  item.artPool=suggestionPoolOf(item); // an unselected picture stays as a suggestion
+  // An unticked emoji stays as a suggestion; drawings and added pictures stay as options anyway.
+  if(window.B3ShorashimPictures.isEmojiValue(v))item.artPool=suggestionPoolOf(item);
   if(selected.includes(v)){
     item.art=selected.filter(x=>x!==v);
   }else if(selected.length>=ART_STUDENT_MAX){
-    alert(`Students can see up to ${ART_STUDENT_MAX} pictures. Unselect one first.`);
+    alert(`Students can see up to ${ART_STUDENT_MAX} pictures. Untick one first.`);
+    renderCatalog();
     return;
   }else{
     item.art=[...selected,v];
@@ -1330,9 +1314,11 @@ async function togglePictureChoice(id,artValue){
 }
 (function addPicturePickerStyles(){
   const s=document.createElement('style');
-  s.textContent='.teacher-art-chip.selected{outline:3px solid #2e7d32;outline-offset:-1px;background:#e8f5e9}'
-    +'.teacher-art-preview .teacher-art-chip:not(.selected){opacity:.55}'
-    +'.teacher-art-preview .teacher-art-chip:not(.selected):hover{opacity:1}'
+  s.textContent='.teacher-art-option{display:inline-flex;align-items:center;gap:6px;border:2px solid #e5e7eb;border-radius:10px;padding:4px 8px;margin:2px;background:#fff;cursor:pointer}'
+    +'.teacher-art-option.selected{border-color:#2e7d32;background:#e8f5e9}'
+    +'.teacher-art-option input{width:18px;height:18px;margin:0;cursor:pointer}'
+    +'.teacher-art-emoji{font-size:26px;line-height:1}'
+    +'.teacher-art-thumb{display:block;width:64px;height:46px;object-fit:contain;border-radius:6px;background:#fafafa}'
     +'.teacher-art-count{width:100%;font-size:12px;color:#555;margin:0 0 2px}';
   document.head.appendChild(s);
 })();

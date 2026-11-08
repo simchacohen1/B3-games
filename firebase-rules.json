@@ -126,6 +126,24 @@
         ".write": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))"
       }
     },
+    "shorashimTeacherPictures": {
+      "$uid": {
+        "$pictureId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && (!data.exists() || !newData.exists())) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))",
+          ".validate": "newData.hasChildren(['data', 'createdAt']) && newData.child('createdAt').isNumber() && newData.child('data').isString() && newData.child('data').val().length <= 200000 && (newData.child('data').val().beginsWith('data:image/webp;base64,') || newData.child('data').val().beginsWith('data:image/jpeg;base64,') || newData.child('data').val().beginsWith('data:image/png;base64,'))",
+          "data": {
+            ".validate": true
+          },
+          "createdAt": {
+            ".validate": true
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "tentTrailTrivia": {
       ".read": true,
       ".write": true

@@ -14,6 +14,7 @@ async function open(page,section){
   });
   // app.js needs the shared perek/list helpers first, as on the real page.
   await page.addScriptTag({path:path.join(root,'shorashim/units.js')});
+  await page.addScriptTag({path:path.join(root,'shorashim/pictures.js')});
   await page.addScriptTag({path:path.join(root,'shorashim/app.js')});
   await expect.poll(()=>page.evaluate(()=>!!window.FTTFollowActivities?.shorashim)).toBe(true);
 }

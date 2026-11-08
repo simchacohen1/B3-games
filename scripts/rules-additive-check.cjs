@@ -18,6 +18,9 @@ const ALLOWED_NEW = [
   // Issue #611 (PENDING OWNER REVIEW): per-teacher Shorashim libraries. New, private node only:
   // each teacher reads/writes only their own uid; owner and active admins may read/write any.
   ['shorashimLibraries'],
+  // Issue #627 (PENDING OWNER REVIEW): pictures a teacher adds to Shorashim words. New node only:
+  // a teacher adds/removes only under their own uid (no overwrite); signed-in users read one picture by exact id.
+  ['shorashimTeacherPictures'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
