@@ -137,6 +137,18 @@ test('paginated reads are bounded, no audio downloads during class/list/report, 
   await denied(send(f, 'teacherA', 'delete', { id, confirm: 'wrong' }), 400);
   await send(f, 'teacherA', 'delete', { id, confirm: id }); assert.equal(f.audio.objects.size, 0); await denied(send(f, 'studentA', 'get', { id }), 404);
 });
+test('synthetic cost evidence: scoped metadata, no broad student roots, audio only on demand', async t => {
+  const f = await fixture(), id = await assigned(f);
+  await send(f, 'studentA', 'submit', { id, audio: webm, type: 'audio/webm', duration: 5 });
+  await send(f, 'teacherA', 'grade', { id, revision: 1, marks: [{ unitId: 'l:0', category: 'correct' }], final: true });
+  f.store.reads.length = 0;
+  const response = await send(f, 'teacherA', 'list');
+  assert.equal(f.audio.reads.length, 0);
+  assert(f.store.reads.every(r => r.path !== 'b3Games/students' && r.path !== WS + 'classes' && !r.path.includes('/kriah-test-wt')));
+  const result = { scenario: 'one fictional reviewed attempt', metadataResponseBytes: Buffer.byteLength(JSON.stringify(response)), scopedStoreReadBytes: f.store.reads.reduce((n, r) => n + r.bytes, 0), storeReadCount: f.store.reads.length, audioDownloadsBeforePlay: f.audio.reads.length };
+  await send(f, 'teacherA', 'audioRead', { id }); result.audioDownloadsAfterPlay = f.audio.reads.length;
+  t.diagnostic(JSON.stringify(result));
+});
 test('staging-only backend and frontend refuse production; shared model parity', async () => {
   assert.throws(() => createService({ projectId: 'b3-games' }), /staging only/);
   assert.equal(fs.readFileSync('kriah-assessment/core.js', 'utf8'), fs.readFileSync('backend/kriah-staging/core.js', 'utf8'));

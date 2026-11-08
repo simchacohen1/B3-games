@@ -105,7 +105,7 @@ function createService({ projectId, store, audio, now = Date.now }) {
     if (!sid) fail(400, 'Choose a student.');
     if (action === 'skills') {
       const rows = await store.list(base(classId) + '/students/' + sid + '/mastery', { limit: 100 });
-      return { skills: Object.fromEntries(Object.entries(rows).filter(([, row]) => !auth.student || row.shared === true)) };
+      return { skills: Object.fromEntries(Object.entries(rows).filter(([, row]) => !auth.student || row.shared === true).map(([id, row]) => [id, auth.student ? { kind: row.kind, label: row.label, state: row.state, updatedAt: row.updatedAt } : row])) };
     }
     if (action === 'setSkill') {
       const skill = Core.skillId(body.kind, body.label);

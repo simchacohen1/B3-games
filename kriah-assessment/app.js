@@ -137,7 +137,8 @@
     const gen = state.generation;
     const { record } = await call({ action: 'get', id }); state.record = record; state.marks = record.marks || []; state.undo = [];
     const box = $('assessment'); box.hidden = false;
-    box.append(el('h2', record.exercise.title), el('p', record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(record.status)), el('p', record.exercise.pronunciation || 'No pronunciation notes provided.'));
+    const meta = el('p', record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(record.status)); meta.id = 'assessmentMeta';
+    box.append(el('h2', record.exercise.title), meta, el('p', record.exercise.pronunciation || 'No pronunciation notes provided.'));
     const player = el('audio'); player.id = 'player'; player.controls = true; player.preload = 'none'; box.append(player);
     if (record.audio) box.append(button('Load original recording', async () => {
       const data = await call({ action: 'audioRead', id });
@@ -271,7 +272,7 @@
       saveActions.querySelectorAll('button').forEach(b => b.disabled = true);
       try {
         const result = await call({ action: 'grade', id: record.id, ...payload, final });
-        record.revision = result.record.revision; state.record = result.record; state.dirty = false; await API.draft(draftKey() + ':grade', null); await loadRecords(); status(final ? 'Final assessment saved.' : 'Assessment draft saved to the server.');
+        record.revision = result.record.revision; state.record = result.record; $('assessmentMeta').textContent = record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(result.record.status); state.dirty = false; await API.draft(draftKey() + ':grade', null); await loadRecords(); status(final ? 'Final assessment saved.' : 'Assessment draft saved to the server.');
       } finally { if (gen === state.generation) saveActions.querySelectorAll('button').forEach(b => b.disabled = false); }
     }
     saveActions.append(button('Save draft', () => save(false)), button('Finalize assessment', () => save(true)), button('Delete assessment & original audio', async () => {

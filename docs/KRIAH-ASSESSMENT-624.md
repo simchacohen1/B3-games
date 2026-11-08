@@ -148,11 +148,16 @@ The demo never talks to Firebase. The Playwright script uses a browser fake
 microphone, simulates an upload outage and page reload, checks manual marking,
 reports, phone width, PDF, microphone denial and direct unauthorized calls.
 
-Local Node results: **17 passed, 0 failed**. Local browser launch is blocked by
+Local Node results: **18 passed, 0 failed**. Local browser launch is blocked by
 the workspace's Chromium `socket(): Operation not permitted`; no local screenshot
 or real-browser success is claimed. A dedicated GitHub PR workflow runs the same
 tests plus the browser journey and uploads fictional screenshots/PDF as artifacts.
 See PR checks for the actual result; a configured test is not a passing test.
+
+The one-attempt synthetic cost case returned 2,181 bytes of list metadata from
+six scoped store reads (3,239 decoded JSON bytes), with zero audio downloads
+before explicit playback and one afterward. These are adapter-fixture sizes,
+not on-wire Firebase measurements or an estimate of a production bill.
 
 ### Separate staging approval gate
 

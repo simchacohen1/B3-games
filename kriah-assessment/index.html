@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kriah Assessment Center · Fun Torah Tools</title><link rel="stylesheet" href="style.css">
 <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script defer src="core.js"></script><script defer src="recorder.js"></script><script defer src="client.js"></script><script defer src="app.js"></script></head>
+<!-- This page has its own fail-closed project/host guard and private audio service.
+     Keep the generic site packager from injecting a different recorder policy. -->
+<script defer src="core.js"></script><script defer src="recorder.js"></script><script data-b3-staging-guard defer src="client.js"></script><script defer src="app.js"></script></head>
 <body><div class="notice">STAGING ONLY · Fictional students and recordings · Manual assessment</div>
 <header><a href="../index.html">Fun Torah Tools</a><div class="brand">א <span>Kriah Assessment Center</span></div><p>Listen carefully. Mark precisely. Plan the next step.</p></header>
 <main><section class="toolbar"><label id="fixtureLabel" hidden>Fictional demo identity <select id="actor"><option value="teacherA">Teacher A · ET test</option><option value="teacherB">Teacher B · WT test</option><option value="studentA">Student Alef · ET test</option><option value="studentB">Student Beis · WT test</option></select></label><button id="signIn" hidden>Teacher Google sign-in</button><a id="studentSignIn" href="../index.html" hidden>Student sign-in on staging homepage</a><button id="signOut" hidden>Sign out & clear local drafts</button><label>Class <select id="classSelect" aria-label="Class"></select></label><label id="studentLabel">Student <select id="studentSelect" aria-label="Student"></select></label><button id="refresh">Refresh</button></section>
