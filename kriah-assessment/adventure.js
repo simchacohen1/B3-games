@@ -36,24 +36,24 @@ const LETTERS = [
 ];
 
 const NEKUDOS = [
-  { symbol: 'ַ', name: 'Kamatz',  sound: 'AH' },
-  { symbol: 'ָ', name: 'Patach',  sound: 'AH' },
-  { symbol: 'ֵ', name: 'Tzeirei', sound: 'EI' },
-  { symbol: 'ִ', name: 'Chirik',  sound: 'EE' },
-  { symbol: 'ֹ', name: 'Cholam',  sound: 'OH' },
-  { symbol: 'ּ', name: 'Dagesh',  sound: '(strengthens the letter)' },
+  { symbol: 'ַ', name: 'Kamatz',   sound: 'AH' },
+  { symbol: 'ָ', name: 'Patach',   sound: 'AH' },
+  { symbol: 'ֵ', name: 'Tzeirei',  sound: 'EI' },
+  { symbol: 'ִ', name: 'Chirik',   sound: 'EE' },
+  { symbol: 'ֹ', name: 'Cholam',   sound: 'OH' },
+  { symbol: 'ּ', name: 'Dagesh',   sound: '(strengthens the letter)' },
   { symbol: 'ׁ', name: 'Shin Dot', sound: 'SH' },
 ];
 
 const BLENDS = [
-  { display: 'בַ', desc: 'Aleph-Beis combo', sound: 'BA' },
-  { display: 'מַ', desc: 'Mem with Kamatz',  sound: 'MA' },
-  { display: 'שַ', desc: 'Shin with Kamatz', sound: 'SHA' },
-  { display: 'לַ', desc: 'Lamed with Kamatz', sound: 'LA' },
-  { display: 'רַ', desc: 'Reish with Kamatz', sound: 'RA' },
-  { display: 'כִ', desc: 'Kaf with Chirik',  sound: 'KI' },
-  { display: 'דֵ', desc: 'Dalet with Tzeirei', sound: 'DEI' },
-  { display: 'תֹ', desc: 'Tav with Cholam',  sound: 'TO' },
+  { display: 'בַ', desc: 'Aleph-Beis combo',    sound: 'BA' },
+  { display: 'מַ', desc: 'Mem with Kamatz',     sound: 'MA' },
+  { display: 'שַ', desc: 'Shin with Kamatz',    sound: 'SHA' },
+  { display: 'לַ', desc: 'Lamed with Kamatz',   sound: 'LA' },
+  { display: 'רַ', desc: 'Reish with Kamatz',   sound: 'RA' },
+  { display: 'כִ', desc: 'Kaf with Chirik',     sound: 'KI' },
+  { display: 'דֵ', desc: 'Dalet with Tzeirei',  sound: 'DEI' },
+  { display: 'תֹ', desc: 'Tav with Cholam',     sound: 'TO' },
 ];
 
 const WORLDS = [
@@ -100,13 +100,17 @@ let _stars  = 0;
 
 function addCoins(n) {
   _coins += n;
-  const el = document.getElementById('coinCount');
-  if (el) el.textContent = _coins;
+  if (typeof document !== 'undefined') {
+    const el = document.getElementById('coinCount');
+    if (el) el.textContent = _coins;
+  }
 }
 function addStars(n) {
   _stars += n;
-  const el = document.getElementById('starCount');
-  if (el) el.textContent = _stars;
+  if (typeof document !== 'undefined') {
+    const el = document.getElementById('starCount');
+    if (el) el.textContent = _stars;
+  }
 }
 
 /** How many worlds are unlocked based on reviewed assessment count. */
@@ -125,36 +129,38 @@ let _currentTab = 'map';
 let _reviewedCount = 0;
 let _records = [];
 
-/* ---- Bootstrap ---- */
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.adv-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.advTab));
+/* ---- Bootstrap (browser only) ---- */
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.adv-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.advTab));
+    });
+
+    document.getElementById('stationBack').addEventListener('click', () => {
+      document.getElementById('stationPanel').hidden = true;
+      document.getElementById('mapTab').hidden = false;
+    });
+
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modalBackdrop').addEventListener('click', closeModal);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    document.getElementById('signInBtn').addEventListener('click', onSignIn);
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+      if (typeof KriahClient !== 'undefined') KriahClient.signOut();
+      location.reload();
+    });
+
+    if (typeof KriahClient !== 'undefined') {
+      KriahClient.init(onIdentity);
+    } else {
+      console.warn('[Adventure] KriahClient not loaded yet');
+    }
   });
-
-  document.getElementById('stationBack').addEventListener('click', () => {
-    document.getElementById('stationPanel').hidden = true;
-    document.getElementById('mapTab').hidden = false;
-  });
-
-  document.getElementById('modalClose').addEventListener('click', closeModal);
-  document.getElementById('modalBackdrop').addEventListener('click', closeModal);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
-  });
-
-  document.getElementById('signInBtn').addEventListener('click', onSignIn);
-
-  document.getElementById('signOutBtn').addEventListener('click', () => {
-    if (typeof KriahClient !== 'undefined') KriahClient.signOut();
-    location.reload();
-  });
-
-  if (typeof KriahClient !== 'undefined') {
-    KriahClient.init(onIdentity);
-  } else {
-    console.warn('[Adventure] KriahClient not loaded yet');
-  }
-});
+}
 
 /* ---- Sign-in ---- */
 function onSignIn() {
@@ -326,7 +332,7 @@ function buildPracticeGrid() {
   const activities = [
     { type: 'spot',  emoji: '🔍', name: 'Spot the Letter', desc: 'Find the right letter in a grid' },
     { type: 'match', emoji: '🔗', name: 'Letter Match',    desc: 'Match letters to their names' },
-    { type: 'blend', emoji: '🗣️', name: 'Sound Blends', desc: 'Identify syllable sounds' },
+    { type: 'blend', emoji: '🗣️', name: 'Sound Blends',  desc: 'Identify syllable sounds' },
     { type: 'quiz',  emoji: '❓',       name: 'Letter Quiz',     desc: 'Name that Hebrew letter!' },
     { type: 'spot',  emoji: '🌊', name: 'Sea Challenge',   desc: 'Spot letters in the sea world' },
     { type: 'blend', emoji: '⛰️', name: 'Mountain Blends', desc: 'Blend letters from the mountains' },
