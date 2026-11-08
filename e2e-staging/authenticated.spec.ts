@@ -227,7 +227,14 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherCard).toContainText('Published');
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(studentPage);
-    let studentCard = studentPage.locator('#list .card').filter({ hasText: title });
+    // Student homework cards are folded (title row only); open this one so its contents can be used.
+    const openCard = async (scope: string) => {
+      const fold = studentPage.locator(scope + ' details.home-fold').filter({ hasText: title });
+      await expect(fold).toHaveCount(1);
+      await fold.evaluate((d: HTMLDetailsElement) => { d.open = true; });
+      return fold.locator('.fold-body');
+    };
+    let studentCard = await openCard('#list');
     await expect(studentCard).toContainText('Ready to start');
     await expect(studentPage.getByRole('tab', { name: /To Do/ })).toBeVisible();
     await expect(studentPage.getByRole('tab', { name: /Handed In/ })).toBeVisible();
@@ -240,16 +247,20 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     ]);
     await expect(activityPage).toHaveURL(/\/shorashim\/index\.html\?hw=/);
     await expect(activityPage.locator('#b3-homework-bar')).toContainText('Back to my homework');
+    // No automatic check for Shorashim: the student ticks the item from the homework bar.
+    await activityPage.getByRole('button', { name: /I finished this/ }).click();
+    await expect(activityPage.locator('#b3-homework-bar')).toContainText('Done!', { timeout: 20000 });
     await activityPage.close();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
-    studentCard = studentPage.locator('#list .card').filter({ hasText: title });
-    await expect(studentCard).toContainText('Ready to start');
+    studentCard = await openCard('#list');
+    await expect(studentCard).toContainText('Started');
+    await expect(studentCard).toContainText('All 1 items done');
 
     await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes.');
     await studentCard.getByRole('button', { name: 'Hand In Homework' }).click();
     await expect(studentCard).toContainText('Handed in');
     await studentPage.getByRole('tab', { name: /Handed In/ }).click();
-    studentCard = studentPage.locator('#section-handed .card').filter({ hasText: title });
+    studentCard = await openCard('#section-handed');
     await studentCard.getByRole('button', { name: /Message your teacher|Read messages/ }).click();
     await studentCard.locator('.home-conversation textarea').fill('Could you check my answer?');
     await studentCard.getByRole('button', { name: 'Send message' }).click();
@@ -300,7 +311,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await teacherCard.getByLabel('Feedback for ' + student.name).fill('Please add one more example.');
     await teacherCard.getByRole('button', { name: 'Return for Corrections' }).click();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
-    studentCard = studentPage.locator('#section-todo .card').filter({ hasText: title });
+    studentCard = await openCard('#section-todo');
     await expect(studentCard).toContainText('Please add one more example.');
     await studentCard.locator(':scope > textarea').fill('Fictional student practiced five minutes and added one more example.');
     await studentCard.getByRole('button', { name: 'Fix and Hand In Again' }).click();
@@ -312,7 +323,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherCard).toHaveCount(0);
 
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
-    studentCard = studentPage.locator('#list .card').filter({ hasText: title });
+    studentCard = await openCard('#list');
     await expect(studentCard).toContainText('Finished');
 
     await teacherPage.locator('#screenCheck .backHome').first().click();
