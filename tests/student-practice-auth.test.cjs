@@ -10,13 +10,20 @@ const seed=()=>({
   'b3Games/workspaces/b3-2026/classes/alpha':{active:true,toolGrants:{chazara:true,'posuk-practice-scroll':true,shorashim:true},members:{synthetic_student:{active:true}}},
   'b3Games/workspaces/b3-2026/classes/beta':{active:true,toolGrants:{chazara:true},members:{synthetic_student:{active:true}}}
 });
+// Like the real database: a child path resolves inside its nearest stored parent.
+function readPath(data,path){
+  if(Object.prototype.hasOwnProperty.call(data,path))return data[path]??null;
+  const parent=Object.keys(data).filter(key=>path.startsWith(key+'/')).sort((a,b)=>b.length-a.length)[0];
+  if(!parent)return null;
+  return path.slice(parent.length+1).split('/').reduce((value,key)=>value?.[key],data[parent])??null;
+}
 const claims={b3StudentRole:'student',b3StudentId:'synthetic_student',b3ClassId:'alpha'};
 async function authorize({token='synthetic-token',claim=claims,data=seed(),source='chazara'}={}){
   const reads=[];
   const result=await authorizePracticeStudent({
     authorization:token?`Bearer ${token}`:'',
     verifyToken:async t=>{assert.equal(t,'synthetic-token');return claim;},
-    get:async path=>{reads.push(path);return data[path]??null;},source,studentTools:tools
+    get:async path=>{reads.push(path);return readPath(data,path);},source,studentTools:tools
   });
   return {result,reads};
 }
@@ -54,4 +61,14 @@ test('verified student identity is derived from claims and never from request bo
   const {result}=await authorize();
   assert.equal(result.studentId,'synthetic_student');
   assert.equal(result.classId,'alpha');
+});
+test('access check reads only small class fields, never the whole class record',async()=>{
+  const {result,reads}=await authorize();
+  assert.equal(result.ok,true);
+  assert.equal(reads.includes('b3Games/workspaces/b3-2026/classes/alpha'),false);
+  assert.ok(reads.includes('b3Games/workspaces/b3-2026/classes/alpha/members/synthetic_student'));
+});
+test('a missing class is still rejected with only field reads',async()=>{
+  const data=seed();delete data['b3Games/workspaces/b3-2026/classes/alpha'];
+  assert.equal((await authorize({data})).result.status,403);
 });

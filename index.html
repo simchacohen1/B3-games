@@ -896,8 +896,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let approvalCounts={};
   let approvalClassCounts={};
   let approvalClassNames={};
-  let approvalAttemptsCache=null,approvalAttemptsAt=0,approvalSweepAt=0;
-  const APPROVAL_POLL_MS=60000,APPROVAL_ATTEMPTS_MAX_AGE_MS=5*60000,APPROVAL_SWEEP_MIN_MS=5*60000;
+  let approvalSweepAt=0;
+  const APPROVAL_POLL_MS=60000,APPROVAL_SWEEP_MIN_MS=5*60000;
   const POINTS_API_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 
   const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
@@ -1025,27 +1025,49 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
   function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
-  async function loadApprovalCenter(autoOpen){
-    if(!isAuthorizedAdmin||approvalCenterLoading)return;
-    approvalCenterLoading=true;
-    renderApprovalCenter();
-    const reads=[
-      // The full Posuk attempts tree is large; reuse it for a few minutes.
-      ["attempts",(approvalAttemptsCache&&Date.now()-approvalAttemptsAt<APPROVAL_ATTEMPTS_MAX_AGE_MS)?Promise.resolve(approvalAttemptsCache):db.ref("posukPractice/attempts").once("value").then(function(snap){approvalAttemptsCache=snap;approvalAttemptsAt=Date.now();return snap;})],
-      ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
-      ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
-      ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
-      ["gallery",db.ref("classGallery/posts").once("value")],
-      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")],
-      ["rewardClasses",db.ref("studentRewards/classes").once("value")]
-    ];
-    const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
-    const data={};const failed=[];
-    settled.forEach(function(result,i){
-      const key=reads[i][0];
-      if(result.status==="fulfilled")data[key]=result.value.val()||{};
-      else failed.push(key);
+  // Approval sources are watched with live listeners instead of being
+  // re-downloaded with once() every minute: Realtime Database charges for data
+  // downloaded, and a listener downloads each tree once and then receives only
+  // the changes. (posukPractice/attempts alone is large.)
+  const APPROVAL_SOURCES=[
+    ["attempts","posukPractice/attempts"],
+    ["pointRequests","studentRewards/pointRequests"],
+    ["shorashimRecordings","posukPractice/shorashimLearning/recordingEvents"],
+    ["shorashimWords","posukPractice/shorashimLearning/catalog/shorashim"],
+    ["gallery","classGallery/posts"],
+    ["redemptions","studentRewards/redemptionsByStudent"],
+    ["rewardClasses","studentRewards/classes"]
+  ];
+  let approvalData={},approvalFailed={},approvalUnwatchers=[],approvalRecomputeTimer=null;
+  function watchApprovalSources(){
+    if(approvalUnwatchers.length)return;
+    approvalData={};approvalFailed={};
+    APPROVAL_SOURCES.forEach(function(source){
+      const key=source[0],ref=db.ref(source[1]);
+      const onValue=function(snap){approvalData[key]=snap.val()||{};delete approvalFailed[key];scheduleApprovalRecompute();};
+      const onError=function(err){console.warn("Approval source unavailable: "+key,err);delete approvalData[key];approvalFailed[key]=true;scheduleApprovalRecompute();};
+      ref.on("value",onValue,onError);
+      approvalUnwatchers.push(function(){ref.off("value",onValue);});
     });
+  }
+  function unwatchApprovalSources(){
+    approvalUnwatchers.forEach(function(off){off();});
+    approvalUnwatchers=[];approvalData={};approvalFailed={};
+    if(approvalRecomputeTimer){clearTimeout(approvalRecomputeTimer);approvalRecomputeTimer=null;}
+  }
+  // Many students writing at once must not trigger a recount per write.
+  function scheduleApprovalRecompute(){
+    if(approvalRecomputeTimer)return;
+    approvalRecomputeTimer=setTimeout(function(){approvalRecomputeTimer=null;loadApprovalCenter(false);},1000);
+  }
+  async function loadApprovalCenter(autoOpen){
+    if(!isAuthorizedAdmin)return;
+    watchApprovalSources();
+    // Show "checking" until every source has answered once (with data or an error).
+    approvalCenterLoading=APPROVAL_SOURCES.some(function(source){return approvalData[source[0]]===undefined&&!approvalFailed[source[0]];});
+    if(approvalCenterLoading){renderApprovalCenter();return;}
+    const data=approvalData;
+    const failed=Object.keys(approvalFailed);
     // Gallery posts live in one shared list but the gallery page shows one class at a time,
     // so link straight to the class that has the waiting projects (most pending first).
     const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
@@ -1094,6 +1116,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("approvalCenterButton").classList.remove("hidden");
     if(approvalCenterTimer)clearInterval(approvalCenterTimer);
     // Keep the corner approval badge updated without auto-opening the center modal.
+    // The listeners keep the data current; this timer only recounts what is
+    // already in memory (no download), so the automatic Posuk point sweep
+    // still gets its regular chance to run.
     loadApprovalCenter(false);
     approvalCenterTimer=setInterval(function(){if(!document.hidden)loadApprovalCenter(false);},APPROVAL_POLL_MS);
   }
@@ -1103,7 +1128,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     closeApprovalCenter();
     approvalCounts={};
     approvalClassCounts={};
-    approvalAttemptsCache=null;approvalAttemptsAt=0;
+    unwatchApprovalSources();
     approvalCenterAutoShown=false;
   }
 
@@ -2258,7 +2283,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
   el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
-  el("approvalCenterRefresh")?.addEventListener("click",()=>{approvalAttemptsAt=0;loadApprovalCenter(false);});
+  el("approvalCenterRefresh")?.addEventListener("click",()=>{unwatchApprovalSources();loadApprovalCenter(false);});
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
