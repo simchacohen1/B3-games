@@ -141,3 +141,19 @@ test('library panel still loads when stricter rules refuse the class student lis
   // Live student listeners have a cancel callback, so a refusal is a warning, not an uncaught error.
   assert.match(teacher,/studentsRef\.on\('child_added',applyStudent,studentsRefused\)/);
 });
+
+test('choosing a learning unit still accepts an older plain perek number',()=>{
+  const vm=require('node:vm');
+  const fn=app.split(/\r?\n/).find(l=>l.startsWith('function chooseLearningPerek('));
+  assert.ok(fn,'chooseLearningPerek exists');
+  const ctx=vm.createContext({
+    followAllowsScreen:()=>true,bookletAllowed:()=>false,goScreen:()=>{},
+    studentUnits:()=>[{key:'perek:18'},{key:'list:Animals'}],
+    currentTrack:'',learningPerek:'',selectedItemKey:null
+  });
+  vm.runInContext(fn+'\nthis.pick=v=>{learningPerek="";chooseLearningPerek(v);return learningPerek;};',ctx);
+  assert.equal(ctx.pick(18),'perek:18','a plain number from older callers');
+  assert.equal(ctx.pick('perek:18'),'perek:18');
+  assert.equal(ctx.pick('list:Animals'),'list:Animals');
+  assert.equal(ctx.pick(19),'','a perek the class does not have is ignored');
+});

@@ -301,13 +301,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
   await expect(page.locator('#appShell')).toBeVisible();
   await page.getByRole('button',{name:/Learn New Shorashim/}).click();
-  await expect(page.locator('[data-learning-perek="18"] .perek-progress')).toContainText('1 of 1 learned');
-  await page.locator('[data-learning-perek="18"]').click();
+  await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
+  await page.locator('[data-learning-perek="perek:18"]').click();
   await expect(page.locator('#editorContent')).toBeVisible();
   await page.reload();
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
   await page.getByRole('button',{name:/Learn New Shorashim/}).click();
-  await expect(page.locator('[data-learning-perek="18"] .perek-progress')).toContainText('1 of 1 learned');
+  await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
   expect(await readFixture(`posukPractice/shorashimLearning/students/${ariId}`)).toBeNull();
   const chazaraTeacherContext=await browser.newContext(),chazaraTeacherPage=await chazaraTeacherContext.newPage();
   await configureBrowser(chazaraTeacherPage,pageErrors,failedFirebase);
@@ -332,7 +332,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await chazaraTeacherPage.goto(`${origin}/shorashim/index.html?class=${CLASS_ID}`);
   await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
   await chazaraTeacherPage.getByRole('button',{name:/Learn New Shorashim/}).click();
-  await expect(chazaraTeacherPage.locator('[data-learning-perek="18"] .perek-progress')).toContainText('0 of 1 learned');
+  await expect(chazaraTeacherPage.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('0 of 1 learned');
   await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);
   expect(claims.b3StudentId).toBe(ariId);expect(claims.b3ClassId).toBe(CLASS_ID);
