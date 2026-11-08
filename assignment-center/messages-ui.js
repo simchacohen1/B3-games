@@ -80,6 +80,7 @@
       '.dm-earlier{margin-top:14px}',
       '.dm-earlier>summary{cursor:pointer;font-weight:800;color:#5b7290;padding:8px 2px}',
       '.hw-flash{animation:hwFlash 2s ease-out}',
+      '.dm-off .tab-messages,.dm-off .dm-about,.dm-off #dmBox,.dm-off .dm-hint{display:none!important}',
       '@keyframes hwFlash{0%,40%{box-shadow:0 0 0 4px #4a9eed}100%{box-shadow:none}}'
     ].join('\n');
     document.head.append(s);
@@ -439,7 +440,8 @@
 
     // ---------- public ----------
     async function refreshUnread() {
-      try { var d = await opts.call({ action: 'dmUnread' }); setUnread(Number(d.unread) || 0); } catch (e) { /* keep the last count */ }
+      try { var d = await opts.call({ action: 'dmUnread' }); setUnread(Number(d.unread) || 0); document.body.classList.remove('dm-off'); }
+      catch (e) { if (e && e.status === 400) document.body.classList.add('dm-off'); } // server not updated yet: hide Messages until it is
     }
     function show() {
       state.visible = true;
