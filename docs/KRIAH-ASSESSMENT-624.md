@@ -204,3 +204,28 @@ returns that unchanged value for the server hash comparison, clears superseded
 callback errors on retries, and reports a missing/conflicting record only after
 confirmation. The two adapter regressions cover this behavior without adding a
 listener or weakening the expected-revision conflict check.
+
+### Authenticated staging results
+
+After the adapter fix, `scripts/kriah-stage-api-verify.cjs` passed against the
+deployed Firebase service with four real fictional Firebase sign-ins. It checked
+assignment, a valid one-second synthetic silent Ogg/Opus submission, duplicate
+retry, grading, shared feedback and reports, byte-identical original retrieval,
+teacher/student class denial, student grading denial, teacher/member revocation,
+revoked-token denial, private RTDB denial and anonymous audio denial.
+The original was 318 bytes; 19 API calls returned 7,124 JSON bytes. These are test
+response sizes, not billed RTDB measurements. Three `audioRead` attempts include
+two denied cross-class calls; only the authorized call downloaded the original.
+
+The owner's connected Edge browser was also signed in as a fictional teacher.
+Original playback decoded with duration=1 second, readyState=4 and no media error.
+A second nekudah was marked correct, draft saved, then finalized on the actual
+staging server. The real report showed 1/2 assessed units correct (50%), 20 not
+assessed, kamatz needing practice and patach correct. The preview is left open
+with that fictional account for review.
+
+The complete automated **remote** fake-microphone browser script remains
+unverified because its browser-runtime download repeatedly timed out/was slow.
+The local-fictional CI microphone/recovery/markup/report journey passes. Real
+Safari/iPad remains a separate check. These limitations do not prevent reviewing
+the isolated staging deployment, and do not grant production release approval.
