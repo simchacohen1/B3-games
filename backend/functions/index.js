@@ -2761,3 +2761,12 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
 exports.cleanupClassPointerShareTickets = require('./class-pointer-share-ticket-cleanup').cleanupClassPointerShareTickets;
 exports.funTorahVocabularyBank = require('./vocabulary-bank').funTorahVocabularyBank;
+
+// Mishnayos Practice (issue #634): Silverstein answer key stays server-side.
+const mishnayosPractice = require("./mishnayos-practice")({ ANTHROPIC_API_KEY, setCors, parseMultipart, transcribeAudio });
+exports.generateMishnahTranslationChunks = mishnayosPractice.generateMishnahTranslationChunks;
+exports.gradeMishnahTranslationChunk = mishnayosPractice.gradeMishnahTranslationChunk;
+exports.generateMishnahQuestions = mishnayosPractice.generateMishnahQuestions;
+exports.gradeMishnahQuestionAnswer = mishnayosPractice.gradeMishnahQuestionAnswer;
+exports.gradeMishnahExplanation = mishnayosPractice.gradeMishnahExplanation;
+exports.mishnayosAnswerKey = mishnayosPractice.mishnayosAnswerKey;
