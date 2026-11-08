@@ -89,7 +89,7 @@
     const box = $('libraryList'); box.replaceChildren();
     if (!state.library.length) box.append(el('p', 'Create your first exercise, then assign it to one or more students.'));
     state.library.forEach(ex => {
-      const card = el('article', null, 'card'); card.append(el('div', ex.type === 'Letters' ? 'א ב' : ex.unitType === 'nekudah' ? 'אָ בֵּ' : 'אַבָּא', 'exercise-emblem')); card.append(el('h2', ex.title), el('p', ex.type + ' · ' + ex.level), el('p', ex.text, 'hebrew'));
+      const card = el('article', null, 'card'); card.append(el('div', ex.type === 'Letter recognition' ? 'א ב' : ex.unitType === 'nekudah' ? 'אָ בֵּ' : 'אַבָּא', 'exercise-emblem')); card.append(el('h2', ex.title), el('p', ex.type + ' · ' + ex.level), el('p', ex.text, 'hebrew'));
       card.lastChild.dir = 'rtl'; card.lastChild.lang = 'he';
       card.append(button('Edit', () => editExercise(ex), 'secondary'), button('Assign', () => assignPanel(ex))); box.append(card);
     });
@@ -203,7 +203,7 @@
       stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = false; timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds · Listen before submitting.';
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
-    state.recording = recorder; recordButton.classList.add('record-primary'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
+    state.recording = recorder; recordButton.classList.add('record-primary'); recordButton.setAttribute('aria-label', 'Record reading'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
     const recovered = await API.draft(draftKey() + ':audio').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
     if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); player.src = url; submit.disabled = false; retry.disabled = !!recovered.uploadStarted; recordButton.disabled = !!recovered.uploadStarted; timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
