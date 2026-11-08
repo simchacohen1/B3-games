@@ -115,6 +115,14 @@ main .screen[hidden],.wizard-step[hidden]{display:none!important}
 .choice.assign{background:var(--blue-light);border-color:#6ea8f5}
 .choice.messages{grid-column:1/-1;background:#f5f0ff;border-color:#b69df8}
 .choice.messages[hidden]{display:none}
+.choice.subjects{grid-column:1/-1;min-height:0;background:#fff7ed;border-color:#f6b26b}
+.subject-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.subject-row input{flex:1;min-width:0}
+.subject-row button,.subject-add button{width:auto}
+.subject-add{align-items:end}
+.teacher-subjects{border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin:0 0 10px}
+.teacher-subjects legend{font-weight:800;padding:0 6px}
+.subject-tick{display:inline-flex;align-items:center;gap:4px;margin:4px 14px 4px 0;font-weight:600}
 
 .screen-head{display:flex;align-items:center;gap:14px;margin:12px 0 20px}
 .screen-head h1{margin:0;font-size:26px;font-weight:900}
@@ -278,7 +286,8 @@ button.link:hover{background:none;color:var(--navy)}
     <div class="home-grid"><button class="choice create" id="openCreate"><span class="icon" aria-hidden="true">＋</span><strong>Create Assignment</strong><small>Make homework or a class assignment, step by step.</small></button>
     <button class="choice check" id="openCheck"><span class="icon" aria-hidden="true">✓</span><strong>Check Assignments <span class="badge wait" id="reviewCount" title="Students waiting for your check">0</span></strong><small>Student work waiting for your review. Approve it or send it back with a note.</small></button>
     <button class="choice assign" id="openAssignments"><span class="icon" aria-hidden="true">▣</span><strong>Reports</strong><small>See every assignment, how many students are done, and each student's grades.</small></button>
-    <button class="choice messages" id="openMessages" hidden><span class="icon" aria-hidden="true">💬</span><strong>Messages from students <span class="badge wait" id="messagesCount" title="New messages from students" hidden>0</span></strong><small>Voice and text messages that are not about one assignment. Pick a student to read and reply.</small></button></div>
+    <button class="choice messages" id="openMessages" hidden><span class="icon" aria-hidden="true">💬</span><strong>Messages from students <span class="badge wait" id="messagesCount" title="New messages from students" hidden>0</span></strong><small>Voice and text messages that are not about one assignment. Pick a student to read and reply.</small></button>
+    <button class="choice subjects" id="openSubjects"><span class="icon" aria-hidden="true">📖</span><strong>Class subjects</strong><small>This class's subjects (e.g. Chumash, Mishnayos) and which teacher teaches each one.</small></button></div>
     <button class="sec" id="openPreview">Preview Student View <span class="muted">· read-only sample</span></button>
   </section>
   <section class="screen" id="screenCreate" hidden aria-labelledby="createHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="createHeading">Create Assignment</h1></div>
@@ -288,7 +297,7 @@ button.link:hover{background:none;color:var(--navy)}
     <div class="create-field"><span class="question-number" aria-hidden="true">2</span><div><span class="field-label" id="itemsQuestion">What are they practicing?</span><p class="field-help">Add one or more items. Each item opens the activity at exactly the right spot, for example Posuk Practice, perek 18, pesukim 12–14.</p><div id="itemsBuilder" role="group" aria-labelledby="itemsQuestion"></div><select id="type" hidden aria-hidden="true" tabindex="-1"></select></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">3</span><div><label for="title">Give it a short name</label><input id="title" maxlength="120" placeholder="For example: This week's Shorashim"></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">4</span><div><label for="details">What should students do?</label><textarea id="details" maxlength="1200" placeholder="Practice saying each word. Then come back here and hand it in."></textarea></div></div>
-    <div class="create-field"><span class="question-number" aria-hidden="true">5</span><div><label for="subject">Subject <span class="muted" style="font-weight:400;font-size:14px">(optional)</span></label><p class="field-help">Students can filter their homework by subject, e.g. Chumash, Mishnayos.</p><input id="subject" maxlength="60" placeholder="e.g. Chumash"></div></div>
+    <div class="create-field"><span class="question-number" aria-hidden="true">5</span><div><label for="subject">Subject <span class="muted" style="font-weight:400;font-size:14px">(optional)</span></label><p class="field-help">Students can filter their homework by subject. Homework with a subject is seen only by you; with no subject, every teacher in this class sees it.</p><select id="subject" aria-describedby="subjectHelp"><option value="">No subject</option></select><p class="field-help" id="subjectHelp"></p></div></div>
     <div class="step-actions"><button class="sec backHome">Cancel</button><button id="nextAudience" class="primary-action">Next: Choose students →</button></div></div>
     <div class="create-step" id="createStep2" hidden><div class="audience-box" id="audBox"><h3>👥 Who should get this?</h3><p>Choose students in <strong><span class="className"></span></strong>.</p><label class="audience-choice"><input type="radio" name="aud" value="all" checked><span>Everyone in my class<small>The easiest choice — send it to the whole class.</small></span></label><label class="audience-choice"><input type="radio" name="aud" value="some"><span>Choose students<small>Only the students you select will see it.</small></span></label><div class="students" id="studentPick" style="display:none"></div></div><div class="step-actions"><button class="sec" id="backToDetails">← Back</button><button id="nextReview" class="primary-action">Next: Review before sharing →</button></div></div>
     <div class="create-step" id="createStep3" hidden><div class="step-review"><h3>✅ Check it before sharing</h3><p class="muted">You can save this as a draft or publish it now.</p></div>
@@ -303,6 +312,10 @@ button.link:hover{background:none;color:var(--navy)}
   <section class="screen" id="screenAssignment" hidden aria-labelledby="oneAssignmentHeading"><div class="screen-head"><button class="sec backReports">← Reports</button><h1 id="oneAssignmentHeading">Assignment</h1></div><div id="oneAssignment"></div></section>
   <section class="screen" id="screenStudent" hidden aria-labelledby="oneStudentHeading"><div class="screen-head"><button class="sec backReports">← Reports</button><h1 id="oneStudentHeading">Student</h1></div><div id="oneStudent"></div></section>
   <section class="screen" id="screenMessages" hidden aria-labelledby="messagesHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="messagesHeading">Messages from students</h1></div><p class="muted">Messages here are not about one assignment. Notes about a specific assignment are on that assignment.</p><div id="messagesBox" class="card general-messages"></div></section>
+  <section class="screen" id="screenSubjects" hidden aria-labelledby="subjectsHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="subjectsHeading">Class subjects</h1></div>
+    <p class="muted">Subjects for <strong><span class="className"></span></strong>. Every teacher in this class can change these, and all teachers have the same rights. Homework with a subject is seen only by the teacher who posted it. Homework with no subject is seen by every teacher in the class.</p>
+    <div class="card"><h2>Subjects</h2><div id="subjectRows"></div><div class="row subject-add"><div><label for="newSubject">Add a subject</label><input id="newSubject" maxlength="60" placeholder="For example: Chumash"></div><div><button id="addSubject">Add subject</button></div></div><div id="subjectMsg" class="msg" role="status" aria-live="polite"></div></div>
+    <div class="card"><h2>Who teaches what</h2><p class="muted">Tick the subjects each teacher teaches. A teacher with nothing ticked can use any subject.</p><div id="teacherSubjectRows"></div><div id="teacherSubjectMsg" class="msg" role="status" aria-live="polite"></div></div></section>
   <section class="screen" id="screenPreview" hidden aria-labelledby="previewHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="previewHeading">Preview Student View</h1></div><div class="fake-banner"><strong>Fictional sample</strong><br>This is a read-only example. It does not use student records and cannot save or submit work.</div><div id="fakeStudent"></div></section>
 </div>
 </main>
@@ -333,6 +346,7 @@ $('openCheck').onclick=function(){showScreen('screenCheck')};
 $('openAssignments').onclick=function(){$('listNotice').textContent='';renderReports();showScreen('screenAssignments')};
 $('openPreview').onclick=function(){showScreen('screenPreview')};
 $('openMessages').onclick=function(){renderMessages();showScreen('screenMessages')};
+$('openSubjects').onclick=function(){$('subjectMsg').textContent='';$('teacherSubjectMsg').textContent='';renderSubjects();showScreen('screenSubjects')};
 ['title','details','assigned','due'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
 function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';var pi=$('previewItems');if(!pi){pi=el('ol',null,'hwi-list');pi.id='previewItems';$('previewDetails').after(pi)}pi.replaceChildren();if(typeof itemsBox!=='undefined')itemsBox.get().forEach(function(item){var d=HI.describe(item);pi.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
 function goCreateStep(step){state.createStep=Math.max(1,Math.min(3,step));[1,2,3].forEach(function(n){$('createStep'+n).hidden=n!==state.createStep});$('stepCaption').textContent='Step '+state.createStep+' of 3 · '+['','Assignment','Students','Review & share'][state.createStep];$('progressFill').style.width=(state.createStep*100/3)+'%';if(state.createStep===3)updatePreview();window.scrollTo({top:0,behavior:'smooth'})}
@@ -370,7 +384,7 @@ $('cls').onchange=function(){state.classId=$('cls').value;document.querySelector
 document.querySelectorAll('input[name=aud]').forEach(function(r){r.onchange=function(){$('studentPick').style.display=r.value==='some'&&r.checked?'':'none'}});
 
 async function load(){
-  try{state.data=await api({action:'teacherList'});buildPick();document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;renderOpenScreens();renderReview();renderMessages()}
+  try{state.data=await api({action:'teacherList'});buildPick();document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;if(!state.editing)fillSubjects();renderOpenScreens();renderReview();renderMessages();if(!$('screenSubjects').hidden)renderSubjects()}
   catch(e){$('list').replaceChildren(el('div',e.message,'card msg err'))}
 }
 function buildPick(){
@@ -380,7 +394,7 @@ function buildPick(){
 }
 function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
 function resetForm(){state.editing=null;state.editingPublication=null;$('formTitle').textContent='Let’s make an assignment!';setLabel('homework');$('save').textContent='Save Draft';$('publishNow').textContent='Publish to Students';$('publishNow').hidden=false;$('cancelEdit').style.display='none';
-  ['title','details','subject','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;itemsBox.set([]);syncType();updatePreview();goCreateStep(1)}
+  ['title','details','due','target'].forEach(function(i){$(i).value=''});$('subject').value='';fillSubjects();$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;itemsBox.set([]);syncType();updatePreview();goCreateStep(1)}
 $('cancelEdit').onclick=resetForm;
 async function submitForm(publishRequested){
   var ip=itemsProblem();if(ip){say($('formMsg'),ip);goCreateStep(1);return}
@@ -392,14 +406,15 @@ async function submitForm(publishRequested){
   try{
     var id=state.editing;
     if(wasEditing){
-      await api({action:'edit',assignmentId:id,label:chosenLabel(),title:$('title').value,details:$('details').value,subject:$('subject').value.trim(),items:itemsBox.get(),
+      await api(Object.assign(subjectChoice(),{action:'edit',assignmentId:id,label:chosenLabel(),title:$('title').value,details:$('details').value,items:itemsBox.get(),
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
-        targetAmount:$('target').value,targetUnit:$('targetUnit').value});
+        targetAmount:$('target').value,targetUnit:$('targetUnit').value}));
     }else{
       var newItems=itemsBox.get();
-      var body={action:'create',type:newItems.length?newItems[0].type:$('type').value,items:newItems,label:chosenLabel(),title:$('title').value.trim(),details:$('details').value,subject:$('subject').value.trim(),
+      var body={action:'create',type:newItems.length?newItems[0].type:$('type').value,items:newItems,label:chosenLabel(),title:$('title').value.trim(),details:$('details').value,
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
         targetAmount:$('target').value,targetUnit:$('targetUnit').value};
+      Object.assign(body,subjectChoice());
       if(document.querySelector('input[name=aud]:checked').value==='some')body.studentIds=Array.prototype.map.call($('studentPick').querySelectorAll('input:checked'),function(c){return c.value});
       var created=await api(body);id=created.id;state.editing=id;state.editingPublication='draft';
     }
@@ -410,6 +425,40 @@ async function submitForm(publishRequested){
   }catch(e){say($('formMsg'),state.editing?'Your draft is saved, but it was not shared. Use Publish to Students to try again.':e.message)}finally{$('save').disabled=false;$('publishNow').disabled=false}
 }
 $('save').onclick=function(){submitForm(false)};$('publishNow').onclick=function(){submitForm(true)};
+// ---------- Subjects ----------
+// The subject picker lists this class's subjects that this teacher teaches. Homework that
+// already has a subject the teacher no longer teaches (or an older typed-in subject) keeps it.
+function fillSubjects(a){
+  var sel=$('subject'),prev=sel.value,d=state.data||{},list=d.subjects||[],mine=(d.me&&d.me.subjectIds)||list.map(function(x){return x.id});
+  sel.replaceChildren();var none=el('option','No subject · every teacher in this class sees it');none.value='';sel.append(none);
+  list.forEach(function(x){if(mine.indexOf(x.id)>=0||(a&&a.subjectId===x.id)){var o=el('option',x.name);o.value=x.id;sel.append(o)}});
+  if(a&&a.subject&&!a.subjectId){var keep=el('option',a.subject+' (kept)');keep.value='__keep';sel.append(keep)}
+  sel.value=a?(a.subjectId||(a.subject?'__keep':'')):'';
+  if(!a&&prev&&prev!=='__keep'&&sel.querySelector('option[value="'+prev+'"]'))sel.value=prev; // a refresh keeps the teacher's pick
+  $('subjectHelp').textContent=list.length?'':'This class has no subjects yet. Add them from Home → Class subjects.';
+}
+function subjectChoice(){var v=$('subject').value;return v==='__keep'?{}:{subjectId:v}}
+async function subjectCall(body,box){try{await api(body);await load();return true}catch(e){say(box,e.message);return false}}
+function renderSubjects(){
+  var d=state.data||{},list=d.subjects||[],rows=$('subjectRows'),teachers=d.teachers||{};rows.replaceChildren();
+  if(!d.subjects){rows.append(el('p','Subjects are not available yet on this site.','muted'));$('addSubject').disabled=true;return}
+  $('addSubject').disabled=false;
+  if(!list.length)rows.append(el('p','No subjects yet. Homework works as before until you add some.','muted'));
+  list.forEach(function(x){var r=el('div',null,'subject-row');var input=el('input');input.value=x.name;input.maxLength=60;input.setAttribute('aria-label','Name of subject '+x.name);
+    var save=el('button','Rename','sec');save.onclick=async function(){if(!input.value.trim()||input.value.trim()===x.name)return;save.disabled=true;if(await subjectCall({action:'renameSubject',subjectId:x.id,name:input.value},$('subjectMsg')))say($('subjectMsg'),'Renamed.',true);save.disabled=false};
+    var del=el('button','Remove','sec');del.onclick=async function(){if(!confirm('Remove the subject "'+x.name+'"? Homework already tagged with it keeps the name.'))return;del.disabled=true;if(await subjectCall({action:'removeSubject',subjectId:x.id},$('subjectMsg')))say($('subjectMsg'),'Removed.',true);del.disabled=false};
+    r.append(input,save,del);rows.append(r)});
+  var tbox=$('teacherSubjectRows');tbox.replaceChildren();
+  var ids=Object.keys(teachers).sort(function(a,b){return teachers[a].name.localeCompare(teachers[b].name)});
+  if(!ids.length){tbox.append(el('p','No teachers are linked to this class yet.','muted'));return}
+  if(!list.length){tbox.append(el('p','Add a subject first.','muted'));return}
+  ids.forEach(function(uid){var t=teachers[uid],f=el('fieldset',null,'teacher-subjects');f.append(el('legend',t.name+(d.me&&d.me.id===uid?' (you)':'')));
+    list.forEach(function(x){var l=el('label',null,'subject-tick'),c=el('input');c.type='checkbox';c.value=x.id;c.checked=(t.subjectIds||[]).indexOf(x.id)>=0;c.style.width='auto';
+      c.onchange=async function(){var chosen=Array.prototype.map.call(f.querySelectorAll('input:checked'),function(i){return i.value});f.disabled=true;if(await subjectCall({action:'setTeacherSubjects',teacherId:uid,subjectIds:chosen},$('teacherSubjectMsg')))say($('teacherSubjectMsg'),'Saved for '+t.name+'.',true);f.disabled=false};
+      l.append(c,document.createTextNode(' '+x.name));f.append(l)});
+    tbox.append(f)});
+}
+$('addSubject').onclick=async function(){var n=$('newSubject').value.trim();if(!n){say($('subjectMsg'),'Type a subject name first.');$('newSubject').focus();return}$('addSubject').disabled=true;if(await subjectCall({action:'addSubject',name:n},$('subjectMsg'))){$('newSubject').value='';say($('subjectMsg'),'Added '+n+'.',true)}$('addSubject').disabled=false};
 // ---------- Reports ----------
 var LABELS={homework:'Homework',classwork:'Class Assignment'};
 function labelOf(a){return a&&a.label==='classwork'?'classwork':'homework'}
@@ -445,7 +494,7 @@ function renderReports(){var d=state.data,box=$('list');if(!d)return;box.replace
   $('reportSummary').textContent=plural(d.assignments.length,'assignment')+' · '+plural(waiting,'student')+' waiting for your check';
   if(!d.assignments.length){box.append(el('div','No assignments yet. Choose Create Assignment to make your first one.','card muted'));return}
   sortedAssignments().forEach(function(a){var p=pubOf(a),row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
-    var top=el('div',null,'row-top'),name=el('span',null,'row-name');name.append(document.createTextNode(a.title+' '),labelBadge(a));if(a.subject)name.append(el('span',a.subject,'badge'));if(p==='draft')name.append(el('span','Draft · students can’t see it','badge state'));if(p==='archived')name.append(el('span','Archived','badge state'));top.append(name,el('span',dateLine(a),'row-dates'));row.append(top);
+    var top=el('div',null,'row-top'),name=el('span',null,'row-name');name.append(document.createTextNode(a.title+' '),labelBadge(a));if(a.subject)name.append(el('span',a.subject,'badge'));if(a.postedBy&&a.mine===false)name.append(el('span','By '+a.postedBy,'badge'));if(p==='draft')name.append(el('span','Draft · students can’t see it','badge state'));if(p==='archived')name.append(el('span','Archived','badge state'));top.append(name,el('span',dateLine(a),'row-dates'));row.append(top);
     if(p!=='draft')row.append(countLine(assignmentCounts(a)));
     row.onclick=function(){openAssignment(a.id)};box.append(row)})}
 // One row per student across every assignment they were given (drafts are not counted: students never saw them).
@@ -464,7 +513,7 @@ document.querySelectorAll('.backReports').forEach(function(b){b.onclick=function
 $('viewAssignments').onclick=function(){state.reportView='assignments';renderReports()};
 $('viewStudents').onclick=function(){state.reportView='students';renderReports()};
 $('reportSort').onchange=function(){state.reportSort=$('reportSort').value;renderReports()};
-function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;$('subject').value=a.subject||'';$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;itemsBox.set(a.items||[]);setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
+function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;fillSubjects(a);$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;itemsBox.set(a.items||[]);setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
 function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(state.openAssignmentId);root.replaceChildren();if(!a){$('oneAssignmentHeading').textContent='Assignment';root.append(el('div','This assignment is no longer available.','card muted'));return}
   var p=pubOf(a),c=assignmentCounts(a);$('oneAssignmentHeading').textContent=a.title;
   var card=el('div',null,'card'),badges=el('div');badges.append(labelBadge(a),el('span',H.TYPES[a.type]||a.type,'badge'));if(a.subject)badges.append(el('span',a.subject,'badge'));badges.append(el('span',p==='published'?'Published':p==='archived'?'Archived':'Draft · students can’t see it','badge '+(p==='published'?'ok':'state')));card.append(badges);
