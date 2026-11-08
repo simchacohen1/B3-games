@@ -144,7 +144,13 @@ function createService({ projectId, store, audio, now = Date.now }) {
     if (action === 'get') return { record: visible(current, auth.student) };
     if (action === 'audioRead') {
       if (!current.audio) fail(404, 'No recording submitted yet.');
-      return { audio: await audio.read(current.audio.path), type: current.audio.type };
+      const encoded = await audio.read(current.audio.path);
+      const stored = Buffer.from(encoded, 'base64');
+      const digest = crypto.createHash('sha256').update(stored).digest('hex');
+      if (stored.length !== current.audio.size || digest !== current.audio.hash) {
+        fail(409, 'The stored original audio failed its integrity check. Do not grade this recording; contact the administrator.');
+      }
+      return { audio: encoded, type: current.audio.type };
     }
     if (action === 'submit') {
       if (!auth.student) fail(403, 'Only the assigned student can submit.');
