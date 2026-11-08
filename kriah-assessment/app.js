@@ -157,7 +157,9 @@
     if (record.audio) box.append(button('Load original recording', async () => {
       const data = await call({ action: 'audioRead', id });
       const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: data.type })); state.urls.push(url); player.src = url; status('Original recording loaded. No automatic word alignment.');
+      const url = URL.createObjectURL(new Blob([bytes], { type: data.type })); state.urls.push(url); player.src = url;
+       player.onloadedmetadata = () => { const expected = Number(record.audio?.duration), actual = player.duration; if (Number.isFinite(expected) && expected >= 3 && Number.isFinite(actual) && actual > 0 && actual + Math.max(2, expected * 0.12) < expected) status('Warning: playback is only ' + Math.round(actual) + ' seconds, but the original was reported as ' + Math.round(expected) + ' seconds. This recording may be incomplete; do not grade it as complete.', true); };
+       status('Original recording loaded. Expected duration: ' + Math.round(record.audio?.duration || 0) + 's. No automatic word alignment.');
     }, 'secondary'));
     if (state.role === 'student') await studentAssessment(box, record, player, gen);
     else await teacherAssessment(box, record, gen);
@@ -199,7 +201,10 @@
       } finally { if (gen === state.generation) { submit.disabled = !state.blob; retry.disabled = !!state.blob?.uploadStarted; recordButton.disabled = !!state.blob?.uploadStarted; } }
     }); submit.disabled = true;
     const recorder = new KriahRecorder({ onTick: seconds => { timer.textContent = '● Recording · ' + Math.floor(seconds) + ' seconds / 300'; timer.className = 'recording'; }, onError: error => { if (gen === state.generation) { status(error.message, true); stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = !state.blob; } }, onComplete: async value => {
-      if (gen !== state.generation) return; state.blob = value; const url = URL.createObjectURL(value.blob); state.urls.push(url); player.src = url;
+      if (gen !== state.generation) return;
+      await KriahRecorder.verifyPlayableDuration(value.blob, value.duration);
+      if (gen !== state.generation) return;
+      state.blob = value; const url = URL.createObjectURL(value.blob); state.urls.push(url); player.src = url;
       stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = false; timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds · Listen before submitting.';
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
