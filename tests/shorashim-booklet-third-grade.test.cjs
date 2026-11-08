@@ -92,7 +92,7 @@ test('three-choice UI, week dropdown, source load order and review filter are wi
   assert.match(html,/Change List/);
   assert.ok(html.indexOf('app.js?v=')>0&&html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the booklet release');
-  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261019-booklet-1'));
+  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261108-bulk-delete-1'));
   assert.match(review,/reviewPerekFilter === 'booklet'/);
   assert.match(teacher,/window\.FTT_BOOKLET_SHORASHIM\.find/);
   assert.doesNotMatch(app,/\`\$\{learningPerek/);
