@@ -87,7 +87,10 @@
   function unreadCount(messages, role) {
     return (messages || []).filter(function (m) { return m && m.unread && m.role !== role; }).length;
   }
-  function clock(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function clock(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return two(Math.floor(s / 60)) + ':' + two(s % 60); }
+  // "00:04 · 00:11 left": elapsed time, then what is left of the 15 second limit.
+  function recClock(elapsed) { return clock(Math.floor(Math.min(elapsed, VOICE_MAX_MS) / 1000) * 1000) + ' · ' + clock(VOICE_MAX_MS - elapsed) + ' left'; }
   function sentAt(ts) {
     if (!ts) return '';
     try { return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
@@ -118,11 +121,14 @@
       '.rec-dot{width:14px;height:14px;border-radius:50%;background:#e02424;flex:none;animation:recPulse 1.2s ease-out infinite}',
       '@keyframes recPulse{0%{box-shadow:0 0 0 0 rgba(224,36,36,.6);opacity:1}50%{opacity:.55}70%{box-shadow:0 0 0 10px rgba(224,36,36,0)}100%{box-shadow:0 0 0 0 rgba(224,36,36,0);opacity:1}}',
       '@media (prefers-reduced-motion:reduce){.rec-dot{animation:none}}',
-      '.rec-time{font-variant-numeric:tabular-nums;min-width:62px}',
+      '.rec-time{font-variant-numeric:tabular-nums;min-width:120px}',
       '.rec-meter{flex:1 1 90px;min-width:90px;height:10px;border-radius:6px;background:#f7d4d4;overflow:hidden}',
       '.rec-meter[hidden]{display:none}',
       '.rec-meter span{display:block;height:100%;width:100%;background:linear-gradient(90deg,#16a34a,#eab308 70%,#e02424);transform-origin:left center;transform:scaleX(0);transition:transform .08s linear}',
       '.conversation-recording button{margin:0!important;min-height:36px}',
+      '.general-messages h4{margin-top:0}',
+      '.message-picker{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}',
+      '.message-picker select{max-width:100%}',
       '.conversation-record[data-recording="true"]{background:#e02424!important;border-color:#e02424!important;color:#fff!important}'
     ].join('\n');
     document.head.append(style);
@@ -156,7 +162,7 @@
     var messages = options.messages || [];
     var role = options.role;
     var unread = unreadCount(messages, role), marked = false;
-    var heading = el('h4', role === 'teacher' ? 'Notes with this student' : 'Notes with your teacher');
+    var heading = el('h4', options.title || (role === 'teacher' ? 'Notes with this student' : 'Notes with your teacher'));
     var headingBadge = null;
     if (unread && !options.collapsed) { headingBadge = el('span', unread + ' new', 'conversation-unread'); heading.append(headingBadge); }
     box.append(heading);
@@ -237,7 +243,7 @@
       }
       history.append(item);
     });
-    if (!messages.length) history.append(el('p', 'No notes yet. Send a message if you have a question.', 'muted'));
+    if (!messages.length) history.append(el('p', options.emptyText || 'No notes yet. Send a message if you have a question.', 'muted'));
     content.append(history);
     if (messages.length) setTimeout(function () { history.scrollTop = history.scrollHeight; }, 0);
     var note = el('textarea'); note.maxLength = 500; note.placeholder = role === 'teacher' ? 'Write a kind note or correction' : 'Ask your teacher a question';
@@ -247,7 +253,8 @@
     var record = el('button', '🎙 Record voice note', 'conversation-record sec'); record.type = 'button';
     // Recording panel: pulsing red dot, time left, live sound meter, cancel.
     var panel = el('div', null, 'conversation-recording'); panel.hidden = true;
-    var recLabel = el('span', 'Recording', 'rec-label'), recTime = el('span', clock(VOICE_MAX_MS) + ' left', 'rec-time');
+    var recLabel = el('span', 'Recording', 'rec-label'), recTime = el('span', recClock(0), 'rec-time');
+    recTime.setAttribute('role', 'timer');
     var meter = el('span', null, 'rec-meter'), meterBar = el('span');
     meter.append(meterBar); meter.setAttribute('aria-hidden', 'true');
     var cancel = el('button', 'Cancel', 'sec conversation-cancel'); cancel.type = 'button';
@@ -318,7 +325,7 @@
         recorder.start(1000);
         r.started = Date.now();
         record.dataset.recording = 'true'; record.disabled = false; record.textContent = '■ Stop & send'; sendText.disabled = true;
-        panel.hidden = false; recTime.textContent = clock(VOICE_MAX_MS) + ' left';
+        panel.hidden = false; recTime.textContent = recClock(0);
         feedback.textContent = 'Recording now. Speak your note, then press Stop & send.';
         r.stopMeter = startMeter(stream, function (level) {
           if (level > r.peak) r.peak = level;
@@ -328,7 +335,7 @@
         r.tick = setInterval(function () {
           if (!box.isConnected) { stopRecording(true); return; } // the page re-drew: never leave the mic on
           var elapsed = Date.now() - r.started;
-          recTime.textContent = clock(VOICE_MAX_MS - elapsed) + ' left';
+          recTime.textContent = recClock(elapsed);
           if (r.stopMeter && elapsed > 3000 && r.peak < 0.03)
             feedback.textContent = 'We can’t hear anything yet. Check that your microphone is on and not muted.';
           if (elapsed >= VOICE_MAX_MS && recorder.state === 'recording') recorder.stop();

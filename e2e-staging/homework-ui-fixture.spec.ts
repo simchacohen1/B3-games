@@ -145,7 +145,7 @@ test('fictional teacher sees distinct workload states and simple screens @homewo
   await expect(rowFor('Eli Weiss')).toContainText('Done ✓');
   await expect(rowFor('Eli Weiss')).toContainText('Great work!');
   await page.screenshot({ path: testInfo.outputPath('homework-teacher-assignment-report.png'), fullPage: true });
-  await rowFor('Eli Weiss').getByRole('button', { name: 'Eli Weiss' }).click();
+  await rowFor('Eli Weiss').getByRole('button', { name: 'Eli Weiss', exact: true }).click();
   await expect(page.locator('#oneStudent')).toContainText('Done (approved): 1 of 1 assignment');
 
   expect(watch.productionRequests).toEqual([]);
@@ -187,7 +187,7 @@ test('fictional student can read teacher feedback and send a private message @ho
   await messages.click();
   await expect(page.locator('.conversation-content')).toBeVisible();
   await expect(page.locator('.conversation-content')).toContainText('Try reading that line again.');
-  await expect(page.getByRole('button', { name: '▶ Listen to voice note' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '▶ Play voice note' })).toBeVisible();
   await page.getByRole('tab', { name: /To Do/ }).click();
   await page.locator('.home-conversation textarea').fill('Thank you. I will try again!');
   await page.getByRole('button', { name: 'Send message' }).click();

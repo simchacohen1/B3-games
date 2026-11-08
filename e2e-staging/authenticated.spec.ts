@@ -198,10 +198,21 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await teacherPage.getByRole('button', { name: 'Save Draft' }).click();
     await expect(teacherPage.locator('#listNotice')).toContainText('Draft saved.');
     created = true;
-    teacherCard = teacherPage.locator('#list .card').filter({ hasText: title });
-    assignmentId = await teacherCard.getAttribute('data-assignment-id') || '';
+    // Reports list (redesigned in #616): one row per assignment; details open on their own screen.
+    const reportRow = teacherPage.locator('#list .report-row').filter({ hasText: title });
+    await expect(reportRow).toContainText('Draft · students can’t see it');
+    assignmentId = await teacherPage.evaluate(async title => {
+      const token = await (window as any).firebase.auth().currentUser.getIdToken();
+      const response = await fetch('https://us-central1-fun-torah-tools-staging.cloudfunctions.net/homeworkPortal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ action: 'teacherList', classId: 'TEST-ALEF' }) });
+      const data = await response.json();
+      return (data.assignments || []).find((row: any) => row.title === title)?.id || '';
+    }, title);
     expect(assignmentId).not.toBe('');
-    await expect(teacherCard).toContainText('Draft — students cannot see this');
+    await reportRow.click();
+    teacherCard = teacherPage.locator('#oneAssignment > .card').first();
+    await expect(teacherCard).toContainText('Draft · students can’t see it');
 
     await signInStudent(studentPage, student, HOMEWORK_SITE);
     await studentPage.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
@@ -257,7 +268,7 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     await expect(teacherCard).toContainText('Could you check my answer?');
-    await expect(teacherCard.getByRole('button', { name: /Listen to voice note/ })).toBeVisible();
+    await expect(teacherCard.getByRole('button', { name: /Play voice note/ })).toBeVisible();
     await teacherCard.locator('.home-conversation textarea').fill('Yes—please add one more example.');
     await teacherCard.getByRole('button', { name: 'Send message' }).click();
     await expect(teacherCard).toContainText('Yes—please add one more example.');

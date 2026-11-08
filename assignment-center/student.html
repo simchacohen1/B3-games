@@ -225,8 +225,17 @@ function render(data){
   listBox.replaceChildren();
   statusBox.style.display='none';
   var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'! 🌟'),el('p',!data.assignments.length?'No homework for you right now. Enjoy your free time!':data.openCount?'Here’s what you can work on today.':'You finished everything. Great job! 🎉'));listBox.append(intro);
+  if(data.general)listBox.append(generalPanel(data.general.messages||[])); // older servers have no standalone messages yet
   var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
   var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 '};groups.forEach(function(g,i){var b=el('button',(tabIcons[g.id]||'')+g.name+' · '+g.items.length,'tab-'+g.id);b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',i===0?'true':'false');b.setAttribute('aria-controls','section-'+g.id);var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.hidden=i!==0;pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});b.onclick=function(){tabs.querySelectorAll('[role=tab]').forEach(function(t){t.setAttribute('aria-selected','false')});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=true});b.setAttribute('aria-selected','true');pane.hidden=false};tabs.append(b);sections.append(pane)});listBox.append(tabs,sections);
+}
+// Messages that are not about one assignment. Voice only, text only, or both; never needs a hand-in.
+function generalPanel(messages){
+  var c=el('article',null,'card general-messages');c.id='generalMessages';
+  c.append(H.conversation({role:'student',collapsed:true,threadKey:'general',title:'Message your teacher',
+    emptyText:'No messages yet. You can type a message or record a voice note for your teacher.',
+    messages:messages,send:function(body){return call(body)},onSent:refresh}));
+  return c;
 }
 function card(a){
   var bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';var c=el('article',null,'card home-card '+bucket);
