@@ -1,7 +1,7 @@
 /* Shared credentials for paid learning services; never send them to other hosts. */
 (function (root) {
   'use strict';
-  const endpoint = /^https:\/\/us-central1-b3-games\.cloudfunctions\.net\/(gradeComprehension|gradeTranslationChunk|gradeQuestionAnswer|generateTranslationChunks|generateComprehensionQuestions|generateWeeklyQuiz|generateShorashimArt|synthesizeSpeech)$/;
+  const endpoint = /^https:\/\/us-central1-b3-games\.cloudfunctions\.net\/(gradeComprehension|gradeTranslationChunk|gradeQuestionAnswer|generateTranslationChunks|generateComprehensionQuestions|generateWeeklyQuiz|generateShorashimArt|synthesizeSpeech|generateMishnahTranslationChunks|gradeMishnahTranslationChunk|generateMishnahQuestions|gradeMishnahQuestionAnswer|gradeMishnahExplanation)$/;
   async function paidFetch(url, options) {
     if (!endpoint.test(String(url))) throw new Error('Unknown learning service.');
     const headers = new Headers(options && options.headers);
