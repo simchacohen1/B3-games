@@ -78,6 +78,18 @@ test('principal is class-scoped, owner can enumerate only enabled synthetic clas
   assert.equal((await f.service.handle(I.owner, { action: 'classes' })).classes.length, 2);
   await denied(f.service.handle({ ...I.teacherA, firebase: { sign_in_provider: 'password' } }, { ...ctx, action: 'openClass' }));
 });
+test('real staging password fixtures require verified test-domain identity plus explicit server marker', async () => {
+  const f = await fixture();
+  const actor = { ...I.teacherA, email: 'teacher.alef@funtorahtools-staging.test', firebase: { sign_in_provider: 'password' } };
+  const body = { ...ctx, action: 'openClass' };
+  await denied(f.service.handle(actor, body));
+  await f.store.set(WS + 'teachers/' + actor.uid + '/kriahSynthetic', true);
+  assert.equal((await f.service.handle(actor, body)).students.length, 1);
+  await denied(f.service.handle({ ...actor, email_verified: false }, body));
+  await denied(f.service.handle({ ...actor, email: 'teacher@example.com' }, body));
+  await f.store.set(WS + 'teachers/' + actor.uid + '/active', false);
+  await denied(f.service.handle(actor, body));
+});
 test('upload retries are idempotent, original audio immutable, new attempt preserves previous audio', async () => {
   const f = await fixture(), id = await assigned(f);
   const payload = { id, audio: webm, type: 'audio/webm', duration: 4 };

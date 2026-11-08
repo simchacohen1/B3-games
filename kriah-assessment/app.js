@@ -44,6 +44,7 @@
     $('attemptList').replaceChildren(); $('libraryList').replaceChildren(); $('reportBody').replaceChildren(); $('exerciseForm').hidden = true; $('assignPanel').hidden = true;
     options($('classSelect'), []); options($('studentSelect'), []);
     $('signIn').hidden = API.fixture || !!API.uid(); $('studentSignIn').hidden = API.fixture || !!API.uid(); $('signOut').hidden = API.fixture || !API.uid();
+    $('fixtureLogin').hidden = !API.staging || !!API.uid();
     if (!API.uid()) { status('Sign in with a fictional staging account. Students use the staging homepage sign-in.'); return; }
     status('Checking your assigned classes…');
     const result = await call({ action: 'classes' }); state.role = result.role;
@@ -76,6 +77,11 @@
   $('refresh').onclick = () => run(async () => { if (safeToLeave()) { release(); await identityChanged(); } });
   $('more').onclick = () => run(() => loadRecords(true));
   $('signIn').onclick = () => run(() => API.signIn());
+  $('fixtureLogin').onsubmit = event => { event.preventDefault(); run(async () => {
+    const email = $('fixtureEmail').value.trim(), password = $('fixturePassword').value;
+    $('fixturePassword').value = '';
+    await API.fixtureSignIn(email, password);
+  }); };
   $('signOut').onclick = () => run(async () => { if (safeToLeave()) { release(); await API.signOut(); } });
   $('actor').onchange = () => run(async () => { if (!safeToLeave()) return; release(); await API.chooseActor($('actor').value); await identityChanged(); });
 

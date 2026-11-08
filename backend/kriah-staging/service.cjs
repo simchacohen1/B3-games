@@ -16,8 +16,11 @@ const copy = value => JSON.parse(JSON.stringify(value));
 function createService({ projectId, store, audio, now = Date.now }) {
   if (projectId !== PROJECT) throw new Error('Kriah service is staging only.');
   async function teacher(identity, classId) {
-    if (!identity?.uid || identity.email_verified !== true || identity.firebase?.sign_in_provider !== 'google.com') fail(403, 'Verified Google teacher sign-in required.');
+    if (!identity?.uid || identity.email_verified !== true) fail(403, 'Verified staging teacher sign-in required.');
     const [admin, row] = await Promise.all([store.get('b3Games/admins/' + safeKey(identity.uid)), store.get(WS + 'teachers/' + identity.uid)]);
+    const provider = identity.firebase?.sign_in_provider;
+    const fixtureLogin = provider === 'password' && /^[^@]+@funtorahtools-staging\.test$/.test(identity.email || '') && row?.kriahSynthetic === true;
+    if (provider !== 'google.com' && !fixtureLogin) fail(403, 'Verified Google teacher or explicitly provisioned staging fixture required.');
     const owner = identity.email === 'owner@funtorahtools-staging.test';
     if (!owner && admin?.active !== true && (row?.active !== true || row.classIds?.[classId] !== true)) fail(403, 'Class is not assigned to this teacher.');
     return true;

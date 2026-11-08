@@ -691,6 +691,12 @@
     el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
     el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
     el('room').classList.toggle('checkers-mode', gameKey === 'checkers');
+    el('room').classList.toggle('c4-mode', gameKey === 'connect-four');
+    el('room').classList.toggle('ttt-mode', gameKey === 'tic-tac-toe');
+    el('room').classList.toggle('memory-mode', gameKey === 'memory-match');
+    el('room').classList.toggle('reversi-mode', gameKey === 'reversi');
+    el('room').classList.toggle('bingo-mode', gameKey === 'bingo');
+    el('room').classList.toggle('mathrace-mode', gameKey === 'math-race');
     el('room').classList.toggle('set-mode', gameKey === 'set');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();

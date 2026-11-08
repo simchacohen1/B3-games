@@ -57,7 +57,10 @@ is accepted only by the loopback development server, never by Firebase.
 
 Every service action rechecks current class access, membership/profile and tool
 grant. Teacher ID tokens must be verified Google identities; active teacher
-records grant only their current `classIds`. Current principal records use the
+records grant only their current `classIds`. A staging fixture can also use a
+verified `@funtorahtools-staging.test` password identity, but only when its current
+server-side teacher record explicitly has `kriahSynthetic: true`. Ordinary
+password accounts, unverified identities and other domains are denied. Current principal records use the
 same owner-maintained, derived class IDs; they get no administrator shortcut.
 The staging owner / active admins can enumerate enabled fictional classes only.
 Students use existing Firebase custom-token claims `b3StudentRole`,
@@ -148,7 +151,7 @@ The demo never talks to Firebase. The Playwright script uses a browser fake
 microphone, simulates an upload outage and page reload, checks manual marking,
 reports, phone width, PDF, microphone denial and direct unauthorized calls.
 
-Local Node results: **18 passed, 0 failed**. Local browser launch is blocked by
+Local Node results: **19 passed, 0 failed**. Local browser launch is blocked by
 the workspace's Chromium `socket(): Operation not permitted`; no local screenshot
 or real-browser success is claimed. A dedicated GitHub PR workflow runs the same
 tests plus the browser journey and uploads fictional screenshots/PDF as artifacts.
@@ -171,8 +174,8 @@ needed to:
    reviewed draft commit, and publish the new page on an isolated staging preview.
    Do not deploy rules or other functions. Set the staging GCLOUD_PROJECT during
    local source analysis as needed; the service rejects all other projects.
-3. Provision two fictional Google teachers and two fictional custom-token
-   students with `kriah-test-*` classes/profile flags as specified above.
+3. Provision two fictional verified test-domain teachers and two fictional
+   students with `kriah-test-*` classes/profile flags and student claims as specified above.
    Never put passwords, ID tokens or passcodes into GitHub or this document.
 4. Verify authenticated assign → record → mark → report, direct class/student
    denial, revoked teacher/member/token access, storage/RTDB direct denial,
@@ -180,3 +183,15 @@ needed to:
 
 Production enablement requires separate work and approval: this draft deliberately
 rejects production. No live Firebase permissions should be loosened to make it run.
+
+## Approved staging setup continuation
+
+The owner approved isolated staging setup and deployment in the development
+session after the initial draft. This does not authorize production or a merge.
+`scripts/kriah-stage-preview.cjs` creates a minimal preview package with only the
+new center and validated public staging config. `scripts/kriah-stage-fixtures.cjs`
+creates the dedicated verified test-domain accounts and marked class records;
+passwords are random and retained only in a mode-0600 temporary file, never logs.
+Existing unrelated account/class records are not overwritten. All commands must
+explicitly target `fun-torah-tools-staging`. Hosting uses a `kriah-624` preview
+channel; the staging site's current live channel remains untouched.

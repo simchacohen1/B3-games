@@ -55,5 +55,8 @@
     const database = await db(), prefix = uid() + ':';
     await new Promise((resolve, reject) => { const tx = database.transaction('drafts', 'readwrite'), store = tx.objectStore('drafts'), req = store.openCursor(); req.onsuccess = () => { const cursor = req.result; if (cursor) { if (String(cursor.key).startsWith(prefix)) cursor.delete(); cursor.continue(); } }; tx.oncomplete = resolve; tx.onerror = reject; });
   }
-  root.KriahClient = { fixture, staging, init, call, uid, blob64, draft, clearDrafts, async chooseActor(value) { actor = value; }, async signIn() { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }, async signOut() { await clearDrafts(); if (auth) await auth.signOut(); } };
+  root.KriahClient = { fixture, staging, init, call, uid, blob64, draft, clearDrafts, async chooseActor(value) { actor = value; }, async signIn() { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }, async fixtureSignIn(email, password) {
+    if (!staging || !auth || !/^[^@]+@funtorahtools-staging\.test$/.test(email)) throw new Error('Use an explicitly provisioned fictional staging account.');
+    await auth.signInWithEmailAndPassword(email, password);
+  }, async signOut() { await clearDrafts(); if (auth) await auth.signOut(); } };
 })(window);
