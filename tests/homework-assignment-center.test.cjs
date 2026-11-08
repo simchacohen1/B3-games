@@ -173,7 +173,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   assert.match(homeSource, /id="homeworkCenterCard" href="assignment-center\/teacher\.html"[^>]*>[\s\S]*?Homework &amp; Assignments/,
     'the main Teacher Tools panel links directly to the Homework Center');
-  assert.match(homeSource, /fun-torah-tools-staging--homework-406-preview/,
+  assert.match(homeSource, /homework-406-preview\|pr-597-homework-notes/,
     'the signed-in student auth route recognizes only the staging Homework preview host');
   assert.match(homeSource, /return "https:\/\/us-central1-b3-games\.cloudfunctions\.net\/funTorahStudentAuth"/,
     'student auth keeps the production function target on production hosts');
@@ -274,7 +274,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     'staging student login honors and validates the requested class');
   const e2eSource = fs.readFileSync(__dirname + '/../e2e-staging/staging-common.ts', 'utf8');
   assert.match(e2eSource, /FTT_STAGING_SITE must be the staging live site/);
-  assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);
+  assert.match(e2eSource, /homework-406-preview\|pr-597-homework-notes/);
   const smokeSource = fs.readFileSync(__dirname + '/../e2e-staging/public-smoke.spec.ts', 'utf8');
   assert.match(smokeSource, /tool\.previewOnly && process\.env\.GITHUB_EVENT_NAME === 'pull_request'/);
 });

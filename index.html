@@ -1527,7 +1527,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   // Student sign-in is checked on the server; passcodes never reach the browser.
   function studentAuthUrl(){
     const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
-    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/i.test(location.hostname);
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/i.test(location.hostname);
     if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
     return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
   }
