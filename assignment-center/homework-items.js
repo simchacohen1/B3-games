@@ -61,6 +61,7 @@
     if (!t || !t.url) return '';
     var u = new URL(t.url, base || root.location.href), d = item.details || {}, p = u.searchParams;
     p.set('hw', assignment.id); p.set('hwItem', item.id);
+    if (assignment.classId) p.set('hwClass', assignment.classId); // students in several classes
     p.set('hwTitle', String(assignment.title || '').slice(0, 80));
     if (assignment.assignedAt != null) p.set('hwSince', String(assignment.assignedAt));
     if (item.type === 'posuk') {
