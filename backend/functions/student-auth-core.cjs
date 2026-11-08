@@ -17,7 +17,8 @@ const WINDOW_MS=600000;
 const LIMITS={
  volumePerIp:1000,        // all calls from one address: stops runaway traffic only
  wrongPerIp:100,          // wrong passcodes from one address, across every student
- wrongPerStudentAndIp:8   // wrong passcodes for one name from one address
+ wrongPerStudentAndIp:8,  // wrong passcodes for one name from one address
+ wrongPerStudent:30       // wrong passcodes for one name from ANY address (stops guessing by switching networks)
 };
 const TOO_MANY='Too many sign-in attempts. Try again in 10 minutes.';
 
@@ -28,7 +29,8 @@ function limitPaths(action,body,ip){
  return {
   volume:'b3Private/studentLoginVolume/'+address,
   wrongIp:'b3Private/studentLoginFailures/ip/'+address,
-  wrongPair:'b3Private/studentLoginFailures/pair/'+hash(kind+':'+who+'|'+(ip||'unknown'))
+  wrongPair:'b3Private/studentLoginFailures/pair/'+hash(kind+':'+who+'|'+(ip||'unknown')),
+  wrongStudent:'b3Private/studentLoginFailures/student/'+hash(kind+':'+who)
  };
 }
 
@@ -52,13 +54,13 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
  if(action!=='login'&&action!=='choosePin'&&action!=='verify')return authenticate(store,body,now);
  const paths=limitPaths(action,body,ip);
  await countVolume(store,paths.volume,now);
- await refuseIfLocked(store,[[paths.wrongIp,LIMITS.wrongPerIp],[paths.wrongPair,LIMITS.wrongPerStudentAndIp]],now);
+ await refuseIfLocked(store,[[paths.wrongIp,LIMITS.wrongPerIp],[paths.wrongPair,LIMITS.wrongPerStudentAndIp],[paths.wrongStudent,LIMITS.wrongPerStudent]],now);
  try{
   return await authenticate(store,body,now);
  }catch(error){
   // Only a real passcode check that did not match counts. Missing input, ambiguous
   // names, turned-off accounts and server errors never use up the allowance.
-  if(error?.wrongCredentials)await Promise.all([recordWrong(store,paths.wrongIp,now),recordWrong(store,paths.wrongPair,now)]);
+  if(error?.wrongCredentials)await Promise.all([recordWrong(store,paths.wrongIp,now),recordWrong(store,paths.wrongPair,now),recordWrong(store,paths.wrongStudent,now)]);
   throw error;
  }
 }

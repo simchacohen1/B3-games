@@ -1,5 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {studentAuth}=require('../backend/functions/student-auth-core.cjs');
+// STUDENT_AUTH_CORE lets tests/student-auth-copies.test.cjs rerun this file against the staging copies.
+const {studentAuth}=require(process.env.STUDENT_AUTH_CORE||'../backend/functions/student-auth-core.cjs');
 const {manageStudents}=require('../backend/functions/student-management-core.cjs');
 const {readPasscode}=require('../backend/functions/student-passcodes.cjs');
 
@@ -178,4 +179,19 @@ test('transaction rechecks concurrent PIN reservations and teacher resets',async
 test('empty RTDB local cache is retried before approving the server-side PIN change',async()=>{
  const d=seed(),tx=d.tx;d.tx=async(path,fn)=>{if(path==='b3Private/passcodes')assert.deepEqual(fn(null),{});return tx(path,fn);};
  assert.equal((await choose(d)).requiresPinChange,false);
+});
+
+test('guessing one student passcode from many different addresses is still capped',async()=>{
+ const d=seed();
+ for(let i=0;i<30;i++)await assert.rejects(studentAuth(d,{action:'login',name:'Moshe Levi',pin:'9'+i},'roaming-ip-'+i,1000),{code:401});
+ await assert.rejects(studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},'fresh-ip',1000),{code:429});
+ assert.equal((await studentAuth(d,{action:'login',name:'Dovid',pin:'3333'},'fresh-ip',1000)).id,'dovid');
+ assert.equal((await studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},'fresh-ip',1000+600001)).id,'moshe');
+});
+test('returning to the home page (verify + login) many times never locks a class out',async()=>{
+ const d=seed(),ip='school-wifi';
+ for(let visit=0;visit<300;visit++){
+  assert.ok((await studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'},ip,1000)).ok);
+  assert.equal((await studentAuth(d,{action:'login',name:'Moshe Levi',pin:'1111'},ip,1000)).id,'moshe');
+ }
 });
