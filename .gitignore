@@ -27,3 +27,4 @@ staging-results/
 /\.firebase/
 /staging/*.local.json
 .preview-build/
+/.staging-posuk-grading/
