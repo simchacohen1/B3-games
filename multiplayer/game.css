@@ -152,118 +152,29 @@ button.gf-p.ask{cursor:pointer;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f
 .checkers-mode .actions{margin-top:10px}.checkers-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
 @media(max-width:560px){.play-area.checkers-mode{padding:12px 8px 18px}.ck-board{border-width:6px}.pc{border-width:3px}}
 @media(prefers-reduced-motion:reduce){.pc{transition:none}}
-
-/* ═══════════════════════════════════════════════════════════════
-   Set game — polished 3D table (uses :has() — no JS changes needed)
-   ═══════════════════════════════════════════════════════════════ */
-
-/* Play area: deep purple velvet table */
-.play-area:has(.set-board){
-  position:relative;
-  border:3px solid #ffffffb0;
-  border-radius:28px;
-  padding:16px 16px 22px;
-  color:#fff;
-  background:
-    radial-gradient(circle at 28% 12%,#ffffff44,transparent 42%),
-    linear-gradient(145deg,#3b0764 4%,#7c3aed 96%);
-  box-shadow:
-    inset 0 2px 4px #ffffff80,
-    0 8px 0 #2e0552,
-    0 18px 28px #1a033640;
-  overflow:hidden;
-}
-.play-area:has(.set-board) .room-top{grid-template-columns:1fr;border:0;padding:0}
-.play-area:has(.set-board) #roomCode,
-.play-area:has(.set-board) #players{display:none}
-.play-area:has(.set-board) .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
-.play-area:has(.set-board) .player-turn{color:#e9d5ff;text-shadow:0 1px 3px #0006;font-size:15px;letter-spacing:.02em;margin:10px 0 0}
-.play-area:has(.set-board) .game-result{color:#ffd23f;text-shadow:0 2px 6px #0007}
-
-/* Board: green felt surface */
-.set-board{
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  max-width:660px;
-  gap:12px;
-  padding:18px;
-  background:
-    radial-gradient(ellipse at 50% 40%,#4ade8033,transparent 70%),
-    radial-gradient(circle at 50% 50%,#15803d,#0f5a2e);
-  border-radius:20px;
-  box-shadow:
-    inset 0 4px 16px #0007,
-    inset 0 -2px 8px #00000030,
-    0 6px 0 #0a3d1f,
-    0 14px 24px #0005;
-  margin:14px auto;
-}
-
-/* Cards: thick playing-card look with 3D depth */
-.set-board .board-cell{
-  position:relative;
-  aspect-ratio:2.5/3.5;
-  min-height:90px;
-  border:0;
-  border-radius:14px;
-  background:linear-gradient(160deg,#ffffff 0%,#f0f4ff 60%,#dde6ff 100%);
-  color:#1e1b4b;
-  font-size:clamp(13px,2.8vw,22px);
-  font-weight:900;
-  letter-spacing:.04em;
-  cursor:pointer;
-  box-shadow:
-    0 1px 0 #c7d2fe,
-    0 4px 0 #a5b4fc,
-    0 8px 16px #0005,
-    inset 0 1px 2px #ffffffcc;
-  transform:translateY(0);
-  transition:transform .13s,box-shadow .13s;
-  outline:2px solid #c7d2fe;
-  outline-offset:-4px;
-  overflow:hidden;
-  display:grid;
-  place-items:center;
-  padding:6px;
-  line-height:1.6;
-}
-.set-board .board-cell::before{
-  content:'';
-  position:absolute;
-  inset:0;
-  border-radius:14px;
-  background:linear-gradient(170deg,#ffffff88 0%,transparent 50%);
-  pointer-events:none;
-}
-.set-board .board-cell:hover:not(:disabled){
-  transform:translateY(-5px) scale(1.03);
-  box-shadow:
-    0 1px 0 #c7d2fe,
-    0 8px 0 #a5b4fc,
-    0 18px 28px #0007,
-    inset 0 1px 2px #ffffffcc;
-}
-.set-board .board-cell:disabled{cursor:default;opacity:.75;transform:none}
-
-/* Selected card: lifted with gold glow */
-.set-board .set-selected{
-  background:linear-gradient(160deg,#fffbeb 0%,#fef3c7 60%,#fde68a 100%);
-  outline-color:#fbbf24;
-  box-shadow:
-    0 1px 0 #fde68a,
-    0 8px 0 #d97706,
-    0 0 0 3px #fbbf24,
-    0 0 22px 4px #fbbf2466,
-    0 18px 28px #0007,
-    inset 0 1px 2px #ffffffcc;
-  transform:translateY(-8px) scale(1.05);
-  color:#78350f;
-}
-.set-board .set-selected::before{background:linear-gradient(170deg,#ffffffaa 0%,transparent 50%)}
-
-@media(max-width:560px){
-  .set-board{gap:8px;padding:12px}
-  .set-board .board-cell{min-height:70px;border-radius:10px}
-}
-@media(prefers-reduced-motion:reduce){
-  .set-board .board-cell{transition:none}
-}
+/* Set table: matches the Set tile on the Arcade home page. */
+.play-area.set-mode{position:relative;border:3px solid #ffffffb0;border-radius:28px;padding:16px 16px 22px;color:#fff;background:radial-gradient(circle at 28% 12%,#ffffff55,transparent 42%),linear-gradient(145deg,#53228e 4%,#ae59ee 96%);box-shadow:inset 0 2px 4px #ffffff80,0 8px 0 #3a1768,0 18px 28px #12315b40;overflow:hidden}
+.set-mode .room-top{grid-template-columns:1fr;border:0;padding:0}.set-mode #roomCode,.set-mode #players{display:none}.set-mode .room-top .muted{margin:0 0 10px;color:#fff;font-weight:900;font-size:18px;text-align:center;text-shadow:0 2px 3px #0005}
+.st-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.st-p{display:flex;align-items:center;gap:8px;background:#3a176890;border:3px solid #ffffff66;border-radius:999px;padding:5px 14px 5px 6px;font-weight:900;color:#fff}
+.st-p i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,#ffd23f,#ff8a1f);color:#7a2d00;font-style:normal;box-shadow:inset 0 1px 2px #fff9}
+.st-p small{display:block;font-size:11px;font-weight:800;opacity:.95}
+.st-p.me{background:#fff;color:#3a1768;border-color:#ffd23f;box-shadow:0 0 0 4px #ffd23f66}
+.st-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:560px;margin:0 auto}
+.set-mode .st-card{aspect-ratio:3/4;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6%;padding:8% 0;border:0;border-radius:14px;background:#fff;box-shadow:0 5px 0 #0003,0 10px 16px #0004;transition:transform .15s;font-size:0}
+.set-mode .st-card:hover:not(:disabled){background:#fffdf0;border:0}.set-mode .st-card:disabled{opacity:1;cursor:default}
+.set-mode .st-card svg{width:62%;height:auto;display:block}
+.set-mode .st-card.sel,.set-mode .st-card.sel:hover{background:#fffbe6;transform:translateY(-8px) scale(1.04);box-shadow:0 0 0 4px #ffd23f,0 0 22px #ffd23f,0 5px 0 #0003}
+.set-mode .st-card:focus-visible{outline:4px solid #ffd23f;outline-offset:3px}
+.st-hint{text-align:center;font-weight:900;text-shadow:0 2px 3px #0005;margin-top:14px;font-size:14px;min-height:1em}
+.set-mode .actions{margin-top:10px}.set-mode .game-result{color:#fff;text-shadow:0 2px 3px #0005}
+@media(max-width:560px){.play-area.set-mode{padding:12px 8px 18px}.st-grid{gap:8px}}
+@media(prefers-reduced-motion:reduce){.set-mode .st-card{transition:none}}
+/* Set cards: 3D playing-card depth (gloss sheen, stacked edge for thickness, lift on hover). */
+.set-mode .st-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#fff 0%,#faf7ff 60%,#efe8fd 100%);box-shadow:0 1px 0 #e4dbf7,0 4px 0 #c9b6ee,0 8px 16px #0005,inset 0 1px 2px #fffc;transition:transform .13s,box-shadow .13s}
+.set-mode .st-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(170deg,#ffffff99 0%,transparent 50%);pointer-events:none}
+.set-mode .st-card svg{position:relative;z-index:1}
+.set-mode .st-card:hover:not(:disabled):not(.sel){background:linear-gradient(160deg,#fffef6 0%,#fffbea 60%,#fbf1d0 100%);transform:translateY(-5px) scale(1.03);box-shadow:0 1px 0 #e4dbf7,0 8px 0 #c9b6ee,0 18px 28px #0007,inset 0 1px 2px #fffc}
+.set-mode .st-card.sel,.set-mode .st-card.sel:hover{background:linear-gradient(160deg,#fffbeb 0%,#fef3c7 60%,#fde68a 100%);box-shadow:0 0 0 4px #ffd23f,0 0 22px #ffd23f,0 8px 0 #d99a06,0 18px 28px #0007,inset 0 1px 2px #fffc}
+@media(max-width:560px){.set-mode .st-card{border-radius:10px}}
+@media(prefers-reduced-motion:reduce){.set-mode .st-card{transition:none}.set-mode .st-card:hover:not(:disabled):not(.sel){transform:none}}
