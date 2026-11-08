@@ -1,6 +1,12 @@
-/* Teacher-only screenshot pictures for Shorashim words.
- * Deliberately separate from student cards and student drawing uploads.
- * Requires the matching restricted Cloud Storage rule before use. */
+/* Teacher picture upload for Shorashim words.
+ * Replaces the old Regenerate Pictures button.
+ * Teachers can upload a picture by:
+ *   - Choosing a file from their computer (📁)
+ *   - Pasting a screenshot from clipboard (Ctrl+V)
+ * Each upload is stored under the teacher's UID in Firebase Storage
+ * and appears as a new UNTICKED checkbox option in the picture list.
+ * Any verified teacher account (not just the owner account) can upload.
+ */
 (() => {
   'use strict';
   const PREFIX = 'shorashim-teacher-pictures/';
@@ -17,24 +23,13 @@
         url.pathname.startsWith('/v0/b/' + BUCKET + '/o/' + encodeURIComponent(PREFIX));
     } catch (_) { return false; }
   }
+
+  /** Any verified teacher account can upload — not restricted to owner email. */
   function allowedTeacher() {
     const user = firebase.auth().currentUser;
-    // Matches the narrowly scoped proposed Storage rule. A student or an
-    // ordinary signed-in Google user cannot acquire teacher upload access.
-    return !!(activeTeacherAccess?.authorized && user?.emailVerified &&
-      user.email === 'simcha5770@gmail.com');
+    return !!(activeTeacherAccess?.authorized && user?.emailVerified);
   }
-  function picturePreview(button) {
-    const src = button.dataset.art;
-    if (!screenshotURL(src)) return;
-    button.textContent = '';
-    const img = document.createElement('img');
-    img.src = src;
-    img.alt = 'Teacher screenshot';
-    img.className = 'teacher-uploaded-thumb';
-    img.loading = 'lazy';
-    button.appendChild(img);
-  }
+
   function prepareScreenshot(file) {
     if (!file || !INPUT_TYPES.includes(file.type))
       return Promise.reject(Error('Choose a PNG, JPG, or WebP screenshot.'));
@@ -64,6 +59,7 @@
       image.src = objectURL;
     });
   }
+
   async function upload(id, file, row) {
     const item = (state.catalog.shorashim || []).find(x => x.id === id);
     if (!item || !allowedTeacher()) return;
@@ -71,73 +67,81 @@
     const controls = [...row.querySelectorAll('[data-screenshot-upload], [data-screenshot-paste]')];
     controls.forEach(x => x.disabled = true);
     try {
-      const selected = sanitizeClassArt(item.art);
-      if (selected.length >= ART_STUDENT_MAX)
-        throw Error('First unselect one of the four pictures for this word.');
-      message.textContent = 'Preparing screenshot…';
+      message.textContent = 'Preparing picture…';
       const blob = await prepareScreenshot(file);
       const user = firebase.auth().currentUser;
-      if (!user || !allowedTeacher()) throw Error('Sign in as the approved teacher again.');
+      if (!user || !allowedTeacher()) throw Error('Sign in as your teacher account again.');
       const filename = Date.now() + '-' + Math.random().toString(36).slice(2) + '.webp';
       const ref = firebase.storage().ref(PREFIX + user.uid + '/' + filename);
-      message.textContent = 'Uploading screenshot…';
-      await ref.put(blob, {contentType: 'image/webp'});
+      message.textContent = 'Uploading picture…';
+      await ref.put(blob, { contentType: 'image/webp' });
       const url = await ref.getDownloadURL();
       if (!screenshotURL(url)) throw Error('Could not verify the picture link.');
-      // Persist only the URL in the class catalog, not image bytes.
-      const previousArt = item.art;
-      const previousPool = item.artPool;
-      item.art = sanitizeClassArt([...selected, url]);
-      item.artPool = sanitizeSuggestionPool([...item.art, ...(item.artPool || [])]);
-      item.autoArt = false;
+      // Add URL to artPool only (unticked by default — teacher must check it to show students)
+      const previousArtPool = item.artPool;
+      item.artPool = sanitizeSuggestionPool([...(item.artPool || []), url]);
       try {
         await saveCatalog();
       } catch (err) {
-        item.art = previousArt;
-        item.artPool = previousPool;
+        item.artPool = previousArtPool;
         throw err;
       }
       renderCatalog();
-      status('☁️ Screenshot added to ' + item.front);
+      status('☁️ Picture uploaded for ' + item.front + ' — tick it to show students');
     } catch (error) {
       const denied = /unauthorized|permission.denied|storage\/unauthorized|permission denied/i.test(
         String(error?.code || '') + ' ' + String(error?.message || ''));
       const text = denied
-        ? 'Teacher screenshot Storage permission is not enabled yet. No card was changed.'
-        : (error?.message || 'Could not upload screenshot.');
+        ? 'Picture upload permission is not enabled yet. No card was changed.'
+        : (error?.message || 'Could not upload picture.');
       message.textContent = text;
       status(text, 'error');
     } finally { controls.forEach(x => x.disabled = false); }
   }
+
+  /**
+   * Inject upload controls into a catalog row's .teacher-upload-controls placeholder.
+   * Called by renderCatalog() after each row is built.
+   */
   function controlsFor(row) {
     const id = row.dataset.id;
-    const pictureBox = row.querySelector('.teacher-art-preview');
-    if (!id || !pictureBox) return;
-    row.querySelectorAll('[data-a="art"]').forEach(picturePreview);
+    const placeholder = row.querySelector('.teacher-upload-controls');
+    if (!id || !placeholder) return;
     if (!allowedTeacher()) return;
+
+    // Avoid double-injection if renderCatalog fires again quickly
+    if (placeholder.dataset.injected) return;
+    placeholder.dataset.injected = '1';
+
     const wrap = document.createElement('div');
     wrap.className = 'teacher-screenshot-tools';
+
     const paste = document.createElement('div');
     paste.className = 'teacher-screenshot-paste';
     paste.dataset.screenshotPaste = '';
     paste.tabIndex = 0;
     paste.contentEditable = 'true';
     paste.setAttribute('role', 'textbox');
-    paste.setAttribute('aria-label', 'Paste a screenshot here using Control V');
-    paste.textContent = '📋 Click here, then Ctrl+V to paste a screenshot';
+    paste.setAttribute('aria-label', 'Paste a picture here using Control V');
+    paste.textContent = '📋 Click here, then Ctrl+V to paste a picture';
+
     const fileButton = document.createElement('button');
     fileButton.type = 'button';
     fileButton.className = 'ghost';
     fileButton.dataset.screenshotUpload = '';
-    fileButton.textContent = '📁 Choose Screenshot';
+    fileButton.textContent = '📁 Choose Picture File';
+
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.hidden = true;
     fileInput.accept = INPUT_TYPES.join(',');
+
     const message = document.createElement('small');
     message.dataset.screenshotStatus = '';
-    message.setAttribute('aria-live','polite');
+    message.setAttribute('aria-live', 'polite');
     message.className = 'mini-note';
+    message.textContent = 'Uploaded pictures are unticked by default — tick them above to show students.';
+
     paste.addEventListener('paste', event => {
       event.preventDefault();
       const file = [...(event.clipboardData?.items || [])]
@@ -151,20 +155,20 @@
       fileInput.value = '';
       if (file) upload(id, file, row);
     };
+
     wrap.append(paste, fileButton, fileInput, message);
-    pictureBox.after(wrap);
+    placeholder.appendChild(wrap);
   }
-  const originalRenderCatalog = renderCatalog;
-  renderCatalog = function screenshotReadyCatalog() {
-    originalRenderCatalog();
-    document.querySelectorAll('#teacherCatalog .catalog-teacher-row').forEach(controlsFor);
-  };
+
+  // Expose so renderCatalog() can call controlsFor() per row
+  window.ShorashimTeacherScreenshot = { controlsFor };
+
   const style = document.createElement('style');
   style.textContent =
-    '.teacher-screenshot-tools{margin:10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}' +
-    '.teacher-screenshot-paste{border:2px dashed #818cf8;background:#eef2ff;border-radius:12px;padding:10px;font-size:13px;min-width:240px;cursor:text}' +
-    '.teacher-screenshot-paste:focus{outline:3px solid #6366f1}' +
-    '.teacher-uploaded-thumb{display:block;width:76px;height:55px;object-fit:contain;border-radius:7px}' +
-    '.teacher-art-chip:has(.teacher-uploaded-thumb){padding:5px}';
+    '.teacher-screenshot-tools{margin:10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}'
+    + '.teacher-screenshot-paste{border:2px dashed #818cf8;background:#eef2ff;border-radius:12px;padding:10px;font-size:13px;min-width:240px;cursor:text}'
+    + '.teacher-screenshot-paste:focus{outline:3px solid #6366f1}'
+    + '.teacher-uploaded-thumb{display:block;width:60px;height:44px;object-fit:contain;border-radius:7px}'
+    + '.teacher-upload-controls{margin-top:4px}';
   document.head.appendChild(style);
 })();
