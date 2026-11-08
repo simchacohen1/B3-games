@@ -92,6 +92,22 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <p class="hint">Each teacher has their own Shorashim library under their own account. New teachers start with an empty library. Choose a teacher, then tick which of your lists to copy into their library. It is a copy: your own classes are not changed, and the teacher decides which of their classes get the words.</p>
 <select id="libraryTeacherSelect"><option value="">Choose teacher</option></select>
 <div id="libraryGrant"></div></section>
+
+<section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
+<p class="hint">Upload a CSV to add teachers, principals, students, and classes all at once. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
+<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>type</code> (teacher / principal / student / class), <code>name</code>, <code>email</code> (teachers &amp; principals), <code>passcode</code> (students' individual sign-in passcode), <code>class</code> (class name; required for students). One row per person or class. Classes in the file are created first.</p>
+<div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Preview</button></div>
+<div id="bulkPreviewArea" style="display:none;margin-top:12px">
+  <div id="bulkSummary" style="margin-bottom:10px;font-weight:700;font-size:16px"></div>
+  <div id="bulkTable" style="overflow-x:auto;font-size:15px"></div>
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <button id="bulkImport" type="button" style="background:#16a34a">&#x2705; Import all</button>
+    <button id="bulkCancel" type="button" style="background:#fff;color:#b91c1c;border:1px solid #fecaca">Cancel</button>
+  </div>
+</div>
+<div id="bulkProgress" style="display:none;margin-top:12px;font-weight:700;font-size:16px"></div>
+<div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:220px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
+</section>
 </div>
 <div id="status" class="toast"></div>
 </main>
@@ -330,6 +346,194 @@ async function renderLibraryGrant(){
 }
 q("libraryTeacherSelect").onchange=renderLibraryGrant;
 q("toolClassSelect").onchange=renderToolGrants;
+
+// ---- Bulk upload -------------------------------------------------------
+// Classes, teacher invites and principal invites are written exactly as the
+// single-add controls above write them. Students are created through the
+// trusted funTorahManageStudents function so the passcode is stored only in
+// private storage (never in a public profile) and sign-in works immediately.
+const BULK_TEMPLATE_ROWS=[
+  "type,name,email,passcode,class",
+  "class,Grade 5,,,",
+  "teacher,Rabbi Cohen,rabbicohen@gmail.com,,Grade 5",
+  "principal,Mrs. Levi,mrslevi@gmail.com,,",
+  "student,Moshe Goldberg,,pass123,Grade 5",
+  "student,Chana Stern,,pass456,Grade 5",
+];
+const BULK_TYPES=["teacher","principal","student","class"];
+const MANAGE_STUDENTS_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents";
+q("bulkDownloadTemplate").onclick=function(e){
+  e.preventDefault();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([BULK_TEMPLATE_ROWS.join("\n")],{type:"text/csv"}));
+  a.download="bulk-upload-template.csv";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+function splitCSVLine(line){
+  const fields=[];let cur="",inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(ch===","&&!inQ){fields.push(cur.trim());cur="";}
+    else cur+=ch;
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+function parseBulkCSV(text){
+  const lines=String(text||"").replace(/^﻿/,"").replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
+  if(!lines.length)return[];
+  const header=splitCSVLine(lines[0]).map(h=>h.toLowerCase());
+  const col=k=>header.indexOf(k);
+  // "password" is accepted as an older name for the passcode column.
+  const passCol=col("passcode")>=0?"passcode":"password";
+  return lines.slice(1).map((line,i)=>{
+    const fields=splitCSVLine(line);
+    const get=k=>col(k)>=0?String(fields[col(k)]||"").trim():"";
+    return{row:i+2,type:get("type").toLowerCase(),name:get("name"),email:get("email").toLowerCase(),passcode:get(passCol),cls:get("class")};
+  }).filter(r=>r.type||r.name);
+}
+const bulkNameKey=s=>String(s||"").trim().toLowerCase();
+function bulkValidate(rows){
+  const errors=[];
+  const knownClasses=new Set(Object.values(classData||{}).map(c=>bulkNameKey(c&&c.name)));
+  rows.forEach(r=>{if(r.type==="class"&&r.name)knownClasses.add(bulkNameKey(r.name));});
+  rows.forEach(r=>{
+    const at="Row "+r.row+": ";
+    if(!BULK_TYPES.includes(r.type)){errors.push(at+'unknown type "'+r.type+'"');return;}
+    if(!r.name){errors.push(at+"missing name");return;}
+    if(r.name.length>100)errors.push(at+"name is longer than 100 characters");
+    if((r.type==="teacher"||r.type==="principal")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))errors.push(at+r.type+" needs a valid email");
+    if(r.type==="student"){
+      if(!r.cls)errors.push(at+"student needs a class");
+      if(!r.passcode)errors.push(at+"student needs a passcode");
+      else if(r.passcode.length>100)errors.push(at+"passcode is longer than 100 characters");
+    }
+    if(r.cls&&(r.type==="student"||r.type==="teacher")&&!knownClasses.has(bulkNameKey(r.cls)))errors.push(at+'class "'+r.cls+'" does not exist and is not in this file');
+  });
+  return errors;
+}
+function bulkReset(){
+  q("bulkPreviewArea").style.display="none";
+  q("bulkFile").value="";
+  delete q("bulkFile")._parsedRows;
+}
+q("bulkPreview").onclick=function(){
+  const file=q("bulkFile").files[0];
+  if(!file){q("status").textContent="Choose a CSV file first.";return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const rows=parseBulkCSV(e.target.result);
+    if(!rows.length){q("status").textContent="No data rows found in CSV.";return;}
+    const errors=bulkValidate(rows);
+    const count=t=>rows.filter(r=>r.type===t).length;
+    const summary=count("teacher")+" teacher(s), "+count("principal")+" principal(s), "+count("class")+" class(es), "+count("student")+" student(s)";
+    const errHtml=errors.length?'<span style="color:#b91c1c">&#x26A0;&#xFE0F; '+errors.length+' issue(s) found. Fix the file and preview again:</span><ul style="margin:6px 0 0;padding-left:18px">'+errors.map(e=>'<li>'+safe(e)+'</li>').join("")+'</ul><br>':"";
+    q("bulkSummary").innerHTML=errHtml+"Found: "+safe(summary);
+    const td=v=>'<td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+v+'</td>';
+    // Passcodes are not shown on screen; the preview only confirms one is set.
+    const tbody=rows.map(r=>'<tr>'+td(r.row)+td(safe(r.type))+td(safe(r.name))+td(r.type==="student"?(r.passcode?"passcode set":"&mdash;"):safe(r.email||"—"))+td(safe(r.cls||"—"))+'</tr>').join("");
+    q("bulkTable").innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr>'+["Row","Type","Name","Email / Passcode","Class"].map(h=>'<th style="text-align:left;padding:7px 10px;background:#f1f5f9;border-bottom:2px solid #e2e8f0">'+h+'</th>').join("")+'</tr></thead><tbody>'+tbody+'</tbody></table>';
+    q("bulkPreviewArea").style.display="";
+    q("bulkLog").style.display="none";
+    q("bulkProgress").style.display="none";
+    q("bulkImport").disabled=errors.length>0;
+    q("bulkCancel").disabled=false;
+    q("bulkFile")._parsedRows=errors.length?null:rows;
+  };
+  reader.readAsText(file);
+};
+q("bulkCancel").onclick=bulkReset;
+async function bulkCreateStudent(classId,name,passcode){
+  const response=await fetch(MANAGE_STUDENTS_URL,{
+    method:"POST",signal:AbortSignal.timeout(15000),
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},
+    body:JSON.stringify({action:"create",classId,name,passcode})
+  });
+  let result={};try{result=await response.json();}catch(_){}
+  if(!response.ok)throw new Error(result.error||"Could not create the student.");
+  return result;
+}
+q("bulkImport").onclick=async function(){
+  const rows=q("bulkFile")._parsedRows;
+  if(!rows){q("status").textContent="Preview the CSV first.";return;}
+  q("bulkImport").disabled=true;q("bulkCancel").disabled=true;q("bulkPreview").disabled=true;
+  const prog=q("bulkProgress"),logEl=q("bulkLog"),log=[];
+  prog.style.display="";logEl.style.display="";logEl.innerHTML="";
+  const root="b3Games/workspaces/"+WS,TS=firebase.database.ServerValue.TIMESTAMP,total=rows.length;
+  let done=0,failed=0;
+  const addLog=(msg,ok)=>{if(!ok)failed++;log.push((ok?"&#x2705; ":"&#x26A0;&#xFE0F; ")+safe(msg));logEl.innerHTML=log.join("<br>");logEl.scrollTop=logEl.scrollHeight;};
+  const step=()=>{prog.textContent="Importing... "+done+" / "+total;};
+  const ofType=t=>rows.filter(r=>r.type===t);
+  try{
+    step();
+    const liveClasses=(await db.ref(root+"/classes").once("value")).val()||{};
+    const classNameToId={};
+    Object.entries(liveClasses).forEach(([id,c])=>{if(c&&c.name)classNameToId[bulkNameKey(c.name)]=id;});
+    // Classes first, so the rows below can refer to them by name.
+    for(const r of ofType("class")){
+      const lk=bulkNameKey(r.name);
+      if(classNameToId[lk]){addLog('Class "'+r.name+'" already exists (skipped)',true);done++;step();continue;}
+      // Names without Latin letters or digits produce an empty key; never write to the classes root.
+      let cid=key(r.name)||"class";
+      if(liveClasses[cid]||(await db.ref(root+"/classes/"+cid).once("value")).exists())cid+="_"+Date.now().toString().slice(-6);
+      try{
+        await db.ref(root+"/classes/"+cid).set({name:r.name,active:true});
+        classNameToId[lk]=cid;liveClasses[cid]={name:r.name,active:true};
+        addLog('Class "'+r.name+'" created',true);
+      }catch(err){addLog('Class "'+r.name+'": '+err.message,false);}
+      done++;step();
+    }
+    // Teachers: an invite, active once a class is assigned (same as Add teacher + Assign).
+    for(const r of ofType("teacher")){
+      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
+      try{
+        if((await ref.once("value")).exists()){addLog("Teacher "+r.email+" already exists (skipped; assign classes above)",true);done++;step();continue;}
+        const classId=r.cls?classNameToId[bulkNameKey(r.cls)]:"";
+        if(r.cls&&!classId){addLog("Teacher "+r.email+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
+        const invite={email:r.email,name:r.name||r.email,role:"teacher",active:!!classId,updatedAt:TS};
+        if(classId)invite.classIds={[classId]:true};
+        await ref.set(invite);
+        addLog("Teacher "+r.name+" ("+r.email+") added"+(classId?" and assigned to "+r.cls:", inactive until a class is assigned"),true);
+      }catch(err){addLog("Teacher "+r.email+": "+err.message,false);}
+      done++;step();
+    }
+    // Principals: same record as Add principal; supervision is chosen above afterwards.
+    for(const r of ofType("principal")){
+      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
+      try{
+        if((await ref.once("value")).exists()){addLog("Principal "+r.email+" already exists (skipped)",true);done++;step();continue;}
+        await ref.set({email:r.email,name:r.name||r.email,role:"principal",accountType:"principal",active:false,updatedAt:TS});
+        addLog("Principal "+r.name+" ("+r.email+") added; select supervised teachers to activate",true);
+      }catch(err){addLog("Principal "+r.email+": "+err.message,false);}
+      done++;step();
+    }
+    // Students: created by the trusted backend, one request per student.
+    for(const r of ofType("student")){
+      const classId=classNameToId[bulkNameKey(r.cls)];
+      if(!classId){addLog("Student "+r.name+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
+      const members=(liveClasses[classId]&&liveClasses[classId].members)||{};
+      if(Object.values(members).some(m=>m&&bulkNameKey(m.name)===bulkNameKey(r.name))){addLog("Student "+r.name+" is already in "+r.cls+" (skipped)",true);done++;step();continue;}
+      try{
+        const result=await bulkCreateStudent(classId,r.name,r.passcode);
+        ((liveClasses[classId]=liveClasses[classId]||{}).members=members)[result.studentId||r.name]={name:r.name,active:true};
+        addLog("Student "+r.name+" added to "+r.cls,true);
+      }catch(err){addLog("Student "+r.name+": "+err.message,false);}
+      done++;step();
+    }
+    prog.textContent="Done! "+done+" row(s) processed"+(failed?", "+failed+" need attention (see list below).":".");
+  }catch(err){
+    console.error(err);
+    prog.textContent="Import stopped: "+err.message+" ("+done+" of "+total+" rows processed).";
+  }finally{
+    delete q("bulkFile")._parsedRows;
+    q("bulkFile").value="";
+    q("bulkCancel").disabled=false;q("bulkPreview").disabled=false;
+    await load();
+  }
+};
+// ---- End bulk upload ---------------------------------------------------
+
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
 })();
