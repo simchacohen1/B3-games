@@ -42,11 +42,14 @@
 .island-place[data-game-group]{grid-column:auto!important}
 .teacher-tools-container{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .teacher-tools-section{max-width:1130px}
+/* Pending-submissions badge on the Homework tile */
+.hw-pending-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#e05252;color:#fff;font-size:12px;font-weight:800;line-height:1;vertical-align:middle;margin-left:4px;box-shadow:0 2px 6px rgba(224,82,82,.4)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261020-demo-student"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
+<script src="assignment-center/homework-common.js?v=20261108-hwtile"></script>
 </head><body>
 <button id="signOut" class="signout-pill hidden">Sign out</button>
 <h1 id="homeTitle">Fun Torah Tools</h1>
@@ -84,8 +87,43 @@ function showTeacherSignIn(message){
  q('signOut').classList.add('hidden');
  q('gate').innerHTML='<h2>Teacher &amp; administrator sign in</h2><p id="teacherSignInStatus" role="status"></p><button type="button" class="sign" id="login">Sign in with Google</button>';
  q('teacherSignInStatus').textContent=message||'Use your authorized teacher or administrator Google account.';
- q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in…';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
+ q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in\u2026';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
 }
+
+// --- Homework pending-submissions badge ---
+// Called after render() so the tiles are already in the DOM.
+// For each class that has homework enabled, quietly fetch the assignment list
+// and show a red badge on the tile with the number of submitted-but-not-yet-approved rows.
+async function loadHomeworkBadges(classIds,user){
+  if(!window.HomeworkCommon||!HomeworkCommon.isAllowedRuntime())return;
+  const auth=firebase.auth();
+  const currentUser=auth.currentUser||user;
+  if(!currentUser||!currentUser.getIdToken)return;
+  let token;
+  try{token=await currentUser.getIdToken();}catch(e){return;}
+  classIds.forEach(async id=>{
+    // Find the homework tile for this class by its data-class-id section.
+    const sec=q('classes').querySelector('.class-card[data-class-id="'+id+'"]');
+    if(!sec)return;
+    const hwTile=sec.querySelector('[data-game-id="homework"]');
+    if(!hwTile)return;
+    try{
+      const data=await HomeworkCommon.call({action:'teacherList',classId:id},token);
+      let submitted=0;
+      (data.assignments||[]).forEach(a=>{
+        Object.values(a.students||{}).forEach(s=>{if(s.status==='submitted')submitted++;});
+      });
+      if(submitted>0){
+        const badge=document.createElement('span');
+        badge.className='hw-pending-badge';
+        badge.setAttribute('aria-label',submitted+' assignment'+(submitted===1?'':'s')+' waiting for review');
+        badge.textContent=String(submitted);
+        hwTile.querySelector('.card-title').append(badge);
+      }
+    }catch(e){/* silently ignore -- the badge is a nice-to-have */}
+  });
+}
+
 async function render(user,access){
  const generation=++renderGeneration;
  if(previewTeacherId){
@@ -99,7 +137,7 @@ async function render(user,access){
      previewActive=true;user={email:teacher.name};access={authorized:true,role:'teacher',classIds:teacher.classIds};
    }catch(error){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent=error.message;return;}
  }
- if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press “Exit student view” at the bottom to return to your teacher account.";return}
+ if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press \u201cExit student view\u201d at the bottom to return to your teacher account.";return}
  if(!access?.authorized){showTeacherSignIn(user?'This Google account is not assigned as a Fun Torah Tools teacher. Choose your authorized account.':'');return}
  if(access.role==="admin"){
    if(previewParams.get('manageStudentTools')!=='1'){location.replace("index.html");return}
@@ -136,15 +174,20 @@ async function render(user,access){
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+'<div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card" data-class-id="'+id+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+'<div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;
    const welcome=q('who').parentElement;
-   welcome.querySelector('.sub').textContent='Explore the teacher’s assigned classes and tools in read-only view. You remain signed in as the owner.';
+   welcome.querySelector('.sub').textContent='Explore the teacher\u2019s assigned classes and tools in read-only view. You remain signed in as the owner.';
    if(!q('exitTeacherPreview')){const exit=document.createElement('a');exit.id='exitTeacherPreview';exit.href='admin.html?v=20261008-teacher-preview';exit.className='sign';exit.textContent='Exit teacher view';exit.style.cssText='display:inline-block;margin-top:14px;color:#fff';welcome.append(exit);}
+ }
+ // After the DOM is painted, quietly load homework badges (non-blocking).
+ if(!previewActive){
+   const hwClassIds=ids.filter((id,i)=>{const s=snaps[i];if(!s||!s.exists())return false;const grants=(s.val()||{}).toolGrants||{};return grants['homework']===true;});
+   if(hwClassIds.length)loadHomeworkBadges(hwClassIds,user);
  }
 }
 q("classes").onclick=e=>{if(e.target.closest&&e.target.closest("[data-act-as-student]"))api.openActAsStudentPicker();};
@@ -173,7 +216,7 @@ function watchPrincipalAccess(user,access){
  ref.on("value",handle,failed);
 }
 window.addEventListener("pagehide",stopPrincipalAccessWatch,{once:true});
-// The gate already says “Checking your teacher account…”. Keep that neutral
+// The gate already says "Checking your teacher account…". Keep that neutral
 // state until Firebase has restored the saved Google session and verified access.
 // Calling showTeacherSignIn() before this callback flashes the login unnecessarily.
 api.onAuthStateChanged((user,authorized,access)=>{
@@ -184,4 +227,3 @@ api.onAuthStateChanged((user,authorized,access)=>{
 });
 })();
 </script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="← Fun Torah Tools"></script></body></html>
-
