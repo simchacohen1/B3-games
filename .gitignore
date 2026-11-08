@@ -30,3 +30,4 @@ staging-results/
 
 # Quick sign-in .bat files for test students contain passcodes (#619)
 *.local.bat
+/.staging-posuk-grading/
