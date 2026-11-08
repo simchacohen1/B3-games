@@ -30,19 +30,19 @@ const CATALOG_SEED_VERSION=1; // One-time unit/Perek seed. Firebase remains auth
 const PEREK18_FINAL_SHORASHIM=[
   {id:'p18-25-chalal',pasuk:'25',front:'חָלַל',hebrew:'חָלִלָה',english:'far be it / profane'},
   {id:'p18-25-mut',pasuk:'25',front:'מוּת',hebrew:'לְהָמִית',english:'die / put to death'},
-  {id:'p18-27-anah',pasuk:'27',front:'עָנָה',hebrew:'וַיַּעַן',english:'answered'},
-  {id:'p18-27-yaal',pasuk:'27',front:'יָאַל',hebrew:'הוֹאַלְתִּי',english:'began / undertook'},
+  {id:'p18-27-anah',pasuk:'27',front:'עָנָה',hebrew:'וַיַּעַן',english:'answered'},
+  {id:'p18-27-yaal',pasuk:'27',front:'יָאַל',hebrew:'הוֹאַלְתִּי',english:'began / undertook'},
   {id:'p18-27-afar',pasuk:'27',front:'עָפָר',hebrew:'עָפָר',english:'dust'},
   {id:'p18-27-efer',pasuk:'27',front:'אֵפֶר',hebrew:'וָאֵפֶר',english:'ashes'},
   {id:'p18-28-chasar',pasuk:'28',front:'חָסַר',hebrew:'יַחְסְרוּן',english:'lacked / were missing'},
   {id:'p18-28-shachat',pasuk:'28',front:'שָׁחַת',hebrew:'הֲתַשְׁחִית',english:'destroyed / corrupted'},
-  {id:'p18-28-arba',pasuk:'28',front:'אַרְבַּע',hebrew:'אַרְבָּעִים',english:'four'},
-  {id:'p18-29-yasaf',pasuk:'29',front:'יָסַף',hebrew:'וַיֹּסֶף',english:'added / continued'},
+  {id:'p18-28-arba',pasuk:'28',front:'אַרְבַּע',hebrew:'אַרְבָּעִים',english:'four'},
+  {id:'p18-29-yasaf',pasuk:'29',front:'יָסַף',hebrew:'וַיֹּסֶף',english:'added / continued'},
   {id:'p18-30-charah',pasuk:'30',front:'חָרָה',hebrew:'יִחַר',english:'became angry'},
-  {id:'p18-31-eser',pasuk:'31',front:'עֶשֶׂר',hebrew:'עֶשְׂרִים',english:'ten'},
-  {id:'p18-32-paam',pasuk:'32',front:'פַּעַם',hebrew:'הַפַּעַם',english:'time / occurrence'}
+  {id:'p18-31-eser',pasuk:'31',front:'עֶשֶׂר',hebrew:'עֶשְׂרִים',english:'ten'},
+  {id:'p18-32-paam',pasuk:'32',front:'פַּעַם',hebrew:'הַפַּעַם',english:'time / occurrence'}
 ];
-function hebrewKey(v){return String(v||'').normalize('NFD').replace(/[\u0591-\u05C7]/g,'').replace(/[^א-ת]/g,'')}
+function hebrewKey(v){return String(v||'').normalize('NFD').replace(/[\u0591-\u05C7]/g,'').replace(/[^\u05d0-\u05ea]/g,'')}
 function ensurePerek18FinalShorashim(){
   state.catalog=state.catalog||{};
   const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
@@ -61,7 +61,7 @@ function ensurePerek18FinalShorashim(){
   return added;
 }
 
-const PEREK19_SHORASHIM=[[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two"], [1, "malach", "מַלְאָךְ", "הַמַּלְאָכִים", "angel / messenger"], [1, "erev", "עֶרֶב", "בָּעֶרֶב", "evening"], [1, "shaar", "שַׁעַר", "שַׁעַר", "gate"], [2, "sur", "סוּר", "סוּרוּ", "turn aside"], [2, "lun", "לוּן", "וְלִינוּ", "stay overnight"], [2, "shechem", "שְׁכֶם", "וְהִשְׁכַּמְתֶּם", "get up early"], [2, "rechov", "רְחוֹב", "בָרְחוֹב", "street / open square"], [3, "patzar", "פָּצַר", "וַיִּפְצַר", "urge strongly"], [3, "mishteh", "מִשְׁתֶּה", "מִשְׁתֶּה", "feast"], [3, "matzah", "מַצָּה", "מַצּוֹת", "matzah"], [3, "afah", "אָפָה", "וַיֹּאפֶה", "bake"], [4, "terem", "טֶרֶם", "טֶרֶם", "before / not yet"], [4, "shachav", "שָׁכַב", "יִשְׁכָּבוּ", "lie down"], [4, "savav", "סָבַב", "נָסַבּוּ", "surround"], [4, "ad", "עַד", "עַד", "until"], [4, "katzeh", "קָצֶה", "מִקָּצֶה", "edge / end"], [5, "lailah", "לַיְלָה", "הַלַּיְלָה", "night"], [5, "yatza", "יָצָא", "הוֹצֵא", "go out / take out"], [6, "delet", "דֶּלֶת", "הַדֶּלֶת", "door"], [6, "sagar", "סָגַר", "סָגָרוּ", "close"], [7, "ach", "אָח", "אַחַי", "brother"], [7, "raa", "רָעַע", "תָּרֵעוּ", "do evil"], [8, "bat", "בַּת", "בָנוֹת", "daughter"], [8, "rak", "רַק", "רַק", "only"], [8, "tzel", "צֵל", "בְּצֵל", "shade"], [8, "korah", "קוֹרָה", "קֹרָתִי", "roof beam / roof"], [9, "echad", "אֶחָד", "הָאֶחָד", "one"], [9, "gur", "גּוּר", "לָגוּר", "dwell as a stranger"], [9, "halah", "הָלְאָה", "הָלְאָה", "farther / onward"], [9, "shavar", "שָׁבַר", "וַיִּשְׁבֹּר", "break"], [10, "yad", "יָד", "יָדְךָ", "hand"], [11, "nakah", "נָכָה", "הִכּוּ", "strike"], [11, "sanverim", "סַנְוֵרִים", "בַּסַּנְוֵרִים", "blindness"], [11, "katan", "קָטֹן", "מִקָּטֹן", "small"], [11, "laah", "לָאָה", "וַיִּלְאוּ", "become weary"], [12, "mi", "מִי", "מִי", "who"], [12, "poh", "פֹּה", "פֹה", "here"], [12, "chatan", "חָתָן", "חָתָן", "son-in-law / bridegroom"], [15, "boker", "בֹּקֶר", "הַבֹּקֶר", "morning"], [15, "shachar", "שַׁחַר", "הַשַּׁחַר", "dawn"], [15, "alah", "עָלָה", "עֲלֵה", "rise / go up"], [15, "utz", "אוּץ", "וַיָּאִיצוּ", "urge / hurry"], [15, "pen", "פֶּן", "פֶּן", "lest"], [15, "avon", "עָוֹן", "בַּעֲוֹן", "sin"], [16, "hitmahmah", "הִתְמַהְמֵהַּ", "וַיִּתְמַהְמָהּ", "linger"], [16, "chazak", "חָזַק", "וַיַּחֲזִקוּ", "hold strongly"], [16, "chamal", "חָמַל", "בְּחֶמְלַת", "have compassion"], [16, "nuach", "נוּחַ", "וַיַּנִּחֻהוּ", "place / set down"], [16, "chutz", "חוּץ", "מִחוּץ", "outside"], [17, "malat", "מָלַט", "הִמָּלֵט", "escape"], [17, "nefesh", "נֶפֶשׁ", "נַפְשֶׁךָ", "life / soul"], [17, "navat", "נָבַט", "תַּבִּיט", "look"], [17, "kikar", "כִּכָּר", "הַכִּכָּר", "plain / district"], [17, "har", "הַר", "הָהָרָה", "mountain"], [19, "chesed", "חֶסֶד", "חַסְדְּךָ", "kindness"], [19, "yachol", "יָכֹל", "אוּכַל", "be able"], [19, "davak", "דָּבַק", "תִּדְבָּקַנִי", "cling / catch up"], [20, "nus", "נוּס", "לָנוּס", "flee"], [20, "tzoar", "צָעִיר", "מִצְעָר", "small / little"], [21, "bilti", "בִּלְתִּי", "לְבִלְתִּי", "not"], [21, "hafach", "הָפַךְ", "הָפְכִּי", "overturn"], [21, "gam", "גַּם", "גַּם", "also"], [23, "shemesh", "שֶׁמֶשׁ", "הַשֶּׁמֶשׁ", "sun"], [24, "matar", "מָטַר", "הִמְטִיר", "rain down"], [24, "gafrit", "גׇּפְרִית", "גׇּפְרִית", "sulfur"], [24, "esh", "אֵשׁ", "וָאֵשׁ", "fire"], [24, "shamayim", "שָׁמַיִם", "הַשָּׁמָיִם", "heavens"], [25, "tzemach", "צֶמַח", "צֶמַח", "plant / growth"], [25, "adamah", "אֲדָמָה", "הָאֲדָמָה", "ground"], [26, "melach", "מֶלַח", "מֶלַח", "salt"], [28, "kitor", "קִיטוֹר", "קִיטֹר", "smoke"], [28, "kivshan", "כִּבְשָׁן", "הַכִּבְשָׁן", "furnace"], [29, "zachar", "זָכַר", "וַיִּזְכֹּר", "remember"], [30, "mearah", "מְעָרָה", "בַּמְּעָרָה", "cave"], [31, "bechor", "בְּכוֹר", "הַבְּכִירָה", "older / firstborn"], [31, "av", "אָב", "אָבִינוּ", "father"], [31, "ayin-none", "אַיִן", "אַיִן", "none / there is no"], [32, "shakah", "שָׁקָה", "וְנַשְׁקֶה", "give to drink"], [32, "yayin", "יַיִן", "יַיִן", "wine"], [32, "zera", "זֶרַע", "זֶרַע", "offspring / seed"], [34, "mochorat", "מָחֳרָת", "מִמָּחֳרָת", "next day"], [34, "emesh", "אֶמֶשׁ", "אֶמֶשׁ", "last night"], [36, "harah", "הָרָה", "וַתַּהֲרֶיןָ", "become pregnant"]].map(([pasuk,slug,front,hebrew,english])=>({
+const PEREK19_SHORASHIM=[[1, "shnayim", "\u05e9\u05b0\u05c1\u05e0\u05b7\u05d9\u05b4\u05dd", "\u05e9\u05b0\u05c1\u05e0\u05b5\u05d9", "two"], [1, "malach", "\u05de\u05b7\u05dc\u05b0\u05d0\u05b8\u05da\u05b0", "\u05d4\u05b7\u05de\u05bc\u05b7\u05dc\u05b0\u05d0\u05b8\u05db\u05b4\u05d9\u05dd", "angel / messenger"], [1, "erev", "\u05e2\u05b6\u05e8\u05b6\u05d1", "\u05d1\u05b8\u05bc\u05e2\u05b6\u05e8\u05b6\u05d1", "evening"], [1, "shaar", "\u05e9\u05b7\u05c1\u05e2\u05b7\u05e8", "\u05e9\u05b7\u05c1\u05e2\u05b7\u05e8", "gate"], [2, "sur", "\u05e1\u05d5\u05bc\u05e8", "\u05e1\u05d5\u05bc\u05e8\u05d5\u05bc", "turn aside"], [2, "lun", "\u05dc\u05d5\u05bc\u05df", "\u05d5\u05b0\u05dc\u05b4\u05d9\u05e0\u05d5\u05bc", "stay overnight"], [2, "shechem", "\u05e9\u05b0\u05c1\u05db\u05b6\u05dd", "\u05d5\u05b0\u05d4\u05b4\u05e9\u05b0\u05c1\u05db\u05bc\u05b7\u05de\u05b0\u05ea\u05bc\u05b6\u05dd", "get up early"], [2, "rechov", "\u05e8\u05b0\u05d7\u05d5\u05b9\u05d1", "\u05d1\u05b8\u05e8\u05b0\u05d7\u05d5\u05b9\u05d1", "street / open square"], [3, "patzar", "\u05e4\u05b8\u05e6\u05b7\u05e8", "\u05d5\u05b7\u05d9\u05bc\u05b4\u05e4\u05b0\u05e6\u05b7\u05e8", "urge strongly"], [3, "mishteh", "\u05de\u05b4\u05e9\u05b0\u05c1\u05ea\u05bc\u05b6\u05d4", "\u05de\u05b4\u05e9\u05b0\u05c1\u05ea\u05bc\u05b6\u05d4", "feast"], [3, "matzah", "\u05de\u05b7\u05e6\u05bc\u05b8\u05d4", "\u05de\u05b7\u05e6\u05bc\u05d5\u05b9\u05ea", "matzah"], [3, "afah", "\u05d0\u05b8\u05e4\u05b8\u05d4", "\u05d5\u05b7\u05d9\u05bc\u05b9\u05d0\u05e4\u05b6\u05d4", "bake"], [4, "terem", "\u05d8\u05b6\u05e8\u05b6\u05dd", "\u05d8\u05b6\u05e8\u05b6\u05dd", "before / not yet"], [4, "shachav", "\u05e9\u05b8\u05c1\u05db\u05b7\u05d1", "\u05d9\u05b4\u05e9\u05b0\u05c1\u05db\u05b8\u05bc\u05d1\u05d5\u05bc", "lie down"], [4, "savav", "\u05e1\u05b8\u05d1\u05b7\u05d1", "\u05e0\u05b8\u05e1\u05b7\u05d1\u05bc\u05d5\u05bc", "surround"], [4, "ad", "\u05e2\u05b7\u05d3", "\u05e2\u05b7\u05d3", "until"], [4, "katzeh", "\u05e7\u05b8\u05e6\u05b6\u05d4", "\u05de\u05b4\u05e7\u05bc\u05b8\u05e6\u05b6\u05d4", "edge / end"], [5, "lailah", "\u05dc\u05b7\u05d9\u05b0\u05dc\u05b8\u05d4", "\u05d4\u05b7\u05dc\u05bc\u05b7\u05d9\u05b0\u05dc\u05b8\u05d4", "night"], [5, "yatza", "\u05d9\u05b8\u05e6\u05b8\u05d0", "\u05d4\u05d5\u05b9\u05e6\u05b5\u05d0", "go out / take out"], [6, "delet", "\u05d3\u05bc\u05b6\u05dc\u05b6\u05ea", "\u05d4\u05b7\u05d3\u05bc\u05b6\u05dc\u05b6\u05ea", "door"], [6, "sagar", "\u05e1\u05b8\u05d2\u05b7\u05e8", "\u05e1\u05b8\u05d2\u05b8\u05e8\u05d5\u05bc", "close"], [7, "ach", "\u05d0\u05b8\u05d7", "\u05d0\u05b7\u05d7\u05b7\u05d9", "brother"], [7, "raa", "\u05e8\u05b8\u05e2\u05b7\u05e2", "\u05ea\u05b8\u05bc\u05e8\u05b5\u05e2\u05d5\u05bc", "do evil"], [8, "bat", "\u05d1\u05bc\u05b7\u05ea", "\u05d1\u05b8\u05e0\u05d5\u05b9\u05ea", "daughter"], [8, "rak", "\u05e8\u05b7\u05e7", "\u05e8\u05b7\u05e7", "only"], [8, "tzel", "\u05e6\u05b5\u05dc", "\u05d1\u05b0\u05e6\u05b5\u05dc", "shade"], [8, "korah", "\u05e7\u05d5\u05b9\u05e8\u05b8\u05d4", "\u05e7\u05b9\u05e8\u05b8\u05ea\u05b4\u05d9", "roof beam / roof"], [9, "echad", "\u05d0\u05b6\u05d7\u05b8\u05d3", "\u05d4\u05b8\u05d0\u05b6\u05d7\u05b8\u05d3", "one"], [9, "gur", "\u05d2\u05bc\u05d5\u05bc\u05e8", "\u05dc\u05b8\u05d2\u05d5\u05bc\u05e8", "dwell as a stranger"], [9, "halah", "\u05d4\u05b8\u05dc\u05b0\u05d0\u05b8\u05d4", "\u05d4\u05b8\u05dc\u05b0\u05d0\u05b8\u05d4", "farther / onward"], [9, "shavar", "\u05e9\u05b8\u05c1\u05d1\u05b7\u05e8", "\u05d5\u05b7\u05d9\u05bc\u05b4\u05e9\u05b0\u05c1\u05d1\u05bc\u05b9\u05e8", "break"], [10, "yad", "\u05d9\u05b8\u05d3", "\u05d9\u05b8\u05d3\u05b0\u05da\u05b8", "hand"], [11, "nakah", "\u05e0\u05b8\u05db\u05b8\u05d4", "\u05d4\u05b4\u05db\u05bc\u05d5\u05bc", "strike"], [11, "sanverim", "\u05e1\u05b7\u05e0\u05b0\u05d5\u05b5\u05e8\u05b4\u05d9\u05dd", "\u05d1\u05bc\u05b7\u05e1\u05bc\u05b7\u05e0\u05b0\u05d5\u05b5\u05e8\u05b4\u05d9\u05dd", "blindness"], [11, "katan", "\u05e7\u05b8\u05d8\u05b9\u05df", "\u05de\u05b4\u05e7\u05bc\u05b8\u05d8\u05b9\u05df", "small"], [11, "laah", "\u05dc\u05b8\u05d0\u05b8\u05d4", "\u05d5\u05b7\u05d9\u05bc\u05b4\u05dc\u05b0\u05d0\u05d5\u05bc", "become weary"], [12, "mi", "\u05de\u05b4\u05d9", "\u05de\u05b4\u05d9", "who"], [12, "poh", "\u05e4\u05b9\u05d4", "\u05e4\u05b9\u05d4", "here"], [12, "chatan", "\u05d7\u05b8\u05ea\u05b8\u05df", "\u05d7\u05b8\u05ea\u05b8\u05df", "son-in-law / bridegroom"], [15, "boker", "\u05d1\u05b9\u05e7\u05b6\u05e8", "\u05d4\u05b7\u05d1\u05bc\u05b9\u05e7\u05b6\u05e8", "morning"], [15, "shachar", "\u05e9\u05b7\u05c1\u05d7\u05b7\u05e8", "\u05d4\u05b7\u05e9\u05bc\u05c1\u05b7\u05d7\u05b7\u05e8", "dawn"], [15, "alah", "\u05e2\u05b8\u05dc\u05b8\u05d4", "\u05e2\u05b2\u05dc\u05b5\u05d4", "rise / go up"], [15, "utz", "\u05d0\u05d5\u05bc\u05e5", "\u05d5\u05b7\u05d9\u05bc\u05b8\u05d0\u05b4\u05d9\u05e6\u05d5\u05bc", "urge / hurry"], [15, "pen", "\u05e4\u05bc\u05b6\u05df", "\u05e4\u05bc\u05b6\u05df", "lest"], [15, "avon", "\u05e2\u05b8\u05d5\u05b9\u05df", "\u05d1\u05bc\u05b7\u05e2\u05b2\u05d5\u05b9\u05df", "sin"], [16, "hitmahmah", "\u05d4\u05b4\u05ea\u05b0\u05de\u05b7\u05d4\u05b0\u05de\u05b5\u05d4\u05b7\u05bc", "\u05d5\u05b7\u05d9\u05bc\u05b4\u05ea\u05b0\u05de\u05b7\u05d4\u05b0\u05de\u05b8\u05d4\u05bc", "linger"], [16, "chazak", "\u05d7\u05b8\u05d6\u05b7\u05e7", "\u05d5\u05b7\u05d9\u05bc\u05b7\u05d7\u05b2\u05d6\u05b4\u05d9\u05e7\u05d5\u05bc", "hold strongly"], [16, "chamal", "\u05d7\u05b8\u05de\u05b7\u05dc", "\u05d1\u05b0\u05bc\u05d7\u05b6\u05de\u05b0\u05dc\u05b7\u05ea", "have compassion"], [16, "nuach", "\u05e0\u05d5\u05bc\u05d7\u05b7", "\u05d5\u05b7\u05d9\u05bc\u05b7\u05e0\u05bc\u05b4\u05d7\u05bb\u05d4\u05d5\u05bc", "place / set down"], [16, "chutz", "\u05d7\u05d5\u05bc\u05e5", "\u05de\u05b4\u05d7\u05d5\u05bc\u05e5", "outside"], [17, "malat", "\u05de\u05b8\u05dc\u05b7\u05d8", "\u05d4\u05b4\u05de\u05bc\u05b8\u05dc\u05b5\u05d8", "escape"], [17, "nefesh", "\u05e0\u05b6\u05e4\u05b6\u05e9\u05c1", "\u05e0\u05b7\u05e4\u05b0\u05e9\u05c1\u05b6\u05da\u05b8", "life / soul"], [17, "navat", "\u05e0\u05b8\u05d1\u05b7\u05d8", "\u05ea\u05b7\u05bc\u05d1\u05bc\u05b4\u05d9\u05d8", "look"], [17, "kikar", "\u05db\u05b4\u05bc\u05db\u05bc\u05b8\u05e8", "\u05d4\u05b7\u05db\u05bc\u05b4\u05db\u05bc\u05b8\u05e8", "plain / district"], [17, "har", "\u05d4\u05b7\u05e8", "\u05d4\u05b8\u05d4\u05b8\u05e8\u05b8\u05d4", "mountain"], [19, "chesed", "\u05d7\u05b6\u05e1\u05b6\u05d3", "\u05d7\u05b7\u05e1\u05b0\u05d3\u05bc\u05b0\u05da\u05b8", "kindness"], [19, "yachol", "\u05d9\u05b8\u05db\u05b9\u05dc", "\u05d0\u05d5\u05bc\u05db\u05b7\u05dc", "be able"], [19, "davak", "\u05d3\u05b8\u05d1\u05b7\u05e7", "\u05ea\u05bc\u05b4\u05d3\u05b0\u05d1\u05bc\u05b8\u05e7\u05b7\u05e0\u05b4\u05d9", "cling / catch up"], [20, "nus", "\u05e0\u05d5\u05bc\u05e1", "\u05dc\u05b8\u05e0\u05d5\u05bc\u05e1", "flee"], [20, "tzoar", "\u05e6\u05b8\u05e2\u05b4\u05d9\u05e8", "\u05de\u05b4\u05e6\u05b0\u05e2\u05b8\u05e8", "small / little"], [21, "bilti", "\u05d1\u05bc\u05b4\u05dc\u05b0\u05ea\u05bc\u05b4\u05d9", "\u05dc\u05b0\u05d1\u05b4\u05dc\u05b0\u05ea\u05bc\u05b4\u05d9", "not"], [21, "hafach", "\u05d4\u05b8\u05e4\u05b7\u05da\u05b0", "\u05d4\u05b8\u05e4\u05b0\u05db\u05bc\u05b4\u05d9", "overturn"], [21, "gam", "\u05d2\u05bc\u05b7\u05dd", "\u05d2\u05bc\u05b7\u05dd", "also"], [23, "shemesh", "\u05e9\u05b6\u05c1\u05de\u05b6\u05e9\u05c1", "\u05d4\u05b7\u05e9\u05bc\u05c1\u05b6\u05de\u05b6\u05e9\u05c1", "sun"], [24, "matar", "\u05de\u05b8\u05d8\u05b7\u05e8", "\u05d4\u05b4\u05de\u05b0\u05d8\u05b4\u05d9\u05e8", "rain down"], [24, "gafrit", "\u05d2\u05c7\u05e4\u05b0\u05e8\u05b4\u05d9\u05ea", "\u05d2\u05c7\u05e4\u05b0\u05e8\u05b4\u05d9\u05ea", "sulfur"], [24, "esh", "\u05d0\u05b5\u05e9\u05c1", "\u05d5\u05b8\u05d0\u05b5\u05e9\u05c1", "fire"], [24, "shamayim", "\u05e9\u05b8\u05c1\u05de\u05b7\u05d9\u05b4\u05dd", "\u05d4\u05b7\u05e9\u05bc\u05c1\u05b8\u05de\u05b8\u05d9\u05b4\u05dd", "heavens"], [25, "tzemach", "\u05e6\u05b6\u05de\u05b7\u05d7", "\u05e6\u05b6\u05de\u05b7\u05d7", "plant / growth"], [25, "adamah", "\u05d0\u05b2\u05d3\u05b8\u05de\u05b8\u05d4", "\u05d4\u05b8\u05d0\u05b2\u05d3\u05b8\u05de\u05b8\u05d4", "ground"], [26, "melach", "\u05de\u05b6\u05dc\u05b7\u05d7", "\u05de\u05b6\u05dc\u05b7\u05d7", "salt"], [28, "kitor", "\u05e7\u05b4\u05d9\u05d8\u05d5\u05b9\u05e8", "\u05e7\u05b4\u05d9\u05d8\u05b9\u05e8", "smoke"], [28, "kivshan", "\u05db\u05bc\u05b4\u05d1\u05b0\u05e9\u05b8\u05c1\u05df", "\u05d4\u05b7\u05db\u05bc\u05b4\u05d1\u05b0\u05e9\u05b8\u05c1\u05df", "furnace"], [29, "zachar", "\u05d6\u05b8\u05db\u05b7\u05e8", "\u05d5\u05b7\u05d9\u05bc\u05b4\u05d6\u05b0\u05db\u05bc\u05b9\u05e8", "remember"], [30, "mearah", "\u05de\u05b0\u05e2\u05b8\u05e8\u05b8\u05d4", "\u05d1\u05bc\u05b7\u05de\u05bc\u05b0\u05e2\u05b8\u05e8\u05b8\u05d4", "cave"], [31, "bechor", "\u05d1\u05bc\u05b0\u05db\u05d5\u05b9\u05e8", "\u05d4\u05b7\u05d1\u05bc\u05b0\u05db\u05b4\u05d9\u05e8\u05b8\u05d4", "older / firstborn"], [31, "av", "\u05d0\u05b8\u05d1", "\u05d0\u05b8\u05d1\u05b4\u05d9\u05e0\u05d5\u05bc", "father"], [31, "ayin-none", "\u05d0\u05b7\u05d9\u05b4\u05df", "\u05d0\u05b7\u05d9\u05b4\u05df", "none / there is no"], [32, "shakah", "\u05e9\u05b8\u05c1\u05e7\u05b8\u05d4", "\u05d5\u05b0\u05e0\u05b7\u05e9\u05b0\u05c1\u05e7\u05b6\u05d4", "give to drink"], [32, "yayin", "\u05d9\u05b7\u05d9\u05b4\u05df", "\u05d9\u05b7\u05d9\u05b4\u05df", "wine"], [32, "zera", "\u05d6\u05b6\u05e8\u05b7\u05e2", "\u05d6\u05b6\u05e8\u05b7\u05e2", "offspring / seed"], [34, "mochorat", "\u05de\u05b8\u05d7\u05b3\u05e8\u05b8\u05ea", "\u05de\u05b4\u05de\u05bc\u05b8\u05d7\u05b3\u05e8\u05b8\u05ea", "next day"], [34, "emesh", "\u05d0\u05b6\u05de\u05b6\u05e9\u05c1", "\u05d0\u05b6\u05de\u05b6\u05e9\u05c1", "last night"], [36, "harah", "\u05d4\u05b8\u05e8\u05b8\u05d4", "\u05d5\u05b7\u05ea\u05bc\u05b7\u05d4\u05b2\u05e8\u05b6\u05d9\u05b0\u05df\u05b8", "become pregnant"]].map(([pasuk,slug,front,hebrew,english])=>({
   id:`19-${pasuk}-${slug}`,
   perek:19,
   listName:'Main List',
@@ -74,7 +74,14 @@ const PEREK19_SHORASHIM=[[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two
   hidden:false
 }));
 function perekOf(i){return Number(i?.perek)||18}
-function perekLabel(i){return perekOf(i)===19?'Perek י״ט':'Perek י״ח'}
+// Expandable Perek label lookup. Add a new entry here to support a future chapter.
+// Unknown chapters fall back to 'Perek N' so nothing silently breaks.
+const PEREK_OPTIONS=[
+  {value:18,label:'Perek \u05d9\u05f4\u05d7'},
+  {value:19,label:'Perek \u05d9\u05f4\u05d8'},
+  {value:20,label:'Perek \u05db'},
+];
+function perekLabel(i){const n=perekOf(i);const found=PEREK_OPTIONS.find(o=>o.value===n);return found?found.label:`Perek ${n}`}
 function vocalizedCatalogKey(i){return String(i?.front||'').normalize('NFC')}
 function ensurePerekUnitsAnd19(){
   state.catalog=state.catalog||{};
@@ -169,10 +176,10 @@ function suggestionPoolOf(item){
 // Perek 19: reliable, meaning-specific choices when the AI picture service is unavailable.
 // These are suggestions, not teacher approvals, and only fill currently missing artwork.
 const PEREK19_ART_RULES=[
-  [/^(two|angel|evening|gate)$/i,['2️⃣','👼','🌆','🚪']],
+  [/^(two|angel|evening|gate)$/i,['2️⃣','👼','🏆','🚪']],
   [/^(two)$/i,['2️⃣','✌️','🎲']],
-  [/^angel/i,['🪽','☁️','✨']],
-  [/^evening$/i,['🌆','🌇','🌙']],
+  [/^angel/i,['🪵','☁️','✨']],
+  [/^evening$/i,['🏆','🏇','🌙']],
   [/^gate$/i,['🚪','🏰','🔑']],
   [/^turn aside|turn away$/i,['↪️','🔄','👣']],
   [/^stay overnight$/i,['🛏️','🌙','🏠']],
@@ -180,14 +187,14 @@ const PEREK19_ART_RULES=[
   [/^street|open square$/i,['🛣️','🏘️','🏙️']],
   [/^urge strongly|urge|hurry$/i,['📣','⚡','👣']],
   [/^feast$/i,['🍽️','🥘','🍞']],
-  [/^matzah$/i,['🫓','🍞','🌾']],
+  [/^matzah$/i,['🪳','🍞','🌾']],
   [/^baked?$/i,['🍞','🥖','♨️']],
   [/^bake$/i,['🍞','🥖','♨️']],
   [/^lie down|lay down$/i,['🛏️','😴','🌙']],
   [/^surround(ing)?$/i,['⭕','🔄','🏘️']],
   [/^surround$/i,['⭕','🔄','🏘️']],
   [/^(nation|people)/i,['👥','🌍','🏘️']],
-  [/^edge|end$/i,['📐','🔚','🏞️']],
+  [/^edge|end$/i,['📐','🔚','🇯️']],
   [/^went out|go out|take out$/i,['🚪','➡️','👣']],
   [/^door$/i,['🚪','🔑','🏠']],
   [/^closed?$/i,['🔒','🚪','🔐']],
@@ -211,7 +218,7 @@ const PEREK19_ART_RULES=[
   [/^who$/i,['❓','👤','🔎']],
   [/^here$/i,['📍','👇','🏠']],
   [/^son-in-law|bridegroom$/i,['👔','🏠','🤝']],
-  [/^we$/i,['👥','🤝','🫂']],
+  [/^we$/i,['👥','🤝','🫳']],
   [/^what$/i,['❓','🔎','💭']],
   [/^dawn$/i,['🌅','☀️','🌄']],
   [/^went up|rise|go up$/i,['⬆️','🪜','🌄']],
@@ -219,12 +226,12 @@ const PEREK19_ART_RULES=[
   [/^sin$/i,['❌','⚠️','🚫']],
   [/^linger$/i,['⏳','🐢','⌛']],
   [/^hold strongly$/i,['🧲','💪','🤝']],
-  [/^have compassion|compassion$/i,['❤️','🤲','🛟']],
+  [/^have compassion|compassion$/i,['❤️','🤲','🛹']],
   [/^place|set down$/i,['📦','⬇️','🪑']],
   [/^escape|flee$/i,['🚪','👣','➡️']],
   [/^life|soul$/i,['❤️','🌱','🌿']],
   [/^rest$/i,['🛏️','😴','🪑']],
-  [/^outside$/i,['🏞️','🚪','🌳']],
+  [/^outside$/i,['🇯️','🚪','🌳']],
   [/^i$/i,['👤','☝️','🗣️']],
   [/^able|be able$/i,['💪','✅','🏆']],
   [/^attached$/i,['🔗','📎','🧲']],
@@ -238,7 +245,7 @@ const PEREK19_ART_RULES=[
   [/^sulfur$/i,['🪨','🌋','🟡']],
   [/^heavens$/i,['🌌','☁️','🌤️']],
   [/^plant|grew|growth$/i,['🌱','🌿','🌳']],
-  [/^ground$/i,['🌱','🟫','🏞️']],
+  [/^ground$/i,['🌱','🟧','🇯️']],
   [/^smoke$/i,['💨','🔥','🏭']],
   [/^furnace$/i,['🔥','🧱','🏭']],
   [/^salt$/i,['🧂','🍽️','⚪']],
@@ -247,15 +254,15 @@ const PEREK19_ART_RULES=[
   [/^older|firstborn$/i,['🥇','1️⃣','👶']],
   [/^none|there is no$/i,['⬜','🚫','❌']],
   [/^wine$/i,['🍇','🥤','🍷']],
-  [/^offspring|seed\/child$/i,['🌱','🫘','👶']],
+  [/^offspring|seed\/child$/i,['🌱','🪰','👶']],
   [/^next day|tomorrow$/i,['📅','🌅','➡️']],
   [/^last night$/i,['🌙','🛏️','⬅️']],
   [/^cave$/i,['🪨','⛰️','🕳️']],
-  [/plain|district/i,['🌾','🗺️','🏞️']],
+  [/plain|district/i,['🌾','🗺️','🇯️']],
   [/^cried$/i,['😢','💧','😥']],
   [/^not$/i,['❌','🚫','⛔']],
   [/^gave to drink$/i,['🥤','💧','🫗']],
-  [/^seed\/child$/i,['🌱','🫘','👦']],
+  [/^seed\/child$/i,['🌱','🪰','👦']],
   [/^tomorrow$/i,['📅','🌅','➡️']],
   [/^last night$/i,['🌙','🛏️','⬅️']],
   [/^pregnant|become pregnant$/i,['👶','🍼','🌱']]
@@ -266,7 +273,7 @@ const SMART_ART_RULES=[
   [/\bsee\b|\bsaw\b|\bseen\b|\blook\b|\bappea?r/,['👀','👁️','🔎','✨']],
   [/behold|look!|notice/,['👀','❗','✨','🔎']],
   [/grove|tree|wood/,['🌳','🌲','🌿','🪵']],
-  [/\bsit\b|\bsat\b|sitting/,['🪑','🧎','🛋️','🏕️']],
+  [/\bsit\b|\bsat\b|sitting/,['🪑','🧘','🛋️','🏕️']],
   [/\bheat\b|\bhot\b|warm/,['☀️','🔥','🌡️','🥵']],
   [/\bday\b|daytime/,['☀️','🌤️','📅','🌅']],
   [/\blift\b|\blifted\b|\bcarry\b|\bcarried\b|\braise\b/,['⬆️','🙌','📦','💪']],
@@ -274,14 +281,14 @@ const SMART_ART_RULES=[
   [/\bthree\b|\b3\b/,['3️⃣','🔺','🔢','🧩']],
   // A singular man needs its own concrete teacher-preview cues. Avoid treating
   // איש / "man" as the same as a crowd; teacher chooses what students see.
-  [/\bman\b|\bish\b|איש/u,['👤','👔','🧢','🎩','👞']],
+  [/\bman\b|\bish\b|\u05d0\u05d9\u05e9/u,['👤','👔','🧢','🎩','👞']],
   [/\bmen\b|\bperson\b|\bpeople\b/,['👥','📛','🏠','🗣️']],
   [/\bstand\b|\bstood\b|standing|firm/,['🧍','📍','⬆️','🚶']],
   [/\brun\b|\bran\b|running|hurr(y|ied)|quick/,['🏃','💨','👟','⚡']],
   [/\bcall\b|\bcalled\b|\bsay\b|\bsaid\b|\bspeak\b|\bspoke\b/,['🗣️','💬','📣','👄']],
   [/greet|meet|toward|towards/,['🤝','👥','➡️','📍']],
-  [/\bbow\b|bowed|prostrate/,['🙇','🙏','🧎','⬇️']],
-  [/\bland\b|\bearth\b|ground/,['🌍','🏞️','🌱','🗺️']],
+  [/\bbow\b|bowed|prostrate/,['🙇','🙏','🧘','⬇️']],
+  [/\bland\b|\bearth\b|ground/,['🌍','🇯️','🌱','🗺️']],
   [/\bfind\b|\bfound\b/,['🔎','💡','✅','🎯']],
   [/grace|favor|favour|kindness/,['❤️','✨','🤲','😊']],
   [/cross|passed|pass over|across/,['➡️','🌉','🚶','🛣️']],
@@ -289,7 +296,7 @@ const SMART_ART_RULES=[
   [/\btake\b|\btook\b|\btaken\b/,['✋','🤲','📦','⬅️']],
   [/\blittle\b|\bfew\b|small amount|morsel/,['🤏','1️⃣','🔹','🐜']],
   [/\bwater\b/,['💧','🚰','🌊','🫗']],
-  [/\bwash\b|washed|washing/,['🧼','💦','🫧','🚿']],
+  [/\bwash\b|washed|washing/,['🧴','💦','🪷','🚿']],
   [/\bfoot\b|\bfeet\b|\bleg\b|\blegs\b/,['🦶','👣','🧦','👟']],
   [/lean|support|supported|sustain|sustained/,['🌳','🪑','💪','🤲']],
   [/\bbread\b|\bloaf\b/,['🍞','🥖','🥯','🌾']],
@@ -303,7 +310,7 @@ const SMART_ART_RULES=[
   [/soft|tender/,['🧸','☁️','🪶','🤲']],
   [/\bgood\b|fine|excellent/,['👍','⭐','😊','✅']],
   [/\bgive\b|\bgave\b|\bgiven\b/,['🎁','🤲','➡️','💝']],
-  [/\bbutter\b/,['🧈','🥛','🍞','🐄']],
+  [/\bbutter\b/,['🧨','🥛','🍞','🐄']],
   [/\bmilk\b/,['🥛','🐄','🍼','🤍']],
   [/\bface\b|\bbefore\b/,['🙂','👤','👀','➡️']],
   [/\beat\b|\bate\b|\beaten\b|food|meal/,['🍽️','🥘','😋','🍴']],
@@ -314,39 +321,39 @@ const SMART_ART_RULES=[
   [/\bafter\b|\bbehind\b/,['⬅️','👣','🚶','🔙']],
   [/\bfire\b|burn/,['🔥','🪵','☀️','🚒']],
   [/\bhouse\b|\bhome\b/,['🏠','🏡','🚪','🛏️']],
-  [/\bmaster\b|\blord\b|\bking\b/,['👑','🏛️','⭐','🫅']],
+  [/\bmaster\b|\blord\b|\bking\b/,['👑','🏙️','⭐','🪵']],
   [/\bhand\b|\bhands\b/,['✋','🤲','🖐️','👋']],
   [/\bhead\b/,['👤','🧠','🎩','🙂']],
   [/\bmouth\b/,['👄','🗣️','💬','😮']],
   [/\bchild\b|\bchildren\b/,['🧒','🎒','🧸','📘','🧩']],
   [/\bmother\b|\bwoman\b|\bwomen\b/,['🏠','❤️','🌷','📛']],
-  [/\bfather\b/,['🏠','📘','👔','❤️']],
+  [/\bfather\b/,['🏠','📚','👔','❤️']],
   [/\bwalk\b|\bgo\b|\bwent\b/,['🚶','👣','➡️','🛣️']],
   [/\bcome\b|\bcame\b/,['➡️','🚶','👋','🏠']],
   [/\bup\b|\babove\b/,['⬆️','🪜','☝️','🚀']],
   [/\bdown\b|\bbelow\b/,['⬇️','👇','🪜','📉']],
   [/\bbig\b|\bgreat\b|\blarge\b/,['🐘','⬆️','🔷','💪']],
   [/\bsmall\b|\blittle\b/,['🐜','🤏','🔹','🐭']],
-  [/\bold\b|elder|elderly|aged/,['🦯','⌛','🕰️','📜']],
+  [/\bold\b|elder|elderly|aged/,['��','⌛','🕰️','📜']],
   [/\bnew\b/,['✨','🆕','🌱','🎁']],
   [/\bnight\b/,['🌙','⭐','🌌','🛏️']],
   [/\bmorning\b/,['🌅','☀️','⏰','☕']],
   [/\blight\b|bright/,['💡','☀️','🔦','✨']],
   [/\bdark\b|darkness/,['🌑','🌙','🌌','🕶️']],
-  [/\bbuy\b|\bbought\b/,['🛒','💰','🧾','🛍️']],
+  [/\bbuy\b|\bbought\b/,['🛒','💰','🧧','🛍️']],
   [/\bsell\b|\bsold\b/,['💵','🏷️','🤝','🛍️']],
   [/\bmoney\b|silver|gold/,['💰','💵','🪙','🏦']],
   [/\bcity\b|town/,['🏙️','🏘️','🛣️','🏢']],
-  [/\bfield\b/,['🌾','🌱','🚜','🏞️']],
+  [/\bfield\b/,['🌾','🌱','🚜','🇯️']],
   [/\bmountain\b|\bhill\b/,['⛰️','🏔️','🥾','🌄']],
-  [/\briver\b/,['🌊','🏞️','💧','🚣']],
-  [/\bwell\b|\bspring\b/,['🪣','💧','🌊','🏞️']],
-  [/\banimal\b|\bbeast\b/,['🐄','🐑','🐐','🐎']],
-  [/\bsheep\b|\blamb\b/,['🐑','🌾','🐏','🧶']],
+  [/\briver\b/,['🌊','🇯️','💧','🚣']],
+  [/\bwell\b|\bspring\b/,['🪣','💧','🌊','🇯️']],
+  [/\banimal\b|\bbeast\b/,['🐄','🐑','🐐','📢']],
+  [/\bsheep\b|\blamb\b/,['🐑','🌾','🐏','🧥']],
   [/\bdonkey\b/,['🫏','🐴','🛤️','📦']],
-  [/\bhorse\b/,['🐎','🏇','🌾','🛣️']],
+  [/\bhorse\b/,['📢','🏇','🌾','🛣️']],
   [/\bbird\b/,['🐦','🪶','🪺','🌳']],
-  [/\bseed\b|plant/,['🌱','🌾','🫘','🌻']],
+  [/\bseed\b|plant/,['🌱','🌾','🪰','🌻']],
   [/\bhim\b|\bhis\b|\bhe\b/,['👉','👀','📍','🔹']],
   [/\bthem\b|\bthey\b/,['👥','👉','➡️','🔗']],
   [/\byou\b|\byour\b/,['👉','🏠','💬','📍']],
@@ -526,7 +533,7 @@ async function loadAll(){
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
   if(repaired)updates.push(`${repaired} picture set${repaired===1?'':'s'} created`);
-  status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
+  status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:`☁️ Connected`);
   applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
@@ -594,7 +601,7 @@ function renderCatalog(){
     const selectedArt=sanitizeClassArt(i.art||[]),pool=suggestionPoolOf(i);
     const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click a picture to select or unselect it</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
-    const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
+    const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:''
     const artBlock=currentTrack==='shorashim'
       ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
          <div class="mini-actions">
@@ -603,7 +610,7 @@ function renderCatalog(){
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
-      <div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
+      <div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>&#9650;</button><button data-a="down" ${idx===list.length-1?'disabled':''}>&#9660;</button></div>
       <div class="hebrew">${esc(i.front)}</div>
       <div>
         <b>${esc(i.english)}</b>
@@ -658,7 +665,7 @@ async function regeneratePictures(id){
 
   if(!fresh.length){
     status('☁️ No different matching pictures found');
-    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current suggestions were kept.`);
+    alert(`No additional clear picture choices were found for "${item.front} — ${item.english}".\n\nThe current suggestions were kept.`);
     return;
   }
   // Teacher's selections first, then new suggestions, then older ones (max 20).
@@ -703,7 +710,7 @@ async function mergeDuplicateWord(duplicateId){
   const duplicateIndex=list.findIndex(x=>x.id===duplicate.id);
   const keeper=list.slice(0,duplicateIndex).find(x=>!x.hidden && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key && englishDuplicateKey(x.english)===englishKey);
   if(!keeper)return alert('No matching duplicate was found.');
-  if(!confirm(`Merge duplicate “${duplicate.front}” into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
+  if(!confirm(`Merge duplicate "${duplicate.front}" into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
 
   // Keep the strongest useful metadata from both copies.
   keeper.art=sanitizeClassArt([...(keeper.art||[]),...(duplicate.art||[])]);
@@ -738,11 +745,11 @@ async function removePictureChoice(id,artValue){
 async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||pf==='all'||perekOf(i)===Number(pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
-async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
+async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove "${i.front}" from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
 async function deleteCatalogItem(id){
   const list=state.catalog[currentTrack]||[],i=list.find(x=>x.id===id);
   if(!i)return;
-  if(!confirm(`Permanently delete “${i.front}”?\n\nThis removes the word from Firebase. It will stay deleted after page reloads and future website-file updates. This cannot be undone.`))return;
+  if(!confirm(`Permanently delete "${i.front}"?\n\nThis removes the word from Firebase. It will stay deleted after page reloads and future website-file updates. This cannot be undone.`))return;
   state.catalog[currentTrack]=list.filter(x=>x.id!==id);
   renderCatalog();
   await saveCatalog();
@@ -776,7 +783,7 @@ async function saveEdit(e){
   const proposedFront=$('tFront').value.trim();
   if(currentTrack==='shorashim'){
     const clash=l.find(x=>x.id!==i.id && listNameOf(x)===i.listName && hebrewKey(x.front)===hebrewKey(proposedFront));
-    if(clash){alert(`“${proposedFront}” is already in this list. Edit the existing copy instead of creating a duplicate.`);return;}
+    if(clash){alert(`"${proposedFront}" is already in this list. Edit the existing copy instead of creating a duplicate.`);return;}
   }
   i.front=proposedFront;
   i.english=$('tEnglish').value.trim();
@@ -825,7 +832,7 @@ function applyRequestedTeacherView(){
   const params=new URLSearchParams(window.location.search);
   const tab=params.get('tab');
   if(!['dashboard','lists','access','recordings','leaderboard'].includes(tab||''))return;
-  const btn=document.querySelector('[data-tab="'+tab+'"]');
+  const btn=document.querySelector('[data-tab="'+tab+'"');
   if(btn)btn.click();
   if(tab==='lists'&&params.get('approval')==='pending'){
     const pending=(state.catalog.shorashim||[]).find(function(item){
@@ -863,11 +870,18 @@ $('teacherNewList').onclick=async()=>{
   status('☁️ Saving…','syncing');await db.ref(teacherSettingsPath()).set(state.settings);status('☁️ Saved');
   refreshNamedLists(name);renderCatalog();$('teacherListName').value=name;renderCatalog()
 };
+// Bulk Add: show the Perek selector (from teacher.html) and reset it to
+// placeholder so the teacher must actively choose a chapter each time.
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
-  const pf=$('teacherPerekFilter')?.value||'all';
-  $('bulkPerekLabel').textContent=currentTrack==='shorashim'?(pf==='18'?'Perek י״ח':'Perek י״ט'):'';
-  $('bulkPerekLabel').style.display=currentTrack==='shorashim'?'inline-block':'none';
+  const bulkPerekWrap=$('bulkPerekWrap');
+  if(bulkPerekWrap){
+    bulkPerekWrap.style.display=currentTrack==='shorashim'?'flex':  'none';
+    const sel=$('bulkPerekSelect');
+    if(sel)sel.value=''; // reset to placeholder; teacher must choose
+  }
+  const errEl=$('bulkPerekError');
+  if(errEl)errEl.style.display='none';
   $('bulkItems').value='';
   $('teacherBulkDialog').showModal();
 };
@@ -877,23 +891,31 @@ $('saveBulkItems').onclick=async e=>{
         lines=$('bulkItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),
         l=state.catalog[currentTrack],
         added=[];
+  const isShoreshim=currentTrack==='shorashim';
+  // Require an explicit Perek selection for Shorashim — never default silently.
+  const explicitPerek=isShoreshim?($('bulkPerekSelect')?.value||''):''; 
+  if(isShoreshim&&!explicitPerek){
+    const errEl=$('bulkPerekError');
+    if(errEl)errEl.style.display='block';
+    return; // stop; dialog stays open so teacher can choose
+  }
+  const errEl=$('bulkPerekError');
+  if(errEl)errEl.style.display='none';
   for(const line of lines){
     const parts=line.split('|').map(x=>x.trim());
     if(parts.length<2||!parts[0]||!parts[1])continue;
-    const isShoreshim=currentTrack==='shorashim';
     if(isShoreshim && l.some(x=>listNameOf(x)===name && hebrewKey(x.front)===hebrewKey(parts[0])))continue;
     const item={
       id:`bulk-${currentTrack}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       listName:name,
       front:parts[0],
       english:parts[1],
-      art:isShoreshim?[]:['✨','⭐','🖍️'],
+      art:isShoreshim?[]:['\u2728','\u2b50','\ud83d\udd8d\ufe0f'],
       autoArt:isShoreshim,
       hidden:false
     };
     if(isShoreshim){
-      const pf=$('teacherPerekFilter')?.value||'all';
-      item.perek=pf==='18'?18:19;
+      item.perek=Number(explicitPerek); // explicit teacher selection
       item.hebrew=parts[2]||parts[0];
       item.pasuk=parts[3]||'';
     }
@@ -903,12 +925,12 @@ $('saveBulkItems').onclick=async e=>{
   $('teacherBulkDialog').close();
   renderCatalog();
   if(added.length){
-    status(`☁️ Creating pictures for ${added.length} new word${added.length===1?'':'s'}…`,'syncing');
+    status(`\u2601\ufe0f Creating pictures for ${added.length} new word${added.length===1?'':'s'}\u2026`,'syncing');
     await fillArtForShorashim(added);
   }
   await saveCatalog();
   const missing=added.filter(i=>!sanitizeClassArt(i.art).length).length;
-  if(missing)status(`☁️ Saved • ${missing} new word(s) still need pictures; retry when picture service is available`);
+  if(missing)status(`\u2601\ufe0f Saved \u2022 ${missing} new word(s) still need pictures; retry when picture service is available`);
 };
 $('toggleStudentSite').onclick=toggleStudentSite;
 $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(teacherSettingsPath()).set(state.settings)};
@@ -916,7 +938,7 @@ $('teacherAddItem').onclick=()=>openEdit();
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
 $('tSaveItem').onclick=saveEdit;
-$('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
+$('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added \u2713';loadAccess()};
 bindTabs();
 let teacherAppOpened=false;
 function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
@@ -929,13 +951,13 @@ async function checkClassTeacher(user,access){
   const cls=(await db.ref(`b3Games/workspaces/${window.B3_APP_CONTEXT?.workspaceId||'b3-2026'}/classes/${CLASS_ID}`).once('value')).val();
   if(!cls||cls.active===false||(!admin&&cls.toolGrants?.shorashim!==true)){$('teacherGateMsg').textContent='Shorashim is not turned on for this class. Ask the admin.';return}
   $('teacherGoogleSignIn').classList.add('hidden');
-  document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${cls.name||CLASS_ID}`;
+  document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab \u00b7 ${cls.name||CLASS_ID}`;
   openTeacherApp();
 }
 function openOwnClass(ids){
   const go=id=>{const u=new URL(location.href);u.searchParams.set('class',id);u.searchParams.delete('v');location.replace(u.href)};
   const own=(ids||[]).filter(id=>id&&id!=='*');
-  if(own.length===1){$('teacherGateMsg').textContent='Opening your class…';go(own[0]);return}
+  if(own.length===1){$('teacherGateMsg').textContent='Opening your class\u2026';go(own[0]);return}
   $('teacherGateMsg').textContent='Choose your class.';
   window.B3TeacherClassRosters.load().then(r=>{
     const rows=(r.classes||[]).filter(c=>own.includes(c.id));
@@ -977,7 +999,7 @@ if(CLASS_MODE){
       openTeacherApp();
     }else if(CLASS_ID&&LEGACY_CLASS_IDS.includes(CLASS_ID)&&ids.includes(CLASS_ID)){
       activeLegacyClassScope=CLASS_ID;
-      document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${CLASS_ID.toUpperCase()}`;
+      document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab \u00b7 ${CLASS_ID.toUpperCase()}`;
       $('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');
       openTeacherApp();
     }else if(!CLASS_ID){
@@ -1000,7 +1022,7 @@ function recordingTime(v){
   try{return new Date(n).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}
 }
 function recordingModeLabel(r){
-  return (r.noHints===true||r.mode==="no-hints") ? "🏆 No Hints Challenge" : "🎙️ Record Chazara";
+  return (r.noHints===true||r.mode==="no-hints") ? "\ud83c\udfc6 No Hints Challenge" : "\ud83c\udf99\ufe0f Record Chazara";
 }
 function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==="no-hints")?3:2));}
 async function loadShorashimRecordings(){
@@ -1030,11 +1052,11 @@ function renderShorashimRecordings(){
   box.innerHTML=shorashimRecordingRows.map(r=>{
     const st=String(r.pointRequestStatus||r.status||"pending");
     const pendingReady=st==="pending"&&!!r.pointRequestId;
-    const statusLabel=st==="approved"?"✅ Approved":st==="rejected"?"❌ Rejected":r.pointRequestId?"⏳ Waiting for approval":"⚠️ Points request not connected";
+    const statusLabel=st==="approved"?"\u2705 Approved":st==="rejected"?"\u274c Rejected":r.pointRequestId?"\u23f3 Waiting for approval":"\u26a0\ufe0f Points request not connected";
     return `<div class="teacher-panel" style="margin:12px 0;padding:16px">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
         <div><div style="font-size:1.25rem;font-weight:900">${esc(r.studentName||r.studentId)}</div>
-        <div class="mini-note">${recordingModeLabel(r)} • <b>${recordingPoints(r)} points</b> • ${esc(recordingTime(r.createdAt))}</div></div>
+        <div class="mini-note">${recordingModeLabel(r)} \u2022 <b>${recordingPoints(r)} points</b> \u2022 ${esc(recordingTime(r.createdAt))}</div></div>
         <b>${statusLabel}</b>
       </div>
       ${r.audioURL?`<audio controls preload="none" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0"></audio>`:'<p class="mini-note">Audio file unavailable.</p>'}
@@ -1051,7 +1073,7 @@ async function teacherRewardsToken(){
     const provider=new firebase.auth.GoogleAuthProvider();
     const result=await firebase.auth().signInWithPopup(provider); user=result.user;
   }
-  if(String(user?.email||"").toLowerCase()!=="simcha5770@gmail.com")throw new Error("Please sign in with simcha5770@gmail.com.");
+  if(String(user?.email||"\u200b").toLowerCase()!=="simcha5770@gmail.com")throw new Error("Please sign in with simcha5770@gmail.com.");
   return user.getIdToken(true);
 }
 async function reviewShorashimRecording(requestId,action){
@@ -1068,10 +1090,10 @@ async function reviewShorashimRecording(requestId,action){
 window.reviewShorashimRecording=reviewShorashimRecording;
 window.addEventListener("DOMContentLoaded",()=>{
   const sign=$('recordingsGoogleSignIn');
-  if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
+  if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="\u2713 Signed in \u2014 approvals are ready.";sign.textContent="\u2713 Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
   firebase.auth().onAuthStateChanged(u=>{
     const s=$('recordingsAuthStatus');
-    if(s)s.textContent=u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com"?"✓ Signed in — approvals are ready.":"Sign in when you are ready to approve or reject.";
+    if(s)s.textContent=u&&String(u.email||"\u200b").toLowerCase()==="simcha5770@gmail.com"?"\u2713 Signed in \u2014 approvals are ready.":"Sign in when you are ready to approve or reject.";
   });
 });
 
@@ -1120,20 +1142,20 @@ renderShorashimRecordings=function(){
    const details=panel.querySelector('.mini-note');
    if(details){
      const len=document.createElement('span');
-     len.textContent=' • '+shorashimRecordingDuration(record);
+     len.textContent=' \u2022 '+shorashimRecordingDuration(record);
      details.appendChild(len);
    }
    if(!missingShorashimRequest(record))return;
    const connect=document.createElement('button');
    connect.type='button';connect.className='ghost';
-   connect.textContent='🔧 Connect Points Request';
+   connect.textContent='\ud83d\udd27 Connect Points Request';
    connect.addEventListener('click',async()=>{
-     connect.disabled=true;connect.textContent='Connecting…';
+     connect.disabled=true;connect.textContent='Connecting\u2026';
      try{
        await repairShorashimRecording(record);
        renderShorashimRecordings();
      }catch(error){
-       connect.disabled=false;connect.textContent='🔧 Retry Connecting';
+       connect.disabled=false;connect.textContent='\ud83d\udd27 Retry Connecting';
        alert(error.message||'Could not connect points.');
      }
    });
@@ -1141,7 +1163,7 @@ renderShorashimRecordings=function(){
  });
  const missing=shorashimRecordingRows.filter(missingShorashimRequest).length;
  const all=$('repairShorashimRecordingRequests');
- if(all){all.disabled=missing===0;all.textContent=missing?'🔧 Connect '+missing+' Missing Points Request'+(missing===1?'':'s'):'✓ All Points Requests Connected';}
+ if(all){all.disabled=missing===0;all.textContent=missing?'\ud83d\udd27 Connect '+missing+' Missing Points Request'+(missing===1?'':'s'):'\u2713 All Points Requests Connected';}
 };
 reviewShorashimRecording=async function(requestId,action){
  try{
@@ -1166,7 +1188,7 @@ window.addEventListener('DOMContentLoaded',()=>{
    }
    await loadShorashimRecordings();
    const message=$('recordingsAuthStatus');
-   if(message)message.textContent=repaired+' connected'+(errors.length?' · '+errors.length+' need attention: '+errors.slice(0,2).join('; '):' · Ready for approval');
+   if(message)message.textContent=repaired+' connected'+(errors.length?' \u00b7 '+errors.length+' need attention: '+errors.slice(0,2).join('; '):' \u00b7 Ready for approval');
  };
 });
 
