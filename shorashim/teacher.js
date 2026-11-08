@@ -625,13 +625,31 @@ async function copyLibraryToClass(e){
   const include=(item,track)=>chosen.has(track==='shorashim'?`shorashim|${U.unitKey(item)}`:`${track}|*`);
   status('☁️ Adding words to this class…','syncing');
   let added=0;
-  const result=await db.ref(`${SPACE}/catalog`).transaction(cur=>{const m=U.mergeCatalogById(cur,teacherLibrary.catalog,include);added=m.added;return m.catalog;});
-  const nextSettings=U.mergeSettings(state.settings,{namedLists:teacherLibrary.settings.namedLists,unitLabels:teacherLibrary.settings.unitLabels});
-  await db.ref(teacherSettingsPath()).update({namedLists:nextSettings.namedLists||null,unitLabels:nextSettings.unitLabels||null});
-  state.settings={...state.settings,namedLists:nextSettings.namedLists,unitLabels:nextSettings.unitLabels};
-  if(result.committed)state.catalog=withAllTracks(result.snapshot.val()||state.catalog);
-  $('teacherLibraryDialog').close();renderAll();
-  status(`☁️ Saved • ${added} word${added===1?'':'s'} added to this class`);
+  try{
+    const result=await db.ref(`${SPACE}/catalog`).transaction(cur=>{const m=U.mergeCatalogById(cur,teacherLibrary.catalog,include);added=m.added;return m.catalog;});
+    const nextSettings=U.mergeSettings(state.settings,{namedLists:teacherLibrary.settings.namedLists,unitLabels:teacherLibrary.settings.unitLabels});
+    await db.ref(teacherSettingsPath()).update({namedLists:nextSettings.namedLists||null,unitLabels:nextSettings.unitLabels||null});
+    state.settings={...state.settings,namedLists:nextSettings.namedLists,unitLabels:nextSettings.unitLabels};
+    if(result.committed)state.catalog=withAllTracks(result.snapshot.val()||state.catalog);
+    $('teacherLibraryDialog').close();renderAll();
+    status(`☁️ Saved • ${added} word${added===1?'':'s'} added to this class`);
+  }catch(err){
+    console.error('Could not copy library words to class',err);
+    status('⚠️ Could not add the words. Please try again.','error');
+    alert('Could not add the words to this class. Please try again.');
+  }
+}
+async function copyClassToLibrary(){
+  status('☁️ Saving to your library…','syncing');
+  try{
+    const n=await saveClassToLibrary();
+    renderLibraryStatus();
+    status(`☁️ Saved • ${n} new word${n===1?'':'s'} added to your library`);
+  }catch(err){
+    console.error('Could not save class words to library',err);
+    renderLibraryStatus('Could not save to your library. Please try again.');
+    status('⚠️ Could not save to your library','error');
+  }
 }
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
@@ -1026,7 +1044,7 @@ $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherM
 $('teacherAddItem').onclick=()=>openEdit();
 $('teacherRenameUnit').onclick=renameUnitLabel;
 $('teacherShowBooklet').onchange=e=>setShowBooklet(e.target.checked);
-$('teacherLibraryFromClass').onclick=async()=>{status('☁️ Saving to your library…','syncing');const n=await saveClassToLibrary();renderLibraryStatus();status(`☁️ Saved • ${n} new word${n===1?'':'s'} added to your library`);};
+$('teacherLibraryFromClass').onclick=copyClassToLibrary;
 $('teacherLibraryToClass').onclick=openLibraryDialog;
 $('cancelLibraryCopy').onclick=()=>$('teacherLibraryDialog').close();
 $('saveLibraryCopy').onclick=copyLibraryToClass;
