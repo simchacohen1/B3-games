@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "name": "Homework: draft → publish → student hand-in → corrections → approval → archive",
+      "routes": [
+        "assignment-center/teacher.html",
+        "assignment-center/student.html"
+      ],
+      "checks": [
+        {
+          "file": "authenticated.spec.ts",
+          "title": "fictional teacher publishes homework for a fictional student @auth @homework"
+        }
+      ]
+    },
+    {
+      "name": "Teacher, principal and owner account lifecycle",
+      "routes": [
+        "teacher-home.html",
+        "owner-admin.html",
+        "admin.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Weekly Quiz: assign, answer, submit, reload and review",
+      "routes": [
+        "weekly-quiz/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Chazara: record, upload, play, grade and reload",
+      "routes": [
+        "chazara/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Shorashim: practice, record, save and teacher review",
+      "routes": [
+        "shorashim/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Posuk Practice: record, grade, retry and dispute",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Rashi Letters: record, review and enforce daily limit",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Student Rewards: earn, redeem and preserve balances",
+      "routes": [
+        "student-rewards/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Class Gallery: submit, approve and reload all posts",
+      "routes": [
+        "class-gallery/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Class Pointer: share, annotate, switch presenter and reconnect",
+      "routes": [
+        "class-pointer-prototype/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Multiplayer: match, play to completion and award coins exactly once",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Game Show: create, join, answer and score",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Halacha: learn, complete and reload progress",
+      "routes": [
+        "halacha/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Sefer HaMitzvos: daily content, color, save and reload",
+      "routes": [
+        "sefer-hamitzvos/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Student reports: history, individual PDF and complete class ZIP",
+      "routes": [
+        "student-report/index.html"
+      ],
+      "checks": []
+    },
+    {
+      "name": "Yiddish: complete activity and reload progress",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Follow the Teacher: lock, redirect and release",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Messaging: send text and audio, receive and mark read",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Kriah: assign, record, mark letters and nekudos, finalize and report",
+      "routes": [],
+      "checks": []
+    },
+    {
+      "name": "Class isolation: student/teacher/principal access and revocation",
+      "routes": [],
+      "checks": []
+    }
+  ]
+}
