@@ -109,6 +109,9 @@ test('homework runs only on the live site with live config, or on staging; activ
 
   const html = fs.readFileSync(__dirname + '/../assignment-center/student.html', 'utf8');
   assert.match(html, /data-assignment-launch/);
+  // The activity tab must inherit the student's sessionStorage sign-in; noopener blocks that copy.
+  assert.match(html, /launch.rel='opener'/);
+  assert.doesNotMatch(html, /launch.rel='noopener'/);
   assert.match(html, /press Hand In\. The activity does not send your homework/);
   const cardCode = html.slice(html.indexOf('function card(a)'), html.indexOf('async function refresh()'));
   const launchCode = cardCode.slice(cardCode.indexOf('var activityUrl'), cardCode.indexOf("if(a.status==='returned'"));
