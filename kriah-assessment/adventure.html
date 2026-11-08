@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kriah Adventure · Fun Torah Tools</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="adventure.css">
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script defer src="core.js"></script>
+  <script data-b3-staging-guard defer src="client.js"></script>
+  <script defer src="adventure.js"></script>
+</head>
+<body>
+  <div class="notice" id="stagingNotice">
+    🧪 STAGING ONLY · Fictional students · Adventure preview — not production
+  </div>
+
+  <header class="adv-header">
+    <div class="adv-header-inner">
+      <div class="adv-floating-letters" aria-hidden="true">
+        <span style="--delay:0s">א</span>
+        <span style="--delay:.4s">ב</span>
+        <span style="--delay:.8s">ג</span>
+        <span style="--delay:1.2s">ד</span>
+        <span style="--delay:1.6s">ה</span>
+      </div>
+      <div class="adv-header-text">
+        <h1>🗺️ Kriah Adventure</h1>
+        <p class="adv-tagline">Learn to read Hebrew — one letter at a time!</p>
+      </div>
+      <div class="adv-coins" id="coinDisplay" aria-live="polite">
+        🪙 <span id="coinCount">0</span>
+        ⭐ <span id="starCount">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="adv-toolbar" aria-label="Account controls">
+      <div id="userInfo" class="adv-user-info" hidden>
+        <span id="userDisplayName"></span>
+        <button id="signOutBtn" class="adv-btn adv-btn-sm">Sign Out</button>
+      </div>
+      <div id="signInControls">
+        <select id="fixtureSelect" class="adv-select">
+          <option value="">— Select student (fixture) —</option>
+          <option value="student-aleph">Student: Aleph (fixture)</option>
+          <option value="student-beis">Student: Beis (fixture)</option>
+          <option value="student-gimmel">Student: Gimmel (fixture)</option>
+        </select>
+        <button id="signInBtn" class="adv-btn adv-btn-primary">Sign In</button>
+      </div>
+    </section>
+
+    <div id="signInGate" class="adv-gate">
+      <div class="adv-gate-inner">
+        <div class="adv-gate-emoji">🏰</div>
+        <h2>Welcome to Kriah Adventure!</h2>
+        <p>Sign in above to start your Hebrew reading quest.</p>
+        <p class="adv-gate-note">Use a <strong>fictional student fixture</strong> for this staging preview.</p>
+      </div>
+    </div>
+
+    <div id="teacherNotice" hidden class="adv-notice-box">
+      <div class="adv-notice-icon">👩‍🏫</div>
+      <div>
+        <strong>Teacher account detected</strong>
+        <p>The adventure map is for students only. Use the <a href="index.html">Assessment Center</a> to manage classes, assign exercises, and review student recordings.</p>
+      </div>
+    </div>
+
+    <div id="adventureApp" hidden>
+      <div class="adv-welcome" id="welcomeBanner">
+        <span id="welcomeEmoji">🌟</span>
+        <span id="welcomeName">Adventurer</span>, your quest continues!
+      </div>
+
+      <div id="assignmentAlert" hidden class="adv-assignment-alert">
+        <span>📋</span>
+        <span id="assignmentAlertText">You have new assignments from your teacher!</span>
+      </div>
+
+      <nav class="adv-tabs" aria-label="Adventure sections">
+        <button class="adv-tab active" data-adv-tab="map">🗺️ Adventure Map</button>
+        <button class="adv-tab" data-adv-tab="practice">✏️ Practice Activities</button>
+        <button class="adv-tab" data-adv-tab="progress">📊 My Progress</button>
+      </nav>
+
+      <!-- MAP TAB -->
+      <section id="mapTab" class="adv-tab-panel">
+        <p class="adv-map-intro">Complete more teacher assignments to unlock new worlds!</p>
+        <div id="worldGrid" class="adv-world-grid" role="list">
+          <!-- worlds rendered by adventure.js -->
+        </div>
+      </section>
+
+      <!-- STATION DETAIL PANEL -->
+      <section id="stationPanel" hidden class="adv-station-panel">
+        <button id="stationBack" class="adv-btn adv-btn-sm adv-back-btn">← Back to Map</button>
+        <div id="stationContent"></div>
+      </section>
+
+      <!-- PRACTICE TAB -->
+      <section id="practiceTab" hidden class="adv-tab-panel">
+        <h2 class="adv-section-title">Practice Activities</h2>
+        <p class="adv-section-desc">Choose any activity to practice your Aleph-Beis skills!</p>
+        <div id="practiceGrid" class="adv-practice-grid">
+          <!-- cards rendered by adventure.js -->
+        </div>
+      </section>
+
+      <!-- PROGRESS TAB -->
+      <section id="progressTab" hidden class="adv-tab-panel">
+        <h2 class="adv-section-title">My Progress</h2>
+        <div id="progressList" class="adv-progress-list">
+          <!-- records rendered by adventure.js -->
+        </div>
+      </section>
+
+      <!-- ACTIVITY MODAL -->
+      <div id="activityModal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="adv-modal-backdrop" id="modalBackdrop"></div>
+        <div class="adv-modal-box">
+          <div class="adv-modal-header">
+            <h2 id="modalTitle">Activity</h2>
+            <button id="modalClose" class="adv-modal-close" aria-label="Close">✕</button>
+          </div>
+          <div id="modalBody" class="adv-modal-body"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="adv-footer">
+    No real student data is used in this preview. Coins and stars are display-only and are never saved to any server.
+    <span class="adv-footer-sep">·</span>
+    <a href="index.html">Teacher Assessment Center</a>
+  </footer>
+</body>
+</html>
