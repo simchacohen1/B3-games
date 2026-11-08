@@ -33,6 +33,7 @@ assert.equal(merged.shorashim[2].id, 'new', 'new words append to the existing li
 assert.deepEqual(JSON.parse(JSON.stringify(merged.prefix)), current.prefix, 'other Shorashim tracks are preserved');
 
 const bulk = source.slice(source.indexOf('async function fillArtForShorashim'), source.indexOf('function mergeCatalogWithoutReplacingPictures'));
-assert.match(bulk, /!sanitizeClassArt\(i\.art\)\.length/, 'bulk process only targets missing art');
+assert.match(bulk, /!sanitizeSuggestionPool\(i\.artPool\)\.length/, 'bulk process only targets words without suggestions');
+assert.doesNotMatch(bulk, /item\.art\s*=\s*(?!\[\])/, 'automatic suggestions never tick a picture for students (issue #627)');
 assert.doesNotMatch(bulk, /teacherApproved!==true/, 'approved entries with missing art may receive safe fallback art');
 console.log('Shorashim art safety tests passed.');

@@ -61,6 +61,6 @@ test('review remains in selected-card order unless Shuffle is chosen',()=>{
   assert.match(categories,/let arr = keys\.map\(k => map\.get\(k\)\)\.filter\(Boolean\)/);
   assert.match(categories,/value === 'shuffle'/);
   assert.match(html,/<input type="radio" name="reviewOrderMode" value="order" checked>/);
-  assert.match(html,/review-categories\.js\?v=20261106-units-1/);
+  assert.match(html,/review-categories\.js\?v=20261107-pictures-1/);
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the newest-review release');
 });
