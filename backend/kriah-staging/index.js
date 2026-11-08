@@ -2,6 +2,7 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
 const { createService, PROJECT } = require('./service.cjs');
+const changeRecord = require('./transaction.cjs');
 const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
 // Refuse to load or deploy against production, even with production credentials.
 if (project !== PROJECT) throw new Error('Kriah Assessment Center requires fun-torah-tools-staging.');
@@ -24,13 +25,7 @@ const store = {
     return (await query.limitToLast(limit).get()).val() || {};
   },
   async change(path, fn) {
-    let failure;
-    const result = await db.ref(path).transaction(value => {
-      try { return fn(value); } catch (error) { failure = error; return undefined; }
-    }, undefined, false);
-    if (failure) throw failure;
-    if (!result.committed) throw Object.assign(new Error('Assessment changed. Try again.'), { code: 409 });
-    return result.snapshot.val();
+    return changeRecord(db.ref(path), fn);
   }
 };
 const audio = {

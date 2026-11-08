@@ -1,8 +1,9 @@
 # Kriah Assessment Center — Issue #624
 
-This is a staging-only implementation. No production data access, deployment,
-rules change, paid service activation or migration is included. The draft PR
-does not authorize a merge or deployment. The UI lives at
+This is a staging-only implementation. The owner subsequently approved isolated
+staging setup and deployment; the dedicated service and preview were deployed.
+No production data access/deployment, rules change or migration is included.
+The draft PR does not authorize a production merge or deployment. The UI lives at
 `kriah-assessment/index.html`; no live homepage links are added.
 
 ## Implemented behavior
@@ -151,7 +152,7 @@ The demo never talks to Firebase. The Playwright script uses a browser fake
 microphone, simulates an upload outage and page reload, checks manual marking,
 reports, phone width, PDF, microphone denial and direct unauthorized calls.
 
-Local Node results: **19 passed, 0 failed**. Local browser launch is blocked by
+Local Node results: **21 passed, 0 failed**. Local browser launch is blocked by
 the workspace's Chromium `socket(): Operation not permitted`; no local screenshot
 or real-browser success is claimed. A dedicated GitHub PR workflow runs the same
 tests plus the browser journey and uploads fictional screenshots/PDF as artifacts.
@@ -162,11 +163,10 @@ six scoped store reads (3,239 decoded JSON bytes), with zero audio downloads
 before explicit playback and one afterward. These are adapter-fixture sizes,
 not on-wire Firebase measurements or an estimate of a production bill.
 
-### Separate staging approval gate
+### Separate staging approval gate (subsequently granted)
 
-No staging deploy was performed because this task explicitly forbids deployment
-without owner approval. For a remote authenticated demonstration, approval is
-needed to:
+The owner granted the following isolated staging setup/deployment scope after
+the initial draft. Production remains excluded:
 
 1. Provision the dedicated private staging bucket and least-privilege service
    account access; enable only already-approved Firebase/Cloud services.
@@ -195,3 +195,12 @@ passwords are random and retained only in a mode-0600 temporary file, never logs
 Existing unrelated account/class records are not overwritten. All commands must
 explicitly target `fun-torah-tools-staging`. Hosting uses a `kriah-624` preview
 channel; the staging site's current live channel remains untouched.
+
+The deployed preview is
+`https://fun-torah-tools-staging--kriah-624-h422du6m.web.app/kriah-assessment/index.html`.
+Real Firebase testing found an adapter issue hidden by the in-memory store:
+RTDB can invoke a transaction with provisional uncached `null`. The adapter now
+returns that unchanged value for the server hash comparison, clears superseded
+callback errors on retries, and reports a missing/conflicting record only after
+confirmation. The two adapter regressions cover this behavior without adding a
+listener or weakening the expected-revision conflict check.

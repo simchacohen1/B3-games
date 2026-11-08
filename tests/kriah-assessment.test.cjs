@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const Core = require('../kriah-assessment/core.js');
 const Recorder = require('../kriah-assessment/recorder.js');
+const changeRecord = require('../backend/kriah-staging/transaction.cjs');
 const { fixture, identities: I, example } = require('../scripts/kriah-fixture.cjs');
 const { createService, PROJECT, WS, MAX_BYTES } = require('../backend/kriah-staging/service.cjs');
 const ex = changes => Core.exercise({ ...example, ...changes });
@@ -177,4 +178,24 @@ test('recorder mic denial, cancel during permission wait, supported Safari forma
   class FakeRecorder { static isTypeSupported(t) { return t === 'audio/mp4'; } constructor(stream, opts) { selected = opts.mimeType; this.mimeType = opts.mimeType; } start() {} stop() { this.ondataavailable({ data: new Blob([new Uint8Array(20)]) }); this.onstop(); } }
   const recorder = new Recorder({ media: { async getUserMedia() { return { getTracks: () => [{ stop() { stopped++; } }] }; } }, Recorder: FakeRecorder, clock: () => now, onComplete: v => completed = v });
   await recorder.start(); now = 1000; recorder.stop(); await Promise.resolve(); assert.equal(selected, 'audio/mp4'); assert.equal(completed.blob.type, 'audio/mp4'); assert.equal(recorder.timer, null); assert.equal(recorder.stream, null);
+});
+test('RTDB adapter tolerates provisional uncached null and clears a superseded error after server retry', async () => {
+  const ref = { async transaction(update) {
+    assert.equal(update(null), null, 'Provisional cache miss must reach the server comparison, not abort');
+    const updated = update({ revision: 1, status: 'assigned' });
+    assert.deepEqual(updated, { revision: 2, status: 'submitted' });
+    return { committed: true, snapshot: { val: () => updated } };
+  } };
+  const result = await changeRecord(ref, row => {
+    if (!row) throw Object.assign(new Error('Assessment not found.'), { code: 404 });
+    return { revision: row.revision + 1, status: 'submitted' };
+  });
+  assert.equal(result.status, 'submitted');
+});
+test('RTDB adapter reports confirmed missing/conflicting records without overwriting data', async () => {
+  const missing = { async transaction(update) { const value = update(null); assert.equal(value, null); return { committed: true, snapshot: { val: () => null } }; } };
+  await denied(changeRecord(missing, row => { if (!row) throw Object.assign(new Error('Missing'), { code: 404 }); return row; }), 404);
+  const row = { revision: 2, status: 'reviewed' };
+  const conflict = { async transaction(update) { assert.equal(update(row), row); return { committed: true, snapshot: { val: () => row } }; } };
+  await denied(changeRecord(conflict, () => { throw Object.assign(new Error('Revision conflict'), { code: 409 }); }), 409);
 });
