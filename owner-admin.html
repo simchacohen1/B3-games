@@ -6,102 +6,86 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Owner Admin — Fun Torah Tools</title>
+<title>Fun Torah Tools — Owner Admin</title>
+
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="principal-scope.js?v=20261025"></script>
+<script src="student-scope.js?v=20261108"></script>
 <style>
- *{box-sizing:border-box;margin:0;padding:0}
- body{font-family:system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;padding-bottom:60px}
- header{background:#1d1d1f;color:#f5f5f7;padding:18px 24px;display:flex;align-items:center;justify-content:space-between}
- header h1{font-size:1.1rem;font-weight:600}
- header .sub{font-size:.8rem;opacity:.6;margin-top:2px}
- header .back{color:#86b7fe;font-size:.85rem;text-decoration:none}
- main{max-width:900px;margin:32px auto;padding:0 16px;display:grid;gap:24px}
- .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px #0001}
- .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
- .card-head h2{font-size:1rem;font-weight:600}
- .formrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
- input,select{padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:.9rem;min-width:160px}
- button{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:.9rem;background:#0071e3;color:#fff}
- button.danger{background:#ff3b30}
- button.sm{padding:4px 10px;font-size:.8rem}
- .gate{text-align:center;padding:60px 0}
- .gate h2{margin-bottom:12px}
- .gate p{color:#555;margin-bottom:20px}
- .hidden{display:none!important}
- .entry{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:.9rem}
- .entry:last-child{border-bottom:none}
- .entry.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
- .entry b{display:block}
- .entry small{color:#888;font-size:.8rem}
- .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
- .chip{background:#e8f0fe;color:#1a73e8;border-radius:20px;padding:3px 10px;font-size:.8rem;display:inline-flex;align-items:center;gap:4px}
- .chip button{background:none;color:#1a73e8;padding:0 2px;font-size:.85rem;line-height:1}
- .listlabel{font-size:.8rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
- .hint{font-size:.85rem;color:#555;margin-bottom:12px}
- .notice{background:#fff9e6;border:1px solid #ffd60a;border-radius:8px;padding:10px 14px;font-size:.85rem;margin-bottom:14px}
- .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1d1d1f;color:#fff;padding:10px 20px;border-radius:8px;font-size:.9rem;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;z-index:999}
- .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
- fieldset{border:1px solid #ddd;border-radius:8px;padding:12px}
- legend{font-size:.8rem;font-weight:600;padding:0 6px;color:#555}
- .bulk-preview{background:#f5f5f7;border-radius:8px;padding:12px;font-size:.85rem;margin-top:10px;white-space:pre-wrap;max-height:200px;overflow:auto}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
+header{background:#172033;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:24px}.sub{color:#b9c6da;font-size:14px;margin-top:4px}
+.back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:11px 16px;border-radius:10px}
+main{max-width:760px;margin:24px auto 90px;padding:0 16px}
+.notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;padding:14px 16px;margin-bottom:18px;line-height:1.45;font-size:16px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 4px 14px rgba(15,23,42,.06)}
+.card-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.stepnum{flex:none;width:42px;height:42px;border-radius:50%;background:#2563eb;color:#fff;font-weight:900;font-size:21px;display:flex;align-items:center;justify-content:center}
+.card h2{font-size:23px;margin:0}
+.hint{color:#64748b;line-height:1.45;margin:4px 0 14px;font-size:16px}
+.formrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.formrow input,.formrow select{flex:1 1 200px}
+.card input,.card select{padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:17px;background:#fff;width:100%}
+.card button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:800;font-size:17px;cursor:pointer}
+.card button:hover{background:#1d4ed8}.card button:disabled{opacity:.5}
+.formrow button{flex:none}
+.listlabel{margin:16px 0 4px;font-size:14px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+.entry{padding:12px 0;border-bottom:1px solid #e2e8f0}.entry:last-child{border-bottom:0}
+.entry b{font-size:18px}
+.entry small{display:block;color:#64748b;font-size:15px;margin-top:2px}
+.entry.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card button.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;padding:8px 14px;font-size:15px}
+.card button.danger:hover{background:#fef2f2}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;border-radius:999px;padding:5px 6px 5px 14px;font-size:16px}
+.card .chip button{background:transparent;color:#64748b;padding:3px 9px;border-radius:999px;font-size:16px}
+.card .chip button:hover{background:#fee2e2;color:#b91c1c}
+.toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px}
+.tool{display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid #e2e8f0;border-radius:14px;background:#f8fafc;cursor:pointer;user-select:none;font-weight:700;font-size:17px;line-height:1.25}
+.tool input{width:24px;height:24px;margin:0;flex:none;accent-color:#16a34a;cursor:pointer;padding:0}
+.tool:has(input:checked){background:#dcfce7;border-color:#22c55e;color:#14532d}
+.tool .on{margin-left:auto;font-size:13px;font-weight:900;color:#15803d;display:none}
+.tool:has(input:checked) .on{display:inline}
+.tools-title{margin:26px 0 4px;font-size:21px}
+.gate{max-width:520px;margin:70px auto;background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center}
+.gate button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:900;font-size:17px;cursor:pointer}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
-</head>
-<body>
+</head><body>
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
 <main>
-<div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden">Sign in with Google</button></div>
+<div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
 <div id="ownerArea" class="hidden">
-<p class="notice">Changes take effect immediately. There is no undo.</p>
+<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
 
-<section class="card">
-<div class="card-head"><h2>Teachers</h2></div>
-<p class="hint">Add a teacher by email. They’ll be inactive until a class is assigned.</p>
-<div class="formrow">
- <input id="teacherEmail" type="email" placeholder="Teacher email">
- <input id="teacherName" type="text" placeholder="Display name (optional)">
- <button id="addTeacher">Add teacher</button>
-</div>
-<div class="listlabel">Current teachers</div>
-<div id="teachers"></div>
-</section>
+<section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
+<p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
+<div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
+<div class="listlabel">Your teachers</div><div id="teachers"></div></section>
 
-<section class="card">
-<div class="card-head"><h2>Principals</h2></div>
-<p class="hint">Principals see the classes of their supervised teachers. They log in with Google.</p>
-<div class="formrow">
- <input id="principalEmail" type="email" placeholder="Principal Google email">
- <input id="principalName" type="text" placeholder="Display name (optional)">
- <button id="addPrincipal">Add principal</button>
-</div>
-<div class="listlabel">Current principals</div>
-<div id="principals"></div>
-</section>
+<section class="card"><div class="card-head"><h2>Principals</h2></div>
+<p class="hint">A principal signs in with Google and can use teacher tools for all classes taught by the teachers you select. Only you can add accounts, assign supervision or change platform-wide settings.</p>
+<div class="formrow"><input id="principalEmail" type="email" placeholder="Principal Google email"><input id="principalName" placeholder="Principal name"><button id="addPrincipal">Add principal</button></div>
+<div id="principals"></div></section>
 
-<section class="card">
-<div class="card-head"><h2>Classes</h2></div>
-<p class="hint">Add a class by ID (short, no spaces). Teachers and students are assigned separately.</p>
-<div class="formrow">
- <input id="classId" placeholder="Class ID (e.g. grade3a)">
- <input id="className" placeholder="Display name">
- <button id="addClass">Add class</button>
-</div>
-<div class="listlabel">Current classes</div>
-<div id="classes"></div>
-</section>
+<section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
+<p class="hint">Create a class for each group of students.</p>
+<div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
+<div class="listlabel">Your classes</div><div id="classes"></div></section>
 
-<section class="card">
-<div class="card-head"><h2>Give a teacher a class</h2></div>
-<p class="hint">Select a teacher and a class to assign.</p>
-<div class="formrow">
- <select id="teacherSelect"><option value="">Choose teacher</option></select>
- <select id="classSelect"><option value="">Choose class</option></select>
- <button id="assignTeacher">Assign</button>
-</div>
-<div class="listlabel">Current assignments</div>
-<div id="assignments"></div>
-</section>
+<section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
+<p class="hint">Pick a teacher and a class, then press Assign.</p>
+<div class="formrow"><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button></div>
+<div class="listlabel">Who has what</div><div id="assignments"></div></section>
 
-<section class="card">
-<div class="card-head"><h2>Tools and content</h2></div>
+<section class="card"><div class="card-head"><div class="stepnum">4</div><h2>Tools and content</h2></div>
+<p class="hint">New classes start with no tools. Choose a class, then tap only the tools its teacher should get. Green = on. Changes save instantly.</p>
+<select id="toolClassSelect"><option value="">Choose class</option></select>
+<div id="toolList"></div>
+<h3 class="tools-title">Class Content</h3>
 <p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
 <div id="resourceList"></div></section>
 
@@ -122,19 +106,20 @@
 </section>
 
 <section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
-<p class="hint">Paste a list of students (one per line, name then passcode separated by a tab or comma) to upload to a class.</p>
-<div class="formrow">
- <select id="bulkClassSelect"><option value="">Choose class</option></select>
+<p class="hint">Upload a CSV to add teachers, principals, students, and classes all at once. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
+<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>type</code> (teacher / principal / student / class), <code>name</code>, <code>email</code> (teachers &amp; principals), <code>passcode</code> (students' individual sign-in passcode), <code>class</code> (class name; required for students). One row per person or class. Classes in the file are created first.</p>
+<div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Preview</button></div>
+<div id="bulkPreviewArea" style="display:none;margin-top:12px">
+  <div id="bulkSummary" style="margin-bottom:10px;font-weight:700;font-size:16px"></div>
+  <div id="bulkTable" style="overflow-x:auto;font-size:15px"></div>
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <button id="bulkImport" type="button" style="background:#16a34a">&#x2705; Import all</button>
+    <button id="bulkCancel" type="button" style="background:#fff;color:#b91c1c;border:1px solid #fecaca">Cancel</button>
+  </div>
 </div>
-<textarea id="bulkInput" rows="6" style="width:100%;font-family:monospace;font-size:.85rem;padding:8px;border:1px solid #ccc;border-radius:6px" placeholder="StudentName&#9;passcode
-AnotherStudent&#9;passcode"></textarea>
-<div style="margin-top:8px;display:flex;gap:8px">
- <button id="bulkPreview">Preview</button>
- <button id="bulkUpload">Upload</button>
-</div>
-<div id="bulkPreviewArea"></div>
+<div id="bulkProgress" style="display:none;margin-top:12px;font-weight:700;font-size:16px"></div>
+<div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:220px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
 </section>
-
 </div>
 <div id="status" class="toast"></div>
 </main>
@@ -158,89 +143,66 @@ const PLATFORM_TOOLS=[
  ["shorashim","Shorashim","dual"],
  ["chazara","Chazara","dual"],
  ["game-show","Game Show","dual"],
- ["student-rewards","Student Rewards","single"],
- ["class-schedule","Class Schedule","single"],
+ ["student-rewards","Student Rewards","dual"],
+ ["weekly-quiz","Weekly Quiz","dual"],
+ ["multiplayer-center","Multiplayer Center","dual"],
+ ["homework","Homework & Assignments","dual"],
+ ["gallery","Gallery","dual"],
+ ["tag","Tag Game","dual"],
+ ["davening","Davening Player","teacher"],["chavrusa","Chavrusa of the Day","teacher"],["name-picker","Name Picker","teacher"],
+ ["class-pointer","Class Pointer","unsorted"]
 ];
-const B3_CLASSES=["et","wt"];
-function key(s){return String(s||'').toLowerCase().replace(/[^a-z0-9_-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')}
-function safe(s){const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML}
-async function renderToolGrants(){
- const snap=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value"),cd=snap.val()||{};
- const non_b3=Object.entries(cd).filter(([id])=>!B3_CLASSES.includes(id));
- if(!non_b3.length){q("resourceList").innerHTML='<small>No custom classes yet.</small>';return}
- let html='';
- for(const[cid,cls]of non_b3){
-  const tsnapKey="b3Games/workspaces/"+WS+"/toolGrants/"+cid;
-  const tsnapLock="b3Games/workspaces/"+WS+"/lockedGames/"+cid;
-  const[tg,lg]=await Promise.all([db.ref(tsnapKey).once("value"),db.ref(tsnapLock).once("value")]);
-  const grants=tg.val()||{},locks=lg.val()||{};
-  html+='<div style="margin-bottom:16px"><b>'+safe(cls.name||cid)+'</b><div class="chips" style="margin-top:6px">';
-  for(const[tid,label,type]of PLATFORM_TOOLS){
-   const on=!!grants[tid];
-   html+='<label style="margin:3px 4px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-tool="'+tid+'" data-class="'+cid+'" '+(on?'checked':'')+'>'+safe(label)+'</label>';
-  }
-  html+='</div></div>';
- }
- q("resourceList").innerHTML=html;
- q("resourceList").querySelectorAll("input[data-tool]").forEach(cb=>{
-  cb.addEventListener("change",async()=>{
-   const tid=cb.dataset.tool,cid=cb.dataset.class,on=cb.checked;
-   const ref=db.ref("b3Games/workspaces/"+WS+"/toolGrants/"+cid+"/"+tid);
-   await ref.set(on?true:null);
-   q("status").textContent=(on?"Enabled ":"Disabled ")+tid+" for "+cid;
-  });
- });
-}
-async function reconcilePrincipals(teacherData,classData){
- const principals=Object.entries(teacherData).filter(([,t])=>B3PrincipalScope.principal(t));
- if(!principals.length)return;
- const updates={};
- for(const[pid,p]of principals){
-  const supervised=Object.keys(p.supervisedTeachers||{}).filter(tid=>p.supervisedTeachers[tid]);
-  const classIds=new Set();
-  for(const tid of supervised){
-   const t=teacherData[tid];
-   if(!t)continue;
-   Object.keys(t.classIds||{}).filter(id=>t.classIds[id]).forEach(id=>classIds.add(id));
-  }
-  const current=Object.keys(p.classIds||{}).filter(id=>p.classIds[id]);
-  const desired=[...classIds];
-  const toAdd=desired.filter(id=>!current.includes(id));
-  const toRemove=current.filter(id=>!desired.includes(id));
-  for(const id of toAdd)updates["b3Games/workspaces/"+WS+"/teacherInvites/"+pid+"/classIds/"+id]=true;
-  for(const id of toRemove)updates["b3Games/workspaces/"+WS+"/teacherInvites/"+pid+"/classIds/"+id]=null;
+const TOOL_GROUPS=[["dual","Student activities","Students use these. The teacher also gets a control or reports view."],["teacher","Teacher-only tools","Only the teacher sees these. Students never do."],["unsorted","Not sorted yet","Still deciding where these belong."]];
+function key(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
+function safe(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
+function sameMap(a,b){const aa=Object.keys(a||{}).filter(k=>a[k]===true).sort(),bb=Object.keys(b||{}).filter(k=>b[k]===true).sort();return JSON.stringify(aa)===JSON.stringify(bb)}
+async function reconcilePrincipals(invites,classes){
+ const root="b3Games/workspaces/"+WS;
+ const ps=Object.entries(invites||{}).filter(([,p])=>B3PrincipalScope.principal(p));
+ if(!ps.length)return;
+ const linked=(await db.ref(root+"/teachers").once("value")).val()||{},updates={};
+ for(const [id,p] of ps){
+   const scope=B3PrincipalScope.derive(invites,p,classes);
+   const inviteBase=root+"/teacherInvites/"+id;
+   if(!sameMap(p.classIds,scope.classIds))updates[inviteBase+"/classIds"]=Object.keys(scope.classIds).length?scope.classIds:null;
+   if(JSON.stringify(p.supervisedTeachers||{})!==JSON.stringify(scope.supervisedTeachers))updates[inviteBase+"/supervisedTeachers"]=Object.keys(scope.supervisedTeachers).length?scope.supervisedTeachers:null;
+   if(p.active!==scope.active)updates[inviteBase+"/active"]=scope.active;
+   p.active=scope.active;p.classIds=scope.classIds;p.supervisedTeachers=scope.supervisedTeachers;
+   const uid=p.claimedUid,record=uid&&linked[uid];
+   if(!record||String(record.email||"").toLowerCase()!==String(p.email||"").toLowerCase())continue;
+   const teacherBase=root+"/teachers/"+uid;
+   if(record.accountType!=="principal")updates[teacherBase+"/accountType"]="principal";
+   if(!sameMap(record.classIds,scope.classIds))updates[teacherBase+"/classIds"]=Object.keys(scope.classIds).length?scope.classIds:null;
+   if(JSON.stringify(record.supervisedTeachers||{})!==JSON.stringify(scope.supervisedTeachers))updates[teacherBase+"/supervisedTeachers"]=Object.keys(scope.supervisedTeachers).length?scope.supervisedTeachers:null;
+   if(record.active!==scope.active)updates[teacherBase+"/active"]=scope.active;
+   if(!sameMap(record.classIds,scope.classIds)){
+     for(const classId of new Set([...Object.keys(record.classIds||{}),...Object.keys(scope.classIds)])){
+       if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId)||classId==="*")continue;
+       updates[root+"/classes/"+classId+"/teacherIds/"+uid]=scope.classIds[classId]===true?true:null;
+     }
+   }
  }
  if(Object.keys(updates).length)await db.ref().update(updates);
 }
 function renderPrincipalAssignments(){
- const principals=Object.entries(teacherData).filter(([,t])=>B3PrincipalScope.principal(t));
- q("principals").innerHTML=principals.length?'':'';
- principals.forEach(([pid,p])=>{
-  const teachers=Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t));
-  const chips=teachers.map(([tid,t])=>{
-   const on=(p.supervisedTeachers||{})[tid];
-   return '<label style="margin:3px 4px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-supervise-principal="'+pid+'" data-supervise-teacher="'+tid+'" '+(on?'checked':'')+'>'+safe(t.name||t.email)+'</label>';
-  }).join("");
-  q("principals").insertAdjacentHTML("beforeend",'<div class="entry"><div class="entry row"><span><b>'+safe(p.name||p.email)+'</b><small>'+safe(p.email)+'</small></span><button class="danger sm" data-delete-principal="'+pid+'">Remove</button></div><div style="margin-top:6px"><small>Supervised teachers:</small> '+chips+'</div></div>');
+ const people=Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)&&t.active!==false);
+ const principals=Object.entries(teacherData).filter(([,p])=>B3PrincipalScope.principal(p));
+ q("principals").innerHTML=principals.map(([id,p])=>'<div class="entry"><div class="entry row"><span><b>'+safe(p.name||p.email)+'</b><small>'+safe(p.email)+'</small></span><button class="danger" data-delete-principal="'+safe(id)+'">Remove</button></div><small>Select supervised teachers. Their current classes are automatically granted to this principal.</small><div class="toolgrid">'+people.map(([tid,t])=>'<label class="tool"><input type="checkbox" data-principal="'+safe(id)+'" data-supervised-teacher="'+safe(tid)+'" '+(p.supervisedTeacherIds?.[tid]===true?'checked':'')+'><span>'+safe(t.name||t.email)+'</span></label>').join('')+'</div><small>'+(p.active?'Account can sign in.':'Assign at least one teacher with a class to activate sign-in.')+'</small></div>').join('')||'<p class="hint">No principals have been added yet.</p>';
+ q("principals").querySelectorAll("[data-supervised-teacher]").forEach(box=>box.onchange=async()=>{
+   box.disabled=true;
+   try{
+     await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+box.dataset.principal+"/supervisedTeacherIds/"+box.dataset.supervisedTeacher).set(box.checked?true:null);
+     await load();q("status").textContent="Principal supervision saved.";
+   }catch(error){console.error(error);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not update principal. Try again.";}
  });
- q("principals").addEventListener("change",async e=>{
-  const cb=e.target.closest("[data-supervise-principal]");if(!cb)return;
-  const pid=cb.dataset.supervisePrincipal,tid=cb.dataset.superviseTeacher,on=cb.checked;
-  const updates={};
-  updates["b3Games/workspaces/"+WS+"/teacherInvites/"+pid+"/supervisedTeachers/"+tid]=on?true:null;
-  await db.ref().update(updates);
-  q("status").textContent=(on?"Added":"Removed")+" supervision.";
-  await load();
- },{once:true});
 }
 async function load(){
  const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
  await reconcilePrincipals(teacherData,classData);
  q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><button class="danger" data-delete-teacher="'+id+'">Delete</button></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
- q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect") && (q("toolClassSelect").innerHTML='<option value="">Choose class</option>');
- q("bulkClassSelect").innerHTML='<option value="">Choose class</option>';
- Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("bulkClassSelect").insertAdjacentHTML("beforeend",opt)});
+ q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect").innerHTML='<option value="">Choose class</option>';
+ Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
  const assignmentLines=[];
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
@@ -264,93 +226,294 @@ q("addPrincipal").onclick=async()=>{
 async function deletePrincipal(id){
  const p=teacherData[id];if(!B3PrincipalScope.principal(p))return;
  if(!confirm("Remove principal "+(p.name||p.email)+"? This revokes their access to supervised classes."))return;
- try{
-  await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+id).remove();
-  q("status").textContent="Principal removed.";
-  await load();
- }catch(e){console.error(e);q("status").textContent="Could not remove principal.";}
-}
-q("principals").addEventListener("click",e=>{
- const btn=e.target.closest("[data-delete-principal]");if(!btn)return;
- deletePrincipal(btn.dataset.deletePrincipal);
-});
-q("teachers").addEventListener("click",async e=>{
- const btn=e.target.closest("[data-delete-teacher]");if(!btn)return;
- const id=btn.dataset.deleteTeacher,v=teacherData[id];
- if(!confirm("Delete teacher "+(v&&(v.name||v.email))+"?"))return;
- await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+id).remove();
- q("status").textContent="Teacher removed.";
- await load();
-});
-q("addClass").onclick=async()=>{
- const id=key(q("classId").value),name=q("className").value.trim();
- if(!id){q("status").textContent="Enter a class ID.";return;}
- if(B3_CLASSES.includes(id)){q("status").textContent="That ID is reserved for a B3 class.";return;}
- await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).update({name:name||id,active:true,updatedAt:firebase.database.ServerValue.TIMESTAMP});
- q("classId").value="";q("className").value="";
- q("status").textContent="Class added.";
- await load();
-};
-q("classes").addEventListener("click",async e=>{
- const btn=e.target.closest("[data-delete-class]");if(!btn)return;
- const id=btn.dataset.deleteClass;
- if(!confirm("Delete class "+id+"? This does not remove students or scores."))return;
- await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).remove();
- q("status").textContent="Class removed.";
- await load();
-});
-q("assignTeacher").onclick=async()=>{
- const tid=q("teacherSelect").value,cid=q("classSelect").value;
- if(!tid||!cid){q("status").textContent="Choose both a teacher and a class.";return;}
- const updates={};
- updates["b3Games/workspaces/"+WS+"/teacherInvites/"+tid+"/classIds/"+cid]=true;
- updates["b3Games/workspaces/"+WS+"/teacherInvites/"+tid+"/active"]=true;
- await db.ref().update(updates);
- q("status").textContent="Assigned.";
- await load();
-};
-q("assignments").addEventListener("click",async e=>{
- const btn=e.target.closest("[data-unassign-teacher]");if(!btn)return;
- const tid=btn.dataset.unassignTeacher,cid=btn.dataset.unassignClass;
- const updates={};
- updates["b3Games/workspaces/"+WS+"/teacherInvites/"+tid+"/classIds/"+cid]=null;
- const remaining=Object.keys(teacherData[tid]?.classIds||{}).filter(id=>id!==cid&&teacherData[tid].classIds[id]);
- if(!remaining.length)updates["b3Games/workspaces/"+WS+"/teacherInvites/"+tid+"/active"]=false;
- await db.ref().update(updates);
- q("status").textContent="Unassigned.";
- await load();
-});
-// Bulk upload
-q("bulkPreview").onclick=function(){
- const lines=q("bulkInput").value.trim().split("\n").filter(Boolean);
- const rows=lines.map(l=>{const parts=l.split(/\t|,/);return{name:(parts[0]||'').trim(),passcode:(parts[1]||'').trim()}}).filter(r=>r.name);
- if(!rows.length){q("bulkPreviewArea").innerHTML='<small>Nothing to preview.</small>';return;}
- q("bulkPreviewArea").innerHTML='<div class="bulk-preview">Will upload '+rows.length+' student(s):\n'+rows.map(r=>r.name+(r.passcode?' (passcode set)':' (no passcode)')).join("\n")+'</div>';
-};
-q("bulkUpload").onclick=async function(){
- const cid=q("bulkClassSelect").value;
- if(!cid){q("status").textContent="Choose a class first.";return;}
- const lines=q("bulkInput").value.trim().split("\n").filter(Boolean);
- const rows=lines.map(l=>{const parts=l.split(/\t|,/);return{name:(parts[0]||'').trim(),passcode:(parts[1]||'').trim()}}).filter(r=>r.name);
- if(!rows.length){q("status").textContent="Nothing to upload.";return;}
- if(!confirm("Upload "+rows.length+" student(s) to class "+cid+"?"))return;
- q("status").textContent="Uploading…";
- let ok=0,fail=0;
- for(const row of rows){
-  const sid=key(row.name);
-  if(!sid){fail++;continue;}
-  try{
-   const updates={};
-   updates["b3Games/students/"+sid+"/profile"]={name:row.name,active:true,classId:cid,updatedAt:firebase.database.ServerValue.TIMESTAMP};
-   updates["b3Games/workspaces/"+WS+"/classes/"+cid+"/members/"+sid]={name:row.name,active:true};
-   await db.ref().update(updates);
-   ok++;
-  }catch(e){fail++;console.error(e);}
+ const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+id]:null},uid=p.claimedUid;
+ if(uid){
+   updates[root+"/teachers/"+uid]=null;
+   Object.keys(classData).forEach(c=>{updates[root+"/classes/"+c+"/teacherIds/"+uid]=null});
  }
- q("status").textContent="Done: "+ok+" uploaded"+(fail?", "+fail+" failed":"");
- q("bulkPreviewArea").innerHTML="";
- await load();
+ await db.ref().update(updates);q("status").textContent="Principal removed.";await load();
+}
+q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+// ---- Unassign / delete (owner only; this page is gated to the owner account) ----
+const B3_CLASSES=["et","wt"];
+// A signed-in teacher's own record, found by their invitation's claimedUid or by matching email.
+async function teacherUidFor(inviteId){
+ const inv=teacherData[inviteId]||{};if(inv.claimedUid)return inv.claimedUid;
+ const all=(await db.ref("b3Games/workspaces/"+WS+"/teachers").once("value")).val()||{};
+ const email=String(inv.email||"").toLowerCase();
+ return Object.keys(all).find(uid=>String(all[uid]?.email||"").toLowerCase()===email)||"";
+}
+async function unassign(inviteId,classId){
+ const t=teacherData[inviteId]||{},cname=classData[classId]?.name||classId;
+ if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId+"/classIds/"+classId]:null};
+ const hasRemaining=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);
+ if(!hasRemaining)updates[root+"/teacherInvites/"+inviteId+"/active"]=false;
+ if(uid){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;if(!hasRemaining)updates[root+"/teachers/"+uid+"/active"]=false;updates[root+"/classes/"+classId+"/teacherIds/"+uid]=null;}
+ await db.ref().update(updates);q("status").textContent="Unassigned.";await load();
+}
+async function deleteTeacher(inviteId){
+ const t=teacherData[inviteId]||{};
+ if(!confirm("Delete teacher "+(t.name||t.email)+"? They will lose access to all their classes. Their classes and students stay."))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId]:null};
+ if(uid){updates[root+"/teachers/"+uid]=null;Object.keys(classData).forEach(c=>{if(classData[c]?.teacherIds?.[uid])updates[root+"/classes/"+c+"/teacherIds/"+uid]=null;});}
+ await db.ref().update(updates);q("status").textContent="Teacher deleted.";await load();
+}
+async function deleteClass(classId){
+ if(B3_CLASSES.includes(classId))return;
+ const cname=classData[classId]?.name||classId;
+ if(!confirm("Are you sure you want to delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone."))return;
+ const root="b3Games/workspaces/"+WS,updates={[root+"/classes/"+classId]:null,[root+"/contentGrants/"+classId]:null};
+ Object.keys(classData[classId]?.members||{}).forEach(sid=>{updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]=null;});
+ Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId]){updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teacherInvites/"+tid+"/active"]=false;}});
+ const teachers=(await db.ref(root+"/teachers").once("value")).val()||{};
+ Object.entries(teachers).forEach(([uid,t])=>{if(t?.classIds?.[classId]){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teachers/"+uid+"/active"]=false;}});
+ await db.ref().update(updates);q("status").textContent="Class deleted.";await load();
+}
+document.addEventListener("click",e=>{
+ const u=e.target.closest("[data-unassign-teacher]"),dt=e.target.closest("[data-delete-teacher]"),dc=e.target.closest("[data-delete-class]"),dp=e.target.closest("[data-delete-principal]");
+ const run=p=>p.catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+ if(u)run(unassign(u.dataset.unassignTeacher,u.dataset.unassignClass));
+ if(dt)run(deleteTeacher(dt.dataset.deleteTeacher));
+ if(dc)run(deleteClass(dc.dataset.deleteClass));
+ if(dp)run(deletePrincipal(dp.dataset.deletePrincipal));
+});
+async function renderToolGrants(){
+ const classId=q("toolClassSelect").value;
+ if(!classId){q("toolList").innerHTML='<p class="hint" style="margin-top:12px">Choose a class above to see its tools.</p>';q("resourceList").innerHTML="";return}
+ const snap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants").once("value"),grants=snap.val()||{};
+ q("toolList").innerHTML=TOOL_GROUPS.map(([g,title,desc])=>{const items=PLATFORM_TOOLS.filter(t=>t[2]===g);if(!items.length)return"";return '<div class="listlabel">'+title+'</div><p class="hint" style="margin:0 0 4px">'+desc+'</p><div class="toolgrid">'+items.map(([id,name])=>'<label class="tool"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span>'+safe(name)+'</span><span class="on">ON</span></label>').join("")+'</div>'}).join("");
+ q("toolList").querySelectorAll("[data-tool]").forEach(box=>box.onchange=()=>db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants/"+box.dataset.tool).set(box.checked).then(()=>{q("status").textContent="Saved ✓"}).catch(err=>{console.error(err);box.checked=!box.checked;q("status").textContent="Could not save. Please try again."}));
+ await renderResources(classId);
+}
+// Shorashim: B3's own lists live at the base path; every other class has its own copy under classes/<id>.
+const SHORASHIM_ROOT="posukPractice/shorashimLearning";
+function describeLimit(l){return "Perek "+(l.startPerek||1)+", Posuk "+(l.startPosuk||1)+" through Perek "+l.endPerek+", Posuk "+l.endPosuk}
+function countWords(catalog){return ["shorashim","prefix","suffix"].reduce((n,t)=>n+(Array.isArray(catalog?.[t])?catalog[t].length:0),0)}
+async function renderResources(classId){
+ if(!classId||["et","wt"].includes(classId)){q("resourceList").innerHTML=classId?'<small>This is one of your own B3 classes. It already uses your lists.</small>':"";return}
+ const classPath="b3Games/workspaces/"+WS+"/classes/"+classId;
+ const storyPath="b3Games/workspaces/"+WS+"/contentGrants/"+classId+"/yiddishWineMerchant";
+ const [snap,limitSnap,storySnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),db.ref(classPath+"/posukPracticeLimit").once("value"),db.ref(storyPath).once("value")]),count=countWords(snap.val()),limit=limitSnap.val(),hasStory=storySnap.val()===true;
+ q("resourceList").innerHTML='<div class="entry"><b>🌳 Shorashim words</b><small>'+(count?count+" words in this class":"Empty. The teacher has not added any words yet.")+'</small><button id="copyShorashim" style="margin-top:8px">Give this class a copy of my Shorashim words</button><small id="copyShorashimMsg"></small></div>'+
+  '<div class="entry"><b>📜 Posuk Practice pesukim</b><small>'+(limit?describeLimit(limit):"None open yet. The teacher has not chosen any pesukim.")+'</small><button id="copyPesukim" style="margin-top:8px">Open the same pesukim my classes have</button><small id="copyPesukimMsg"></small></div>'+
+  '<div class="entry"><b>ייִדיש Yiddish story “The Wine Merchant”</b><small>'+(hasStory?"This class has the story. Its teacher chooses which steps are open.":"Not given. Students see “Your teacher has not added a Yiddish story yet.”")+'</small><button id="toggleStory" style="margin-top:8px">'+(hasStory?"Take the story away from this class":"Give this class the Wine Merchant story")+'</button><small id="toggleStoryMsg"></small></div>';
+ q("toggleStory").onclick=async()=>{
+  if(hasStory&&!confirm("Take the Yiddish story away from this class? Their students will no longer be able to practice it."))return;
+  q("toggleStory").disabled=true;
+  try{await db.ref(storyPath).set(hasStory?null:true);await renderResources(classId);q("toggleStoryMsg").textContent=hasStory?"Removed ✓":"Given ✓ The teacher can now open steps for their students.";}
+  catch(err){console.error(err);q("toggleStoryMsg").textContent="Could not save. Please try again.";q("toggleStory").disabled=false}
+ };
+ q("copyPesukim").onclick=async()=>{
+  if(limit&&!confirm("This class already has pesukim open. Replace them with the same pesukim your classes have?"))return;
+  q("copyPesukim").disabled=true;q("copyPesukimMsg").textContent="Copying…";
+  try{
+   // B3's window lives in posukPractice/settings; "no limit" there means all of Bereishis.
+   const mine=(await db.ref("posukPractice/settings/practiceLimit").once("value")).val();
+   const next=mine&&(mine.endPerek||mine.perek)?{startPerek:+mine.startPerek||1,startPosuk:+mine.startPosuk||1,endPerek:+(mine.endPerek||mine.perek),endPosuk:+(mine.endPosuk||mine.posuk)}:{startPerek:1,startPosuk:1,endPerek:50,endPosuk:26};
+   await db.ref(classPath+"/posukPracticeLimit").set({...next,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+   await renderResources(classId);q("copyPesukimMsg").textContent="Done ✓ The teacher can change this class's pesukim any time.";
+  }catch(err){console.error(err);q("copyPesukimMsg").textContent="Could not copy. Please try again.";q("copyPesukim").disabled=false}
+ };
+ q("copyShorashim").onclick=async()=>{
+  if(count&&!confirm("This class already has "+count+" words. Replace them with a copy of your words?"))return;
+  q("copyShorashim").disabled=true;q("copyShorashimMsg").textContent="Copying…";
+  try{
+   const [catalog,lists]=await Promise.all([db.ref(SHORASHIM_ROOT+"/catalog").once("value"),db.ref(SHORASHIM_ROOT+"/settings/namedLists").once("value")]);
+   await db.ref().update({[SHORASHIM_ROOT+"/classes/"+classId+"/catalog"]:catalog.val()||null,[SHORASHIM_ROOT+"/classes/"+classId+"/settings/namedLists"]:lists.val()||null});
+   await renderResources(classId);q("copyShorashimMsg").textContent="Copied ✓ The teacher can now change their copy without affecting yours.";
+  }catch(err){console.error(err);q("copyShorashimMsg").textContent="Could not copy. Please try again.";q("copyShorashim").disabled=false}
+ };
+}
+q("toolClassSelect").onchange=renderToolGrants;
+
+// ---- Bulk upload -------------------------------------------------------
+// Classes, teacher invites and principal invites are written exactly as the
+// single-add controls above write them. Students are created through the
+// trusted funTorahManageStudents function so the passcode is stored only in
+// private storage (never in a public profile) and sign-in works immediately.
+const BULK_TEMPLATE_ROWS=[
+  "type,name,email,passcode,class",
+  "class,Grade 5,,,",
+  "teacher,Rabbi Cohen,rabbicohen@gmail.com,,Grade 5",
+  "principal,Mrs. Levi,mrslevi@gmail.com,,",
+  "student,Moshe Goldberg,,pass123,Grade 5",
+  "student,Chana Stern,,pass456,Grade 5",
+];
+const BULK_TYPES=["teacher","principal","student","class"];
+const MANAGE_STUDENTS_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents";
+q("bulkDownloadTemplate").onclick=function(e){
+  e.preventDefault();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([BULK_TEMPLATE_ROWS.join("\n")],{type:"text/csv"}));
+  a.download="bulk-upload-template.csv";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
+function splitCSVLine(line){
+  const fields=[];let cur="",inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(ch===","&&!inQ){fields.push(cur.trim());cur="";}
+    else cur+=ch;
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+function parseBulkCSV(text){
+  const lines=String(text||"").replace(/^﻿/,"").replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
+  if(!lines.length)return[];
+  const header=splitCSVLine(lines[0]).map(h=>h.toLowerCase());
+  const col=k=>header.indexOf(k);
+  // "password" is accepted as an older name for the passcode column.
+  const passCol=col("passcode")>=0?"passcode":"password";
+  return lines.slice(1).map((line,i)=>{
+    const fields=splitCSVLine(line);
+    const get=k=>col(k)>=0?String(fields[col(k)]||"").trim():"";
+    return{row:i+2,type:get("type").toLowerCase(),name:get("name"),email:get("email").toLowerCase(),passcode:get(passCol),cls:get("class")};
+  }).filter(r=>r.type||r.name);
+}
+const bulkNameKey=s=>String(s||"").trim().toLowerCase();
+function bulkValidate(rows){
+  const errors=[];
+  const knownClasses=new Set(Object.values(classData||{}).map(c=>bulkNameKey(c&&c.name)));
+  rows.forEach(r=>{if(r.type==="class"&&r.name)knownClasses.add(bulkNameKey(r.name));});
+  rows.forEach(r=>{
+    const at="Row "+r.row+": ";
+    if(!BULK_TYPES.includes(r.type)){errors.push(at+'unknown type "'+r.type+'"');return;}
+    if(!r.name){errors.push(at+"missing name");return;}
+    if(r.name.length>100)errors.push(at+"name is longer than 100 characters");
+    if((r.type==="teacher"||r.type==="principal")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))errors.push(at+r.type+" needs a valid email");
+    if(r.type==="student"){
+      if(!r.cls)errors.push(at+"student needs a class");
+      if(!r.passcode)errors.push(at+"student needs a passcode");
+      else if(r.passcode.length>100)errors.push(at+"passcode is longer than 100 characters");
+    }
+    if(r.cls&&(r.type==="student"||r.type==="teacher")&&!knownClasses.has(bulkNameKey(r.cls)))errors.push(at+'class "'+r.cls+'" does not exist and is not in this file');
+  });
+  return errors;
+}
+function bulkReset(){
+  q("bulkPreviewArea").style.display="none";
+  q("bulkFile").value="";
+  delete q("bulkFile")._parsedRows;
+}
+q("bulkPreview").onclick=function(){
+  const file=q("bulkFile").files[0];
+  if(!file){q("status").textContent="Choose a CSV file first.";return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const rows=parseBulkCSV(e.target.result);
+    if(!rows.length){q("status").textContent="No data rows found in CSV.";return;}
+    const errors=bulkValidate(rows);
+    const count=t=>rows.filter(r=>r.type===t).length;
+    const summary=count("teacher")+" teacher(s), "+count("principal")+" principal(s), "+count("class")+" class(es), "+count("student")+" student(s)";
+    const errHtml=errors.length?'<span style="color:#b91c1c">&#x26A0;&#xFE0F; '+errors.length+' issue(s) found. Fix the file and preview again:</span><ul style="margin:6px 0 0;padding-left:18px">'+errors.map(e=>'<li>'+safe(e)+'</li>').join("")+'</ul><br>':"";
+    q("bulkSummary").innerHTML=errHtml+"Found: "+safe(summary);
+    const td=v=>'<td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+v+'</td>';
+    // Passcodes are not shown on screen; the preview only confirms one is set.
+    const tbody=rows.map(r=>'<tr>'+td(r.row)+td(safe(r.type))+td(safe(r.name))+td(r.type==="student"?(r.passcode?"passcode set":"&mdash;"):safe(r.email||"—"))+td(safe(r.cls||"—"))+'</tr>').join("");
+    q("bulkTable").innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr>'+["Row","Type","Name","Email / Passcode","Class"].map(h=>'<th style="text-align:left;padding:7px 10px;background:#f1f5f9;border-bottom:2px solid #e2e8f0">'+h+'</th>').join("")+'</tr></thead><tbody>'+tbody+'</tbody></table>';
+    q("bulkPreviewArea").style.display="";
+    q("bulkLog").style.display="none";
+    q("bulkProgress").style.display="none";
+    q("bulkImport").disabled=errors.length>0;
+    q("bulkCancel").disabled=false;
+    q("bulkFile")._parsedRows=errors.length?null:rows;
+  };
+  reader.readAsText(file);
+};
+q("bulkCancel").onclick=bulkReset;
+async function bulkCreateStudent(classId,name,passcode){
+  const response=await fetch(MANAGE_STUDENTS_URL,{
+    method:"POST",signal:AbortSignal.timeout(15000),
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},
+    body:JSON.stringify({action:"create",classId,name,passcode})
+  });
+  let result={};try{result=await response.json();}catch(_){}
+  if(!response.ok)throw new Error(result.error||"Could not create the student.");
+  return result;
+}
+q("bulkImport").onclick=async function(){
+  const rows=q("bulkFile")._parsedRows;
+  if(!rows){q("status").textContent="Preview the CSV first.";return;}
+  q("bulkImport").disabled=true;q("bulkCancel").disabled=true;q("bulkPreview").disabled=true;
+  const prog=q("bulkProgress"),logEl=q("bulkLog"),log=[];
+  prog.style.display="";logEl.style.display="";logEl.innerHTML="";
+  const root="b3Games/workspaces/"+WS,TS=firebase.database.ServerValue.TIMESTAMP,total=rows.length;
+  let done=0,failed=0;
+  const addLog=(msg,ok)=>{if(!ok)failed++;log.push((ok?"&#x2705; ":"&#x26A0;&#xFE0F; ")+safe(msg));logEl.innerHTML=log.join("<br>");logEl.scrollTop=logEl.scrollHeight;};
+  const step=()=>{prog.textContent="Importing... "+done+" / "+total;};
+  const ofType=t=>rows.filter(r=>r.type===t);
+  try{
+    step();
+    const liveClasses=(await db.ref(root+"/classes").once("value")).val()||{};
+    const classNameToId={};
+    Object.entries(liveClasses).forEach(([id,c])=>{if(c&&c.name)classNameToId[bulkNameKey(c.name)]=id;});
+    // Classes first, so the rows below can refer to them by name.
+    for(const r of ofType("class")){
+      const lk=bulkNameKey(r.name);
+      if(classNameToId[lk]){addLog('Class "'+r.name+'" already exists (skipped)',true);done++;step();continue;}
+      // Names without Latin letters or digits produce an empty key; never write to the classes root.
+      let cid=key(r.name)||"class";
+      if(liveClasses[cid]||(await db.ref(root+"/classes/"+cid).once("value")).exists())cid+="_"+Date.now().toString().slice(-6);
+      try{
+        await db.ref(root+"/classes/"+cid).set({name:r.name,active:true});
+        classNameToId[lk]=cid;liveClasses[cid]={name:r.name,active:true};
+        addLog('Class "'+r.name+'" created',true);
+      }catch(err){addLog('Class "'+r.name+'": '+err.message,false);}
+      done++;step();
+    }
+    // Teachers: an invite, active once a class is assigned (same as Add teacher + Assign).
+    for(const r of ofType("teacher")){
+      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
+      try{
+        if((await ref.once("value")).exists()){addLog("Teacher "+r.email+" already exists (skipped; assign classes above)",true);done++;step();continue;}
+        const classId=r.cls?classNameToId[bulkNameKey(r.cls)]:"";
+        if(r.cls&&!classId){addLog("Teacher "+r.email+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
+        const invite={email:r.email,name:r.name||r.email,role:"teacher",active:!!classId,updatedAt:TS};
+        if(classId)invite.classIds={[classId]:true};
+        await ref.set(invite);
+        addLog("Teacher "+r.name+" ("+r.email+") added"+(classId?" and assigned to "+r.cls:", inactive until a class is assigned"),true);
+      }catch(err){addLog("Teacher "+r.email+": "+err.message,false);}
+      done++;step();
+    }
+    // Principals: same record as Add principal; supervision is chosen above afterwards.
+    for(const r of ofType("principal")){
+      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
+      try{
+        if((await ref.once("value")).exists()){addLog("Principal "+r.email+" already exists (skipped)",true);done++;step();continue;}
+        await ref.set({email:r.email,name:r.name||r.email,role:"principal",accountType:"principal",active:false,updatedAt:TS});
+        addLog("Principal "+r.name+" ("+r.email+") added; select supervised teachers to activate",true);
+      }catch(err){addLog("Principal "+r.email+": "+err.message,false);}
+      done++;step();
+    }
+    // Students: created by the trusted backend, one request per student.
+    for(const r of ofType("student")){
+      const classId=classNameToId[bulkNameKey(r.cls)];
+      if(!classId){addLog("Student "+r.name+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
+      const members=(liveClasses[classId]&&liveClasses[classId].members)||{};
+      if(Object.values(members).some(m=>m&&bulkNameKey(m.name)===bulkNameKey(r.name))){addLog("Student "+r.name+" is already in "+r.cls+" (skipped)",true);done++;step();continue;}
+      try{
+        const result=await bulkCreateStudent(classId,r.name,r.passcode);
+        ((liveClasses[classId]=liveClasses[classId]||{}).members=members)[result.studentId||r.name]={name:r.name,active:true};
+        addLog("Student "+r.name+" added to "+r.cls,true);
+      }catch(err){addLog("Student "+r.name+": "+err.message,false);}
+      done++;step();
+    }
+    prog.textContent="Done! "+done+" row(s) processed"+(failed?", "+failed+" need attention (see list below).":".");
+  }catch(err){
+    console.error(err);
+    prog.textContent="Import stopped: "+err.message+" ("+done+" of "+total+" rows processed).";
+  }finally{
+    delete q("bulkFile")._parsedRows;
+    q("bulkFile").value="";
+    q("bulkCancel").disabled=false;q("bulkPreview").disabled=false;
+    await load();
+  }
+};
+// ---- End bulk upload ---------------------------------------------------
 
  // ---- Students -------------------------------------------------------
  let studentData={};
