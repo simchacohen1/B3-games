@@ -1,0 +1,177 @@
+# Kriah Assessment Center — Issue #624
+
+This is a staging-only implementation. No production data access, deployment,
+rules change, paid service activation or migration is included. The draft PR
+does not authorize a merge or deployment. The UI lives at
+`kriah-assessment/index.html`; no live homepage links are added.
+
+## Implemented behavior
+
+- Teacher-defined library with editable type, level, Hebrew text, acceptable
+  pronunciation, scoring unit and self-correction policy. Optional original
+  starter exercises cover all 22 letters, five finals, common confusions,
+  standard vowels/dots, syllables and words. These are not a standardized scale.
+  Types also include phrases, sentences, pesukim/Tehillim and fluency. Teachers
+  supply their own passage; no external corpus or copyrighted platform is copied.
+- Assign immutable exercise snapshots to selected active fictional class members.
+  Later library edits do not alter earlier attempts.
+- Permission checkbox, timer, microphone denial/retry, original playback,
+  retry before upload, upload progress and explicit submission. A 5-minute /
+  2-MiB limit is enforced. Safari MP4, Chromium WebM and Ogg are supported by
+  format selection; real Safari/iPad compatibility remains unverified.
+- IndexedDB recovery of unsent original Blobs and teacher draft marks. When an
+  upload may have started, the UI keeps those same bytes for idempotent retry.
+  It does not silently replace the first original. A new attempt gets its own
+  record and object. Clear local drafts on explicit sign-out. This is device
+  storage: do not use real pupil recordings in this draft.
+- RTL Hebrew grapheme rendering, separate selectable letter/vowel/dot/word
+  targets, Shift-click span selection, error/correct marks, correction/note,
+  optional teacher-tapped playback time, edit/remove/undo, save and finalize.
+  No ASR, automatic alignment, trimming, voice processing or third-party audio.
+- Accuracy counts only explicitly marked scoring units. Unmarked units remain
+  not assessed. Self-correction can count as an error or correct observation.
+  WPM is optional and requires a teacher-confirmed full-passage duration.
+- Per-student attempt history, date/level/status, accuracy bars, category counts,
+  letter and vowel frequencies, skill filter, explicit teacher mastery decisions,
+  optional sharing of final feedback/mastery decisions, bounded class summary,
+  and browser Print / Save PDF. Private marking notes are never in student views.
+
+## Architecture and isolation
+
+The only changes are new files. Existing Homework, Chazara, Pasuk Practice,
+sign-in, rewards, multiplayer and Firebase rules are untouched. Existing
+Homework recorder code is coupled to short messaging; Chazara's upload helper
+assumes client Firebase Storage writes/download links. The new service requires
+server-authorized private audio without permanent URLs, so those upload flows
+were inspected but are not modified or reused unsafely.
+
+Pure model: `kriah-assessment/core.js`. Its byte-identical backend copy is covered
+by a parity test. Browser: `app.js`, `client.js`, `recorder.js`, `style.css`.
+Backend: `backend/kriah-staging/` is a separate, undeployed Functions codebase.
+`firebase.kriah-staging.json` names only that codebase and has no rules targets.
+
+The staging server refuses any project other than `fun-torah-tools-staging`.
+The UI rejects production hosts/config and never imports `firebase-config.js`.
+The local demo requires localhost plus `?fixture=1`; the fixture-identity header
+is accepted only by the loopback development server, never by Firebase.
+
+Every service action rechecks current class access, membership/profile and tool
+grant. Teacher ID tokens must be verified Google identities; active teacher
+records grant only their current `classIds`. Current principal records use the
+same owner-maintained, derived class IDs; they get no administrator shortcut.
+The staging owner / active admins can enumerate enabled fictional classes only.
+Students use existing Firebase custom-token claims `b3StudentRole`,
+`b3StudentId`, `b3ClassId`, with current active central memberships required.
+The HTTP wrapper calls `verifyIdToken(token, true)` to check token revocation.
+
+Only `kriah-test-*` classes with `active: true`, `kriahSynthetic: true` and
+`toolGrants.kriah-assessment: true` are accepted. Student profiles must also have
+`active: true`, `kriahSynthetic: true`; their matching central membership and
+class member row must explicitly be active. Legacy memberships are not guessed.
+These requirements intentionally prevent this draft from accepting real classes.
+
+### Data schema
+
+All metadata is server-only under the existing private, client-denied tree:
+
+```
+b3Private/kriahAssessmentCenter/classes/{classId}/
+  library/{exerciseId}
+    title, text(NFD), type, level, pronunciation, unitType,
+    countSelfCorrection
+  students/{studentId}/records/{timestamp-uuid}
+    exercise(snapshot), studentId, assignedBy, createdAt,
+    status(assigned|submitted|in_progress|reviewed|deleting), revision,
+    audio(path,sha256,size,type,duration), submittedAt,
+    marks[{unitId,category,correction,note,time}], timing,
+    feedback, recommendation, shareFeedback, summary,
+    gradedBy, reviewedAt, parentId?, retryId?
+  students/{studentId}/mastery/{letter_or_nekudah_codepoint}
+    kind, label, state(mastered|needs-practice|not-assessed),
+    shared, updatedAt, teacherId
+```
+
+Audio is **not** in RTDB or the existing Firebase Storage bucket. The adapter
+requires the separate GCS bucket
+`fun-torah-tools-staging-kriah-private`, with uniform bucket access and enforced
+public-access prevention. It checks both bucket properties for every audio
+operation. The server service account needs object create/read/delete plus
+bucket metadata read; pupils/teachers need no GCS IAM roles. Objects are
+`kriah/{classId}/{studentId}/{attemptId}`. Conditional generation-zero creation
+and SHA-256 checks preserve the original through concurrent requests. No
+download tokens, public object links or signed URL cache are created.
+
+Current staging rules/IAM have not been remotely verified. Before deployment,
+verify the existing private RTDB tree remains client-denied and provision the
+dedicated private bucket in the staging project. Do not deploy broad new rules.
+
+### Reads, costs and retention
+
+There are no RTDB listeners, background polls, automatic audio downloads, or AI
+calls. Lists use key pagination (25 records plus one lookahead). Class reports
+explicitly load at most 25 records per selected class member. Library/member
+views cap at 100; this draft is for small test classes. The UI labels partial
+history and mixed scoring units. It does not claim to have read all history when
+more pages exist. Metadata includes original exercise/marks within a bounded
+record; audio bytes are stored separately. Original bytes download only after
+an explicit Play/Load action. Upload base64 adds approximately 33% HTTP overhead
+and is limited to one small original per attempt; this can later be replaced by
+a private resumable transport if measurements justify it.
+
+Synthetic decoded response sizes and read paths are measured in the service
+tests; these are **not Firebase billing or authenticated staging measurements**.
+Max 2 function instances limits concurrency, not total spend. No billing setup
+was activated. Small fictional fixtures are the only permitted data.
+
+Retention in this draft is explicit teacher deletion, not an unimplemented
+automatic expiry promise. Delete removes the record and the deterministic audio
+object, including interrupted-upload orphans. Deletion has a resumable tombstone
+if storage fails. Local recovery drafts are removed after confirmed save/submit
+or explicit sign-out; clearing browser site data also removes them. Before any
+real-pupil release, the owner must choose retention/backup policy and validate
+full student removal. Staging test records should be deleted after review.
+
+## Verification and review
+
+Local commands:
+
+```
+node --test tests/kriah-assessment.test.cjs
+node scripts/kriah-fixture.cjs
+python tests/kriah-browser.py
+```
+
+Open the printed loopback URL. Use the fictional identity selector (two teachers
+and isolated ET/WT test classes). The local service stores data/audio in memory;
+restarting it clears server fixtures. IndexedDB recovery stays in that browser.
+The demo never talks to Firebase. The Playwright script uses a browser fake
+microphone, simulates an upload outage and page reload, checks manual marking,
+reports, phone width, PDF, microphone denial and direct unauthorized calls.
+
+Local Node results: **17 passed, 0 failed**. Local browser launch is blocked by
+the workspace's Chromium `socket(): Operation not permitted`; no local screenshot
+or real-browser success is claimed. A dedicated GitHub PR workflow runs the same
+tests plus the browser journey and uploads fictional screenshots/PDF as artifacts.
+See PR checks for the actual result; a configured test is not a passing test.
+
+### Separate staging approval gate
+
+No staging deploy was performed because this task explicitly forbids deployment
+without owner approval. For a remote authenticated demonstration, approval is
+needed to:
+
+1. Provision the dedicated private staging bucket and least-privilege service
+   account access; enable only already-approved Firebase/Cloud services.
+2. Deploy only `functions:kriah-staging` to `fun-torah-tools-staging` from the
+   reviewed draft commit, and publish the new page on an isolated staging preview.
+   Do not deploy rules or other functions. Set the staging GCLOUD_PROJECT during
+   local source analysis as needed; the service rejects all other projects.
+3. Provision two fictional Google teachers and two fictional custom-token
+   students with `kriah-test-*` classes/profile flags as specified above.
+   Never put passwords, ID tokens or passcodes into GitHub or this document.
+4. Verify authenticated assign → record → mark → report, direct class/student
+   denial, revoked teacher/member/token access, storage/RTDB direct denial,
+   real Safari/iPad, and measured read/audio traffic, then delete the fixtures.
+
+Production enablement requires separate work and approval: this draft deliberately
+rejects production. No live Firebase permissions should be loosened to make it run.
