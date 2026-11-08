@@ -137,7 +137,8 @@
       await stateRef.set(row);
       if(serial!==generation)return;
       clearInterval(heartbeat); heartbeat = null;
-      ownRevision = m === C.MODES.INDEPENDENT ? null : revision;
+      // Follow once is a single send: only Locked is kept alive, so a Free send expires on its own.
+      ownRevision = m === C.MODES.LOCKED ? revision : null;
       if (ownRevision) {
         const ref = stateRef, classId = current, uid = teacher.user.uid, publicKey = teacher.publicKey;
         heartbeat = setInterval(async () => {
