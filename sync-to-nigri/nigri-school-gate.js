@@ -13,6 +13,8 @@
   const script = document.currentScript;
   const base = new URL('../', script && script.src || location.href); // site root
   const panelOnly = !!(script && script.dataset.mode === 'panel');
+  // data-owner-only="1": older pages that still sync with the service's own account; teachers use School Marks instead.
+  const ownerOnly = !!(script && script.dataset.ownerOnly === '1');
   let settle;
   const ready = new Promise(resolve => { settle = resolve; });
   window.B3NigriGate = { ready };
@@ -90,8 +92,10 @@
         if (first) { first = false; settle({ allowed: false, reason: 'signed-out' }); }
         return;
       }
-      const result = await window.B3SchoolScope.checkNigri({ db, user, workspaceId });
-      if (result.allowed) unlock(); else cover(window.B3SchoolScope.message(result.reason), false);
+      let result = await window.B3SchoolScope.checkNigri({ db, user, workspaceId });
+      if (ownerOnly && result.allowed && result.reason !== 'owner') result = Object.assign({}, result, { allowed: false, reason: 'owner-only' });
+      if (result.allowed) unlock();
+      else cover(result.reason === 'owner-only' ? 'This older page is for the owner. Use School Marks → Nigri to sync your marks.' : window.B3SchoolScope.message(result.reason), false);
       window.B3NigriGate.result = result;
       if (first) { first = false; settle(result); }
     });

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script><script src="sync-to-nigri/nigri-school-gate.js?v=20261107"></script>
+<head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script><script src="sync-to-nigri/nigri-school-gate.js?v=20261107"></script><script src="sync-to-nigri/nigri-auth.js"></script><script src="sync-to-nigri/nigri-connect.js?v=20261108"></script>
 <meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,6 +22,7 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:800;cursor:point
 <body><div class="wrap">
 <a class="back" href="sync-to-nigri/school-marks.html">← Back to School Marks</a>
 <h1>A Chossid is a Lamdan — Weekly Marks</h1>
+<div data-nigri-connect hidden></div>
 <div class="banner">These are reviewable drafts. Edit any score or comment before syncing. Nothing is saved to Nigri until you press the green button.</div>
 <div class="card">
 <h2 style="margin-top:0">Nigri Mark Details</h2>
@@ -84,14 +85,16 @@ async function syncClass(id,btn){
  const students=rows.map((r,i)=>{const raw=r.querySelector('[data-mark]').value.trim();return{name:cls.students[i][0],mark:raw===''?null:Number(raw),attendance:'present',comment:r.querySelector('[data-comment]').value.trim()||undefined}});
  const missing=students.filter(s=>s.mark===null||!Number.isFinite(s.mark));
  if(missing.length){status.textContent='Enter a mark for every student before syncing.';return;}
+ const blocked=await (window.NigriConnect?window.NigriConnect.cannotSync():(window.B3NigriGate&&(window.B3NigriGate.result||{}).reason!=='owner'?'The Nigri sync helper did not load. Refresh the page.':null));
+ if(blocked){status.textContent=blocked;return;}
  const date=document.getElementById('date').value;
  const body={class_section:cls.label,topic:document.getElementById('topicPreview').value.trim()||'A Chossid is a Lamdan',test_name:document.getElementById('namePreview').value.trim()||'Parshas Noach',type:'test',date,description:document.getElementById('descriptionPreview').value.trim(),students};
  if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
  btn.disabled=true;status.textContent='Syncing…';
  try{
-  const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)});
+  const res=(window.NigriConnect?(await window.NigriConnect.sendMarks(body,()=>fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)}))).response:await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)}));
   const out=await res.json().catch(()=>({}));
-  status.textContent=res.ok&&out.status==='success'?'Saved to Nigri'+(out.test_id?' (mark #'+out.test_id+')':''):'Not saved: '+(out.detail||res.status);
+  status.textContent=res.ok&&out.status==='success'?'Saved to Nigri'+(out.test_id?' (mark #'+out.test_id+')':''):'Not saved: '+(out.detail||out.error||res.status);
  }catch(e){status.textContent='Could not reach Nigri sync: '+e.message}finally{btn.disabled=false}
 }
 render();
