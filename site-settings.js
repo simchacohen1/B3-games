@@ -1413,6 +1413,17 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
   else showBackToHome();
 
+  // ---- Student class lookup (for student login pages) ---------------------
+  // After a successful name+passcode login, call this to get the student's
+  // assigned class IDs. Returns array of classId strings. Falls back to
+  // legacyClassId if the student has no workspace record yet.
+  async function getStudentAssignedClassIds(db, studentId, legacyClassId) {
+    if (window.B3StudentScope && db && studentId) {
+      return B3StudentScope.getStudentClassIds(db, WORKSPACE_ID, studentId, legacyClassId);
+    }
+    return legacyClassId ? [legacyClassId] : [];
+  }
+
   window.B3SiteSettings = {
     defaultSettings: cloneDefaultSettings(),
     normalizeSettings: normalizeSettings,
@@ -1455,7 +1466,8 @@
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,
     openActAsStudentPicker: openActAsStudentPicker,
-    openMyDemoStudent: openMyDemoStudent
+    openMyDemoStudent: openMyDemoStudent,
+    getStudentAssignedClassIds: getStudentAssignedClassIds
   };
   // Pages that never ask about sign-in still need their sign-in screens shown.
   if (authChecking) {

@@ -10,6 +10,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script>
 <script src="principal-scope.js?v=20261025"></script>
+<script src="student-scope.js?v=20261108"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -87,6 +88,22 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <h3 class="tools-title">Class Content</h3>
 <p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
 <div id="resourceList"></div></section>
+
+<section class="card" id="studentsCard">
+<div class="card-head"><h2>Students</h2></div>
+<p class="hint">Assign a student to a school, then to one or more classes within that school.</p>
+<div class="formrow">
+ <select id="studentSelect"><option value="">Choose student…</option></select>
+ <select id="studentSchoolSelect"><option value="">Assign school…</option></select>
+ <button id="assignStudentSchool">Set school</button>
+</div>
+<div id="studentClassAssign" style="display:none;margin-top:10px">
+ <div class="listlabel">Assign classes (school&#x2019;s classes only)</div>
+ <div id="studentClassChips" class="chips" style="margin-top:6px"></div>
+</div>
+<div class="listlabel" style="margin-top:14px">Students and their classes</div>
+<div id="studentAssignments"></div>
+</section>
 
 <section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
 <p class="hint">Upload a CSV to add teachers, principals, students, and classes all at once. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
@@ -191,6 +208,8 @@ async function load(){
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  renderPrincipalAssignments();
  await renderToolGrants();
+ await loadStudentData();
+ renderStudentSection();
 }
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
 q("addPrincipal").onclick=async()=>{
@@ -495,6 +514,83 @@ q("bulkImport").onclick=async function(){
   }
 };
 // ---- End bulk upload ---------------------------------------------------
+
+ // ---- Students -------------------------------------------------------
+ let studentData={};
+ async function loadStudentData(){
+  const snap=await db.ref("b3Games/workspaces/"+WS+"/students").once("value");
+  studentData=snap.val()||{};
+ }
+ function renderStudentSection(){
+  q("studentSelect").innerHTML='<option value="">Choose student…</option>';
+  const list=[];
+  const allIds=new Set([...Object.keys(studentData)]);
+  allIds.forEach(id=>{
+   const ws=studentData[id]||{};
+   q("studentSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(ws.name||id)+'</option>');
+   const assignedIds=Object.keys(ws.classIds||{}).filter(c=>ws.classIds[c]===true);
+   const schoolName=ws.schoolId||'—';
+   list.push('<div class="entry"><b>'+safe(ws.name||id)+'</b><small>school: '+safe(schoolName)+'</small>'+(assignedIds.length?'<div class="chips">'+assignedIds.map(c=>'<span class="chip">'+safe(classData[c]&&classData[c].name||c)+' <button title="Unassign" data-unassign-student="'+id+'" data-unassign-class="'+c+'">✕</button></span>').join("")+"</div>":'<small> — no classes</small>')+'</div>');
+  });
+  q("studentAssignments").innerHTML=list.join("")||'<small>No students yet.</small>';
+  q("studentSchoolSelect").innerHTML='<option value="">Assign school…</option><option value="__clear">Clear school</option>';
+  const knownSchools=new Set();
+  Object.values(teacherData).forEach(t=>{if(t.schoolId)knownSchools.add(t.schoolId)});
+  Object.values(studentData).forEach(s=>{if(s.schoolId)knownSchools.add(s.schoolId)});
+  knownSchools.forEach(s=>q("studentSchoolSelect").insertAdjacentHTML("beforeend",'<option value="'+s+'">'+safe(s)+'</option>'));
+  updateStudentClassPanel();
+ }
+ function updateStudentClassPanel(){
+  const sid=q("studentSelect").value;
+  const ws=studentData[sid]||{};
+  const school=ws.schoolId||"";
+  if(!sid||!school){q("studentClassAssign").style.display="none";return;}
+  q("studentClassAssign").style.display="";
+  const schoolClasses=Object.entries(classData).filter(([,c])=>!c.schoolId||c.schoolId===school);
+  if(!schoolClasses.length){q("studentClassChips").innerHTML='<small>No classes for this school yet.</small>';return;}
+  const assigned=ws.classIds||{};
+  q("studentClassChips").innerHTML=schoolClasses.map(([cid,c])=>{
+   const on=assigned[cid]===true;
+   return '<label style="margin:3px 4px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-class-toggle="'+cid+'" '+(on?'checked':'')+'>'+safe(c.name||cid)+'</label>';
+  }).join("");
+ }
+ q("studentSelect").onchange=function(){
+  updateStudentClassPanel();
+  const sid=this.value;
+  const ws=studentData[sid]||{};
+  if(ws.schoolId)q("studentSchoolSelect").value=ws.schoolId;
+ };
+ q("assignStudentSchool").onclick=async function(){
+  const sid=q("studentSelect").value,schoolId=q("studentSchoolSelect").value;
+  if(!sid){q("status").textContent="Choose a student first.";return;}
+  if(!schoolId){q("status").textContent="Choose a school first.";return;}
+  const realSchool=schoolId==="__clear"?"":schoolId;
+  try{
+   await B3StudentScope.setStudentSchool(db,WS,sid,realSchool,Date.now());
+   q("status").textContent="School assigned.";
+   await loadStudentData();renderStudentSection();
+  }catch(e){console.error(e);q("status").textContent="Could not assign school: "+e.message;}
+ };
+ q("studentClassChips").addEventListener("change",async function(e){
+  const cb=e.target.closest("[data-class-toggle]");if(!cb)return;
+  const sid=q("studentSelect").value,cid=cb.dataset.classToggle,on=cb.checked;
+  if(!sid||!cid)return;
+  try{
+   await B3StudentScope.setStudentClass(db,WS,sid,cid,on,Date.now());
+   q("status").textContent=(on?"Assigned to ":"Removed from ")+safe(classData[cid]&&classData[cid].name||cid)+".";
+   await loadStudentData();renderStudentSection();
+  }catch(e){console.error(e);cb.checked=!on;q("status").textContent="Could not update class: "+e.message;}
+ });
+ q("studentAssignments").addEventListener("click",async function(e){
+  const btn=e.target.closest("[data-unassign-student]");if(!btn)return;
+  const sid=btn.dataset.unassignStudent,cid=btn.dataset.unassignClass;
+  if(!sid||!cid)return;
+  try{
+   await B3StudentScope.setStudentClass(db,WS,sid,cid,false,Date.now());
+   q("status").textContent="Removed.";
+   await loadStudentData();renderStudentSection();
+  }catch(e){console.error(e);q("status").textContent="Could not remove: "+e.message;}
+ });
 
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
