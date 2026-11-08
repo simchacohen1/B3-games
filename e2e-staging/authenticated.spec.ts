@@ -182,7 +182,11 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(teacherPage.locator('#fakeStudent button').first()).toBeDisabled();
     await teacherPage.locator('#screenPreview .backHome').click();
     await teacherPage.getByRole('button', { name: /Create Assignment/ }).click();
-    await teacherPage.locator('#type').selectOption('shorashim');
+    // Homework is built from checklist items (#649).
+    await teacherPage.getByRole('button', { name: /Add an item/ }).click();
+    await teacherPage.locator('#itemsBuilder .hwi-editor select').first().selectOption('shorashim');
+    await teacherPage.getByRole('button', { name: 'Add to homework' }).click();
+    await expect(teacherPage.locator('#itemsBuilder .hwi-row')).toHaveCount(1);
     await teacherPage.locator('#title').fill(title);
     await teacherPage.locator('#details').fill('Fictional staging assignment for automated acceptance testing.');
     await teacherPage.getByRole('button', { name: /Next: Choose students/ }).click();
@@ -232,9 +236,10 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
 
     const [activityPage] = await Promise.all([
       studentPage.waitForEvent('popup'),
-      studentCard.getByRole('link', { name: 'Start Activity' }).click()
+      studentCard.locator('a[data-homework-item]').first().click()
     ]);
-    await expect(activityPage).toHaveURL(/\/shorashim\/index\.html$/);
+    await expect(activityPage).toHaveURL(/\/shorashim\/index\.html\?hw=/);
+    await expect(activityPage.locator('#b3-homework-bar')).toContainText('Back to my homework');
     await activityPage.close();
     await studentPage.reload({ waitUntil: 'domcontentloaded' });
     studentCard = studentPage.locator('#list .card').filter({ hasText: title });
