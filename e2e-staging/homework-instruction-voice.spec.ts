@@ -102,17 +102,21 @@ test('teacher records instructions; another teacher\'s assignment cannot be chan
   await page.locator('#oneAssignment').getByRole('button', { name: 'Edit' }).click();
   await expect(page.locator('#voiceField')).toContainText('This assignment has recorded instructions.');
   await page.locator('#voiceField').getByRole('button', { name: 'Remove recording' }).click();
+  await page.locator('#nextAudience').click();
+  await page.locator('#nextReview').click();
   await page.locator('#save').click();
   await expect(page.locator('#listNotice')).toContainText('Changes saved.', { timeout: 20000 });
   expect(calls.filter(c => c.action === 'edit').at(-1)).toMatchObject({ assignmentId: 'mine1', removeVoice: true });
 
   // Another teacher's assignment: can listen, cannot record or remove.
-  await page.locator('#openAssignments').click();
-  await page.getByText('Co-teacher assignment').first().click();
+  // Saving returns to Reports.
+  await page.getByRole('button', { name: 'Open report for Co-teacher assignment' }).click();
   await page.locator('#oneAssignment').getByRole('button', { name: 'Edit' }).click();
   await expect(page.locator('#voiceField')).toContainText('Only the teacher who created this assignment can add or change its recorded instructions.');
   await expect(page.locator('#voiceField').getByRole('button', { name: /Record/ })).toHaveCount(0);
   await expect(page.locator('#voiceField').getByRole('button', { name: 'Remove recording' })).toHaveCount(0);
+  await page.locator('#nextAudience').click();
+  await page.locator('#nextReview').click();
   await page.locator('#save').click();
   await expect(page.locator('#listNotice')).toContainText('Changes saved.', { timeout: 20000 });
   const otherEdit = calls.filter(c => c.action === 'edit').at(-1);
