@@ -3,7 +3,7 @@
   'use strict';
   var STAGING_PROJECT = 'fun-torah-tools-staging';
   var STAGING_HOST = 'fun-torah-tools-staging.web.app';
-  var STAGING_PREVIEW_HOST = /^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/;
+  var STAGING_PREVIEW_HOST = /^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/;
   var projectId = root.B3_FIREBASE_CONFIG && root.B3_FIREBASE_CONFIG.projectId;
   var host = root.location && root.location.hostname ? root.location.hostname.toLowerCase() : '';
   var localPreview = /^(localhost|127\.0\.0\.1)$/.test(host) &&
@@ -125,7 +125,7 @@
       if (options.onSent) await options.onSent();
     }
     sendText.onclick = async function () {
-      if (!note.value.trim()) { feedback.textContent = 'Write a message first.'; note.focus(); return; }
+      if (!note.value.trim()) { feedback.textContent = 'Type a message, or record a voice note, before sending.'; note.focus(); return; }
       sendText.disabled = true;
       try { await send({ text: note.value.trim() }); note.value = ''; feedback.textContent = 'Message sent.'; }
       catch (error) { feedback.textContent = error.message || 'Message could not be sent.'; }
@@ -143,7 +143,7 @@
         var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(function (type) {
           return !root.MediaRecorder.isTypeSupported || root.MediaRecorder.isTypeSupported(type);
         });
-        var recorder = new root.MediaRecorder(stream, mime ? { mimeType: mime } : undefined), chunks = [];
+        var recorder = new root.MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 }), chunks = [];
         record._recorder = recorder; record.dataset.recording = 'true'; record.disabled = false;
         record.textContent = '■ Stop & send'; feedback.textContent = 'Recording… up to 15 seconds.';
         recorder.ondataavailable = function (event) { if (event.data?.size) chunks.push(event.data); };
@@ -156,10 +156,13 @@
             var voiceDataURL = await new Promise(function (resolve, reject) {
               var reader = new FileReader(); reader.onload = function () { resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(blob);
             });
-            await send({ voiceDataURL: voiceDataURL }); feedback.textContent = 'Voice note sent.';
+            var typed = note.value.trim();
+            await send(typed ? { voiceDataURL: voiceDataURL, text: typed } : { voiceDataURL: voiceDataURL });
+            note.value = ''; feedback.textContent = 'Voice note sent.';
           } catch (error) { feedback.textContent = error.message || 'Voice note could not be sent.'; }
           finally { record.disabled = false; }
         };
+        recorder.start();
         record._recordTimer = setTimeout(function () { if (recorder.state === 'recording') recorder.stop(); }, 15000);
       } catch (error) {
         if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
