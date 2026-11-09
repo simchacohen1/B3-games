@@ -312,6 +312,19 @@ test('export backup never contains passcodes',async()=>{
  assert.equal(JSON.stringify(r).includes('111111'),false);
  assert.equal(r.records.old_reuven.student.halacha.done,3);
 });
+test('undo preview lists every class it touches and whether the class had students before; classes are kept',async()=>{
+ const store=site(),at=Date.parse('2026-11-09T02:18:37Z'),ws=store.tree.b3Games.workspaces['b3-2026'];
+ await legacyImport(store,[['Class Kid A','191919','et'],['Class Kid B','202020','b2_et_morning'],['Class Kid C','212121','b2_et_morning']],at);
+ const p=await manageStudents(store,OWNER,{action:'rollbackPreview',...legacySource(at)});
+ assert.deepEqual(p.classes.map(c=>[c.classId,c.membersNow,c.leaving,c.membersAfter,c.newWithImport]),[['b2_et_morning',2,2,0,true],['et',2,1,1,false]]);
+ assert.equal(p.summary.totalStudents,5);assert.equal(p.summary.classesAffected,2);
+ // New-style import: the batch record says which classes it made.
+ const {body}=await runImport(store,csv(['Class,Brand New Class,,,,','Student,Class Kid D,,232323,Brand New Class; ET']));
+ const q=await manageStudents(store,OWNER,{action:'rollbackPreview',batchId:body.batchId});
+ assert.deepEqual(q.classes.map(c=>[c.name,c.leaving,c.newWithImport]),[['Brand New Class',1,true],['ET',1,false]]);
+ await manageStudents(store,OWNER,{action:'rollbackExecute',batchId:body.batchId,manifestHash:q.manifestHash,backupConfirmed:true,confirmText:'ROLL BACK 1'});
+ assert.ok(Object.values(ws.classes).some(c=>c.name==='Brand New Class'),'a class the import made is not deleted');
+});
 test('overview groups an untracked import run by its audit entries, not by names',async()=>{
  const store=site(),at=Date.parse('2026-11-09T17:49:11Z');
  await legacyImport(store,Array.from({length:12},(_,i)=>['Run Kid '+i,String(300000+i),i%2?'b2_et_morning':'b2_et_afternoon']).map((r,i)=>r),at);
