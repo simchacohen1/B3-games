@@ -493,6 +493,7 @@ const bulkNameKey=s=>String(s||"").trim().toLowerCase();
 function bulkValidate(rows){
   const errors=[];
   const knownClasses=new Set(Object.values(classData||{}).map(c=>bulkNameKey(c&&c.name)));
+  const studentPasscodes=new Map();
   rows.forEach(r=>{if(r.type==="class"&&r.name)knownClasses.add(bulkNameKey(r.name));});
   rows.forEach(r=>{
     const at="Row "+r.row+": ";
@@ -501,6 +502,10 @@ function bulkValidate(rows){
     if(r.name.length>100)errors.push(at+"name is longer than 100 characters");
     if((r.type==="teacher"||r.type==="principal")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))errors.push(at+r.type+" needs a valid email");
     if(r.type==="student"){
+      const studentKey=bulkNameKey(r.name);
+      if(studentKey&&studentPasscodes.has(studentKey)&&studentPasscodes.get(studentKey)!==r.passcode)
+        errors.push(at+"student appears in multiple classes with different passcodes");
+      else if(studentKey)studentPasscodes.set(studentKey,r.passcode);
       if(!r.cls)errors.push(at+"student needs a class");
       if(!r.passcode)errors.push(at+"student needs a passcode");
       else if(r.passcode.length>100)errors.push(at+"passcode is longer than 100 characters");
@@ -540,11 +545,14 @@ q("bulkPreview").onclick=function(){
   reader.readAsText(file);
 };
 q("bulkCancel").onclick=bulkReset;
-async function bulkCreateStudent(classId,name,passcode){
+async function bulkCreateStudent(classId,name,passcode,existingStudentId){
+  const body=existingStudentId
+    ? {action:"add",classId,studentId:existingStudentId}
+    : {action:"create",classId,name,passcode};
   const response=await fetch(MANAGE_STUDENTS_URL,{
     method:"POST",signal:AbortSignal.timeout(15000),
     headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},
-    body:JSON.stringify({action:"create",classId,name,passcode})
+    body:JSON.stringify(body)
   });
   let result={};try{result=await response.json();}catch(_){}
   if(!response.ok)throw new Error(result.error||"Could not create the student.");
@@ -604,16 +612,23 @@ q("bulkImport").onclick=async function(){
       }catch(err){addLog("Principal "+r.email+": "+err.message,false);}
       done++;step();
     }
-    // Students: created by the trusted backend, one request per student.
+    // Reuse a student's account for additional classes in this CSV.
+    // Never merge pre-existing accounts based on a name match alone.
+    const importedStudents=new Map();
     for(const r of ofType("student")){
       const classId=classNameToId[bulkNameKey(r.cls)];
       if(!classId){addLog("Student "+r.name+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
       const members=(liveClasses[classId]&&liveClasses[classId].members)||{};
       if(Object.values(members).some(m=>m&&bulkNameKey(m.name)===bulkNameKey(r.name))){addLog("Student "+r.name+" is already in "+r.cls+" (skipped)",true);done++;step();continue;}
       try{
-        const result=await bulkCreateStudent(classId,r.name,r.passcode);
-        ((liveClasses[classId]=liveClasses[classId]||{}).members=members)[result.studentId||r.name]={name:r.name,active:true};
-        addLog("Student "+r.name+" added to "+r.cls,true);
+        const studentKey=bulkNameKey(r.name);
+        const existingStudentId=importedStudents.get(studentKey);
+        const result=await bulkCreateStudent(classId,r.name,r.passcode,existingStudentId);
+        const studentId=result.studentId||existingStudentId;
+        if(!studentId)throw new Error("Student account ID missing from server response.");
+        importedStudents.set(studentKey,studentId);
+        ((liveClasses[classId]=liveClasses[classId]||{}).members=members)[studentId]={studentId,name:r.name,active:true};
+        addLog("Student "+r.name+(existingStudentId?" assigned":" created and assigned")+" to "+r.cls,true);
       }catch(err){addLog("Student "+r.name+": "+err.message,false);}
       done++;step();
     }
