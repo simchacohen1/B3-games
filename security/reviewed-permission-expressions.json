@@ -602,6 +602,36 @@
       "expression": false
     },
     {
+      "path": "/posukPractice/mishnayos/drafts/$studentId/$mishnaKey",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == $studentId && root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/status').val() != 'submitted' && root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/status').val() != 'submitting' && (root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/lockedUntil').val() == null || root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/lockedUntil').val() < now)"
+    },
+    {
+      "path": "/posukPractice/mishnayos/drafts/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId"
+    },
+    {
+      "path": "/posukPractice/mishnayos/notices/$studentId/$noticeId/seen",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId && data.parent().exists() && newData.val() == true"
+    },
+    {
+      "path": "/posukPractice/mishnayos/notices/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/mishnayos/submissionHistory",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/posukPractice/mishnayos/submissions/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
       "path": "/posukPractice/settings/$other",
       "permission": ".write",
       "expression": true

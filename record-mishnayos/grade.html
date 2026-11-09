@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<!-- Mishnayos Practice: teacher grading of submitted mishnayos (issue #692) -->
+<html lang="en">
+<head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mishnayos Practice — Grade Submissions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1F2D3D; --navy-light:#2E4257; --parchment:#F1E7CE; --gold:#C9A227; --gold-light:#E4C662;
+    --ink:#24344A; --ink-soft:#5A6C82; --green:#2e7d32; --red:#b3261e;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Quicksand',sans-serif; background:linear-gradient(180deg,var(--navy) 0%,#16202c 100%); color:#E9E4D4; min-height:100vh; }
+  .wrap{ max-width:1240px; margin:0 auto; padding:24px 16px 60px; }
+  header{ text-align:center; margin-bottom:18px; }
+  header h1{ font-family:'Frank Ruhl Libre',serif; color:var(--gold-light); margin:0 0 4px; font-size:2rem; }
+  header p{ margin:0; color:#c9d3df; }
+  .top-links{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:12px; }
+  .btn{ font-family:'Quicksand',sans-serif; font-weight:800; font-size:.95rem; border:0; border-radius:999px; padding:10px 20px; cursor:pointer;
+    background:var(--gold); color:#1d1606; box-shadow:0 3px 0 #8f7319; text-decoration:none; display:inline-block; }
+  .btn.ghost{ background:var(--navy-light); color:#E9E4D4; box-shadow:0 3px 0 #111a24; }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .gate{ max-width:420px; margin:60px auto; text-align:center; background:var(--navy-light); border-radius:16px; padding:24px; }
+  .section-title{ font-family:'Frank Ruhl Libre',serif; color:var(--gold-light); font-size:1.35rem; margin:26px 0 10px; }
+  .empty{ background:rgba(255,255,255,.06); border-radius:14px; padding:18px; text-align:center; color:#c9d3df; }
+  .card{ background:var(--parchment); color:var(--ink); border-radius:18px; border:3px double var(--gold); padding:16px 16px 18px; margin-bottom:16px; }
+  .card-head{ display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; border-bottom:2px solid var(--gold); padding-bottom:8px; margin-bottom:10px; }
+  .card-head .who{ font-weight:800; font-size:1.15rem; }
+  .card-head .what{ font-family:'Frank Ruhl Libre','Noto Serif Hebrew',serif; font-weight:700; font-size:1.15rem; direction:rtl; }
+  .card-head .meta{ color:var(--ink-soft); font-weight:700; font-size:.85rem; width:100%; }
+  .lines{ display:flex; flex-direction:column; gap:4px; }
+  .gline{ display:flex; align-items:center; gap:10px; direction:rtl; }
+  .gline .heb{ flex:1 1 auto; min-width:0; font-family:'Noto Serif Hebrew',serif; font-size:1.35rem; line-height:1.6; background:rgba(255,255,255,.6); border-radius:8px; padding:2px 8px; }
+  .gline .num{ flex:0 0 auto; width:26px; text-align:center; font-weight:800; color:var(--ink-soft); direction:ltr; }
+  .play{ flex:0 0 auto; width:42px; height:42px; border-radius:50%; border:2px solid var(--gold); background:#fff; cursor:pointer; font-size:1rem; }
+  .play.playing{ background:var(--gold); }
+  .gline.playing .heb{ background:#fff3c4; }
+  .grade-form{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:14px; align-items:end; }
+  .grade-form label{ display:flex; flex-direction:column; gap:4px; font-weight:800; font-size:.9rem; }
+  .grade-form input[type=number], .grade-form input[type=text]{ font:inherit; font-weight:700; padding:9px 10px; border-radius:10px; border:2px solid var(--ink-soft); background:#fff; color:var(--ink); }
+  .gold-toggle{ display:flex; gap:6px; }
+  .gold-toggle button{ flex:1; font:inherit; font-weight:800; padding:9px 8px; border-radius:10px; border:2px solid var(--ink-soft); background:#fff; color:var(--ink); cursor:pointer; }
+  .gold-toggle button.on.yes{ background:#fff3c4; border-color:var(--gold); }
+  .gold-toggle button.on.no{ background:#fdecec; border-color:#e08b8b; }
+  .comment-field{ grid-column:1/-1; }
+  .points-preview{ grid-column:1/-1; font-weight:800; background:rgba(46,125,50,.1); border-radius:10px; padding:9px 12px; }
+  .row-actions{ grid-column:1/-1; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .msg{ font-weight:700; }
+  .msg.err{ color:var(--red); }
+  .graded-row{ background:rgba(255,255,255,.06); border-radius:12px; padding:10px 14px; margin-bottom:8px; display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; }
+  .pill{ display:inline-block; border-radius:999px; padding:2px 10px; font-weight:800; font-size:.8rem; }
+  .pill.gold{ background:#fff3c4; color:#6b5200; }
+  .pill.retry{ background:#fdecec; color:#8e1b1b; }
+  .rules{ background:rgba(255,255,255,.06); border-radius:14px; padding:12px 16px; color:#d7dee8; font-size:.92rem; line-height:1.5; }
+  .hidden{ display:none !important; }
+  @media (max-width:620px){ .gline .heb{ font-size:1.1rem; } .card{ padding:12px 10px 14px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="gate" class="gate">
+    <div style="margin-bottom:12px;font-weight:700;">Teacher Google account</div>
+    <button class="btn" id="enterBtn">Sign in with Google</button>
+    <div id="gateMsg" style="font-size:.85rem;margin-top:10px;color:#ffb3b3;"></div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <header>
+      <h1>📥 Mishnayos — Grade Submissions</h1>
+      <p id="classLabel">Listen to each line, then grade the whole mishna.</p>
+      <div class="top-links">
+        <a class="btn ghost" id="dashLink" href="teacher.html">← Mishnayos dashboard</a>
+        <button class="btn ghost" id="reloadBtn" type="button">🔄 Refresh</button>
+      </div>
+    </header>
+    <div class="rules">
+      <b>How grading works.</b> The student gets 5 points each time he submits.
+      <b>Gold standard</b> pays 10 points minus 1 for each mistake, and the mishna is locked for him for one month.
+      <b>Not gold standard</b> pays no grade points and he can record it again and resubmit.
+      A bonus is added on top, with no limit. The student sees a message with his result.
+    </div>
+    <div class="section-title">Waiting for you</div>
+    <div id="pendingList"><div class="empty">Loading…</div></div>
+    <div class="section-title">Recently graded</div>
+    <div id="gradedList"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="../private-media.js?v=20261015-private"></script>
+<script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+<script>
+'use strict';
+const firebaseConfig = window.B3_FIREBASE_CONFIG;
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const API = 'https://us-central1-' + firebaseConfig.projectId + '.cloudfunctions.net/mishnayosSubmissions';
+const params = new URLSearchParams(location.search);
+const classId = params.get('class') || '';
+const HEB = { berachos: 'ברכות' };
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const HEB_ONES = ['','א','ב','ג','ד','ה','ו','ז','ח','ט'], HEB_TENS = ['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+function heb(n){ n = Number(n); if(n === 15) return 'טו'; if(n === 16) return 'טז'; return (HEB_TENS[Math.floor(n / 10)] || '') + (HEB_ONES[n % 10] || ''); }
+const when = ms => ms ? new Date(Number(ms)).toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+
+let texts = null;      // maseches -> data file
+let submissions = [];
+let player = null, playingBtn = null;
+
+if(classId) $('dashLink').href = 'teacher.html?class=' + encodeURIComponent(classId);
+
+async function call(body){
+  const user = firebase.auth().currentUser;
+  if(!user) throw new Error('Sign in first.');
+  const r = await fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + await user.getIdToken() }, body: JSON.stringify({ classId, ...body }) });
+  const data = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(data.error || 'That did not go through. Try again.');
+  return data;
+}
+async function loadTexts(){
+  if(texts) return texts;
+  const r = await fetch('data/berachos.he.json?v=20261108');
+  texts = { berachos: await r.json() };
+  return texts;
+}
+function linesOf(s){
+  const m = texts && texts[s.maseches] && texts[s.maseches].perakim[s.perek - 1] && texts[s.maseches].perakim[s.perek - 1].mishnayos[s.mishnah - 1];
+  return m ? m.lines : [];
+}
+const refHeb = s => (HEB[s.maseches] || s.maseches) + ' ' + heb(s.perek) + ':' + heb(s.mishnah);
+
+function stopAudio(){ if(player){ try{ player.pause(); }catch(_){} } if(playingBtn){ playingBtn.classList.remove('playing'); playingBtn.textContent = '▶️'; playingBtn.closest('.gline')?.classList.remove('playing'); } player = null; playingBtn = null; }
+async function playLine(btn, path, onDone){
+  if(playingBtn === btn){ stopAudio(); return; }
+  stopAudio();
+  btn.textContent = '⏳';
+  try{
+    const url = await B3PrivateMedia.url(path);
+    const a = new Audio(url);
+    player = a; playingBtn = btn;
+    btn.classList.add('playing'); btn.textContent = '⏸'; btn.closest('.gline')?.classList.add('playing');
+    a.onended = () => { if(player === a){ stopAudio(); if(onDone) onDone(); } };
+    a.onerror = () => { if(player === a) stopAudio(); btn.title = 'Could not play'; };
+    await a.play();
+  }catch(err){
+    btn.textContent = '⚠️'; btn.title = err.message;
+  }
+}
+
+function pendingCard(s, idx){
+  const lines = linesOf(s);
+  const rows = [];
+  for(let i = 0; i < s.lineCount; i++){
+    const l = s.lines && (s.lines[i] || s.lines[String(i)]);
+    rows.push('<div class="gline"><span class="num">' + (i + 1) + '</span><div class="heb">' + esc(lines[i] || '') + '</div>' +
+      (l ? '<button class="play" type="button" data-i="' + i + '" data-path="' + esc(l.path) + '" title="Play line ' + (i + 1) + '">▶️</button>' : '<span>—</span>') + '</div>');
+  }
+  return '<div class="card" data-idx="' + idx + '">' +
+    '<div class="card-head"><span class="who">' + esc(s.studentName) + (s.className ? ' <span style="color:var(--ink-soft);font-size:.85rem;">· ' + esc(s.className) + '</span>' : '') + '</span>' +
+      '<span class="what">' + esc(refHeb(s)) + '</span>' +
+      '<span class="meta">Try ' + esc(s.attempt) + ' · submitted ' + esc(when(s.submittedAt)) + ' · ' + esc(s.lineCount) + ' lines</span></div>' +
+    '<div style="margin-bottom:8px;"><button class="btn ghost playall" type="button">▶️ Play all lines</button></div>' +
+    '<div class="lines">' + rows.join('') + '</div>' +
+    '<div class="grade-form">' +
+      '<label>Gold standard?<div class="gold-toggle"><button type="button" class="yes">🏅 Yes</button><button type="button" class="no">🔁 Not yet</button></div></label>' +
+      '<label>Mistakes<input type="number" class="mistakes" min="0" max="999" step="1" value="0" inputmode="numeric"></label>' +
+      '<label>Bonus points<input type="number" class="bonus" min="0" step="1" value="0" inputmode="numeric"></label>' +
+      '<label class="comment-field">Note to the student (optional)<input type="text" class="comment" maxlength="1000" placeholder="e.g. Read line 3 slowly"></label>' +
+      '<div class="points-preview">Choose gold standard or not yet.</div>' +
+      '<div class="row-actions"><button class="btn save" type="button" disabled>Save grade</button><span class="msg"></span></div>' +
+    '</div></div>';
+}
+function wireCard(card, s){
+  let gold = null;
+  const yes = card.querySelector('.yes'), no = card.querySelector('.no'), mistakes = card.querySelector('.mistakes'),
+    bonus = card.querySelector('.bonus'), preview = card.querySelector('.points-preview'), save = card.querySelector('.save'), msg = card.querySelector('.msg');
+  const num = el => { const n = Number(el.value); return Number.isSafeInteger(n) && n >= 0 ? n : null; };
+  function update(){
+    yes.classList.toggle('on', gold === true); no.classList.toggle('on', gold === false);
+    const m = num(mistakes), b = num(bonus);
+    if(gold === null){ preview.textContent = 'Choose gold standard or not yet.'; save.disabled = true; return; }
+    if(m === null || m > 999 || b === null){ preview.textContent = 'Mistakes and bonus must be whole numbers, 0 or more.'; save.disabled = true; return; }
+    const g = gold ? Math.max(0, 10 - m) : 0;
+    preview.textContent = (gold ? 'Gold standard: 10 − ' + m + ' = ' + g : 'Not yet: 0 grade points (he can try again)') +
+      (b ? ' · bonus +' + b : '') + ' → ' + (g + b) + ' points' + (gold ? ' · locked for one month' : '');
+    save.disabled = false;
+  }
+  yes.onclick = () => { gold = true; update(); };
+  no.onclick = () => { gold = false; update(); };
+  mistakes.oninput = bonus.oninput = update;
+  card.querySelectorAll('.play').forEach(b => b.onclick = () => playLine(b, b.dataset.path));
+  card.querySelector('.playall').onclick = () => {
+    const btns = Array.from(card.querySelectorAll('.play'));
+    const next = i => { if(i < btns.length) playLine(btns[i], btns[i].dataset.path, () => next(i + 1)); };
+    next(0);
+  };
+  save.onclick = async () => {
+    save.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
+    try{
+      const r = await call({ action:'teacher-grade', studentId: s.studentId, key: s.key, attempt: s.attempt, gold, mistakes: num(mistakes), bonus: num(bonus), comment: card.querySelector('.comment').value });
+      msg.textContent = '✅ Saved. ' + (r.gradePoints + r.bonus) + ' points paid.' + (r.pointsNotAdded ? ' (Points could not be added: this student has no Student Rewards account.)' : '');
+      stopAudio();
+      setTimeout(load, 900);
+    }catch(err){
+      msg.className = 'msg err'; msg.textContent = err.message; save.disabled = false;
+    }
+  };
+  update();
+}
+function render(){
+  const pending = submissions.filter(s => s.status === 'submitted');
+  const graded = submissions.filter(s => s.status === 'graded').slice(0, 40);
+  const pl = $('pendingList');
+  pl.innerHTML = pending.length ? pending.map((s, i) => pendingCard(s, i)).join('') : '<div class="empty">Nothing to grade right now. 🎉</div>';
+  pl.querySelectorAll('.card').forEach(card => wireCard(card, pending[Number(card.dataset.idx)]));
+  $('gradedList').innerHTML = graded.length ? graded.map(s => {
+    const g = s.grade || {};
+    return '<div class="graded-row"><span><b>' + esc(s.studentName) + '</b> · <span style="font-family:\'Noto Serif Hebrew\',serif;">' + esc(refHeb(s)) + '</span> · try ' + esc(s.attempt) + '</span>' +
+      '<span>' + (g.gold ? '<span class="pill gold">🏅 Gold standard</span>' : '<span class="pill retry">🔁 Try again</span>') +
+      ' · ' + esc(g.mistakes || 0) + ' mistakes · +' + esc((g.gradePoints || 0) + (g.bonus || 0)) + ' pts' +
+      (s.lockedUntil ? ' · locked until ' + esc(new Date(s.lockedUntil).toLocaleDateString()) : '') +
+      ' · ' + esc(when(g.gradedAt)) + '</span></div>';
+  }).join('') : '<div class="empty">No graded mishnayos yet.</div>';
+}
+async function load(){
+  $('pendingList').innerHTML = '<div class="empty">Loading…</div>';
+  try{
+    const [data] = await Promise.all([call({ action:'teacher-list' }), loadTexts().catch(() => null)]);
+    submissions = data.submissions || [];
+    render();
+  }catch(err){
+    $('pendingList').innerHTML = '<div class="empty" style="color:#ffb3b3;">' + esc(err.message) + '</div>';
+    $('gradedList').innerHTML = '';
+  }
+}
+$('reloadBtn').onclick = load;
+$('enterBtn').onclick = () => B3SiteSettings.signInWithGoogle().catch(e => $('gateMsg').textContent = e.message);
+B3SiteSettings.onAuthStateChanged(async (user, authorized, access) => {
+  if(authorized && !classId){
+    $('gate').classList.add('hidden');
+    B3ClassGate.requireInUrl(path => db.ref(path).once('value').then(s => s.val()), access, B3SiteSettings.workspaceId)
+      .catch(e => { $('gate').classList.remove('hidden'); $('gateMsg').textContent = e.message; });
+    return;
+  }
+  const ok = authorized && (access.role === 'admin' || access.classIds.includes(classId));
+  $('gate').classList.toggle('hidden', ok);
+  $('dashboard').classList.toggle('hidden', !ok);
+  if(!ok && user) $('gateMsg').textContent = 'This class is not assigned to your teacher account.';
+  if(ok) load();
+});
+</script>
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script>
+</body>
+</html>
