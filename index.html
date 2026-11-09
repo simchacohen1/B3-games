@@ -646,6 +646,19 @@ document.addEventListener("DOMContentLoaded",function(){
     window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
   }
   const db=window.firebase.database();
+  // Issue #667: the owner only needs the student ids here. A REST shallow read
+  // returns just the keys (a few KB) instead of every full student record (MB).
+  async function ownerStudentIds(){
+    try{
+      const user=firebase.auth().currentUser,base=String(firebase.app().options.databaseURL||"").replace(/\/+$/,"");
+      if(user&&base){
+        const res=await fetch(base+"/b3Games/students.json?shallow=true&auth="+encodeURIComponent(await user.getIdToken()));
+        if(res.ok)return Object.keys((await res.json())||{});
+      }
+    }catch(e){console.warn("Shallow student list failed; using full read.",e);}
+    const snap=await db.ref("b3Games/students").once("value");
+    return Object.keys(snap.val()||{});
+  }
   const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
   const classLabels={et:"ET",wt:"WT"};
 
@@ -783,8 +796,7 @@ document.addEventListener("DOMContentLoaded",function(){
     // The owner can still manage the complete B3 student directory.
     let studentIds=[];
     if(isOwner){
-      const studentsIndex=await db.ref("b3Games/students").once("value");
-      studentIds=Object.keys(studentsIndex.val()||{});
+      studentIds=await ownerStudentIds();
     }else{
       const ids=new Set();
       Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));

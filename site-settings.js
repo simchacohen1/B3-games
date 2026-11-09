@@ -640,6 +640,16 @@
   // the new teacher -> class -> membership model. No student names or PINs are
   // embedded in source code. Legacy records remain in place until every app has
   // switched to the new paths.
+  const WORKSPACE_SEED_KEY = "b3Games_workspaceSeedAt";
+  function workspaceSeedDue() {
+    try {
+      const last = Number(localStorage.getItem(WORKSPACE_SEED_KEY) || 0);
+      if (last && Date.now() - last < 24 * 60 * 60 * 1000) return false;
+      localStorage.setItem(WORKSPACE_SEED_KEY, String(Date.now()));
+    } catch (e) {}
+    return true;
+  }
+
   function migrateWorkspaceData(services, user) {
     if (!services || !services.db || !user || !isBootstrapAdmin(user)) return Promise.resolve();
     return Promise.all([
@@ -1116,7 +1126,10 @@
         setSignedInHint(access.authorized);
         callback(user, access.authorized, access);
         endAuthChecking();
-        if (access.authorized && access.role === "admin") {
+        // Issue #667: the legacy migration below downloads the whole student list
+        // (several MB). It only needs to catch up occasionally, so run it at most
+        // once a day per browser instead of on every owner page view.
+        if (access.authorized && access.role === "admin" && workspaceSeedDue()) {
           services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
             return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
               return migrateWorkspaceData(services, user);
