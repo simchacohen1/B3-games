@@ -31,11 +31,17 @@ test('non-owner teacher opens Shorashim without a second sign-in', async ({ page
   await ownerPage.goto(`${origin}/owner-admin.html`);
   await ownerPage.getByRole('button', { name: 'Sign in with Google' }).click();
   await expect(ownerPage.locator('#ownerArea')).toBeVisible();
+  // Every class and teacher belongs to a school (#631, #666).
+  await ownerPage.locator('#schoolName').fill('Fictional Pilot School');
+  await ownerPage.locator('#addSchool').click();
+  await expect(ownerPage.locator('#schools')).toContainText('Fictional Pilot School');
+  await ownerPage.locator('#classSchool').selectOption({ label: 'Fictional Pilot School' });
   await ownerPage.locator('#className').fill('Pilot Room Alpha');
   await ownerPage.locator('#addClass').click();
   await expect(ownerPage.locator('#classes')).toContainText('Pilot Room Alpha');
   await ownerPage.locator('#teacherEmail').fill('teacher@example.test');
   await ownerPage.locator('#teacherName').fill('Fictional Teacher');
+  await ownerPage.locator('#teacherSchool').selectOption({ label: 'Fictional Pilot School' });
   await ownerPage.locator('#addTeacher').click();
   await expect(ownerPage.locator('#teachers')).toContainText('Fictional Teacher');
   await ownerPage.locator('#teacherSelect').selectOption('teacher_example_test');
