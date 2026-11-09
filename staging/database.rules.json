@@ -108,6 +108,17 @@
               ".read": "auth != null"
             }
           },
+          "students": {
+            ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+            ".write": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+          },
+          "contentGrants": {
+            ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+            ".write": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+            "$classId": {
+              ".read": "auth != null"
+            }
+          },
           "classes": {
             ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
             "$classId": {

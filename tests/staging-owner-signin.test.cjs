@@ -228,8 +228,12 @@ test('staging student tools accept the button sign-in; production code never doe
   assert.doesNotMatch(read('backend/functions/student-management-core.cjs'), /'custom'/);
 });
 
-test('staging database rules let the staging owner use Schools, and nobody signed out', () => {
+test('staging database rules cover what Owner Admin loads: Schools, Students, Content', () => {
   const owner = "auth != null && auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true";
-  const schools = JSON.parse(read('staging/database.rules.json')).rules.b3Games.workspaces.$workspaceId.schools;
+  const workspace = JSON.parse(read('staging/database.rules.json')).rules.b3Games.workspaces.$workspaceId;
+  const schools = workspace.schools;
   assert.deepEqual(schools, { '.read': owner, '.write': owner, $schoolId: { '.read': 'auth != null' } });
+  const ownerOrAdmin = "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)";
+  assert.deepEqual(workspace.students, { '.read': ownerOrAdmin, '.write': ownerOrAdmin });
+  assert.deepEqual(workspace.contentGrants, { '.read': ownerOrAdmin, '.write': ownerOrAdmin, $classId: { '.read': 'auth != null' } });
 });
