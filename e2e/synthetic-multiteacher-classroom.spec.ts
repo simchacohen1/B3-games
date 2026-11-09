@@ -352,12 +352,9 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#comprehensionCheck')).not.toHaveClass(/hidden/);
   await page.reload();
   await expect(page.locator('#app')).toBeVisible();
-  // Chazara still unlocks a posuk from the earlier computer-graded scores
-  // (existing students have them). Whether a teacher's gold standard should
-  // also unlock Chazara is an open owner question on #694.
-  await writeFixture(`${attemptsPath}/legacy_ai_scores`, {hebrewScore: 100, translationTotal: 1, translationChunkResults: [{verdict: 'correct', chunkIndex: 0}]});
-  // Chazara consumes this student's persisted Posuk mastery and keeps its
-  // own class-attributed review and recording history.
+  // The teacher's gold standard grade above is what unlocks this posuk in
+  // Chazara (#694); there are no computer reading or translation scores.
+  // Chazara keeps its own class-attributed review and recording history.
   await page.goto(`${origin}/chazara/index.html`);
   await expect(page.locator('#app')).toBeVisible();
   await expect(page.locator('#studentNameTop')).toHaveText('Ari Example');
