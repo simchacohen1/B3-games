@@ -25,7 +25,7 @@
   var invitationSection = document.getElementById("invitationSection");
   var invitationSummary = document.getElementById("invitationSummary");
   var leaderboardSection = document.getElementById("classLeaderboard");
-  function renderLeaderboard(rows, balance) {
+  function renderLeaderboard(rows, balance, rewardsConfigured) {
     var list = document.getElementById("leaderboardRows"), status = document.getElementById("leaderboardStatus");
     var balanceBox = document.getElementById("gameCoinBalance");
     list.replaceChildren();
@@ -35,6 +35,12 @@
       list.appendChild(item);
     });
     status.textContent = rows && rows.length ? "Top players in " + classInfo.className + "." : "No game coin scores yet. Play a class game to get started!";
+    if (rewardsConfigured === false) {
+      status.textContent += classInfo.role === "teacher"
+        ? " Students do not earn coins until you set the class rewards below."
+        : " Game coins are not turned on for your class yet. Ask your teacher.";
+    }
+    if (classInfo.role === "teacher") return;
     var peerCoins = Math.max(0, Number(balance && balance.peerCoins) || 0);
     var computerCoins = Math.max(0, Number(balance && balance.computerCoins) || 0);
     document.getElementById("gameCoinTotal").textContent = String(Math.max(0, Number(balance && balance.totalCoins) || peerCoins + computerCoins));
@@ -291,10 +297,11 @@
         statusBox.textContent = (classInfo.role === "teacher" ? "Playing as teacher " : "Signed in as ") + sessionName + " · " + classInfo.className + ". Showing games for this class.";
         readyToPlay = true;
         drawCategoryHome();
-        if (classInfo.role === "student" && typeof firebase.functions === "function") {
+        if (typeof firebase.functions === "function") {
+          // Students see their balance and the class board; teachers see the class board too.
           leaderboardSection.hidden = false;
           firebase.app().functions("us-central1").httpsCallable("multiplayerGameAction")({ action: "leaderboard", workspaceId: classInfo.workspaceId, classId: classInfo.classId })
-            .then(function (result) { renderLeaderboard(result.data && result.data.leaderboard || [], result.data && result.data.balance || {}); })
+            .then(function (result) { var data = result.data || {}; renderLeaderboard(data.leaderboard || [], data.balance || {}, data.rewardsConfigured); })
             .catch(function () { document.getElementById("leaderboardStatus").textContent = "Class leaderboard is unavailable right now."; });
         }
         if (classInfo.role === "teacher" && typeof firebase.functions === "function") setupCoinPolicyEditor();

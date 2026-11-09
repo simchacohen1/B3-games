@@ -20,7 +20,7 @@
   const el = id => document.getElementById(id);
   const title = el('gameTitle'), hint = el('gameHint'), message = el('message'), roomSection = el('room');
   const board = el('board'), actions = el('actions');
-  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', countdownTimer = null, countdownRetryTimer = null, countdownStarting = false, settlementRetryTimer = null, settlementInFlight = '', settledRoomCode = '', settlementRetries = 0;
+  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', countdownTimer = null, countdownRetryTimer = null, countdownStarting = false, awayTimer = null, settlementRetryTimer = null, settlementInFlight = '', settledRoomCode = '', settlementRetries = 0;
 
   function text(tag, className, value) {
     const node = document.createElement(tag);
@@ -69,6 +69,7 @@
       else { clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); countdownTimer = countdownRetryTimer = null; countdownStarting = false; el('countdown').hidden = true; }
       draw();
       if (room.state === 'finished') settleFinishedRoom();
+      else el('coinResult').hidden = true;
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
     if (['bingo', 'dominoes', 'go-fish', 'uno-style'].includes(gameKey)) {
       privateRef = db.ref(`b3Private/multiplayerGames/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/rooms/${roomCode}/hands/${studentId}`);
@@ -80,7 +81,7 @@
       }, () => notice('Your private game information could not be loaded. Refresh to reconnect.', true));
     }
   }
-  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); clearTimeout(settlementRetryTimer); countdownTimer = countdownRetryTimer = settlementRetryTimer = null; ref = listener = privateRef = privateListener = null; }
+  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); clearTimeout(settlementRetryTimer); clearTimeout(awayTimer); countdownTimer = countdownRetryTimer = settlementRetryTimer = awayTimer = null; ref = listener = privateRef = privateListener = null; }
   function clearSavedRejoin(code) {
     try {
       const key = 'fttMultiplayerRejoin:' + studentId, saved = JSON.parse(sessionStorage.getItem(key) || 'null');
@@ -90,6 +91,7 @@
   function statusText() {
     if (!room) return 'Connecting…';
     if (room.state === 'lobby') return room.host === studentId ? 'Waiting for classmates. You start the game when everyone is ready.' : 'Waiting for the host to start.';
+    if ((room.finished || room.state === 'finished') && room.forfeitBy?.length && room.winner === studentId) return 'Your classmate left, so you win this game.';
     if (room.finished || room.state === 'finished') return room.draw ? 'It’s a draw!' : (room.winner === studentId ? 'You won! Great game.' : ((room.players || []).find(p => p.studentId === room.winner)?.name || 'A classmate') + ' won this game.');
     if (gameKey === 'math-race') return 'Solve the question with your classmates.';
     if (gameKey === 'set') return 'Find a set of three cards.';
@@ -180,9 +182,28 @@
         if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn uno-btn', pending));
         else actions.append(text('div', 'player-turn', 'Tap a glowing token.'));
       }
+      addAwayControls();
       actions.append(button('Leave game', leaveRoom, 'quiet', pending));
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
     }
+  }
+  // When a classmate leaves mid-game, wait a short grace period for them to come back,
+  // then let the players who stayed continue (or win, if nobody else is left).
+  function addAwayControls() {
+    clearTimeout(awayTimer); awayTimer = null;
+    const away = room?.awayPlayers || [];
+    if (!away.length || room.state !== 'playing') return;
+    const names = away.map(player => player.name).join(', ');
+    const readyAt = Math.max(...away.map(player => Number(player.leftAt) || 0)) + (Number(room.awayGraceMs) || 45000);
+    const waitMs = readyAt - Date.now();
+    const alone = activePlayerCount(room) <= 1;
+    if (waitMs > 0) {
+      actions.append(text('div', 'player-turn', `${names} left the game. Waiting ${Math.ceil(waitMs / 1000)} seconds for them to come back…`));
+      awayTimer = setTimeout(() => { awayTimer = null; draw(); }, Math.min(waitMs, 5000));
+      return;
+    }
+    actions.append(text('div', 'player-turn', `${names} left the game.`));
+    actions.append(button(alone ? 'End game — I win' : 'Continue without them', () => call('claim-forfeit').catch(showError), 'btn', pending));
   }
   function runCountdown(countdownAt) {
     if (countdownTimer) return;
@@ -206,12 +227,28 @@
     };
     tick(); countdownTimer = setInterval(tick, 100);
   }
+  function showCoinResult(coins) {
+    const box = el('coinResult');
+    if (!box || !coins) return;
+    box.hidden = false;
+    if (!coins.configured) { box.textContent = '🪙 Game coins are not turned on for your class yet. Ask your teacher to set them up.'; return; }
+    const earned = Math.max(0, Number(coins.earned) || 0), total = Math.max(0, Number(coins.totalCoins) || 0);
+    box.textContent = earned
+      ? `🪙 +${earned} game coin${earned === 1 ? '' : 's'}${coins.computerGame ? ' (computer game)' : ''}! You now have ${total}.`
+      : `🪙 No coins this round. You have ${total} game coin${total === 1 ? '' : 's'}.`;
+  }
+  function isActiveStudentPlayer() {
+    return classInfo?.role !== 'teacher' && (room?.players || []).some(player => player.studentId === studentId && player.role === 'student');
+  }
   function settleFinishedRoom() {
-    if (!room || room.state !== 'finished' || settledRoomCode === roomCode || settlementInFlight === roomCode) return;
+    if (!room || room.state !== 'finished' || settledRoomCode === roomCode + ':' + (room.round || 1) || settlementInFlight === roomCode) return;
+    // Only students who played can collect coins; teachers and spectators would just get an error.
+    if (!isActiveStudentPlayer()) return;
     settlementInFlight = roomCode;
-    call('settle').then(() => {
-      settledRoomCode = roomCode; settlementInFlight = ''; settlementRetries = 0;
+    call('settle').then(result => {
+      settledRoomCode = roomCode + ':' + (room?.round || 1); settlementInFlight = ''; settlementRetries = 0;
       clearTimeout(settlementRetryTimer); settlementRetryTimer = null;
+      showCoinResult(result.coins);
     }).catch(() => {
       settlementInFlight = '';
       settlementRetries += 1;
@@ -707,7 +744,8 @@
     try {
       if (roomCode) {
         await call('leave');
-        if (room && room.host !== studentId && ['lobby', 'playing'].includes(room.state)) {
+        // The host now hands a game in progress to another player, so a host can rejoin it too.
+        if (room && (room.state === 'playing' || room.state === 'lobby' && room.host !== studentId)) {
           sessionStorage.setItem('fttMultiplayerRejoin:' + studentId, JSON.stringify({ gameKey, roomCode }));
         }
       }
