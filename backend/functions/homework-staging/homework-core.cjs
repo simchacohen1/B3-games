@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const policy = require('./homework-policy.cjs');
 const { resolveStudent } = require('./student-login-core.cjs');
 const { guarded } = require('./auth-attempts.cjs');
+const DM = require('./homework-messages.cjs');
 const hwItems = require('./homework-items-core.cjs');
 
 const WS = 'b3-2026';
@@ -105,7 +106,7 @@ function present(def, rec, now) {
     status: rec.status, late: isLate(def, rec, now),
     draft: rec.draft || '', progress: rec.progress || 0, answer: rec.answer || '',
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-    updatedAt: rec.updatedAt || null,
+    updatedAt: rec.updatedAt || null, teacherId: def.createdBy || null,
     items: hwItems.itemsOf(def), itemsDone: hwItems.doneMap(def, rec),
     messages: publicMessages(rec, 'student')
   };
@@ -382,8 +383,41 @@ async function teacherDo(store, identity, body, now, newId) {
   fail(400, 'Unknown action.');
 }
 
+// ---- one-on-one messages (#647) ----------------------------------------------
+// Teacher side: the inbox lists the students of every class this account may open.
+// A single conversation needs the class check and that the student is on its roster.
+async function teacherDm(store, identity, body, now, newId) {
+  if (body.action === 'dmInbox' || body.action === 'dmUnread') {
+    const { classes } = await authorizedClasses(store, identity);
+    if (body.action === 'dmUnread') return DM.teacherUnread(store, WS, identity.uid, classes.map(c => c.id));
+    return DM.teacherInbox(store, { ws: WS, uid: identity.uid, classes,
+      members: async classId => activeMembers(store, (await store.get('b3Games/workspaces/' + WS + '/classes/' + classId)) || {}) });
+  }
+  const classId = body.classId, sid = body.studentId;
+  const { cls, id: uid } = await teacherAccess(store, identity, classId);
+  const member = key(sid) ? cls.members?.[sid] : null;
+  const profile = member && member.active !== false ? await store.get('b3Games/students/' + sid + '/profile') : null;
+  if (!member || member.active === false || profile?.active === false) fail(404, 'That student is not in this class.');
+  const row = await store.get('b3Games/workspaces/' + WS + '/teachers/' + uid);
+  const onList = row && row.active !== false && row.classIds?.[classId] === true;
+  const kind = onList ? (row.accountType === 'principal' || row.role === 'principal' ? 'principal' : 'teacher') : 'admin';
+  const adult = { kind, name: DM.adultName(onList ? row : { displayName: identity.name, email: identity.email }, kind === 'principal' ? 'Principal' : 'Teacher') };
+  const defs = {};
+  if (body.action === 'dmSend' && key(body.assignmentId)) {
+    const def = await store.get(base(classId) + '/definitions/' + body.assignmentId);
+    if (def && publicationState(def) === 'published' && targets(def, { [sid]: true }).includes(sid)) defs[body.assignmentId] = def;
+  }
+  const t = { ws: WS, classId, sid, uid, viewer: 'teacher', adult, studentName: profile?.name || member.name || sid };
+  return DM.teacherThreadApi(store, t, body, now, newId, defs);
+}
+async function studentDm(store, body, now, ip, newId) {
+  const s = await studentContext(store, body, now, ip);
+  return DM.studentApi(store, { ws: WS, classId: s.classId, sid: s.sid, defs: s.defs, mine: s.mine }, body, now, newId);
+}
+
 // ---- student actions -------------------------------------------------------
-async function studentDo(store, body, now, ip, newId) {
+// Proves who the student is and loads their class's homework definitions.
+async function studentContext(store, body, now, ip) {
   const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
     () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   const sid = student.id, classId = student.classId;
@@ -399,6 +433,10 @@ async function studentDo(store, body, now, ip, newId) {
   const defs = (await store.get(base(classId) + '/definitions')) || {};
   const mine = def => (def.audience === 'all' || (Array.isArray(def.audience) && def.audience.includes(sid))) &&
     publicationState(def) === 'published' && (def.assignedAt == null || def.assignedAt <= now);
+  return { student, sid, classId, actor, ctx, scope, defs, mine };
+}
+async function studentDo(store, body, now, ip, newId) {
+  const { student, sid, classId, actor, ctx, scope, defs, mine } = await studentContext(store, body, now, ip);
 
   if (body.action === 'studentList') {
     const out = [];
@@ -501,6 +539,10 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
   if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return'].includes(a)) {
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
+  }
+  if (DM.DM_ACTIONS.includes(a)) {
+    if (auth && auth.identity) return teacherDm(store, auth.identity, body, now, newId);
+    return studentDm(store, body, now, auth && auth.ip, newId);
   }
   if (['comment', 'voiceRead', 'markRead'].includes(a) && auth && auth.identity)
     return teacherDo(store, auth.identity, body, now, newId);

@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 import { HOMEWORK_SITE, loadCredentials, watchPage, expectStagingIsolation, signInStudent, signInAdult } from './staging-common';
 
 // Issue #621: standalone "Message your teacher" / "Messages from students" threads,
+// Since #647 these older shared threads live under "Earlier messages" in the Messages tab/screen
+// (shown only when they have messages); new chats are one-on-one (homework-direct-messages tests).
 // the recording indicator, and voice notes that send on their own (no typing, no hand-in).
 // Chromium's fake microphone plays a tone, so real recordings are made without a person.
 test.use({
@@ -56,6 +58,8 @@ test('fictional student and teacher use standalone messages with a recording ind
   });
   await studentPage.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
   await expectStagingIsolation(studentPage);
+  await studentPage.getByRole('tab', { name: /Messages/ }).click();
+  await studentPage.locator('.dm-earlier > summary').click();
   const panel = studentPage.locator('#generalMessages');
   await expect(panel).toContainText('Messages with your teacher');
   // There is no homework at all, yet the student can still reach the teacher.
@@ -121,7 +125,7 @@ test('fictional student and teacher use standalone messages with a recording ind
   });
   await teacherPage.goto(HOMEWORK_SITE + '/assignment-center/teacher.html?class=TEST-ALEF', { waitUntil: 'domcontentloaded' });
   await expectStagingIsolation(teacherPage);
-  const open = teacherPage.getByRole('button', { name: /Messages from students/ });
+  const open = teacherPage.locator('#openMessages');
   await expect(open).toBeVisible();
   await expect(teacherPage.locator('#messagesCount')).toHaveText('1');
   // Before the screen opens nothing is marked read: the student with a new message comes first.
@@ -129,6 +133,7 @@ test('fictional student and teacher use standalone messages with a recording ind
   await expect(teacherPage.locator('#messagesStudent option').first()).toHaveText('Maya Levin · 💬 1 new');
   expect(teacherCalls.some(c => c.action === 'markRead')).toBe(false);
   await open.click();
+  await teacherPage.locator('#earlierMessages > summary').click();
   const box = teacherPage.locator('#messagesBox');
   // Opening the thread marks it read; the label and badge clear.
   await expect(teacherPage.locator('#messagesStudent option').first()).toHaveText('Maya Levin · 1 message');
@@ -157,6 +162,8 @@ test('fictional student and teacher use standalone messages with a recording ind
 
 test('fictional student sends a standalone voice note and the teacher replies @auth @homework', async ({ browser }, testInfo) => {
   test.skip(!credentials, NOT_CONFIGURED);
+  // #647 replaced new standalone notes with one-on-one Messages; the old shared thread is only shown when it already has messages.
+  test.skip(true, 'Retired by #647: new messages are one-on-one. Needs a real-staging Messages tab test instead.');
   const adult = credentials!.adultAccounts.find(row => row.role === 'teacher' && row.classId === 'TEST-ALEF');
   const student = credentials!.studentAccounts.find(row => row.classId === 'TEST-ALEF');
   if (!adult || !student) throw new Error('Fictional TEST-ALEF teacher and student credentials are required.');

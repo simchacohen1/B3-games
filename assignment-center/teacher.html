@@ -287,7 +287,7 @@ button.link:hover{background:none;color:var(--navy)}
     <div class="home-grid"><button class="choice create" id="openCreate"><span class="icon" aria-hidden="true">＋</span><strong>Create Assignment</strong><small>Make homework or a class assignment, step by step.</small></button>
     <button class="choice check" id="openCheck"><span class="icon" aria-hidden="true">✓</span><strong>Check Assignments <span class="badge wait" id="reviewCount" title="Students waiting for your check">0</span></strong><small>Student work waiting for your review. Approve it or send it back with a note.</small></button>
     <button class="choice assign" id="openAssignments"><span class="icon" aria-hidden="true">▣</span><strong>Reports <span class="badge new-msg" id="notesCount" title="New notes from students about an assignment" hidden>0</span></strong><small>See every assignment, how many students are done, and each student's grades.</small></button>
-    <button class="choice messages" id="openMessages" hidden><span class="icon" aria-hidden="true">💬</span><strong>Messages from students <span class="badge wait" id="messagesCount" title="New messages from students" hidden>0</span></strong><small>Voice and text messages that are not about one assignment. Pick a student to read and reply.</small></button></div>
+    <button class="choice messages" id="openMessages"><span class="icon" aria-hidden="true">💬</span><strong>Messages <span class="badge wait" id="messagesCount" title="New messages from students" hidden>0</span></strong><small>One-on-one voice and text chats with your students, grouped by class.</small></button></div>
     <button class="sec" id="openPreview">Preview Student View <span class="muted">· read-only sample</span></button>
   </section>
   <section class="screen" id="screenCreate" hidden aria-labelledby="createHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="createHeading">Create Assignment</h1></div>
@@ -310,7 +310,8 @@ button.link:hover{background:none;color:var(--navy)}
     <p class="report-summary" id="reportSummary"></p><div id="list"></div></section>
   <section class="screen" id="screenAssignment" hidden aria-labelledby="oneAssignmentHeading"><div class="screen-head"><button class="sec backReports">← Reports</button><h1 id="oneAssignmentHeading">Assignment</h1></div><div id="oneAssignment"></div></section>
   <section class="screen" id="screenStudent" hidden aria-labelledby="oneStudentHeading"><div class="screen-head"><button class="sec backReports">← Reports</button><h1 id="oneStudentHeading">Student</h1></div><div id="oneStudent"></div></section>
-  <section class="screen" id="screenMessages" hidden aria-labelledby="messagesHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="messagesHeading">Messages from students</h1></div><p class="muted">Messages here are not about one assignment. Notes about a specific assignment are on that assignment.</p><div id="messagesBox" class="card general-messages"></div></section>
+  <section class="screen" id="screenMessages" hidden aria-labelledby="messagesHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="messagesHeading">Messages</h1></div><p class="muted dm-hint">Tap a student to open your conversation. Tap 🎤 once to record, then ➤ to send.</p><div id="dmBox"></div>
+    <details id="earlierMessages" class="dm-earlier" hidden><summary>Earlier class messages (shared by all teachers of this class)</summary><div id="messagesBox" class="card general-messages"></div></details></section>
   <section class="screen" id="screenPreview" hidden aria-labelledby="previewHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="previewHeading">Preview Student View</h1></div><div class="fake-banner"><strong>Fictional sample</strong><br>This is a read-only example. It does not use student records and cannot save or submit work.</div><div id="fakeStudent"></div></section>
 </div>
 </main>
@@ -321,6 +322,7 @@ button.link:hover{background:none;color:var(--navy)}
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="../class-confirm-gate.js"></script>
 <script src="homework-common.js"></script>
+<script src="messages-ui.js"></script>
 <script src="homework-items.js"></script>
 <script>
 (function(){'use strict';
@@ -336,20 +338,30 @@ function say(box,m,good){box.textContent=m;box.className='msg '+(good?'good':'er
 // One notice under the class bar: confirmations fade out, load errors stay with a Try again button.
 var noticeTimer=0;function notice(m,good){var n=$('pageNotice');clearTimeout(noticeTimer);if(!m){n.hidden=true;return}n.replaceChildren(document.createTextNode(m));n.className='page-notice '+(good?'good':'err');n.hidden=false;if(!good){var retry=el('button','Try again','sec');retry.type='button';retry.onclick=function(){notice('');load()};n.append(retry)}else noticeTimer=setTimeout(function(){n.hidden=true},6000)}
 async function api(body){var t=await auth.currentUser.getIdToken();return H.call(Object.assign({classId:state.classId},body),t)}
-function showScreen(id){document.querySelectorAll('#app .screen').forEach(function(s){s.hidden=s.id!==id});window.scrollTo({top:0,behavior:'smooth'})}
+function showScreen(id){if(id!=='screenMessages'&&Msgs)Msgs.hide();document.querySelectorAll('#app .screen').forEach(function(s){s.hidden=s.id!==id});window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('.backHome').forEach(function(b){b.onclick=function(){showScreen('screenHome')}});
 $('openCreate').onclick=function(){resetForm();$('formMsg').textContent='';showScreen('screenCreate')};
 $('openCheck').onclick=function(){showScreen('screenCheck')};
 $('openAssignments').onclick=function(){$('listNotice').textContent='';renderReports();showScreen('screenAssignments')};
 $('openPreview').onclick=function(){showScreen('screenPreview')};
-$('openMessages').onclick=function(){renderMessages();showScreen('screenMessages')};
+$('openMessages').onclick=function(){renderMessages();showScreen('screenMessages');Msgs.show()};
+// Messages (#647): one-on-one chats with every student in every class this account may open.
+var dmUnread=0,legacyUnread=0;
+function drawMessagesCount(){var n=dmUnread+legacyUnread;$('messagesCount').textContent=String(n);$('messagesCount').hidden=!n}
+var Msgs=window.HomeworkMessages.create({role:'teacher',call:function(body){return api(body)},
+  who:function(c){return {classId:c.classId,studentId:c.id}},
+  onUnread:function(n){dmUnread=n;drawMessagesCount()},
+  onJump:async function(id,c){
+    if(c&&c.classId&&c.classId!==state.classId&&Array.prototype.some.call($('cls').options,function(o){return o.value===c.classId})){$('cls').value=c.classId;state.classId=c.classId;resetForm();await load()}
+    openAssignment(id)}});
+$('dmBox').append(Msgs.root);
 ['title','details','assigned','due'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
 function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';var pi=$('previewItems');if(!pi){pi=el('ol',null,'hwi-list');pi.id='previewItems';$('previewDetails').after(pi)}pi.replaceChildren();if(typeof itemsBox!=='undefined')itemsBox.get().forEach(function(item){var d=HI.describe(item);pi.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
 function goCreateStep(step){state.createStep=Math.max(1,Math.min(3,step));[1,2,3].forEach(function(n){$('createStep'+n).hidden=n!==state.createStep});$('stepCaption').textContent='Step '+state.createStep+' of 3 · '+['','Assignment','Students','Review & share'][state.createStep];$('progressFill').style.width=(state.createStep*100/3)+'%';if(state.createStep===3)updatePreview();window.scrollTo({top:0,behavior:'smooth'})}
 function continueToStudents(){var ip=itemsProblem();if(ip){say($('formMsg'),ip);$('itemsBuilder').scrollIntoView({block:'center'});return}if(!$('title').value.trim()){say($('formMsg'),'Add a short name for this assignment first.');$('title').focus();return}say($('formMsg'),'');goCreateStep(2)}
 function continueToReview(){if(document.querySelector('input[name=aud]:checked').value==='some'&&!$('studentPick').querySelector('input:checked')){say($('formMsg'),'Pick at least one student, or choose everyone in your class.');$('studentPick').scrollIntoView({block:'center'});return}say($('formMsg'),'');goCreateStep(3)}
 $('nextAudience').onclick=continueToStudents;$('backToDetails').onclick=function(){goCreateStep(1)};$('nextReview').onclick=continueToReview;$('backToAudience').onclick=function(){goCreateStep(2)};
-function renderFictionalPreview(){var root=$('fakeStudent');root.replaceChildren();root.append(el('h2','Hi, Maya! Ready for homework?'));var tabs=el('div');['To Do','Handed In','Finished'].forEach(function(t){tabs.append(el('span',t,'badge'))});root.append(tabs);var c=el('div',null,'card');c.append(el('span','To Do','badge wait'),el('h3','Practice 5 minutes of Shorashim'),el('p','Read the words and practice saying each one. You still need to press Hand In when you finish.'));var b=el('button','Start Activity');b.disabled=true;b.setAttribute('aria-label','Sample only: Start Activity is disabled');c.append(b,el('button','Hand In','sec'));c.querySelectorAll('button').forEach(function(x){x.disabled=true});root.append(c,el('p','This example is only a picture of the student page. No real student information or homework is loaded.','muted'))}
+function renderFictionalPreview(){var root=$('fakeStudent');root.replaceChildren();root.append(el('h2','Hi, Maya! Ready for homework?'));var tabs=el('div');['To Do','Handed In','Finished','Messages'].forEach(function(t){tabs.append(el('span',t,'badge'))});root.append(tabs);var c=el('div',null,'card');c.append(el('span','To Do','badge wait'),el('h3','Practice 5 minutes of Shorashim'),el('p','Read the words and practice saying each one. You still need to press Hand In when you finish.'));var b=el('button','Start Activity');b.disabled=true;b.setAttribute('aria-label','Sample only: Start Activity is disabled');c.append(b,el('button','Hand In','sec'));c.querySelectorAll('button').forEach(function(x){x.disabled=true});root.append(c,el('p','This example is only a picture of the student page. No real student information or homework is loaded.','muted'))}
 renderFictionalPreview();
 Object.keys(H.TYPES).forEach(function(k){var label=H.TYPES[k];if(k==='audio'||k==='video')label+=' — not available yet';var o=el('option',label);o.value=k;if(k==='audio'||k==='video')o.disabled=true;$('type').append(o)});
 function syncType(){var t=$('type').value;$('targetWrap').style.display='';$('targetUnit').value=t==='shorashim'?'minutes':t==='weeklyQuiz'?'questions':$('targetUnit').value;var aud=document.getElementById('audBox');if(aud)aud.style.display=state.editing?'none':''}
@@ -373,7 +385,7 @@ auth.onAuthStateChanged(async function(u){
     var names={};classes.forEach(function(c){names[c.id]=c.name||c.id});
     var chosen=await B3ClassGate.choose({ids:ids,names:names});
     $('cls').value=chosen;
-    state.classId=$('cls').value;$('app').style.display='';load();
+    state.classId=$('cls').value;$('app').style.display='';load();Msgs.refreshUnread();
   }catch(e){$('signin').style.display='';$('app').style.display='none';say($('signinMsg'),e.message)}
 });
 $('cls').onchange=function(){state.classId=$('cls').value;document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;resetForm();load()};
@@ -495,6 +507,7 @@ function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(s
   var wrap=el('div',null,'tablewrap'),t=el('table',null,'report-table'),hr=el('tr');['Student','Status','Handed in','Grade','Your comment','Notes'].forEach(function(x){hr.append(el('th',x))});var thead=el('thead');thead.append(hr);t.append(thead);var tb=el('tbody');
   ids.forEach(function(id){var s=a.students[id],tr=el('tr'),nameTd=el('td'),nb=el('button',s.name,'link');nb.onclick=function(){openStudent(id)};nameTd.append(nb);var st=el('td');st.append(statusCell(s));if(a.items&&a.items.length)st.append(HI.progressTag(a,s));var g=el('td',null,'grade');g.append(gradeCell(s));var cm=el('td');cm.append(commentCell(s));
     var n=(s.messages||[]).length,newNotes=H.unreadCount(s.messages,'teacher'),notesTd=el('td'),open=state.openNotes===id,nbtn=el('button',open?'Hide notes':'💬 Notes'+(n?' · '+n:''),'sec');if(newNotes&&!open)nbtn.append(el('span',newNotes+' new','conversation-unread'));nbtn.setAttribute('aria-expanded',String(open));nbtn.setAttribute('aria-label',(open?'Hide':'Open')+' notes with '+s.name);nbtn.onclick=function(){state.openNotes=open?null:id;renderAssignmentDetail()};notesTd.append(nbtn);
+    var dmb=el('button','🎤 Message','sec');dmb.setAttribute('aria-label','Message '+s.name+' about this assignment');dmb.onclick=function(){showScreen('screenMessages');Msgs.compose({assignmentId:a.id,assignmentTitle:a.title,contactId:id,classId:state.classId})};notesTd.append(document.createTextNode(' '),dmb);
     tr.append(nameTd,st,el('td',s.submittedAt?H.when(s.submittedAt):'—'),g,cm,notesTd);tb.append(tr);
     if(open){var nr=el('tr',null,'notes-row'),cell=el('td');cell.colSpan=6;if(s.answer)cell.append(el('strong','What '+s.name+' handed in'),el('div',s.answer,'review-work'));cell.append(H.conversation({role:'teacher',studentName:s.name,threadKey:'a-'+a.id+'-'+id,title:'Notes with '+s.name,messages:s.messages||[],send:function(body){return api(Object.assign({assignmentId:a.id,studentId:id},body))},onSent:load,onRead:function(){markSeen(s)}}));nr.append(cell);tb.append(nr)}});
   t.append(tb);wrap.append(t);tableCard.append(wrap);root.append(tableCard)}
@@ -512,12 +525,12 @@ function renderOpenScreens(){renderReports();if(!$('screenAssignment').hidden)re
 function messageThreads(){return (state.data&&state.data.messages)||null}
 function renderMessages(){var threads=messageThreads(),box=$('messagesBox');
   // Older servers send no standalone messages: keep the choice hidden until the server supports it.
-  $('openMessages').hidden=!threads;if(!threads||!box)return;
+  if(!threads||!box){legacyUnread=0;drawMessagesCount();$('earlierMessages').hidden=true;return}
   var students=state.data.students||{},ids=Object.keys(students);
   var newFor=function(id){return H.unreadCount(threads[id]||[],'teacher')};
   var lastAt=function(id){var t=threads[id]||[];return t.length?Number(t[t.length-1].createdAt)||0:0};
-  var total=ids.reduce(function(n,id){return n+newFor(id)},0);
-  $('messagesCount').textContent=String(total);$('messagesCount').hidden=!total;
+  legacyUnread=ids.reduce(function(n,id){return n+newFor(id)},0);drawMessagesCount();
+  $('earlierMessages').hidden=!ids.some(function(id){return (threads[id]||[]).length});
   box.replaceChildren();
   if(!ids.length){box.append(el('p','No students are in this class yet.','muted'));return}
   ids.sort(function(a,b){return newFor(b)-newFor(a)||lastAt(b)-lastAt(a)||students[a].name.localeCompare(students[b].name)});
@@ -529,7 +542,7 @@ function renderMessages(){var threads=messageThreads(),box=$('messagesBox');
   box.append(H.conversation({role:'teacher',studentName:name,threadKey:'general-'+id,title:'Messages with '+name,
     emptyText:'No messages with '+name+' yet. You can type a message or record a voice note.',
     messages:threads[id]||[],send:function(body){return api(Object.assign({studentId:id},body))},onSent:load,
-    onRead:function(){(threads[id]||[]).forEach(function(m){m.unread=false});var n=$('messagesCount'),left=ids.reduce(function(t,x){return t+newFor(x)},0);n.textContent=String(left);n.hidden=!left;var opt=sel.querySelector('option[value="'+id+'"]');if(opt)opt.textContent=name+((threads[id]||[]).length?' · '+plural(threads[id].length,'message'):'')}}));
+    onRead:function(){(threads[id]||[]).forEach(function(m){m.unread=false});legacyUnread=ids.reduce(function(t,x){return t+newFor(x)},0);drawMessagesCount();var opt=sel.querySelector('option[value="'+id+'"]');if(opt)opt.textContent=name+((threads[id]||[]).length?' · '+plural(threads[id].length,'message'):'')}}));
 }
 // ---------- New notes from students about one assignment ----------
 function newNotesIn(a){return Object.keys(a.students||{}).reduce(function(n,id){return n+H.unreadCount(a.students[id].messages,'teacher')},0)}
