@@ -123,16 +123,16 @@ body.boards-on #studentDock{display:none!important}
 /* Teacher marks on a student's shared screen (screen-annotate.js). */
 .cp-screen-ink{position:absolute;z-index:2;touch-action:none}
 .cp-screen-ink[hidden]{display:none}
-.cp-screen-tools{position:relative;z-index:3;flex:none;align-self:center;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 8px;max-width:100%;margin:0 0 6px;padding:6px 10px;border-radius:14px;background:#0f172a;color:#fff;box-shadow:0 6px 22px #0006;font:600 14px system-ui,sans-serif}
+.cp-screen-tools{position:relative;z-index:3;flex:none;align-self:center;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 8px;max-width:100%;margin:0 0 4px;padding:4px 8px;border-radius:12px;background:#0f172a;color:#fff;box-shadow:0 6px 22px #0006;font:600 14px system-ui,sans-serif}
 .cp-screen-tools[hidden]{display:none}
 .cp-screen-group{display:inline-flex;align-items:center;gap:4px}
-.cp-screen-tools button{min-height:34px;padding:4px 10px;border-radius:9px;border:1px solid #ffffff40;background:#1e293b;color:#fff;font:700 14px system-ui,sans-serif;cursor:pointer;box-shadow:none}
+.cp-screen-tools button{min-height:32px;padding:3px 9px;border-radius:9px;border:1px solid #ffffff40;background:#1e293b;color:#fff;font:700 14px system-ui,sans-serif;cursor:pointer;box-shadow:none}
 .cp-screen-tools button:hover:enabled{background:#334155}
 .cp-screen-tools button[aria-pressed="true"]{background:#fef08a;color:#111827;border-color:#facc15}
 .cp-screen-tools button:disabled{opacity:.45;cursor:default}
 .cp-screen-swatches button{width:28px;min-height:28px;height:28px;padding:0;border-radius:50%;background:var(--c);border:2px solid #ffffff80}
 .cp-screen-swatches button[aria-pressed="true"]{background:var(--c);outline:3px solid #facc15;outline-offset:1px;border-color:#fff}
-.cp-screen-help{flex-basis:100%;text-align:center;font-size:13px;font-weight:600;color:#e2e8f0}
+.cp-screen-help{flex:1 1 200px;max-width:340px;text-align:left;font-size:13px;line-height:1.25;font-weight:600;color:#e2e8f0}
 .board-screen-large{display:flex;flex-direction:column;align-items:stretch;padding:6px}
 .board-screen-large video{position:relative;inset:auto;flex:1;min-height:0;width:100%;height:auto}
 .board-screen-large .board-panel-text{margin:auto}

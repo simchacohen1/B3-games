@@ -4,6 +4,7 @@
 // real backend handler, a stub Firebase object, made-up students/teacher. Nothing touches Firebase or the internet.
 // Needs the `peer` package: set PEER_MODULE to the folder of an installed `peer` (not a repo dependency).
 //   PEER_MODULE=C:/path/to/node_modules/peer npx playwright test e2e/pointer-join-ticket-two-browser.spec.cjs --project=chromium
+// PEER_CLOUD=1 instead uses the real public PeerJS signaling service (0.peerjs.com), as the live site does.
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -57,9 +58,8 @@ function makeBackend() {
 }
 
 test.beforeAll(async () => {
-  test.skip(!process.env.PEER_MODULE, 'set PEER_MODULE to an installed `peer` package folder to run the real-browser test');
-  const { PeerServer } = require(process.env.PEER_MODULE);
-  if (!process.env.PEER_EXTERNAL) peerServer = PeerServer({ port: PORT, path: '/', allow_discovery: false });
+  test.skip(!process.env.PEER_MODULE && !process.env.PEER_CLOUD, 'set PEER_MODULE (local signaling) or PEER_CLOUD=1 (public PeerJS) to run the real-browser test');
+  if (!process.env.PEER_CLOUD && !process.env.PEER_EXTERNAL) { const { PeerServer } = require(process.env.PEER_MODULE); peerServer = PeerServer({ port: PORT, path: '/', allow_discovery: false }); }
   backend = makeBackend();
 });
 test.afterAll(async () => { try { peerServer && peerServer.close && peerServer.close(); } catch { /* done */ } });
@@ -75,7 +75,7 @@ async function wire(context, { token, student, extra, session, realFirebase = fa
     }
     if (p === '/activity-test.html') {
       const firebaseTags = realFirebase ? '<script src="/firebase-app-compat.js"></script><script src="/firebase-database-compat.js"></script><script>firebase.initializeApp({projectId:"demo-pointer-test",databaseURL:"http://127.0.0.1:9009?ns=demo-pointer-test"});firebase.database().useEmulator("127.0.0.1",9009)</script>' : '';
-      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body><main id="stage"></main>' + firebaseTags + '<script src="/class-pointer-prototype/vendor/peerjs-1.5.5.min.js"></script><script defer src="/class-pointer-prototype/activity-share.js"></script></body></html>' });
+      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"></head><body><main id="stage"></main>' + firebaseTags + '<script src="/class-pointer-prototype/vendor/peerjs-1.5.5.min.js"></script><script defer src="/class-pointer-prototype/activity-share.js"></script></body></html>' });
     }
     const file = process.env.OLD_CLASSROOM && p.endsWith('/class-pointer-prototype/classroom.js') ? process.env.OLD_CLASSROOM : path.join(ROOT, p); // negative control: the page as it was before the fix
     if (STUB_EMPTY.some(n => p.endsWith('/' + n)) || p.endsWith('/firebase-config.js')) return route.fulfill({ contentType: 'text/javascript', body: '' });
@@ -96,7 +96,8 @@ async function wire(context, { token, student, extra, session, realFirebase = fa
   });
   await context.addInitScript(({ port, token, student, extra, session, realFirebase }) => {
     // local signaling server instead of the public PeerJS cloud
-    let RealPeer; Object.defineProperty(window, 'Peer', { configurable: true, get() { return RealPeer && function (id, opts) { return new RealPeer(id, { host: 'localhost', port, secure: false, ...(opts || {}) }); }; }, set(v) { RealPeer = v; } });
+    // (port 0 = PEER_CLOUD: keep the real public PeerJS service, exactly as the live site uses it)
+    if (port) { let RealPeer; Object.defineProperty(window, 'Peer', { configurable: true, get() { return RealPeer && function (id, opts) { return new RealPeer(id, { host: 'localhost', port, secure: false, ...(opts || {}) }); }; }, set(v) { RealPeer = v; } }); }
     const noop = () => {};
     const ref = path => ({ set: async () => {}, update: async () => {}, remove: async () => {}, on: (_event, callback) => { if (session && path.includes('/classPointerSessions')) { window.__activitySessionCallback = callback; setTimeout(() => callback({ val: () => ({ [session.roomId]: session }) }), 0); } }, off: noop, once: async () => ({ val: () => null }), onDisconnect: () => ({ remove: noop, set: noop }) });
     if (!realFirebase) window.firebase = { apps: [{}], initializeApp: noop, auth: () => ({ currentUser: token ? { uid: token, getIdToken: async () => token } : null, onAuthStateChanged: cb => cb(token ? { uid: token } : null) }), database: () => ({ ref }), storage: () => ({ ref }) };
@@ -111,7 +112,7 @@ async function wire(context, { token, student, extra, session, realFirebase = fa
         window.__captureStreams.push(stream); return stream;
       } });
     }
-  }, { port: PORT, token, student, extra, session, realFirebase });
+  }, { port: process.env.PEER_CLOUD ? 0 : PORT, token, student, extra, session, realFirebase });
 }
 
 async function startTeacher(browser) {
@@ -349,3 +350,59 @@ test('reconnecting asks for a fresh ticket; a removed student cannot rejoin and 
   expect(await roster(t.page)).not.toContain('Avi Synthetic');
   await s.context.close(); await t.context.close();
 });
+
+// ---------- Two-way, end to end over real PeerJS/WebRTC (#673) ----------
+// Teacher shares his screen -> a student on an ordinary activity page sees it and points on it -> the teacher sees
+// his named pointer. The student shares his screen -> the teacher opens it large and draws -> the student sees it.
+test('both directions: student points on the teacher lesson, teacher draws on the student screen', async ({ browser }) => {
+  // The previous test deactivates Avi in the shared synthetic backend; he is an active member again here.
+  backend.rows.get('b3Games/workspaces/b3-2026/classes/et').members.avi.active = true;
+  backend.rows.set('b3Games/workspaces/b3-2026/classes/et/members/avi', { active: true });
+  const t = await startTeacher(browser);
+  const session = enableSharing(t.room);
+  const context = await browser.newContext();
+  await wire(context, { student: AVI, extra: 'canvas', session });
+  const s = await activityTab(context, 'two-way');
+  await expect.poll(async () => (await rosterList(t.page)).some(r => r.studentId === 'avi' && r.admitted), { timeout: 40000 }).toBe(true);
+
+  // 1. Teacher -> student: the lesson arrives over the activity page.
+  await expect(t.page.locator('#shareScreen')).toBeEnabled({ timeout: 10000 });
+  await t.page.evaluate(() => document.getElementById('shareScreen').click());
+  const lesson = s.locator('#fttTeacherLessonOverlay video');
+  await expect.poll(() => lesson.evaluate(v => v.videoWidth), { timeout: 40000 }).toBeGreaterThan(0);
+  await expect(s.locator('#fttLessonDrawTools')).toContainText('👀 Watch only');
+  // The teacher lets him point; his toolbar says so and his pointer reaches the teacher, with his name.
+  await t.page.evaluate(() => window.ClassPointerRoster.setLevelForName('Avi Synthetic', 'point'));
+  await expect(s.locator('#fttLessonDrawTools')).toContainText('You may point', { timeout: 15000 });
+  const box = await lesson.boundingBox();
+  for (let i = 0; i < 6; i++) { await s.mouse.move(box.x + box.width * (0.3 + i * 0.03), box.y + box.height * 0.5); await s.waitForTimeout(120); }
+  await expect(t.page.locator('#pointerLayer .pointer .name', { hasText: 'Avi Synthetic' })).toBeVisible({ timeout: 15000 });
+
+  // 2. Student -> teacher: he shares his screen; the teacher sees the live picture.
+  await s.getByRole('button', { name: 'Back to Activity' }).click();
+  const share = s.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
+  await expect(share).toBeVisible({ timeout: 20000 });
+  await share.click();
+  const tile = t.page.locator('#activityScreenTray .cp-activity-screen').first();
+  await expect.poll(() => tile.locator('video').evaluate(v => v.videoWidth), { timeout: 40000 }).toBe(320);
+  // The teacher opens it large, picks Pen and draws; the line appears on the student's own page.
+  await tile.locator('video').click();
+  await tile.getByRole('button', { name: 'Draw on the student’s screen.' }).click();
+  const ink = await tile.locator('canvas.cp-screen-ink').boundingBox();
+  await t.page.mouse.move(ink.x + ink.width * 0.2, ink.y + ink.height * 0.5); await t.page.mouse.down();
+  await t.page.mouse.move(ink.x + ink.width * 0.7, ink.y + ink.height * 0.5, { steps: 10 }); await t.page.mouse.up();
+  const layer = s.locator('.cp-my-screen-ink');
+  await expect(layer).toBeVisible({ timeout: 15000 });
+  await expect(layer).toContainText('Your teacher is showing you something on your screen');
+  // Point: the student's page receives the live teacher pointer.
+  await tile.getByRole('button', { name: /red “Teacher” pointer/ }).click();
+  await t.page.mouse.move(ink.x + ink.width * 0.5, ink.y + ink.height * 0.4); await t.page.mouse.move(ink.x + ink.width * 0.52, ink.y + ink.height * 0.42);
+  if (process.env.POINTER_SHOTS) { await s.waitForTimeout(500); await s.screenshot({ path: process.env.POINTER_SHOTS + '/real-student-sees-teacher.png' }); await t.page.screenshot({ path: process.env.POINTER_SHOTS + '/real-teacher-draws.png' }); }
+  // He stops sharing: the marks leave his screen.
+  await tile.getByRole('button', { name: /Erase all your marks/ }).click();
+  await s.locator('#fttActivityScreenShare button').first().click();
+  await expect.poll(() => t.page.locator('#activityScreenTray .cp-activity-screen').count(), { timeout: 20000 }).toBe(0);
+  await expect(layer).toBeHidden({ timeout: 15000 });
+  await context.close(); await t.context.close();
+});
+

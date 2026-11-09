@@ -70,8 +70,11 @@
   document.addEventListener?.('classpointer:sharing-state',()=>setFocus(null));
 
   // Show the newest live screen this student is sharing (another tab's share replaces the picture, not the tile).
+  // A tab that was just closed can take a while to report its call closed over the real PeerJS service; its video
+  // stops first. Prefer the newest call whose video is still arriving, so the tile never goes blank.
+  const liveVideo=stream=>!!stream?.getVideoTracks?.().some(track=>track.readyState==='live'&&!track.muted);
   function showLatest(entry){
-    const latest=entry.calls[entry.calls.length-1];
+    const latest=[...entry.calls].reverse().find(item=>liveVideo(item.stream))||entry.calls[entry.calls.length-1];
     const stream=latest?.stream||null;
     if(entry.video.srcObject!==stream){entry.video.srcObject=stream;if(stream)entry.video.play?.().catch?.(()=>{})}
     notify();
@@ -139,7 +142,11 @@
       const priorFailure=document.getElementById('activityScreenFailure');if(priorFailure)priorFailure.hidden=true;
       const entry=tileFor(verified.studentId,String(verified.studentName||'Student'));
       const item={call,stream:null};entry.calls.push(item);screens.set(call,verified.studentId);
-      call.on('stream',stream=>{if(!screens.has(call))return;item.stream=stream;showLatest(entry)});
+      call.on('stream',stream=>{
+        if(!screens.has(call))return;item.stream=stream;showLatest(entry);
+        // Re-pick the picture whenever this screen's video stops or starts again.
+        for(const track of stream.getVideoTracks?.()||[])for(const type of ['mute','unmute','ended'])track.addEventListener?.(type,()=>{if(screens.has(call))showLatest(entry)});
+      });
       // Tidy up after the closing call has finished its own work (keeps this safe if close fires more than once).
       const later=()=>(typeof queueMicrotask==='function'?queueMicrotask:fn=>fn())(()=>clear(call));
       call.on('close',later);call.on('error',later);
