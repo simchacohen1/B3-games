@@ -72,7 +72,7 @@
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
     document.body.append(boardStage);
     const boardCss=document.createElement('link');boardCss.rel='stylesheet';
-    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261018-embedded1',root).href;
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261109-twoway1',root).href;
     document.head.append(boardCss);
     window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
       sendTeacher:message=>{
@@ -80,7 +80,7 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261101-fix66',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-twoway1',root).href);
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -88,7 +88,8 @@
     holder.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
-    const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
+    const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:190px';
+    const IDLE_TEXT='Click to show your teacher your screen. Choose Entire Screen.';label.textContent=IDLE_TEXT;
     // Screen-sharing errors must never send a student into the retired Pointer page.
     const fallback=document.createElement('button');fallback.type='button';
     fallback.textContent='Try again';fallback.hidden=true;
@@ -159,12 +160,18 @@
     function redrawToolbar(){
       if(!allowedMode(lessonTool))lessonTool=lessonLevel==='none'?'point':lessonLevel==='highlight'?'highlight':lessonLevel==='pen'?'pen':'point';
       for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool));button.style.background=mode===lessonTool?'#fef08a':'#193b6c';button.style.color=mode===lessonTool?'#102748':'white';button.style.borderColor=mode===lessonTool?'#facc15':'#86a6df'}
-      viewOnly.hidden=lessonLevel!=='none';undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';for(const button of [...colorButtons,...sizeButtons])button.disabled=lessonLevel==='none';
+      viewOnly.textContent=lessonLevel==='none'?'👀 Watch only':lessonLevel==='point'?'You may point':lessonLevel==='highlight'?'You may point and highlight':'You may point, highlight and write';
+      viewOnly.title=lessonLevel==='none'?'Your teacher has not turned on pointing or drawing for you.':'Pick a tool, then use it on the lesson. Everyone sees it.';
+      undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';for(const button of [...colorButtons,...sizeButtons])button.disabled=lessonLevel==='none';colorSelect.style.display=sizeSelect.style.display=lessonLevel==='none'?'none':'flex';
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
     }
     for(const [mode,symbol,name] of lessonModes){
-      const button=document.createElement('button');button.type='button';button.textContent=symbol;button.title=name;button.setAttribute('aria-label',name);
-      button.style.cssText='width:48px;height:48px;padding:0;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;font:900 27px system-ui;line-height:1;touch-action:manipulation';
+      // Icon plus a visible name, so a student never has to guess what a tool does.
+      const button=document.createElement('button');button.type='button';button.title=name;button.setAttribute('aria-label',name);
+      const icon=document.createElement('span');icon.textContent=symbol;icon.setAttribute('aria-hidden','true');icon.style.cssText='display:block;font:900 22px/1 system-ui';
+      const caption=document.createElement('span');caption.textContent=name.replace('Highlight box','Box');caption.setAttribute('aria-hidden','true');caption.style.cssText='display:block;margin-top:2px;font:700 10px/1.1 system-ui;white-space:nowrap';
+      button.append(icon,caption);
+      button.style.cssText='min-width:52px;height:50px;padding:3px 5px;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;line-height:1;touch-action:manipulation';
       button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
@@ -178,9 +185,9 @@
     const sizeButtons=[];
     const selectSize=value=>{lessonSize=value;for(const b of sizeButtons){const on=Number(b.dataset.size)===value;b.setAttribute('aria-pressed',String(on));b.style.background=on?'#fef08a':'#193b6c';b.style.borderColor=on?'#facc15':'#86a6df'}};
     for(const [size,name,thickness] of [[.008,'Thin',2],[.016,'Medium',5],[.028,'Thick',9]]){const b=document.createElement('button');b.type='button';b.dataset.size=String(size);b.title=name;b.setAttribute('aria-label',name+' line');b.style.cssText='width:47px;height:47px;display:flex;align-items:center;justify-content:center;border:3px solid #86a6df;border-radius:11px;background:#193b6c;cursor:pointer;touch-action:manipulation';const line=document.createElement('span');line.style.cssText='width:28px;height:'+thickness+'px;border-radius:10px;background:#fff';b.append(line);b.addEventListener('click',()=>selectSize(size));sizeButtons.push(b);sizeSelect.append(b)}
-    undo.textContent='↶';undo.title='Undo my last drawing';undo.setAttribute('aria-label','Undo my last drawing');
-    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽';clear.title='Clear only my drawings';clear.setAttribute('aria-label','Clear only my drawings');
-    for(const b of [undo,clear])b.style.cssText='width:47px;height:47px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:900 26px system-ui;cursor:pointer;touch-action:manipulation';
+    undo.textContent='↶ Undo';undo.title='Undo my last drawing';undo.setAttribute('aria-label','Undo my last drawing');
+    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽 Clear mine';clear.title='Clear only my drawings';clear.setAttribute('aria-label','Clear only my drawings');
+    for(const b of [undo,clear])b.style.cssText='height:47px;padding:0 10px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:800 15px system-ui;white-space:nowrap;cursor:pointer;touch-action:manipulation';
     clear.addEventListener('click',()=>{if(admitted&&lessonActive&&presenceConn?.open&&lessonLevel!=='none')presenceConn.send({type:'edit-highlights',action:'clear'})});
     const bottomRow=document.createElement('div');bottomRow.style.cssText='display:flex;gap:8px;align-items:center;justify-content:center';
     bottomRow.append(sizeSelect,undo,clear);
@@ -220,9 +227,14 @@
       }
       for(const [id,point] of Object.entries(lessonMarks.points||{})){
         if(!Number.isFinite(point?.x)||!Number.isFinite(point?.y)||point.x<0||point.x>1||point.y<0||point.y>1)continue;
-        const tag=document.createElement('span');tag.textContent='●';
-        const who=(lessonMarks.members||[]).find(m=>m.id===id);tag.title=who?.name||'Pointer';
-        tag.style.cssText='position:absolute;transform:translate(-50%,-50%);color:#ffcc00;font:900 26px system-ui;text-shadow:0 1px 4px #000';
+        const who=id==='teacher'?{name:'Teacher',color:'#ffcc00'}:(lessonMarks.members||[]).find(m=>m.id===id);
+        const color=/^#[0-9a-fA-F]{6}$/.test(point.color||'')?point.color:/^#[0-9a-fA-F]{6}$/.test(who?.color||'')?who.color:'#ffcc00';
+        const tag=document.createElement('span');tag.title=who?.name||'Pointer';
+        tag.style.cssText='position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none';
+        const dot=document.createElement('span');dot.textContent='●';dot.style.cssText='color:'+color+';font:900 26px/1 system-ui;text-shadow:0 1px 4px #000';
+        const name=document.createElement('span');name.textContent=String(who?.name||'').slice(0,32);
+        name.style.cssText='margin-top:2px;padding:1px 6px;border-radius:6px;background:#0f172acc;color:#fff;font:700 12px system-ui;white-space:nowrap';
+        tag.append(dot);if(name.textContent)tag.append(name);
         tag.style.left=(point.x*100)+'%';tag.style.top=(point.y*100)+'%';pointerLayer.appendChild(tag);
       }
     }
@@ -450,10 +462,12 @@
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
+      // My screen is no longer shared: take the teacher's marks off it.
+      if(prior)window.ClassPointerBoards?.clearScreenMarks?.();
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
-      label.textContent='';
+      label.textContent=IDLE_TEXT;
       fallback.hidden=true;
     }
     function status(text){label.textContent=text}
@@ -540,7 +554,7 @@
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('Sharing your screen with the teacher');
+        status('✅ Your teacher can see your screen. Click Stop Sharing when your teacher says.');
       }catch(error){
         captured?.getTracks().forEach(t=>t.stop());
         // A failure must release media/peer resources without erasing the error or reopening a blocking dialog.
