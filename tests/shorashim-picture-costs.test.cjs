@@ -21,5 +21,5 @@ test('paid teacher-requested suggestions are opt-in and never replace selected p
  assert.ok(js.includes('New picture suggestions use separate OpenAI API credits.'));
  assert.ok(js.includes('const fresh=candidates.filter(x=>!oldPool.includes(x));'));
  assert.ok(js.includes('item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);'));
- assert.match(html,/teacher\.js\?v=20261108-bulk-delete-1/);
+ assert.match(html,/teacher\.js\?v=20261109-units-bulk-delete/);
 });
