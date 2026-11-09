@@ -37,12 +37,15 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
 <script src="../../guest-mode.js?v=20261011-guest"></script><script src="../../access-guard.js" data-b3-tool-id="yiddish"></script><script src="../../teacher-account.js?v=20261008"></script>
 <header><a class="back" href="../index.html">← Yiddish</a><div><h1 id="title">Story 2</h1><span id="titleYi" class="title-yi" lang="yi" hidden></span><small id="credit"></small></div><div class="player"><audio id="audio" controls preload="metadata"></audio><div class="bar"><label>Speed <select id="speed"><option>0.75</option><option selected>1</option><option>1.1</option><option>1.25</option><option>1.5</option><option>2</option></select></label><button id="rewind">Back 10 sec</button><button id="full">Full screen</button></div></div></header>
 <main><section class="card pic-card" aria-label="Pictures"><div class="bar"><label>Picture width <input id="width" type="range" min="30" max="75" value="55"></label></div><div id="stage" class="stage"></div><div id="caption" class="caption"></div><div id="picNav" class="bar nav"><button id="prev">← Previous</button><strong id="count"></strong><button id="next">Next →</button></div><div id="thumbs" class="thumbs"></div><div class="hint" id="picHint">Pictures follow the audio. You can also use ← / → or click a paragraph.</div></section><section class="card" aria-label="Story text"><div class="bar textbar"><button id="smaller">A−</button><strong id="fontLabel">28 px</strong><button id="bigger">A+</button><button id="top">Text top</button><label><input type="checkbox" id="follow" checked> Follow the audio</label></div><div class="transcript" id="text"></div><div class="hint">Original wording preserved. Click a paragraph to highlight it<span id="seekHint" hidden> and play from there</span>. <span id="notice" role="status"></span></div></section></main>
-<script src="story.js?v=1"></script><script src="word-times.js?v=1"></script>
+<script src="story.js?v=2"></script><script src="word-times.js?v=2"></script>
 <script>
 (() => {
   const S = window.YIDDISH_STORY_2 || {}, WT = window.YIDDISH_STORY_2_WORD_TIMES || null, $ = id => document.getElementById(id);
   const paras = Array.isArray(S.paras) ? S.paras : [], intro = Array.isArray(S.intro) ? S.intro : [];
-  const pics = (Array.isArray(S.pictures) ? S.pictures : []).filter(p => p && p.src).sort((a, b) => (a.para || 0) - (b.para || 0));
+  const pics = (Array.isArray(S.pictures) ? S.pictures : []).filter(p => p && p.src);
+  /* Pictures with `at` (seconds) change at that moment in the audio, even in the middle of a paragraph. */
+  const picsByTime = pics.length > 0 && pics.every(p => Number.isFinite(p.at));
+  pics.sort(picsByTime ? (a, b) => a.at - b.at : (a, b) => (a.para || 0) - (b.para || 0));
   const times = Object.entries(S.times || {}).map(([i, t]) => [Number(i), Number(t)]).filter(([i, t]) => Number.isInteger(i) && paras[i] != null && Number.isFinite(t)).sort((a, b) => a[1] - b[1]);
   const KEY = 'yiddish-story2-reader-v1', audio = $('audio');
   let state = { font: 28, width: 55 }, pos = 0, activePara = -1, onWord = null;
@@ -108,7 +111,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     const p = $('p' + i); if (!p) return;
     p.classList.add('active');
     if (scroll && $('follow').checked) box.scrollTop = p.offsetTop - box.offsetTop - 10;
-    if (pics.length) { let j = -1; pics.forEach((pic, k) => { if ((pic.para || 0) <= i) j = k; }); if (j >= 0 && j !== pos) { pos = j; renderPic(); } }
+    if (pics.length && !picsByTime) { let j = -1; pics.forEach((pic, k) => { if ((pic.para || 0) <= i) j = k; }); if (j >= 0 && j !== pos) { pos = j; renderPic(); } }
   }
   function tick() {
     const t = audio.currentTime;
@@ -116,6 +119,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     let hit = null; const spans = wordSpans[activePara];
     if (spans) for (const sp of spans) { if (+sp.dataset.s <= t && t < +sp.dataset.e) { hit = sp; break; } }
     if (hit !== onWord) { if (onWord) onWord.classList.remove('on'); if (hit) hit.classList.add('on'); onWord = hit; }
+    if (picsByTime) { let j = 0; pics.forEach((pic, k) => { if (pic.at <= t + 0.05) j = k; }); if (j !== pos) { pos = j; renderPic(); } }
   }
   let raf = 0; const loop = () => { tick(); if (!audio.paused) raf = requestAnimationFrame(loop); };
   audio.addEventListener('play', () => { cancelAnimationFrame(raf); loop(); });
@@ -132,6 +136,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     }
     const pic = pics[pos], img = document.createElement('img');
     img.src = pic.src; img.alt = pic.caption || ''; stage.replaceChildren(img);
+    if (pics[pos + 1]) new Image().src = pics[pos + 1].src; /* load the next picture early so page turns are instant */
     $('caption').textContent = pic.caption || '';
     $('count').textContent = `${pos + 1} / ${pics.length}`;
     $('prev').disabled = pos === 0; $('next').disabled = pos === pics.length - 1;
@@ -139,6 +144,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
   }
   function go(j) {
     if (j < 0 || j >= pics.length) return; pos = j; renderPic();
+    if (picsByTime && audioReady) { audio.currentTime = pics[j].at; return; }
     if ($('follow').checked && pics[j].para != null) { const p = $('p' + pics[j].para); if (p) { box.querySelectorAll('.para.active').forEach(x => x.classList.remove('active')); p.classList.add('active'); activePara = pics[j].para; box.scrollTop = p.offsetTop - box.offsetTop - 10; } }
   }
   $('prev').onclick = () => go(pos - 1); $('next').onclick = () => go(pos + 1);
