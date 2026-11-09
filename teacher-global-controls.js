@@ -236,7 +236,21 @@
     }
     syncPointerButtons();
   }
+  // Shared drawing toolbar: a teacher always has the pencil button (class-pointer-prototype/annotation-toolbar.js).
+  var annotateLoading = null;
+  function teacherAnnotate(on) {
+    if (!on) { if (window.FTTAnnotate) window.FTTAnnotate.setRole(null); return; }
+    if (window.FTTAnnotate) { window.FTTAnnotate.setRole('teacher'); return; }
+    if (annotateLoading) return;
+    annotateLoading = document.createElement('script');
+    annotateLoading.src = new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1', base).href;
+    annotateLoading.async = true;
+    annotateLoading.onload = function() { if (authorized && window.FTTAnnotate) window.FTTAnnotate.setRole('teacher'); };
+    annotateLoading.onerror = function() { annotateLoading = null; };
+    document.head.appendChild(annotateLoading);
+  }
   function reset() {
+    teacherAnnotate(false);
     authorized = false; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
@@ -279,6 +293,7 @@
       // pre-selected; otherwise the bar shows "Choose a class\u2026".
       selected = ids.includes(requested) ? requested : '';
       authorized=true;
+      teacherAnnotate(true);
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
