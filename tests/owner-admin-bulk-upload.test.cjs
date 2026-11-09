@@ -29,8 +29,10 @@ function harness(initial={}){
  const fetch=async(url,opts)=>{
   const body=JSON.parse(opts.body);studentCalls.push({url,body,auth:opts.headers.Authorization});
   if(body.name==='Fail Student')return {ok:false,json:async()=>({error:'Enter a student name and individual passcode.'})};
-  const id='student_'+studentCalls.length;
-  write('b3Games/workspaces/b3-2026/classes/'+body.classId+'/members/'+id,{studentId:id,name:body.name,active:true});
+  const id=body.action==='add'?body.studentId:'student_'+studentCalls.length;
+  const name=body.name||Object.values(read('b3Games/workspaces/b3-2026/classes')||{})
+    .flatMap(cls=>Object.values(cls.members||{})).find(m=>m.studentId===id)?.name;
+  write('b3Games/workspaces/b3-2026/classes/'+body.classId+'/members/'+id,{studentId:id,name,active:true});
   return {ok:true,json:async()=>({ok:true,studentId:id})};
  };
  let loads=0;
@@ -152,4 +154,36 @@ test('class names without Latin letters never write to the classes root',async()
  const classes=h.read('b3Games/workspaces/b3-2026/classes');
  assert.deepEqual(Object.values(classes),[{name:'כיתה ה',active:true}]);
  assert.match(Object.keys(classes)[0],/^class/);
+});
+
+test('same student in ET and WT gets one account and the same passcode',async()=>{
+ const h=harness();
+ h.preview([
+  'type,name,email,passcode,class',
+  'class,B3 ET,,,',
+  'class,B3 WT,,,',
+  'student,Example Boy,,secure-pin,B3 ET',
+  'student,Example Boy,,secure-pin,B3 WT'
+ ].join('\n'));
+ assert.equal(h.el('bulkImport').disabled,false);
+ await h.importAll();
+ assert.deepEqual(h.studentCalls.map(c=>c.body),[
+  {action:'create',classId:'b3_et',name:'Example Boy',passcode:'secure-pin'},
+  {action:'add',classId:'b3_wt',studentId:'student_1'}
+ ]);
+ assert.equal(Object.keys(h.read('b3Games/workspaces/b3-2026/classes/b3_et/members')).length,1);
+ assert.equal(Object.keys(h.read('b3Games/workspaces/b3-2026/classes/b3_wt/members')).length,1);
+ assert.equal(h.read('b3Games/workspaces/b3-2026/classes/b3_wt/members/student_1').studentId,'student_1');
+});
+test('multiple class rows with conflicting passcodes cannot be imported',()=>{
+ const h=harness();
+ h.preview([
+  'type,name,email,passcode,class',
+  'class,B3 ET,,,',
+  'class,B3 WT,,,',
+  'student,Example Boy,,1111,B3 ET',
+  'student,Example Boy,,2222,B3 WT'
+ ].join('\n'));
+ assert.equal(h.el('bulkImport').disabled,true);
+ assert.match(h.el('bulkSummary').innerHTML,/different passcodes/);
 });
