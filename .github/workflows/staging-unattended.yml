@@ -31,6 +31,9 @@ on:
       - 'playwright.staging.config.ts'
       - 'scripts/staging-test-report.cjs'
       - 'tests/staging-test-report.test.cjs'
+      - 'scripts/feature-health-report.cjs'
+      - 'testing/feature-health.json'
+      - 'tests/feature-health-report.test.cjs'
       - '.github/workflows/staging-unattended.yml'
 
 permissions:
@@ -66,7 +69,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Reporter self-test
-        run: node --test tests/staging-test-report.test.cjs
+        run: node --test tests/staging-test-report.test.cjs tests/feature-health-report.test.cjs
 
       - name: Public smoke (anonymous)
         if: env.TIER == 'smoke' || env.TIER == 'nightly'
@@ -137,6 +140,20 @@ jobs:
           2. npm ci && npm ci --prefix backend/functions --ignore-scripts
           3. node --test \"tests/**/*.test.cjs\" and node scripts/security-rule-audit.cjs --ci" \
             ${{ env.FILE_ISSUES == 'true' && '--issues' || '' }}
+
+      - name: Build feature-by-feature health report
+        if: always()
+        run: node scripts/feature-health-report.cjs staging-results/smoke.json staging-results/auth.json
+      - name: Upload feature health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-health-${{ env.TIER }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            staging-results/feature-health.md
+            staging-results/feature-health.json
 
       - name: Upload failure evidence
         if: always() && (steps.smoke.outputs.failed != '0' || steps.auth.outputs.failed != '0' || steps.regression.outputs.failed != '0')

@@ -603,7 +603,7 @@ function renderCatalog(){
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
-      <div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
+      <div class="mini-actions"><label class="bulk-pick" title="Select for bulk delete"><input type="checkbox" data-a="pick" ${bulkSelected.has(String(i.id))?'checked':''} aria-label="Select ${esc(i.front)}"></label><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
       <div class="hebrew">${esc(i.front)}</div>
       <div>
         <b>${esc(i.english)}</b>
@@ -619,6 +619,9 @@ function renderCatalog(){
       </div>
     </div>`;
   }).join('')||'<p class="mini-note">This list is empty.\nAdd an item or use Bulk Add.</p>';
+  const visibleIds=new Set(list.map(i=>String(i.id)));
+  [...bulkSelected].forEach(id=>{if(!visibleIds.has(id))bulkSelected.delete(id)});
+  updateBulkBar(list);
 
   [...$('teacherCatalog').querySelectorAll('.catalog-teacher-row')].forEach(row=>{
     const id=row.dataset.id;
@@ -627,6 +630,7 @@ function renderCatalog(){
     row.querySelector('[data-a=edit]').onclick=()=>openEdit(id);
     row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);
     row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
+    row.querySelector('[data-a=pick]').onchange=e=>{if(e.target.checked)bulkSelected.add(String(id));else bulkSelected.delete(String(id));updateBulkBar(list);};
     const approve=row.querySelector('[data-a=approve]');
     if(approve)approve.onclick=()=>toggleTeacherApproval(id);
     const mergeDuplicate=row.querySelector('[data-a=merge-duplicate]');
@@ -739,6 +743,28 @@ async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$(
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
+/* Bulk delete: tick words in the current list, then delete them all at once. */
+const bulkSelected=new Set();
+function updateBulkBar(list){
+  const bar=$('teacherBulkBar');if(!bar)return;
+  bar.classList.toggle('hidden',!list.length);
+  const n=bulkSelected.size,all=$('teacherSelectAll'),del=$('teacherDeleteSelected');
+  if(all){all.checked=list.length>0&&n===list.length;all.indeterminate=n>0&&n<list.length;all.onchange=()=>{bulkSelected.clear();if(all.checked)list.forEach(i=>bulkSelected.add(String(i.id)));renderCatalog();};}
+  const lbl=$('teacherSelectAllLabel');if(lbl)lbl.textContent=`Select all (${list.length})`;
+  if(del){del.disabled=!n;del.textContent=`🗑 Delete Selected (${n})`;del.onclick=deleteSelectedCatalogItems;}
+  const clr=$('teacherClearSelected');if(clr){clr.classList.toggle('hidden',!n);clr.onclick=()=>{bulkSelected.clear();renderCatalog();};}
+}
+async function deleteSelectedCatalogItems(){
+  const list=state.catalog[currentTrack]||[],picked=list.filter(x=>bulkSelected.has(String(x.id)));
+  if(!picked.length)return;
+  const preview=picked.slice(0,12).map(x=>`• ${x.front}${x.english?` — ${x.english}`:''}`).join('\n')+(picked.length>12?`\n…and ${picked.length-12} more`:'');
+  if(!confirm(`Permanently delete ${picked.length} word${picked.length===1?'':'s'}?\n\n${preview}\n\nThis removes them from Firebase. This cannot be undone.`))return;
+  const ids=new Set(picked.map(x=>String(x.id)));
+  state.catalog[currentTrack]=list.filter(x=>!ids.has(String(x.id)));
+  bulkSelected.clear();
+  renderCatalog();
+  await saveCatalog();
+}
 async function deleteCatalogItem(id){
   const list=state.catalog[currentTrack]||[],i=list.find(x=>x.id===id);
   if(!i)return;

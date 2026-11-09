@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const policy = require('./homework-policy.cjs');
 const { resolveStudent } = require('./student-login-core.cjs');
 const { guarded } = require('./auth-attempts.cjs');
+const hwItems = require('./homework-items-core.cjs');
 
 const WS = 'b3-2026';
 const key = s => typeof s === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(s);
@@ -105,6 +106,7 @@ function present(def, rec, now) {
     draft: rec.draft || '', progress: rec.progress || 0, answer: rec.answer || '',
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
     updatedAt: rec.updatedAt || null,
+    items: hwItems.itemsOf(def), itemsDone: hwItems.doneMap(def, rec),
     messages: publicMessages(rec, 'student')
   };
 }
@@ -229,13 +231,14 @@ async function teacherDo(store, identity, body, now, newId) {
         if (late) counts.missing++;
         students[sid] = { name: members[sid].name, status: rec.status, late, answer: rec.answer || '',
           progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-          messages: publicMessages(rec, 'teacher') };
+          itemsDone: hwItems.doneMap(def, rec), messages: publicMessages(rec, 'teacher') };
       }
       rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details,
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
-        publicationState: publicationState(def), createdAt: def.createdAt, publishedAt: def.publishedAt ?? null, counts, students });
+        publicationState: publicationState(def), createdAt: def.createdAt, publishedAt: def.publishedAt ?? null,
+        items: hwItems.itemsOf(def), counts, students });
     }
     const sids = Object.keys(members);
     const threads = await Promise.all(sids.map(sid => generalThread(store, generalPath(classId, sid), 'teacher')));
@@ -245,8 +248,9 @@ async function teacherDo(store, identity, body, now, newId) {
   }
 
   if (body.action === 'create') {
+    const items = hwItems.cleanItems(body.items, newId);
     let def;
-    try { def = policy.cleanDefinition({ type: body.type, title: body.title, details: body.details || '', dueAt: body.dueAt ?? null }); }
+    try { def = policy.cleanDefinition({ type: items ? items[0].type : body.type, title: body.title, details: body.details || '', dueAt: body.dueAt ?? null }); }
     catch (e) { fail(400, 'Check the type, title (up to 120 letters) and instructions.'); }
     const rawTarget = body.targetAmount == null || body.targetAmount === '' ? body.targetMinutes : body.targetAmount;
     const targetAmount = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
@@ -265,7 +269,7 @@ async function teacherDo(store, identity, body, now, newId) {
     }
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
-    const full = { id, ...def, label, assignedAt, targetAmount, targetUnit,
+    const full = { id, ...def, ...(items ? { items } : {}), label, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
     await store.set(base(classId) + '/definitions/' + id, full);
@@ -332,9 +336,11 @@ async function teacherDo(store, identity, body, now, newId) {
   }
   if (body.action === 'edit') {
     if (publicationState(def) === 'archived') fail(409, 'Archived assignments are read only.');
+    // items: undefined keeps the current list, an empty list removes it (back to a plain assignment).
+    const items = body.items === undefined ? hwItems.itemsOf(def) : hwItems.cleanItems(body.items, newId) || [];
     let next;
     try {
-      next = policy.cleanDefinition({ type: def.type, title: body.title ?? def.title, details: body.details ?? def.details,
+      next = policy.cleanDefinition({ type: items.length ? items[0].type : def.type, title: body.title ?? def.title, details: body.details ?? def.details,
         dueAt: body.dueAt === undefined ? def.dueAt : body.dueAt });
     } catch (e) { fail(400, 'Check the title, instructions and due date.'); }
     const label = cleanLabel(body.label, labelOf(def));
@@ -346,7 +352,9 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit === undefined ? def.targetUnit || (def.targetMinutes ? 'minutes' : '') : body.targetUnit);
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
-    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, label, assignedAt, targetAmount,
+    const kept = { ...def };
+    delete kept.items;
+    await store.set(base(classId) + '/definitions/' + def.id, { ...kept, ...next, ...(items.length ? { items } : {}), label, assignedAt, targetAmount,
       targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
     return { ok: true };
   }
@@ -418,6 +426,23 @@ async function studentDo(store, body, now, ip, newId) {
     return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
   }
   if (body.action === 'markRead') return markRead(store, path, 'student', now);
+  if (body.action === 'itemDone') {
+    // Sent by the activity page (homework mode) when the student finishes one checklist item.
+    const item = hwItems.itemsOf(def).find(x => x.id === body.itemId);
+    if (!item) fail(404, 'That homework item was not found.');
+    let result = null;
+    const tx = await store.tx(path, cur => {
+      const rec = cur || newRecord(def, now);
+      const itemsDone = { ...(rec.itemsDone || {}) };
+      if (!itemsDone[item.id]) itemsDone[item.id] = now;
+      const next = { ...rec, itemsDone, updatedAt: now };
+      if (rec.status === 'assigned') next.status = 'in_progress';
+      result = next;
+      return next;
+    });
+    if (!tx || tx.committed === false || !result) fail(409, 'Could not save. Please try again.');
+    return { ok: true, itemsDone: hwItems.doneMap(def, result), allDone: hwItems.allDone(def, result) };
+  }
   if (body.action === 'voiceRead') {
     const rec = await store.get(path), message = (rec?.messages || []).find(item => item.id === body.messageId && item.voice);
     if (!message) fail(404, 'That voice note is no longer available.');
@@ -448,7 +473,8 @@ async function studentDo(store, body, now, ip, newId) {
   }
   if (body.action === 'submit') {
     const answer = text(body.answer, 2000), progress = minutes(body.progress);
-    if (!answer && def.targetUnit !== 'minutes' && !def.targetMinutes) fail(400, 'Write a short note about what you did.');
+    if (!answer && def.targetUnit !== 'minutes' && !def.targetMinutes &&
+        !hwItems.allDone(def, await store.get(path))) fail(400, 'Write a short note about what you did.');
     await store.tx(path, cur => {
       const rec = cur || newRecord(def, now);
       if (rec.status === 'submitted' && rec.answer === answer) return rec; // repeat tap: same result
@@ -478,7 +504,7 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
   }
   if (['comment', 'voiceRead', 'markRead'].includes(a) && auth && auth.identity)
     return teacherDo(store, auth.identity, body, now, newId);
-  if (['studentList', 'save', 'submit', 'comment', 'voiceRead', 'markRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
+  if (['studentList', 'save', 'submit', 'itemDone', 'comment', 'voiceRead', 'markRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };
