@@ -16,6 +16,8 @@ body{margin:0;padding:18px}
 main{max-width:530px;margin:12vh auto;padding:24px;background:#fff;border:1px solid #dce4ef;border-radius:18px;box-shadow:0 12px 35px #1720331a}
 h1{margin:0 0 10px;color:#17395b}
 p{line-height:1.55;color:#526075}
+.headline{font-size:1.2rem;font-weight:700;color:#17395b}
+.small{font-size:.9rem}
 </style>
 <script>
 /* A new same-origin window inherits this tab's sessionStorage. The invitation
@@ -23,13 +25,19 @@ p{line-height:1.55;color:#526075}
 try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key&&key.startsWith('fttPointerShareInvite:'))sessionStorage.removeItem(key)}}catch{}
 try{if(window.opener)window.opener=null}catch{}
 </script>
-<script defer src="activity-share.js?v=20261101-switch1"></script>
+<script defer src="activity-share.js?v=20261109-holdertab1"></script>
 </head>
 <body>
 <main>
 <h1>Share My Screen</h1>
-<p>Keep this window open while you visit Shorashim or another activity. Choose <strong>Entire Screen</strong> in your browser. The screen will keep sharing as you change activities in your other tab.</p>
-<div id="fttShareControlArea"></div><p role="status">Start or stop sharing here. No separate Class Pointer student page is needed.</p>
+<p id="fttShareHeadline" class="headline">Getting ready…</p>
+<p>Your teacher sees your screen while this tab stays open. You can visit any page in your other tab and the sharing keeps going.</p>
+<div id="fttShareControlArea"></div>
+<p class="small">To stop, click <strong>Stop Sharing</strong> here or in your other tab. Stopping closes this tab.</p>
 </main>
+<script>
+/* If sharing could not start (not signed in, sharing turned off), say so instead of waiting forever. */
+setTimeout(function(){var h=document.getElementById('fttShareHeadline');if(h&&h.textContent==='Getting ready…')h.textContent='Sharing is not available right now. Close this tab and try again from your other tab.'},15000);
+</script>
 </body>
 </html>
