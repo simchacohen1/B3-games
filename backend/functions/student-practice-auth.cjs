@@ -4,6 +4,23 @@ const validKey=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(val
 const toolForSource=source=>['reading100','translation100','understand100'].includes(source)?'posuk-practice-scroll'
   :String(source||'').startsWith('shorashim-')?'shorashim':String(source||'').startsWith('rashi-')?'rashi-letters':'chazara';
 
+// The parts of a class record a student access check uses: its active flag,
+// tool grants and this one student's membership row. The whole record also
+// holds every member and the class's gallery posts, so reading it on every
+// request downloaded far more than the check needs. Returns null when none
+// of those parts exist (no such class, or this student is not in it).
+async function readClassForStudent(get,classId,studentId,workspaceId='b3-2026'){
+  const base=`b3Games/workspaces/${workspaceId}/classes/${classId}`;
+  const [active,toolGrants,member]=await Promise.all([
+    get(`${base}/active`),get(`${base}/toolGrants`),get(`${base}/members/${studentId}`)
+  ]);
+  if(active==null&&toolGrants==null&&member==null)return null;
+  const cls={members:member==null?{}:{[studentId]:member}};
+  if(active!=null)cls.active=active;
+  if(toolGrants!=null)cls.toolGrants=toolGrants;
+  return cls;
+}
+
 async function authorizePracticeStudent({authorization,verifyToken,get,source,studentTools}){
   if(!String(authorization||'').startsWith('Bearer '))return {ok:false,status:401,error:'Student sign-in required.'};
   let decoded;
@@ -15,7 +32,7 @@ async function authorizePracticeStudent({authorization,verifyToken,get,source,st
   const [profile,memberships,cls]=await Promise.all([
     get(`b3Games/students/${studentId}/profile`),
     get(`b3Games/students/${studentId}/memberships`),
-    get(`b3Games/workspaces/b3-2026/classes/${classId}`)
+    readClassForStudent(get,classId,studentId)
   ]);
   const member=cls?.members?.[studentId],rows=memberships||{};
   const enrolled=Object.values(rows).some(row=>row&&row.active!==false&&row.workspaceId==='b3-2026'&&row.classId===classId)
@@ -28,4 +45,4 @@ async function authorizePracticeStudent({authorization,verifyToken,get,source,st
   return {ok:true,studentId,classId,decoded};
 }
 
-module.exports={authorizePracticeStudent,toolForSource,validKey};
+module.exports={authorizePracticeStudent,readClassForStudent,toolForSource,validKey};

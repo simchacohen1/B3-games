@@ -618,7 +618,7 @@ function switchStudent(reload=true){
 }
 
 function detachLaunchListeners(){
-  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(assignmentQueueRef)assignmentQueueRef.off();if(launchPollTimer)clearInterval(launchPollTimer);
+  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(assignmentQueueRef)assignmentQueueRef.off();if(launchPollTimer)clearTimeout(launchPollTimer);
   classLaunchRef=personalLaunchRef=assignmentQueueRef=null;launchPollTimer=null;refreshActiveLaunch=null;
 }
 
@@ -747,14 +747,14 @@ let quizLoadError='';
 function chooseActiveLaunch(id){
   id=id||'';
   if(id===activeLaunchId&&(launchData||launchPollTimer))return;
-  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
+  if(launchPollTimer)clearTimeout(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
   activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;quizLoadError='';
   if(!id){render();return;}
   const cached=assignedInfo[id];
   if(cached&&cached.error&&!cached.launch){quizLoadError=cached.error;render();}
   else if(cached&&cached.launch){launchData=cached.launch;render();}
   else render();
-  let refreshCount=0,failures=0;
+  let failures=0,historyAt=Date.now();
   const refresh=async()=>{
     try{
       const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;
@@ -764,7 +764,7 @@ function chooseActiveLaunch(id){
       if(result.completion)allCompletions[id]={[myStudentId]:result.completion};
       if(allLaunches[id])allLaunches[id]=launchData;
       render();renderAssigned();
-      if(++refreshCount%12===0)await listenForHistory();
+      if(Date.now()-historyAt>=60000){historyAt=Date.now();await listenForHistory();}
     }catch(error){
       console.warn('Could not refresh quiz:',error);if(activeLaunchId!==id)return;
       // A permanent answer (not assigned / not found) is shown right away; a
@@ -773,8 +773,26 @@ function chooseActiveLaunch(id){
       if([400,403,404].includes(error.status)||(!launchData&&failures>=2)||failures>=6){quizLoadError=error.message||'Could not load this quiz.';render();}
     }
   };
-  refreshActiveLaunch=refresh;refresh();launchPollTimer=setInterval(refresh,2500);
+  // Each refresh is a Cloud Function call, so poll only as fast as the quiz
+  // needs: quickly while the teacher is pacing questions live, slowly when
+  // nothing can change soon, and not at all while the tab is hidden (the
+  // visibilitychange handler below catches up as soon as it is shown again).
+  const nextDelay=()=>{
+    const l=launchData;
+    if(!l)return 5000;                                        // still loading / not found yet
+    if(l.endedAt||allCompletions[id]?.[myStudentId])return 60000; // finished: only a revoke or review can change
+    if(!l.started)return 5000;                                // waiting for the teacher to start
+    if(l.mode==='test')return 30000;                          // self-paced: every question is already open
+    return 4000;                                              // teacher-paced live quiz
+  };
+  const tick=async()=>{
+    if(refreshActiveLaunch!==refresh)return;
+    if(!document.hidden)await refresh();
+    if(refreshActiveLaunch===refresh)launchPollTimer=setTimeout(tick,document.hidden?5000:nextDelay());
+  };
+  refreshActiveLaunch=refresh;launchPollTimer=setTimeout(tick,0);
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&refreshActiveLaunch)refreshActiveLaunch();});
 
 function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
 function questionState(i){const qs=(launchData&&launchData.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}

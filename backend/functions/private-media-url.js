@@ -19,11 +19,13 @@ async function canReadMedia(db,identity,path){
     const studentClassId=String(identity.b3ClassId||'');
     if(!studentClassId||classId&&classId!==studentClassId)return false;
     classId=classId||studentClassId;
-    const [studentClass,membership]=await Promise.all([
-      db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get(),
+    // Only the class's active flag and this student's own membership: the whole
+    // class record also holds every member and the gallery posts.
+    const [classActive,membership]=await Promise.all([
+      db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/active`).get(),
       db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${studentId}`).get()
     ]);
-    if(!studentClass.exists()||!membership.exists()||studentClass.child('active').val()===false||membership.child('active').val()===false)return false;
+    if(!membership.exists()||classActive.val()===false||membership.child('active').val()===false)return false;
     if(studentId===ownerId)return true;
     if(!galleryPostId)return false;
     let post=await db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts/${galleryPostId}`).get();
@@ -36,11 +38,13 @@ async function canReadMedia(db,identity,path){
   if(identity.firebase?.sign_in_provider!=='google.com')return false;
   if(!classId){const profile=await db.ref(`b3Games/students/${ownerId}/profile`).get();classId=String(profile.child('classId').val()||'');}
   if(!classId)return false;
-  const [teacher,cls]=await Promise.all([
+  const [teacher,classActive,ownerMember]=await Promise.all([
     db.ref(`b3Games/workspaces/b3-2026/teachers/${identity.uid}`).get(),
-    db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get()
+    db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/active`).get(),
+    db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${ownerId}`).get()
   ]);
-  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.exists()&&cls.child('active').val()!==false&&cls.child('members/'+ownerId).exists()&&cls.child('members/'+ownerId+'/active').val()!==false;
+  // The owner's membership row existing also proves the class exists.
+  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&classActive.val()!==false&&ownerMember.exists()&&ownerMember.child('active').val()!==false;
 }
 exports.canReadMedia=canReadMedia;
 

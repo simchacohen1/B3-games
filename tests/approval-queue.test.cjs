@@ -134,7 +134,7 @@ test('owner can reach the Student Rewards Approvals tab (activity points, Approv
 
 test('homepage shows class names (ET / WT), not internal class ids',()=>{
   const home=fs.readFileSync('index.html','utf8');
-  assert.match(home,/\["rewardClasses",db\.ref\("studentRewards\/classes"\)\.once\("value"\)\]/);
+  assert.match(home,/\["rewardClasses","studentRewards\/classes"\]/);
   const fn=home.slice(home.indexOf('function approvalClassSplitText'),home.indexOf('function approvalClassFallback'));
   const ctx={approvalClassNames:{'class-34056e86':'B3 ET','class-b3-wt':'B3 WT'}};
   const f=vm.runInNewContext('('+fn.replace('function approvalClassSplitText','function')+')',ctx);
