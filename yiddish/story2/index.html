@@ -42,7 +42,10 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
 (() => {
   const S = window.YIDDISH_STORY_2 || {}, WT = window.YIDDISH_STORY_2_WORD_TIMES || null, $ = id => document.getElementById(id);
   const paras = Array.isArray(S.paras) ? S.paras : [], intro = Array.isArray(S.intro) ? S.intro : [];
-  const pics = (Array.isArray(S.pictures) ? S.pictures : []).filter(p => p && p.src).sort((a, b) => (a.para || 0) - (b.para || 0));
+  const pics = (Array.isArray(S.pictures) ? S.pictures : []).filter(p => p && p.src);
+  /* Pictures with `at` (seconds) change at that moment in the audio, even in the middle of a paragraph. */
+  const picsByTime = pics.length > 0 && pics.every(p => Number.isFinite(p.at));
+  pics.sort(picsByTime ? (a, b) => a.at - b.at : (a, b) => (a.para || 0) - (b.para || 0));
   const times = Object.entries(S.times || {}).map(([i, t]) => [Number(i), Number(t)]).filter(([i, t]) => Number.isInteger(i) && paras[i] != null && Number.isFinite(t)).sort((a, b) => a[1] - b[1]);
   const KEY = 'yiddish-story2-reader-v1', audio = $('audio');
   let state = { font: 28, width: 55 }, pos = 0, activePara = -1, onWord = null;
@@ -108,7 +111,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     const p = $('p' + i); if (!p) return;
     p.classList.add('active');
     if (scroll && $('follow').checked) box.scrollTop = p.offsetTop - box.offsetTop - 10;
-    if (pics.length) { let j = -1; pics.forEach((pic, k) => { if ((pic.para || 0) <= i) j = k; }); if (j >= 0 && j !== pos) { pos = j; renderPic(); } }
+    if (pics.length && !picsByTime) { let j = -1; pics.forEach((pic, k) => { if ((pic.para || 0) <= i) j = k; }); if (j >= 0 && j !== pos) { pos = j; renderPic(); } }
   }
   function tick() {
     const t = audio.currentTime;
@@ -116,6 +119,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     let hit = null; const spans = wordSpans[activePara];
     if (spans) for (const sp of spans) { if (+sp.dataset.s <= t && t < +sp.dataset.e) { hit = sp; break; } }
     if (hit !== onWord) { if (onWord) onWord.classList.remove('on'); if (hit) hit.classList.add('on'); onWord = hit; }
+    if (picsByTime) { let j = 0; pics.forEach((pic, k) => { if (pic.at <= t + 0.05) j = k; }); if (j !== pos) { pos = j; renderPic(); } }
   }
   let raf = 0; const loop = () => { tick(); if (!audio.paused) raf = requestAnimationFrame(loop); };
   audio.addEventListener('play', () => { cancelAnimationFrame(raf); loop(); });
@@ -132,6 +136,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     }
     const pic = pics[pos], img = document.createElement('img');
     img.src = pic.src; img.alt = pic.caption || ''; stage.replaceChildren(img);
+    if (pics[pos + 1]) new Image().src = pics[pos + 1].src; /* load the next picture early so page turns are instant */
     $('caption').textContent = pic.caption || '';
     $('count').textContent = `${pos + 1} / ${pics.length}`;
     $('prev').disabled = pos === 0; $('next').disabled = pos === pics.length - 1;
@@ -139,6 +144,7 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
   }
   function go(j) {
     if (j < 0 || j >= pics.length) return; pos = j; renderPic();
+    if (picsByTime && audioReady) { audio.currentTime = pics[j].at; return; }
     if ($('follow').checked && pics[j].para != null) { const p = $('p' + pics[j].para); if (p) { box.querySelectorAll('.para.active').forEach(x => x.classList.remove('active')); p.classList.add('active'); activePara = pics[j].para; box.scrollTop = p.offsetTop - box.offsetTop - 10; } }
   }
   $('prev').onclick = () => go(pos - 1); $('next').onclick = () => go(pos + 1);
