@@ -321,3 +321,21 @@ test('overview groups an untracked import run by its audit entries, not by names
  assert.equal(ov.students.filter(s=>s.importBatchId===run.id).length,12);
  assert.equal(ov.students.find(s=>s.studentId==='old_reuven').importBatchId,null);
 });
+
+// Staging copy only: fictional staging accounts may use bulk tools on staging.
+test('staging account rule: password sign-in only with the staging flag, claim and admin record; never in production code',async()=>{
+ const prod=require('../backend/functions/student-management-core.cjs').manageStudents;
+ const stag=require('../backend/functions-staging/student-management-core.cjs').manageStudents;
+ const store=site();store.tree.b3Games.admins={stage_owner:{active:true}};
+ const id={uid:'stage_owner',email:'owner@funtorahtools-staging.test',email_verified:true,b3StagingAccount:true,firebase:{sign_in_provider:'password'}};
+ const old=process.env.B3_STAGING_DEPLOYMENT;
+ try{
+  delete process.env.B3_STAGING_DEPLOYMENT;
+  await assert.rejects(stag(store,id,{action:'auditLog'}),/Google/);
+  process.env.B3_STAGING_DEPLOYMENT='true';
+  await assert.rejects(prod(store,id,{action:'auditLog'}),/Google/,'production never accepts password sign-in');
+  await assert.rejects(stag(store,{...id,b3StagingAccount:false},{action:'auditLog'}),/Google/);
+  await assert.rejects(stag(store,{...id,uid:'not_admin'},{action:'auditLog'}),/Owner or administrator/);
+  assert.equal((await stag(store,id,{action:'auditLog'})).ok,true);
+ }finally{if(old===undefined)delete process.env.B3_STAGING_DEPLOYMENT;else process.env.B3_STAGING_DEPLOYMENT=old;}
+});
