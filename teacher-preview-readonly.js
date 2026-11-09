@@ -11,7 +11,12 @@
     throw new Error("Missing verified teacher preview context");
   }
   const denied = () => Promise.reject(new Error("Read-only teacher preview: changes are disabled."));
-  const readonly = {authorized: true, role: "teacher", classIds: [context.classId], preview: true};
+  // All of the previewed teacher's classes (verified by the shell), selected class first.
+  const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
+  const teacherClassIds = Array.isArray(context.classIds)
+    ? context.classIds.filter(id => typeof id === "string" && SAFE_ID.test(id) && id !== context.classId)
+    : [];
+  const readonly = {authorized: true, role: "teacher", classIds: [context.classId, ...new Set(teacherClassIds)], preview: true};
   window.B3_READ_ONLY_TEACHER_PREVIEW = true;
 
   // Guard remote function calls, even when a tool bypasses Firebase.
