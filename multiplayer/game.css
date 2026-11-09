@@ -239,3 +239,4 @@ button.gf-p.ask{cursor:pointer;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f
 .mathrace-mode .math-answer{background:#ffffff20;border:2px solid #ffffff60;color:#fff;border-radius:14px;font-size:28px;font-weight:900;text-align:center;padding:14px 20px;box-shadow:0 4px 0 #0003,inset 0 2px 4px #00000030}
 .mathrace-mode .math-answer::placeholder{color:#ffffff80}
 .mathrace-mode .math-answer:focus{outline:none;border-color:#ffd23f;box-shadow:0 0 0 3px #ffd23f66,0 4px 0 #0003}
+.coin-result{margin:14px auto 0;max-width:540px;padding:10px 16px;border:2px solid #f1c84a;border-radius:16px;background:#fff8d6;color:#5b3f00;font-weight:900;font-size:17px;text-align:center;box-shadow:0 4px 12px #75591422}

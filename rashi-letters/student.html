@@ -389,7 +389,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
-<script src="../b3-race.js?v=teacher-player-20261029-1"></script>
+<script src="../b3-race.js?v=race-sync-20261109"></script>
 <script src="recordings.js?v=20261023-rashi-mic-tile"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -1510,17 +1510,29 @@ async function joinRoom(code,reconnectAsHost){
 
 function enterRoom(code,isHost){
   viewVersion++;
-  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null,waitStartedAt:Date.now(),reminderTimer:null};
+  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null,waitStartedAt:Date.now(),reminderTimer:null,conn:null};
   watchGames();
+  // After a short network drop Firebase has already marked this player "left"; undo that on reconnect.
+  const r=simRoom, connRef=db.ref('.info/connected');
+  const connCb=connRef.on('value',s=>{
+    if(s.val()!==true || simRoom!==r || r.finished || !r.data || !r.data.players || !r.data.players[mpPlayerId]) return;
+    const mine=r.ref.child('players/'+mpPlayerId);
+    if(r.data.players[mpPlayerId].left) mine.update({left:false}).catch(()=>{});
+    mine.onDisconnect().update({left:true});
+  });
+  r.conn={ref:connRef, cb:connCb};
   db.ref(ROOMS_PATH).once('value').then(s=>{ const all=s.val()||{}; if(simRoom && simRoom.code===code) onRoomUpdate(all[code]||null, all); });
 }
 
 function leaveRoom(){
   stopWatching();
-  const r=simRoom; if(!r) return; simRoom=null;
+  const r=simRoom; if(!r) return; simRoom=null; if(r.conn) r.conn.ref.off('value',r.conn.cb);
   try{
     const state=r.data && r.data.state;
-    if(r.isHost && (state==='lobby' || state==='playing' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); if(mpCenterPath){const center=db.ref(mpCenterPath+'/rashi-letters-'+r.code);center.onDisconnect().cancel();center.remove().catch(()=>{});} }
+    // A host leaving a race in progress only steps out; classmates who are still racing keep their game.
+    const othersRacing=activePlayers(r.data).some(([id])=>id!==mpPlayerId);
+    if(r.isHost && state==='playing' && !r.finished && othersRacing){ const hm=r.ref.child('players/'+mpPlayerId); hm.onDisconnect().cancel(); hm.update({left:true}).catch(()=>{}); }
+    else if(r.isHost && (state==='lobby' || state==='playing' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); if(mpCenterPath){const center=db.ref(mpCenterPath+'/rashi-letters-'+r.code);center.onDisconnect().cancel();center.remove().catch(()=>{});} }
     else if(!r.finished && r.data){ const me=r.ref.child('players/'+mpPlayerId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
   }catch(e){ console.error(e); }
 }
@@ -1543,6 +1555,9 @@ function onRoomUpdate(room, all){
   if(room.state==='playing' && !r.started){
     if(!room.players || !room.players[mpPlayerId] || room.players[mpPlayerId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
     r.started=true;r.qi=Number(room.players[mpPlayerId].q)||0;r.score=Number(room.players[mpPlayerId].score)||0;
+    // Once the race is on, a short drop on the host's device must not delete everyone's game.
+    // (cancel() also clears this player's own marker, which is set again just below.)
+    if(r.isHost) r.ref.onDisconnect().cancel();
     r.ref.child('players/'+mpPlayerId).onDisconnect().update({left:true});
     if(r.qi>=room.questions.length)renderWaiting();else runCountdown(); return;
   }
