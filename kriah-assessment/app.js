@@ -41,7 +41,7 @@
   async function identityChanged() {
     state.generation++; release(); state.records = []; state.library = []; state.students = []; state.classId = ''; state.studentId = ''; state.role = '';
     $('tabs').hidden = true; ['library', 'attempts', 'reports'].forEach(id => $(id).hidden = true);
-    $('attemptList').replaceChildren(); $('libraryList').replaceChildren(); $('reportBody').replaceChildren(); $('exerciseForm').hidden = true; $('assignPanel').hidden = true;
+    $('attemptList').replaceChildren(); document.getElementById('gradeQueueList')?.replaceChildren(); $('libraryList').replaceChildren(); $('reportBody').replaceChildren(); $('exerciseForm').hidden = true; $('assignPanel').hidden = true;
     options($('classSelect'), []); options($('studentSelect'), []);
     $('signIn').hidden = API.fixture || !!API.uid(); $('studentSignIn').hidden = API.fixture || !!API.uid(); $('signOut').hidden = API.fixture || !API.uid();
     $('fixtureLogin').hidden = !API.staging || !!API.uid();
@@ -72,7 +72,7 @@
     renderAttempts(); if (state.tab === 'reports') renderReport();
     status('Loaded ' + state.records.length + ' assessment(s)' + (state.next ? ' · More history available.' : '.'));
   }
-  $('classSelect').onchange = () => run(async () => { if (!safeToLeave()) { $('classSelect').value = state.classId; return; } state.generation++; release(); state.classId = $('classSelect').value; state.records = []; state.studentId = state.role === 'student' ? state.studentId : ''; $('exerciseForm').hidden = true; $('assignPanel').hidden = true; await openClass(); });
+  $('classSelect').onchange = () => run(async () => { if (!safeToLeave()) { $('classSelect').value = state.classId; return; } state.generation++; release(); state.classId = $('classSelect').value; state.records = []; state.studentId = state.role === 'student' ? state.studentId : ''; $('gradeQueueList').replaceChildren(); $('exerciseForm').hidden = true; $('assignPanel').hidden = true; await openClass(); });
   $('studentSelect').onchange = () => run(async () => { if (!safeToLeave()) { $('studentSelect').value = state.studentId; return; } state.generation++; release(); state.studentId = $('studentSelect').value; state.records = []; await loadRecords(); });
   $('refresh').onclick = () => run(async () => { if (safeToLeave()) { release(); await identityChanged(); } });
   $('more').onclick = () => run(() => loadRecords(true));
@@ -118,16 +118,53 @@
   }); };
   function assignPanel(ex) {
     state.assignId = ex.id; $('assignPanel').hidden = false; $('assignTitle').textContent = ex.title + ' · ' + ex.level;
-    $('assignStudents').replaceChildren(); state.students.forEach(s => { const check = input('checkbox'); check.value = s.id; const label = field(s.name, check); label.className = 'check'; $('assignStudents').append(label); });
+    const list = $('assignStudents'); list.replaceChildren();
+    if (!state.students.length) list.append(el('p', 'This class has no active students yet.'));
+    if (state.students.length > 1) {
+      const all = input('checkbox'); all.id = 'assignAll'; const label = field('Select all students', all); label.className = 'check select-all';
+      all.onchange = () => list.querySelectorAll('input[data-student]').forEach(c => { c.checked = all.checked; });
+      list.append(label);
+    }
+    state.students.forEach(s => { const check = input('checkbox'); check.value = s.id; check.dataset.student = s.id; const label = field(s.name, check); label.className = 'check'; list.append(label); });
+    // The panel sits below the whole library; bring it into view so the click visibly did something.
+    $('assignPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   $('assign').onclick = () => run(async () => {
-    const studentIds = [...$('assignStudents').querySelectorAll('input:checked')].map(c => c.value);
+    const studentIds = [...$('assignStudents').querySelectorAll('input[data-student]:checked')].map(c => c.value);
     if (!studentIds.length) throw new Error('Select at least one student.');
     $('assign').disabled = true;
-    try { const result = await call({ action: 'assign', studentId: undefined, exerciseId: state.assignId, studentIds }); $('assignPanel').hidden = true; await loadRecords(); status('Assigned to ' + result.assigned.length + ' student(s).'); }
+    try { const result = await call({ action: 'assign', studentId: undefined, exerciseId: state.assignId, studentIds }); $('assignPanel').hidden = true; await loadRecords(); status('Assigned to ' + result.assigned.length + ' student(s). Students see it under “My reading assignments”.'); }
     finally { $('assign').disabled = false; }
   });
+  // Teacher grading queue: one explicit, bounded load (latest 25 per student,
+  // like the class summary) instead of opening every student one by one.
+  const queue = el('div', null, 'grade-queue'); queue.id = 'gradeQueue'; queue.hidden = true;
+  const queueList = el('div'); queueList.id = 'gradeQueueList';
+  const findWork = el('button', 'Show work waiting to be graded (all students)', 'secondary'); findWork.type = 'button'; findWork.id = 'findUngraded';
+  findWork.onclick = () => run(async () => {
+    const gen = state.generation, found = []; findWork.disabled = true;
+    try {
+      for (const s of state.students) {
+        const data = await call({ action: 'list', studentId: s.id, limit: 25 });
+        if (gen !== state.generation) return;
+        data.records.filter(r => r.status === 'submitted' || r.status === 'in_progress').forEach(r => found.push({ s, r }));
+      }
+    } finally { findWork.disabled = false; }
+    queueList.replaceChildren(el('h2', found.length ? found.length + ' recording(s) waiting to be graded' : 'Nothing is waiting to be graded.'));
+    found.sort((a, b) => String(a.r.submittedAt || a.r.createdAt).localeCompare(String(b.r.submittedAt || b.r.createdAt))).forEach(({ s, r }) => {
+      const row = el('article', null, 'row'), text = el('div');
+      text.append(el('strong', s.name + ' · ' + r.exercise.title), el('p', 'Sent ' + new Date(r.submittedAt || r.createdAt).toLocaleString()), el('span', statusLabel(r.status), 'tag tag-' + r.status));
+      row.append(text, button('Grade', async () => {
+        if (!safeToLeave()) return;
+        state.generation++; release(); state.studentId = s.id; $('studentSelect').value = s.id; state.records = [];
+        await loadRecords(); await openAssessment(r.id);
+      })); queueList.append(row);
+    });
+    status(found.length ? 'Oldest first. Press Grade to open one.' : 'Nothing is waiting to be graded in the latest 25 assessments per student.');
+  });
+  queue.append(findWork, queueList); $('attemptList').before(queue);
   function renderAttempts() {
+    queue.hidden = state.role !== 'teacher' || !state.students.length;
     $('attemptList').replaceChildren(); $('more').hidden = !state.next;
     $('attemptHeading').textContent = state.role === 'teacher' ? 'Assessments · ' + ($('studentSelect').selectedOptions[0]?.textContent || '') : 'My reading assignments';
     if (!state.records.length) $('attemptList').append(el('p', 'No assessments assigned yet.'));
@@ -137,7 +174,22 @@
       row.append(text, button('Open assessment', () => openAssessment(r.id), 'secondary')); $('attemptList').append(row);
     });
   }
-  function statusLabel(s) { return { assigned: 'Not recorded', submitted: 'Ungraded', in_progress: 'Review in progress', reviewed: 'Reviewed' }[s] || s; }
+  function statusLabel(s) {
+    const labels = state.role === 'student' ? { assigned: 'To record', submitted: 'Sent to teacher', in_progress: 'Sent to teacher', reviewed: 'Reviewed' } : { assigned: 'Not recorded', submitted: 'Ungraded', in_progress: 'Review in progress', reviewed: 'Reviewed' };
+    return labels[s] || s;
+  }
+  // Chromium's MediaRecorder WebM files report duration Infinity until the end
+  // is seeked once. Resolve it so the teacher gets a seek bar and the
+  // truncation check below can run.
+  function whenDurationKnown(player, done) {
+    player.onloadedmetadata = () => {
+      if (Number.isFinite(player.duration)) { done(); return; }
+      player.ondurationchange = () => { if (!Number.isFinite(player.duration)) return; player.ondurationchange = null; player.currentTime = 0; done(); };
+      try { player.currentTime = 1e101; } catch (_) {}
+    };
+  }
+  // Preload local audio so the duration fix runs before the first Play press.
+  function showAudio(player, url) { player.preload = 'auto'; player.src = url; player.hidden = false; }
   const draftKey = () => state.classId + ':' + state.studentId + ':' + state.record.id;
   let draftQueue = Promise.resolve();
   function draftValue() { return { revision: state.record.revision, marks: state.marks, feedback: $('feedback')?.value || '', recommendation: $('recommendation')?.value || '', shareFeedback: $('shareFeedback')?.checked || false, countSelfCorrection: $('countSelf')?.checked || false, timing: $('confirmTiming')?.checked ? { confirmed: true, seconds: Number($('timing')?.value) } : null }; }
@@ -153,14 +205,17 @@
     const box = $('assessment'); box.hidden = false;
     const meta = el('p', record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(record.status)); meta.id = 'assessmentMeta';
     box.append(el('h2', record.exercise.title), meta, el('p', record.exercise.pronunciation || 'No pronunciation notes provided.'));
-    const player = el('audio'); player.id = 'player'; player.controls = true; player.preload = 'none'; box.append(player);
-    if (record.audio) box.append(button('Load original recording', async () => {
+    // An empty 0:00 player before anything exists is confusing; show it once it has audio.
+    const player = el('audio'); player.id = 'player'; player.controls = true; player.preload = 'none'; player.hidden = true; box.append(player);
+    if (record.audio) { const load = button('Load original recording', async () => {
       const data = await call({ action: 'audioRead', id });
       const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: data.type })); state.urls.push(url); player.src = url;
-       player.onloadedmetadata = () => { const expected = Number(record.audio?.duration), actual = player.duration; if (Number.isFinite(expected) && expected >= 3 && Number.isFinite(actual) && actual > 0 && actual + Math.max(2, expected * 0.12) < expected) status('Warning: playback is only ' + Math.round(actual) + ' seconds, but the original was reported as ' + Math.round(expected) + ' seconds. This recording may be incomplete; do not grade it as complete.', true); };
-       status('Original recording loaded. Expected duration: ' + Math.round(record.audio?.duration || 0) + 's. No automatic word alignment.');
-    }, 'secondary'));
+      const url = URL.createObjectURL(new Blob([bytes], { type: data.type })); state.urls.push(url);
+      whenDurationKnown(player, () => { const expected = Number(record.audio?.duration), actual = player.duration; if (Number.isFinite(expected) && expected >= 3 && Number.isFinite(actual) && actual > 0 && actual + Math.max(2, expected * 0.12) < expected) status('Warning: playback is only ' + Math.round(actual) + ' seconds, but the original was reported as ' + Math.round(expected) + ' seconds. This recording may be incomplete; do not grade it as complete.', true); });
+      // showAudio preloads: with preload "none" the truncation check would wait for Play.
+      showAudio(player, url); load.hidden = true;
+      status('Original recording loaded. Expected duration: ' + Math.round(record.audio?.duration || 0) + 's. No automatic word alignment.');
+    }, 'secondary'); box.append(load); }
     if (state.role === 'student') await studentAssessment(box, record, player, gen);
     else await teacherAssessment(box, record, gen);
     if (gen === state.generation) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -169,27 +224,45 @@
     const text = el('p', record.exercise.text, 'hebrew passage'); text.dir = 'rtl'; text.lang = 'he'; box.append(text);
     if (record.feedback || record.recommendation) box.append(el('h3', 'Teacher feedback'), el('p', record.feedback), el('p', record.recommendation));
     if (record.summary) box.append(scorePanel(record.summary));
-    if (record.audio) { box.append(button('Start a new attempt', async () => { const result = await call({ action: 'retry', id: record.id }); await loadRecords(); await openAssessment(result.id); })); return; }
+    if (record.audio) {
+      box.append(el('p', record.status === 'reviewed' ? '✓ Your teacher has reviewed this reading.' : '✓ Your recording was sent. Your teacher will listen and review it. You are done with this one.', 'done-note'));
+      box.append(button('Start a new attempt', async () => {
+        if (!confirm('Record this reading again as a new attempt? Your teacher keeps the recording you already sent, too.')) return;
+        const result = await call({ action: 'retry', id: record.id }); await loadRecords(); await openAssessment(result.id);
+      }, 'secondary'));
+      return;
+    }
     const consent = input('checkbox'), consentLabel = field('I am using a fictional test reading. Record my voice and share it with my assigned teacher.', consent); consentLabel.className = 'check'; box.append(consentLabel);
     const timer = el('p', 'Up to 5 minutes · 2 MiB maximum. Nothing is sent until you press Submit.', 'subtle'); timer.id = 'recordTimer'; box.append(timer);
     const actions = el('div', null, 'actions');
+    // One place decides which controls make sense right now, so a student
+    // cannot record over a take by accident or press buttons that do nothing.
+    let uploading = false;
+    function sync() {
+      if (gen !== state.generation) return;
+      const busy = ['requesting', 'recording', 'stopping'].includes(recorder.state), locked = !!state.blob?.uploadStarted;
+      recordButton.disabled = uploading || busy || !!state.blob;
+      stop.hidden = cancel.hidden = !busy; stop.disabled = recorder.state !== 'recording';
+      retry.hidden = !state.blob; retry.disabled = uploading || busy || locked;
+      submit.disabled = uploading || busy || !state.blob;
+    }
     const recordButton = button('Record reading', async () => {
       if (state.blob?.uploadStarted) throw new Error('Retry submitting the same original recording first.');
-      if (!consent.checked) throw new Error('Confirm recording permission first.');
-      recordButton.disabled = true; retry.disabled = true; submit.disabled = true; status('Waiting for microphone permission…');
-      try { await recorder.start(); if (gen !== state.generation) return; stop.disabled = recorder.state !== 'recording'; status('Recording…'); }
-      catch (e) { recordButton.disabled = false; retry.disabled = false; submit.disabled = !state.blob; throw e; }
+      if (!consent.checked) { consentLabel.classList.add('attention'); throw new Error('Tick the permission box above first, then press Record.'); }
+      status('Waiting for microphone permission…');
+      try { const starting = recorder.start(); sync(); await starting; if (gen !== state.generation) return; sync(); if (recorder.state === 'recording') status('Recording… Press Stop when you finish reading.'); }
+      catch (e) { sync(); throw e; }
     });
-    const stop = button('Stop recording', () => { stop.disabled = true; recorder.stop(); }, 'danger'); stop.disabled = true;
+    const stop = button('Stop recording', () => { recorder.stop(); sync(); }, 'danger');
     const retry = button('Retry recording', async () => {
       if (state.blob?.uploadStarted) throw new Error('Upload may already have started. Submit the same original bytes again.');
       if (state.blob && !confirm('Discard this local recording and try again?')) return;
-      recorder.cancel(); await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; player.removeAttribute('src'); submit.disabled = true; recordButton.disabled = false; status('Ready to record again.');
+      recorder.cancel(); await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; player.removeAttribute('src'); player.hidden = true; timer.className = 'subtle'; timer.textContent = 'Up to 5 minutes · 2 MiB maximum. Nothing is sent until you press Submit.'; sync(); status('Ready to record again.');
     }, 'secondary');
-    const cancel = button('Cancel recording', () => { if (!['requesting', 'recording', 'stopping'].includes(recorder.state)) return; recorder.cancel(); stop.disabled = true; recordButton.disabled = !!state.blob?.uploadStarted; retry.disabled = !!state.blob?.uploadStarted; submit.disabled = !state.blob; status('Recording cancelled. Nothing was uploaded.'); }, 'secondary');
+    const cancel = button('Cancel recording', () => { if (!['requesting', 'recording', 'stopping'].includes(recorder.state)) return; recorder.cancel(); timer.className = 'subtle'; sync(); status('Recording cancelled. Nothing was uploaded.'); }, 'secondary');
     const submit = button('Submit recording', async () => {
-      if (!state.blob || !consent.checked) throw new Error('Record and confirm permission before submitting.');
-      submit.disabled = true; retry.disabled = true; recordButton.disabled = true;
+      if (!state.blob || !consent.checked) { if (!consent.checked) consentLabel.classList.add('attention'); throw new Error('Record and confirm permission before submitting.'); }
+      uploading = true; sync();
       try {
         const captured = state.blob; captured.uploadStarted = true; await API.draft(draftKey() + ':audio', captured).catch(() => {}); const audio = await API.blob64(captured.blob);
         if (gen !== state.generation) return;
@@ -198,20 +271,21 @@
       } catch (error) {
         if (error.status === 400 && state.blob) { state.blob.uploadStarted = false; await API.draft(draftKey() + ':audio', state.blob); }
         throw error;
-      } finally { if (gen === state.generation) { submit.disabled = !state.blob; retry.disabled = !!state.blob?.uploadStarted; recordButton.disabled = !!state.blob?.uploadStarted; } }
-    }); submit.disabled = true;
-    const recorder = new KriahRecorder({ onTick: seconds => { timer.textContent = '● Recording · ' + Math.floor(seconds) + ' seconds / 300'; timer.className = 'recording'; }, onError: error => { if (gen === state.generation) { status(error.message, true); stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = !state.blob; } }, onComplete: async value => {
+      } finally { uploading = false; sync(); }
+    });
+    consent.onchange = () => consentLabel.classList.remove('attention');
+    const recorder = new KriahRecorder({ onTick: seconds => { timer.textContent = '● Recording · ' + Math.floor(seconds) + ' seconds / 300'; timer.className = 'recording'; }, onError: error => { if (gen === state.generation) { status(error.message, true); timer.className = 'subtle'; sync(); } }, onComplete: async value => {
       if (gen !== state.generation) return;
       await KriahRecorder.verifyPlayableDuration(value.blob, value.duration);
       if (gen !== state.generation) return;
-      state.blob = value; const url = URL.createObjectURL(value.blob); state.urls.push(url); player.src = url;
-      stop.disabled = true; recordButton.disabled = false; retry.disabled = false; submit.disabled = false; timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds · Listen before submitting.';
+      state.blob = value; const url = URL.createObjectURL(value.blob); state.urls.push(url); whenDurationKnown(player, () => {}); showAudio(player, url);
+      timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds recorded · Listen, then press Submit (or Retry to record again).'; sync();
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
-    state.recording = recorder; recordButton.classList.add('record-primary'); recordButton.setAttribute('aria-label', 'Record reading'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions);
+    state.recording = recorder; recordButton.classList.add('record-primary'); recordButton.setAttribute('aria-label', 'Record reading'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions); sync();
     const recovered = await API.draft(draftKey() + ':audio').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
-    if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); player.src = url; submit.disabled = false; retry.disabled = !!recovered.uploadStarted; recordButton.disabled = !!recovered.uploadStarted; timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
+    if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); whenDurationKnown(player, () => {}); showAudio(player, url); sync(); timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
   }
   function scorePanel(summary) {
     const panel = el('div', null, 'score');
@@ -236,7 +310,9 @@
     function pick(a, b) {
       start = Math.min(a, b); end = Math.max(a, b); target.replaceChildren();
       const us = parsed.units.filter(u => u.kind === 'word' ? parsed.clusters.some(c => c.word === u.word && c.index >= start && c.index <= end) : u.cluster >= start && u.cluster <= end);
-      for (const kind of ['letter', 'nekudah', 'word']) if (us.some(u => u.kind === kind)) { const o = el('option', 'All selected ' + kind + ' units'); o.value = 'span:' + kind; target.append(o); }
+      // Say exactly what a span mark will cover: one click on בָּ selects two
+      // nekudah units (kamatz and dagesh), and both would get the same mark.
+      for (const kind of ['letter', 'nekudah', 'word']) { const of = us.filter(u => u.kind === kind); if (!of.length) continue; const o = el('option', (of.length === 1 ? 'The selected ' + kind : 'All ' + of.length + ' selected ' + kind + ' units') + (kind === 'nekudah' ? ' (' + of.map(u => u.label).join(', ') + ')' : '')); o.value = 'span:' + kind; target.append(o); }
       us.forEach(u => { const o = el('option', u.kind + ' · ' + (u.symbol ? '◌' + u.symbol + ' ' : '') + u.label + ' · position ' + (u.cluster == null ? u.word + 1 : u.cluster + 1)); o.value = u.id; target.append(o); });
       target.value = us.some(u => u.kind === record.exercise.unitType) ? 'span:' + record.exercise.unitType : target.options[0].value;
       renderPassage();
@@ -256,6 +332,19 @@
       });
     }
     async function changed() { renderPassage(); renderMarks(); await persistGrade(); }
+    const scoring = record.exercise.unitType, plural = { letter: 'letters', nekudah: 'nekudos', word: 'words' }[scoring] || scoring + ' units';
+    const order = new Map(parsed.units.map((u, i) => [u.id, i]));
+    const position = u => u.kind === 'word' ? 'word ' + (u.word + 1) : 'position ' + (u.cluster + 1);
+    const unitName = u => u.kind + ' ' + (u.symbol ? '◌' + u.symbol + ' ' : '') + u.label + ' (' + position(u) + ')';
+    const unmarked = () => parsed.units.filter(u => u.kind === scoring && !state.marks.some(m => m.unitId === u.id));
+    // Accuracy counts only marked units. A teacher who marks just the mistakes
+    // would otherwise finalize 0% for a nearly perfect reading.
+    async function markRestCorrect() {
+      const rest = unmarked(); if (!rest.length) return 0;
+      state.undo.push(structuredClone(state.marks));
+      state.marks = C.marks(record.exercise, [...state.marks, ...rest.map(u => ({ unitId: u.id, category: 'correct', correction: '', note: '', time: null }))]);
+      await changed(); return rest.length;
+    }
     const mark = button('Apply mark to selected unit(s)', async () => {
       const units = selectedUnits(); if (!units.length) return;
       const time = timestamp.value === '' ? null : Number(timestamp.value);
@@ -263,17 +352,25 @@
       const next = C.marks(record.exercise, [...state.marks.filter(m => !units.some(u => u.id === m.unitId)), ...changes]);
       state.undo.push(structuredClone(state.marks)); state.marks = next; await changed(); status('Mark added. Recovery draft saved locally; press Save draft to save to the server.');
     });
-    picker.append(button('Use current playback time', () => { timestamp.value = $('player').currentTime.toFixed(1); }, 'secondary'), document.createTextNode(' '), mark);
+    const restButton = button('Mark all unmarked ' + plural + ' correct', async () => { const n = await markRestCorrect(); status(n ? 'Marked ' + n + ' remaining ' + plural + ' correct. Recovery draft saved locally; press Save draft or Finalize.' : 'Every ' + scoring + ' already has a mark.'); }, 'secondary');
+    restButton.id = 'markRest';
+    picker.append(button('Use current playback time', () => { timestamp.value = $('player').currentTime.toFixed(1); }, 'secondary'), document.createTextNode(' '), mark, document.createTextNode(' '), restButton);
+    picker.append(el('p', 'Quick way: mark only the mistakes, then press “Mark all unmarked ' + plural + ' correct”.', 'subtle'));
     box.append(picker);
     const list = el('ol', null, 'mark-list'); list.id = 'markList'; const summaryBox = el('div'); summaryBox.id = 'scoreBox';
+    const progress = el('p', null, 'mark-progress'); progress.id = 'markProgress';
     function renderMarks() {
-      list.replaceChildren(); state.marks.forEach(m => {
+      list.replaceChildren(); [...state.marks].sort((a, b) => order.get(a.unitId) - order.get(b.unitId)).forEach(m => {
         const u = parsed.units.find(u => u.id === m.unitId), item = el('li');
-        item.append(el('span', u.kind + ' ' + (u.symbol ? '◌' + u.symbol + ' ' : '') + u.label + ': ' + m.category + (m.correction ? ' → ' + m.correction : '') + (m.note ? ' · ' + m.note : '') + (m.time == null ? '' : ' · ' + m.time + 's')));
+        item.append(el('span', unitName(u) + ': ' + m.category.replaceAll('-', ' ') + (m.correction ? ' → ' + m.correction : '') + (m.note ? ' · ' + m.note : '') + (m.time == null ? '' : ' · ' + m.time + 's')));
+        if (m.category !== 'correct') item.className = 'mark-item-error';
         item.append(button('Edit', () => { const cluster = u.cluster ?? parsed.clusters.find(c => c.word === u.word)?.index ?? 0; pick(cluster, cluster); target.value = u.id; category.value = m.category; correction.value = m.correction; note.value = m.note; timestamp.value = m.time ?? ''; }, 'secondary'), button('Remove', async () => { state.undo.push(structuredClone(state.marks)); state.marks = state.marks.filter(v => v.unitId !== m.unitId); await changed(); }, 'secondary')); list.append(item);
       });
       const ex = { ...record.exercise, countSelfCorrection: $('countSelf')?.checked || false };
-      summaryBox.replaceChildren(scorePanel(C.summary(ex, state.marks, $('confirmTiming')?.checked ? { confirmed: true, seconds: Number($('timing').value) } : null)));
+      const total = parsed.units.filter(u => u.kind === scoring).length, left = unmarked().length;
+      progress.textContent = 'Marked ' + (total - left) + ' of ' + total + ' ' + plural + (left ? ' · ' + left + ' not marked yet (not counted in accuracy)' : ' · all marked');
+      progress.classList.toggle('complete', !left); restButton.disabled = !left;
+      summaryBox.replaceChildren(progress, scorePanel(C.summary(ex, state.marks, $('confirmTiming')?.checked ? { confirmed: true, seconds: Number($('timing').value) } : null)));
     }
     const feedback = el('textarea'); feedback.id = 'feedback'; feedback.maxLength = 1000; feedback.value = record.feedback || '';
     const recommendation = el('textarea'); recommendation.id = 'recommendation'; recommendation.maxLength = 500; recommendation.value = record.recommendation || '';
@@ -297,7 +394,16 @@
         record.revision = result.record.revision; state.record = result.record; $('assessmentMeta').textContent = record.exercise.type + ' · ' + record.exercise.level + ' · ' + statusLabel(result.record.status); state.dirty = false; await API.draft(draftKey() + ':grade', null).catch(() => {}); await loadRecords(); status(final ? 'Final assessment saved.' : 'Assessment draft saved to the server.');
       } finally { if (gen === state.generation) controls.forEach(([n, disabled]) => n.disabled = disabled); }
     }
-    saveActions.append(button('Save draft', () => save(false)), button('Finalize assessment', () => save(true)), button('Delete assessment & original audio', async () => {
+    async function finalize() {
+      const left = unmarked().length, total = parsed.units.filter(u => u.kind === scoring).length;
+      if (left) {
+        if (confirm(left + ' of ' + total + ' ' + plural + ' have no mark yet.\n\nOK: mark them all correct, then finalize.\nCancel: other choices.')) await markRestCorrect();
+        else if (!confirm('Finalize with ' + left + ' ' + plural + ' not assessed?\n\nAccuracy will count only the ' + (total - left) + ' ' + plural + ' you marked.')) { status('Not finalized. Mark the remaining ' + plural + ', then finalize.'); return; }
+      }
+      if (!share.checked && !confirm('The student will not see this result, because “Share final feedback and summary with student” is not ticked.\n\nOK: finalize anyway (private).\nCancel: go back.')) { status('Not finalized. Tick “Share final feedback and summary with student” if the student should see it.'); return; }
+      await save(true);
+    }
+    saveActions.append(button('Save draft', () => save(false)), button('Finalize assessment', finalize), button('Delete assessment & original audio', async () => {
       if (!confirm('Permanently delete this fictional assessment and its original recording?')) return;
       await call({ action: 'delete', id: record.id, confirm: record.id }); await API.draft(draftKey() + ':grade', null).catch(() => {}); release(); await loadRecords(); status('Assessment and original recording deleted.');
     }, 'danger')); box.append(saveActions);

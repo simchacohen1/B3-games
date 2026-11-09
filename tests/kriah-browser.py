@@ -84,8 +84,13 @@ try:
         expect(student.locator('#status')).to_contain_text('Fictional upload outage')
         student.get_by_role('button', name='Submit recording', exact=True).click()
         expect(student.locator('#status')).to_contain_text('Recording submitted')
+        expect(student.locator('#assessment')).to_contain_text('Your recording was sent')
         teacher.get_by_role('button', name='Refresh', exact=True).click()
-        teacher.get_by_role('button', name='Open assessment', exact=True).click()
+        # Grading queue finds submitted work across students and opens it.
+        teacher.get_by_role('button', name='Show work waiting to be graded (all students)', exact=True).click()
+        expect(teacher.locator('#gradeQueueList')).to_contain_text('1 recording(s) waiting to be graded')
+        teacher.locator('#gradeQueueList').get_by_role('button', name='Grade', exact=True).click()
+        expect(teacher.locator('#markProgress')).to_contain_text('Marked 0 of 19 letters')
         teacher.get_by_role('button', name='Load original recording', exact=True).click()
         expect(teacher.locator('#status')).to_contain_text('Original recording loaded')
         teacher.locator('[data-cluster="0"]').click()
@@ -104,6 +109,7 @@ try:
         expect(teacher.locator('#markList li')).to_have_count(1)
         teacher.locator('#markTarget').select_option('span:letter')
         teacher.get_by_role('button', name='Apply mark to selected unit(s)', exact=True).click()
+        expect(teacher.locator('#markProgress')).to_contain_text('Marked 2 of 19 letters')
         teacher.locator('#feedback').fill('Listen again to this kamatz.')
         teacher.locator('#recommendation').fill('Practise the two marked syllables.')
         teacher.locator('#shareFeedback').check()
@@ -112,6 +118,10 @@ try:
         teacher.get_by_role('button', name='Finalize assessment', exact=True).click()
         expect(teacher.locator('#status')).to_contain_text('Final assessment saved')
         expect(teacher.locator('#assessmentMeta')).to_contain_text('Reviewed')
+        # Finalize offers to mark the unmarked letters correct (dialog accepted),
+        # so accuracy is 19/19 rather than counting only the two marked letters.
+        expect(teacher.locator('#markProgress')).to_contain_text('Marked 19 of 19 letters')
+        expect(teacher.locator('#scoreBox')).to_contain_text('100%')
         teacher.screenshot(path=str(OUT / 'teacher-marking.png'), full_page=True)
         teacher.get_by_role('button', name='Progress reports', exact=True).click()
         expect(teacher.locator('#reportBody')).to_contain_text('Kamatz')
