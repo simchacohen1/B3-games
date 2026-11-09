@@ -116,7 +116,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 
 .home-tabs{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:10px;
   padding:4px 0 18px;
 }
@@ -135,6 +135,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 .home-tabs .tab-todo{background:#fffae8;border-color:#f5cb3a;color:#7a5500}
 .home-tabs .tab-handed{background:#e8f1ff;border-color:#6ea8f5;color:#1a3f80}
 .home-tabs .tab-finished{background:#e8faf0;border-color:#4fc47d;color:#15673a}
+.home-tabs .tab-messages{background:#f5f0ff;border-color:#b69df8;color:#4b2a9c}
+.home-tabs .tab-messages .count.unread{background:#25a55f;color:#fff}
+.dm-about{display:inline-flex;align-items:center;gap:6px;background:#f5f0ff!important;color:#4b2a9c!important;border:1.5px solid #b69df8!important}
 .home-tabs button[aria-selected=true]{
   box-shadow:0 0 0 3px rgba(26,39,68,.12);
   transform:translateY(-3px);
@@ -183,7 +186,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 @media(max-width:520px){
   main{margin:12px auto}
   header{padding:12px 16px}
-  .home-tabs{gap:7px}
+  .home-tabs{gap:7px;grid-template-columns:repeat(2,minmax(0,1fr))}
   .home-tabs button{font-size:14px;padding:9px 6px;min-height:64px}
   .home-intro h1{font-size:23px}
   .home-card{padding:16px}
@@ -197,6 +200,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 <script src="../firebase-config.js"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="homework-common.js"></script>
+<script src="messages-ui.js"></script>
 <script src="homework-items.js"></script>
 <script>
 (function(){'use strict';
@@ -218,24 +222,45 @@ function saveLocal(id,v){try{sessionStorage.setItem(draftKey(id),v)}catch(e){}}
 function clearLocal(id){try{sessionStorage.removeItem(draftKey(id))}catch(e){}}
 function call(body){return H.call(Object.assign({},auth,body))}
 
+var lastData=null,tabApi={},earlierOpen=false;
+// Messages tab (#647): one-on-one chats with my teachers and the principal.
+var Msgs=window.HomeworkMessages.create({role:'student',call:call,
+  who:function(c){return {teacherId:c.id}},
+  onUnread:function(n){drawUnread(n)},
+  onJump:function(id){focusAssignment(id)}});
+function drawUnread(n){var b=document.querySelector('.tab-messages .count');if(b){b.textContent=n?n+' new':'';b.classList.toggle('unread',!!n);b.hidden=!n}}
+function bucketOf(a){return a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo'}
 function render(data){
+  lastData=data;
   listBox.replaceChildren();
   statusBox.style.display='none';
   var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'! 🌟'),el('p',!data.assignments.length?'No homework for you right now. Enjoy your free time!':data.openCount?'Here’s what you can work on today.':'You finished everything. Great job! 🎉'));listBox.append(intro);
-  if(data.general)listBox.append(generalPanel(data.general.messages||[])); // older servers have no standalone messages yet
-  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){var g=a.status==='approved'?groups[2]:a.status==='submitted'?groups[1]:groups[0];g.items.push(a)});
+  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){groups[{todo:0,handed:1,finished:2}[bucketOf(a)]].items.push(a)});
   // The chosen tab survives every refresh (sending a note, coming back to the page, handing in).
-  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','My homework');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 '},buttons=[];
-  function select(id,focus){activeTab=id;buttons.forEach(function(t){var on=t.dataset.tab===id;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;if(on&&focus)t.focus()});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=p.id!=='section-'+id})}
-  groups.forEach(function(g){var b=el('button',(tabIcons[g.id]||'')+g.name+' · '+g.items.length,'tab-'+g.id);b.type='button';b.dataset.tab=g.id;b.id='tab-'+g.id;b.setAttribute('role','tab');b.setAttribute('aria-controls','section-'+g.id);
-    var fresh=g.items.reduce(function(n,a){return n+H.unreadCount(a.messages,'student')},0);if(fresh)b.append(el('span','💬 '+fresh+' new','tab-new'));
-    var pane=el('section',null,'home-section');pane.id='section-'+g.id;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby','tab-'+g.id);pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});
-    b.onclick=function(){select(g.id)};buttons.push(b);tabs.append(b);sections.append(pane)});
+  var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','My homework');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 ',messages:'💬 '},buttons=[];tabApi={};
+  function select(id,focus){if(activeTab==='messages'&&id!=='messages')Msgs.hide();activeTab=id;buttons.forEach(function(t){var on=t.dataset.tab===id;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;if(on&&focus)t.focus()});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=p.id!=='section-'+id});if(id==='messages')Msgs.show()}
+  function addTab(id,label,pane,fresh){var b=el('button',label,'tab-'+id);b.type='button';b.dataset.tab=id;b.id='tab-'+id;b.setAttribute('role','tab');b.setAttribute('aria-controls','section-'+id);if(fresh)b.append(el('span','💬 '+fresh+' new','tab-new'));pane.id='section-'+id;pane.dataset.tab=id;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby','tab-'+id);b.onclick=function(){select(id)};buttons.push(b);tabs.append(b);sections.append(pane)}
+  groups.forEach(function(g){var pane=el('section',null,'home-section');pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});
+    var fresh=g.items.reduce(function(n,a){return n+H.unreadCount(a.messages,'student')},0);addTab(g.id,(tabIcons[g.id]||'')+g.name+' · '+g.items.length,pane,fresh)});
+  var mpane=el('section',null,'home-section');mpane.append(el('h2','Messages'),Msgs.root);
+  // Messages from before one-on-one chats (one thread shared by all class teachers) stay readable here.
+  var earlier=data.general&&data.general.messages||[];if(earlier.length){var d=el('details',null,'dm-earlier');d.open=earlierOpen;d.addEventListener('toggle',function(){earlierOpen=d.open});d.append(el('summary','Earlier messages to all my teachers · '+earlier.length),generalPanel(earlier));mpane.append(d)}
+  addTab('messages',tabIcons.messages+'Messages',mpane);
+  var count=el('span',null,'count');tabs.querySelector('.tab-messages').append(count);drawUnread(Msgs.unread());
   // Left/right arrow keys move between tabs.
   tabs.addEventListener('keydown',function(e){if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;var i=buttons.findIndex(function(t){return t.dataset.tab===activeTab});i=(i+(e.key==='ArrowRight'?1:buttons.length-1))%buttons.length;e.preventDefault();select(buttons[i].dataset.tab,true)});
+  tabApi.select=select;
   listBox.append(tabs);
   if(flash){var f=el('div',flash,'flash');f.setAttribute('role','status');listBox.append(f);flash='';}
-  listBox.append(sections);select(activeTab);
+  listBox.append(sections);select(activeTab);Msgs.refreshUnread();
+}
+// Show one homework post: switch to its tab, open it and bring it into view.
+function focusAssignment(id){
+  var a=lastData&&lastData.assignments.find(function(x){return x.id===id});
+  if(!a){alert('That homework is no longer on your list.');return}
+  openCards[id]=1;tabApi.select(bucketOf(a));
+  var d=document.querySelector('[data-assignment-card="'+id+'"]');if(!d)return;
+  d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});d.classList.remove('hw-flash');void d.offsetWidth;d.classList.add('hw-flash');
 }
 var activeTab='todo',flash='';
 // Messages that are not about one assignment. Voice only, text only, or both; never needs a hand-in.
@@ -250,7 +275,7 @@ function generalPanel(messages){
 var openCards={};
 function card(a){
   var body=cardBody(a),bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';
-  var d=el('details',null,'card home-card home-fold '+bucket),sum=el('summary',null,'fold-sum');
+  var d=el('details',null,'card home-card home-fold '+bucket),sum=el('summary',null,'fold-sum');d.setAttribute('data-assignment-card',a.id);
   d.open=!!openCards[a.id];d.addEventListener('toggle',function(){if(d.open)openCards[a.id]=1;else delete openCards[a.id]});
   var head=body.firstChild,meta=head&&head.nextSibling;body.removeChild(head);
   var tags=el('span',null,'fold-tags');if(meta){var first=meta.firstChild;if(first)tags.append(first.cloneNode(true));Array.prototype.forEach.call(meta.children,function(x){if(/Due|Late/.test(x.textContent))tags.append(x.cloneNode(true))})}if(a.items&&a.items.length)tags.append(HI.progressTag(a,a));
@@ -276,6 +301,9 @@ function cardBody(a){
   var activityUrl=hasItems?'':H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='opener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
   if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
+  // Messages tab (#647): a message started here arrives tagged to this homework. It never hands anything in.
+  var about=el('button','🎤 Message my teacher about this','sec dm-about');about.type='button';about.setAttribute('data-message-about',a.id);
+  about.onclick=function(){tabApi.select('messages');Msgs.compose({assignmentId:a.id,assignmentTitle:a.title,contactId:a.teacherId});listBox.querySelector('.home-tabs').scrollIntoView({behavior:'smooth',block:'start'})};c.append(about);
   c.append(H.conversation({role:'student',collapsed:true,threadKey:a.id,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh,
     onRead:function(){var d=c.closest('details'),pane=c.closest('[role=tabpanel]');if(d){var t=d.querySelector('.fold-sum .new-msg');if(t)t.remove()}
       if(pane&&!pane.querySelector('.new-msg')){var tab=document.getElementById(pane.getAttribute('aria-labelledby'));var n=tab&&tab.querySelector('.tab-new');if(n)n.remove()}}}));
@@ -323,6 +351,6 @@ async function refresh(){
   }
 }
 refresh();
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&!listBox.querySelector('textarea:focus'))refresh()});
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&!listBox.querySelector('textarea:focus')&&!Msgs.isRecording())refresh()});
 })();
 </script></body></html>
