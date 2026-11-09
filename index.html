@@ -151,7 +151,7 @@
   .home-access-card iframe{flex:1;width:100%;border:0;background:#f1f5f9}
   @media(max-width:560px){.home-class-bar{top:58px;left:auto;right:10px;transform:none}body.has-home-class-bar>h1{padding-top:104px!important}.home-class-bar label{display:none}.home-access-modal{padding:0}.home-access-card{height:100%;border-radius:0}}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
-.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
+#classPick{display:none}.login-card.picking>:not(h2):not(#classPick){display:none}.login-card.picking #classPick{display:block}.class-pick-list{display:grid;gap:10px;margin:14px 0}.login-card .class-pick-list button{margin:0;font-size:19px}.login-card button.class-pick-back{background:#e2e8f0;color:#26364a}.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
 /* Keep the student launchers visible together on desktop screens. */
 @media(min-width:760px){
  body{padding-top:16px}
@@ -442,6 +442,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <label for="classPinInput">Passcode</label>
     <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <div id="classPick" role="group" aria-label="Choose your class"></div>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
@@ -1606,7 +1607,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
     }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
+    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:"",choices:studentClassChoices.slice()};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
@@ -1713,6 +1714,24 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(key)try{localStorage.removeItem(key);}catch(e){}
   }
 
+  // A student in several classes picks one after the passcode is accepted.
+  // Resolves with the class id, or null when they press Back.
+  function chooseStudentClass(choices,name){
+    return new Promise(resolve=>{
+      const card=el("loginCard"),box=el("classPick"),heading=card.querySelector("h2");
+      const done=value=>{card.classList.remove("picking");heading.textContent="Student Sign In";box.replaceChildren();resolve(value);};
+      const help=document.createElement("p");help.textContent="Hi "+(name||"there")+"! Which class are you going to?";
+      const list=document.createElement("div");list.className="class-pick-list";
+      choices.slice().sort((a,b)=>String(a.name||a.id).localeCompare(String(b.name||b.id))).forEach(c=>{
+        const b=document.createElement("button");b.type="button";b.textContent=c.name||c.id;b.onclick=()=>done(c.id);list.appendChild(b);
+      });
+      const back=document.createElement("button");back.type="button";back.className="class-pick-back";back.textContent="← Back";back.onclick=()=>done(null);
+      heading.textContent="Choose your class";setLoginMsg("");
+      box.replaceChildren(help,list,back);card.classList.add("picking");
+      list.querySelector("button")?.focus();
+    });
+  }
+
   async function studentSignIn(){
     const btn=el("studentSignInBtn");
     if(btn.disabled)return;
@@ -1738,7 +1757,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       clearWrongPasscodeAttempts(studentName);
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
-      setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+      // One class: straight in. Several: the student chooses (quick test links skip this).
+      let entry=r;
+      const choices=Array.isArray(r.choices)?r.choices:[];
+      if(!testLink&&choices.length>1){
+        const picked=await chooseStudentClass(choices,r.name);
+        if(!picked){setLoginMsg("");return;}
+        if(picked!==r.classId)entry={...r,classId:picked,customToken:""};
+      }
+      setLoginMsg("Opening your games…");await enterStudent(entry);setLoginMsg("");
       // A student who opened a direct activity link (e.g. a teacher-assigned
       // Weekly Quiz) before signing in goes straight back to it.
       let returnTo="";try{returnTo=sessionStorage.getItem("b3StudentReturnTo")||"";sessionStorage.removeItem("b3StudentReturnTo");}catch(e){}

@@ -53,7 +53,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 .gate button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:900;font-size:17px;cursor:pointer}
 .hidden{display:none!important}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
-.schoolpick{flex:0 1 260px!important;width:auto!important;padding:8px 10px!important;font-size:15px!important}.entry .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.syncs{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}.card .syncs input{width:22px;height:22px;padding:0;accent-color:#16a34a}.noschool{color:#b45309!important;font-weight:700}
+.schoolpick{flex:0 1 260px!important;width:auto!important;padding:8px 10px!important;font-size:15px!important}.entry .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.syncs{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}.card .syncs input{width:22px;height:22px;padding:0;accent-color:#16a34a}.noschool{color:#b45309!important;font-weight:700}.studentrow .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.classtick{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-weight:600;cursor:pointer}.card .classtick input{width:20px;height:20px;padding:0;accent-color:#16a34a}.studentrow small.warn{display:block;color:#b45309;margin-top:4px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head><body>
@@ -80,8 +80,9 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="principals"></div></section>
 
 <section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
-<p class="hint">Create a class for each group of students.</p>
-<div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
+<p class="hint">Create a class for each group of students. Every class belongs to one school.</p>
+<div class="formrow"><input id="className" placeholder="New class name"><select id="classSchool" aria-label="School"><option value="">Choose school</option></select><button id="addClass">Add class</button></div>
+<div id="classSchoolMove"></div>
 <div class="listlabel">Your classes</div><div id="classes"></div></section>
 
 <section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
@@ -99,18 +100,10 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 
 <section class="card" id="studentsCard">
 <div class="card-head"><h2>Students</h2></div>
-<p class="hint">Assign a student to a school, then to one or more classes within that school.</p>
-<div class="formrow">
- <select id="studentSelect"><option value="">Choose student…</option></select>
- <select id="studentSchoolSelect"><option value="">Assign school…</option></select>
- <button id="assignStudentSchool">Set school</button>
-</div>
-<div id="studentClassAssign" style="display:none;margin-top:10px">
- <div class="listlabel">Assign classes (school&#x2019;s classes only)</div>
- <div id="studentClassChips" class="chips" style="margin-top:6px"></div>
-</div>
-<div class="listlabel" style="margin-top:14px">Students and their classes</div>
-<div id="studentAssignments"></div>
+<p class="hint">Each student belongs to one school, and only you can choose it. Then tick the classes they are in &mdash; only that school&rsquo;s classes are shown. Ticking adds the student to the class; unticking takes them out (their work is kept). Names, passcodes and sign-in don&rsquo;t change.</p>
+<div id="studentImport"></div>
+<div class="formrow"><input id="studentSearch" type="search" placeholder="Find a student" aria-label="Find a student"></div>
+<div id="studentList"></div>
 </section>
 
 <section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
@@ -210,12 +203,13 @@ async function load(){
  q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><span class="rowbtns">'+schoolPicker(id,v)+'<button class="danger" data-delete-teacher="'+id+'">Delete</button></span></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
  q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect").innerHTML='<option value="">Choose class</option>';
- Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
+ Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b><span class="rowbtns">'+classSchoolPicker(id,v)+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</span></div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
  const assignmentLines=[];
  Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  renderPrincipalAssignments();
  renderSchools();
+ renderClassSchoolMove();
  await renderToolGrants();
  await loadStudentData();
  renderStudentSection();
@@ -244,7 +238,7 @@ async function deletePrincipal(id){
  }
  await db.ref().update(updates);q("status").textContent="Principal removed.";await load();
 }
-q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=q("classSchool").value;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});q("className").value="";q("status").textContent="Class added ✓";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Schools (owner only). One school per teacher, stored on the invitation. See school-scope.js. ----
 const SCHOOLS_PATH=()=>"b3Games/workspaces/"+WS+"/schools";
@@ -253,7 +247,7 @@ function schoolPicker(inviteId,inv){const cur=inv&&inv.schoolId||"",known=!!scho
 function renderSchools(){
  const counts=B3SchoolScope.countBySchool(teacherData),ids=Object.keys(schoolData).sort((a,b)=>schoolData[a].name.localeCompare(schoolData[b].name));
  q("schools").innerHTML=ids.map(id=>{const sc=schoolData[id],n=counts[id]||0;return '<div class="entry row"><span><b>'+safe(sc.name)+'</b><small>'+n+' '+(n===1?'person':'people')+'</small></span><span class="rowbtns"><label class="syncs"><input type="checkbox" data-school-sync="'+safe(id)+'"'+(sc.syncsToNigri?' checked':'')+'> Syncs to Nigri</label><button type="button" data-school-rename="'+safe(id)+'" style="padding:8px 14px;font-size:15px">Rename</button><button type="button" class="danger" data-school-delete="'+safe(id)+'">Delete</button></span></div>'}).join("")||'<small>No schools yet.</small>';
- ["teacherSchool","principalSchool"].forEach(sel=>{const keep=q(sel).value;q(sel).innerHTML=schoolOptions(keep,"Choose school");});
+ ["teacherSchool","principalSchool","classSchool"].forEach(sel=>{const keep=q(sel).value;q(sel).innerHTML=schoolOptions(keep,"Choose school");});
  const plan=B3SchoolScope.planDefaultMove(teacherData,schoolData,0);
  q("schoolMove").innerHTML=plan.assign.length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+plan.assign.length+' '+(plan.assign.length===1?'person has':'people have')+' no school yet.</b> Put them in <b>'+safe(plan.schoolName)+'</b>'+(plan.createSchool?' (a new school with Syncs to Nigri on)':'')+'? Nothing else about them changes.<div class="chips">'+plan.assign.map(a=>'<span class="chip" style="padding-right:14px">'+safe(a.name)+(a.principal?' (principal)':'')+(a.signedIn?'':' · not signed in yet')+'</span>').join("")+'</div><button type="button" id="schoolMoveGo" style="margin-top:12px">Move them now</button></div>':'';
  if(plan.assign.length)q("schoolMoveGo").onclick=()=>moveEveryoneWithoutSchool().catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
@@ -285,6 +279,8 @@ async function deleteSchool(id){
  const sc=schoolData[id];if(!sc)return;
  const n=B3SchoolScope.countBySchool((await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value")).val()||{})[id]||0;
  if(n){alert(sc.name+" still has "+n+" "+(n===1?"person":"people")+". Move them to another school first.");return}
+ const use=B3StudentScope.countSchoolUse(id,(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{},await B3StudentScope.loadRecords(db,WS));
+ if(use.classes||use.students){alert(sc.name+" still has "+use.classes+" "+(use.classes===1?"class":"classes")+" and "+use.students+" "+(use.students===1?"student":"students")+". Move them to another school first.");return}
  if(!confirm("Delete the school "+sc.name+"?"))return;
  await db.ref(SCHOOLS_PATH()+"/"+id).remove();q("status").textContent="School deleted.";await load();
 }
@@ -594,82 +590,106 @@ q("bulkImport").onclick=async function(){
 };
 // ---- End bulk upload ---------------------------------------------------
 
- // ---- Students -------------------------------------------------------
- let studentData={};
- async function loadStudentData(){
-  const snap=await db.ref("b3Games/workspaces/"+WS+"/students").once("value");
-  studentData=snap.val()||{};
- }
- function renderStudentSection(){
-  q("studentSelect").innerHTML='<option value="">Choose student…</option>';
-  const list=[];
-  const allIds=new Set([...Object.keys(studentData)]);
-  allIds.forEach(id=>{
-   const ws=studentData[id]||{};
-   q("studentSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(ws.name||id)+'</option>');
-   const assignedIds=Object.keys(ws.classIds||{}).filter(c=>ws.classIds[c]===true);
-   const schoolName=ws.schoolId||'—';
-   list.push('<div class="entry"><b>'+safe(ws.name||id)+'</b><small>school: '+safe(schoolName)+'</small>'+(assignedIds.length?'<div class="chips">'+assignedIds.map(c=>'<span class="chip">'+safe(classData[c]&&classData[c].name||c)+' <button title="Unassign" data-unassign-student="'+id+'" data-unassign-class="'+c+'">✕</button></span>').join("")+"</div>":'<small> — no classes</small>')+'</div>');
-  });
-  q("studentAssignments").innerHTML=list.join("")||'<small>No students yet.</small>';
-  q("studentSchoolSelect").innerHTML='<option value="">Assign school…</option><option value="__clear">Clear school</option>';
-  const knownSchools=new Set();
-  Object.values(teacherData).forEach(t=>{if(t.schoolId)knownSchools.add(t.schoolId)});
-  Object.values(studentData).forEach(s=>{if(s.schoolId)knownSchools.add(s.schoolId)});
-  knownSchools.forEach(s=>q("studentSchoolSelect").insertAdjacentHTML("beforeend",'<option value="'+s+'">'+safe(s)+'</option>'));
-  updateStudentClassPanel();
- }
- function updateStudentClassPanel(){
-  const sid=q("studentSelect").value;
-  const ws=studentData[sid]||{};
-  const school=ws.schoolId||"";
-  if(!sid||!school){q("studentClassAssign").style.display="none";return;}
-  q("studentClassAssign").style.display="";
-  const schoolClasses=Object.entries(classData).filter(([,c])=>!c.schoolId||c.schoolId===school);
-  if(!schoolClasses.length){q("studentClassChips").innerHTML='<small>No classes for this school yet.</small>';return;}
-  const assigned=ws.classIds||{};
-  q("studentClassChips").innerHTML=schoolClasses.map(([cid,c])=>{
-   const on=assigned[cid]===true;
-   return '<label style="margin:3px 4px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" data-class-toggle="'+cid+'" '+(on?'checked':'')+'>'+safe(c.name||cid)+'</label>';
-  }).join("");
- }
- q("studentSelect").onchange=function(){
-  updateStudentClassPanel();
-  const sid=this.value;
-  const ws=studentData[sid]||{};
-  if(ws.schoolId)q("studentSchoolSelect").value=ws.schoolId;
- };
- q("assignStudentSchool").onclick=async function(){
-  const sid=q("studentSelect").value,schoolId=q("studentSchoolSelect").value;
-  if(!sid){q("status").textContent="Choose a student first.";return;}
-  if(!schoolId){q("status").textContent="Choose a school first.";return;}
-  const realSchool=schoolId==="__clear"?"":schoolId;
+// ---- Classes: which school each class belongs to ------------------------
+function classSchoolPicker(classId,cls){const cur=cls&&cls.schoolId||"",known=!!schoolData[cur];return '<select class="schoolpick'+(known?'':' noschool')+'" data-class-school="'+safe(classId)+'" aria-label="School for '+safe(cls&&cls.name||classId)+'">'+(known?'':'<option value="" selected>No school</option>')+schoolOptions(cur)+'</select>'}
+function renderClassSchoolMove(){
+ const ids=B3StudentScope.classesWithoutSchool(classData);
+ q("classSchoolMove").innerHTML=ids.length&&Object.keys(schoolData).length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+ids.length+' '+(ids.length===1?'class has':'classes have')+' no school yet.</b> Students can only be given classes in their own school.<div class="chips">'+ids.map(id=>'<span class="chip" style="padding-right:14px">'+safe(classData[id].name||id)+'</span>').join("")+'</div><div class="formrow" style="margin-top:10px"><select id="classSchoolMoveTo" aria-label="School">'+schoolOptions("","Choose school")+'</select><button type="button" id="classSchoolMoveGo">Put them in this school</button></div></div>':"";
+ if(q("classSchoolMoveGo"))q("classSchoolMoveGo").onclick=()=>moveClassesWithoutSchool().catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+}
+// Re-reads the classes first so a school chosen meanwhile is never overwritten.
+async function moveClassesWithoutSchool(){
+ const to=q("classSchoolMoveTo").value;if(!schoolData[to]){q("status").textContent="Choose a school first.";return}
+ const ids=B3StudentScope.classesWithoutSchool((await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{});
+ if(!ids.length){await load();return}
+ if(!confirm("Put "+ids.length+" "+(ids.length===1?"class":"classes")+" in "+schoolData[to].name+"?"))return;
+ const updates={};ids.forEach(id=>{updates["b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId"]=to});
+ await db.ref().update(updates);q("status").textContent="Classes moved into "+schoolData[to].name+" ✓";await load();
+}
+q("classes").addEventListener("change",async e=>{
+ const sel=e.target.closest("[data-class-school]");if(!sel)return;
+ const id=sel.dataset.classSchool,cls=classData[id],to=sel.value;if(!cls||!schoolData[to])return;
+ if(cls.schoolId&&schoolData[cls.schoolId]&&!confirm("Move the class "+(cls.name||id)+" from "+schoolData[cls.schoolId].name+" to "+schoolData[to].name+"? Students from the old school stay in it until you change them below.")){sel.value=cls.schoolId;return}
+ sel.disabled=true;
+ try{await db.ref("b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId").set(to);q("status").textContent="Class school saved ✓";await load();}
+ catch(err){console.error(err);sel.disabled=false;q("status").textContent="Could not save the class school. Try again.";}
+});
+
+// ---- Students -------------------------------------------------------
+// Owner record per student: b3Games/workspaces/<ws>/students/<id> = {schoolId, classIds}.
+// It never holds a name (that part of the database is public). Names come from
+// the class rosters already loaded above. Class changes go through the trusted
+// funTorahManageStudents add/remove actions, exactly as teachers' changes do.
+let studentRecords={},rosterData={};
+async function loadStudentData(){studentRecords=await B3StudentScope.loadRecords(db,WS);rosterData=B3StudentScope.rosterStudents(classData);}
+const studentName=id=>rosterData[id]&&rosterData[id].name||id;
+async function manageStudent(action,classId,studentId){
+ // Same Firebase project as this page (staging tests never touch the live site).
+ const url=MANAGE_STUDENTS_URL.replace("-b3-games.",firebase.app().options.projectId==="fun-torah-tools-staging"?"-fun-torah-tools-staging.":"-b3-games.");
+ const response=await fetch(url,{method:"POST",signal:AbortSignal.timeout(15000),
+  headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},
+  body:JSON.stringify({action,classId,studentId})});
+ let result={};try{result=await response.json();}catch(_){}
+ if(!response.ok)throw new Error(result.error||"Could not update the class.");
+ return result;
+}
+function studentRow(id){
+ const name=studentName(id),rec=studentRecords[id]||{schoolId:"",classIds:{}},school=schoolData[rec.schoolId]?rec.schoolId:"";
+ const inClasses=rosterData[id]&&rosterData[id].classIds||{},offered=B3StudentScope.classesForSchool(classData,school);
+ const pick='<select class="schoolpick'+(school?'':' noschool')+'" data-student-school="'+safe(id)+'" aria-label="School for '+safe(name)+'">'+(school?'':'<option value="" selected>No school</option>')+schoolOptions(school)+'</select>';
+ const boxes=!school?'<small>Choose a school first.</small>':offered.length?offered.map(cid=>'<label class="classtick"><input type="checkbox" data-student-class="'+safe(id)+'" value="'+safe(cid)+'"'+(inClasses[cid]?' checked':'')+'> '+safe(classData[cid].name||cid)+'</label>').join(""):'<small>This school has no classes yet.</small>';
+ const outside=Object.keys(inClasses).filter(c=>!offered.includes(c));
+ const note=outside.length?'<small class="warn">'+(school?'Also in a class outside this school: ':'In: ')+outside.map(c=>safe(classData[c]&&classData[c].name||c)).join(", ")+'</small>':'';
+ return '<div class="entry studentrow" data-student-row="'+safe(id)+'" data-name="'+safe(name.toLowerCase())+'"><div class="row"><b>'+safe(name)+'</b><span class="rowbtns">'+pick+'</span></div><div class="chips">'+boxes+'</div>'+note+'</div>';
+}
+function renderStudentSection(){
+ const ids=[...new Set([...Object.keys(rosterData),...Object.keys(studentRecords)])].sort((a,b)=>studentName(a).localeCompare(studentName(b)));
+ q("studentList").innerHTML=ids.map(studentRow).join("")||'<small>No students yet. Add them to a class first (for example with Bulk Upload).</small>';
+ filterStudents();
+ const plan=B3StudentScope.planImport(rosterData,studentRecords,classData,0);
+ q("studentImport").innerHTML=plan.created.length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+plan.created.length+' '+(plan.created.length===1?'student has':'students have')+' no school yet.</b> Set them up from the classes they are in now? A student whose classes are all in one school gets that school'+(plan.noSchool.length?'; the other '+plan.noSchool.length+' you choose below':'')+'. Nothing about their sign-in or classes changes.<div style="margin-top:10px"><button type="button" id="studentImportGo">Set up '+plan.created.length+' '+(plan.created.length===1?'student':'students')+'</button></div></div>':"";
+ if(q("studentImportGo"))q("studentImportGo").onclick=()=>importStudents().catch(err=>{console.error(err);q("status").textContent="Could not set up students. Please try again.";});
+}
+function filterStudents(){const t=q("studentSearch").value.trim().toLowerCase();q("studentList").querySelectorAll("[data-student-row]").forEach(r=>{r.hidden=!!t&&!r.dataset.name.includes(t)})}
+q("studentSearch").addEventListener("input",filterStudents);
+// Re-reads records first so the import never overwrites a record saved meanwhile. Writes only the new path.
+async function importStudents(){
+ const records=await B3StudentScope.loadRecords(db,WS),classes=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
+ const plan=B3StudentScope.planImport(B3StudentScope.rosterStudents(classes),records,classes,firebase.database.ServerValue.TIMESTAMP);
+ if(!plan.created.length){await load();return}
+ if(!confirm("Set up "+plan.created.length+" "+(plan.created.length===1?"student":"students")+" from the classes they are in now?"))return;
+ const updates={};Object.entries(plan.updates).forEach(([sid,rec])=>{updates[B3StudentScope.studentPath(WS,sid)]=rec});
+ await db.ref().update(updates);q("status").textContent="Set up "+plan.created.length+" "+(plan.created.length===1?"student":"students")+" ✓";await load();
+}
+q("studentList").addEventListener("change",async e=>{
+ const sel=e.target.closest("[data-student-school]"),box=e.target.closest("[data-student-class]");
+ if(sel){
+  const id=sel.dataset.studentSchool,to=sel.value,name=studentName(id),from=(studentRecords[id]||{}).schoolId;if(!schoolData[to])return;
+  const plan=B3StudentScope.planSchoolChange(rosterData[id]&&rosterData[id].classIds||{},classData,to);
+  const leaving=plan.remove.map(c=>classData[c]&&classData[c].name||c);
+  const ask=leaving.length?"Put "+name+" in "+schoolData[to].name+"? They will be taken out of "+leaving.join(", ")+" (not in that school). Their work is kept.":schoolData[from]?"Move "+name+" from "+schoolData[from].name+" to "+schoolData[to].name+"?":"";
+  if(ask&&!confirm(ask)){sel.value=schoolData[from]?from:"";return}
+  sel.disabled=true;
   try{
-   await B3StudentScope.setStudentSchool(db,WS,sid,realSchool,Date.now());
-   q("status").textContent="School assigned.";
-   await loadStudentData();renderStudentSection();
-  }catch(e){console.error(e);q("status").textContent="Could not assign school: "+e.message;}
- };
- q("studentClassChips").addEventListener("change",async function(e){
-  const cb=e.target.closest("[data-class-toggle]");if(!cb)return;
-  const sid=q("studentSelect").value,cid=cb.dataset.classToggle,on=cb.checked;
-  if(!sid||!cid)return;
+   for(const cid of plan.remove)await manageStudent("remove",cid,id);
+   await B3StudentScope.saveSchool(db,WS,id,to,plan.keep,firebase.database.ServerValue.TIMESTAMP);
+   q("status").textContent=name+" is now in "+schoolData[to].name+" ✓";await load();
+  }catch(err){console.error(err);q("status").textContent="Could not change the school: "+err.message;await load();}
+  return;
+ }
+ if(box){
+  const id=box.dataset.studentClass,cid=box.value,on=box.checked,name=studentName(id),cname=classData[cid]&&classData[cid].name||cid;
+  const school=(studentRecords[id]||{}).schoolId;
+  if(!schoolData[school]||classData[cid]?.schoolId!==school){box.checked=!on;q("status").textContent="That class is not in "+name+"'s school.";return}
+  if(!on&&!confirm("Take "+name+" out of "+cname+"? Their work is kept.")){box.checked=true;return}
+  box.disabled=true;
   try{
-   await B3StudentScope.setStudentClass(db,WS,sid,cid,on,Date.now());
-   q("status").textContent=(on?"Assigned to ":"Removed from ")+safe(classData[cid]&&classData[cid].name||cid)+".";
-   await loadStudentData();renderStudentSection();
-  }catch(e){console.error(e);cb.checked=!on;q("status").textContent="Could not update class: "+e.message;}
- });
- q("studentAssignments").addEventListener("click",async function(e){
-  const btn=e.target.closest("[data-unassign-student]");if(!btn)return;
-  const sid=btn.dataset.unassignStudent,cid=btn.dataset.unassignClass;
-  if(!sid||!cid)return;
-  try{
-   await B3StudentScope.setStudentClass(db,WS,sid,cid,false,Date.now());
-   q("status").textContent="Removed.";
-   await loadStudentData();renderStudentSection();
-  }catch(e){console.error(e);q("status").textContent="Could not remove: "+e.message;}
- });
+   await manageStudent(on?"add":"remove",cid,id);
+   await B3StudentScope.setStudentClass(db,WS,id,cid,on,firebase.database.ServerValue.TIMESTAMP);
+   q("status").textContent=(on?name+" added to ":name+" taken out of ")+cname+" ✓";await load();
+  }catch(err){console.error(err);box.checked=!on;box.disabled=false;q("status").textContent="Could not update the class: "+err.message;}
+ }
+});
 
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
