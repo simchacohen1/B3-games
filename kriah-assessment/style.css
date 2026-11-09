@@ -10,3 +10,13 @@ main{position:relative;padding-top:0;max-width:1160px}.toolbar{position:relative
 @media(max-width:650px){header{padding:20px 20px 43px}.hero-layout{align-items:flex-start}.letter-garden{display:none}.brand-icon{width:47px;height:53px;font-size:36px;flex-shrink:0}.hero-chips{gap:6px}.hero-chips span{font-size:10px}.toolbar{padding:16px;gap:12px}.toolbar label{min-width:120px}main{padding:0 14px 20px}.brand span{font-size:26px}.panel,.card{padding:18px}.row{padding:17px}nav button{padding:10px 5px;font-size:12px}.metric{min-width:100px;padding:13px}.cluster{font-size:36px}.section-head{margin:23px 0 18px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}button:hover:enabled{transform:none}}
 @media print{body{background:#fff}header{background:#fff;padding:10px}.hero-layout .eyebrow,.hero-chips,.letter-garden,.brand-icon{display:none}header p,header a{color:#333}.toolbar{display:none}.metric,.panel,.row{box-shadow:none}.metric strong,h1{color:#222}.brand span{color:#222}}
+/* Workflow clarity: keep confirmations/errors visible while scrolled, give the reading text clear gaps between letters/words, and style the grading helpers. */
+#status{position:sticky;top:8px;z-index:20;box-shadow:0 4px 14px rgba(40,30,90,.12)}#status:empty{display:none}
+p.hebrew,.passage.hebrew{word-spacing:.4em}
+.done-note{background:#e7f7ef;color:#1d6b47;border-radius:12px;padding:12px 15px;font-weight:600}
+label.check.attention{outline:2px solid #d9534f;outline-offset:4px;border-radius:8px}
+.mark-progress{font-weight:600;color:#7b5817;background:#fff6dd;border-radius:10px;padding:8px 12px;margin:12px 0 6px}.mark-progress.complete{color:#1d6b47;background:#e7f7ef}
+.mark-list li.mark-item-error>span{color:#a2332a;font-weight:600}
+.grade-queue{margin:0 0 16px}.grade-queue h2{font-size:18px;margin:12px 0 8px}
+label.check.select-all{font-weight:600;border-bottom:1px solid #e1d9f2;padding-bottom:8px}
+@media print{#status{position:static;box-shadow:none}.grade-queue{display:none}}
