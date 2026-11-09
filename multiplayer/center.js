@@ -19,7 +19,7 @@
     { key: "go-fish", name: "Go Fish", icon: "🐟", description: "Ask classmates for cards and collect complete sets.", url: "game.html?game=go-fish", mode: "start" },
     { key: "uno-style", name: "Uno-style Cards", icon: "UNO", description: "Match colors and numbers with simple action cards.", url: "game.html?game=uno-style", mode: "start" }
   ];
-  var sessionId = "", sessionName = "", db = null, roomsPollTimer = null, roomsCallable = null, roomsRequest = 0, scopeKey = "", classInfo = null;
+  var sessionId = "", sessionName = "", db = null, roomsPollTimer = null, roomsCallable = null, roomsRequest = 0, scopeKey = "", classInfo = null, lockRef = null, lockListener = null;
   var statusBox = document.getElementById("accountStatus");
   var invitations = document.getElementById("invitations");
   var invitationSection = document.getElementById("invitationSection");
@@ -47,6 +47,77 @@
     document.getElementById("gameCoinBreakdown").textContent = "Peer games " + peerCoins + " · Computer games " + computerCoins;
     balanceBox.hidden = false;
   }
+
+  // ── Game lock ──────────────────────────────────────────────────────────────
+  function setupGameLock() {
+    var wid = classInfo.workspaceId, cid = classInfo.classId;
+    lockRef = db.ref("multiplayerCenter/workspaces/" + wid + "/classes/" + cid + "/gamesLocked");
+    var isTeacher = classInfo.role === "teacher";
+
+    if (isTeacher) {
+      // Build the teacher toggle button
+      var lockSection = document.createElement("div");
+      lockSection.id = "gameLockSection";
+      lockSection.style.cssText = "text-align:center;margin:10px 0 18px";
+      var lockBtn = document.createElement("button");
+      lockBtn.id = "gameLockBtn";
+      lockBtn.type = "button";
+      lockBtn.className = "btn";
+      lockBtn.style.cssText = "font-size:15px;padding:8px 22px;border-radius:20px";
+      var lockStatus = document.createElement("span");
+      lockStatus.id = "gameLockStatus";
+      lockStatus.style.cssText = "display:block;font-size:13px;color:#64748b;margin-top:6px";
+      lockSection.append(lockBtn, lockStatus);
+      var gamesSection = document.querySelector("section[aria-labelledby='gamesHeading']");
+      if (gamesSection) gamesSection.insertBefore(lockSection, gamesSection.firstChild);
+
+      function applyTeacherLockUI(locked) {
+        lockBtn.textContent = locked ? "🔓 Unlock Games" : "🔒 Lock Games for Students";
+        lockBtn.style.background = locked ? "#dc2626" : "#1d4ed8";
+        lockBtn.style.color = "#fff";
+        lockBtn.style.border = "none";
+        lockStatus.textContent = locked
+          ? "Games are locked. Students see a 'games locked' message."
+          : "Games are open. Students can play freely.";
+      }
+
+      lockBtn.addEventListener("click", function () {
+        lockBtn.disabled = true;
+        lockRef.once("value").then(function (snap) {
+          var nowLocked = !!snap.val();
+          return lockRef.set(!nowLocked);
+        }).catch(function (err) {
+          lockStatus.textContent = "Could not change lock. " + (err && err.message || "");
+        }).finally(function () { lockBtn.disabled = false; });
+      });
+
+      lockListener = lockRef.on("value", function (snap) {
+        applyTeacherLockUI(!!snap.val());
+      });
+    } else {
+      // Student: watch lock state and show/hide overlay
+      lockListener = lockRef.on("value", function (snap) {
+        var locked = !!snap.val();
+        var overlay = document.getElementById("gameLockOverlay");
+        var gamesSection = document.querySelector("section[aria-labelledby='gamesHeading']");
+        if (locked) {
+          if (!overlay && gamesSection) {
+            overlay = document.createElement("div");
+            overlay.id = "gameLockOverlay";
+            overlay.style.cssText = "text-align:center;padding:36px 20px;background:#fef2f2;border:2px solid #fca5a5;border-radius:16px;margin:18px 0";
+            overlay.innerHTML = "<div style='font-size:48px'>🔒</div><h3 style='margin:8px 0 4px;color:#991b1b'>Games are locked</h3><p style='color:#7f1d1d;margin:0'>Your teacher has locked the Multiplayer Arcade. Games will be available again when your teacher unlocks them.</p>";
+            gamesSection.insertBefore(overlay, document.getElementById("gameCategories"));
+          }
+          if (overlay) overlay.hidden = false;
+          document.querySelectorAll(".game-launch").forEach(function (btn) { btn.disabled = true; });
+        } else {
+          if (overlay) overlay.hidden = true;
+          document.querySelectorAll(".game-launch").forEach(function (btn) { btn.disabled = !readyToPlay; });
+        }
+      });
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   function setupCoinPolicyEditor() {
     var section = document.getElementById("gameCoinSettings"), form = document.getElementById("gameCoinPolicyForm");
@@ -297,6 +368,7 @@
         statusBox.textContent = (classInfo.role === "teacher" ? "Playing as teacher " : "Signed in as ") + sessionName + " · " + classInfo.className + ". Showing games for this class.";
         readyToPlay = true;
         drawCategoryHome();
+        setupGameLock();
         if (typeof firebase.functions === "function") {
           // Students see their balance and the class board; teachers see the class board too.
           leaderboardSection.hidden = false;
@@ -315,6 +387,9 @@
       }
     });
   }
-  window.addEventListener("pagehide", function () { clearInterval(roomsPollTimer); roomsPollTimer = null; roomsRequest += 1; });
+  window.addEventListener("pagehide", function () {
+    clearInterval(roomsPollTimer); roomsPollTimer = null; roomsRequest += 1;
+    if (lockRef && lockListener) { lockRef.off("value", lockListener); lockRef = null; lockListener = null; }
+  });
   start();
 })();
