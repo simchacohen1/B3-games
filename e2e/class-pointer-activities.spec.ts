@@ -263,8 +263,9 @@ test('screen exclusions close active video, preserve classmates, and remain inde
   await expect(page.locator('.board-tile')).toHaveCount(1);
   await expect.poll(() => page.locator('.board-tile video').evaluateAll((videos: HTMLVideoElement[]) => videos.filter(v => v.srcObject).length)).toBe(1);
   const initial=await page.locator('.board-tile').first().boundingBox();
-  expect(initial!.width).toBeGreaterThan(700);
-  expect(initial!.height).toBeGreaterThan(380);
+  // The "not sharing yet" line sits above the tiles (it no longer covers them), so one tile is slightly shorter.
+  expect(initial!.width).toBeGreaterThan(640);
+  expect(initial!.height).toBeGreaterThan(360);
   await page.getByLabel('Screen sharing for Ari', {exact:true}).first().uncheck();
   expect(await page.evaluate(() => (window as any).__closed)).toBe(true);
   await expect(page.getByLabel('Screen sharing for Levi', {exact:true}).first()).toBeChecked();
@@ -341,7 +342,8 @@ test('gallery sizes one live screen large and shrinks automatically as streams j
   await join('a');
   await expect(page.locator('.board-tile')).toHaveCount(1);
   const big=await page.locator('.board-tile').first().boundingBox();
-  expect(big!.width).toBeGreaterThan(700);
+  // The "not sharing yet" line sits above the tiles (it no longer covers them), so one tile is slightly shorter.
+  expect(big!.width).toBeGreaterThan(640);
   await join('b');
   await expect(page.locator('.board-tile')).toHaveCount(2);
   const small=await page.locator('.board-tile').first().boundingBox();

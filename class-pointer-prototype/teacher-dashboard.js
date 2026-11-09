@@ -78,6 +78,38 @@ function init(){
  const studentsBtn=iconButton('cp-topbar-btn cp-students-toggle','users','Students');studentsBtn.id='cpStudentsToggle';
  studentsBtn.setAttribute('aria-controls','cpStudentsDrawer');
  topbar.append(studentsBtn);
+ /* First-time guide: five short steps. Opens by itself the first time a teacher uses Class Pointer. */
+ const guideBtn=el('button','cp-topbar-btn cp-guide-btn','❓ Help');guideBtn.type='button';guideBtn.id='cpGuideBtn';
+ guideBtn.title='How Class Pointer works: a short guide';
+ topbar.append(guideBtn);
+ const guide=el('dialog','cp-guide');guide.id='cpGuide';guide.setAttribute('aria-labelledby','cpGuideTitle');
+ const guideHead=el('div','cp-guide-head');
+ const guideTitle=el('h2',null,'How Class Pointer works');guideTitle.id='cpGuideTitle';
+ const guideClose=el('button','cp-guide-x');guideClose.type='button';guideClose.setAttribute('aria-label','Close the guide');guideClose.append(icon('close'));
+ guideHead.append(guideTitle,guideClose);
+ const intro=el('p','cp-guide-intro','Students who are signed in to Fun Torah Tools connect by themselves. They do not need a link and do not need to leave the activity they are on.');
+ const steps=el('ol','cp-guide-steps');
+ for(const [head,text] of [
+  ['Show your lesson','In My screen, pick what to teach from: Share my screen, a PDF, a webpage or a whiteboard. Every student in this class sees it right away.'],
+  ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows his name.'],
+  ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. He clicks it and chooses Entire Screen. His screen appears here as a tile, and the list on top shows who has not shared yet.'],
+  ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. He sees your marks on his own screen. 🧽 Clear takes them off.'],
+  ['When you are done','Use the red Stop button to stop what students are watching. The Student sharing button in the top bar turns screen sharing off for the whole class.']
+ ]){const li=el('li');li.append(el('strong',null,head),el('span',null,text));steps.append(li)}
+ const note=el('p','cp-guide-note','The browser always asks a student before his screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
+ const guideOk=el('button','cp-guide-ok','Got it');guideOk.type='button';
+ guide.append(guideHead,intro,steps,note,guideOk);
+ document.body.append(guide);
+ const GUIDE_KEY='classPointerGuideSeen';
+ function closeGuide(){try{guide.close()}catch{guide.removeAttribute('open')}try{localStorage.setItem(GUIDE_KEY,'1')}catch{}guideBtn.focus?.()}
+ function openGuide(){if(guide.open)return;try{guide.showModal()}catch{guide.setAttribute('open','')}guideOk.focus?.()}
+ guideBtn.addEventListener('click',openGuide);guideClose.addEventListener('click',closeGuide);guideOk.addEventListener('click',closeGuide);
+ guide.addEventListener('cancel',event=>{event.preventDefault();closeGuide()});
+ guide.addEventListener('click',event=>{if(event.target===guide)closeGuide()});
+ window.ClassPointerGuide={open:openGuide,close:closeGuide};
+ let seenGuide=true;try{seenGuide=localStorage.getItem(GUIDE_KEY)==='1'}catch{}
+ // Automated browser tests (navigator.webdriver) open it themselves, so it does not cover the page they test.
+ if(!seenGuide&&!navigator.webdriver)setTimeout(openGuide,400);
  const back=header?.querySelector('a[href]');
  if(back){back.classList.add('cp-topbar-back');topbar.append(back)}
  if(header){header.replaceChildren(topbar);header.classList.add('cp-header')}
@@ -346,7 +378,7 @@ function init(){
   link.addEventListener('click',()=>{if(!capture.disabled)capture.click()});
   foot.append(el('span','cp-source-sep','·'),link);tileButtons.push([link,capture]);
  }
- pickerCard.append(foot,el('p','cp-source-note','Students join with the invite link. You can switch anytime.'));
+ pickerCard.append(foot,el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
  stage?.append(pickerCard);
  for(const [b,original] of tileButtons){
   const sync=()=>{b.disabled=original.disabled};

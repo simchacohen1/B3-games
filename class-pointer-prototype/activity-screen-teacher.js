@@ -31,6 +31,8 @@
   const CARD_BIG='background:#0b1222;color:white;padding:10px;border-radius:14px;flex:1;min-width:0;min-height:0;box-shadow:0 12px 40px #0008;display:flex;flex-direction:column;gap:8px';
   const VIDEO_SMALL='pointer-events:auto;position:static;width:100%;height:180px;object-fit:contain;background:#050a16;cursor:zoom-in';
   const VIDEO_BIG='pointer-events:auto;position:static;width:100%;flex:1;min-height:0;height:auto;object-fit:contain;background:#050a16;cursor:zoom-out';
+  const WRAP_SMALL='position:relative;display:flex';
+  const WRAP_BIG='position:relative;display:flex;flex-direction:column;flex:1;min-height:0';
   const BUTTON='min-height:40px;padding:0 14px;border-radius:10px;border:1px solid #ffffff55;background:#1d4ed8;color:#fff;font:700 15px system-ui;cursor:pointer';
   let focused=null; // student id shown large
 
@@ -55,6 +57,8 @@
       entry.card.hidden=!!focused&&!big;
       entry.card.style.cssText=big?CARD_BIG:CARD_SMALL;
       entry.video.style.cssText=big?VIDEO_BIG:VIDEO_SMALL;
+      entry.wrap.style.cssText=big?WRAP_BIG:WRAP_SMALL;
+      entry.ink?.refresh();
       entry.enlarge.textContent=big?'◀ Back to gallery':'⤢ Enlarge';
       entry.enlarge.setAttribute?.('aria-pressed',String(big));
       entry.enlarge.title=big?'Return to all student screens (sharing continues)':'Show '+entry.name+'’s screen large';
@@ -89,8 +93,11 @@
     dismiss.title='Close this student’s screen (he can share again)';
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
     dismiss.onclick=()=>closeStudent(studentId);
-    card.append(top,video,dismiss);tray.appendChild(card);
-    entry={card,video,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    // Enlarged, the teacher can point or draw on this screen; the student sees it on his own screen.
+    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video);
+    card.append(top,wrap,dismiss);tray.appendChild(card);
+    entry={card,video,wrap,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    entry.ink=window.ClassPointerScreenMarks?.attach?.(wrap,video,()=>focused===studentId&&students.get(studentId)===entry?{id:studentId,name:entry.name}:null)||null;
     setFocus(focused);
     return entry;
   }
@@ -102,7 +109,7 @@
       entry.calls=entry.calls.filter(item=>item.call!==call);
       // Another tab of the same boy is still sharing: keep his tile and show that screen.
       if(entry.calls.length)showLatest(entry);
-      else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null}
+      else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null;window.ClassPointerScreenMarks?.clearFor(studentId)}
     }
     setFocus(focused);
     notify();

@@ -50,6 +50,16 @@
       }
     }
     organize();
+    // Keep the tabs truthful when the gallery is opened or closed some other way
+    // (Student sharing button, Students menu, closing the gallery).
+    function syncTabs(){
+      const current=window.ClassPointerBoards?.workspace?.();
+      const id=current==='screens'?'screens':current==='boards'?'whiteboards':'teach';
+      for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
+      document.body.classList.toggle('cp-student-workspace',id!=='teach');
+    }
+    document.addEventListener('classpointer:sharing-state',syncTabs);
+    document.addEventListener('class-pointer-workspace',()=>setTimeout(syncTabs,0));
     new MutationObserver(organize).observe(dock,{childList:true,subtree:false});
     const observer=new MutationObserver(()=>{tabs.hidden=panel.hidden});
     observer.observe(panel,{attributes:true,attributeFilter:['hidden']});
