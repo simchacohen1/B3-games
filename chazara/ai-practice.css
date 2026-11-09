@@ -1,0 +1,81 @@
+/* Chazara AI Practice (#688). Scoped with the aip- prefix so the existing chart is untouched. */
+.aip-panel{background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 16px #0001;margin:14px 0;border:2px solid #c7d2fe}
+.aip-panel h2{margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.aip-badge{display:inline-block;padding:3px 9px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:12px;font-weight:900;letter-spacing:.02em}
+.aip-badge.regular{background:#e0f2fe;color:#075985}
+.aip-sub{color:#64748b;font-size:14px;margin:0 0 10px}
+.aip-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.aip-card{display:flex;flex-direction:column;gap:8px;text-align:left;border:0;border-radius:16px;padding:14px;background:linear-gradient(135deg,#eef2ff,#faf5ff);box-shadow:0 3px 0 #c7d2fe;cursor:pointer;font:inherit;color:#1e1b4b;min-height:44px}
+.aip-card:hover{filter:brightness(.98)}
+.aip-card:focus-visible,.aip-btn:focus-visible,.aip-close:focus-visible{outline:4px solid #f59e0b;outline-offset:3px}
+.aip-card .aip-card-title{font-size:18px;font-weight:900}
+.aip-card .aip-card-ref{direction:rtl;text-align:right;font-size:17px;font-weight:800;color:#4338ca}
+.aip-card .aip-card-go{align-self:flex-start;background:#4f46e5;color:#fff;border-radius:999px;padding:8px 14px;font-weight:900}
+.aip-card .aip-card-progress{font-size:13px;color:#475569;font-weight:700}
+.aip-regular{margin-top:12px;border-top:1px dashed #cbd5e1;padding-top:10px}
+.aip-regular-item{background:#f8fafc;border-radius:12px;padding:10px 12px;margin:8px 0}
+.aip-regular-item b{display:block}
+.aip-hebrew{direction:rtl;text-align:right;font-family:"Noto Serif Hebrew","Frank Ruhl Libre","SBL Hebrew","Times New Roman",serif;line-height:1.9;unicode-bidi:isolate}
+
+/* Practice screen */
+.aip-overlay{position:fixed;inset:0;z-index:2147483000;background:rgba(30,27,75,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px}
+.aip-dialog{position:relative;width:min(760px,100%);background:#fff;border-radius:24px;box-shadow:0 20px 50px #0004;padding:20px 20px 24px;margin:auto 0;color:#1f2937}
+.aip-close{position:absolute;top:12px;right:12px;border:0;background:#f1f5f9;border-radius:999px;width:44px;height:44px;font-size:22px;cursor:pointer}
+.aip-dialog h2{margin:0 52px 4px 0;font-size:26px}
+.aip-steps{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px;padding:0;list-style:none}
+.aip-steps li{flex:1 1 180px;background:#f8fafc;border-radius:14px;padding:10px 12px;font-weight:800;font-size:16px}
+.aip-steps li span{display:inline-block;width:28px;height:28px;border-radius:50%;background:#4f46e5;color:#fff;text-align:center;line-height:28px;margin-right:6px}
+.aip-progress{display:flex;gap:6px;justify-content:center;margin:6px 0 10px}
+.aip-dot{width:14px;height:14px;border-radius:50%;background:#e2e8f0}
+.aip-dot.done{background:#22c55e}.aip-dot.now{background:#4f46e5;box-shadow:0 0 0 4px #c7d2fe}
+.aip-pasuk{background:#fffbeb;border:2px solid #fde68a;border-radius:18px;padding:14px 16px;margin:8px 0 14px}
+.aip-pasuk .aip-label{direction:rtl;text-align:right;font-weight:900;color:#92400e;font-size:18px}
+.aip-pasuk .aip-hebrew{font-size:clamp(26px,5vw,36px);font-weight:600;color:#1c1917}
+.aip-mic{display:flex;align-items:center;gap:8px;justify-content:center;font-weight:800;color:#475569;margin:6px 0;min-height:28px}
+.aip-mic .aip-mic-dot{width:14px;height:14px;border-radius:50%;background:#94a3b8}
+.aip-mic.on .aip-mic-dot{background:#ef4444;animation:aip-pulse 1s infinite}
+.aip-mic.ready .aip-mic-dot{background:#22c55e}
+.aip-mic.blocked{color:#b91c1c}.aip-mic.blocked .aip-mic-dot{background:#b91c1c}
+.aip-meter{display:flex;gap:4px;justify-content:center;align-items:flex-end;height:36px;margin:4px 0 10px}
+.aip-meter i{display:block;width:10px;border-radius:5px;background:#a5b4fc;height:6px;transition:height .08s}
+.aip-timer{text-align:center;font-weight:900;font-size:20px;color:#b91c1c;min-height:26px}
+.aip-actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:12px}
+.aip-btn{border:0;border-radius:999px;padding:16px 26px;font-size:20px;font-weight:900;cursor:pointer;min-height:56px;min-width:180px;box-shadow:0 4px 0 #0002;font-family:inherit}
+.aip-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0002}
+.aip-btn:disabled{opacity:.55;cursor:not-allowed}
+.aip-btn.rec{background:#ef4444;color:#fff}
+.aip-btn.next{background:#4f46e5;color:#fff}
+.aip-btn.finish{background:#16a34a;color:#fff}
+.aip-btn.soft{background:#e2e8f0;color:#1f2937;font-size:16px;min-width:0;padding:12px 18px;min-height:48px}
+.aip-btn.big-rec{width:min(320px,100%);font-size:24px;padding:20px}
+.aip-note{text-align:center;color:#92400e;font-weight:800;min-height:22px;margin:6px 0}
+
+/* Checking */
+.aip-checking{text-align:center;padding:26px 6px}
+.aip-checking .aip-books{font-size:54px;display:flex;justify-content:center;gap:10px}
+.aip-checking .aip-books span{display:inline-block;animation:aip-bounce 1.1s infinite}
+.aip-checking .aip-books span:nth-child(2){animation-delay:.15s}.aip-checking .aip-books span:nth-child(3){animation-delay:.3s}
+.aip-checking h3{font-size:26px;margin:12px 0 4px}
+
+/* Results */
+.aip-result{text-align:center;padding:12px 6px;border-radius:20px}
+.aip-result .aip-emoji{font-size:72px;line-height:1}
+.aip-result h3{font-size:34px;margin:8px 0}
+.aip-result p{font-size:20px;margin:6px auto;max-width:560px}
+.aip-result.excellent{background:linear-gradient(180deg,#dcfce7,#fff)}
+.aip-result.almost{background:linear-gradient(180deg,#fef9c3,#fff)}
+.aip-result.try_again{background:linear-gradient(180deg,#e0e7ff,#fff)}
+.aip-result.unclear,.aip-result.unavailable{background:linear-gradient(180deg,#f1f5f9,#fff)}
+.aip-tips{list-style:none;padding:0;margin:10px 0}
+.aip-tips li{background:#fff;border-radius:12px;padding:8px 12px;margin:6px auto;max-width:520px;font-weight:700;color:#334155;box-shadow:0 1px 4px #0001}
+.aip-stars{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0}
+.aip-stars span{direction:rtl;background:#fff;border-radius:999px;padding:6px 12px;font-weight:800;box-shadow:0 1px 4px #0001}
+.aip-confetti{position:fixed;inset:0;pointer-events:none;z-index:2147483001;overflow:hidden}
+.aip-confetti i{position:absolute;top:-20px;width:10px;height:16px;border-radius:3px;animation:aip-fall 2.6s linear forwards}
+.aip-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@keyframes aip-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.25)}}
+@keyframes aip-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes aip-fall{to{transform:translateY(110vh) rotate(540deg)}}
+@media (max-width:560px){.aip-dialog{padding:16px 14px 20px;border-radius:18px}.aip-dialog h2{font-size:22px}.aip-btn{min-width:0;width:100%}.aip-result h3{font-size:28px}}
+@media (prefers-reduced-motion:reduce){.aip-mic.on .aip-mic-dot,.aip-checking .aip-books span{animation:none}.aip-confetti{display:none}.aip-meter i{transition:none}}
