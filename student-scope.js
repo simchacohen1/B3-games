@@ -3,7 +3,10 @@
  * Owner-managed record (owner/admin write only, like teacher records):
  *   b3Games/workspaces/<ws>/students/<studentId>
  *     schoolId   string   chosen by the owner; students cannot pick it
- *     classIds   { <classId>: true }   classes inside that school
+ *     classIds   { <classId>: true }   owner-panel copy of the student's classes.
+ *                Not authoritative: the real many-to-many link is
+ *                b3Games/students/<id>/memberships <-> classes/<id>/members,
+ *                which every sign-in, rule and teacher tool reads.
  *     updatedAt  number
  *
  * PRIVACY: b3Games/workspaces is publicly readable, so this record never
@@ -160,14 +163,25 @@
 
   // ---- after sign-in (site-settings.js) -------------------------------------
 
-  // The student's assigned classes, or [legacyClassId] when they have no record yet.
+  // The student's classes, or [legacyClassId] when they have none yet.
+  // Read from the authoritative membership list (b3Games/students/<id>/memberships,
+  // mirrored by classes/<id>/members), NOT from this record's classIds: teachers
+  // add and remove students through funTorahManageStudents, which never touches
+  // this owner record, so its classIds can be out of date.
   async function getStudentClassIds(db, workspaceId, studentId, legacyClassId) {
     if (!db || !validKey(studentId)) return legacyClassId ? [legacyClassId] : [];
     try {
-      const ids = Object.keys(normalizeRecord((await db.ref(studentPath(workspaceId, studentId)).once('value')).val()).classIds);
+      const rows = (await db.ref('b3Games/students/' + studentId + '/memberships').once('value')).val() || {};
+      const ids = [];
+      Object.keys(rows).forEach(function (k) {
+        const m = rows[k];
+        if (m && m.active !== false && m.workspaceId === workspaceId && validKey(m.classId) && ids.indexOf(m.classId) < 0) ids.push(String(m.classId));
+      });
       if (ids.length) return ids;
+      // A student whose classes were all removed on purpose has none; never revive the legacy class.
+      if (Object.keys(rows).length) return [];
     } catch (e) {
-      console.warn('Could not read student class assignments:', e);
+      console.warn('Could not read student class memberships:', e);
     }
     return legacyClassId ? [legacyClassId] : [];
   }
