@@ -3,6 +3,14 @@ const {randomUUID,randomBytes,createHash}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const tools=require('./student-tool-policy.js');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
+const imports=require('./student-import-core.cjs');
+const rollback=require('./student-rollback-core.cjs');
+const BULK_ACTIONS={
+ importPreview:imports.importPreview,importApply:imports.importApply,
+ rollbackPreview:rollback.rollbackPreview,rollbackExecute:rollback.rollbackExecute,rollbackUndo:rollback.rollbackUndo,
+ studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
+ exportBackup:rollback.exportBackup,auditLog:rollback.auditLog
+};
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
 // the old public copies (profiles, class members, legacy allowedStudents).
@@ -88,6 +96,12 @@ async function manageStudents(store,identity,body,now=Date.now()){
   if(body.deletePublic===true && (body.migrationProtocol!==MIGRATION_PROTOCOL || body.backupConfirmed!==true))
    fail(409,'Preview the migration and confirm a verified backup before removing public passcodes.');
   return migratePasscodes(store,body.deletePublic===true,now,{dryRun:body.dryRun===true});
+ }
+ // Issue #706: bulk roster import, import rollback and bulk student
+ // management. Owner and active site administrators only, enforced here.
+ if(Object.hasOwn(BULK_ACTIONS,body.action)){
+  if(!owner)fail(403,'Owner or administrator access required.');
+  return BULK_ACTIONS[body.action](store,identity,body,now);
  }
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
