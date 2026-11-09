@@ -1,6 +1,6 @@
 'use strict';
 // Issue #692: Mishnayos Practice records one line at a time and sends work to
-// the teacher only on Submit; the comprehension step lives in Mishnayos Test Me.
+// the teacher only on Submit; the comprehension step lives in Mishnayos חידון (test-me.html).
 // These checks keep the pages wired the way the redesign needs.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -30,16 +30,17 @@ test('the whole mishna is one step, so every one of its lines is on the page', (
   assert.doesNotMatch(student, /\(m\.sections \|\| \[\[0, m\.lines\.length\]\]\)\.forEach/);
 });
 
-test('the comprehension step is gone from Mishnayos Practice and lives in Test Me', () => {
+test('the comprehension step is gone from Mishnayos Practice and lives in Mishnayos חידון (test-me.html)', () => {
   const legacy = student.slice(student.indexOf('<div id="legacyTasks"'), student.indexOf('<!-- /legacyTasks -->'));
   assert.match(student, /<div id="legacyTasks" style="display:none" aria-hidden="true">/);
   assert.ok(legacy.includes('id="comprehensionPanel"'), 'the old Understand step is inside the hidden block');
-  assert.match(student, /tab'\) === 'comprehension'\)\{ location\.replace\('test-me\.html'/);
-  assert.match(testMe, /<title>Mishnayos Test Me<\/title>/);
+  assert.match(student, /p\.get\('mode'\) === 'quiz' \|\| p\.get\('tab'\) === 'comprehension'/);
+  assert.match(student, /location\.replace\('test-me\.html'/);
+  assert.match(testMe, /<title>Mishnayos חידון<\/title>/);
   assert.match(testMe, /const TEST_ME_ONLY = true;/);
   assert.match(testMe, /if\(TEST_ME_ONLY\) tab = 'comprehension';/);
   assert.match(testMe, /<div class="task-tabs hidden" aria-hidden="true">/);
-  assert.match(index, /href="record-mishnayos\/test-me\.html"><span class="card-icon">🧠<\/span><span class="card-title">Mishnayos Test Me<\/span>/);
+  assert.match(index, /href="record-mishnayos\/test-me\.html"><span class="card-icon">🧠<\/span><span class="card-title">Mishnayos חידון<\/span>/);
   assert.match(index, /data-companion-of="posuk-practice-scroll" href="record-mishnayos\/test-me\.html"/);
 });
 

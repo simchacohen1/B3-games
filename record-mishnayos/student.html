@@ -12,6 +12,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="posuk-practice-scroll"></script>
+<script>
+/* חידון (quiz) mode (#693) now lives in its own page, test-me.html (#692):
+   this page records line by line. ?mode=quiz and old tab=comprehension links
+   (Chazara, My Progress) go there. */
+(function(){
+  var p = new URLSearchParams(location.search);
+  if(p.get('mode') === 'quiz' || p.get('tab') === 'comprehension'){
+    p.delete('mode'); p.delete('tab');
+    var q = p.toString();
+    location.replace('test-me.html' + (q ? '?' + q : '') + location.hash);
+  }
+})();
+</script>
 <title>Mishnayos Practice</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -2062,7 +2075,7 @@ let comprehensionScore = null;     // 0-100, supplementary to the verdict tier a
 let comprehensionFeedback = "";
 
 /* ---------- Tabs (one task visible at a time) ---------- */
-let activeTab = 'reading'; // 'reading' | 'comprehension'
+let activeTab = window.B3_QUIZ_MODE ? 'comprehension' : 'reading'; // 'reading' | 'translate' | 'comprehension'
 
 /* ---------- Autosave tracking ----------
    Each task is graded and saved automatically the moment grading
@@ -3366,6 +3379,9 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
    Switching tabs never loses anything already recorded — it's purely a
    visibility toggle. */
 function setActiveTab(tab){
+  // Quiz mode is only the Understand task; practice mode never shows it.
+  if(window.B3_QUIZ_MODE) tab = 'comprehension';
+  else if(tab === 'comprehension') tab = 'reading';
   activeTab = tab;
   document.getElementById('readingPanel').classList.toggle('hidden', tab !== 'reading');
   document.getElementById('translationPanel').classList.toggle('hidden', tab !== 'translate');
@@ -3398,7 +3414,8 @@ function hideNudge(){
 // translation -> comprehension) so the nudge always points to the next
 // natural step rather than jumping around.
 function nextUnfinishedTask(justSaved){
-  const order = ['hebrew', 'translation', 'comprehension'];
+  // Understand lives in its own חידון tile now, so never nudge toward it.
+  const order = window.B3_QUIZ_MODE ? [] : ['hebrew', 'translation'];
   for(const t of order){
     if(t !== justSaved && !attemptSaved[t]) return t;
   }

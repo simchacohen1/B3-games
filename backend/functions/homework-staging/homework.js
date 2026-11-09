@@ -11,7 +11,8 @@ exports.homeworkPortal=onRequest({region:'us-central1',cors:[
  res.set('Cache-Control','no-store');
  if(req.method==='GET')return res.json({ok:true,ready:true,version:1});
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
- const voiceComment=req.body?.action==='comment'&&typeof req.body?.voiceDataURL==='string';
+ // Voice notes, and recorded instructions on create/edit, carry up to 100 KB of audio (about 133 KB as base64).
+ const voiceComment=['comment','create','edit'].includes(req.body?.action)&&typeof req.body?.voiceDataURL==='string';
  // One-on-one voice messages (#647) can be up to 5 minutes (3 MB of audio, ~4 MB as base64).
  const voiceMessage=req.body?.action==='dmSend'&&typeof req.body?.voiceDataURL==='string';
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>(voiceMessage?4200000:voiceComment?320000:20000))return res.status(413).json({error:'Request too large.'});

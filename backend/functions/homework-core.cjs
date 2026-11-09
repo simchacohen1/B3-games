@@ -110,8 +110,25 @@ function present(def, rec, now) {
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
     updatedAt: rec.updatedAt || null, teacherId: def.createdBy || null,
     items: hwItems.itemsOf(def), itemsDone: hwItems.doneMap(def, rec),
+    instructionVoice: !!def.instructionVoice,
     messages: publicMessages(rec, 'student')
   };
+}
+// ---- recorded instructions (one voice message per assignment) -------------
+// The audio lives outside the definition so lists never carry it; it is read only through
+// instructionVoiceRead. Only the teacher who created the assignment can add, replace or remove it.
+const instructionVoicePath = (classId, aid) => base(classId) + '/instructionVoice/' + aid;
+const ownsAssignment = (def, actorId) => !!def.createdBy && def.createdBy === actorId;
+function instructionVoiceChange(body) {
+  if (body.voiceDataURL != null) return { set: cleanVoiceData(body.voiceDataURL) };
+  if (body.removeVoice === true) return { remove: true };
+  return null;
+}
+async function readInstructionVoice(store, classId, def) {
+  if (!def.instructionVoice) fail(404, 'This assignment has no recorded instructions.');
+  const voiceDataURL = await store.get(instructionVoicePath(classId, def.id));
+  if (!voiceDataURL) fail(404, 'The recorded instructions are no longer available.');
+  return { ok: true, voiceDataURL };
 }
 
 function cleanVoiceData(value) {
@@ -241,13 +258,14 @@ async function teacherDo(store, identity, body, now, newId) {
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
         publicationState: publicationState(def), createdAt: def.createdAt, publishedAt: def.publishedAt ?? null,
-        items: hwItems.itemsOf(def), counts, students });
+        items: hwItems.itemsOf(def), instructionVoice: !!def.instructionVoice, ownedByMe: ownsAssignment(def, actorId), counts, students });
     }
     const sids = Object.keys(members);
     const threads = await Promise.all(sids.map(sid => generalThread(store, generalPath(classId, sid), 'teacher')));
     const messages = {};
     sids.forEach((sid, i) => { messages[sid] = threads[i]; });
-    return { ok: true, students: members, assignments: rows, messages };
+    // features tells the page this server supports recorded instructions (older servers leave it out).
+    return { ok: true, students: members, assignments: rows, messages, features: { instructionVoice: true } };
   }
 
   if (body.action === 'create') {
@@ -271,11 +289,17 @@ async function teacherDo(store, identity, body, now, newId) {
       audience = [...new Set(body.studentIds)].filter(s => key(s) && has(members, s));
       if (!audience.length) fail(400, 'Choose students who are in this class.');
     }
+    const voice = body.voiceDataURL == null ? null : cleanVoiceData(body.voiceDataURL);
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
     const full = { id, ...def, ...(items ? { items } : {}), label, subject, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
+    if (voice) {
+      // Audio first, so the definition never points at a recording that is not there.
+      await store.set(instructionVoicePath(classId, id), voice);
+      full.instructionVoice = { at: now, by: actorId };
+    }
     await store.set(base(classId) + '/definitions/' + id, full);
     return { ok: true, id };
   }
@@ -287,6 +311,8 @@ async function teacherDo(store, identity, body, now, newId) {
   }
   const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
   if (!def) fail(404, 'That assignment was not found.');
+
+  if (body.action === 'instructionVoiceRead') return readInstructionVoice(store, classId, def);
 
   if (body.action === 'comment' || body.action === 'voiceRead' || body.action === 'markRead') {
     const sid = body.studentId;
@@ -351,12 +377,16 @@ async function teacherDo(store, identity, body, now, newId) {
     if (publicationState(def) !== 'draft' || def.publishedAt != null || hasStudentRecord)
       fail(409, 'Archive homework that was published or has student work, so nothing is lost.');
     await store.set(base(classId) + '/definitions/' + def.id, null);
+    await store.set(instructionVoicePath(classId, def.id), null);
     return { ok: true };
   }
   if (body.action === 'edit') {
     if (publicationState(def) === 'archived') fail(409, 'Archived assignments are read only.');
     // items: undefined keeps the current list, an empty list removes it (back to a plain assignment).
     const items = body.items === undefined ? hwItems.itemsOf(def) : hwItems.cleanItems(body.items, newId) || [];
+    if ((body.voiceDataURL != null || body.removeVoice === true) && !ownsAssignment(def, actorId))
+      fail(403, 'Only the teacher who created this assignment can change its recorded instructions.');
+    const voiceChange = instructionVoiceChange(body);
     let next;
     try {
       next = policy.cleanDefinition({ type: items.length ? items[0].type : def.type, title: body.title ?? def.title, details: body.details ?? def.details,
@@ -372,10 +402,18 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit === undefined ? def.targetUnit || (def.targetMinutes ? 'minutes' : '') : body.targetUnit);
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
+    let instructionVoice = def.instructionVoice || null;
+    if (voiceChange?.set) {
+      await store.set(instructionVoicePath(classId, def.id), voiceChange.set);
+      instructionVoice = { at: now, by: actorId };
+    }
     const kept = { ...def };
     delete kept.items;
     await store.set(base(classId) + '/definitions/' + def.id, { ...kept, ...next, ...(items.length ? { items } : {}), label, subject, assignedAt, targetAmount,
-      targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
+      targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
+      instructionVoice: voiceChange?.remove ? null : instructionVoice, editedAt: now, editedBy: actorId });
+    // Remove the audio only after the definition stops pointing at it.
+    if (voiceChange?.remove) await store.set(instructionVoicePath(classId, def.id), null);
     return { ok: true };
   }
   if (body.action === 'approve' || body.action === 'return') {
@@ -476,6 +514,7 @@ async function studentDo(store, body, now, ip, newId) {
 
   const def = key(body.assignmentId) && has(defs, body.assignmentId) && mine(defs[body.assignmentId]) ? defs[body.assignmentId] : null;
   if (!def || !mine(def)) fail(404, 'That assignment was not found.');
+  if (body.action === 'instructionVoiceRead') return readInstructionVoice(store, classId, def);
   const path = recordPath(classId, sid, def.id);
   if (body.action === 'comment') {
     const message = messageInput(body, 'student', now, newId);
@@ -563,9 +602,10 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (auth && auth.identity) return teacherDm(store, auth.identity, body, now, newId);
     return studentDm(store, body, now, auth && auth.ip, newId);
   }
-  if (['comment', 'voiceRead', 'markRead'].includes(a) && auth && auth.identity)
+  if (['comment', 'voiceRead', 'markRead', 'instructionVoiceRead'].includes(a) && auth && auth.identity)
     return teacherDo(store, auth.identity, body, now, newId);
-  if (['studentList', 'save', 'submit', 'itemDone', 'comment', 'voiceRead', 'markRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
+  if (['studentList', 'save', 'submit', 'itemDone', 'comment', 'voiceRead', 'markRead', 'instructionVoiceRead'].includes(a))
+    return studentDo(store, body, now, auth && auth.ip, newId);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };
