@@ -205,3 +205,31 @@ test('browser: the script only ever talks to the staging project', () => {
   assert.doesNotMatch(source, /b3-games|funtorahtools\.com|github\.io/i);
   assert.equal(client.ENDPOINT, 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/stagingOwnerSignIn');
 });
+
+// ---------- After signing in: Owner Admin has to work on staging ----------
+test('staging student tools accept the button sign-in; production code never does', async () => {
+  const staging = require('../backend/functions-staging/student-management-core.cjs').manageStudents;
+  const production = require('../backend/functions/student-management-core.cjs').manageStudents;
+  const store = { get: async p => (p === 'b3Games/admins/stage_owner' ? { active: true } : null), update: async () => {} };
+  const id = { uid: 'stage_owner', email: 'owner@funtorahtools-staging.test', email_verified: true, b3StagingAccount: true, firebase: { sign_in_provider: 'custom' } };
+  const old = process.env.B3_STAGING_DEPLOYMENT;
+  try {
+    delete process.env.B3_STAGING_DEPLOYMENT;
+    await assert.rejects(staging(store, id, { action: 'auditLog' }), /Google/, 'needs the staging deployment flag');
+    process.env.B3_STAGING_DEPLOYMENT = 'true';
+    await assert.rejects(production(store, id, { action: 'auditLog' }), /Google/, 'production never accepts it');
+    await assert.rejects(staging(store, { ...id, b3StagingAccount: undefined }, { action: 'auditLog' }), /Google/, 'student-style custom sign-in is refused');
+    await assert.rejects(staging(store, { ...id, email_verified: false }, { action: 'auditLog' }), /Google/);
+    await assert.rejects(staging(store, { ...id, uid: 'not_admin' }, { action: 'auditLog' }), /Owner or administrator/);
+    assert.equal((await staging(store, id, { action: 'auditLog' })).ok, true);
+  } finally {
+    if (old === undefined) delete process.env.B3_STAGING_DEPLOYMENT; else process.env.B3_STAGING_DEPLOYMENT = old;
+  }
+  assert.doesNotMatch(read('backend/functions/student-management-core.cjs'), /'custom'/);
+});
+
+test('staging database rules let the staging owner use Schools, and nobody signed out', () => {
+  const owner = "auth != null && auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true";
+  const schools = JSON.parse(read('staging/database.rules.json')).rules.b3Games.workspaces.$workspaceId.schools;
+  assert.deepEqual(schools, { '.read': owner, '.write': owner, $schoolId: { '.read': 'auth != null' } });
+});

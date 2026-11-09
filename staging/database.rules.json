@@ -101,6 +101,13 @@
               ".read": "auth != null && auth.token.email_verified == true && auth.token.email != null && auth.token.email == data.child('email').val()"
             }
           },
+          "schools": {
+            ".read": "auth != null && auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true",
+            ".write": "auth != null && auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true",
+            "$schoolId": {
+              ".read": "auth != null"
+            }
+          },
           "classes": {
             ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
             "$classId": {
