@@ -11,7 +11,7 @@ const Module = require('node:module');
 
 const ROOT = path.resolve(__dirname, '..');
 const HE = require(path.join(ROOT, 'record-mishnayos/data/berachos.he.json'));
-const EN = require(path.join(ROOT, 'backend/functions/data/mishnayos/berachos.en.json'));
+const EN = require(path.join(ROOT, 'backend/functions/_answer-key/mishnayos/berachos.en.json'));
 const core = require(path.join(ROOT, 'backend/functions/mishnayos-practice-core.cjs'));
 const studentHtml = fs.readFileSync(path.join(ROOT, 'record-mishnayos/student.html'), 'utf8');
 
@@ -23,6 +23,26 @@ test('the public Hebrew file has all 9 perakim of Berachos and no English', () =
     'no English words in the public Hebrew data');
   assert.ok(!fs.readdirSync(path.join(ROOT, 'record-mishnayos/data')).some(f => /\.en\./.test(f)),
     'the English answer key is not in the website folder');
+});
+
+// GitHub Pages (legacy Jekyll build) publishes the whole repository except
+// paths with a folder or file name starting with "_" or ".". The English
+// answer key must sit under such a folder so it is not downloadable from the
+// website (issue #674: it used to be served from backend/functions/data/).
+test('the English answer key is never in a folder GitHub Pages publishes', () => {
+  const found = [];
+  (function walk(dir, rel){
+    for(const ent of fs.readdirSync(dir, { withFileTypes:true })){
+      if(/^[._]/.test(ent.name) || ent.name === 'node_modules') continue;
+      const r = rel ? rel + '/' + ent.name : ent.name;
+      if(/^preview-/.test(r)) continue; // old preview copies, not this tool's data
+      if(ent.isDirectory()) walk(path.join(dir, ent.name), r);
+      else if(/\.en\.json$/.test(ent.name) && /mishn/i.test(r)) found.push(r);
+    }
+  })(ROOT, '');
+  assert.deepEqual(found, [], 'Silverstein English would be public at funtorahtools.com/' + found[0]);
+  assert.ok(path.relative(ROOT, require.resolve(path.join(ROOT, 'backend/functions/_answer-key/mishnayos/berachos.en.json')))
+    .split(path.sep).some(part => part.startsWith('_')));
 });
 
 test('every Mishnah\'s lines and sections cover its whole text exactly', () => {

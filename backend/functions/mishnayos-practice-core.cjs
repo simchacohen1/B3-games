@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Mishnayos Practice — pure helpers (no Firebase, no network) so they can be
- * unit-tested. The Silverstein English lives ONLY in data/mishnayos/*.en.json,
+ * unit-tested. The Silverstein English lives ONLY in _answer-key/mishnayos/*.en.json,
  * bundled with the Cloud Functions; nothing in this file ever returns English
  * to a student-facing response except through the explicit "answer key"
  * helpers used for teacher-only storage.
@@ -18,7 +18,7 @@ function loadMaseches(maseches) {
   const meta = MASECHTOS[key];
   if (!meta) return null;
   if (!dataCache.has(key)) {
-    dataCache.set(key, require(path.join(__dirname, 'data', 'mishnayos', meta.file)));
+    dataCache.set(key, require(path.join(__dirname, '_answer-key', 'mishnayos', meta.file)));
   }
   return { key, meta, data: dataCache.get(key) };
 }
