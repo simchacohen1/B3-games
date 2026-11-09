@@ -67,10 +67,37 @@ test('Submit sends every line to the teacher, clears the drafts and pays 5 point
   assert.equal(notices(s)[0].kind, 'submitted'); assert.equal(notices(s)[0].points, 5);
 });
 
-test('Submit is refused until every line is recorded', async () => {
+test('the student does not have to record every line: Submit sends only the recorded ones', async () => {
   const s = seed();
-  delete s.store.tree.posukPractice.mishnayos.drafts.moshe[KEY].lines[3];
-  await assert.rejects(run(s, STUDENT, { action: 'submit', key: KEY }), { code: 400, message: /line 4/ });
+  const lines = s.store.tree.posukPractice.mishnayos.drafts.moshe[KEY].lines;
+  delete lines[1]; delete lines[3]; delete lines[4];
+  const r = await run(s, STUDENT, { action: 'submit', key: KEY });
+  assert.equal(r.status, 'submitted'); assert.equal(r.points, 5);
+  const row = sub(s);
+  // Each recording keeps its own place in the mishna, so the teacher sees which lines they are.
+  assert.deepEqual(Object.keys(row.lines).sort(), ['0', '2', '5']);
+  assert.equal(row.recordedCount, 3); assert.equal(row.lineCount, 6);
+  assert.match(row.lines[2].path, /\/a1\/line3\.webm$/);
+  assert.match(row.lines[5].path, /\/a1\/line6\.webm$/);
+  assert.equal(balance(s), 25);
+  const list = await run(s, { role: 'teacher', identity: T }, { action: 'teacher-list', classId: 'sc' });
+  assert.equal(list.submissions[0].recordedCount, 3);
+  // Gold standard is judged on the lines he sent: 10 minus 1 per mistake.
+  const g = await run(s, { role: 'teacher', identity: T }, { action: 'teacher-grade', classId: 'sc', studentId: 'moshe', key: KEY, attempt: 1, gold: true, mistakes: 2, bonus: 0 });
+  assert.equal(g.gradePoints, 8); assert.equal(balance(s), 33);
+});
+
+test('Submit is refused when no line is recorded', async () => {
+  const s = seed();
+  s.store.tree.posukPractice.mishnayos.drafts.moshe[KEY].lines = {};
+  await assert.rejects(run(s, STUDENT, { action: 'submit', key: KEY }), { code: 400, message: /at least one line/ });
+  assert.equal(sub(s), undefined); assert.equal(balance(s), 20);
+});
+
+test('a recorded line whose file is missing is refused, not silently skipped', async () => {
+  const s = seed();
+  s.files.set.delete(s.store.tree.posukPractice.mishnayos.drafts.moshe[KEY].lines[3].path);
+  await assert.rejects(run(s, STUDENT, { action: 'submit', key: KEY }), { code: 400, message: /Line 4 did not save/ });
   assert.equal(sub(s), undefined); assert.equal(balance(s), 20);
 });
 

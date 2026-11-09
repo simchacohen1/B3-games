@@ -163,13 +163,14 @@ function pendingCard(s, idx){
   const rows = [];
   for(let i = 0; i < s.lineCount; i++){
     const l = s.lines && (s.lines[i] || s.lines[String(i)]);
+    if(!l) continue; // he did not record this line
     rows.push('<div class="gline"><span class="num">' + (i + 1) + '</span><div class="heb">' + esc(lines[i] || '') + '</div>' +
-      (l ? '<button class="play" type="button" data-i="' + i + '" data-path="' + esc(l.path) + '" title="Play line ' + (i + 1) + '">▶️</button>' : '<span>—</span>') + '</div>');
+      '<button class="play" type="button" data-i="' + i + '" data-path="' + esc(l.path) + '" title="Play line ' + (i + 1) + '">▶️</button></div>');
   }
   return '<div class="card" data-idx="' + idx + '">' +
     '<div class="card-head"><span class="who">' + esc(s.studentName) + (s.className ? ' <span style="color:var(--ink-soft);font-size:.85rem;">· ' + esc(s.className) + '</span>' : '') + '</span>' +
       '<span class="what">' + esc(refHeb(s)) + '</span>' +
-      '<span class="meta">Try ' + esc(s.attempt) + ' · submitted ' + esc(when(s.submittedAt)) + ' · ' + esc(s.lineCount) + ' lines</span></div>' +
+      '<span class="meta">Try ' + esc(s.attempt) + ' · submitted ' + esc(when(s.submittedAt)) + ' · ' + (rows.length === s.lineCount ? esc(s.lineCount) + ' lines' : esc(rows.length) + ' of ' + esc(s.lineCount) + ' lines recorded') + '</span></div>' +
     '<div style="margin-bottom:8px;"><button class="btn ghost playall" type="button">▶️ Play all lines</button></div>' +
     '<div class="lines">' + rows.join('') + '</div>' +
     '<div class="grade-form">' +

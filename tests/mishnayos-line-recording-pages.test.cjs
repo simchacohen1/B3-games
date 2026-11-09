@@ -31,9 +31,6 @@ test('the whole mishna is one step, so every one of its lines is on the page', (
 });
 
 test('the comprehension step is gone from Mishnayos Practice and lives in Mishnayos חידון (test-me.html)', () => {
-  const legacy = student.slice(student.indexOf('<div id="legacyTasks"'), student.indexOf('<!-- /legacyTasks -->'));
-  assert.match(student, /<div id="legacyTasks" style="display:none" aria-hidden="true">/);
-  assert.ok(legacy.includes('id="comprehensionPanel"'), 'the old Understand step is inside the hidden block');
   assert.match(student, /p\.get\('mode'\) === 'quiz' \|\| p\.get\('tab'\) === 'comprehension'/);
   assert.match(student, /location\.replace\('test-me\.html'/);
   assert.match(testMe, /<title>Mishnayos חידון<\/title>/);
@@ -42,6 +39,27 @@ test('the comprehension step is gone from Mishnayos Practice and lives in Mishna
   assert.match(testMe, /<div class="task-tabs hidden" aria-hidden="true">/);
   assert.match(index, /href="record-mishnayos\/test-me\.html"><span class="card-icon">🧠<\/span><span class="card-title">Mishnayos חידון<\/span>/);
   assert.match(index, /data-companion-of="posuk-practice-scroll" href="record-mishnayos\/test-me\.html"/);
+});
+
+test('the old Read / Translate / Understand tab code is removed from the practice page, not just hidden', () => {
+  for(const gone of ['legacyTasks', 'task-tabs', 'tab-btn', 'tabReadingBtn', 'tabTranslateBtn', 'tabComprehensionBtn', 'readingPanel',
+    'translationPanel', 'comprehensionPanel', 'setActiveTab', 'toggleRecording', 'scoreHebrewReading', 'loadHistory', 'historyList',
+    'paid-api.js', 'cloudfunctions.net/grade']){
+    assert.ok(!student.includes(gone), gone + ' is still in student.html');
+  }
+  // Every element the script looks up is on the page.
+  const ids = new Set([...student.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+  const wanted = [...student.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
+  assert.deepEqual(wanted.filter(id => !ids.has(id)), []);
+});
+
+test('Submit does not wait for every line: one recorded line is enough', () => {
+  assert.match(recorder, /btn\.disabled = !ready \|\| n < 1 \|\|/);
+  assert.doesNotMatch(recorder, /n < total/);
+  assert.match(student, /You do not have to record every line\./);
+  assert.match(grade, /if\(!l\) continue;/);
+  assert.match(recorder, /busy/);
+  assert.match(student, /window\.MishnayosLines\.busy\(\)/);
 });
 
 test('the practice page no longer wakes the paid grading services', () => {

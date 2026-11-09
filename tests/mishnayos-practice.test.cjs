@@ -102,7 +102,8 @@ test('the student page never fetches Sefaria or sends a translation', () => {
   assert.ok(!/acceptedTranslations/.test(studentHtml), 'chunk English is never sent from the browser');
   assert.ok(!/formData\.append\('posukTranslation'/.test(studentHtml));
   assert.ok(!/posukTranslation:\s*\(part/.test(studentHtml));
-  assert.ok(/generateMishnahTranslationChunks/.test(studentHtml));
+  // The practice page records line by line (#692): it calls no AI grading service at all.
+  assert.ok(!/cloudfunctions\.net\/(grade|generate|score|synthesize)/i.test(studentHtml), 'no paid grading services');
   assert.ok(/'posukPractice\/mishnayos\/attempts\/'/.test(studentHtml));
   assert.ok(!/'posukPractice\/attempts\//.test(studentHtml), 'Mishnayos never writes Posuk attempts');
 });

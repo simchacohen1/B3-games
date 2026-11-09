@@ -5,7 +5,8 @@
  * The student records each line of a mishna (reading and translating it in
  * the same recording). Each line's recording is a draft in the student's own
  * space, so he can leave and come back. Nothing reaches the teacher until he
- * presses Submit. While a mishna waits for the teacher he cannot re-record it.
+ * presses Submit. He does not have to record every line: Submit sends the
+ * lines he recorded (at least one). While a mishna waits for the teacher he cannot re-record it.
  * The teacher grades it: if it is not gold standard he can try again; if it
  * is gold standard the mishna is locked for one month.
  *
@@ -121,18 +122,21 @@ async function submit(store, files, student, body, now) {
   if (blocked === 'waiting') fail(409, 'This mishna is already waiting for your teacher.');
   if (blocked === 'locked') fail(409, 'This mishna is locked until ' + new Date(Number(before.lockedUntil)).toDateString() + '.');
 
-  // Every line must have a recording that is really in the student's drafts.
+  // The student chooses which lines to record: at least one, not necessarily
+  // all. Each recorded line must really be in the student's own drafts.
   const draft = await store.get(draftPath + '/lines') || {};
   const prefix = draftPrefix(studentId, info.key);
   const lines = [];
   for (let i = 0; i < info.lineCount; i++) {
     const entry = draft[i] ?? draft[String(i)];
-    const p = String(entry?.path || '');
-    if (!entry || !p.startsWith(prefix) || p.includes('..') || !(await files.exists(p))) {
-      fail(400, 'Record every line before you submit (line ' + (i + 1) + ' is missing).');
+    if (!entry) continue;
+    const p = String(entry.path || '');
+    if (!p.startsWith(prefix) || p.includes('..') || !(await files.exists(p))) {
+      fail(400, 'Line ' + (i + 1) + ' did not save properly. Record it again, then submit.');
     }
-    lines.push({ path: p, mime: String(entry.mime || '').slice(0, 60), durationMs: Math.max(0, Math.round(Number(entry.durationMs) || 0)) });
+    lines.push({ index: i, path: p, mime: String(entry.mime || '').slice(0, 60), durationMs: Math.max(0, Math.round(Number(entry.durationMs) || 0)) });
   }
+  if (!lines.length) fail(400, 'Record at least one line before you submit.');
 
   // Claim the submission so two Submit presses cannot both go through.
   const attempt = Number(before?.attempt || 0) + 1;
@@ -145,7 +149,7 @@ async function submit(store, files, student, body, now) {
   const copied = [];
   try {
     for (let i = 0; i < lines.length; i++) {
-      const dst = submittedPath(studentId, info.key, attempt, i, extFor(lines[i]));
+      const dst = submittedPath(studentId, info.key, attempt, lines[i].index, extFor(lines[i]));
       await files.copy(lines[i].path, dst);
       copied.push({ ...lines[i], draftPath: lines[i].path, path: dst });
     }
@@ -161,8 +165,9 @@ async function submit(store, files, student, body, now) {
   const rewardStudentId = await resolveRewardStudentId(store, studentId);
   const submission = {
     key: info.key, maseches: info.maseches, perek: info.perek, mishnah: info.mishnah, lineCount: info.lineCount,
-    status: 'submitted', attempt, submittedAt: now, classId: classId || '', studentName, rewardStudentId: rewardStudentId || '',
-    lines: Object.fromEntries(copied.map((c, i) => [i, { path: c.path, mime: c.mime, durationMs: c.durationMs }])),
+    status: 'submitted', attempt, recordedCount: copied.length, submittedAt: now, classId: classId || '', studentName, rewardStudentId: rewardStudentId || '',
+    // Keyed by the line's place in the mishna; lines he did not record are absent.
+    lines: Object.fromEntries(copied.map(c => [c.index, { path: c.path, mime: c.mime, durationMs: c.durationMs }])),
     // The last grade stays visible to the teacher in the history, not here.
     grade: null, lockedUntil: null
   };
@@ -203,6 +208,7 @@ async function teacherRoster(store, scopeLib, identity, classId) {
 function publicSubmission(studentId, student, sub) {
   return { studentId, studentName: sub.studentName || student?.name || studentId, className: student?.className || '',
     key: sub.key, maseches: sub.maseches, perek: sub.perek, mishnah: sub.mishnah, lineCount: sub.lineCount,
+    recordedCount: sub.recordedCount ?? Object.values(sub.lines || {}).filter(Boolean).length,
     status: sub.status, attempt: sub.attempt, submittedAt: sub.submittedAt || null, lines: sub.lines || {},
     grade: sub.grade || null, lockedUntil: sub.lockedUntil || null };
 }

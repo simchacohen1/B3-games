@@ -3,7 +3,8 @@
  * Each line of the mishna has its own record button. One recording covers
  * reading the line and translating it. Recordings are drafts saved to the
  * student's own space, so he can leave and come back. Nothing goes to the
- * teacher until he presses Submit. After that he cannot re-record until the
+ * teacher until he presses Submit. He does not have to record every line:
+ * Submit sends the lines he recorded. After that he cannot re-record until the
  * teacher grades it; a gold-standard mishna stays locked for a month.
  *
  * Loaded after the main script of student.html and uses its globals:
@@ -179,10 +180,9 @@
     status.innerHTML = html;
     const btn = $('submitMishnaBtn');
     btn.classList.toggle('hidden', st !== 'open');
-    btn.disabled = !ready || n < total || !!rec || Object.keys(saving).length > 0 || !live();
+    btn.disabled = !ready || n < 1 || !!rec || Object.keys(saving).length > 0 || !live();
     $('lineHelp').classList.toggle('hidden', st !== 'open');
     if(!live()) $('submitMsg').textContent = teacherPreview ? 'Preview: recordings stay in this tab and nothing is sent.' : '';
-    else if(st === 'open' && n < total && !$('submitMsg').dataset.sticky) $('submitMsg').textContent = '';
   }
   function gradeLine(g){
     if(!g) return '';
@@ -300,9 +300,11 @@
   /* ---------- Submit ---------- */
   async function submit(){
     if(!cur || !live() || state() !== 'open') return;
-    const total = cur.lineCount;
-    if(recordedCount() < total) return;
-    if(!confirm('Send all ' + total + ' lines to your teacher?\n\nYou cannot record this mishna again until your teacher grades it.')) return;
+    const total = cur.lineCount, n = recordedCount();
+    if(n < 1) return;
+    const what = n === total ? 'all ' + total + ' lines' : n + ' of ' + total + ' lines';
+    const skipped = n === total ? '' : '\n\nThe lines you did not record will not be sent.';
+    if(!confirm('Send ' + what + ' to your teacher?' + skipped + '\n\nYou cannot record this mishna again until your teacher grades it.')) return;
     const btn = $('submitMishnaBtn'), msg = $('submitMsg');
     btn.disabled = true; msg.textContent = 'Sending to your teacher…';
     try{
@@ -367,5 +369,8 @@
   });
   if(document.readyState !== 'loading'){ const btn = $('submitMishnaBtn'); if(btn) btn.onclick = submit; }
 
-  window.MishnayosLines = { open, close, startNotices, fitLines, LOCK_DAYS };
+  /* True while a line is being recorded or a draft is still uploading. */
+  const busy = () => !!rec || Object.keys(saving).length > 0;
+
+  window.MishnayosLines = { open, close, startNotices, fitLines, busy, LOCK_DAYS };
 })();
