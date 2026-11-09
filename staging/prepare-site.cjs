@@ -113,6 +113,16 @@ function stageSource(siteRoot, env = process.env) {
       content = "window.B3_STAGING_DISABLED_INTEGRATIONS = window.B3_STAGING_DISABLED_INTEGRATIONS || [];\n" +
         "window.B3_STAGING_DISABLED_INTEGRATIONS.push('nigri-sync');\n";
     }
+    if (relative === 'paid-api.js') {
+      // The allowlist is a regex, so its host is written with escaped dots and
+      // the plain-text host replacement above never reaches it. Point the
+      // packaged copy at the staging Functions host only; production paid-api.js
+      // is never edited.
+      const productionHost = 'us-central1-b3-games\\.cloudfunctions\\.net';
+      if (!content.includes(productionHost)) throw new Error('Cannot find the learning-service host allowlist in paid-api.js.');
+      const stagingHost = new URL(functionsOrigin).hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      content = content.split(productionHost).join(stagingHost);
+    }
     if (relative === 'chossid-lamdan.html') {
       const fictionalRoster = "const DEFAULT_DATA={date:'2026-10-26',classes:[" +
         "{id:'TEST-A-ET',label:'Test Class Alef',students:[['Test Student A1',92,'Fictional staging data'],['Test Student A2',88,'Fictional staging data']]}," +
@@ -213,6 +223,8 @@ function stageSource(siteRoot, env = process.env) {
     if (file === path.join(stageDir, 'staging-config.js')) continue;
     const content = fs.readFileSync(file, 'utf8').toLowerCase();
     for (const value of FORBIDDEN) if (content.includes(value)) violations.push(path.relative(root, file) + ' contains a production endpoint/config marker');
+    // Regex-escaped production hosts (e.g. b3-games\.cloudfunctions\.net) slip past the plain-text check.
+    if (/b3-games(?:-default-rtdb)?\\\.(?:cloudfunctions|firebaseapp|firebasestorage|firebaseio)/.test(content)) violations.push(path.relative(root, file) + ' contains an escaped production endpoint');
     // Homework's own "is this the live site?" guards compare against 'b3-games' to REFUSE live use; they never connect to it.
     const rel = path.relative(root, file).split(path.sep).join('/');
     const isLiveGuard = ['assignment-center/home-link.js', 'assignment-center/homework-common.js', 'assignment-center/staging-guard.js'].includes(rel);
