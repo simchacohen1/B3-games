@@ -5,14 +5,17 @@
  *
  *  - decode:    ffmpeg (bundled ffmpeg-static) -> 16 kHz mono 16-bit PCM, in memory
  *  - recognize: Google Cloud Speech-to-Text v1 (same service Posuk Practice uses)
- *  - judge:     Claude via the official Anthropic SDK (key from Secret Manager)
+ *  - judge:     Claude Haiku 5.5 via the official Anthropic SDK (key from Secret Manager)
  * Audio is never written to Storage or the database.
  */
 const { spawn } = require('node:child_process');
 const { pcmFromBuffer } = require('./audio-signal.cjs');
 
 const MAX_SEGMENT_SECONDS = 62;
-const JUDGE_MODEL = process.env.CHAZARA_AI_JUDGE_MODEL || 'claude-opus-5-5';
+// Claude Haiku 5.5: low cost for a short, structured judging task. Effort 'high' for
+// strict instruction following (thinking is adaptive and on by default).
+const JUDGE_MODEL = process.env.CHAZARA_AI_JUDGE_MODEL || 'claude-haiku-5-5';
+const JUDGE_EFFORT = process.env.CHAZARA_AI_JUDGE_EFFORT || 'high';
 
 function decodeWithFfmpeg(ffmpegPath) {
   return (buffer, _mime) => new Promise((resolve, reject) => {
@@ -56,18 +59,20 @@ function googleRecognizer(speechClient, { timeoutMs = 25000 } = {}) {
   };
 }
 
-function claudeJudge(anthropicClient, { model = JUDGE_MODEL, timeoutMs = 30000 } = {}) {
+function claudeJudge(anthropicClient, { model = JUDGE_MODEL, effort = JUDGE_EFFORT, timeoutMs = 30000 } = {}) {
   return async ({ system, user, schema }) => {
-    const response = await anthropicClient.beta.messages.create({
+    // Haiku 5.5 has no server-side refusal fallback, so no `fallbacks` parameter;
+    // a refusal is handled below as "checker unavailable" (the child is never blamed).
+    const response = await anthropicClient.messages.create({
       model,
-      max_tokens: 4000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+      max_tokens: 8000, // thinking counts toward this; leave room before the JSON answer
+      output_config: { effort, format: { type: 'json_schema', schema } },
       system,
       messages: [{ role: 'user', content: user }]
     }, { timeout: timeoutMs, maxRetries: 1 });
     if (response.stop_reason === 'refusal') throw Object.assign(new Error('Checker declined'), { code: 'judge_refusal' });
+    if (response.stop_reason === 'max_tokens') throw Object.assign(new Error('Checker ran out of room'), { code: 'judge_invalid' });
+    // Read text blocks by type: the response can start with thinking blocks.
     const text = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     let json;
     try { json = JSON.parse(text); } catch (_) { throw Object.assign(new Error('Checker returned unreadable output'), { code: 'judge_invalid' }); }
@@ -75,4 +80,4 @@ function claudeJudge(anthropicClient, { model = JUDGE_MODEL, timeoutMs = 30000 }
   };
 }
 
-module.exports = { decodeWithFfmpeg, googleRecognizer, claudeJudge, MAX_SEGMENT_SECONDS, JUDGE_MODEL };
+module.exports = { decodeWithFfmpeg, googleRecognizer, claudeJudge, MAX_SEGMENT_SECONDS, JUDGE_MODEL, JUDGE_EFFORT };

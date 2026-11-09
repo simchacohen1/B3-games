@@ -33,7 +33,8 @@ const COOLDOWN_MS = 4000;          // minimum gap between two checks by one stud
 
 const DEFAULT_LIMITS = { minute: 20, day: 150, month: 1500, studentDay: 15, classDay: 120 };
 // List-price estimates used only for the owner's usage report (verify in the billing console).
-const PRICES = { speechPerMinute: 0.024, inputPerMTok: 4, outputPerMTok: 20 };
+// Claude Haiku 5.5 list price for prompts up to 100K tokens (ours are ~2K).
+const PRICES = { speechPerMinute: 0.024, inputPerMTok: 0.1, outputPerMTok: 0.5 };
 
 const SEFARIM = ['Bereishis', 'Shemos', 'Vayikra', 'Bamidbar', 'Devarim'];
 const HEB_NUM = n => {

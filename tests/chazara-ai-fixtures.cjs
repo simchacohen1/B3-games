@@ -86,7 +86,11 @@ function fakeProviders({ judgeFails = false, recognizeFails = false, judgeInvali
         // The fake judge reads a verdict planted in the English transcript: [[most]] etc.
         const m = /\[\[(\w+)(?:\|(\w+))?\]\]/.exec(it.englishTranscript + ' ' + it.hebrewTranscript) || [];
         const cov = m[1] || 'none', flag = m[2] || '';
-        rows[it.id] = { id: it.id, meaningCoverage: ['most', 'some', 'little', 'none'].includes(cov) ? cov : 'none',
+        const coverage = ['most', 'some', 'little', 'none'].includes(cov) ? cov : 'none';
+        // Key ideas consistent with the verdict, unless the scenario plants an inconsistent one.
+        const conveyed = flag === 'inconsistent' ? 1 : { most: 3, some: 1, little: 0, none: 0 }[coverage];
+        const keyIdeas = ['who appeared', 'where', 'what he was doing'].map((idea, i) => ({ idea, conveyed: i < conveyed }));
+        rows[it.id] = { id: it.id, keyIdeas, meaningCoverage: coverage,
           contradicts: flag === 'contradicts', offTopic: flag === 'offTopic', nonsense: flag === 'nonsense', tooGarbledToJudge: flag === 'garbled' };
       }
       return { rows, usage: { inputTokens: 1500, outputTokens: 300 } };

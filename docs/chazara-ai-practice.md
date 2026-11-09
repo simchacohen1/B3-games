@@ -57,7 +57,7 @@ browser (chazara/ai-practice.js)                       Cloud Function chazaraAiP
                                                           2 providers.cjs     Google STT: Hebrew (boosted) + English;
                                                                               Hebrew again UNBOOSTED only if step 3 says "strong"
                                                           3 hebrew-match.cjs  deterministic, accent-tolerant, in-order runs
-                                                          4 meaning-judge.cjs Claude vs TEACHER-APPROVED meaning (JSON schema)
+                                                          4 meaning-judge.cjs Claude Haiku 5.5 vs TEACHER-APPROVED meaning (JSON schema)
                                                           5 decide.cjs        fixed rules → 4 outcomes + fixed messages
 ```
 
@@ -67,15 +67,29 @@ browser (chazara/ai-practice.js)                       Cloud Function chazaraAiP
   existing `ANTHROPIC_API_KEY` secret, so no new vendor/account is needed. Claude cannot take
   audio, so recognition is done by Google. **Google STT v1 has no Yiddish model**; Yiddish is
   expected to come through the Hebrew-script pass (and partly the English pass) and is judged for
-  meaning by Claude. That is a known accuracy risk to measure (below). Alternatives if real-audio
-  results are poor: OpenAI `gpt-4o-transcribe`/Whisper (has Yiddish, children untested) or Google
-  Chirp (v2). Both need owner approval and a new key/billing; the provider interface makes the swap
-  a one-file change.
+  meaning by Claude. That is a known accuracy risk to measure (below). Alternatives for recognition
+  if real-audio results are poor: OpenAI `gpt-4o-transcribe`/Whisper (has Yiddish, children
+  untested) or Google Chirp (v2). Both need owner approval and a new key/billing; the provider
+  interface makes the swap a one-file change.
+- **Meaning model: Claude Haiku 5.5** (`claude-haiku-5-5`, effort `high`, structured JSON output).
+  Judging one short explanation against a teacher-approved meaning is a small, well-defined task,
+  so the low-cost model is used. To keep it reliable, the prompt makes it work in explicit steps:
+  split the approved meaning into 2–6 key ideas, mark each idea conveyed or not, then choose
+  most/some/little/none, with flags for contradiction, off-topic, nonsense and too-garbled. It
+  includes worked examples (English, Yiddish, name-only, contradiction, off-topic, garbled) and
+  says "when in doubt, choose the lower level". The server then checks that a "most" agrees with
+  the model's own list (at least 2 ideas and at least 60% conveyed), or it is downgraded.
+  Haiku has no server-side refusal fallback; a refusal is treated as "checker unavailable"
+  (not counted, retry allowed). The model can be changed without a code edit via the
+  `CHAZARA_AI_JUDGE_MODEL` / `CHAZARA_AI_JUDGE_EFFORT` environment variables, e.g. to
+  `claude-sonnet-5-5` (≈ $0.01–0.03 more per attempt) if real-audio results show Haiku misjudging
+  meanings.
 - **Conservative by design** (fewer false "Excellent"s):
   - the boosted Hebrew pass must be **confirmed by an unboosted pass** before reading counts as strong;
   - Hebrew coverage counts only words heard **in order, in runs** — another pasuk sharing a few
     words (וירא, פתח האהל) scores low;
-  - "strong meaning" also needs enough spoken words beyond the Hebrew (blocks keyword-only answers);
+  - "strong meaning" must agree with the judge's own key-idea list and needs enough spoken words
+    beyond the Hebrew (blocks keyword-only answers);
   - transcripts are treated as data (prompt-injection text in a recording cannot instruct the judge);
   - any uncertainty → "Couldn't Hear Clearly", never "Let's Try Again".
 
@@ -100,29 +114,36 @@ browser (chazara/ai-practice.js)                       Cloud Function chazaraAiP
 - **Off switch:** nothing is checked (and nothing billed) until the owner sets
   `b3Private/chazaraAiPractice/config/enabled = true`.
 
-## Expected cost (list prices — verify in the Google Cloud and Anthropic consoles)
+## Expected cost (list prices as of Nov 2026 — verify in the Google Cloud and Anthropic consoles)
 
-| Part | Price used | Typical 1-pasuk attempt (~30 s) |
-|---|---|---|
-| Google Speech-to-Text v1 | ~$0.024 / audio-minute per pass (≈$0.016 with data logging) | 2–3 passes × 30 s ≈ **$0.024–0.036** |
-| Claude `claude-opus-5-5` (effort medium) | $4 / $20 per million tokens in/out | ~1.5k in + ~0.3–1.5k out ≈ **$0.01–0.035** |
-| Cloud Function (1 GiB, ~5–10 s) | Firebase Blaze | < $0.001 |
-| **Total** | | **≈ $0.04–0.07 per single-pasuk attempt** (3 pesukim ≈ $0.10–0.18) |
+| Part | Price used | 1 pasuk (~30 s) | 3 pesukim (~90 s) |
+|---|---|---|---|
+| Google Speech-to-Text v1 | ~$0.024 / audio-minute per pass (≈$0.016 with data logging) | 2–3 passes ≈ **$0.024–0.036** | ≈ **$0.072–0.108** |
+| Claude Haiku 5.5 meaning check (effort high) | $0.10 / $0.50 per million tokens in/out | ~1.5–2k in + ~0.7–2.5k out (incl. thinking) ≈ **$0.0005–0.0015** | ~2.5–3.5k in + ~1–4k out ≈ **$0.001–0.0025** |
+| Cloud Function (1 GiB, ~5–10 s) | Firebase Blaze | < $0.001 | < $0.001 |
+| **Total per attempt** | | **≈ $0.025–0.04** | **≈ $0.075–0.11** |
 
-Example: 25 boys × 2 attempts/day × 1 pasuk ≈ $2–3.50/day ≈ $40–70 per school month.
-The default monthly cap (1500 checks) bounds the worst case at roughly **$60–110/month**.
-Silence/too-short recordings are rejected before any paid call. The owner can read actual
-monthly totals with the `usageReport` action (evaluations, outcomes, speech seconds, tokens,
-estimated cost per evaluation, average time).
+Switching the meaning check from Claude Opus 5.5 to Haiku 5.5 cut its share from about
+$0.01–0.035 to about $0.001 per attempt. Speech recognition is now about 95% of the cost.
+
+Example: 25 boys × 2 attempts/day × 1 pasuk = 1,000 attempts per 20-day school month
+≈ **$25–40/month**. The default monthly cap (1,500 checks) bounds the worst case at about
+**$40–60/month** if assignments are single-pasuk, or **$110–165/month** if every check is a
+3-pasuk assignment; lower `config/limits/month` to tighten it. Silence/too-short recordings are
+rejected before any paid call. The owner can read actual monthly totals with the `usageReport`
+action (evaluations, outcomes, speech seconds, tokens, estimated cost per evaluation, average time),
+which now uses Haiku prices.
 
 ## Tests
 
-- `node --test tests/chazara-ai-practice.test.cjs` — 46 tests, fictional data, **fake providers**
+- `node --test tests/chazara-ai-practice.test.cjs` — 51 tests, fictional data, **fake providers**
   (no paid calls). Covers the 22 required scenarios: correct/minor errors/alt wording/English/
   Yiddish/mixed → Excellent; major mistakes, wrong pasuk, wrong translation, reading-only,
   translation-only, missing pasuk, unrelated talk, gibberish, silence, noise, very short, unclear
   transcription, API errors/timeouts/interrupted uploads, retries/replay, unauthorized and
-  cross-class access, rate limits/duplicates/off switch — plus privacy (nothing stored, regular
+  cross-class access, rate limits/duplicates/off switch — plus the Haiku request shape (model,
+  JSON schema, no fallback parameter, refusal/max-tokens handling, thinking blocks), the key-idea
+  consistency guard, the prompt's required instructions, privacy (nothing stored, regular
   Chazara untouched) and the no-rules-change guarantee.
 - `node tests/chazara-ai-browser.cjs` — Chromium with a fake microphone and a mocked checker:
   panel, RTL Hebrew for every pasuk, keyboard start, recording indicator, multi-pasuk steps,
@@ -149,7 +170,7 @@ node scripts/chazara-ai-audio-eval.cjs manifest.json --paid --out report.json
 It reports false approvals (incorrect → Excellent), false rejections (correct → Almost/Try again),
 uncertain results, average time and cost per evaluation, with per-pasuk diagnostics.
 
-Suggested set (≈ 60–80 clips, ~$5 total): recorded with parental consent or by adults/older
+Suggested set (≈ 60–80 clips, ~$3 total): recorded with parental consent or by adults/older
 children imitating children, on school devices, in a classroom-like room. Per pasuk (e.g. Bereishis
 18:1–3): correct reading + English; + Yiddish; + mixed; correct with 2–3 slips; Ashkenazi vs Israeli
 pronunciation; reading only; translation only; many mistakes; wrong pasuk; unrelated chat; silly
@@ -164,6 +185,9 @@ Suggested go-live bar: **false approvals ≤ 2%** and false rejections ≤ 15% o
 
 - Recognition of children's Ashkenazi Hebrew and Yiddish by Google STT is **unmeasured**. Likely
   failure mode is false "Almost/Couldn't hear" for correct readers (safe direction), not false praise.
+- The Haiku meaning check has only been tested with a simulated judge; how often it misjudges real
+  children's explanations (especially Yiddish arriving in Hebrew letters) is measured by the paid
+  real-audio run. If it is too lenient or strict, raise the model via `CHAZARA_AI_JUDGE_MODEL`.
 - Yiddish has no dedicated recognizer here; meaning judgement for Yiddish depends on how it comes
   through the Hebrew-script/English passes.
 - Audio checks use simple level/SNR measures; a constant hum the child talks over loudly may pass,
