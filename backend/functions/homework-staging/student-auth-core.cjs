@@ -79,7 +79,7 @@ async function authenticate(store,body,now){
   Object.entries(legacyRows||{}).forEach(([id,row])=>{if(key(id)&&row&&row.active!==false&&!central?.[id]?.profile&&sameName(id,row))ids.add(id)});
   const matches=[];
   for(const id of ids){const code=await readPasscode(get,id,{allowLegacyDefault:true});if(equal(code.passcode,pin))matches.push({id,code});}
-  if(matches.length>1)fail(409,'More than one student has this name and passcode. Ask your teacher for a different passcode.');
+  if(matches.length>1)fail(409,'More than one student account has this name and passcode. Ask your teacher: an administrator can fix it in Owner Admin, Students, Bulk Management.');
   if(!matches.length)fail(401,'Check your name and passcode.',{wrongCredentials:true});
   const {id,code}=matches[0];
   const profile=central?.[id]?.profile||null,legacy=legacyRows?.[id]||null;

@@ -3,6 +3,14 @@ const {randomUUID,randomBytes,createHash}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const tools=require('./student-tool-policy.js');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
+const imports=require('./student-import-core.cjs');
+const rollback=require('./student-rollback-core.cjs');
+const BULK_ACTIONS={
+ importPreview:imports.importPreview,importApply:imports.importApply,
+ rollbackPreview:rollback.rollbackPreview,rollbackExecute:rollback.rollbackExecute,rollbackUndo:rollback.rollbackUndo,
+ studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
+ exportBackup:rollback.exportBackup,auditLog:rollback.auditLog
+};
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
 // the old public copies (profiles, class members, legacy allowedStudents).
@@ -71,7 +79,11 @@ async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
 }
 
 async function manageStudents(store,identity,body,now=Date.now()){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+ // Staging copy only: approved fictional staging accounts (password sign-in,
+ // b3StagingAccount claim) are accepted, exactly as teacher-claim-core does.
+ // B3_STAGING_DEPLOYMENT is only set on the staging project.
+ const stagingPassword=process.env.B3_STAGING_DEPLOYMENT==='true'&&identity?.b3StagingAccount===true&&identity.firebase?.sign_in_provider==='password';
+ if(!identity?.uid||identity.email_verified!==true||(identity.firebase?.sign_in_provider!=='google.com'&&!stagingPassword))fail(403,'Verified Google teacher sign-in required.');
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
  // The owner account and any active site administrator count as owner here.
  const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
@@ -88,6 +100,12 @@ async function manageStudents(store,identity,body,now=Date.now()){
   if(body.deletePublic===true && (body.migrationProtocol!==MIGRATION_PROTOCOL || body.backupConfirmed!==true))
    fail(409,'Preview the migration and confirm a verified backup before removing public passcodes.');
   return migratePasscodes(store,body.deletePublic===true,now,{dryRun:body.dryRun===true});
+ }
+ // Issue #706: bulk roster import, import rollback and bulk student
+ // management. Owner and active site administrators only, enforced here.
+ if(Object.hasOwn(BULK_ACTIONS,body.action)){
+  if(!owner)fail(403,'Owner or administrator access required.');
+  return BULK_ACTIONS[body.action](store,identity,body,now);
  }
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
