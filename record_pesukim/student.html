@@ -1314,9 +1314,10 @@ if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
         </div>
         <div class="instruction-card">
           <div class="instruction-copy">
-            <strong>Make one recording: read the Hebrew out loud, then say what it means in English.</strong>
-            <span>Tap the microphone to start. Tap ⏹️ when you finish. Listen to it, then send it to your teacher.</span>
+            <strong>Read a few Hebrew words, then say what they mean in English. Keep going like that, a few words at a time, to the end.</strong>
+            <span>Tap the microphone once to start. It keeps recording the whole time. Tap ⏹️ when you finish, then send it to your teacher.</span>
           </div>
+          <button class="listen-btn" id="combinedInstructionBtn" type="button">🔊 Listen</button>
         </div>
         <div id="combinedStateBox" class="combined-state hidden"></div>
         <div class="record-stage" id="combinedRecordStage">
@@ -1326,7 +1327,7 @@ if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
             <audio id="combinedAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="combinedDeleteBtn" title="Delete this recording">🗑️ Record again</button>
           </div>
-          <div class="record-caption">🎙️ Tap to start • read the Hebrew • say the English • tap ⏹️ to stop</div>
+          <div class="record-caption">🎙️ Tap to start • a few Hebrew words • their English • the next few words • tap ⏹️ at the end</div>
           <span class="status-tag" id="combinedStatus">Not recorded yet</span>
         </div>
         <div style="text-align:center;margin-top:10px;">
@@ -2384,6 +2385,8 @@ function speakTextBrowserFallback(text){
 /* ---------- Student-friendly spoken directions ---------- */
 function studentDirection(task){
   const many = currentIsRange && currentPosukEndNum > currentPosukNum;
+  if(task === 'combined') return 'Tap the microphone once to start. Read a few Hebrew words out loud, then say what those words mean in English. Then read the next few Hebrew words and say what they mean. Keep going like that until the end of the ' +
+    (many ? 'selected pesukim' : 'posuk') + '. The recording keeps going the whole time, so you do not need to tap between pieces. When you finish, tap the stop button, then send it to your teacher.';
   if(task === 'reading') return many
     ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.'
     : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.';
@@ -2395,6 +2398,7 @@ function studentDirection(task){
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
 }
 
+document.getElementById('combinedInstructionBtn').onclick = () => speakText(studentDirection('combined'));
 document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
 document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
 document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));
@@ -6767,7 +6771,7 @@ async function toggleCombinedRecording(){
       combinedStartedAt = Date.now();
       startMicMeter(combinedStream, 'combined');
       btn.disabled = false; btn.classList.add('recording'); btn.textContent = '⏹️';
-      combinedEl('combinedStatus').textContent = '🎙️ Recording… read, then translate. Tap ⏹️ when you finish.';
+      combinedEl('combinedStatus').textContent = '🎙️ Recording… a few Hebrew words, then their English. Keep going. Tap ⏹️ at the end.';
       combinedMaxTimer = setTimeout(() => { if(rec.state === 'recording'){ try{ rec.stop(); }catch(_e){} } }, COMBINED_MAX_MS);
     };
     rec.onstop = () => {
