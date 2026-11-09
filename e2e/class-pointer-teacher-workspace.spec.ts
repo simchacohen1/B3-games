@@ -508,20 +508,20 @@ test('teacher points and draws on an enlarged student screen; only that student 
   await addPresenceStudent(page, 'pt2', 'Pointer Test Student Two');
   await fakeScreenCall(page, 'a'.repeat(64));
   const tile = page.locator('#activityScreenTray .cp-activity-screen').first();
-  // Small tiles have no drawing tools; they appear once the screen is enlarged.
-  await expect(tile.locator('.cp-screen-tools')).toBeHidden();
+  // Small tiles have no drawing tools; the shared drawing toolbar opens by itself once the screen is enlarged.
+  const tools = page.locator('#fttAnnotate .fa-bar');
+  await expect(tools).toBeHidden();
   await tile.locator('video').click();
-  const tools = tile.locator('.cp-screen-tools');
   await expect(tools).toBeVisible();
-  await expect(tools.getByRole('button', { name: /Just watch/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(tools.locator('.cp-screen-help')).toContainText('Choose 👆 Point or ✏️ Pen');
+  // It starts on Hand: nothing is sent until the teacher picks a tool.
+  await expect(tools.getByRole('button', { name: /^Hand:/ })).toHaveAttribute('aria-pressed', 'true');
   // Point: the student gets the moving pointer.
-  await tools.getByRole('button', { name: /red “Teacher” pointer/ }).click();
+  await tools.getByRole('button', { name: /^Pointer:/ }).click();
   const ink = tile.locator('canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
   await expect.poll(async () => (await sentOf(page, 'board-screen-live')).some((m: any) => m.point && Math.abs(m.point.x - 0.25) < 0.02)).toBe(true);
   // Pen: a finished line goes to Student One, never to Student Two.
-  await tools.getByRole('button', { name: 'Draw on the student’s screen.' }).click();
+  await tools.getByRole('button', { name: /^Pen:/ }).click();
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.4, { steps: 8 }); await page.mouse.up();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
@@ -529,7 +529,7 @@ test('teacher points and draws on an enlarged student screen; only that student 
   expect(stroke.tool).toBe('pen'); expect(stroke.points.length).toBeGreaterThan(2);
   expect(await page.evaluate(() => (window as any).__sent.every((m: any) => m.to === 'pt1'))).toBe(true);
   await shot(page, 'teacher-draws-on-student-screen');
-  await tools.getByRole('button', { name: /Undo your last mark/ }).click();
+  await tools.getByRole('button', { name: /Undo my last change/ }).click();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(0);
   // Drawing on the student's screen never placed the teacher's own lesson pointer.
   expect(await page.locator('#pointerLayer [data-person="teacher"]').count()).toBe(0);
@@ -555,15 +555,15 @@ test('the Student screens gallery offers the same Point and Pen tools on a scree
   const grid = page.locator('#boardsView .board-tile');
   await expect(grid).toHaveCount(1);
   await grid.first().click();
-  const tools = page.locator('#boardsView .board-screen-large .cp-screen-tools');
+  const tools = page.locator('#fttAnnotate .fa-bar');
   await expect(tools).toBeVisible();
-  await tools.getByRole('button', { name: 'Draw on the student’s screen.' }).click();
+  await tools.getByRole('button', { name: /^Pen:/ }).click();
   const ink = page.locator('#boardsView .board-screen-large canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6, { steps: 6 }); await page.mouse.up();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
   await shot(page, 'gallery-draws-on-student-screen');
-  await tools.getByRole('button', { name: /Erase all your marks/ }).click();
+  await tools.getByRole('button', { name: /Erase all my marks here/ }).click();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(0);
   expect(errors).toEqual([]);
   await context.close();

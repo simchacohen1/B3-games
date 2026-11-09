@@ -34,9 +34,20 @@
 
   // ---------- Board data ----------
   const validPoint=p=>!!p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1;
+  // Lines from the shared drawing toolbar (annotation-toolbar.js) may also be a highlight, a shape or a text box.
+  const ITEM_TOOLS=['highlight','rect','ellipse','line','arrow','text'],ITEM_SIZES=SIZE_VALUES.concat([0.02,0.045]);
   function cleanStroke(s){
-    if(!s||typeof s.id!=='string'||!/^[a-z0-9-]{2,40}$/i.test(s.id)||!COLORS.includes(s.color)||!SIZE_VALUES.includes(s.size)||!Array.isArray(s.points)||!s.points.length||s.points.length>MAX_POINTS||!s.points.every(validPoint))return null;
-    return{id:s.id,color:s.color,size:s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
+    if(!s||typeof s.id!=='string'||!/^[a-z0-9-]{2,40}$/i.test(s.id)||!COLORS.includes(s.color)||!Array.isArray(s.points)||!s.points.length||s.points.length>MAX_POINTS||!s.points.every(validPoint))return null;
+    const tool=s.tool==null||s.tool==='pen'?null:s.tool;
+    if(tool!==null&&!ITEM_TOOLS.includes(tool))return null;
+    if(!(tool?ITEM_SIZES:SIZE_VALUES).includes(s.size))return null;
+    const out={id:s.id,color:s.color,size:s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
+    if(tool){
+      if(tool==='text'){if(typeof s.text!=='string'||!s.text.trim()||s.text.length>200||out.points.length!==1)return null;out.text=s.text}
+      else if(tool!=='highlight'&&out.points.length!==2)return null;
+      out.tool=tool;
+    }
+    return out;
   }
   // One teacher-owned activity is copied to every student's independent board.
   // Uploaded pictures remain locked under the boys' marks. Word activities have a
@@ -128,6 +139,7 @@
 
   // ---------- Drawing on a canvas ----------
   function strokeOn(ctx,s,w,h){
+    if(s.tool&&window.FTTAnnotate){window.FTTAnnotate.drawItem(ctx,s,p=>[p.x*w,p.y*h],w);return}
     const pts=s.points,width=Math.max(1,s.size*w);ctx.strokeStyle=s.color;ctx.fillStyle=s.color;
     if(pts.every(p=>p.x===pts[0].x&&p.y===pts[0].y)){ctx.beginPath();ctx.arc(pts[0].x*w,pts[0].y*h,width/2,0,Math.PI*2);ctx.fill();return}
     ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(pts[0].x*w,pts[0].y*h);
@@ -330,6 +342,27 @@
       void startShare('screen');
     }
     function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
+    // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
+    // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
+    const boardOpen=()=>on&&mode==='boards'&&!blocked;
+    const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+      label:'Drawing on your whiteboard. Your teacher sees it.',
+      rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
+      getItems:()=>board.strokes.filter(item=>item.by==='student'),
+      setItems(list){
+        const mine=board.strokes.filter(item=>item.by==='student'),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
+        const removed=mine.filter(item=>!keep.has(item.id)).map(item=>item.id);
+        if(removed.length)act({type:'board-remove',ids:removed});
+        for(const item of list)if(!had.has(item.id)){const {by,...stroke}=item;act({type:'board-add',stroke})}
+      },
+      live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
+    // The toolbar is there only while my whiteboard is open (or while I share my screen).
+    function syncAnnotate(){
+      const FA=window.FTTAnnotate;if(!FA)return;
+      if(boardOpen())FA.push(boardSurface);
+      FA.setReason('whiteboard',boardOpen());
+      if(!boardOpen())FA.release(boardSurface);
+    }
     drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
 
     async function startShare(){
@@ -355,6 +388,7 @@
         if(!c){s.getTracks().forEach(t=>t.stop());shareNote.textContent='Could not send your screen. Try again.';return}
         stream=s;call=c;
         s.getVideoTracks()[0]?.addEventListener('ended',()=>{if(stream===s)stopShare(true)},{once:true});
+        window.FTTAnnotate?.setReason('sharing',true);
         c.on?.('close',()=>{if(call===c)stopShare(false)});c.on?.('error',()=>{if(call===c){stopShare(false);shareNote.textContent='The connection to your teacher failed. Try sharing again.'}});
         B.sendTeacher({type:'board-screen',sharing:true});
       }catch(error){shareNote.textContent=error?.name==='NotAllowedError'?'Sharing was canceled. Click the button to try again.':'Could not share your screen. Try again.'}
@@ -364,7 +398,7 @@
       const s=stream,c=call;stream=null;call=null;
       c?.close();s?.getTracks().forEach(t=>t.stop());
       if(tell&&on&&s)B.sendTeacher({type:'board-screen',sharing:false});
-      if(s)clearScreenMarks();
+      if(s){clearScreenMarks();window.FTTAnnotate?.setReason('sharing',false)}
       redraw();
     }
     function show(next){
@@ -380,6 +414,8 @@
     const screenInk={strokes:[],draft:null,point:null,layer:null,canvas:null,banner:null,frame:0};
     const inkPoint=p=>!!p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1;
     function inkStroke(s){
+      // Shapes and text boxes from the teacher's drawing toolbar (annotation-toolbar.js).
+      if(window.FTTAnnotate&&s&&s.tool!=='pen'&&s.tool!=='highlight')return window.FTTAnnotate.cleanItem(s,{idPrefix:'t',maxPoints:400});
       if(!s||typeof s.id!=='string'||!/^t[a-z0-9-]{1,40}$/i.test(s.id)||!['pen','highlight'].includes(s.tool)||typeof s.color!=='string'||!/^#[0-9a-f]{6}$/i.test(s.color)||
         !Number.isFinite(s.size)||s.size<.001||s.size>.05||!Array.isArray(s.points)||!s.points.length||s.points.length>400||!s.points.every(inkPoint))return null;
       return{id:s.id,tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y}))};
@@ -415,6 +451,7 @@
       const ctx=c.getContext('2d'),o=pageOnScreen(),at=p=>[p.x*o.w-o.x,p.y*o.h-o.y];
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.lineCap='round';ctx.lineJoin='round';
       for(const s of [...screenInk.strokes,...(screenInk.draft?[screenInk.draft]:[])]){
+        if(window.FTTAnnotate){window.FTTAnnotate.drawItem(ctx,s,at,o.w);continue}
         ctx.save();ctx.globalAlpha=s.tool==='highlight'?.38:1;ctx.strokeStyle=s.color;ctx.lineWidth=Math.max(2,s.size*o.w);
         ctx.beginPath();const [x0,y0]=at(s.points[0]);ctx.moveTo(x0,y0);if(s.points.length===1)ctx.lineTo(x0+.1,y0);
         for(const p of s.points.slice(1)){const [x,y]=at(p);ctx.lineTo(x,y)}ctx.stroke();ctx.restore();
@@ -450,11 +487,12 @@
         if(!on){if(was)B.status('Your teacher closed the boards. Back to the lesson.')}
         else if(blocked){if(!wasBlocked)B.status('Your teacher paused your board for now.')}
         else if(!was||wasMode!==mode||wasBlocked)B.status(mode==='screens'?'Your teacher asked you to share your screen. Click Share my screen.':'Your teacher opened your own whiteboard. Draw with the pen. Your teacher can see your board.');
+        syncAnnotate();
       }else if(on&&mode==='boards'&&!blocked)applyOp(board,message,'teacher');
       redraw();return true;
     }
     new ResizeObserver(redraw).observe(stage);document.addEventListener('fullscreenchange',redraw);
-    window.ClassPointerBoards={fromTeacher,clearScreenMarks,reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false)}};
+    window.ClassPointerBoards={fromTeacher,clearScreenMarks,reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false);syncAnnotate()}};
     return;
   }
 

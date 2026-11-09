@@ -10,6 +10,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="posuk-practice-scroll"></script>
+<script>
+/* חידון (quiz) mode. The AI comprehension questions (tap the Hebrew words)
+   live in their own home tile, which opens this same page with ?mode=quiz.
+   Quiz mode shows only the Understand task; the normal practice page shows
+   only Read and Translate. Saved attempts, grading, teacher review and
+   Chazara scores are the same records either way. Old links that ask for
+   tab=comprehension (Chazara, My Progress) are sent to quiz mode. */
+(function(){
+  var p = new URLSearchParams(location.search);
+  if(p.get('mode') !== 'quiz' && p.get('tab') === 'comprehension'){
+    p.set('mode', 'quiz');
+    location.replace(location.pathname + '?' + p.toString() + location.hash);
+  }
+  // ?tool=test-me was the #694 draft name for this same mode; keep those links working.
+  window.B3_QUIZ_MODE = p.get('mode') === 'quiz' || p.get('tool') === 'test-me';
+  document.documentElement.classList.toggle('quiz-mode', window.B3_QUIZ_MODE);
+  if(window.B3_QUIZ_MODE){
+    document.title = 'Chumash חידון';
+    document.addEventListener('DOMContentLoaded', function(){
+      var h = document.querySelector('header.top h1'), d = document.querySelector('header.top p');
+      if(h) h.textContent = '🧠 Chumash חידון';
+      if(d) d.textContent = 'Answer questions about the posuk by tapping the Hebrew words.';
+    });
+  }
+})();
+</script>
+<style>
+  html.quiz-mode .task-tabs{ display:none; }
+  html.quiz-mode #comprehensionPanel .step-chip{ display:none; }
+  html:not(.quiz-mode) #tabComprehensionBtn{ display:none; }
+</style>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1199,10 +1230,10 @@
 <script>
 /* Two tools share this page (Issue #694):
    - Posuk Practice (default): one recording of reading + translation, graded by the teacher.
-   - Chumash Test Me (?tool=test-me): the Understand questions that used to be step 3 here. */
-window.POSUK_TOOL_MODE = new URLSearchParams(location.search).get('tool') === 'test-me' ? 'test-me' : 'practice';
+   - Chumash חידון (?mode=quiz, set up at the top of this page): the Understand questions
+     that used to be step 3 here. 'test-me' is this page's internal name for that mode. */
+window.POSUK_TOOL_MODE = window.B3_QUIZ_MODE ? 'test-me' : 'practice';
 document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
-if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
 </script>
 <style>
   .tool-practice .task-tabs, .tool-practice #readingPanel, .tool-practice #translationPanel,
@@ -1230,12 +1261,6 @@ if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
     <h1 id="toolTitle">📜 Posuk Practice Scroll</h1>
     <p id="toolSubtitle">Read the posuk and translate it in one recording. Your teacher will grade it!</p>
   </header>
-  <script>
-  if(window.POSUK_TOOL_MODE === 'test-me'){
-    document.getElementById('toolTitle').textContent = '🧠 Chumash Test Me';
-    document.getElementById('toolSubtitle').textContent = 'Pick a posuk and answer questions to show you understand it.';
-  }
-  </script>
 
   <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
   <div id="nameGate" class="name-gate">
@@ -1314,9 +1339,10 @@ if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
         </div>
         <div class="instruction-card">
           <div class="instruction-copy">
-            <strong>Make one recording: read the Hebrew out loud, then say what it means in English.</strong>
-            <span>Tap the microphone to start. Tap ⏹️ when you finish. Listen to it, then send it to your teacher.</span>
+            <strong>Read a few Hebrew words, then say what they mean in English. Keep going like that, a few words at a time, to the end.</strong>
+            <span>Tap the microphone once to start. It keeps recording the whole time. Tap ⏹️ when you finish, then send it to your teacher.</span>
           </div>
+          <button class="listen-btn" id="combinedInstructionBtn" type="button">🔊 Listen</button>
         </div>
         <div id="combinedStateBox" class="combined-state hidden"></div>
         <div class="record-stage" id="combinedRecordStage">
@@ -1326,7 +1352,7 @@ if(window.POSUK_TOOL_MODE === 'test-me') document.title = 'Chumash Test Me';
             <audio id="combinedAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="combinedDeleteBtn" title="Delete this recording">🗑️ Record again</button>
           </div>
-          <div class="record-caption">🎙️ Tap to start • read the Hebrew • say the English • tap ⏹️ to stop</div>
+          <div class="record-caption">🎙️ Tap to start • a few Hebrew words • their English • the next few words • tap ⏹️ at the end</div>
           <span class="status-tag" id="combinedStatus">Not recorded yet</span>
         </div>
         <div style="text-align:center;margin-top:10px;">
@@ -2384,6 +2410,8 @@ function speakTextBrowserFallback(text){
 /* ---------- Student-friendly spoken directions ---------- */
 function studentDirection(task){
   const many = currentIsRange && currentPosukEndNum > currentPosukNum;
+  if(task === 'combined') return 'Tap the microphone once to start. Read a few Hebrew words out loud, then say what those words mean in English. Then read the next few Hebrew words and say what they mean. Keep going like that until the end of the ' +
+    (many ? 'selected pesukim' : 'posuk') + '. The recording keeps going the whole time, so you do not need to tap between pieces. When you finish, tap the stop button, then send it to your teacher.';
   if(task === 'reading') return many
     ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.'
     : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.';
@@ -2395,6 +2423,7 @@ function studentDirection(task){
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
 }
 
+document.getElementById('combinedInstructionBtn').onclick = () => speakText(studentDirection('combined'));
 document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
 document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
 document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));
@@ -3462,9 +3491,10 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
    Switching tabs never loses anything already recorded — it's purely a
    visibility toggle. */
 function setActiveTab(tab){
-  // Chumash Test Me only has the Understand questions; Posuk Practice has
-  // only the combined recording panel (none of these three tabs).
+  // Chumash חידון (quiz mode) only has the Understand questions; Posuk Practice
+  // has only the combined recording panel (none of these three tabs).
   if(window.POSUK_TOOL_MODE === 'test-me') tab = 'comprehension';
+  else if(tab === 'comprehension') tab = 'reading';
   activeTab = tab;
   document.getElementById('readingPanel').classList.toggle('hidden', tab !== 'reading');
   document.getElementById('translationPanel').classList.toggle('hidden', tab !== 'translate');
@@ -3498,7 +3528,8 @@ function hideNudge(){
 // translation -> comprehension) so the nudge always points to the next
 // natural step rather than jumping around.
 function nextUnfinishedTask(justSaved){
-  const order = ['hebrew', 'translation', 'comprehension'];
+  // Understand lives in its own חידון tile now, so never nudge toward it.
+  const order = window.B3_QUIZ_MODE ? [] : ['hebrew', 'translation'];
   for(const t of order){
     if(t !== justSaved && !attemptSaved[t]) return t;
   }
@@ -3791,7 +3822,7 @@ function resetComprehensionQuestionState(){
   questionTryCounts = {};
   comprehensionMode = 'questions';
   renderComprehensionQuestionUI();
-  // Understand questions live only in Chumash Test Me now (#694); do not
+  // Understand questions live only in Chumash חידון now (#694); do not
   // call the paid question generator from Posuk Practice.
   if(window.POSUK_TOOL_MODE === 'practice') return;
 
@@ -6767,7 +6798,7 @@ async function toggleCombinedRecording(){
       combinedStartedAt = Date.now();
       startMicMeter(combinedStream, 'combined');
       btn.disabled = false; btn.classList.add('recording'); btn.textContent = '⏹️';
-      combinedEl('combinedStatus').textContent = '🎙️ Recording… read, then translate. Tap ⏹️ when you finish.';
+      combinedEl('combinedStatus').textContent = '🎙️ Recording… a few Hebrew words, then their English. Keep going. Tap ⏹️ at the end.';
       combinedMaxTimer = setTimeout(() => { if(rec.state === 'recording'){ try{ rec.stop(); }catch(_e){} } }, COMBINED_MAX_MS);
     };
     rec.onstop = () => {
@@ -6969,12 +7000,12 @@ combinedEl('combinedSubmitBtn').onclick = submitCombinedRecording;
   const p=HM.params,sefer=p.get('sefer')||'Bereishis',perek=Number(p.get('perek')),from=Number(p.get('posuk')),to=Number(p.get('endPosuk')||from);
   const skills=(p.get('hwSkills')||'reading').split(',').filter(s=>['reading','translate','understand'].includes(s));
   if(!perek||!from||!skills.length)return;
-  // Understand moved to Chumash Test Me (#694): an Understand-only homework opens there.
+  // Understand moved to Chumash חידון (#694): an Understand-only homework opens there.
   if(window.POSUK_TOOL_MODE==='practice'&&skills.length===1&&skills[0]==='understand'){
-    const u=new URL(location.href);u.searchParams.set('tool','test-me');location.replace(u.href);return;
+    const u=new URL(location.href);u.searchParams.set('mode','quiz');location.replace(u.href);return;
   }
   const names=window.POSUK_TOOL_MODE==='practice'
-    ?{reading:'Reading',translate:'Translate',understand:'Understand (in Chumash Test Me)'}
+    ?{reading:'Reading',translate:'Translate',understand:'Understand (in Chumash חידון)'}
     :{reading:'Reading (in Posuk Practice)',translate:'Translate (in Posuk Practice)',understand:'Understand'};
   const lock=document.createElement('style');
   lock.textContent='html.b3-homework-mode #selectionShell,html.b3-homework-mode #changeSelectionBtn,html.b3-homework-mode #prevPosukBtn,html.b3-homework-mode #nextPosukBtn{display:none!important}';

@@ -154,6 +154,10 @@ main .screen[hidden],.wizard-step[hidden]{display:none!important}
 .field-help{margin:0 0 8px;color:var(--muted);line-height:1.45;font-size:14px}
 .create-field input,.create-field select,.create-field textarea{font-size:16px;padding:13px 14px;border-radius:12px}
 .create-field textarea{min-height:96px}
+.create-field[hidden]{display:none}
+.voice-controls{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.voice-controls audio{max-width:100%}
+.voice-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
 .audience-box{background:var(--blue-light);border:1.5px solid #b8d8f7;border-radius:16px;padding:18px;margin-top:14px}
 .audience-box h3{margin:0 0 4px;font-size:17px;font-weight:800}
@@ -300,11 +304,12 @@ button.link:hover{background:none;color:var(--navy)}
     <div class="create-field"><span class="question-number" aria-hidden="true">3</span><div><label for="title">Give it a short name</label><input id="title" maxlength="120" placeholder="For example: This week's Shorashim"></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">4</span><div><label for="details">What should students do?</label><textarea id="details" maxlength="1200" placeholder="Practice saying each word. Then come back here and hand it in."></textarea></div></div>
     <div class="create-field"><span class="question-number" aria-hidden="true">5</span><div><label for="subject">Subject <span class="muted" style="font-weight:400;font-size:14px">(optional)</span></label><p class="field-help">Students can filter their homework by subject, e.g. Chumash, Mishnayos.</p><input id="subject" maxlength="60" placeholder="e.g. Chumash"></div></div>
+    <div class="create-field" id="voiceField" hidden><span class="question-number" aria-hidden="true">6</span><div><span class="field-label">Record instructions (optional)</span><p class="field-help">Read the instructions aloud so students who find reading hard can press play and listen. Up to 15 seconds.</p><div id="voiceControls" class="voice-controls"></div><p id="voiceMsg" class="field-help" role="status" aria-live="polite"></p></div></div>
     <div class="step-actions"><button class="sec backHome">Cancel</button><button id="nextAudience" class="primary-action">Next: Choose students →</button></div></div>
     <div class="create-step" id="createStep2" hidden><div class="audience-box" id="audBox"><h3>👥 Who should get this?</h3><p>Choose students in <strong><span class="className"></span></strong>.</p><label class="audience-choice"><input type="radio" name="aud" value="all" checked><span>Everyone in my class<small>The easiest choice — send it to the whole class.</small></span></label><label class="audience-choice"><input type="radio" name="aud" value="some"><span>Choose students<small>Only the students you select will see it.</small></span></label><div class="students" id="studentPick" style="display:none"></div></div><div class="step-actions"><button class="sec" id="backToDetails">← Back</button><button id="nextReview" class="primary-action">Next: Review before sharing →</button></div></div>
     <div class="create-step" id="createStep3" hidden><div class="step-review"><h3>✅ Check it before sharing</h3><p class="muted">You can save this as a draft or publish it now.</p></div>
     <details class="optional-settings"><summary>Set a due date or practice goal (optional)</summary><p class="field-help">You can skip these and change them later.</p><div class="row"><div><label for="assigned">Start date</label><input id="assigned" type="date" required></div><div><label for="due">Due date</label><input id="due" type="date"></div></div><div id="targetWrap"><label for="target">Practice goal (optional)</label><div class="row"><div><input id="target" type="number" min="1" max="240" placeholder="For example: 10"></div><div><label class="muted" for="targetUnit">Count in</label><select id="targetUnit" aria-label="Goal unit"><option value="minutes">Minutes</option><option value="questions">Questions</option><option value="rounds">Rounds</option><option value="items">Items</option></select></div></div></div></details>
-    <div class="create-preview" id="createPreview"><strong>👀 Students will see</strong><p id="previewTitle">Your assignment name will appear here.</p><p id="previewDetails" class="muted">Your instructions will appear here.</p><p id="previewDates" class="muted"></p></div>
+    <div class="create-preview" id="createPreview"><strong>👀 Students will see</strong><p id="previewTitle">Your assignment name will appear here.</p><p id="previewDetails" class="muted">Your instructions will appear here.</p><p id="previewDates" class="muted"></p><p id="previewVoice" hidden>🔊 Students can also listen to your recorded instructions.</p></div>
     <div class="step-actions step-actions-final"><button class="sec" id="backToAudience">← Back</button><div class="create-actions"><button class="sec" id="save">Save Draft</button><button id="publishNow" class="primary-action">Publish to Students</button></div></div><p class="create-publish-help">Publishing sends this assignment to the selected students.</p><button class="sec" id="cancelEdit" style="display:none">Cancel edit</button><div id="formMsg" class="msg" role="status" aria-live="polite"></div></div></div>
   </section>
   <section class="screen" id="screenCheck" hidden aria-labelledby="checkHeading"><div class="screen-head"><button class="sec backHome">← Home</button><h1 id="checkHeading">Check Assignments</h1></div><p id="reviewSummary" class="muted"></p><div id="reviewList"></div></section>
@@ -335,6 +340,27 @@ if(!H.isAllowedRuntime()){$('signinMsg').textContent='Homework is not available 
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 var auth=firebase.auth();
 var state={openReview:{},classId:'',data:null,editing:null,editingPublication:null,createStep:1,reportView:'assignments',reportSort:'newest',detailSort:'name',openAssignmentId:null,openStudentId:null,openNotes:null,reviewDrafts:{}};
+// Recorded instructions (#629): one optional voice message per assignment. Only the teacher who created
+// the assignment can add, replace or remove it; the server checks this too.
+var voice={pending:null,remove:false,existing:false,owned:true,assignmentId:null,recorder:null};
+function voiceSupported(){return !!(state.data&&state.data.features&&state.data.features.instructionVoice)}
+function hasVoice(){return !!(voice.pending||(voice.existing&&!voice.remove))}
+function resetVoice(a){if(voice.recorder)voice.recorder.cancel();voice={pending:null,remove:false,existing:!!(a&&a.instructionVoice),owned:!a||a.ownedByMe===true,assignmentId:a?a.id:null,recorder:null};$('voiceMsg').textContent='';renderVoiceField()}
+function readInstructions(id){return function(){return api({action:'instructionVoiceRead',assignmentId:id})}}
+function renderVoiceField(){var box=$('voiceControls');$('voiceField').hidden=!voiceSupported();box.replaceChildren();
+  if(!voice.owned){box.append(el('p','Only the teacher who created this assignment can add or change its recorded instructions.','muted'));if(voice.existing)box.append(H.instructionPlayer(readInstructions(voice.assignmentId),{label:'🔊 Play recorded instructions'}));return}
+  if(voice.pending){var player=el('audio');player.controls=true;player.src=voice.pending;box.append(el('strong','New recording ready. It is saved when you save the assignment.'),player)}
+  else if(voice.existing&&!voice.remove)box.append(el('strong','This assignment has recorded instructions.'),H.instructionPlayer(readInstructions(voice.assignmentId),{label:'🔊 Play recorded instructions'}));
+  else if(voice.existing&&voice.remove)box.append(el('strong','The recording will be removed when you save.'));
+  var row=el('div',null,'voice-row');
+  voice.recorder=H.voiceRecorder({feedback:$('voiceMsg'),host:box,buttonClass:'sec voice-record',idleLabel:hasVoice()?'🎙 Record again':'🎙 Record instructions',stopLabel:'■ Stop recording',
+    recordingText:'Recording now. Read the instructions aloud, then press Stop recording.',busyText:'Getting the recording ready…',cancelledText:'Recording cancelled. Nothing changed.',
+    unsupportedText:'Recording is not supported in this browser. Students will still see the written instructions.',failText:'Could not start recording. Students will still see the written instructions.',
+    onRecorded:async function(d){voice.pending=d;voice.remove=false;setTimeout(function(){renderVoiceField();updatePreview()},0);return 'Recorded. Press Save to keep it.'}});
+  row.append(voice.recorder.button);
+  if(hasVoice()){var rm=el('button','Remove recording','sec voice-remove');rm.type='button';rm.onclick=function(){if(voice.pending)voice.pending=null;else voice.remove=true;$('voiceMsg').textContent=voice.existing?'The recording will be removed when you save.':'Recording removed.';renderVoiceField();updatePreview()};row.append(rm)}
+  else if(voice.remove){var undo=el('button','Keep the recording','sec');undo.type='button';undo.onclick=function(){voice.remove=false;$('voiceMsg').textContent='';renderVoiceField();updatePreview()};row.append(undo)}
+  box.append(row,voice.recorder.panel)}
 function setLabel(v){var r=document.querySelector('input[name=label][value='+(v==='classwork'?'classwork':'homework')+']');if(r)r.checked=true}
 function chosenLabel(){var r=document.querySelector('input[name=label]:checked');return r?r.value:'homework'}
 function say(box,m,good){box.textContent=m;box.className='msg '+(good?'good':'err')}
@@ -359,7 +385,7 @@ var Msgs=window.HomeworkMessages.create({role:'teacher',call:function(body){retu
     openAssignment(id)}});
 $('dmBox').append(Msgs.root);
 ['title','details','assigned','due'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
-function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';var pi=$('previewItems');if(!pi){pi=el('ol',null,'hwi-list');pi.id='previewItems';$('previewDetails').after(pi)}pi.replaceChildren();if(typeof itemsBox!=='undefined')itemsBox.get().forEach(function(item){var d=HI.describe(item);pi.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
+function updatePreview(){if(!$('previewTitle'))return;$('previewTitle').textContent=$('title').value||'Your assignment name will appear here.';$('previewDetails').textContent=$('details').value||'Your instructions will appear here.';$('previewVoice').hidden=!hasVoice();var pi=$('previewItems');if(!pi){pi=el('ol',null,'hwi-list');pi.id='previewItems';$('previewDetails').after(pi)}pi.replaceChildren();if(typeof itemsBox!=='undefined')itemsBox.get().forEach(function(item){var d=HI.describe(item);pi.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});$('previewDates').textContent=($('assigned').value?'Starts '+H.when(H.assignedFromInput($('assigned').value)):'Starts today')+($('due').value?' · Due '+H.when(H.dueFromInput($('due').value)):'')}
 function goCreateStep(step){state.createStep=Math.max(1,Math.min(3,step));[1,2,3].forEach(function(n){$('createStep'+n).hidden=n!==state.createStep});$('stepCaption').textContent='Step '+state.createStep+' of 3 · '+['','Assignment','Students','Review & share'][state.createStep];$('progressFill').style.width=(state.createStep*100/3)+'%';if(state.createStep===3)updatePreview();window.scrollTo({top:0,behavior:'smooth'})}
 function continueToStudents(){var ip=itemsProblem();if(ip){say($('formMsg'),ip);$('itemsBuilder').scrollIntoView({block:'center'});return}if(!$('title').value.trim()){say($('formMsg'),'Add a short name for this assignment first.');$('title').focus();return}say($('formMsg'),'');goCreateStep(2)}
 function continueToReview(){if(document.querySelector('input[name=aud]:checked').value==='some'&&!$('studentPick').querySelector('input:checked')){say($('formMsg'),'Pick at least one student, or choose everyone in your class.');$('studentPick').scrollIntoView({block:'center'});return}say($('formMsg'),'');goCreateStep(3)}
@@ -407,7 +433,7 @@ function buildPick(){
 }
 function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
 function resetForm(){state.editing=null;state.editingPublication=null;$('formTitle').textContent='Let’s make an assignment!';setLabel('homework');$('save').textContent='Save Draft';$('publishNow').textContent='Publish to Students';$('publishNow').hidden=false;$('cancelEdit').style.display='none';
-  ['title','details','subject','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;itemsBox.set([]);syncType();updatePreview();goCreateStep(1)}
+  ['title','details','subject','due','target'].forEach(function(i){$(i).value=''});$('assigned').value=today();$('type').disabled=false;document.querySelector('input[name=aud][value=all]').checked=true;$('studentPick').style.display='none';$('studentPick').querySelectorAll('input').forEach(function(c){c.checked=false});document.querySelector('.optional-settings').open=false;itemsBox.set([]);resetVoice(null);syncType();updatePreview();goCreateStep(1)}
 $('cancelEdit').onclick=resetForm;
 async function submitForm(publishRequested){
   var ip=itemsProblem();if(ip){say($('formMsg'),ip);goCreateStep(1);return}
@@ -421,12 +447,14 @@ async function submitForm(publishRequested){
     if(wasEditing){
       await api({action:'edit',assignmentId:id,label:chosenLabel(),title:$('title').value,details:$('details').value,subject:$('subject').value.trim(),items:itemsBox.get(),
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
-        targetAmount:$('target').value,targetUnit:$('targetUnit').value});
+        targetAmount:$('target').value,targetUnit:$('targetUnit').value,
+        voiceDataURL:voice.owned&&voice.pending?voice.pending:undefined,removeVoice:voice.owned&&!voice.pending&&voice.remove?true:undefined});
     }else{
       var newItems=itemsBox.get();
       var body={action:'create',type:newItems.length?newItems[0].type:$('type').value,items:newItems,label:chosenLabel(),title:$('title').value.trim(),details:$('details').value,subject:$('subject').value.trim(),
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
         targetAmount:$('target').value,targetUnit:$('targetUnit').value};
+      if(voice.pending)body.voiceDataURL=voice.pending;
       if(document.querySelector('input[name=aud]:checked').value==='some')body.studentIds=Array.prototype.map.call($('studentPick').querySelectorAll('input:checked'),function(c){return c.value});
       var created=await api(body);id=created.id;state.editing=id;state.editingPublication='draft';createdNow=true;
     }
@@ -491,12 +519,13 @@ document.querySelectorAll('.backReports').forEach(function(b){b.onclick=function
 $('viewAssignments').onclick=function(){state.reportView='assignments';renderReports()};
 $('viewStudents').onclick=function(){state.reportView='students';renderReports()};
 $('reportSort').onchange=function(){state.reportSort=$('reportSort').value;renderReports()};
-function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;$('subject').value=a.subject||'';$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;itemsBox.set(a.items||[]);setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
+function startEdit(a){var p=pubOf(a);state.editing=a.id;state.editingPublication=p;$('formTitle').textContent='Change this assignment';$('save').textContent='Save changes';$('publishNow').hidden=p==='published';$('publishNow').textContent='Publish to Students';$('cancelEdit').style.display='';$('title').value=a.title;$('details').value=a.details;$('subject').value=a.subject||'';$('assigned').value=H.inputFromDue(a.assignedAt);$('due').value=H.inputFromDue(a.dueAt);$('target').value=a.targetAmount||'';$('targetUnit').value=a.targetUnit||'minutes';$('type').value=a.type;$('type').disabled=true;itemsBox.set(a.items||[]);setLabel(labelOf(a));document.querySelector('.optional-settings').open=true;resetVoice(a);syncType();updatePreview();goCreateStep(1);showScreen('screenCreate')}
 function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(state.openAssignmentId);root.replaceChildren();if(!a){$('oneAssignmentHeading').textContent='Assignment';root.append(el('div','This assignment is no longer available.','card muted'));return}
   var p=pubOf(a),c=assignmentCounts(a);$('oneAssignmentHeading').textContent=a.title;
   var card=el('div',null,'card'),badges=el('div');badges.append(labelBadge(a),el('span',H.TYPES[a.type]||a.type,'badge'));if(a.subject)badges.append(el('span',a.subject,'badge'));badges.append(el('span',p==='published'?'Published':p==='archived'?'Archived':'Draft · students can’t see it','badge '+(p==='published'?'ok':'state')));card.append(badges);
   var meta=el('div',null,'detail-meta');meta.append(el('span',p==='draft'?'Created '+H.when(a.createdAt):'Given '+H.when(givenAt(a))),el('span',a.dueAt!=null?'Due '+H.when(a.dueAt):'No due date'),el('span',c.total+' '+(c.total===1?'student':'students')+' assigned'));if(a.targetAmount)meta.append(el('span','Goal: '+a.targetAmount+' '+(a.targetUnit||'')));card.append(meta);
   if(a.details)card.append(el('p',a.details,'detail-instructions'));
+  if(a.instructionVoice)card.append(H.instructionPlayer(readInstructions(a.id),{label:'🔊 Play recorded instructions'}));
   if(a.items&&a.items.length){var il=el('ol',null,'hwi-list');a.items.forEach(function(item){var d=HI.describe(item);il.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});card.append(el('strong','Checklist ('+a.items.length+' items)'),il)}
   if(p!=='draft'){card.append(countLine(c),countDetail(c))}else card.append(el('p','Students can’t see this yet. Publish it to send it to them.','count-detail'));
   var ed=el('button','Edit','sec');ed.disabled=p==='archived';ed.onclick=function(){startEdit(a)};

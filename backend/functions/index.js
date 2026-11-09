@@ -2107,7 +2107,13 @@ exports.gradeQuestionAnswer = onRequest(
             headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY.value(), 'anthropic-version': '2023-06-01' },
             body: JSON.stringify(body)
           });
-          if (!response.ok) throw new Error('AI grading unavailable');
+          if (!response.ok) {
+            // Record why Anthropic refused (bad key, model, quota) like the
+            // other grading functions do; the student still sees a plain 502.
+            const errText = await response.text().catch(() => '');
+            console.error('Anthropic question-grading error:', response.status, errText.slice(0, 500));
+            throw new Error('AI grading unavailable');
+          }
           const data = await response.json();
           const text = (data.content || []).find(b => b.type === 'text')?.text || '';
           return JSON.parse(text.replace(/```json|```/g, '').trim());

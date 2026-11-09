@@ -173,6 +173,10 @@
       '.general-messages h4{margin-top:0}',
       '.message-picker{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px;font-weight:700}',
       '.message-picker select{max-width:100%}',
+      '.instruction-voice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}',
+      '.instruction-play{font-size:18px;font-weight:800;padding:12px 20px;min-height:48px;border-radius:14px;background:#2d7ecc;color:#fff;border:0;cursor:pointer}',
+      '.instruction-play[aria-pressed="true"]{background:#1a2744}',
+      '.instruction-status{color:#8a1c1c;font-weight:700}',
       '.conversation-record[data-recording="true"]{background:#e02424!important;border-color:#e02424!important;color:#fff!important}'
     ].join('\n');
     document.head.append(style);
@@ -199,6 +203,139 @@
         if (ctx.close) ctx.close().catch(function () {});
       };
     } catch (e) { return null; }
+  }
+  // One voice recorder for notes and recorded instructions: pulsing red dot, MM:SS timer (time used and
+  // time left), live sound meter, Cancel, and the 15 second / 100 KB limits the server also enforces.
+  // options.onRecorded(voiceDataURL) saves the recording and returns the message to show.
+  function voiceRecorder(options) {
+    addConversationStyles();
+    var feedback = options.feedback;
+    function say(text, tone) { if (options.tell) options.tell(text, tone); else feedback.textContent = text || ''; }
+    var idleLabel = options.idleLabel || '🎙 Record voice note', stopLabel = options.stopLabel || '■ Stop & send';
+    var record = el('button', idleLabel, options.buttonClass || 'conversation-record sec'); record.type = 'button';
+    var panel = el('div', null, 'conversation-recording'); panel.hidden = true;
+    var recLabel = el('span', 'Recording', 'rec-label'), recTime = el('span', recClock(0), 'rec-time');
+    recTime.setAttribute('role', 'timer');
+    var meter = el('span', null, 'rec-meter'), meterBar = el('span');
+    meter.append(meterBar); meter.setAttribute('aria-hidden', 'true');
+    var cancel = el('button', 'Cancel', 'sec conversation-cancel'); cancel.type = 'button';
+    panel.append(el('span', null, 'rec-dot'), recLabel, recTime, meter, cancel);
+    var rec = null;
+    function stopRecording(cancelled) {
+      if (!rec) return;
+      rec.cancelled = rec.cancelled || !!cancelled;
+      if (rec.recorder.state !== 'inactive') rec.recorder.stop();
+    }
+    function idle() {
+      record.dataset.recording = 'false'; record.textContent = idleLabel;
+      if (options.onEnd) options.onEnd();
+    }
+    cancel.onclick = function () { stopRecording(true); };
+    record.onclick = async function () {
+      if (rec) { stopRecording(false); return; }
+      if (!root.navigator?.mediaDevices?.getUserMedia || !root.MediaRecorder) {
+        say(options.unsupportedText || 'Voice notes are not supported in this browser. You can send a written message.', 'error'); return;
+      }
+      record.disabled = true; say('Starting the microphone…');
+      var stream;
+      try {
+        stream = await root.navigator.mediaDevices.getUserMedia({ audio: true });
+        // Chrome/Firefox record webm or ogg; Safari and iPad record mp4.
+        var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(function (type) {
+          return !root.MediaRecorder.isTypeSupported || root.MediaRecorder.isTypeSupported(type);
+        });
+        var recorder = new root.MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 });
+        var r = rec = { recorder: recorder, stream: stream, chunks: [], bytes: 0, started: 0, peak: 0, cancelled: false, full: false };
+        recorder.ondataavailable = function (event) {
+          if (!event.data || !event.data.size) return;
+          r.chunks.push(event.data); r.bytes += event.data.size;
+          // Some browsers ignore the bitrate; stop before the note gets bigger than the server allows.
+          if (r.bytes > VOICE_SAFE_BYTES && recorder.state === 'recording') { r.full = true; recorder.stop(); }
+        };
+        recorder.onstop = async function () {
+          clearInterval(r.tick); if (r.stopMeter) r.stopMeter();
+          stream.getTracks().forEach(function (track) { track.stop(); });
+          rec = null; panel.hidden = true; meterBar.style.transform = 'scaleX(0)';
+          idle();
+          if (r.cancelled) { say(options.cancelledText || 'Recording cancelled. Nothing was sent.'); record.disabled = false; return; }
+          record.disabled = true;
+          try {
+            if (Date.now() - r.started < 700) throw new Error('That was too short. Press Record, speak, then press ' + stopLabel.replace(/^■\s*/, '') + '.');
+            var type = audioType(recorder.mimeType || (r.chunks[0] && r.chunks[0].type) || mime || 'audio/webm');
+            var blob = new Blob(r.chunks, { type: type });
+            if (!blob.size) throw new Error('Nothing was recorded. Check your microphone and try again.');
+            if (blob.size > VOICE_MAX_BYTES) throw new Error('That recording was too large. Please try a shorter note.');
+            say(options.busyText || 'Sending voice note…');
+            var voiceDataURL = await new Promise(function (resolve, reject) {
+              var reader = new FileReader(); reader.onload = function () { resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(blob);
+            });
+            say((await options.onRecorded(voiceDataURL)) || '', 'good');
+          } catch (error) { say(error.message || 'Voice note could not be sent.', 'error'); }
+          finally { record.disabled = false; }
+        };
+        recorder.start(1000);
+        r.started = Date.now();
+        record.dataset.recording = 'true'; record.disabled = false; record.textContent = stopLabel;
+        if (options.onStart) options.onStart();
+        panel.hidden = false; recTime.textContent = recClock(0);
+        say(options.recordingText || 'Recording now. Speak your note, then press Stop & send.');
+        r.stopMeter = startMeter(stream, function (level) {
+          if (level > r.peak) r.peak = level;
+          meterBar.style.transform = 'scaleX(' + level.toFixed(3) + ')';
+        });
+        meter.hidden = !r.stopMeter;
+        r.tick = setInterval(function () {
+          if (!(options.host || panel).isConnected) { stopRecording(true); return; } // the page re-drew: never leave the mic on
+          var elapsed = Date.now() - r.started;
+          recTime.textContent = recClock(elapsed);
+          if (r.stopMeter && elapsed > 3000 && r.peak < 0.03)
+            say('We can’t hear anything yet. Check that your microphone is on and not muted.', 'error');
+          if (elapsed >= VOICE_MAX_MS && recorder.state === 'recording') recorder.stop();
+        }, 250);
+      } catch (error) {
+        if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
+        rec = null; panel.hidden = true; record.disabled = false; idle();
+        say(error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : (options.failText || 'Could not start recording. You can send a written message.'), 'error');
+      }
+    };
+    return { button: record, panel: panel, cancel: function () { stopRecording(true); } };
+  }
+  // A big, clear button that plays recorded instructions. It loads the audio once, then can be
+  // played again as many times as the student likes. load() returns { voiceDataURL }.
+  function instructionPlayer(load, options) {
+    addConversationStyles();
+    options = options || {};
+    var wrap = el('div', null, 'instruction-voice');
+    var playText = options.label || '🔊 Listen to the instructions';
+    var button = el('button', playText, 'instruction-play'); button.type = 'button';
+    var status = el('span', null, 'instruction-status'); status.setAttribute('aria-live', 'polite');
+    var player = null, played = false, cantPlay = 'This recording was made on a different kind of device and can’t play here. Try opening it in Chrome or on a computer.';
+    function ready() { button.disabled = false; button.textContent = played ? '🔁 Listen again' : playText; button.setAttribute('aria-pressed', 'false'); }
+    button.onclick = async function () {
+      if (player && !player.paused) { player.pause(); player.currentTime = 0; ready(); return; }
+      button.disabled = true; status.textContent = '';
+      try {
+        if (!player) {
+          button.textContent = 'Loading…';
+          var audio = await load();
+          player = new root.Audio(); player.preload = 'auto';
+          var type = String(audio.voiceDataURL || '').slice(5).split(';')[0];
+          if (type && player.canPlayType && !player.canPlayType(type)) throw new Error(cantPlay);
+          player.onended = function () { played = true; ready(); };
+          player.onerror = function () { status.textContent = cantPlay; ready(); };
+          player.src = audio.voiceDataURL;
+        }
+        player.currentTime = 0;
+        await player.play();
+        button.disabled = false; button.textContent = '■ Stop'; button.setAttribute('aria-pressed', 'true');
+      } catch (error) {
+        if (error && error.message === cantPlay) player = null;
+        status.textContent = (error && error.name === 'NotAllowedError') ? 'Press the button again to play.' : (error && error.message) || 'The instructions could not play.';
+        ready();
+      }
+    };
+    wrap.append(button, status);
+    return wrap;
   }
   function conversation(options) {
     addConversationStyles();
@@ -319,16 +456,17 @@
     });
     var actions = el('div', null, 'conversation-actions');
     var sendText = el('button', 'Send message', 'conversation-send'); sendText.type = 'button';
-    var record = el('button', '🎙 Record voice note', 'conversation-record sec'); record.type = 'button';
+    // Same recorder as recorded instructions: red dot, MM:SS timer, sound meter, Cancel, 15 s / 100 KB limits.
+    var recorder = voiceRecorder({ feedback: feedback, tell: tell, host: box,
+      onStart: function () { sendText.disabled = true; },
+      onEnd: function () { sendText.disabled = false; },
+      onRecorded: async function (voiceDataURL) {
+        var typed = note.value.trim();
+        await send(typed ? { voiceDataURL: voiceDataURL, text: typed } : { voiceDataURL: voiceDataURL }, 'Voice note sent.');
+        note.value = ''; return 'Voice note sent.';
+      } });
+    var record = recorder.button, panel = recorder.panel;
     var hint = el('span', 'Enter to send · Shift+Enter for a new line', 'conversation-hint');
-    // Recording panel: pulsing red dot, time left, live sound meter, cancel.
-    var panel = el('div', null, 'conversation-recording'); panel.hidden = true;
-    var recLabel = el('span', 'Recording', 'rec-label'), recTime = el('span', recClock(0), 'rec-time');
-    recTime.setAttribute('role', 'timer');
-    var meter = el('span', null, 'rec-meter'), meterBar = el('span');
-    meter.append(meterBar); meter.setAttribute('aria-hidden', 'true');
-    var cancel = el('button', 'Cancel', 'sec conversation-cancel'); cancel.type = 'button';
-    panel.append(el('span', null, 'rec-dot'), recLabel, recTime, meter, cancel);
     async function send(payload, notice) {
       await options.send(Object.assign({ action: 'comment' }, payload));
       note.value = ''; fit();
@@ -343,82 +481,6 @@
       catch (error) { tell(error.message || 'Message could not be sent.', 'error'); }
       finally { sendText.disabled = false; }
     };
-    var rec = null;
-    function stopRecording(cancelled) {
-      if (!rec) return;
-      rec.cancelled = rec.cancelled || !!cancelled;
-      if (rec.recorder.state !== 'inactive') rec.recorder.stop();
-    }
-    cancel.onclick = function () { stopRecording(true); };
-    record.onclick = async function () {
-      if (rec) { stopRecording(false); return; }
-      if (!root.navigator?.mediaDevices?.getUserMedia || !root.MediaRecorder) {
-        tell('Voice notes are not supported in this browser. You can send a written message.', 'error'); return;
-      }
-      record.disabled = true; tell('Starting the microphone…');
-      var stream;
-      try {
-        stream = await root.navigator.mediaDevices.getUserMedia({ audio: true });
-        // Chrome/Firefox record webm or ogg; Safari and iPad record mp4.
-        var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(function (type) {
-          return !root.MediaRecorder.isTypeSupported || root.MediaRecorder.isTypeSupported(type);
-        });
-        var recorder = new root.MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 });
-        var r = rec = { recorder: recorder, stream: stream, chunks: [], bytes: 0, started: 0, peak: 0, cancelled: false, full: false };
-        recorder.ondataavailable = function (event) {
-          if (!event.data || !event.data.size) return;
-          r.chunks.push(event.data); r.bytes += event.data.size;
-          // Some browsers ignore the bitrate; stop before the note gets bigger than the server allows.
-          if (r.bytes > VOICE_SAFE_BYTES && recorder.state === 'recording') { r.full = true; recorder.stop(); }
-        };
-        recorder.onstop = async function () {
-          clearInterval(r.tick); if (r.stopMeter) r.stopMeter();
-          stream.getTracks().forEach(function (track) { track.stop(); });
-          rec = null; panel.hidden = true; meterBar.style.transform = 'scaleX(0)';
-          record.dataset.recording = 'false'; record.textContent = '🎙 Record voice note'; sendText.disabled = false;
-          if (r.cancelled) { tell('Recording cancelled. Nothing was sent.'); record.disabled = false; return; }
-          record.disabled = true;
-          try {
-            if (Date.now() - r.started < 700) throw new Error('That was too short. Press Record, speak, then press Stop & send.');
-            var type = audioType(recorder.mimeType || (r.chunks[0] && r.chunks[0].type) || mime || 'audio/webm');
-            var blob = new Blob(r.chunks, { type: type });
-            if (!blob.size) throw new Error('Nothing was recorded. Check your microphone and try again.');
-            if (blob.size > VOICE_MAX_BYTES) throw new Error('That recording was too large. Please try a shorter note.');
-            tell('Sending voice note…');
-            var voiceDataURL = await new Promise(function (resolve, reject) {
-              var reader = new FileReader(); reader.onload = function () { resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(blob);
-            });
-            var typed = note.value.trim();
-            await send(typed ? { voiceDataURL: voiceDataURL, text: typed } : { voiceDataURL: voiceDataURL }, 'Voice note sent.');
-            tell('Voice note sent.', 'good');
-          } catch (error) { tell(error.message || 'Voice note could not be sent.', 'error'); }
-          finally { record.disabled = false; }
-        };
-        recorder.start(1000);
-        r.started = Date.now();
-        record.dataset.recording = 'true'; record.disabled = false; record.textContent = '■ Stop & send'; sendText.disabled = true;
-        panel.hidden = false; recTime.textContent = recClock(0);
-        tell('Recording now. Speak your note, then press Stop & send.');
-        r.stopMeter = startMeter(stream, function (level) {
-          if (level > r.peak) r.peak = level;
-          meterBar.style.transform = 'scaleX(' + level.toFixed(3) + ')';
-        });
-        meter.hidden = !r.stopMeter;
-        r.tick = setInterval(function () {
-          if (!box.isConnected) { stopRecording(true); return; } // the page re-drew: never leave the mic on
-          var elapsed = Date.now() - r.started;
-          recTime.textContent = recClock(elapsed);
-          if (r.stopMeter && elapsed > 3000 && r.peak < 0.03)
-            tell('We can’t hear anything yet. Check that your microphone is on and not muted.', 'error');
-          if (elapsed >= VOICE_MAX_MS && recorder.state === 'recording') recorder.stop();
-        }, 250);
-      } catch (error) {
-        if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
-        rec = null; panel.hidden = true;
-        record.dataset.recording = 'false'; record.textContent = '🎙 Record voice note'; record.disabled = false; sendText.disabled = false;
-        tell(error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : 'Could not start recording. You can send a written message.', 'error');
-      }
-    };
     actions.append(record, hint, sendText); compose.append(note, actions, panel, feedback);
     content.append(compose); box.append(content);
     if (note.value) setTimeout(fit, 0);
@@ -427,7 +489,7 @@
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
     isStagingRuntime: function () { return isStagingRuntime; }, isAllowedRuntime: function () { return isStagingRuntime || isLiveRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
     dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
-    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts, dayLabel: dayLabel };
+    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts, dayLabel: dayLabel, voiceRecorder: voiceRecorder, instructionPlayer: instructionPlayer };
   if (root.document && root.document.head) addConversationStyles(); // "N new" tags can show before any notes box
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);
