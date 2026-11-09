@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<!-- Mishnayos Practice (issue #634) — built from the Posuk Practice Scroll, 2026-11-08 -->
+<!-- Mishnayos Practice (issue #634) — built from the Posuk Practice Scroll, 2026-11-08.
+     Issue #692: one recording per line (read + translate), drafts, one Submit, teacher grading.
+     The comprehension step moved to test-me.html (Mishnayos Test Me). -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1219,6 +1221,61 @@
     .translation-action-btn{ padding:7px 9px; }
   }
 
+  /* ---------- Issue #692: one record button per line ----------
+     The text box goes the full width of the card so each Hebrew line sits on
+     its own row. line-recorder.js shrinks the font until the longest line fits. */
+  body.lines-mode .wrap{ max-width:1240px; }
+  /* The text box now fills the page width, so the side margins the floating
+     Previous / Next arrows used are gone: put them in a row under the panel. */
+  body.lines-mode .posuk-nav-row{ display:flex; justify-content:space-between; gap:12px; margin:0 0 18px; }
+  body.lines-mode .nav-arrow,
+  body.lines-mode .nav-arrow:active{ position:static; transform:none; opacity:1; height:48px; padding:0 20px; font-size:1rem; }
+  body.lines-mode .nav-arrow:disabled{ opacity:.4; }
+  body.lines-mode .scroll:has(.lines-page){ position:static; max-height:none; overflow:visible; padding:18px 16px; }
+  .lines-page{ max-width:none; --line-size:30px; }
+  .lines-page .mishnah-body{ display:flex; flex-direction:column; gap:4px; }
+  .line-row{ display:flex; align-items:center; gap:10px; padding:2px 6px 2px 4px; border-radius:12px; border:2px solid transparent; }
+  .line-row .line-text{ flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; font-size:var(--line-size); line-height:1.6;
+    padding:2px 6px; border-radius:8px; background:rgba(255,255,255,.55); }
+  .line-row.wraps .line-text{ white-space:normal; overflow:visible; }
+  .line-row.recorded{ background:rgba(46,125,50,.08); border-color:rgba(46,125,50,.28); }
+  .line-row.recording{ background:rgba(198,40,40,.07); border-color:#c62828; }
+  .line-row.locked .line-text{ background:rgba(255,255,255,.35); }
+  .mishnah-letter.inline{ float:none; display:inline-flex; vertical-align:middle; margin:0 0 0 10px; font-size:.8em; }
+  .line-tools{ flex:0 0 auto; display:flex; gap:6px; align-items:center; direction:ltr; }
+  .line-rec,.line-play{ width:44px; height:44px; border-radius:50%; border:2px solid var(--gold); background:#fff; cursor:pointer;
+    font-size:1.15rem; line-height:1; display:inline-flex; align-items:center; justify-content:center; padding:0; position:relative;
+    box-shadow:0 2px 0 rgba(0,0,0,.12); }
+  .line-play{ width:38px; height:38px; font-size:.95rem; }
+  .line-rec.done::after{ content:'✓'; position:absolute; right:-4px; bottom:-4px; width:18px; height:18px; border-radius:50%;
+    background:#2e7d32; color:#fff; font-size:.7rem; font-weight:900; display:flex; align-items:center; justify-content:center; }
+  .line-rec.recording{ background:#c62828; border-color:#8e1b1b; color:#fff; animation:lineRecPulse 1.1s ease-in-out infinite; }
+  .line-rec:disabled,.line-play:disabled{ opacity:.4; cursor:not-allowed; animation:none; }
+  @keyframes lineRecPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(198,40,40,.45); } 50%{ box-shadow:0 0 0 8px rgba(198,40,40,0); } }
+  .line-panel{ background:rgba(255,255,255,.78); border:2px solid var(--gold); border-radius:16px; padding:14px 16px; margin:0 0 18px; text-align:center; }
+  .line-help{ font-weight:700; color:var(--ink-soft); margin-bottom:10px; }
+  .line-progress{ font-weight:800; margin:6px 0 4px; }
+  .line-progress-track{ height:8px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden; max-width:360px; margin:0 auto 10px; }
+  .line-progress-bar{ height:100%; width:0; background:#2e7d32; transition:width .25s; }
+  .line-status{ border-radius:12px; padding:10px 14px; margin-bottom:10px; font-weight:700; background:#f3efe2; }
+  .line-status.waiting{ background:#fff7dc; border:1.5px solid #f0d27a; }
+  .line-status.gold{ background:#fff3c4; border:1.5px solid var(--gold); }
+  .line-status.retry{ background:#fdecec; border:1.5px solid #f3b0b0; }
+  .teacher-comment{ font-style:italic; font-weight:600; }
+  .grade-detail{ font-weight:600; color:var(--ink-soft); }
+  .notice-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; align-items:center; justify-content:center; padding:16px; }
+  .notice-backdrop.show{ display:flex; }
+  .notice-card{ background:var(--parchment); border:3px solid var(--gold); border-radius:20px; padding:24px 22px; max-width:420px; width:100%; text-align:center; box-shadow:0 12px 40px var(--shadow); }
+  .notice-card h2{ font-family:'Frank Ruhl Libre',serif; margin:0 0 6px; }
+  .notice-points{ font-size:2rem; font-weight:900; color:#2e7d32; margin:8px 0; }
+  .notice-list{ list-style:none; padding:0; margin:8px 0; font-weight:700; }
+  .notice-small{ font-size:.85rem; color:var(--ink-soft); }
+  @media (max-width:620px){
+    body.lines-mode .scroll:has(.lines-page){ padding:12px 8px; }
+    .line-row{ gap:6px; padding:2px; }
+    .line-rec{ width:40px; height:40px; }
+    .line-play{ width:34px; height:34px; }
+  }
 </style>
 <script src="../paid-api.js?v=20261108-mishnayos"></script>
 <script defer src="../gallery-share.js?v=20261022-pointer2"></script>
@@ -1228,7 +1285,7 @@
 
   <header class="top">
     <h1>📖 Mishnayos Practice</h1>
-    <p>Read the Mishnah. Translate it. Show you understand it!</p>
+    <p>Record each line: read it, then say what it means.</p>
   </header>
 
   <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
@@ -1288,6 +1345,19 @@
 
     <div id="recordingArea" class="hidden">
 
+      <!-- Issue #692: one recording per line, saved as a draft, then one Submit. -->
+      <div class="line-panel hidden" id="lineRecorder">
+        <div class="line-status hidden" id="lineStatus"></div>
+        <div class="line-help" id="lineHelp">Tap 🎙️ next to a line. Read the line, then say what it means. Tap ⏹ when you finish. Your recordings are saved, so you can come back later.</div>
+        <div class="line-progress" id="lineCount"></div>
+        <div class="line-progress-track"><div class="line-progress-bar" id="lineCountBar"></div></div>
+        <button class="btn gold" id="submitMishnaBtn" type="button" disabled>📤 Submit to my teacher</button>
+        <div class="msg" id="submitMsg"></div>
+      </div>
+
+      <!-- The old Read / Translate / Understand steps. Hidden: the page now
+           records line by line, and Understand moved to Mishnayos Test Me. -->
+      <div id="legacyTasks" style="display:none" aria-hidden="true">
       <!-- Tab switcher: only one task shown at a time. Each recording is
            graded and saved automatically — there is no separate "Save"
            step. A checkmark appears on a tab once that task has been
@@ -1444,12 +1514,14 @@
         </div>
       </div>
 
+      </div><!-- /legacyTasks -->
+
       <div class="save-row posuk-nav-row">
         <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous part">◀️ Previous</button>
         <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next part">Next ▶️</button>
       </div>
 
-      <div class="history">
+      <div class="history" style="display:none" aria-hidden="true">
         <button class="history-toggle" id="historyToggleBtn" type="button" aria-expanded="false" aria-controls="historyBody">
           <span>📈 See my past tries</span><span class="chevron">⌄</span>
         </button>
@@ -1462,6 +1534,13 @@
   </div>
 
   <footer class="who">Nigri Shluchim Online School · Mishnayos · Text: Sefaria (Torat Emet)</footer>
+</div>
+
+<div class="notice-backdrop" id="noticeModal" role="dialog" aria-modal="true">
+  <div class="notice-card">
+    <div id="noticeBody"></div>
+    <button class="btn gold" id="noticeOkBtn" type="button">OK</button>
+  </div>
 </div>
 
 <!-- Firebase SDKs -->
@@ -2468,6 +2547,8 @@ function enterApp(){
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
   });
+  // "Sent, +5 points" and "your teacher graded it" messages.
+  if(window.MishnayosLines) window.MishnayosLines.startNotices();
   // Nothing is selectable until we know which class's practice window applies.
   practiceScopeReady = false;
   rebuildPerekOptionsForClassLimit();
@@ -2519,9 +2600,9 @@ function applyDeepLinkFromURL(){
   const perekParam = parseInt(params.get('perek'));
   const posukParam = parseInt(params.get('posuk'));
   const endPosukParam = parseInt(params.get('endPosuk'));
-  const requestedTab = ['reading','translate','comprehension'].includes(params.get('tab'))
-    ? params.get('tab')
-    : null;
+  // Understand moved to Mishnayos Test Me (issue #692).
+  if(params.get('tab') === 'comprehension'){ location.replace('test-me.html' + location.search); return; }
+  const requestedTab = null;
   const s=validSefer(params.get('sefer')||DEFAULT_SEFER);
   if(s!==selectedSefer){seferSelect.value=s;if(seferSelect.value!==s)return;seferSelect.onchange();}
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
@@ -2686,11 +2767,23 @@ function perekAllowedByClassLimit(p,s=selectedSefer){
   return chumashPosition(s,p,999)>=chumashPosition(l.startSefer,l.startPerek,l.startPosuk)
     &&chumashPosition(s,p,1)<=chumashPosition(l.endSefer,l.endPerek,l.endPosuk);
 }
+// Teachers still set the practice window in parts (a long mishna has
+// several). A whole mishna is open when its first part is open.
+function limitPartNumber(perekNum, mishnahNum){
+  const perek = MISHNAYOS_DATA && MISHNAYOS_DATA.perakim[perekNum - 1];
+  if(!perek) return mishnahNum;
+  let n = 0;
+  for(const m of perek.mishnayos){
+    if(m.mishnah === mishnahNum) return n + 1;
+    n += (m.sections && m.sections.length) || 1;
+  }
+  return mishnahNum;
+}
 function isWithinClassPracticeLimit(p,v,s=selectedSefer){
   if(!practiceScopeReady)return false;
   if(!classPracticeLimit)return !ownClassSpace;
   if(classPracticeLimit.closed)return false;
-  const l=classPracticeLimit,k=chumashPosition(s,p,v);
+  const l=classPracticeLimit,k=chumashPosition(s,p,limitPartNumber(p,v));
   return k>=chumashPosition(l.startSefer,l.startPerek,l.startPosuk)
     &&k<=chumashPosition(l.endSefer,l.endPerek,l.endPosuk);
 }
@@ -2880,8 +2973,6 @@ perekSelect.onchange = async () => {
   resetScroll();
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
-  warmTranslationServices();
-  warmQuestionGradingService();
   fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
   fetchClassroomReferenceChapter(perekNum).catch(err => console.error('Classroom reference prefetch failed', err));
   fetchKehotChapterTranslation(perekNum).catch(err => console.error('Kehot comprehension reference prefetch failed', err));
@@ -2946,9 +3037,6 @@ async function loadSelectedPesukim(){
       return;
     }
   }
-  wakeScorer();
-  warmTranslationServices();
-  warmQuestionGradingService();
   document.getElementById('fetchMsg').textContent = 'Loading the Mishnah…';
   try{
     const [pesukim, translations] = await Promise.all([
@@ -3119,7 +3207,8 @@ function sectionsForPerek(data, perekNum){
   const perek = data.perakim[perekNum - 1];
   const out = [];
   (perek ? perek.mishnayos : []).forEach(m => {
-    (m.sections || [[0, m.lines.length]]).forEach(([start, end], i, all) => {
+    // Issue #692: the whole mishna is one step (one record button per line).
+    [[0, m.lines.length]].forEach(([start, end], i, all) => {
       out.push({ mishnah: m.mishnah, part: i + 1, partsCount: all.length,
         lines: m.lines.slice(start, end), mishnahLines: m.lines, startLine: start, endLine: end });
     });
@@ -3185,6 +3274,7 @@ function abbreviateShaimos(text){
 }
 
 function resetScroll(){
+  if(window.MishnayosLines) window.MishnayosLines.close();
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
@@ -3262,27 +3352,13 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
 
   document.getElementById('scrollPlaceholder').classList.add('hidden');
   const textEl = document.getElementById('posukText');
-  textEl.innerHTML = mishnahPageHtml(perekNum, posukNum);
   textEl.classList.remove('hidden');
-  // Bring the lit-up lines into view inside the scroll box.
-  // Runs twice: once after layout, once after the Hebrew web font settles.
-  const scrollToCurrent = () => {
-    const box = document.getElementById('scrollBox');
-    const firstCurrent = textEl.querySelector('.mishnah-line.current');
-    const info = sectionInfo(perekNum, posukNum);
-    if(!box || !firstCurrent || currentPosukNum !== posukNum) return;
-    box.scrollTop = (info && info.startLine > 0)
-      ? Math.max(0, box.scrollTop + firstCurrent.getBoundingClientRect().top - box.getBoundingClientRect().top - 70)
-      : 0;
-  };
-  setTimeout(scrollToCurrent, 120);
-  setTimeout(scrollToCurrent, 700);
   document.getElementById('scrollBox').classList.toggle('range-selection', isRange);
   document.getElementById('recordingArea').classList.remove('hidden');
   collapseSelectionPicker();
   updateNavArrows();
-  resetRecordingUI();
-  loadHistory();
+  // Issue #692: every line on its own row with its own record button.
+  window.MishnayosLines.open(perekNum, sectionInfo(perekNum, posukNum));
 }
 
 /* ---------- Tab switching ----------
@@ -6496,6 +6572,7 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
+<script src="line-recorder.js?v=20261109-692"></script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
 </html>

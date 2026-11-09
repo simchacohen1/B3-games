@@ -13,6 +13,7 @@ async function canReadMedia(db,identity,path){
   else if(parts[0]==='posukPractice'&&parts.length>=3)ownerId=parts[1];
   else if(parts[0]==='shorashimLearning'&&parts[1]==='students'&&parts[2])ownerId=parts[2];
   else if(parts[0]==='shorashim-recordings'&&parts[1])ownerId=parts[1];
+  else if(parts[0]==='mishnayosSubmitted'&&parts[1]&&parts.length>=3)ownerId=parts[1];
   else if(parts[0]==='classGallery'&&parts.length>=5){classId=parts[1];ownerId=parts[2];galleryPostId=parts[3];}
   else return false;
   if(isStudent){
