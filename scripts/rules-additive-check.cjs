@@ -15,6 +15,9 @@ const ALLOWED_NEW = [
   // Not Pointer: already on main since a804b7e (2026-10-11, owner) but never published to the live database.
   // Approved by the owner on 2026-10-18 to go live together with the Pointer additive step.
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'halachaAccess'],
+  // Issue #611 (PENDING OWNER REVIEW): per-teacher Shorashim libraries. New, private node only:
+  // each teacher reads/writes only their own uid; owner and active admins may read/write any.
+  ['shorashimLibraries'],
   // Issue #634 Mishnayos Practice: copies of the Posuk Practice rules for the new tool's own data,
   // plus a teacher-only answer key. Requested by the owner 2026-11-08; the owner reviews these on
   // the PR, and they go live only with a separately approved rules deploy.

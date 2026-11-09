@@ -915,6 +915,16 @@
       "path": "/tentTrailTrivia",
       "permission": ".write",
       "expression": true
+    },
+    {
+      "path": "/shorashimLibraries/$uid",
+      "permission": ".read",
+      "expression": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))"
+    },
+    {
+      "path": "/shorashimLibraries/$uid",
+      "permission": ".write",
+      "expression": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))"
     }
   ]
 }

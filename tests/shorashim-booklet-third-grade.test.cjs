@@ -12,6 +12,7 @@ const review=fs.readFileSync('shorashim/review-categories.js','utf8');
 const imported=fs.readFileSync('shorashim/booklet-3rd-grade.js','utf8');
 const globals={window:{}};
 vm.runInNewContext(imported,globals);
+globals.window.B3ShorashimUnits=require('../shorashim/units.js');
 const cards=globals.window.FTT_BOOKLET_SHORASHIM;
 // app.js is cache-busted on every release; require a build label dated on or after this feature.
 const appBuildDate=()=>{const m=html.match(/<script src="app\.js\?v=(\d{8})[^"]*"><\/script>/);assert.ok(m,'app.js is loaded with a dated cache-bust label');return Number(m[1]);};
@@ -28,10 +29,9 @@ const newContext=(overrides={})=>{
     isStudentAvailable:item=>!!item&&!item.hidden,
     keyFor:(track,id)=>track+':'+id,
     splitKey:key=>key.split(':'),
-    itemPerek:item=>item?.bookletWeek?0:Number(item?.perek)||18,
     ...overrides
   });
-  ['bookletCatalog','getItem','visibleCatalog','learningCatalog','nextLearningUncreated'].forEach(name=>vm.runInContext(fn(name),ctx));
+  ['bookletCatalog','getItem','visibleCatalog','learningCatalog','nextLearningUncreated','unitKeyOf','unitLabels','studentUnits','currentLearningUnit'].forEach(name=>vm.runInContext(fn(name),ctx));
   return {ctx,s};
 };
 
@@ -64,9 +64,9 @@ test('booklet words never mingle with Perek 18 and Perek 19 lists',()=>{
   assert.equal(ctx.nextLearningUncreated().id,'booklet-3rd-w30-1');
   ctx.bookletWeek='all';
   assert.equal(ctx.learningCatalog().length,180);
-  ctx.learningPerek=18;
+  ctx.learningPerek='perek:18';
   assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['p18']);
-  ctx.learningPerek=19;
+  ctx.learningPerek='perek:19';
   assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['p19']);
   assert.equal(ctx.getItem('shorashim:p18').front,'Other');
   assert.equal(ctx.getItem('prefix:booklet-3rd-w01-1'),null);
@@ -84,15 +84,18 @@ test('booklet allows any chosen week and preserves student word progression',()=
   assert.equal(ctx.learningCatalog().filter(x=>s.cards['shorashim:'+x.id]?.learnedAt).length,1);
 });
 
-test('three-choice UI, week dropdown, source load order and review filter are wired',()=>{
-  for(const x of ['18','19','booklet'])assert.match(html,new RegExp('data-learning-perek="'+x+'"'));
+test('unit choices are generated, booklet tile, week dropdown, source load order and review filter are wired',()=>{
+  assert.match(html,/data-learning-perek="booklet"/);
+  assert.match(html,/id="perekUnitChoices"/);
+  assert.doesNotMatch(html,/data-learning-perek="1[89]"|data-review-perek="1[89]"/,'no hardcoded perakim in the student page');
+  assert.ok(html.indexOf('units.js?v=')>0&&html.indexOf('units.js?v=')<html.indexOf('app.js?v='));
   assert.match(html,/id="bookletWeekSelect"/);
   for(let n=1;n<=30;n++)assert.match(html,new RegExp('<option value="'+n+'">Week '+n+'</option>'));
   assert.match(html,/data-review-perek="booklet"/);
   assert.match(html,/Change List/);
   assert.ok(html.indexOf('app.js?v=')>0&&html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the booklet release');
-  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261108-bulk-delete-1'));
+  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261109-units-bulk-delete'));
   assert.match(review,/reviewPerekFilter === 'booklet'/);
   assert.match(teacher,/window\.FTT_BOOKLET_SHORASHIM\.find/);
   assert.doesNotMatch(app,/\`\$\{learningPerek/);
