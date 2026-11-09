@@ -41,8 +41,12 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     if(!bearer)return res.status(401).json({error:'Sign-in required.'});
     if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId))return res.status(400).json({error:'Invalid class.'});
     const identity=await admin.auth().verifyIdToken(bearer,true),db=admin.database();
-    const [cls,member,teacher,adminRow]=await Promise.all([
-      db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get(),
+    // Read only the class's small active/name fields, never the whole class
+    // record: it also holds every member and this class's gallery posts, so a
+    // whole-record read on each 20-second poll defeated the version check below.
+    const [clsActive,clsName,member,teacher,adminRow]=await Promise.all([
+      db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/active`).get(),
+      db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/name`).get(),
       identity.b3StudentRole==='student'&&identity.b3ClassId===classId?db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${identity.b3StudentId}`).get():Promise.resolve(null),
       db.ref(`b3Games/workspaces/b3-2026/teachers/${identity.uid}`).get(),
       db.ref(`b3Games/admins/${identity.uid}/active`).get()
@@ -51,7 +55,8 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     const isTeacher=identity.firebase?.sign_in_provider==='google.com'&&teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true;
     const isMember=identity.b3StudentRole==='student'&&identity.b3ClassId===classId&&member?.exists()&&member.child('active').val()!==false;
     const allowed=owner||adminRow.val()===true||isMember||isTeacher;
-    if(!allowed||!cls.exists()||cls.child('active').val()===false)return res.status(403).json({error:'Active class access required.'});
+    const classExists=clsActive.exists()||clsName.exists();
+    if(!allowed||!classExists||clsActive.val()===false)return res.status(403).json({error:'Active class access required.'});
     const legacy=['et','wt'].includes(classId),path=legacy?'classGallery/posts':`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts`;
     // Version check: one tiny read tells us whether any post in this class changed
     // since the browser's last full load. Read it BEFORE the posts so a write that
