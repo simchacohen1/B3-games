@@ -18,7 +18,7 @@ test('screen requests do not add a dialog over whiteboard or activity',()=>{
   const activity=read('activity-share.js');
   for(const old of ['fttShareRequestOverlay','routeTeacherRequest','Open Sharing Window'])assert.ok(!activity.includes(old));
   assert.ok(activity.includes("holder.style.display=active?'flex':'none'"));
-  assert.ok(activity.includes("btn.addEventListener('click',beginShare)"));
+  assert.ok(activity.includes("btn.addEventListener('click',shareClick)"));
 });
 
 test('whiteboard denial remains enforced by authenticated teacher mode',()=>{
