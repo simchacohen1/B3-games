@@ -191,10 +191,17 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   .home-intro h1{font-size:23px}
   .home-card{padding:16px}
 }
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.filter-bar span.filter-label{font-size:13px;font-weight:800;color:var(--muted);margin-right:4px}
+.filter-chip{display:inline-flex;align-items:center;border:1.5px solid var(--border);border-radius:20px;padding:5px 13px;font-size:13px;font-weight:700;background:#fff;color:var(--navy);cursor:pointer;transition:background .12s,border-color .12s}
+.filter-chip:hover{background:var(--bg);border-color:var(--blue)}
+.filter-chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.filter-section{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 </style></head><body>
 <header><strong>📚 My Homework</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
 <main>
 <div id="status" class="card muted">Loading your homework…</div>
+<div id="filterBar" class="filter-bar" hidden></div>
 <div id="list"></div>
 </main>
 <script src="../firebase-config.js"></script>
@@ -206,6 +213,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 (function(){'use strict';
 var H=window.HomeworkCommon,HI=window.HomeworkItems,el=H.el;
 var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
+var filterBar=document.getElementById('filterBar');
+var activeFilters={subject:null,time:null,done:null};
 if(!H.isAllowedRuntime()){statusBox.textContent='Homework is not available on this site.';return}
 function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
 var auth={studentId:ss('b3Games_studentId'),studentName:ss('b3Games_studentName'),pin:ss('b3Games_classPin'),classId:ss('b3Games_studentClass')};
@@ -223,6 +232,46 @@ function clearLocal(id){try{sessionStorage.removeItem(draftKey(id))}catch(e){}}
 function call(body){return H.call(Object.assign({},auth,body))}
 
 var lastData=null,tabApi={},earlierOpen=false;
+// Filter chips: subject, due today / this week, done / not done. Chips combine; tap again to turn one off.
+function isDone(a){return a.status==='submitted'||a.status==='approved'}
+function startOfDay(t){var d=new Date(t);d.setHours(0,0,0,0);return d.getTime()}
+function dueMatches(a,time){
+  if(a.dueAt==null)return false;
+  var today=startOfDay(Date.now()),day=new Date(today);
+  if(time==='today'){day.setDate(day.getDate()+1);return a.dueAt>=today&&a.dueAt<day.getTime()}
+  day.setDate(day.getDate()-day.getDay());var weekStart=day.getTime();day.setDate(day.getDate()+7); // Sunday to Shabbos
+  return a.dueAt>=weekStart&&a.dueAt<day.getTime();
+}
+function subjectKey(s){return String(s||'').trim().toLowerCase()} // "Chumash" and "chumash" are one subject
+function applyFilters(list){
+  return list.filter(function(a){
+    if(activeFilters.subject&&subjectKey(a.subject)!==activeFilters.subject)return false;
+    if(activeFilters.time&&!dueMatches(a,activeFilters.time))return false;
+    if(activeFilters.done==='done'&&!isDone(a))return false;
+    if(activeFilters.done==='notdone'&&isDone(a))return false;
+    return true;
+  });
+}
+function filtering(){return !!(activeFilters.subject||activeFilters.time||activeFilters.done)}
+function buildFilterBar(list){
+  filterBar.replaceChildren();
+  var seen={},subjects=[];list.forEach(function(a){var k=subjectKey(a.subject);if(k&&!seen[k]){seen[k]=1;subjects.push({key:k,name:a.subject.trim()})}});
+  subjects.sort(function(x,y){return x.key<y.key?-1:x.key>y.key?1:0});
+  if(activeFilters.subject&&!seen[activeFilters.subject])activeFilters.subject=null; // that subject is gone now
+  filterBar.hidden=!list.length;if(!list.length)return;
+  function chip(text,kind,value){
+    var b=el('button',text,'filter-chip'+(activeFilters[kind]===value?' on':''));b.type='button';
+    b.setAttribute('aria-pressed',activeFilters[kind]===value?'true':'false');
+    b.onclick=function(){activeFilters[kind]=activeFilters[kind]===value?null:value;render(lastData)};
+    return b;
+  }
+  function section(label,chips){var sec=el('div',null,'filter-section');sec.append(el('span',label,'filter-label'));chips.forEach(function(c){sec.append(c)});filterBar.append(sec)}
+  filterBar.setAttribute('role','group');filterBar.setAttribute('aria-label','Filter homework');
+  if(subjects.length)section('Subject',subjects.map(function(x){return chip(x.name,'subject',x.key)}));
+  section('Due',[chip('Today','time','today'),chip('This week','time','week')]);
+  section('Show',[chip('Not done','done','notdone'),chip('Done','done','done')]);
+  if(filtering()){var clear=el('button','✕ Clear filters','filter-chip');clear.type='button';clear.onclick=function(){activeFilters={subject:null,time:null,done:null};render(lastData)};filterBar.append(clear)}
+}
 // Messages tab (#647): one-on-one chats with my teachers and the principal.
 var Msgs=window.HomeworkMessages.create({role:'student',call:call,
   who:function(c){return {teacherId:c.id}},
@@ -235,12 +284,13 @@ function render(data){
   listBox.replaceChildren();
   statusBox.style.display='none';
   var intro=el('div',null,'home-intro');intro.append(el('h1','Hi, '+auth.studentName+'! 🌟'),el('p',!data.assignments.length?'No homework for you right now. Enjoy your free time!':data.openCount?'Here’s what you can work on today.':'You finished everything. Great job! 🎉'));listBox.append(intro);
-  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];data.assignments.forEach(function(a){groups[{todo:0,handed:1,finished:2}[bucketOf(a)]].items.push(a)});
+  buildFilterBar(data.assignments);listBox.append(filterBar);
+  var groups=[{id:'todo',name:'To Do',items:[]},{id:'handed',name:'Handed In',items:[]},{id:'finished',name:'Finished',items:[]}];applyFilters(data.assignments).forEach(function(a){groups[{todo:0,handed:1,finished:2}[bucketOf(a)]].items.push(a)});
   // The chosen tab survives every refresh (sending a note, coming back to the page, handing in).
   var tabs=el('div',null,'home-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','My homework');var sections=el('div'),tabIcons={todo:'📌 ',handed:'📬 ',finished:'🏆 ',messages:'💬 '},buttons=[];tabApi={};
   function select(id,focus){if(activeTab==='messages'&&id!=='messages')Msgs.hide();activeTab=id;buttons.forEach(function(t){var on=t.dataset.tab===id;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;if(on&&focus)t.focus()});sections.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=p.id!=='section-'+id});if(id==='messages')Msgs.show()}
   function addTab(id,label,pane,fresh){var b=el('button',label,'tab-'+id);b.type='button';b.dataset.tab=id;b.id='tab-'+id;b.setAttribute('role','tab');b.setAttribute('aria-controls','section-'+id);if(fresh)b.append(el('span','💬 '+fresh+' new','tab-new'));pane.id='section-'+id;pane.dataset.tab=id;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby','tab-'+id);b.onclick=function(){select(id)};buttons.push(b);tabs.append(b);sections.append(pane)}
-  groups.forEach(function(g){var pane=el('section',null,'home-section');pane.append(el('h2',g.name));if(!g.items.length){var empty=g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});
+  groups.forEach(function(g){var pane=el('section',null,'home-section');pane.append(el('h2',g.name));if(!g.items.length){var empty=filtering()?'No homework here matches your filters.':g.id==='todo'?'All done for now! 🎉 Check back when your teacher adds homework.':g.id==='handed'?'You haven’t handed anything in yet. Work you hand in will show up here.':'Finished homework and teacher comments will show up here.';pane.append(el('div',empty,'card muted'))}g.items.forEach(function(a){pane.append(card(a))});
     var fresh=g.items.reduce(function(n,a){return n+H.unreadCount(a.messages,'student')},0);addTab(g.id,(tabIcons[g.id]||'')+g.name+' · '+g.items.length,pane,fresh)});
   var mpane=el('section',null,'home-section');mpane.append(el('h2','Messages'),Msgs.root);
   // Messages from before one-on-one chats (one thread shared by all class teachers) stay readable here.
@@ -258,6 +308,7 @@ function render(data){
 function focusAssignment(id){
   var a=lastData&&lastData.assignments.find(function(x){return x.id===id});
   if(!a){alert('That homework is no longer on your list.');return}
+  if(!applyFilters([a]).length){activeFilters={subject:null,time:null,done:null};render(lastData)} // hidden by a filter: show everything
   openCards[id]=1;tabApi.select(bucketOf(a));
   var d=document.querySelector('[data-assignment-card="'+id+'"]');if(!d)return;
   d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});d.classList.remove('hw-flash');void d.offsetWidth;d.classList.add('hw-flash');
@@ -272,7 +323,7 @@ function generalPanel(messages){
   return c;
 }
 // Each homework is one short row (title + status). Tap it to open the full card.
-var openCards={};
+var openCards={},typedMins={}; // typedMins keeps unsaved minutes when the list redraws (e.g. a filter chip is tapped)
 function card(a){
   var body=cardBody(a),bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';
   var d=el('details',null,'card home-card home-fold '+bucket),sum=el('summary',null,'fold-sum');d.setAttribute('data-assignment-card',a.id);
@@ -290,6 +341,7 @@ function cardBody(a){
   var stateLabel=a.status==='approved'?'Finished! 🌟':a.status==='submitted'?'Handed in — teacher will check it':a.status==='returned'?'Try again — see teacher note':a.status==='in_progress'?'Started — keep going':'Ready to start';
   var b=el('span',stateLabel,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
   meta.append(b,el('span',H.TYPES[a.type]||a.type,'badge'));
+  if(a.subject)meta.append(el('span',a.subject,'badge'));
   if(a.dueAt!=null)meta.append(el('span',(a.late?'Late – was due ':'Due ')+H.when(a.dueAt),'badge'+(a.late?' late':'')));
   if(a.assignedAt!=null)meta.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
   c.append(meta);
@@ -318,7 +370,7 @@ function cardBody(a){
   var mins=null;
   if(a.targetUnit==='minutes'){
     c.append(el('label','Minutes I practiced'));
-    mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
+    mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=typedMins[a.id]!=null?typedMins[a.id]:a.progress||0;mins.addEventListener('input',function(){typedMins[a.id]=mins.value});c.append(mins);
   }
   c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':hasItems?'✏️ Anything to tell your teacher? (optional once every item is done)':'✏️ Tell your teacher what you did'));
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
@@ -334,7 +386,7 @@ function cardBody(a){
   };
   sub.onclick=async function(){
     sub.disabled=true;save.disabled=true;sub.textContent='Handing in…';
-    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);delete openCards[a.id];
+    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);delete openCards[a.id];delete typedMins[a.id];
       // Follow the homework to the Handed In tab so it does not just vanish from To Do.
       activeTab='handed';flash='📬 “'+a.title+'” is handed in. Your teacher will check it soon.';await refresh();}
     catch(e){say(msg,e.message);sub.disabled=false;save.disabled=false;sub.textContent=a.status==='returned'?'Fix and Hand In Again':'Hand In Homework';if(e.status===400)ta.focus()}
