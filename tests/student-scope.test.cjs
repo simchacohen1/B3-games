@@ -61,8 +61,21 @@ test('database helpers write only schoolId, classIds and updatedAt under the stu
   assert.deepEqual(writes[0], { 'b3Games/workspaces/b3-2026/students/s1/schoolId': 'negri', 'b3Games/workspaces/b3-2026/students/s1/classIds': { c1: true }, 'b3Games/workspaces/b3-2026/students/s1/updatedAt': 9 });
   assert.deepEqual(writes[1], { 'b3Games/workspaces/b3-2026/students/s1/classIds/c2': null, 'b3Games/workspaces/b3-2026/students/s1/updatedAt': 10 });
   await assert.rejects(S.setStudentClass(db, 'b3-2026', 's1', '../x', true, 1));
-  assert.deepEqual(await S.getStudentClassIds(db, 'b3-2026', 's1', 'et'), ['c1']);
   assert.deepEqual(await S.getStudentClassIds(null, 'b3-2026', 's1', 'et'), ['et']);
+});
+
+test('student classes come from the authoritative memberships, not the owner copy', async () => {
+  const data = {
+    'b3Games/students/s1/memberships': { a: { workspaceId: 'b3-2026', classId: 'c1', active: true }, b: { workspaceId: 'b3-2026', classId: 'c2', active: true }, c: { workspaceId: 'b3-2026', classId: 'c3', active: false }, d: { workspaceId: 'other', classId: 'c4', active: true } },
+    'b3Games/students/s2/memberships': { a: { workspaceId: 'b3-2026', classId: 'et', active: false } },
+    'b3Games/workspaces/b3-2026/students/s1': { classIds: { stale: true } }
+  };
+  const reads = [];
+  const db = { ref: p => ({ once: async () => { reads.push(p); return { val: () => data[p] || null }; } }) };
+  assert.deepEqual(await S.getStudentClassIds(db, 'b3-2026', 's1', 'et'), ['c1', 'c2']);
+  assert.ok(!reads.includes('b3Games/workspaces/b3-2026/students/s1'));
+  assert.deepEqual(await S.getStudentClassIds(db, 'b3-2026', 's2', 'et'), [], 'removed on purpose stays removed');
+  assert.deepEqual(await S.getStudentClassIds(db, 'b3-2026', 'new', 'et'), ['et']);
 });
 
 test('owner panel and sign-in wiring', () => {
