@@ -22,5 +22,5 @@ test('words with no ticked picture and no suggestions get free suggestions, neve
 test('the paid Regenerate Pictures request is removed (issue #627)',()=>{
  assert.equal(js.includes('New picture suggestions use separate OpenAI API credits.'),false);
  assert.equal(js.includes('regeneratePictures'),false);
- assert.match(html,/teacher\.js\?v=20261107-pictures-1/);
+ assert.match(html,/teacher\.js\?v=20261109-pictures-2/);
 });

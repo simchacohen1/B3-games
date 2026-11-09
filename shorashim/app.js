@@ -16,6 +16,8 @@ const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
 // Every other class gets its own separate lists, students and leaderboards
 // under classes/<classId>, and starts empty until its teacher adds words.
 let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
+// Students see only ticked pictures, read from their own class space (CLOUD_ROOT/pictures).
+if(window.B3ShorashimPictures)window.B3ShorashimPictures.setClassSpace(()=>CLOUD_ROOT);
 let classSpaceId = '', resolvedStudentClassId='';
 const LEGACY_CLASS_IDS = ['et','wt'];
 function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}

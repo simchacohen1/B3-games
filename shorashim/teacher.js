@@ -7,9 +7,34 @@ const CLASS_ID=(new URLSearchParams(location.search).get('class')||'').trim();
 const LEGACY_CLASS_IDS=['et','wt'];
 const CLASS_MODE=!!CLASS_ID&&!LEGACY_CLASS_IDS.includes(CLASS_ID);
 // Firebase drops empty lists, so a brand-new class may come back with no tracks at all.
-function withAllTracks(c){c=c||{};['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
+function withAllTracks(c){c=c||{};noteTickedTeacherPictures(c);['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
 const CLASS_ID_VALID=/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID);
 const SPACE=CLASS_MODE&&CLASS_ID_VALID?`${ROOT}/classes/${CLASS_ID}`:ROOT;
+// Students read only the copies of ticked pictures kept in this class (SPACE/pictures).
+// A teacher's own added pictures stay private to that teacher.
+window.B3ShorashimPictures.setClassSpace(SPACE);
+// Ticked added pictures seen in the class word list since this page loaded. On each save,
+// pictures no longer ticked lose their class copy; newly ticked ones get one.
+const knownTickedTeacherPictures=new Set(),classPictureCopied=new Set(),classPictureRemoved=new Set();
+function noteTickedTeacherPictures(catalog){
+  window.B3ShorashimPictures.tickedTeacherPictures(catalog).forEach(v=>knownTickedTeacherPictures.add(v));
+}
+async function syncClassPictures(){
+  const P=window.B3ShorashimPictures,ticked=P.tickedTeacherPictures(state.catalog);
+  const candidates=new Set([...knownTickedTeacherPictures,...P.mentionedTeacherPictures(state.catalog)]);
+  const stale=[...candidates].filter(v=>!ticked.has(v)&&!classPictureRemoved.has(v));
+  const missing=[...ticked].filter(v=>!classPictureCopied.has(v));
+  const problems=[];
+  await Promise.all([
+    ...stale.map(v=>P.unpublishFromClass(v).then(()=>{classPictureRemoved.add(v);classPictureCopied.delete(v);knownTickedTeacherPictures.delete(v);})
+      .catch(err=>{console.warn('Could not remove a picture from the class',err);problems.push(err);})),
+    // Ticked pictures copied in from a library or another class get their class copy here.
+    ...missing.map(v=>P.publishToClass(v).then(()=>{classPictureCopied.add(v);classPictureRemoved.delete(v);})
+      .catch(err=>console.warn('Ticked picture is not available to students yet',err)))
+  ]);
+  ticked.forEach(v=>knownTickedTeacherPictures.add(v));
+  if(problems.length)throw problems[0];
+}
 let activeTeacherAccess=null,isSiteAdmin=false,activeLegacyClassScope='',scopedStudentIds=[];
 const legacyScoped=()=>!!activeLegacyClassScope&&!isSiteAdmin;
 const teacherSettingsPath=()=>legacyScoped()?`${ROOT}/classes/${activeLegacyClassScope}/settings`:`${SPACE}/settings`;
@@ -649,7 +674,7 @@ async function copyLibraryToClass(e){
     const nextSettings=U.mergeSettings(state.settings,{namedLists:teacherLibrary.settings.namedLists,unitLabels:teacherLibrary.settings.unitLabels});
     await db.ref(teacherSettingsPath()).update({namedLists:nextSettings.namedLists||null,unitLabels:nextSettings.unitLabels||null});
     state.settings={...state.settings,namedLists:nextSettings.namedLists,unitLabels:nextSettings.unitLabels};
-    if(result.committed)state.catalog=withAllTracks(result.snapshot.val()||state.catalog);
+    if(result.committed){state.catalog=withAllTracks(result.snapshot.val()||state.catalog);await syncClassPictures().catch(err=>console.warn("Class pictures not synced",err));}
     $('teacherLibraryDialog').close();renderAll();
     status(`☁️ Saved • ${added} word${added===1?'':'s'} added to this class`);
   }catch(err){
@@ -829,7 +854,7 @@ async function mergeDuplicateWord(duplicateId){
   status('☁️ Merging duplicate…','syncing');
   const scopedChanges=legacyScoped()?changedStudentIds.filter(id=>scopedStudentIds.includes(id)):changedStudentIds;
   const studentWrites=scopedChanges.map(studentId=>db.ref(`${SPACE}/students/${studentId}`).transaction(student=>B3ShorashimProgressMerge.mergeStudentCards(student,oldKey,newKey,keeper.id)));
-  await Promise.all([db.ref(`${SPACE}/catalog`).set(state.catalog),...studentWrites]);
+  await Promise.all([db.ref(`${SPACE}/catalog`).set(state.catalog),...studentWrites]);await syncClassPictures().catch(err=>console.warn("Class pictures not synced",err));
   renderCatalog();
   status(`☁️ Duplicate merged • ${duplicate.front}`);
 }
@@ -845,7 +870,7 @@ async function removePictureChoice(id,artValue){
 }
 
 async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
-async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
+async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);await syncClassPictures();status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
 async function deleteCatalogItem(id){
@@ -1306,6 +1331,19 @@ async function togglePictureChoice(id,artValue){
     renderCatalog();
     return;
   }else{
+    if(window.B3ShorashimPictures.isTeacherPicture(v)){
+      // Copy the picture into this class first, so students never get a tick without a picture.
+      try{
+        status('☁️ Sharing picture with this class…','syncing');
+        await window.B3ShorashimPictures.publishToClass(v);
+        classPictureCopied.add(v);classPictureRemoved.delete(v);
+      }catch(err){
+        status(err?.message||'Could not share that picture with students.','error');
+        alert(err?.message||'Could not share that picture with students.');
+        renderCatalog();
+        return;
+      }
+    }
     item.art=[...selected,v];
   }
   item.autoArt=false;

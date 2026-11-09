@@ -1,5 +1,5 @@
 /* Shorashim teacher page: add your own picture to a word.
- * The teacher chooses a file or pastes a screenshot. The picture is shrunk to a
+ * The teacher chooses a file, pastes a screenshot, or takes a camera snapshot. The picture is shrunk to a
  * small image and saved under that teacher's own account at
  * shorashimTeacherPictures/<teacherUid>/<pictureId>. The word gets it as a new,
  * UNTICKED option (item.customArt); students see it only after the teacher ticks it.
@@ -18,7 +18,7 @@
     const item = (state.catalog.shorashim || []).find(x => x.id === id);
     if (!item || !allowedTeacher()) return;
     const message = row.querySelector('[data-picture-status]');
-    const controls = [...row.querySelectorAll('[data-picture-upload], [data-picture-paste]')];
+    const controls = [...row.querySelectorAll('[data-picture-upload], [data-picture-paste], [data-picture-camera]')];
     controls.forEach(x => { x.disabled = true; });
     let path = '';
     try {
@@ -55,6 +55,80 @@
       status(text, 'error');
     } finally { controls.forEach(x => { x.disabled = false; }); }
   }
+  // "Take snapshot": a live camera view; the teacher takes a photo, checks it, then keeps it.
+  // The camera is always turned off when the window closes.
+  function cameraAvailable() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+  function openCamera(onPicture) {
+    if (!cameraAvailable()) {
+      alert('This browser cannot use a camera here. Choose a file or paste a screenshot instead.');
+      return;
+    }
+    const dialog = document.createElement('dialog');
+    dialog.className = 'teacher-camera-dialog';
+    dialog.setAttribute('aria-label', 'Take a snapshot');
+    dialog.innerHTML =
+      '<div class="teacher-camera-body">' +
+      '<h3>Take a snapshot</h3>' +
+      '<video playsinline muted autoplay></video>' +
+      '<canvas hidden></canvas>' +
+      '<p class="mini-note" data-camera-status aria-live="polite">Starting camera…</p>' +
+      '<div class="teacher-camera-actions">' +
+      '<button type="button" class="primary" data-camera-shoot disabled>📸 Take snapshot</button>' +
+      '<button type="button" class="primary" data-camera-use hidden>Use this picture</button>' +
+      '<button type="button" class="ghost" data-camera-retake hidden>Retake</button>' +
+      '<button type="button" class="ghost" data-camera-cancel>Cancel</button>' +
+      '</div></div>';
+    document.body.appendChild(dialog);
+    const video = dialog.querySelector('video');
+    const canvas = dialog.querySelector('canvas');
+    const note = dialog.querySelector('[data-camera-status]');
+    const shoot = dialog.querySelector('[data-camera-shoot]');
+    const use = dialog.querySelector('[data-camera-use]');
+    const retake = dialog.querySelector('[data-camera-retake]');
+    let stream = null;
+    const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
+    const close = () => { stop(); if (dialog.open) dialog.close(); dialog.remove(); };
+    const showLive = () => {
+      video.hidden = false; canvas.hidden = true;
+      shoot.hidden = false; use.hidden = true; retake.hidden = true;
+    };
+    dialog.addEventListener('cancel', close);
+    dialog.querySelector('[data-camera-cancel]').onclick = close;
+    shoot.onclick = () => {
+      const w = video.videoWidth, h = video.videoHeight;
+      if (!w || !h) { note.textContent = 'The camera is not ready yet.'; return; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+      video.hidden = true; canvas.hidden = false;
+      shoot.hidden = true; use.hidden = false; retake.hidden = false;
+      note.textContent = 'Keep this picture, or take another one.';
+    };
+    retake.onclick = () => { showLive(); note.textContent = 'Point the camera and take a snapshot.'; };
+    use.onclick = () => {
+      use.disabled = true;
+      canvas.toBlob(blob => {
+        close();
+        if (!blob) { alert('Could not take that snapshot. Please try again.'); return; }
+        onPicture(new File([blob], 'snapshot.png', { type: 'image/png' }));
+      }, 'image/png');
+    };
+    dialog.showModal();
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      .then(s => {
+        if (!dialog.isConnected) { s.getTracks().forEach(t => t.stop()); return; }
+        stream = s; video.srcObject = s;
+        shoot.disabled = false;
+        note.textContent = 'Point the camera and take a snapshot.';
+      })
+      .catch(err => {
+        const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+        note.textContent = denied
+          ? 'Camera permission was refused. Allow the camera in the browser, or choose a file instead.'
+          : 'No camera was found. Choose a file or paste a screenshot instead.';
+      });
+  }
   function controlsFor(row) {
     const id = row.dataset.id;
     const pictureBox = row.querySelector('.teacher-art-preview');
@@ -74,6 +148,12 @@
     fileButton.className = 'ghost';
     fileButton.dataset.pictureUpload = '';
     fileButton.textContent = '📁 Add picture from computer';
+    const cameraButton = document.createElement('button');
+    cameraButton.type = 'button';
+    cameraButton.className = 'ghost';
+    cameraButton.dataset.pictureCamera = '';
+    cameraButton.textContent = '📷 Take snapshot';
+    cameraButton.onclick = () => openCamera(file => addPicture(id, file, row));
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.hidden = true;
@@ -97,7 +177,7 @@
       fileInput.value = '';
       if (file) addPicture(id, file, row);
     };
-    wrap.append(paste, fileButton, fileInput, message);
+    wrap.append(paste, fileButton, cameraButton, fileInput, message);
     pictureBox.after(wrap);
   }
   const originalRenderCatalog = renderCatalog;
@@ -110,6 +190,11 @@
   style.textContent =
     '.teacher-add-picture{margin:10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}' +
     '.teacher-add-picture-paste{border:2px dashed #818cf8;background:#eef2ff;border-radius:12px;padding:10px;font-size:13px;min-width:240px;cursor:text}' +
-    '.teacher-add-picture-paste:focus{outline:3px solid #6366f1}';
+    '.teacher-add-picture-paste:focus{outline:3px solid #6366f1}' +
+    '.teacher-camera-dialog{max-width:min(640px,94vw)}' +
+    '.teacher-camera-body{padding:18px;display:grid;gap:10px}' +
+    '.teacher-camera-body h3{margin:0}' +
+    '.teacher-camera-body video,.teacher-camera-body canvas{width:100%;max-height:60vh;background:#111;border-radius:12px;object-fit:contain}' +
+    '.teacher-camera-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}';
   document.head.appendChild(style);
 })();
