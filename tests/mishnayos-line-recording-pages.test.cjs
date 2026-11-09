@@ -56,7 +56,8 @@ test('the old Read / Translate / Understand tab code is removed from the practic
 test('Submit does not wait for every line: one recorded line is enough', () => {
   assert.match(recorder, /btn\.disabled = !ready \|\| n < 1 \|\|/);
   assert.doesNotMatch(recorder, /n < total/);
-  assert.match(student, /You do not have to record every line\./);
+  assert.match(student, /You do not have to record every line, but gold standard needs every line\./);
+  assert.match(grade, /Gold standard needs every line recorded/);
   assert.match(grade, /if\(!l\) continue;/);
   assert.match(recorder, /busy/);
   assert.match(student, /window\.MishnayosLines\.busy\(\)/);

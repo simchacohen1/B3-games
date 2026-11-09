@@ -82,9 +82,15 @@ test('the student does not have to record every line: Submit sends only the reco
   assert.equal(balance(s), 25);
   const list = await run(s, { role: 'teacher', identity: T }, { action: 'teacher-list', classId: 'sc' });
   assert.equal(list.submissions[0].recordedCount, 3);
-  // Gold standard is judged on the lines he sent: 10 minus 1 per mistake.
-  const g = await run(s, { role: 'teacher', identity: T }, { action: 'teacher-grade', classId: 'sc', studentId: 'moshe', key: KEY, attempt: 1, gold: true, mistakes: 2, bonus: 0 });
-  assert.equal(g.gradePoints, 8); assert.equal(balance(s), 33);
+  // Gold standard needs every line: a partial submission cannot be marked gold.
+  const teacher = { role: 'teacher', identity: T };
+  const grade = { action: 'teacher-grade', classId: 'sc', studentId: 'moshe', key: KEY, attempt: 1, mistakes: 0, bonus: 0 };
+  await assert.rejects(run(s, teacher, { ...grade, gold: true }), { code: 400, message: /every line/ });
+  assert.equal(sub(s).status, 'submitted'); assert.equal(balance(s), 25);
+  // "Not yet" still works, pays the bonus, and lets him record again.
+  const g = await run(s, teacher, { ...grade, gold: false, bonus: 2 });
+  assert.equal(g.gradePoints, 0); assert.equal(g.lockedUntil, null); assert.equal(balance(s), 27);
+  assert.equal(core.blockedReason(sub(s), NOW + 1), '');
 });
 
 test('Submit is refused when no line is recorded', async () => {

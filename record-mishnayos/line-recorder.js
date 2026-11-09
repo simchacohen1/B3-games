@@ -303,7 +303,7 @@
     const total = cur.lineCount, n = recordedCount();
     if(n < 1) return;
     const what = n === total ? 'all ' + total + ' lines' : n + ' of ' + total + ' lines';
-    const skipped = n === total ? '' : '\n\nThe lines you did not record will not be sent.';
+    const skipped = n === total ? '' : '\n\nThe lines you did not record will not be sent. To earn gold standard you need to record every line.';
     if(!confirm('Send ' + what + ' to your teacher?' + skipped + '\n\nYou cannot record this mishna again until your teacher grades it.')) return;
     const btn = $('submitMishnaBtn'), msg = $('submitMsg');
     btn.disabled = true; msg.textContent = 'Sending to your teacher…';

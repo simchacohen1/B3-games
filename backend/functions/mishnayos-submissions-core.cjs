@@ -12,7 +12,8 @@
  *
  * Points (paid straight into Student Rewards):
  *   5 for each Submit,
- *   10 for gold standard, minus 1 for each mistake (never below 0),
+ *   10 for gold standard, minus 1 for each mistake (never below 0);
+ *      gold standard needs every line of the mishna recorded,
  *   plus any teacher bonus (no upper limit).
  *
  * Database paths (posukPractice/mishnayos/...):
@@ -246,12 +247,16 @@ async function teacherGrade(store, scopeLib, identity, body, now) {
   const grade = { gold, mistakes, bonus, gradePoints, totalPoints: gradePoints + bonus, comment, gradedAt: now, gradedBy: email };
 
   const subPath = ROOT + '/submissions/' + studentId + '/' + info.key;
-  let graded = null;
+  let graded = null, incomplete = false;
   const claim = await store.tx(subPath, cur => {
     if (!cur || cur.status !== 'submitted' || Number(cur.attempt) !== attempt) return undefined;
+    // Gold standard is only for a whole mishna: every line must be recorded.
+    incomplete = gold && Object.values(cur.lines || {}).filter(Boolean).length < info.lineCount;
+    if (incomplete) return undefined;
     graded = { ...cur, status: 'graded', grade, lockedUntil };
     return graded;
   });
+  if (incomplete) fail(400, 'Gold standard needs every line recorded. Mark this one "Not yet" so he can record the rest.');
   if (!claim.committed || !graded) fail(409, 'This submission was already graded or replaced. Reload the list.');
 
   const student = scope.students[studentId];

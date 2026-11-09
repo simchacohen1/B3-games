@@ -48,6 +48,8 @@
   .gold-toggle{ display:flex; gap:6px; }
   .gold-toggle button{ flex:1; font:inherit; font-weight:800; padding:9px 8px; border-radius:10px; border:2px solid var(--ink-soft); background:#fff; color:var(--ink); cursor:pointer; }
   .gold-toggle button.on.yes{ background:#fff3c4; border-color:var(--gold); }
+  .gold-toggle button:disabled{ opacity:.45; cursor:not-allowed; }
+  .partial-note{ grid-column:1/-1; font-weight:700; background:#fff7dc; border:1.5px solid #f0d27a; border-radius:10px; padding:9px 12px; }
   .gold-toggle button.on.no{ background:#fdecec; border-color:#e08b8b; }
   .comment-field{ grid-column:1/-1; }
   .points-preview{ grid-column:1/-1; font-weight:800; background:rgba(46,125,50,.1); border-radius:10px; padding:9px 12px; }
@@ -174,10 +176,11 @@ function pendingCard(s, idx){
     '<div style="margin-bottom:8px;"><button class="btn ghost playall" type="button">▶️ Play all lines</button></div>' +
     '<div class="lines">' + rows.join('') + '</div>' +
     '<div class="grade-form">' +
-      '<label>Gold standard?<div class="gold-toggle"><button type="button" class="yes">🏅 Yes</button><button type="button" class="no">🔁 Not yet</button></div></label>' +
+      '<label>Gold standard?<div class="gold-toggle"><button type="button" class="yes"' + (rows.length < s.lineCount ? ' disabled title="Gold standard needs every line recorded"' : '') + '>🏅 Yes</button><button type="button" class="no">🔁 Not yet</button></div></label>' +
       '<label>Mistakes<input type="number" class="mistakes" min="0" max="999" step="1" value="0" inputmode="numeric"></label>' +
       '<label>Bonus points<input type="number" class="bonus" min="0" step="1" value="0" inputmode="numeric"></label>' +
       '<label class="comment-field">Note to the student (optional)<input type="text" class="comment" maxlength="1000" placeholder="e.g. Read line 3 slowly"></label>' +
+      (rows.length < s.lineCount ? '<div class="partial-note">He recorded ' + rows.length + ' of ' + s.lineCount + ' lines. Gold standard needs every line, so this one can only be "Not yet". He can record the rest and submit again.</div>' : '') +
       '<div class="points-preview">Choose gold standard or not yet.</div>' +
       '<div class="row-actions"><button class="btn save" type="button" disabled>Save grade</button><span class="msg"></span></div>' +
     '</div></div>';
