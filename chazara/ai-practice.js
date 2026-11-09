@@ -7,7 +7,8 @@
 (function () {
   'use strict';
   var ENDPOINT = window.CHAZARA_AI_ENDPOINT || 'https://us-central1-b3-games.cloudfunctions.net/chazaraAiPractice';
-  var MIN_SEGMENT_MS = 3000, MAX_SEGMENT_MS = 60000;
+  var MAX_SEGMENT_MS = 60000;
+  var Check = window.ChazaraSilenceCheck; // chazara/ai-practice-check.js (instant, in-browser)
   var OUTCOME_EMOJI = { excellent: '🌟', almost: '💪', try_again: '📖', unclear: '🎧', unavailable: '⏳' };
   var PREVIEW_ITEMS = [{
     id: 'preview_ai', title: 'Sample AI Practice', mode: 'ai', perek: 18, from: 1, to: 2,
@@ -19,9 +20,9 @@
   }];
   var PREVIEW_RESULTS = {
     excellent: { outcome: 'excellent', title: 'Excellent!', message: 'Excellent job! You read and explained the pasuk beautifully!', tips: [], pesukim: [] },
-    almost: { outcome: 'almost', title: 'Almost There!', message: "Great effort! You're getting closer. Practice a little more and try again!", tips: ['Next time, explain what the pasuk means too.'], pesukim: [] },
-    try_again: { outcome: 'try_again', title: "Let's Try Again!", message: "Let's try again! Remember to read the pasuk and explain what it means.", tips: ['Read the Hebrew words first, then say what they mean.'], pesukim: [] },
-    unclear: { outcome: 'unclear', title: "Couldn't Hear Clearly", message: "I couldn't hear you clearly. Please try recording again!", tips: ['Try a quieter spot, away from other voices.'], pesukim: [] }
+    almost: { outcome: 'almost', title: 'Almost There!', message: "Great effort! You're getting closer. Practice a little more and try again!", tips: ['Some pesukim were hard to make out. Try them again!'], pesukim: [] },
+    try_again: { outcome: 'try_again', title: "Let's Try Again!", message: "I couldn't make that out — try again.", tips: ['Read the pasuk in a nice, clear voice, then say what it means.'], pesukim: [] },
+    unclear: { outcome: 'unclear', title: "Couldn't Hear Clearly", message: "I couldn't hear you — try again!", tips: ['Hold the device close and read in a nice, strong voice.'], pesukim: [] }
   };
 
   var state = { preview: false, items: [], aiEnabled: false, panel: null };
@@ -253,7 +254,7 @@
       s.analyser = s.audioCtx.createAnalyser(); s.analyser.fftSize = 512;
       s.audioCtx.createMediaStreamSource(s.stream).connect(s.analyser);
     } catch (_) { s.analyser = null; }
-    s.index = 0; s.blobs = []; s.requestId = newRequestId();
+    s.index = 0; s.blobs = []; s.durations = []; s.requestId = newRequestId();
     beginSegment();
   }
 
@@ -264,6 +265,7 @@
     s.recorder.ondataavailable = function (e) { if (e.data && e.data.size) s.chunks.push(e.data); };
     s.recorder.start(250);
     s.segStart = performance.now();
+    s.frames = []; s.lastFrameAt = 0; // level readings for the instant silence check
     renderRecording();
     say('Recording pasuk ' + (s.index + 1) + '. Read it, then say what it means.');
   }
@@ -288,12 +290,17 @@
       timer.textContent = Math.floor(sec / 60) + ':' + ('0' + sec % 60).slice(-2);
       if (ms >= MAX_SEGMENT_MS) { say('Time is up for this pasuk.'); endSegment(true); }
     }, 250);
-    var bars = meter.querySelectorAll('i'), buf = s.analyser ? new Uint8Array(s.analyser.fftSize) : null;
+    var bars = meter.querySelectorAll('i'), useFloat = !!(s.analyser && s.analyser.getFloatTimeDomainData);
+    var buf = s.analyser ? (useFloat ? new Float32Array(s.analyser.fftSize) : new Uint8Array(s.analyser.fftSize)) : null;
     (function draw() {
       if (!session || !s.recorder || !buf) return;
-      s.analyser.getByteTimeDomainData(buf);
-      var sum = 0; for (var k = 0; k < buf.length; k++) { var v = (buf[k] - 128) / 128; sum += v * v; }
-      var level = Math.min(1, Math.sqrt(sum / buf.length) * 6);
+      var sum = 0, k;
+      if (useFloat) { s.analyser.getFloatTimeDomainData(buf); for (k = 0; k < buf.length; k++) sum += buf[k] * buf[k]; }
+      else { s.analyser.getByteTimeDomainData(buf); for (k = 0; k < buf.length; k++) { var v = (buf[k] - 128) / 128; sum += v * v; } }
+      var rms = Math.sqrt(sum / buf.length), t = performance.now();
+      if (s.lastFrameAt) s.frames.push({ rms: rms, ms: Math.min(100, t - s.lastFrameAt) });
+      s.lastFrameAt = t;
+      var level = Math.min(1, rms * 6);
       for (var j = 0; j < bars.length; j++) bars[j].style.height = Math.max(6, Math.round(36 * level * (0.55 + 0.45 * Math.sin((j + 1) * 1.7 + performance.now() / 160)))) + 'px';
       s.raf = requestAnimationFrame(draw);
     })();
@@ -303,19 +310,44 @@
     forced = forced === true;
     var s = session;
     if (!s || !s.recorder) return;
-    var ms = performance.now() - s.segStart;
-    if (!forced && ms < MIN_SEGMENT_MS) { renderRecordingNote('Keep going! Read the whole pasuk and say what it means.'); return; }
+    var durationMs = performance.now() - s.segStart;
+    var m = Check.measure(s.frames || []);
+    var measuredMs = (s.frames || []).reduce(function (n, f) { return n + f.ms; }, 0);
+    // If the page could not watch the level for most of the recording (no audio
+    // meter, or the tab was in the background), only the length is checked.
+    var verdict = Check.assess({ durationMs: durationMs, peakRms: m.peakRms, voicedMs: m.voicedMs, measured: !!s.analyser && measuredMs >= durationMs * 0.5 });
     var rec = s.recorder;
     clearInterval(s.timer); s.timer = null;
+    if (s.raf) cancelAnimationFrame(s.raf); s.raf = null;
     rec.onstop = function () {
-      s.blobs[s.index] = new Blob(s.chunks, { type: rec.mimeType || s.mime || 'audio/webm' });
       s.recorder = null;
+      if (!verdict.ok) return renderNotHeard(); // instant: nothing is uploaded
+      s.blobs[s.index] = new Blob(s.chunks, { type: rec.mimeType || s.mime || 'audio/webm' });
+      s.durations[s.index] = Math.round(durationMs);
       if (s.index < s.a.pesukim.length - 1) { s.index++; beginSegment(); }
       else { stopAll(); submit(); }
     };
     rec.stop();
   }
-  function renderRecordingNote(text) { var n = session && session.body.querySelector('.aip-note'); if (n) n.textContent = text; say(text); }
+
+  // Instant "Couldn't Hear Clearly" for this pasuk only. Earlier pesukim are kept,
+  // nothing was sent anywhere, and trying again has no penalty.
+  function renderNotHeard() {
+    var s = session, b = s.body, r = Check.MESSAGE, total = s.a.pesukim.length;
+    b.innerHTML = '';
+    var dots = progressDots(); if (dots) b.appendChild(dots);
+    b.appendChild(el('div', { class: 'aip-result unclear', role: 'status' }, [
+      el('div', { class: 'aip-emoji', 'aria-hidden': 'true', text: OUTCOME_EMOJI.unclear }),
+      el('h3', { text: r.title }), el('p', { text: r.message }),
+      el('ul', { class: 'aip-tips' }, r.tips.map(function (t) { return el('li', { text: '💡 ' + t }); }))
+    ]));
+    var again = el('button', { type: 'button', class: 'aip-btn rec', text: total > 1 ? '🎙️ Try This Pasuk Again' : '🎙️ Try Again', onclick: function () { if (session) beginSegment(); } });
+    var close = el('button', { type: 'button', class: 'aip-btn soft', text: 'Done', onclick: closePractice });
+    b.appendChild(el('div', { class: 'aip-actions' }, [again, close]));
+    say(r.title + '. ' + r.message);
+    again.focus();
+  }
+
 
   function renderChecking() {
     var b = session.body;
@@ -343,6 +375,7 @@
       form.append('action', 'evaluate');
       form.append('assignmentId', s.a.id);
       form.append('requestId', s.requestId);
+      form.append('durations', JSON.stringify(s.durations)); // only for the owner's cost report
       s.blobs.forEach(function (blob, i) { form.append('audio' + i, blob, 'pasuk' + i + '.' + extFor(blob.type)); });
       result = await api(form, 100000);
     } catch (e) {

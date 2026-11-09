@@ -22,5 +22,11 @@ for (const f of files) {
   fs.writeFileSync(to, from);
   console.log('copied', f);
 }
+// Files left over in the staging copy that no longer exist in the source.
+const extra = fs.readdirSync(path.join(dst, 'chazara-ai')).filter(f => !files.includes('chazara-ai/' + f));
+for (const f of extra) {
+  if (check) stale.push('chazara-ai/' + f + ' (should be removed)');
+  else { fs.unlinkSync(path.join(dst, 'chazara-ai', f)); console.log('removed', 'chazara-ai/' + f); }
+}
 if (check && stale.length) { console.error('Staging copy out of date:', stale.join(', ')); process.exit(1); }
 module.exports = { files };

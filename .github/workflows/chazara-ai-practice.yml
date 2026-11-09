@@ -23,16 +23,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Decision, security, limits and privacy tests (fake providers, no paid services)
+      - name: Silence check, real-words check, security, limits and privacy tests (fake transcriber, no paid services)
         run: node --test tests/chazara-ai-practice.test.cjs tests/chazara-recording-save.test.cjs tests/chazara-teacher-scope.test.cjs tests/chazara-owner-self-heal.test.cjs
       - name: Staging copy is in sync
         run: node scripts/sync-chazara-ai-staging.cjs --check
-      - name: Audio-validity check on generated audio files (synthetic voice, no paid services)
+      - name: Instant silence check on generated audio files (synthetic voice, no paid services)
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q espeak-ng ffmpeg
           bash scripts/chazara-ai-make-signal-set.sh "$RUNNER_TEMP/sigset"
-          node scripts/chazara-ai-audio-eval.cjs "$RUNNER_TEMP/sigset/manifest.json" --signal-only --out "$RUNNER_TEMP/sigset/report.json"
-          node -e "const r=require(process.argv[1]).rows;const bad=r.filter(x=>x.audio[0].status!==x.expect);if(bad.length){console.error(bad.map(b=>b.name));process.exit(1)}" "$RUNNER_TEMP/sigset/report.json"
+          node scripts/chazara-ai-audio-eval.cjs "$RUNNER_TEMP/sigset/manifest.json" --silence-only
       - name: Browser journey (fake microphone, mocked checker)
         run: |
           npm install --prefix "$RUNNER_TEMP/pw" playwright@1.59.1

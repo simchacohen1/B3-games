@@ -187,7 +187,7 @@
     }
     if (f.mode === 'ai') {
       var chk = el('input', { type: 'checkbox', checked: e.checked, onchange: function () { e.checked = chk.checked; } });
-      box.appendChild(el('label', { style: 'display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:bold' }, [chk, 'I checked the Hebrew text. Students\' readings are compared with it.']));
+      box.appendChild(el('label', { style: 'display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:bold' }, [chk, 'I checked the Hebrew text. Students see it while they practice.']));
     }
     var save = el('button', { type: 'button', class: 'approve-all', text: e.id ? 'Save changes' : 'Create assignment', onclick: function () { saveEditor(save); } });
     var cancel = el('button', { type: 'button', text: 'Cancel', onclick: function () { ui.editing = null; render(); } });

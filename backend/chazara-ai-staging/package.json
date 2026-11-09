@@ -6,9 +6,7 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@huggingface/transformers": "^4.3.2",
     "busboy": "^1.6.0",
-    "ffmpeg-static": "^5.3.0",
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^5.0.0"
   }

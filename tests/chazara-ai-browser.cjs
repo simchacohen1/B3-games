@@ -51,7 +51,7 @@ function serve() {
 async function main() {
   const server = await serve();
   const base = 'http://127.0.0.1:' + server.address().port;
-  const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  let browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   const results = [];
   const check = async (name, fn) => { try { await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name + ': ' + e.message]); } console.log(results[results.length - 1].join('  ').split('\n')[0]); };
   const calls = [];
@@ -80,7 +80,7 @@ async function main() {
       calls.push('evaluate:' + parts + ':' + (req.headers().authorization || '').slice(0, 12));
       await new Promise(r => setTimeout(r, 900));
       const msgs = { excellent: ['Excellent!', 'Excellent job! You read and explained the pasuk beautifully!', []],
-        almost: ['Almost There!', "Great effort! You're getting closer. Practice a little more and try again!", ['Next time, explain what the pasuk means too.']] };
+        almost: ['Almost There!', "Great effort! You're getting closer. Practice a little more and try again!", ['Some pesukim were hard to make out. Try them again!']] };
       const [title, message, tips] = msgs[nextOutcome];
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, outcome: nextOutcome, title, message, tips,
         pesukim: [{ id: '18_1', label: 'פרק יח · פסוק א', status: 'great' }, { id: '18_2', label: 'פרק יח · פסוק ב', status: nextOutcome === 'excellent' ? 'great' : 'practice' }] }) });
@@ -115,14 +115,22 @@ async function main() {
   });
   await page.screenshot({ path: path.join(OUT, '2-ready.png') });
   await page.keyboard.press('Enter'); // keyboard-only start
-  await check('recording indicator, microphone status and too-early nudge', async () => {
+  await check('recording indicator and microphone status', async () => {
     await page.waitForSelector('.aip-mic.on');
     assert.match(await page.textContent('.aip-mic.on'), /Recording/);
-    await page.click('.aip-btn.next');
-    assert.match(await page.textContent('.aip-note'), /Keep going/);
     assert.equal(await page.$$eval('.aip-pasuk', e => e.length), 1, 'only the current pasuk while recording');
   });
   await page.screenshot({ path: path.join(OUT, '3-recording.png') });
+  await check('too short: instant "Couldn\'t Hear Clearly", nothing uploaded, retry the same pasuk', async () => {
+    const before = calls.length;
+    await page.click('.aip-btn.next');
+    await page.waitForSelector('.aip-result.unclear');
+    assert.match(await page.textContent('.aip-result'), /I couldn't hear you — try again!/);
+    assert.equal(calls.length, before, 'no request was sent');
+    await page.click('text=Try This Pasuk Again');
+    await page.waitForSelector('.aip-mic.on');
+    assert.match(await page.textContent('.aip-pasuk .aip-label'), /\(1\/2\)/);
+  });
   await page.waitForTimeout(3200);
   await page.click('.aip-btn.next');
   await check('multi-pasuk: moves to pasuk 2 and shows progress', async () => {
@@ -173,6 +181,35 @@ async function main() {
   });
   await phone.page.screenshot({ path: path.join(OUT, '7-phone.png') });
   await phone.ctx.close();
+
+  // ---------- silent microphone: stopped instantly in the browser ----------
+  const silentWav = path.join(OUT, 'silence.wav');
+  {
+    const rate = 16000, secs = 30, data = Buffer.alloc(rate * secs * 2), h = Buffer.alloc(44);
+    h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVE', 8); h.write('fmt ', 12); h.writeUInt32LE(16, 16);
+    h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32);
+    h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(data.length, 40);
+    fs.writeFileSync(silentWav, Buffer.concat([h, data]));
+  }
+  const quietBrowser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + silentWav] });
+  const realBrowser = browser;
+  browser = quietBrowser;
+  const quiet = await studentPage({ width: 1000, height: 800 });
+  await check('silent microphone: "Couldn\'t Hear Clearly" instantly, nothing uploaded', async () => {
+    const before = calls.filter(c => c.startsWith('evaluate')).length;
+    await quiet.page.waitForSelector('.aip-card');
+    await quiet.page.click('.aip-card');
+    await quiet.page.click('.aip-btn.big-rec');
+    await quiet.page.waitForSelector('.aip-mic.on');
+    await quiet.page.waitForTimeout(3000);
+    await quiet.page.click('.aip-btn.next');
+    await quiet.page.waitForSelector('.aip-result.unclear', { timeout: 5000 });
+    assert.match(await quiet.page.textContent('.aip-result'), /Couldn't Hear Clearly/);
+    assert.equal(calls.filter(c => c.startsWith('evaluate')).length, before);
+  });
+  await quiet.page.screenshot({ path: path.join(OUT, '7b-silent.png') });
+  await quiet.ctx.close(); await quietBrowser.close();
+  browser = realBrowser;
 
   // ---------- teacher panel ----------
   const tctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });

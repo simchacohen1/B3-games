@@ -1,206 +1,147 @@
 'use strict';
-// Chazara AI Practice (#688) — automated tests with fictional data and a fake Whisper.
-// Lenient casual-practice rules: (1) the Hebrew roughly matches the pasuk, (2) extra words
-// were said after it. Meaning is not judged. These tests verify the decision rules, security
-// and limits; they do NOT establish real recognition accuracy (scripts/chazara-ai-audio-eval.cjs).
+// Chazara AI Practice (#688) — automated tests with fictional data and a fake transcriber.
+// Simple, lenient two-step check: (1) instant in-browser silence check, (2) OpenAI
+// transcription must contain real words. No meaning check, no comparison with the pasuk.
+// These tests verify the rules, security and limits — not real transcription quality.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const F = require('./chazara-ai-fixtures.cjs');
-const { hebrewCoverage } = require('../backend/functions/chazara-ai/hebrew-match.cjs');
-const { analyzePcm, classifyAudio } = require('../backend/functions/chazara-ai/audio-signal.cjs');
+const Check = require('../chazara/ai-practice-check.js');
+const { checkTranscript } = require('../backend/functions/chazara-ai/transcript-check.cjs');
 const { evaluateAttempt } = require('../backend/functions/chazara-ai/pipeline.cjs');
-const { decide, THRESHOLDS } = require('../backend/functions/chazara-ai/decide.cjs');
+const { decide } = require('../backend/functions/chazara-ai/decide.cjs');
 const { createService, cleanAssignment } = require('../backend/functions/chazara-ai/service.cjs');
 const { createHandler } = require('../backend/functions/chazara-ai/http.cjs');
-const { whisperRecognizer, cleanTranscript, WHISPER_MODEL } = require('../backend/functions/chazara-ai/providers.cjs');
+const { openaiTranscriber, extFor, TRANSCRIBE_MODEL } = require('../backend/functions/chazara-ai/providers.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const items = keys => keys.map(k => ({ id: k, label: k, ...F.PESUKIM[k] }));
-const run = (keys, specs, opts) => evaluateAttempt({ items: items(keys), segments: specs.map(F.segment), providers: F.fakeProviders(opts) });
+const items = keys => keys.map(k => ({ id: k, label: k }));
+const clip = spec => ({ buffer: F.segment(spec), mimeType: 'audio/webm;codecs=opus', durationMs: 20000 });
+const run = (keys, specs, opts) => evaluateAttempt({ items: items(keys), clips: specs.map(clip), providers: F.fakeProviders(opts) });
 const outcome = async (keys, specs, opts) => (await run(keys, specs, opts)).decision;
 
-// What the Hebrew Whisper pass might return: the reading, then the translation.
-const ENGLISH_AFTER = 'and Hashem appeared to Avraham by Mamre he was sitting by the tent door when it was hot';
-const YIDDISH_AFTER = 'און השם האט זיך באוויזן צו אברהם ביי ממרא ער איז געזעסן ביים טיר פון געצעלט';
-const good = (k, after = ENGLISH_AFTER) => ({ heard: F.HEARD[k] + ' ' + after });
+const READ_AND_EXPLAIN = F.HEARD['18_1'] + ' and Hashem appeared to Avraham by Mamre he was sitting by the tent door';
+const good = () => ({ text: READ_AND_EXPLAIN });
 
-// ---------- Hebrew comparison ----------
-test('Hebrew matcher: tolerant of spelling/accent, strict about different words', () => {
-  const p = F.PESUKIM['18_1'].hebrew;
-  assert.equal(hebrewCoverage(p, F.HEARD['18_1']).coverage, 1);
-  assert.ok(hebrewCoverage(p, F.HEARD['18_1_minor']).coverage >= 0.9, 'Ashkenazi sav/s and small slips still match');
-  assert.ok(hebrewCoverage(p, F.HEARD['18_2']).coverage < THRESHOLDS.reading, 'a different pasuk does not count');
-  assert.ok(hebrewCoverage(p, 'אני הולך לבית ספר היום עם אבא שלי').coverage < THRESHOLDS.reading, 'unrelated Hebrew does not count');
-  assert.equal(hebrewCoverage(p, '').coverage, 0);
+// ---------- step 1: instant silence check (runs in the browser, nothing uploaded) ----------
+const measured = (kind, seconds = 12) => ({ durationMs: seconds * 1000, ...Check.measure(F.framesFrom(F.synth(kind, seconds))) });
+
+test('silence check: speech passes; silence and a quiet room are stopped instantly', () => {
+  assert.deepEqual(Check.assess(measured('speech')), { ok: true, reason: null });
+  assert.equal(Check.assess(measured('silence')).reason, 'too_quiet');
+  assert.equal(Check.assess({ durationMs: 12000, peakRms: 0.2, voicedMs: 200 }).reason, 'too_quiet', 'a click or a cough alone is not a try');
+  assert.equal(Check.assess(measured('short')).ok, true, 'a brief burst of real sound goes on to be transcribed (lean toward passing)');
 });
 
-test('Hebrew matcher: counts the words said after the reading', () => {
-  const p = F.PESUKIM['18_1'].hebrew;
-  assert.equal(hebrewCoverage(p, F.HEARD['18_1']).wordsAfterReading, 0);
-  assert.equal(hebrewCoverage(p, F.HEARD['18_1'] + ' ' + YIDDISH_AFTER).wordsAfterReading, YIDDISH_AFTER.split(' ').length);
-  assert.equal(hebrewCoverage(p, 'blah blah ' + F.HEARD['18_1']).wordsAfterReading, 0, 'words BEFORE the reading are not a translation');
-  assert.ok(hebrewCoverage(p, F.HEARD['18_1'].split(' ').reverse().join(' ')).coverage < THRESHOLDS.reading, 'scrambled words are not a reading');
+test('silence check: very short recordings are stopped instantly', () => {
+  assert.equal(Check.assess(measured('speech', 1.5)).reason, 'too_short');
+  assert.equal(Check.assess({ durationMs: 0 }).reason, 'too_short');
+  assert.equal(Check.assess(null).reason, 'too_short');
 });
 
-// ---------- audio validity ----------
-test('audio validity: speech ok, silence, noise and very short are recognised on the server', () => {
-  assert.equal(classifyAudio(analyzePcm(F.synth('speech'))), 'ok');
-  assert.equal(classifyAudio(analyzePcm(F.synth('silence'))), 'silent');
-  assert.equal(classifyAudio(analyzePcm(F.synth('noise'))), 'noisy');
-  assert.equal(classifyAudio(analyzePcm(F.synth('short'))), 'too_short');
+test('silence check leans toward passing: noise, quiet voices and missing measurements go on', () => {
+  assert.equal(Check.assess(measured('noise')).ok, true, 'loud noise is not silence — the transcription step decides');
+  assert.equal(Check.assess({ durationMs: 8000, peakRms: 0.02, voicedMs: 500 }).ok, true, 'a soft voice with half a second of sound passes');
+  assert.equal(Check.assess({ durationMs: 8000, measured: false }).ok, true, 'never block a child because the level could not be measured');
 });
 
-// ---------- scenarios under the lenient rules ----------
-test('1. reading + English translation -> Excellent', async () => {
-  const d = await outcome(['18_1'], [good('18_1')]);
+test('silence check message is the gentle "Couldn\'t Hear Clearly" outcome', () => {
+  assert.equal(Check.MESSAGE.outcome, 'unclear');
+  assert.equal(Check.MESSAGE.title, "Couldn't Hear Clearly");
+  assert.equal(Check.MESSAGE.message, "I couldn't hear you — try again!");
+});
+
+// ---------- step 2: real words in the transcription ----------
+test('real words pass in any language or script — meaning and the pasuk are not checked', () => {
+  for (const t of [READ_AND_EXPLAIN, F.HEARD['18_1'], 'Hashem appeared to Avraham', 'און ער איז געזעסן', 'vayera elav hashem',
+    'Avraham was swimming with camels', 'dog', 'and he', 'I want to play soccer'])
+    assert.equal(checkTranscript(t).passes, true, t);
+});
+
+test('empty, filler sounds, repeated syllables and recognizer inventions fail', () => {
+  for (const t of ['', '   ', '...', '[Music]', '(silence)', '♪ ♪', 'Thank you.', 'Thanks for watching!', 'תודה רבה',
+    'um uh hmm', 'la la la la', 'blah blah boing boing', 'bababa', 'lalala', 'אה אה', 'ha ha ha', 'ab'])
+    assert.equal(checkTranscript(t).passes, false, JSON.stringify(t));
+});
+
+// ---------- results ----------
+test('reading + translation (real words) -> Excellent', async () => {
+  const d = await outcome(['18_1'], [good()]);
   assert.equal(d.outcome, 'excellent');
   assert.equal(d.message, 'Excellent job! You read and explained the pasuk beautifully!');
 });
 
-test('2. reading with a few minor errors + translation -> Excellent', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: F.HEARD['18_1_minor'] + ' ' + ENGLISH_AFTER }])).outcome, 'excellent');
+test('Yiddish, English, mixed, even unrelated real words -> Excellent (lean heavily toward passing)', async () => {
+  for (const text of ['און השם האט זיך באוויזן צו אברהם', 'Hashem showed Himself ער איז געזעסן', 'can I go outside now'])
+    assert.equal((await outcome(['18_1'], [{ text }])).outcome, 'excellent', text);
 });
 
-test('3/4. any wording of the translation is accepted (meaning is not judged)', async () => {
-  assert.equal((await outcome(['18_1'], [good('18_1', 'G-d showed Himself to Avrohom near Mamre')])).outcome, 'excellent');
-  assert.equal((await outcome(['18_1'], [good('18_1', 'Avraham was swimming with camels')])).outcome, 'excellent', 'lenient: a wrong translation still counts as an attempt');
-});
-
-test('5. Yiddish translation (heard in Hebrew letters) -> Excellent', async () => {
-  assert.equal((await outcome(['18_1'], [good('18_1', YIDDISH_AFTER)])).outcome, 'excellent');
-});
-
-test('6. mixed English/Yiddish translation -> Excellent', async () => {
-  assert.equal((await outcome(['18_1'], [good('18_1', 'Hashem appeared ער איז געזעסן by the tent')])).outcome, 'excellent');
-});
-
-test('7. reading with many mistakes still "roughly matches" -> Excellent when translated', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: F.HEARD['18_1_major'] + ' ' + ENGLISH_AFTER }])).outcome, 'excellent');
-});
-
-test('8. reading the wrong pasuk -> Let\'s Try Again', async () => {
-  const d = await outcome(['18_1'], [{ heard: F.HEARD['18_2'] + ' he lifted his eyes and saw three men' }]);
-  assert.equal(d.outcome, 'try_again');
-});
-
-test('10. reading but nothing after it -> Almost There, reminded to explain', async () => {
-  const d = await outcome(['18_1'], [{ heard: F.HEARD['18_1'] }]);
-  assert.equal(d.outcome, 'almost');
-  assert.match(d.tips.join(' '), /what it means/);
-  assert.doesNotMatch(d.message, /correct/i);
-});
-
-test('10b. one or two words after the reading are not enough for a translation', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: F.HEARD['18_1'] + ' um okay' }])).outcome, 'almost');
-});
-
-test('11. translation with no Hebrew reading -> Let\'s Try Again (no reading to come "after")', async () => {
-  const d = await outcome(['18_1'], [{ heard: ENGLISH_AFTER }]);
-  assert.equal(d.outcome, 'try_again');
-  assert.match(d.tips.join(' '), /Hebrew/);
-});
-
-test('12. multi-pasuk: one pasuk skipped -> Almost There', async () => {
-  const d = await outcome(['18_1', '18_2', '18_3'], [good('18_1'), { signal: 'short' }, good('18_3', 'he said my lords please do not pass by your servant')]);
-  assert.equal(d.outcome, 'almost');
-  assert.equal(d.reason, 'missing_pasuk');
-  assert.deepEqual(d.pesukim.map(p => p.status), ['great', 'practice', 'great']);
-});
-
-test('12b. multi-pasuk: every pasuk read and translated -> Excellent', async () => {
-  const d = await outcome(['18_1', '18_2'], [good('18_1'), good('18_2', 'he looked up and saw three men')]);
-  assert.equal(d.outcome, 'excellent');
-});
-
-test('13. unrelated conversation -> Let\'s Try Again', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: 'מה שלומך היום אני רוצה לשחק כדורגל עם החברים שלי' }])).outcome, 'try_again');
-});
-
-test('14. gibberish and silly sounds -> Let\'s Try Again', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: 'בלה בלה בום בום לה לה לה' }])).outcome, 'try_again');
-});
-
-test('15. silence -> Let\'s Try Again, with a microphone tip', async () => {
-  const d = await outcome(['18_1'], [{ signal: 'silence' }]);
-  assert.equal(d.outcome, 'try_again');
-  assert.equal(d.reason, 'silent');
-  assert.match(d.tips.join(' '), /microphone/);
-});
-
-test('16. loud background noise -> Couldn\'t Hear Clearly', async () => {
-  const d = await outcome(['18_1'], [{ signal: 'noise', ...good('18_1') }]);
-  assert.equal(d.outcome, 'unclear');
-  assert.equal(d.message, "I couldn't hear you clearly. Please try recording again!");
-});
-
-test('17. very short recording -> Let\'s Try Again, without running Whisper', async () => {
-  const providers = F.fakeProviders();
-  const out = await evaluateAttempt({ items: items(['18_1']), segments: [F.segment({ signal: 'short' })], providers });
-  assert.equal(out.decision.outcome, 'try_again');
-  assert.equal(out.decision.reason, 'too_short');
-  assert.equal(providers.calls.recognize, 0);
-});
-
-test('18. clear voice but Whisper heard (almost) nothing -> Couldn\'t Hear Clearly, not blamed', async () => {
-  assert.equal((await outcome(['18_1'], [{ heard: '' }])).outcome, 'unclear');
-  assert.equal((await outcome(['18_1'], [{ heard: 'אה' }])).outcome, 'unclear');
-});
-
-test('a translated pasuk next to a noisy pasuk is never called a mistake', async () => {
-  assert.equal((await outcome(['18_1', '18_2'], [good('18_1'), { signal: 'noise' }])).outcome, 'unclear');
-});
-
-test('one Hebrew Whisper pass per usable pasuk, nothing else', async () => {
-  const providers = F.fakeProviders();
-  await evaluateAttempt({ items: items(['18_1', '18_2']), segments: [F.segment(good('18_1')), F.segment(good('18_2'))], providers });
-  assert.deepEqual(providers.calls.languages, ['he', 'he']);
-});
-
-test('decide: Excellent needs BOTH parts on every pasuk; one part = Almost; none = Try Again', () => {
-  const row = (c, after, extra = {}) => ({ id: 'x', label: 'x', audioStatus: 'ok', readingCoverage: c, wordsAfterReading: after, ...extra });
-  assert.equal(decide([row(1, 5)]).outcome, 'excellent');
-  assert.equal(decide([row(0.31, 3)]).outcome, 'excellent');
-  assert.equal(decide([row(1, 2)]).outcome, 'almost');
-  assert.equal(decide([row(0.2, 9)]).outcome, 'try_again');
-  assert.equal(decide([row(1, 5), row(1, 0)]).outcome, 'almost');
-  assert.equal(decide([row(0, 0, { audioStatus: 'silent' }), row(0, 0, { audioStatus: 'too_short' })]).outcome, 'try_again');
-  assert.equal(decide([row(1, 5, { audioStatus: 'noisy' })]).outcome, 'unclear');
-  for (const d of [decide([row(1, 5)]), decide([row(1, 0)]), decide([row(0, 0)]), decide([row(0, 0, { audioStatus: 'noisy' })])])
-    assert.doesNotMatch(JSON.stringify(d), /confidence|transcri|speech recognition|whisper|\bAI\b/i, 'no technical words for children');
-});
-
-// ---------- local Whisper provider ----------
-test('Whisper provider: free local model, loaded once, Hebrew pass, hallucinations removed', async () => {
-  assert.match(WHISPER_MODEL, /whisper/i);
-  let loads = 0; const seen = [];
-  const recognize = whisperRecognizer({ loadPipeline: async () => { loads++; return async (audio, opts) => { seen.push([audio, opts]); return { text: ' וירא אליו  תודה רבה' }; }; } });
-  const pcm = new Int16Array([0, 16384, -32768]);
-  const a = await recognize({ pcm, sampleRate: 16000, language: 'he' });
-  await recognize({ pcm, sampleRate: 16000, language: 'he' });
-  assert.equal(loads, 1, 'model loaded once per instance');
-  assert.equal(a.transcript, 'וירא אליו', 'a known silence hallucination is removed');
-  assert.equal(seen[0][1].language, 'hebrew');
-  assert.equal(seen[0][1].task, 'transcribe');
-  assert.ok(seen[0][0] instanceof Float32Array);
-  assert.deepEqual(Array.from(seen[0][0]), [0, 0.5, -1]);
-  assert.equal(cleanTranscript('Thanks for watching'), '');
-  await assert.rejects(recognize({ pcm, sampleRate: 8000, language: 'he' }));
-  let fails = 0;
-  const flaky = whisperRecognizer({ loadPipeline: async () => { if (fails++ === 0) throw new Error('download failed'); return async () => ({ text: 'ok' }); } });
-  await assert.rejects(flaky({ pcm, sampleRate: 16000, language: 'he' }));
-  assert.equal((await flaky({ pcm, sampleRate: 16000, language: 'he' })).transcript, 'ok', 'a failed model load is retried next time');
-});
-
-test('no paid AI dependency remains in AI Practice', () => {
-  for (const dir of ['backend/functions/chazara-ai', 'backend/chazara-ai-staging/chazara-ai']) {
-    for (const f of fs.readdirSync(path.join(ROOT, dir))) assert.doesNotMatch(fs.readFileSync(path.join(ROOT, dir, f), 'utf8'), /anthropic|@google-cloud\/speech|claude-/i, dir + '/' + f);
+test('gibberish or empty transcript -> Let\'s Try Again, "I couldn\'t make that out"', async () => {
+  for (const text of ['', 'blah blah boing boing', 'la la la la', 'Thank you.']) {
+    const d = await outcome(['18_1'], [{ text }]);
+    assert.equal(d.outcome, 'try_again', text);
+    assert.equal(d.message, "I couldn't make that out — try again.");
   }
-  for (const f of ['backend/functions/chazara-ai-practice.js', 'backend/chazara-ai-staging/index.js', 'backend/chazara-ai-staging/package.json', 'chazara/ai-practice-teacher.js'])
-    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /anthropic|ANTHROPIC_API_KEY|@google-cloud\/speech|kehot|meaning/i, f);
-  assert.doesNotMatch(fs.readFileSync(path.join(ROOT, 'backend/functions/package.json'), 'utf8'), /@anthropic-ai\/sdk/);
+});
+
+test('multi-pasuk: all with words -> Excellent; some -> Almost There; none -> Let\'s Try Again', async () => {
+  assert.equal((await outcome(['18_1', '18_2', '18_3'], [good(), good(), good()])).outcome, 'excellent');
+  const almost = await outcome(['18_1', '18_2', '18_3'], [good(), { text: 'la la la' }, good()]);
+  assert.equal(almost.outcome, 'almost');
+  assert.deepEqual(almost.pesukim.map(p => p.status), ['great', 'practice', 'great']);
+  assert.equal((await outcome(['18_1', '18_2'], [{ text: '' }, { text: 'um' }])).outcome, 'try_again');
+});
+
+test('messages are gentle and free of technical words', () => {
+  for (const d of [decide([{ id: 'a', label: 'a', passes: true }]), decide([{ id: 'a', label: 'a', passes: false }]),
+    decide([{ id: 'a', label: 'a', passes: true }, { id: 'b', label: 'b', passes: false }])]) {
+    assert.doesNotMatch(JSON.stringify(d), /confidence|transcri|speech recognition|openai|\bAI\b|wrong|fail|bad/i);
+  }
+});
+
+test('one transcription per pasuk clip, nothing else', async () => {
+  const providers = F.fakeProviders();
+  await evaluateAttempt({ items: items(['18_1', '18_2']), clips: [clip(good()), clip(good())], providers });
+  assert.equal(providers.calls.transcribe, 2);
+});
+
+test('audio length for the cost report: provider figure first, else the clamped browser length', async () => {
+  const providers = F.fakeProviders();
+  const a = await evaluateAttempt({ items: items(['18_1']), clips: [{ ...clip({ text: 'x y', seconds: 31.5 }) }], providers });
+  assert.equal(a.usage.audioSeconds, 31.5);
+  const b = await evaluateAttempt({ items: items(['18_1', '18_2']), clips: [{ ...clip(good()), durationMs: 999999 }, { ...clip(good()), durationMs: -5 }], providers });
+  assert.equal(b.usage.audioSeconds, 60);
+});
+
+// ---------- OpenAI provider ----------
+test('OpenAI provider: gpt-4o-mini-transcribe, multipart upload, key from the secret, no language forced', async () => {
+  assert.equal(TRANSCRIBE_MODEL, 'gpt-4o-mini-transcribe');
+  const sent = [];
+  const fetchImpl = async (url, init) => { sent.push([url, init]); return { ok: true, json: async () => ({ text: 'וירא אליו', usage: { type: 'duration', seconds: 12 } }) }; };
+  const t = openaiTranscriber({ apiKey: () => 'sk-test', fetchImpl });
+  const out = await t({ buffer: Buffer.from('abc'), mimeType: 'audio/webm;codecs=opus' });
+  assert.deepEqual(out, { text: 'וירא אליו', seconds: 12 });
+  const [url, init] = sent[0];
+  assert.equal(url, 'https://api.openai.com/v1/audio/transcriptions');
+  assert.equal(init.headers.Authorization, 'Bearer sk-test');
+  assert.equal(init.body.get('model'), 'gpt-4o-mini-transcribe');
+  assert.equal(init.body.get('language'), null);
+  assert.equal(init.body.get('file').name, 'pasuk.webm');
+  assert.equal(extFor('audio/mp4'), 'mp4'); assert.equal(extFor('audio/ogg;codecs=opus'), 'ogg'); assert.equal(extFor(''), 'webm');
+  const bad = openaiTranscriber({ apiKey: () => 'k', fetchImpl: async () => ({ ok: false, status: 400, text: async () => 'Invalid file format' }) });
+  await assert.rejects(bad({ buffer: Buffer.from('x'), mimeType: 'audio/webm' }), e => e.code === 'transcribe_failed' && e.status === 400);
+});
+
+test('no Anthropic, Google Speech or local model dependency remains', () => {
+  for (const dir of ['backend/functions/chazara-ai', 'backend/chazara-ai-staging/chazara-ai'])
+    for (const f of fs.readdirSync(path.join(ROOT, dir)))
+      assert.doesNotMatch(fs.readFileSync(path.join(ROOT, dir, f), 'utf8'), /anthropic|@google-cloud\/speech|huggingface|whisper/i, dir + '/' + f);
+  for (const f of ['backend/functions/package.json', 'backend/chazara-ai-staging/package.json'])
+    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /@anthropic-ai\/sdk|@huggingface\/transformers/, f);
+  assert.match(fs.readFileSync(path.join(ROOT, 'backend/functions/chazara-ai-practice.js'), 'utf8'), /defineSecret\('OPENAI_API_KEY'\)/);
 });
 
 // ---------- service: scenarios 19–22 and teacher controls ----------
@@ -256,8 +197,8 @@ test('students see the Hebrew text for every pasuk', async () => {
   assert.ok(list.assignments[0].pesukim.every(p => /[א-ת]/.test(p.hebrew)));
 });
 
-test('19a. Whisper failure (model load/out of memory) -> friendly "short break", not counted, retry allowed', async () => {
-  const env = setup({ providers: F.fakeProviders({ recognizeFails: true }) });
+test('19a. transcription service down/timeout -> friendly "short break", not counted, retry allowed', async () => {
+  const env = setup({ providers: F.fakeProviders({ transcribeFails: true }) });
   const id = await makeAi(env);
   const r = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId() }, files([good('18_1')]));
   assert.equal(r.outcome, 'unavailable');
@@ -274,24 +215,26 @@ test('19c. interrupted recordings: missing pasuk audio, corrupt audio, empty fil
   assert.equal(env.store.data.b3Private.chazaraAiPractice.inflight?.stu_a, undefined, 'a failed upload never locks the student out');
 });
 
-test('19d. a clip over one minute is refused before running Whisper', async () => {
+test('19d. the browser\'s recording lengths are clamped and used only for the cost report', async () => {
   const env = setup();
   const id = await makeAi(env);
-  await assert.rejects(env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId() }, files([{ ...good('18_1'), seconds: 63 }])), e => e.code === 413);
-  assert.equal(env.prov.calls.recognize, 0);
-  assert.equal(env.store.data.b3Private.chazaraAiPractice.inflight?.stu_a, undefined);
+  await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId(), durations: '[999999]' }, files([good()]));
+  assert.equal(env.store.data.b3Private.chazaraAiPractice.usage.months[Object.keys(env.store.data.b3Private.chazaraAiPractice.usage.months)[0]].audioSeconds, 60);
+  env.clock.advance(5000);
+  const r = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId(), durations: 'not json' }, files([good()]));
+  assert.equal(r.outcome, 'excellent', 'a bad durations field never blocks the check');
 });
 
 test('20. retries work; progress counts attempts; same request replays without re-checking', async () => {
   const env = setup();
   const id = await makeAi(env);
   const first = reqId();
-  const r1 = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: first }, files([{ heard: F.HEARD['18_1'] }]));
-  assert.equal(r1.outcome, 'almost');
-  const calls = env.prov.calls.recognize;
-  const again = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: first }, files([{ heard: F.HEARD['18_1'] }]));
+  const r1 = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: first }, files([{ text: 'la la la' }]));
+  assert.equal(r1.outcome, 'try_again');
+  const calls = env.prov.calls.transcribe;
+  const again = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: first }, files([{ text: 'la la la' }]));
   assert.equal(again.replayed, true);
-  assert.equal(env.prov.calls.recognize, calls, 'duplicate request did not run Whisper again');
+  assert.equal(env.prov.calls.transcribe, calls, 'duplicate request did not pay for transcription again');
   env.clock.advance(5000);
   const r2 = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId() }, files([good('18_1')]));
   assert.equal(r2.outcome, 'excellent');
@@ -327,8 +270,8 @@ test('21b. unauthorized teachers: not Google, unverified, inactive, or class wit
 test('21c. the browser cannot supply the pasuk text or the result', async () => {
   const env = setup();
   const id = await makeAi(env);
-  const r = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId(), meaning: 'blah', hebrew: 'בלה', outcome: 'excellent' }, files([{ heard: 'בלה בלה בום' }]));
-  assert.equal(r.outcome, 'try_again');
+  const r = await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId(), meaning: 'blah', hebrew: 'בלה', outcome: 'excellent' }, files([{ text: 'בלה בלה בום' }]));
+  assert.equal(r.outcome, 'try_again', 'the browser cannot claim a result');
   const regularId = await makeAi(env, ['18_1'], 'regular');
   env.clock.advance(5000);
   await assert.rejects(env.svc.evaluate(STUDENT_A, { assignmentId: regularId, requestId: reqId() }, files([good('18_1')])), e => e.code === 404, 'regular assignments are never AI-checked');
@@ -381,7 +324,7 @@ test('22a. per-student daily limit, per-minute limit and the owner switch', asyn
   const off = setup({ data: { ...F.baseData(), b3Private: { chazaraAiPractice: { config: { enabled: false } } } } });
   const id3 = await makeAi(off);
   await assert.rejects(off.svc.evaluate(STUDENT_A, { assignmentId: id3, requestId: reqId() }, files([good('18_1')])), e => e.code === 503);
-  assert.equal(off.prov.calls.decode, 0, 'switched off = no processing at all');
+  assert.equal(off.prov.calls.transcribe, 0, 'switched off = nothing sent to OpenAI');
 });
 
 test('22b. duplicate and overlapping requests: one check at a time, cooldown, size/type limits', async () => {
@@ -401,12 +344,12 @@ test('22b. duplicate and overlapping requests: one check at a time, cooldown, si
 test('22c. usage totals give the owner cost and timing per evaluation', async () => {
   const env = setup();
   const id = await makeAi(env);
-  await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId() }, files([good('18_1')]));
+  await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId(), durations: '[20000]' }, files([good('18_1')]));
   const report = await env.svc.usageReport({ uid: 'owner', email: 'simcha5770@gmail.com', email_verified: true });
   assert.equal(report.evaluations, 1);
   assert.equal(report.outcomes.excellent, 1);
-  assert.ok(report.audioSeconds >= 11, 'audio seconds checked by Whisper are tracked');
-  assert.ok(report.estimatedCostPerEvaluationUsd < 0.01, 'compute only, no per-request AI fee');
+  assert.equal(report.audioSeconds, 20, 'audio seconds sent for transcription are tracked');
+  assert.equal(report.estimatedCostPerEvaluationUsd, 0.001, '20 s at $0.003/min');
 });
 
 test('privacy: no audio or transcript is stored, and regular Chazara data is never touched', async () => {
@@ -414,7 +357,7 @@ test('privacy: no audio or transcript is stored, and regular Chazara data is nev
   const id = await makeAi(env);
   await env.svc.evaluate(STUDENT_A, { assignmentId: id, requestId: reqId() }, files([good('18_1')]));
   const saved = JSON.stringify(env.store.data.b3Private.chazaraAiPractice.progress) + JSON.stringify(env.store.data.b3Private.chazaraAiPractice.inflight) + JSON.stringify(env.store.data.b3Private.chazaraAiPractice.usage);
-  assert.doesNotMatch(saved, /וירא|Hashem appeared|transcript|heard|signal/);
+  assert.doesNotMatch(saved, /וירא|Hashem appeared|transcript|"text"/);
   assert.ok(env.store.touched.every(([, p]) => !p.startsWith('posukPractice') && !p.startsWith('studentRewards')), 'no regular Chazara, events or points paths');
   assert.ok(env.store.touched.filter(([op]) => op !== 'get').every(([, p]) => p.startsWith('b3Private/chazaraAiPractice/')), 'writes stay in the server-only area');
 });

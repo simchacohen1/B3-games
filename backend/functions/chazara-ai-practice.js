@@ -1,27 +1,24 @@
 'use strict';
 // Chazara AI Practice endpoint (production project). Not deployed until the owner approves.
 // The service is OFF until the owner sets b3Private/chazaraAiPractice/config/enabled = true.
-// No paid AI services: speech is recognised by an open-source Whisper model running
-// inside this function. No API keys or secrets are needed.
+// Speech is transcribed by OpenAI gpt-4o-mini-transcribe (secret OPENAI_API_KEY).
 const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const { ALLOWED_ORIGINS } = require('./paid-api');
 const { createHandler } = require('./chazara-ai/http.cjs');
-const { decodeWithFfmpeg, whisperRecognizer } = require('./chazara-ai/providers.cjs');
+const { openaiTranscriber } = require('./chazara-ai/providers.cjs');
 
+const OPENAI_API_KEY = defineSecret('OPENAI_API_KEY');
 if (!admin.apps.length) admin.initializeApp();
 
-let providers = null; // one Whisper model per instance, loaded on first use
 const handler = createHandler({
   admin,
   allowedOrigin: origin => ALLOWED_ORIGINS.includes(origin),
-  getProviders: () => providers || (providers = {
-    decode: decodeWithFfmpeg(require('ffmpeg-static')),
-    recognize: whisperRecognizer()
-  })
+  getProviders: () => ({ transcribe: openaiTranscriber({ apiKey: () => OPENAI_API_KEY.value() }) })
 });
 
-// Whisper is CPU-bound: one check per instance at a time, 2 vCPU, room for the model in memory.
+// Light work (the transcription runs at OpenAI): small, short-lived instances.
 exports.chazaraAiPractice = onRequest({
-  region: 'us-central1', memory: '4GiB', cpu: 2, timeoutSeconds: 300, maxInstances: 5, concurrency: 1
+  region: 'us-central1', secrets: [OPENAI_API_KEY], memory: '256MiB', timeoutSeconds: 60, maxInstances: 3, concurrency: 20
 }, handler);

@@ -1,17 +1,43 @@
 # Chazara AI Practice (#688)
 
 AI Practice lives **inside the existing Chazara tile**. A teacher marks a Chazara assignment as
-**AI Practice**; students record themselves reading the pasuk and then translating it, and get
-one of four kid-friendly results right away. **Regular Chazara is unchanged and stays the default.**
-No new homepage tile.
+**AI Practice**; students record themselves reading the pasuk and saying what it means, and get a
+friendly result right away. **Regular Chazara is unchanged and stays the default.** No new homepage tile.
 
-This is **casual practice, not grading**, and it is deliberately **lenient**. It checks only two
-things: that the child read something like the assigned pasuk, and that he said something after
-it. It does **not** judge whether the translation is correct, and it uses **no paid AI service**:
-speech is recognised by a free, open-source Whisper model running inside the Cloud Function.
+This is **casual practice, not grading**, and it is kept deliberately **simple and lenient**:
+it only checks that the child actually said something. It does **not** check the meaning and does
+**not** compare what was said with the pasuk. It leans heavily toward passing and only fails a
+recording that is clearly silent or clearly gibberish. The child can always try again, with no penalty.
 
 Status: **built and tested with fictional data. Not deployed. Not yet tried on real children's
-recordings** (see "Real-audio check").
+recordings with the real transcription service.**
+
+## The two-step check
+
+| Step | Where | What it does | If it fails |
+|---|---|---|---|
+| **1. Instant silence check** | in the browser, right after each pasuk is recorded, **before anything is uploaded** | The recording must be at least **2 seconds** long, and the microphone must have picked up sound: a peak level of at least ~-36 dBFS and at least **0.4 s** of sound in total. | 🎧 **Couldn't Hear Clearly** — "I couldn't hear you — try again!" Shown instantly. Nothing is sent to the server or OpenAI, nothing is counted, and the child re-records just that pasuk. |
+| **2. Transcription check** | server | Each pasuk clip is sent to OpenAI **`gpt-4o-mini-transcribe`** (no language forced: Hebrew, English, Yiddish or a mix). If the transcript contains real words, it passes. | 📖 **Let's Try Again!** — "I couldn't make that out — try again." |
+
+"Real words" (server, `transcript-check.cjs`) means at least two different words of 2+ letters, or one
+word of 3+ letters, in any language — after removing filler sounds (um, uh, hmm, la la, blah, boing,
+אה…), one syllable repeated ("lalala", "bababa"), and whole transcripts that recognizers are known to
+invent from silence or noise ("Thank you.", "Thanks for watching", "[Music]", "תודה רבה"…).
+Anything else passes — including a wrong translation or unrelated talking, by design.
+
+## The four results
+
+| Result | Message | When |
+|---|---|---|
+| 🌟 **Excellent!** (+ confetti) | Excellent job! You read and explained the pasuk beautifully! | every pasuk's transcript has real words |
+| 💪 **Almost There!** | Great effort! You're getting closer. Practice a little more and try again! | multi-pasuk only: some pesukim have real words, some don't (tip: "Some pesukim were hard to make out. Try them again!") |
+| 📖 **Let's Try Again!** | I couldn't make that out — try again. | no pasuk has real words (empty or gibberish) |
+| 🎧 **Couldn't Hear Clearly** | I couldn't hear you — try again! | step 1: too short or silent (instant, in the browser) |
+
+If OpenAI is unreachable, the child sees "The checker needs a short break" with a **Check Again**
+button; that attempt is not counted. No coins/points are requested, no audio is saved, and the
+result cannot be changed by the browser. Teacher-preview and Guest mode show a sample with a
+result picker — nothing is sent.
 
 ## What the student sees (chazara/index.html)
 
@@ -19,190 +45,149 @@ recordings** (see "Real-audio check").
    (hidden when there are none). Regular teacher assignments are listed separately as
    **"📋 Chazara from your teacher — Teacher listens"**.
 2. Tap a card → practice screen with the **Hebrew of every assigned pasuk** (nekudos, right-to-left).
-3. **🎙️ Start Recording** → read the pasuk, then say what it means (English, Yiddish or mixed).
-   Multi-pasuk: one pasuk at a time, **Next Pasuk ➜**, then **✅ Finish Recording**.
-   Live recording dot, timer and volume bars; "Keep going!" if pressed too early (< 3 s);
-   each pasuk stops at 60 s.
-4. "Checking your Chazara…" animation → result:
-
-| Outcome | Message | When |
-|---|---|---|
-| 🌟 **Excellent!** (+ confetti) | Excellent job! You read and explained the pasuk beautifully! | every pasuk: the Hebrew roughly matched **and** at least 3 more words were said after it |
-| 💪 **Almost There!** | Great effort! You're getting closer. Practice a little more and try again! | only one part: read but said nothing after it, or (multi-pasuk) some pesukim done and some skipped |
-| 📖 **Let's Try Again!** | Let's try again! Remember to read the pasuk and explain what it means. | silence, gibberish, unrelated talking, a different pasuk, far too short — i.e. no reading of this pasuk heard |
-| 🎧 **Couldn't Hear Clearly** | I couldn't hear you clearly. Please try recording again! | bad audio: loud background noise or distortion, or a clear voice the recognizer could not turn into words |
-
-Plus one short tip (e.g. "After you read the pasuk, say what it means."). It never claims a
-specific word was wrong. Retry is unlimited (within the daily cap). No coins/points are requested,
-no audio is saved, and the result cannot be changed by the browser. Teacher-preview and Guest
-mode show a sample with a result picker — nothing is sent.
+3. **🎙️ Start Recording** → read the pasuk, then say what it means. Multi-pasuk: one pasuk at a time,
+   **Next Pasuk ➜**, then **✅ Finish Recording**. Live recording dot, timer and volume bars; each pasuk
+   stops at 60 s.
+4. "Checking your Chazara…" animation → result (step 1 failures appear instantly instead).
 
 ## What the teacher sees (chazara/teacher.html)
 
 A **📋 Chazara Assignments & 🤖 AI Practice** panel (below the recordings panel):
 - **+ New assignment**: title, sefer, perek, pesukim (≤ 6). Type: **👂 Regular Chazara (default)** or **🤖 AI Practice**.
-- **📖 Load the pesukim text** fills the Hebrew from Sefaria (ה׳ abbreviated, same source as
-  Posuk Practice). The teacher checks it and ticks "I checked the Hebrew text". There is **no
-  meaning/translation field** — translations are not checked.
-- Each assignment shows a **🤖 AI Practice** or **👂 Regular — you review** badge, Edit, Hide/Show.
-- AI assignments show simple completion: "N of M students reached Excellent · K practiced", and
-  per student: tries, latest result in words, reached Excellent ✓. "Practice information only —
-  not a grade." No percentages.
+- **📖 Load the pesukim text** fills the Hebrew from Sefaria (shown to students only; not used for checking).
+- Badges, Edit, Hide/Show, and simple completion for AI assignments ("N of M reached Excellent ·
+  K practiced", per-student tries and latest result). "Practice information only — not a grade."
 
-## How a recording is checked
+## Code
 
 ```
-browser (chazara/ai-practice.js)                       Cloud Function chazaraAiPractice
-  record 1 clip per pasuk  ── multipart + ID token ──▶  http.cjs     CORS, size limits, sign-in
-                                                         service.cjs  auth + class scope, pasuk text from DB,
-                                                                      one-at-a-time lock, replay, caps
-                                                         pipeline.cjs
-                                                          1 audio-signal.cjs  ffmpeg → PCM; silence/noise/short/clipping
-                                                          2 providers.cjs     ONE local Whisper pass, language = Hebrew
-                                                          3 hebrew-match.cjs  reading: Hebrew words heard in order vs the pasuk
-                                                          4 hebrew-match.cjs  translation attempt: words heard AFTER the reading
-                                                          5 decide.cjs        fixed rules → 4 outcomes + fixed messages
+chazara/ai-practice-check.js   step 1 — instant silence check (browser; also used by tests/scripts)
+chazara/ai-practice.js         student panel, recorder, level meter, results
+chazara/ai-practice-teacher.js teacher panel
+backend/functions/chazara-ai/
+  http.cjs              CORS, size limits, sign-in, multipart
+  service.cjs           auth + class scope, one-at-a-time lock, duplicate replay, caps, usage totals
+  pipeline.cjs          step 2 orchestration (one transcription per pasuk clip)
+  providers.cjs         OpenAI gpt-4o-mini-transcribe (plain HTTPS, no SDK)
+  transcript-check.cjs  "real words?" rule
+  decide.cjs            the four results and their messages
+backend/functions/chazara-ai-practice.js   production function (secret OPENAI_API_KEY)
+backend/chazara-ai-staging/                staging-only copy (project-guarded)
 ```
 
-- **Reading check:** the existing accent-tolerant word matcher (nekudos ignored, Ashkenazi/Israeli
-  sound-alikes accepted, split/merged words allowed). The reading "roughly matches" when at least
-  **30%** of the pasuk's words are heard in order, in runs (`THRESHOLDS.reading` in `decide.cjs`).
-  Another pasuk that shares a few common words does not reach this.
-- **Translation check:** at least **3 words** (any language, any script) heard **after the last
-  matched pasuk word** (`THRESHOLDS.extraWords`). What the words mean is not checked. Whisper is run
-  in Hebrew mode, so an English or Yiddish translation usually comes out in Hebrew letters, Latin
-  letters or a mix — all count.
-- **Whisper model:** `Xenova/whisper-small` (multilingual, Hebrew/Yiddish capable), 8-bit quantised,
-  via transformers.js + ONNX Runtime on the function's CPU. Downloaded from Hugging Face once per
-  function instance (~250 MB) and kept in memory. Change it without a code edit with
-  `CHAZARA_AI_WHISPER_MODEL` (e.g. `Xenova/whisper-base`: faster, weaker Hebrew) and
-  `CHAZARA_AI_WHISPER_DTYPE`. Known Whisper "silence hallucinations" (e.g. "תודה רבה",
-  "Thanks for watching") are stripped.
-- **Reusable:** `pipeline.cjs` only needs `{id, label, hebrew}` items and one audio clip each, with
-  injected providers. Nothing in it knows about Chazara or Firebase.
+The model can be changed without a code edit with `CHAZARA_AI_TRANSCRIBE_MODEL`.
 
 ## Security, privacy and limits
 
 - **No database or storage rule changes.** All data is under `b3Private/chazaraAiPractice/…`,
   which the existing rules already deny to every browser. Regular Chazara paths
   (`posukPractice/chazara/**`, events, recordings, Student Rewards) are never read or written.
-- Students: Firebase ID token checked with the existing `authorizePracticeStudent` (active student,
-  active membership, class active, Chazara allowed); only their own class's assignments.
-  Teachers: verified Google sign-in, assigned to the class (or owner/admin), Chazara enabled.
-- The pasuk text and the result are server-side only; extra fields from the browser are ignored.
-- **Audio and transcripts are not stored, and audio never leaves Google Cloud** (no third-party
-  speech or AI service). Stored per student: attempts, last outcome, first-Excellent time.
-  Monthly totals (no student data): checks, outcomes, audio seconds, processing time.
-- **No API keys or secrets** are needed by this function.
+- Students: Firebase ID token checked with the existing `authorizePracticeStudent`; only their own
+  class's assignments. Teachers: verified Google sign-in, assigned to the class (or owner/admin).
+- **Privacy change to note:** recordings that pass step 1 are **sent to OpenAI** for transcription.
+  Under OpenAI's API terms, API audio is not used to train models by default, but OpenAI may keep
+  it for up to 30 days for abuse monitoring (unless the account has Zero Data Retention). Please
+  confirm this fits the school's privacy/parent-consent expectations before turning it on for
+  students. Silent clips stopped in step 1 never leave the device.
+- Nothing is stored except attempt summaries: attempts, last result, first-Excellent time. No audio
+  and no transcript is saved. Monthly totals (no student data): checks, results, audio seconds, time.
 - Limits: 1.5 MB per pasuk clip, 6 MB total, ≤ 6 pesukim, ≤ 60 s per pasuk, audio types only. One
-  check at a time per student (+4 s cooldown); a repeated request id replays the saved result; failed
-  checks are not counted and can be retried.
+  check at a time per student (+4 s cooldown); a repeated request id replays the saved result
+  (no second charge); failed checks are not counted and can be retried.
 - Caps (adjustable in `b3Private/chazaraAiPractice/config/limits`): 20/minute, 150/day,
-  1500/month, 15 per student per day, 120 per class per day. They now protect server time, not an AI bill.
+  1500/month, 15 per student per day, 120 per class per day.
 - **Off switch:** nothing is checked until the owner sets `b3Private/chazaraAiPractice/config/enabled = true`.
 
 ## Expected cost
 
-There is **no per-attempt fee** (no Google Speech-to-Text, no Claude). The only cost is the Cloud
-Function's own compute while Whisper runs (Cloud Functions 2nd gen tier-1 list prices:
-$0.000024 per vCPU-second, $0.0000025 per GiB-second; the function uses 2 vCPU + 4 GiB, so
-≈ **$0.000058 per second of checking**).
+OpenAI `gpt-4o-mini-transcribe` is about **$0.003 per minute of audio** (OpenAI's published
+estimate; it is billed by audio tokens, so check the actual usage page). Step 1 is free and runs
+on the child's device, so silent or too-short recordings cost **nothing**. The Cloud Function is tiny
+(256 MiB, a few seconds per check) and stays inside the Firebase free tier for this volume.
 
-| | 1 pasuk (~30 s audio) | 3 pesukim (~90 s audio) |
+| | Audio sent | Cost per check |
 |---|---|---|
-| Whisper time (estimate, **not yet measured**) | ~15–25 s | ~40–70 s |
-| Compute before free tier | **≈ $0.001–0.0015** | **≈ $0.0025–0.004** |
-| AI/API fees | $0 | $0 |
+| Silent / too short (stopped in the browser) | none | **$0** |
+| 1 pasuk (~30 s) | 0.5 min | **≈ $0.0015** |
+| 3 pesukim (~90 s) | 1.5 min | **≈ $0.0045** |
+| Largest possible (6 pesukim × 60 s) | 6 min | ≈ $0.018 |
 
-- **Free tier:** each Google billing account gets 180,000 vCPU-seconds and 360,000 GiB-seconds per
-  month, shared with the project's other functions. That is enough for roughly **4,000–6,000
-  one-pasuk checks a month** if nothing else used it.
-- **Example class:** 25 boys × 2 attempts/day × 1 pasuk ≈ 1,000 checks/month ≈ 20,000 s ≈
-  **$0 inside the free tier, about $1–1.50/month if the free tier is already used up** by other functions.
-- **Worst case at the default cap** (1,500 checks/month): ≈ $1.50–2.25 (single-pasuk) or
-  ≈ $4–6 (all 3-pasuk), before the free tier.
-- **Other small costs:** each new function instance downloads and loads the model (a "cold start",
-  roughly 30–90 s, ≈ $0.005 each); the larger container image (~1 GB, mostly ONNX Runtime) costs
-  about $0.10/month in Artifact Registry storage. Hugging Face downloads are free.
-- Previous design for comparison: Google Speech-to-Text + Claude Opus/Haiku ≈ $0.025–0.07 per attempt.
+- **Example class:** 25 boys × 2 attempts/day × 1 pasuk ≈ 1,000 checks per school month
+  ≈ **$1.50/month** (about $3/month if every boy also retries once).
+- **Default cap** (1,500 checks/month): ≈ $2.25 for one-pasuk checks, ≈ $7 for three-pasuk checks;
+  ≈ $27 is the absolute ceiling (every check at the 6-pasuk × 60 s maximum).
+- Set a **monthly budget limit on the OpenAI project** as a hard stop in addition to these caps.
+- The owner can read actual monthly totals with the `usageReport` action (checks, results, audio
+  seconds, estimated cost per check, average time).
 
-The owner can read actual monthly totals with the `usageReport` action (checks, outcomes, audio
-seconds, average time, estimated compute cost).
-
-## Trade-offs of the lenient, free design
-
-- **Speed:** Whisper on CPU is slower than a paid recognizer. Expect roughly 15–25 s of "Checking…"
-  per pasuk, and up to a minute or two extra for the first student after the function has been idle
-  (cold start). Up to 5 checks run at once (one per instance); more students wait their turn.
-  `Xenova/whisper-base` is faster if this is too slow.
-- **Easy Excellent, by design:** any rough reading followed by a few words earns Excellent — even a
-  wrong translation, or silly words after a correct reading.
-- **Translation-only, or translating before reading → Let's Try Again,** because the translation
-  check only counts words said *after* a recognised reading.
-- **Phrase-by-phrase style** (read a few words, translate, read more…) counts only the words after
-  the last pasuk word that was recognised; usually the last phrase's translation is enough.
+Earlier designs for comparison: Google Speech-to-Text + Claude ≈ $0.025–0.07 per attempt; local
+Whisper ≈ $0.001 of compute but slow (15–25 s per pasuk) and large to deploy.
 
 ## Tests
 
-- `node --test tests/chazara-ai-practice.test.cjs` — 44 tests, fictional data, **fake Whisper**.
-  Covers: reading + English/Yiddish/mixed/any-wording translation → Excellent; minor and many
-  reading mistakes; reading only → Almost; translation only, wrong pasuk, unrelated talk, gibberish,
-  silence, very short → Try Again; noise and empty recognition → Couldn't Hear; multi-pasuk
-  complete/skipped; one Hebrew Whisper pass per pasuk; Whisper provider (loaded once, audio
-  conversion, hallucination removal, failed load retried); Whisper failure → "short break" and not
-  counted; interrupted/oversized/wrong-type uploads; retries and duplicate replay; unauthorized and
-  cross-class access; rate limits and off switch; usage report; privacy (nothing stored, regular
-  Chazara untouched); no Anthropic/Google Speech dependency; no rules change.
+- `node --test tests/chazara-ai-practice.test.cjs` — 33 tests, fictional data, **fake transcriber**
+  (no paid calls): silence-check thresholds (speech passes; silence, quiet room, clicks and short
+  clips stop; noise, soft voices and unmeasured recordings pass on); real-words rule (real words in
+  any language pass; empty, filler, repeated syllables and known inventions fail); all four results
+  incl. multi-pasuk Almost There; gentle, non-technical messages; one transcription per clip; cost
+  figures; the OpenAI request (model, multipart file, key from the secret, no language forced,
+  error handling); service failure → "short break", not counted; cut-off/oversized/wrong-type
+  uploads; retries and duplicate replay; unauthorized and cross-class access; caps and off switch;
+  privacy (nothing stored, regular Chazara untouched); no Anthropic/Google/Whisper dependency;
+  no rules change.
 - Existing Chazara tests (`chazara-recording-save`, `chazara-teacher-scope`, `chazara-owner-self-heal`) pass.
-- `node tests/chazara-ai-browser.cjs` — 11 checks in Chromium with a fake microphone and a mocked
-  checker: panel, RTL Hebrew, keyboard start, recording indicator, multi-pasuk steps, checking
-  animation, results, retry, phone layout, teacher panel and editor (Hebrew only, no meaning field).
-- `bash scripts/chazara-ai-make-signal-set.sh DIR && node scripts/chazara-ai-audio-eval.cjs DIR/manifest.json --signal-only`
-  — audio check on real decoded audio files (synthetic voice + noise): **10/10 as expected**.
-- transformers.js 4.3.2 was installed and imported in Node 22 and exposes the API the provider uses.
-  **Whisper itself could not be run in the development sandbox** (Hugging Face downloads are blocked
-  there), so recognition speed and accuracy are not measured yet.
+- `node tests/chazara-ai-browser.cjs` — 13 checks in Chromium with a fake microphone and a mocked
+  server, including an early "Finish" (instant Couldn't Hear Clearly, **no request sent**, retry the
+  same pasuk) and a **silent fake microphone** run (stopped instantly in the browser, nothing sent).
+- `bash scripts/chazara-ai-make-signal-set.sh DIR && node scripts/chazara-ai-audio-eval.cjs DIR/manifest.json --silence-only`
+  — the browser's silence check applied to **real decoded audio files** (synthetic voice + noise):
+  **11/11 as expected** (all clips with sound sent on, incl. a very quiet voice and loud noise;
+  silence, a quiet room, a 1-second clip and a multi-pasuk set with one silent pasuk stopped).
 - CI: `.github/workflows/chazara-ai-practice.yml`.
+
+**Not tested yet:** real transcription by OpenAI (no API key in the development environment) and
+real children's voices.
 
 ## Real-audio check (recommended before students use it)
 
 ```
-cd backend/functions && npm install && cd ../..
-node scripts/chazara-ai-audio-eval.cjs manifest.json --full --out report.json
+OPENAI_API_KEY=... node scripts/chazara-ai-audio-eval.cjs manifest.json --full --out report.json
 ```
 
-Free: it runs the same local Whisper model on any computer with internet access (first run
-downloads the model). It reports outcomes against expectations, false "Excellent"s, false
-rejections, "couldn't hear" results, time per check and estimated compute cost, plus per-pasuk
-coverage, words-after-reading and transcript. Use 20–40 authorised recordings (adults or older
-children imitating children, or children with parental consent), including Ashkenazi reading,
-English and Yiddish translations, reading only, silly talk and silence. Keep recordings and the
-manifest out of git. Tune `THRESHOLDS` in `decide.cjs` from the results.
+Costs about $0.003 per audio minute (a 40-clip set is well under $0.25). Reports each case's result
+against the expected one, clips wrongly stopped by the silence check, unexpected Excellents, average
+time and cost, with the transcripts. Use authorised recordings only (adults or older children
+imitating children, or children with parental consent): quiet readers, Ashkenazi reading, English
+and Yiddish explanations, silly sounds, silence and a noisy room. Keep recordings and the manifest
+out of git. Tune `LIMITS` in `chazara/ai-practice-check.js` or the word rule in
+`transcript-check.cjs` from the results.
 
 ## Known limitations
 
-- How well Whisper recognises **children's Ashkenazi Hebrew** is unmeasured. The likely failure is
-  a correct reader getting "Almost There", "Let's Try Again" or "Couldn't Hear Clearly", not false praise.
-- Whisper can occasionally invent text on noisy audio; noisy clips are filtered out first and known
-  phrases are stripped, but not every hallucination can be caught.
-- Audio checks use simple level/SNR measures; a child who speaks with no pauses at all may look "noisy".
-- The Hebrew text comes from Sefaria and must be checked by the teacher.
+- A very soft-spoken child far from the microphone could be stopped by step 1; the thresholds are
+  set low, and the child just tries again.
+- Transcription services sometimes "hear" words in noise; with this lenient rule a noisy room may
+  get Excellent.
+- Unrelated talking, a wrong translation, or reading a different pasuk all count as real words and
+  get Excellent — the check only confirms the child said something.
+- Whether `gpt-4o-mini-transcribe` turns children's Hebrew/Yiddish into words reliably is unmeasured
+  (it only needs *some* words to pass, which makes this less critical).
 
 ## Owner steps to try it on staging (nothing here is done automatically)
 
-1. In project `fun-torah-tools-staging` (already on Blaze for Functions) nothing extra needs to be
-   enabled: no Speech-to-Text API and no secrets.
-2. From a reviewed checkout of this PR branch:
+1. Create an OpenAI API key in a project with a monthly budget limit.
+2. Store it for staging: `firebase functions:secrets:set OPENAI_API_KEY --project fun-torah-tools-staging`.
+3. From a reviewed checkout of this PR branch:
    `cd backend/chazara-ai-staging && npm install && cd ../..`
    `firebase deploy --only functions --config firebase.chazara-ai-staging.json --project fun-torah-tools-staging`
-3. Build and publish a preview channel of the staging site (the staging packager rewrites the
+4. Build and publish a preview channel of the staging site (the staging packager rewrites the
    function URL to staging):
    `node staging/package-site.cjs . staging-build`
    `firebase hosting:channel:deploy chazara-ai --config firebase.staging.json --project fun-torah-tools-staging`
-4. Turn it on (staging DB only): set `b3Private/chazaraAiPractice/config/enabled` to `true`.
-5. With the fictional staging teacher, create an AI Practice assignment; with a fictional student,
-   practice. The first check after deploy is slow (model download).
+5. Turn it on (staging DB only): set `b3Private/chazaraAiPractice/config/enabled` to `true`.
+6. With the fictional staging teacher, create an AI Practice assignment; with a fictional student, practice.
 
-Production later needs: owner approval, `firebase deploy --only functions:chazaraAiPractice`,
-merging the frontend, and setting the production `enabled` flag. Rollback: set `enabled` to
-`false` (instant, no deploy).
+Production later needs: owner approval, the same secret in `b3-games`
+(`firebase functions:secrets:set OPENAI_API_KEY --project b3-games`),
+`firebase deploy --only functions:chazaraAiPractice`, merging the frontend, and setting the
+production `enabled` flag. Rollback: set `enabled` to `false` (instant, no deploy).

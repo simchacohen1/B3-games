@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Fictional fixtures for Chazara AI Practice tests.
- * Fake providers stand in for ffmpeg and the local Whisper model so the
+ * Fake providers stand in for the OpenAI transcription service so the
  * DECISION LOGIC can be tested. They prove nothing about real recognition
  * accuracy — see scripts/chazara-ai-audio-eval.cjs for real-audio validation.
  */
@@ -53,28 +53,30 @@ function synth(kind, seconds = 12, sampleRate = 16000) {
   return pcm;
 }
 
-function fakeProviders({ recognizeFails = false } = {}) {
-  const calls = { decode: 0, recognize: 0, languages: [] };
-  const specs = new WeakMap();
+function fakeProviders({ transcribeFails = false, badAudio = false } = {}) {
+  const calls = { transcribe: 0 };
   return {
     calls,
-    decode: async buf => {
-      calls.decode++;
-      const spec = JSON.parse(buf.toString());
-      if (spec.corrupt) throw Object.assign(new Error('bad audio'), { code: 'decode_failed' });
-      const pcm = synth(spec.signal || 'speech', spec.seconds || 12);
-      specs.set(pcm, spec);
-      return pcm;
-    },
-    // Stands in for the local Whisper pass: returns what the scenario says was heard.
-    recognize: async ({ pcm, language }) => {
-      calls.recognize++;
-      calls.languages.push(language);
-      if (recognizeFails) throw Object.assign(new Error('model failed to load'), { code: 'ENOMEM' });
-      const spec = specs.get(pcm) || {};
-      return { transcript: spec.heard || '' };
+    // Stands in for OpenAI gpt-4o-mini-transcribe: returns what the scenario says was heard.
+    transcribe: async ({ buffer }) => {
+      calls.transcribe++;
+      const spec = JSON.parse(buffer.toString());
+      if (transcribeFails) throw Object.assign(new Error('Transcription failed (HTTP 503)'), { code: 'transcribe_failed', status: 503 });
+      if (badAudio || spec.corrupt) throw Object.assign(new Error('Transcription failed (HTTP 400)'), { code: 'transcribe_failed', status: 400 });
+      return { text: spec.text || '', seconds: spec.seconds };
     }
   };
+}
+
+/** Level readings like the browser takes while recording (one per ~10 ms of audio). */
+function framesFrom(pcm, sampleRate = 16000, frameMs = 10) {
+  const n = Math.round(sampleRate * frameMs / 1000), out = [];
+  for (let i = 0; i + n <= pcm.length; i += n) {
+    let sum = 0;
+    for (let j = i; j < i + n; j++) { const v = pcm[j] / 32768; sum += v * v; }
+    out.push({ rms: Math.sqrt(sum / n), ms: frameMs });
+  }
+  return out;
 }
 
 function memoryStore(initial = {}) {
@@ -133,4 +135,4 @@ function aiAssignment(keys = ['18_1'], mode = 'ai') {
   return { title: 'Fictional practice', mode, sefer: 'Bereishis', perek: 18, from: Math.min(...nums), to: Math.max(...nums), pesukim };
 }
 
-module.exports = { PESUKIM, HEARD, segment, synth, fakeProviders, memoryStore, TEACHER, OTHER_TEACHER, baseData, aiAssignment };
+module.exports = { PESUKIM, HEARD, segment, synth, framesFrom, fakeProviders, memoryStore, TEACHER, OTHER_TEACHER, baseData, aiAssignment };

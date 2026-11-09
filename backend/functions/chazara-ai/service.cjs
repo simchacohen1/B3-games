@@ -33,10 +33,9 @@ const COOLDOWN_MS = 4000;          // minimum gap between two checks by one stud
 
 const DEFAULT_LIMITS = { minute: 20, day: 150, month: 1500, studentDay: 15, classDay: 120 };
 // List-price estimates used only for the owner's usage report (verify in the billing console).
-// No paid AI services: the only cost is the function's own compute while Whisper runs.
-// Cloud Functions 2nd gen (Cloud Run) tier-1 list prices, before the monthly free tier
-// (180,000 vCPU-seconds + 360,000 GiB-seconds per billing account, shared with other functions).
-const PRICES = { vcpuSecond: 0.000024, gibSecond: 0.0000025, vcpu: 2, memoryGiB: 4 };
+// OpenAI gpt-4o-mini-transcribe list price (verify on the OpenAI pricing page).
+// The function's own compute is a few seconds at 256 MiB and is not counted here.
+const PRICES = { transcribePerMinute: 0.003 };
 
 const SEFARIM = ['Bereishis', 'Shemos', 'Vayikra', 'Bamidbar', 'Devarim'];
 const HEB_NUM = n => {
@@ -199,8 +198,7 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
     const month = new Date(now()).toISOString().slice(0, 7);
     const u = (await store.get(ROOT + '/usage/months/' + month)) || {};
     const evaluations = u.evaluations || 0;
-    // Compute while checking (before the free tier, which usually covers it).
-    const cost = (u.totalMs || 0) / 1000 * (PRICES.vcpu * PRICES.vcpuSecond + PRICES.memoryGiB * PRICES.gibSecond);
+    const cost = (u.audioSeconds || 0) / 60 * PRICES.transcribePerMinute;
     return { ok: true, month, ...u, estimatedCostUsd: Math.round(cost * 100) / 100,
       estimatedCostPerEvaluationUsd: evaluations ? Math.round(cost / evaluations * 1000) / 1000 : null,
       averageMs: evaluations ? Math.round((u.totalMs || 0) / evaluations) : null, config: await config(store) };
@@ -236,6 +234,10 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
       total += f.buffer.length;
     }
     if (total > MAX_TOTAL_BYTES) fail(413, 'That recording is too long.');
+    // Recording lengths from the browser are used ONLY for the cost report (clamped to 0–60 s).
+    let durations = [];
+    try { durations = JSON.parse(String(body.durations || '[]')); } catch (_) { durations = []; }
+    durations = files.map((_, i) => Math.min(60000, Math.max(0, Number(Array.isArray(durations) ? durations[i] : 0) || 0)));
 
     // One check at a time per student; a repeated requestId replays the saved result (no new cost).
     const t = now();
@@ -262,13 +264,14 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
     }
     try {
       const out = await evaluateAttempt({
-        items: pesukim.map(p => ({ id: p.perek + '_' + p.posuk, label: pasukLabel(p.perek, p.posuk), hebrew: p.hebrew })),
-        segments: files.map(f => f.buffer), mimeType: files[0].mimeType, providers
+        items: pesukim.map(p => ({ id: p.perek + '_' + p.posuk, label: pasukLabel(p.perek, p.posuk) })),
+        clips: files.map((f, i) => ({ buffer: f.buffer, mimeType: f.mimeType, durationMs: durations[i] })), providers
       });
       result = out.decision; usage = out.usage; elapsedMs = out.elapsedMs;
     } catch (e) {
       if (e && Number.isInteger(e.code) && e.code >= 400 && e.code < 500) { await store.set(inflightPath, null); throw e; }
-      if (e && e.code === 'decode_failed') { await store.set(inflightPath, null); fail(422, 'That recording could not be opened. Please record again.'); }
+      // The transcription service could not read the audio file itself (e.g. a cut-off upload).
+      if (e && e.code === 'transcribe_failed' && e.status === 400) { await store.set(inflightPath, null); fail(422, "That recording didn't save properly — please try again."); }
       console.error('chazaraAiPractice evaluate failed', e && (e.code || e.message));
       result = UNAVAILABLE; countable = false;
     }
