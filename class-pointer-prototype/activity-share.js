@@ -166,8 +166,12 @@
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
     }
     for(const [mode,symbol,name] of lessonModes){
-      const button=document.createElement('button');button.type='button';button.textContent=symbol;button.title=name;button.setAttribute('aria-label',name);
-      button.style.cssText='width:48px;height:48px;padding:0;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;font:900 27px system-ui;line-height:1;touch-action:manipulation';
+      // Icon plus a visible name, so a student never has to guess what a tool does.
+      const button=document.createElement('button');button.type='button';button.title=name;button.setAttribute('aria-label',name);
+      const icon=document.createElement('span');icon.textContent=symbol;icon.setAttribute('aria-hidden','true');icon.style.cssText='display:block;font:900 22px/1 system-ui';
+      const caption=document.createElement('span');caption.textContent=name.replace('Highlight box','Box');caption.setAttribute('aria-hidden','true');caption.style.cssText='display:block;margin-top:2px;font:700 10px/1.1 system-ui;white-space:nowrap';
+      button.append(icon,caption);
+      button.style.cssText='min-width:52px;height:50px;padding:3px 5px;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;line-height:1;touch-action:manipulation';
       button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
@@ -181,9 +185,9 @@
     const sizeButtons=[];
     const selectSize=value=>{lessonSize=value;for(const b of sizeButtons){const on=Number(b.dataset.size)===value;b.setAttribute('aria-pressed',String(on));b.style.background=on?'#fef08a':'#193b6c';b.style.borderColor=on?'#facc15':'#86a6df'}};
     for(const [size,name,thickness] of [[.008,'Thin',2],[.016,'Medium',5],[.028,'Thick',9]]){const b=document.createElement('button');b.type='button';b.dataset.size=String(size);b.title=name;b.setAttribute('aria-label',name+' line');b.style.cssText='width:47px;height:47px;display:flex;align-items:center;justify-content:center;border:3px solid #86a6df;border-radius:11px;background:#193b6c;cursor:pointer;touch-action:manipulation';const line=document.createElement('span');line.style.cssText='width:28px;height:'+thickness+'px;border-radius:10px;background:#fff';b.append(line);b.addEventListener('click',()=>selectSize(size));sizeButtons.push(b);sizeSelect.append(b)}
-    undo.textContent='↶';undo.title='Undo my last drawing';undo.setAttribute('aria-label','Undo my last drawing');
-    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽';clear.title='Clear only my drawings';clear.setAttribute('aria-label','Clear only my drawings');
-    for(const b of [undo,clear])b.style.cssText='width:47px;height:47px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:900 26px system-ui;cursor:pointer;touch-action:manipulation';
+    undo.textContent='↶ Undo';undo.title='Undo my last drawing';undo.setAttribute('aria-label','Undo my last drawing');
+    const clear=document.createElement('button');clear.type='button';clear.textContent='🧽 Clear mine';clear.title='Clear only my drawings';clear.setAttribute('aria-label','Clear only my drawings');
+    for(const b of [undo,clear])b.style.cssText='height:47px;padding:0 10px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:800 15px system-ui;white-space:nowrap;cursor:pointer;touch-action:manipulation';
     clear.addEventListener('click',()=>{if(admitted&&lessonActive&&presenceConn?.open&&lessonLevel!=='none')presenceConn.send({type:'edit-highlights',action:'clear'})});
     const bottomRow=document.createElement('div');bottomRow.style.cssText='display:flex;gap:8px;align-items:center;justify-content:center';
     bottomRow.append(sizeSelect,undo,clear);
