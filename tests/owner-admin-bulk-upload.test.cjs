@@ -43,7 +43,7 @@ function harness(){
   console,setTimeout,Date,JSON,Object,Promise,Math,Set};
  vm.createContext(ctx);vm.runInContext(block,ctx);
  const settle=()=>new Promise(r=>setTimeout(r,20));
- return {tree,store,el,calls,
+ return {tree,store,el,calls,ctx,
   check:async(text,name='roster.csv')=>{el('bulkFile').files=[{text,name}];el('bulkPreview').onclick();await settle();},
   importNow:async()=>{await el('bulkImport').onclick();await settle();}};
 }
@@ -97,4 +97,83 @@ test('importing the same file twice adds nothing',async()=>{
  assert.match(h.el('bulkSummary').innerHTML,/1 already done/);
  await h.importNow();
  assert.equal(named(h,'Twice Kid').length,1);
+});
+
+// ---- Undo CSV Import card -------------------------------------------------------
+test('Undo CSV Import: tick both import runs, review, one confirmation; earlier students and saved work stay; can be put back',async()=>{
+ const h=harness(),ws=h.tree.b3Games.workspaces['b3-2026'];
+ // On the site before any import: same name as an imported child, with saved work.
+ h.tree.b3Games.students.old_moshe={profile:{id:'old_moshe',name:'Moshe Fict',active:true,createdAt:1},memberships:{'b3-2026_b2_et_morning':{workspaceId:'b3-2026',classId:'b2_et_morning',active:true}},halacha:{done:4}};
+ ws.classes.b2_et_morning.members={old_moshe:{studentId:'old_moshe',name:'Moshe Fict',active:true}};
+ ws.classes.b2_et_morning.managementAudit={a0:{action:'add',studentId:'old_moshe',teacherUid:'owner_uid',at:5}};
+ h.tree.b3Private.passcodes.old_moshe={passcode:'482731'};
+ const before=JSON.stringify(h.tree.b3Games.students.old_moshe);
+ // Two runs of the OLD importer (one account per class row), hours apart.
+ const t1=Date.parse('2026-11-09T02:18:37Z'),t2=Date.parse('2026-11-09T17:49:11Z');
+ for(let i=0;i<12;i++)await manageStudents(h.store,OWNER,{action:'create',classId:i%2?'b2_et_morning':'b2_et_afternoon',name:i<2?'Moshe Fict':'Run One '+(i>>1),passcode:String(400000+(i>>1))},t1+i*100);
+ for(let i=0;i<11;i++)await manageStudents(h.store,OWNER,{action:'create',classId:'b2_et_afternoon',name:'Run Two '+i,passcode:String(500000+i)},t2+i*100);
+ // One imported child already did some work: must be kept.
+ const worked=named(h,'Run Two 3')[0].profile.id;
+ h.tree.b3Quiz={scores:{[worked]:{w1:9}}};
+ assert.equal(Object.keys(h.tree.b3Games.students).length,24);
+
+ await h.ctx.undoLoad();
+ const ids=[...h.el('undoBatches').innerHTML.matchAll(/data-undo-batch="([^"]+)"/g)].map(m=>m[1]);
+ assert.equal(ids.length,2,'both import runs are listed');
+ assert.match(h.el('undoBatches').innerHTML,/12 accounts in 2 class/);
+ await h.ctx.undoReview();
+ assert.match(h.el('status').textContent,/Tick the import/);
+ ids.forEach(id=>h.ctx.undoToggle(id,true));
+ await h.ctx.undoReview();
+ const review=h.el('rbArea').innerHTML;
+ assert.match(review,/<b>22<\/b> account\(s\) made by the import will be removed/);
+ assert.match(review,/<b>1<\/b> kept for you to review/);
+ assert.match(review,/<b>1<\/b> other student account\(s\) are not touched/);
+ assert.match(review,/Had students before\. They stay\./);
+ assert.match(review,/Classes \(2\): none are deleted/);
+ assert.match(review,/b2_et_afternoon\)<\/small><\/td><td[^>]*>17<\/td><td[^>]*>16<\/td><td[^>]*>1<\/td><td><small>Had no students before the import/,'one class row for both runs');
+ assert.ok(!/482731|400000|500000/.test(review),'no passcodes on screen');
+ assert.ok(!review.includes('old_moshe'),'the earlier student is not in the undo list');
+
+ // Nothing happens without the backup or with the wrong words.
+ await h.el('rbRun').onclick();
+ assert.match(h.el('status').textContent,/Download the backup first/);
+ await h.el('rbBackup').onclick();
+ h.el('rbConfirm').value='UNDO 21';await h.el('rbRun').onclick();
+ assert.match(h.el('status').textContent,/Type UNDO 22/);
+ assert.equal(Object.keys(h.tree.b3Games.students).length,24,'nothing removed yet');
+ assert.ok(!h.calls.some(c=>c.action==='rollbackExecute'));
+
+ h.el('rbConfirm').value='undo 22';await h.el('rbRun').onclick();
+ assert.match(h.el('rbArea').innerHTML,/Done\.<\/b> 22 account\(s\) removed, 0 put back as before, 1 kept for review/);
+ assert.equal(h.calls.filter(c=>c.action==='rollbackExecute').length,2);
+ assert.equal((h.el('undoBatches').innerHTML.match(/already undone/g)||[]).length,2,'undone imports are marked');
+ assert.equal(h.el('status').textContent,'');
+ assert.deepEqual(Object.keys(h.tree.b3Games.students).sort(),['old_moshe',worked].sort());
+ assert.equal(JSON.stringify(h.tree.b3Games.students.old_moshe),before,'earlier student identical');
+ assert.equal(h.tree.b3Private.passcodes.old_moshe.passcode,'482731');
+ assert.deepEqual(Object.keys(ws.classes.b2_et_morning.members),['old_moshe']);
+ assert.ok(ws.classes.b2_et_afternoon,'classes are never deleted');
+ assert.equal(h.tree.b3Quiz.scores[worked].w1,9,'student work untouched');
+ const runs=Object.values(h.tree.b3Private.importRollbacks);
+ assert.equal(runs.reduce((n,r)=>n+Object.keys(r.backup).length,0),22,'every removed account is backed up first');
+ assert.equal(Object.values(h.tree.b3Private.studentAudit).filter(e=>e.action==='rollback').length,2,'audit log');
+
+ // Recovery: put everything back.
+ for(const id of Object.keys(h.tree.b3Private.importRollbacks))await h.ctx.undoPutBack(id);
+ assert.equal(Object.keys(h.tree.b3Games.students).length,24);
+ assert.equal(named(h,'Moshe Fict').length,3);
+ assert.ok(!h.el('undoBatches').innerHTML.includes('already undone'),'after putting back, the imports can be undone again');
+});
+test('Undo CSV Import: if anything changes after the review, nothing is removed',async()=>{
+ const h=harness(),t=Date.parse('2026-11-09T17:49:11Z');
+ for(let i=0;i<10;i++)await manageStudents(h.store,OWNER,{action:'create',classId:'b2_et_morning',name:'Late Kid '+i,passcode:String(600000+i)},t+i*100);
+ await h.ctx.undoLoad();
+ h.ctx.undoToggle(h.el('undoBatches').innerHTML.match(/data-undo-batch="([^"]+)"/)[1],true);
+ await h.ctx.undoReview();await h.el('rbBackup').onclick();
+ const id=named(h,'Late Kid 4')[0].profile.id;
+ h.tree.b3Games.students[id].halacha={done:1};   // the child used the site meanwhile
+ h.el('rbConfirm').value='UNDO 10';await h.el('rbRun').onclick();
+ assert.match(h.el('status').textContent,/changed since the preview/);
+ assert.equal(Object.keys(h.tree.b3Games.students).length,10);
 });

@@ -128,6 +128,19 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:260px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
 </section>
 
+<section class="card" id="undoImportCard"><div class="card-head"><h2>&#x21A9;&#xFE0F; Undo CSV Import</h2></div>
+<p class="hint">Takes back a CSV import that went wrong. You choose the import, see every account and class it touches, download a backup, and confirm once. Only accounts the import itself made, and that are still empty, are removed. Students who were on the site before, anything with saved work, classes and teachers are never deleted, and everything removed can be put back.</p>
+<div class="formrow"><button id="undoOpen" type="button">Undo CSV Import</button></div>
+<div id="undoArea" style="display:none">
+ <h3>1. Choose the import</h3>
+ <div id="undoBatches"></div>
+ <div class="formrow"><button id="undoReview" type="button">2. Review what will be undone</button></div>
+ <div id="rbArea"></div>
+ <h3 style="margin-top:22px">Earlier removals</h3>
+ <div id="rbHistory"></div>
+</div>
+</section>
+
 <section class="card" id="bulkManageCard"><div class="card-head"><h2>&#x1F9F9; Students &rarr; Bulk Management</h2></div>
 <p class="hint">Find students by class, import, creation date or name. Preview shows each account's history and any saved student work. Only accounts with <b>no</b> student work can be deleted, every deletion is backed up first and can be undone, and the server checks everything again.</p>
 <div class="formrow"><button id="bmLoad" type="button">Load students</button><button id="bmAudit" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Audit log</button></div>
@@ -142,12 +155,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
  <div id="bmList" style="max-height:420px;overflow:auto;font-size:15px"></div>
  <div class="formrow" style="margin-top:10px"><button id="bmPreview" type="button">Preview selected</button><button id="bmExport" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Export backup of selected</button></div>
  <div id="bmPreviewArea"></div>
- <h3 style="margin-top:22px">Undo an import</h3>
- <p class="hint">Choose an import. The preview lists every account it created (only removed if it is still empty and matches the import's own audit record), every existing account it changed (put back as it was), and anything that needs your review. Classes and teachers are never deleted.</p>
- <div class="formrow"><select id="rbBatch" aria-label="Import to undo"><option value="">Choose an import</option></select><button id="rbPreview" type="button">Preview undo</button></div>
- <div id="rbArea"></div>
- <h3 style="margin-top:22px">Earlier removals</h3>
- <div id="rbHistory"></div>
+ <p class="hint" style="margin-top:14px">To take back a whole import, use <b>Undo CSV Import</b> above.</p>
 </div>
 <div id="bmAuditArea" style="margin-top:10px"></div>
 </section>
@@ -601,14 +609,9 @@ async function bmLoad(){
     const r=await manageCall({action:"studentsOverview"},60000);
     bm.students=r.students.sort((a,b)=>a.name.localeCompare(b.name));bm.batches=r.batches;bm.classes=r.classes;bm.selected.clear();
     q("bmClass").innerHTML='<option value="">All classes</option>'+Object.entries(r.classes).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,c])=>'<option value="'+safe(id)+'">'+safe(c.name)+' ('+safe(id)+')</option>').join("");
-    const batchOpt=b=>'<option value="'+safe(b.id)+'">'+safe((b.kind==="legacy"?b.label:"Import "+(b.label||b.id))+" - "+fmtDate(b.createdAt))+'</option>';
+    const batchOpt=b=>'<option value="'+safe(b.id)+'">'+safe(undoLabel(b))+'</option>';
     q("bmBatch").innerHTML='<option value="">Any import</option><option value="-">Not from an import</option>'+r.batches.map(batchOpt).join("");
-    q("rbBatch").innerHTML='<option value="">Choose an import</option>'+r.batches.map(batchOpt).join("");
-    q("rbHistory").innerHTML=bulkList(r.rollbacks,x=>'<li><code>'+safe(x.id)+'</code> '+safe(x.status)+' '+safe(fmtDate(x.startedAt))+' &middot; '+x.backups+' backed-up account(s) <button type="button" data-undo="'+safe(x.id)+'" style="padding:4px 10px">Put them back</button></li>');
-    q("rbHistory").querySelectorAll("[data-undo]").forEach(b=>b.onclick=async()=>{
-      if(!confirm("Put back every account removed by "+b.dataset.undo+"? Accounts that exist again are skipped."))return;
-      try{const u=await manageCall({action:"rollbackUndo",rollbackId:b.dataset.undo});q("status").textContent=u.restored+" account(s) put back.";await bmLoad();await load();}catch(err){q("status").textContent=err.message;}
-    });
+    undoRender(r);
     q("bmArea").style.display="";bmRender();
   }catch(err){console.error(err);q("status").textContent="Could not load students: "+err.message;}
   finally{q("bmLoad").disabled=false;}
@@ -646,35 +649,85 @@ q("bmPreview").onclick=async()=>{
     };
   }catch(err){console.error(err);q("bmPreviewArea").textContent="Could not preview: "+err.message;}
 };
-function rbSource(){
-  const b=bm.batches.find(x=>x.id===q("rbBatch").value);if(!b)return null;
-  return b.kind==="legacy"?{legacy:{from:b.from,to:b.to,createdBy:b.createdBy}}:{batchId:b.id};
+// ---- Undo CSV Import ------------------------------------------------------
+// One or more imports are ticked, reviewed together and undone with one typed
+// confirmation. The server decides what is safe for each import and refuses
+// to run if anything changed after the review.
+let undoSel=new Set();
+function undoLabel(b){return (b.kind==="legacy"?"CSV import":"Import "+(b.label||b.id))+" - "+fmtDate(b.createdAt)+(b.kind==="legacy"?" - "+b.count+" accounts in "+b.classIds.length+" class(es), made before imports were tracked":(b.status?" - "+b.status:""));}
+function undoToggle(id,on){on?undoSel.add(id):undoSel.delete(id);}
+function undoRender(r){
+  bm.batches=r.batches;bm.classes=r.classes;
+  const live=new Set(r.batches.map(b=>b.id));undoSel=new Set([...undoSel].filter(id=>live.has(id)));
+  const list=[...r.batches].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const finished=new Set(r.rollbacks.filter(x=>x.status==="complete").map(x=>x.id)),undone=new Set(r.batches.filter(b=>finished.has(b.kind==="legacy"?"rb_"+b.id:"rb_"+b.id.slice(4))).map(b=>b.id));
+  q("undoBatches").innerHTML=list.length?list.map(b=>'<label style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:16px"><input type="checkbox" style="width:auto;flex:none;margin:4px 0 0" data-undo-batch="'+safe(b.id)+'"'+(undoSel.has(b.id)?" checked":"")+'><span>'+safe(undoLabel(b))+(undone.has(b.id)?' <b>&mdash; already undone</b> (see Earlier removals)':"")+'</span></label>').join(""):'<p>No imports found.</p>';
+  q("undoBatches").querySelectorAll("[data-undo-batch]").forEach(x=>x.onchange=()=>undoToggle(x.dataset.undoBatch,x.checked));
+  q("rbHistory").innerHTML=bulkList(r.rollbacks,x=>'<li><code>'+safe(x.id)+'</code> '+safe(x.status)+' '+safe(fmtDate(x.startedAt))+' &middot; '+x.backups+' backed-up account(s) <button type="button" data-undo="'+safe(x.id)+'" style="padding:4px 10px">Put them back</button></li>');
+  q("rbHistory").querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>undoPutBack(b.dataset.undo));
+  q("undoArea").style.display="";
 }
-q("rbPreview").onclick=async()=>{
-  const src=rbSource();if(!src){q("status").textContent="Choose an import.";return}
-  q("rbArea").innerHTML="<p>Checking every account from this import against the live database...</p>";
+async function undoPutBack(id){
+  if(!confirm("Put back every account removed by "+id+"? Accounts that exist again are skipped."))return;
+  try{const u=await manageCall({action:"rollbackUndo",rollbackId:id});q("status").textContent=u.restored+" account(s) put back.";await undoLoad();await load();}catch(err){q("status").textContent=err.message;}
+}
+async function undoLoad(){
+  q("undoOpen").disabled=true;
+  try{undoRender(await manageCall({action:"studentsOverview"},60000));}
+  catch(err){console.error(err);q("status").textContent="Could not load the imports: "+err.message;}
+  finally{q("undoOpen").disabled=false;}
+}
+q("undoOpen").onclick=undoLoad;
+const undoSource=b=>b.kind==="legacy"?{legacy:{from:b.from,to:b.to,createdBy:b.createdBy}}:{batchId:b.id};
+async function undoReview(){
+  const chosen=bm.batches.filter(b=>undoSel.has(b.id)).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  if(!chosen.length){q("status").textContent="Tick the import you want to undo.";return}
+  q("status").textContent="";q("rbArea").innerHTML="<p>Checking every account from "+(chosen.length>1?"these imports":"this import")+" against the live database...</p>";
   try{
-    const m=await manageCall({action:"rollbackPreview",...src});
-    const s=m.summary,act=s.newSafe+s.existingModified,label={NEW_SAFE:"New, will be removed",EXISTING_MODIFIED:"Existing, classes put back",NEW_HAS_DATA:"New but has student work: kept, review",UNCERTAIN:"Uncertain: kept, review",ALREADY_REMOVED:"Already removed",MISSING:"Gone already"};
-    const groups=Object.keys(label).map(k=>[k,m.records.filter(r=>r.status===k)]).filter(([,v])=>v.length);
-    q("rbArea").innerHTML='<p><b>'+s.newSafe+'</b> new account(s) to remove &middot; <b>'+s.existingModified+'</b> existing account(s) to put back &middot; <b>'+(s.newHasData+s.uncertain)+'</b> to review (kept) &middot; <b>'+s.preservedUntouched+'</b> other student accounts not touched'+(s.alreadyRemoved?' &middot; '+s.alreadyRemoved+' already removed':"")+'</p>'+
-      groups.map(([k,v])=>'<details'+(k!=="NEW_SAFE"?" open":"")+'><summary>'+safe(label[k])+' ('+v.length+')</summary>'+bulkList(v,r=>'<li>'+safe(r.name)+' <small>('+safe(r.studentId)+')</small> &mdash; '+r.classIds.map(id=>safe(bm.classes[id]?bm.classes[id].name:id)).join(", ")+(r.reasons&&r.reasons.length&&k!=="NEW_SAFE"?'<br><small>'+r.reasons.map(safe).join("; ")+'</small>':"")+'</li>')+'</details>').join("")+
-      '<button type="button" id="rbCsv" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Download this list (CSV)</button>'+
-      (act?'<div class="notice" style="margin-top:10px;background:#fef2f2;border-color:#fecaca"><b>Undo this import.</b> First download the backup. Then type <code>ROLL BACK '+act+'</code>. If anything changed since this preview, nothing happens and you are asked to preview again.<div class="formrow" style="margin-top:8px"><button type="button" id="rbBackup">1. Download backup</button><input id="rbConfirm" placeholder="ROLL BACK '+act+'" aria-label="Type to confirm"><button type="button" id="rbRun" class="danger" disabled>2. Undo import</button></div></div>':"<p>Nothing to undo.</p>");
-    q("rbCsv").onclick=()=>downloadFile("undo-preview-"+m.rollbackId+".csv",FTTBulkRoster.toCsv([["Status","Student ID","Name","Classes","Reasons"],...m.records.map(r=>[r.status,r.studentId,r.name,r.classIds.map(id=>bm.classes[id]?bm.classes[id].name:id).join("; "),(r.reasons||[]).join(" | ")])]));
+    const plans=[];for(const b of chosen)plans.push({b,src:undoSource(b),m:await manageCall({action:"rollbackPreview",...undoSource(b)})});
+    const sum=k=>plans.reduce((n,p)=>n+p.m.summary[k],0),act=sum("newSafe")+sum("existingModified"),review=sum("newHasData")+sum("uncertain");
+    const untouched=plans[0].m.summary.totalStudents-act-review;
+    const label={NEW_SAFE:"New accounts made by the import: will be removed",EXISTING_MODIFIED:"Students who were here before: classes put back as they were",NEW_HAS_DATA:"Made by the import but has student work: kept, please review",UNCERTAIN:"Not certain: kept, please review",ALREADY_REMOVED:"Already removed",MISSING:"Gone already"};
+    const cname=id=>safe(bm.classes[id]?bm.classes[id].name:id);
+    // Plans are oldest first, so the first one to mention a class knows whether it had students before.
+    const byClass={};for(const p of plans)for(const c of p.m.classes){if(byClass[c.classId])byClass[c.classId].leaving+=c.leaving;else byClass[c.classId]={...c};}
+    const classRows=Object.values(byClass).sort((a,b)=>a.name.localeCompare(b.name));
+    const section=p=>{
+      const groups=Object.keys(label).map(k=>[k,p.m.records.filter(r=>r.status===k)]).filter(([,v])=>v.length);
+      return '<h3 style="margin-top:16px">'+safe(undoLabel(p.b))+'</h3>'+
+        groups.map(([k,v])=>'<details'+(k!=="NEW_SAFE"?" open":"")+'><summary>'+safe(label[k])+' ('+v.length+')</summary>'+bulkList(v,r=>'<li>'+safe(r.name)+' <small>('+safe(r.studentId)+')</small> &mdash; '+r.classIds.map(cname).join(", ")+(r.reasons&&r.reasons.length&&k!=="NEW_SAFE"?'<br><small>'+r.reasons.map(safe).join("; ")+'</small>':"")+'</li>')+'</details>').join("")+
+        (p.m.staffRestores.length?'<details open><summary>Teachers: classes this import gave them are taken back ('+p.m.staffRestores.length+')</summary>'+bulkList(p.m.staffRestores,t=>'<li>'+safe(t.email)+' &mdash; '+t.classIds.map(cname).join(", ")+'</li>')+'</details>':"");
+    };
+    q("rbArea").innerHTML='<div class="notice" style="margin-top:10px"><b>'+sum("newSafe")+'</b> account(s) made by the import will be removed &middot; <b>'+sum("existingModified")+'</b> student(s) who were here before get their classes put back &middot; <b>'+review+'</b> kept for you to review &middot; <b>'+untouched+'</b> other student account(s) are not touched &middot; classes and teachers are not deleted</div>'+
+      plans.map(section).join("")+
+      '<h3 style="margin-top:16px">Classes ('+classRows.length+'): none are deleted</h3><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr><th style="text-align:left">Class</th><th>Students now</th><th>Leaving</th><th>Students after</th><th style="text-align:left">Note</th></tr></thead><tbody>'+
+      classRows.map(c=>'<tr style="border-top:1px solid #e2e8f0"><td>'+safe(c.name)+' <small>('+safe(c.classId)+')</small></td><td style="text-align:center">'+c.membersNow+'</td><td style="text-align:center">'+c.leaving+'</td><td style="text-align:center">'+(c.membersNow-c.leaving)+'</td><td><small>'+(c.newWithImport?"Had no students before the import. The class stays"+(c.membersNow-c.leaving?"":", empty")+".":"Had students before. They stay.")+'</small></td></tr>').join("")+'</tbody></table>'+
+      '<div class="formrow" style="margin-top:10px"><button type="button" id="rbCsv" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Download this list (CSV)</button></div>'+
+      (act?'<div class="notice" style="margin-top:10px;background:#fef2f2;border-color:#fecaca"><b>3. Undo.</b> First download the backup. Then type <code>UNDO '+act+'</code>. If anything changed since this review, nothing happens and you are asked to review again.<div class="formrow" style="margin-top:8px"><button type="button" id="rbBackup">Download backup</button><input id="rbConfirm" placeholder="UNDO '+act+'" aria-label="Type to confirm"><button type="button" id="rbRun" class="danger" disabled>Undo import</button></div></div>':"<p>Nothing to undo.</p>");
+    q("rbCsv").onclick=()=>downloadFile("undo-review-"+Date.now()+".csv",FTTBulkRoster.toCsv([["Import","Status","Student ID","Name","Classes","Reasons"],...plans.flatMap(p=>p.m.records.map(r=>[undoLabel(p.b),r.status,r.studentId,r.name,r.classIds.map(id=>bm.classes[id]?bm.classes[id].name:id).join("; "),(r.reasons||[]).join(" | ")]))]));
     if(!act)return;
     let backed=false;
-    q("rbBackup").onclick=async()=>{try{const ids=m.records.filter(r=>r.status==="NEW_SAFE"||r.status==="EXISTING_MODIFIED").map(r=>r.studentId);for(let i=0;i<ids.length;i+=500)await bmExport(ids.slice(i,i+500),"undo-backup-"+m.rollbackId+"-"+(i/500+1)+".json");backed=true;q("rbRun").disabled=false;}catch(err){q("status").textContent=err.message;}};
+    q("rbBackup").onclick=async()=>{try{const ids=plans.flatMap(p=>p.m.records.filter(r=>r.status==="NEW_SAFE"||r.status==="EXISTING_MODIFIED").map(r=>r.studentId));for(let i=0;i<ids.length;i+=500)await bmExport(ids.slice(i,i+500),"undo-backup-"+Date.now()+"-"+(i/500+1)+".json");backed=true;q("rbRun").disabled=false;}catch(err){q("status").textContent=err.message;}};
     q("rbRun").onclick=async()=>{
-      if(!backed)return;q("rbRun").disabled=true;q("rbArea").insertAdjacentHTML("beforeend","<p id='rbWorking'>Working... keep this page open.</p>");
+      if(!backed){q("status").textContent="Download the backup first.";return;}
+      if(q("rbConfirm").value.trim().toUpperCase()!=="UNDO "+act){q("status").textContent="Type UNDO "+act+" to confirm.";return;}
+      q("status").textContent="";q("rbRun").disabled=true;q("rbArea").insertAdjacentHTML("beforeend","<p id='rbWorking'>Working... keep this page open. This can take a few minutes.</p>");
+      const done=[];
       try{
-        const r=await manageCall({action:"rollbackExecute",...src,manifestHash:m.manifestHash,backupConfirmed:true,confirmText:q("rbConfirm").value});
-        q("rbArea").innerHTML='<p><b>'+(r.status==="complete"?"Done.":"Finished with problems.")+'</b> '+r.removed+' removed, '+r.restored+' put back, '+r.skipped.length+' kept for review.'+(r.failed.length?' '+r.failed.length+' failed: preview again and run again to finish.':"")+' Undo id: <code>'+safe(r.rollbackId)+'</code></p>';
-        await bmLoad();await load();
-      }catch(err){q("status").textContent=err.message;q("rbRun").disabled=false;const w=q("rbWorking");if(w)w.remove();}
+        for(const p of plans){
+          const n=p.m.summary.newSafe+p.m.summary.existingModified;if(!n)continue;
+          done.push(await manageCall({action:"rollbackExecute",...p.src,manifestHash:p.m.manifestHash,backupConfirmed:true,confirmText:"ROLL BACK "+n}));
+        }
+        const t=k=>done.reduce((n,r)=>n+r[k],0),failed=done.reduce((n,r)=>n+r.failed.length,0);
+        q("rbArea").innerHTML='<p><b>'+(failed?"Finished with problems.":"Done.")+'</b> '+t("removed")+' account(s) removed, '+t("restored")+' put back as before, '+done.reduce((n,r)=>n+r.skipped.length,0)+' kept for review.'+(failed?' '+failed+' could not be done: review again and run again to finish.':"")+' You can put everything back from Earlier removals below. Undo id: '+done.map(r=>'<code>'+safe(r.rollbackId)+'</code>').join(", ")+'</p>';
+        undoSel.clear();await undoLoad();await load();
+      }catch(err){
+        q("status").textContent=err.message+(done.length?" ("+done.length+" import(s) were undone before this; review again to finish.)":"");q("rbRun").disabled=false;const w=q("rbWorking");if(w)w.remove();
+      }
     };
-  }catch(err){console.error(err);q("rbArea").textContent="Could not preview: "+err.message;}
-};
+  }catch(err){console.error(err);q("rbArea").textContent="Could not review: "+err.message;}
+}
+q("undoReview").onclick=undoReview;
 q("bmAudit").onclick=async()=>{
   try{const r=await manageCall({action:"auditLog"},60000);
     q("bmAuditArea").innerHTML='<h3>Audit log</h3>'+bulkList(r.entries,e=>'<li>'+safe(fmtDate(e.at))+' &middot; <b>'+safe(e.action)+'</b> by '+safe(e.byEmail||e.by)+' &middot; '+safe(JSON.stringify(e.counts||{removed:e.removed,restored:e.restored,failed:e.failed}))+(e.batchId?' &middot; '+safe(e.batchId):"")+(e.rollbackId?' &middot; '+safe(e.rollbackId):"")+'</li>');
