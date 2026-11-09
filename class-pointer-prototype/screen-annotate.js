@@ -98,8 +98,8 @@
       for(const [tool,b] of toolButtons)b.setAttribute('aria-pressed',String(tool===shared.tool));
       for(const [color,b] of colorButtons)b.setAttribute('aria-pressed',String(color===shared.color));
       const r=t?record(t.id):null;undo.disabled=!r?.strokes.length;clear.disabled=!r?.strokes.length;
-      help.textContent=!t?'':shared.tool==='watch'?'Choose 👆 Point or ✏️ Pen to show '+t.name+' something. He sees it on his own screen.':
-        shared.tool==='point'?t.name+' sees your red pointer on his screen.':t.name+' sees your drawing on his screen. Use 🧽 Clear when you are done.';
+      help.textContent=!t?'':shared.tool==='watch'?'Choose 👆 Point or ✏️ Pen to show '+t.name+' something. They see it on their own screen.':
+        shared.tool==='point'?t.name+' sees your red pointer on their screen.':t.name+' sees your drawing on their screen. Use 🧽 Clear when you are done.';
       canvas.style.cursor=shared.tool==='watch'?'default':shared.tool==='point'?'none':'crosshair';
       canvas.style.pointerEvents=shared.tool==='watch'?'none':'auto';
       if(!box)return;

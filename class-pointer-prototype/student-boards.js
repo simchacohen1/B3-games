@@ -500,11 +500,11 @@
   const permissionsPanels=[];
   function createPermissionsPanel(){
     const outer=el('div','sharing-permissions'),header=el('strong',null,'Student screen & whiteboard permissions');
-    outer.append(header,el('p',null,'Everyone is enabled by default. Uncheck a boy without affecting the others.'));
+    outer.append(header,el('p',null,'Everyone is enabled by default. Uncheck a student without affecting the others.'));
     for(const [kind,title] of [['screens','Screen sharing'],['boards','Whiteboards']]){
       const actions=el('div','sharing-permission-actions');
-      actions.append(el('strong',null,title),button('Select all','Enable '+title+' for every boy',()=>bulkPermission(kind,true)),
-        button('Clear all','Disable '+title+' for every boy',()=>bulkPermission(kind,false)));
+      actions.append(el('strong',null,title),button('Select all','Enable '+title+' for every student',()=>bulkPermission(kind,true)),
+        button('Clear all','Disable '+title+' for every student',()=>bulkPermission(kind,false)));
       outer.append(actions);
     }
     const list=el('div','sharing-permissions-roster');outer.append(list);
@@ -557,8 +557,8 @@
   // Grid bar: mode switch for the whole class.
   const gridBar=el('div','boards-bar'),count=el('span','boards-count'),modes=el('span','boards-modes');
   modes.setAttribute('role','group');modes.setAttribute('aria-label','What students do');
-  const modeBoards=button('📝 Whiteboards','Every student draws on his own whiteboard',()=>setMode('boards'));
-  const modeScreens=button('🖥 Screens','Every student shares his screen with you. Click a screen to open it large and point or draw on it.',()=>setMode('screens'));
+  const modeBoards=button('📝 Whiteboards','Every student draws on their own whiteboard',()=>setMode('boards'));
+  const modeScreens=button('🖥 Screens','Every student shares their screen with you. Click a screen to open it large and point or draw on it.',()=>setMode('screens'));
   modes.append(modeBoards,modeScreens);
   const chooseParticipants=button('👥 Choose students','Choose whose screens and whiteboards may participate',()=>{
     gridPermissions.hidden=!gridPermissions.hidden;
@@ -699,7 +699,7 @@
     });
   }
   function updateActivityLabel(){
-    activityLabel.textContent=activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all boys':'Boards are blank now';
+    activityLabel.textContent=activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all students':'Boards are blank now';
   }
 
   // Focus bar: one student large.
@@ -711,7 +711,7 @@
   surface.appendChild(canvas);
   const screenBox=el('div','board-screen-large'),screenVideo=el('video'),screenNote=el('p','board-panel-text');
   screenVideo.muted=true;screenVideo.autoplay=true;screenVideo.playsInline=true;screenBox.append(screenVideo,screenNote);
-  const pausedBox=el('div','board-panel');pausedBox.append(el('p','board-panel-text','⏸ Paused'),el('p','board-panel-note','This student is paused. Click ✅ Allow to turn his board or screen back on.'));
+  const pausedBox=el('div','board-panel');pausedBox.append(el('p','board-panel-text','⏸ Paused'),el('p','board-panel-note','This student is paused. Click ✅ Allow to turn their board or screen back on.'));
   focus.append(surface,screenBox,pausedBox);
   // Point and draw on the student's screen that is open large (screen-annotate.js). He sees the marks on his own screen.
   const screenInk=window.ClassPointerScreenMarks?.attach(screenBox,screenVideo,()=>{
@@ -780,7 +780,7 @@
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
-        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for his screen…':'';
+        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for their screen…':'';
         tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
         setVideo(tile.video,screens&&!paused?live:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
@@ -789,7 +789,7 @@
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
-        if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
+        if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share their screen…'}
         else setVideo(screenVideo,null);
         screenInk?.refresh();
         if(!surface.hidden){fit(focus,surface);paint(canvas,boardFor(m),drawer?.draft())}
@@ -831,7 +831,7 @@
     head.append(el('strong',null,notYet.length?'⏳ '+notYet.length+' not sharing yet':'✅ Everyone is sharing'),
       el('span','boards-waiting-count',sharing.length+' of '+eligible.length+' sharing'));
     // Tell a new teacher what to do next.
-    head.append(el('span','boards-waiting-tip',sharing.length?'👆 Click a screen to open it large. There you can point or draw on it.':'Each student clicks the blue Share My Screen button on his computer and chooses Entire Screen.'));
+    head.append(el('span','boards-waiting-tip',sharing.length?'👆 Click a screen to open it large. There you can point or draw on it.':'Each student clicks the blue Share My Screen button on their computer and chooses Entire Screen.'));
     const chips=el('div','boards-waiting-list');
     for(const p of notYet){
       const here=!!p.member,paused=here&&isBlocked(p.member);
@@ -882,11 +882,11 @@
     const item=cleanActivity(next);
     if(next&&!item){B.fail('Please enter a word or choose a valid picture.');return}
     const hasWork=Array.from(boards.values()).some(b=>b.strokes.length||(activity?.kind==='word'&&b.text&&JSON.stringify(b.text)!==JSON.stringify(defaultWord())));
-    if(hasWork&&!confirm('This will erase the boys\' current marks and start a new activity. Continue?'))return;
+    if(hasWork&&!confirm('This will erase the students\' current marks and start a new activity. Continue?'))return;
     boards.clear();chooseActivity(item,dirtyAll);
     for(const m of admitted())sendMode(m);
     dirtyAll();updateActivityLabel();
-    B.status(item?.kind==='word'?'The word is on every boy\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every boy\'s board. Watch them color in real time.':'All boards are blank.');
+    B.status(item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every student\'s board. Watch them color in real time.':'All boards are blank.');
   }
   function setFocus(id){
     drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();
@@ -964,7 +964,7 @@
       await dashboard.requestStudentDestination(destination,policy());
       B.status(destination==='screens'
         ?'Every student now sees a Share My Screen button. Their screens appear here. Click My screen to bring them back to your lesson.'
-        :'Every student now has his own whiteboard. Their work appears here. Click My screen to bring them back to your lesson.');
+        :'Every student now has their own whiteboard. Their work appears here. Click My screen to bring them back to your lesson.');
     }catch(error){
       B.fail('Could not send the class: '+(error?.message||'Please try again.'));
     }finally{buttons.forEach(b=>b.disabled=false)}

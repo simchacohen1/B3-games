@@ -11,7 +11,7 @@
     tabs.setAttribute('aria-label','Classroom sections');
     const items=[
       ['teach','✏️','My screen','Teach from your screen, a PDF, a webpage or a whiteboard. Students see it.'],
-      ['screens','🖥️','Student screens','Asks every student to share his screen with you. Click My screen to bring them back.'],
+      ['screens','🖥️','Student screens','Asks every student to share their screen with you. Click My screen to bring them back.'],
       ['whiteboards','🎨','Student whiteboards','Opens a private whiteboard on every student’s computer. Click My screen to bring them back.']
     ];
     const buttons=new Map();

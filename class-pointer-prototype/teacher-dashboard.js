@@ -92,12 +92,12 @@ function init(){
  const steps=el('ol','cp-guide-steps');
  for(const [head,text] of [
   ['Show your lesson','In My screen, pick what to teach from: Share my screen, a PDF, a webpage or a whiteboard. Every student in this class sees it right away.'],
-  ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows his name.'],
-  ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. He clicks it and chooses Entire Screen. His screen appears here as a tile, and the list on top shows who has not shared yet.'],
-  ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. He sees your marks on his own screen. 🧽 Clear takes them off.'],
+  ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows their name.'],
+  ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. They click it and choose Entire Screen. Their screen appears here as a tile, and the list on top shows who has not shared yet.'],
+  ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. They see your marks on their own screen. 🧽 Clear takes them off.'],
   ['When you are done','Click the red Stop sharing button to stop what students are watching. Student screen sharing: ON · turn off (top bar) stops all student screens. To end the class, close this page; students go back to what they were doing.']
  ]){const li=el('li');li.append(el('strong',null,head),el('span',null,text));steps.append(li)}
- const note=el('p','cp-guide-note','The browser always asks a student before his screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
+ const note=el('p','cp-guide-note','The browser always asks a student before their screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
  const guideOk=el('button','cp-guide-ok','Got it');guideOk.type='button';
  guide.append(guideHead,intro,steps,note,guideOk);
  document.body.append(guide);
@@ -166,7 +166,7 @@ function init(){
   b.addEventListener('click',()=>{Array.from(menu?.querySelectorAll('button')||[]).find(x=>x.textContent.includes(match))?.click()});
   send.append(b);
  }
- more.append(el('p','cp-more-help','Bring every signed-in student to screen sharing or to his own whiteboard.'),send);
+ more.append(el('p','cp-more-help','Bring every signed-in student to screen sharing or to their own whiteboard.'),send);
  const join=$('joinInstructions');if(join)more.append(join);
  const sharing=el('div','cp-student-sharing');
  sharing.append(el('strong',null,'Student sharing'));
@@ -246,7 +246,7 @@ function init(){
    const wasRemoved=!m&&!!row.id&&(R()?.removedIds?.()||[]).includes(row.id);
    if(wasRemoved){
     const back=el('button','cp-mini-btn','Allow back');back.type='button';back.setAttribute('aria-label','Allow '+row.name+' back into the class');
-    back.title='You removed '+row.name+'. Allow him to connect again.';
+    back.title='You removed '+row.name+'. Allow them to connect again.';
     back.addEventListener('click',()=>R()?.allowBack(row.id));const gone=el('span','cp-where','Removed');gone.style.cssText=WHERE;nameCell.append(gone,back);
    }
    if(m&&!m.admitted){

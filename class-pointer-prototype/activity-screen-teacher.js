@@ -95,7 +95,7 @@
     // Clicking the screen itself enlarges it; clicking the large screen returns to the gallery.
     video.addEventListener?.('click',()=>setFocus(focused===studentId?null:studentId));
     const dismiss=document.createElement('button');dismiss.textContent='Stop viewing';dismiss.type='button';
-    dismiss.title='Close this student’s screen (he can share again)';
+    dismiss.title='Close this student’s screen (they can share again)';
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
     dismiss.onclick=()=>closeStudent(studentId);
     // Enlarged, the teacher can point or draw on this screen; the student sees it on his own screen.
