@@ -56,6 +56,18 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
 .schoolpick{flex:0 1 260px!important;width:auto!important;padding:8px 10px!important;font-size:15px!important}.entry .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.syncs{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}.card .syncs input{width:22px;height:22px;padding:0;accent-color:#16a34a}.noschool{color:#b45309!important;font-weight:700}.studentrow .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.classtick{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-weight:600;cursor:pointer}.card .classtick input{width:20px;height:20px;padding:0;accent-color:#16a34a}.studentrow small.warn{display:block;color:#b45309;margin-top:4px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* "Who has what": one teacher open at a time. */
+.acc{border-bottom:1px solid #e2e8f0}.acc:last-child{border-bottom:0}
+.card button.acc-head{display:flex;align-items:center;gap:12px;width:100%;background:transparent;color:#1f2937;padding:14px 6px;border-radius:10px;text-align:left;font-weight:400}
+.card button.acc-head:hover{background:#f8fafc}
+.acc-head .acc-name{flex:1;min-width:0}.acc-head b{font-size:18px}
+.acc-head small{display:block;color:#64748b;font-size:15px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-head small.none{color:#b45309}
+.acc-chev{flex:none;font-size:14px;color:#64748b;transition:transform .15s}
+.acc.open .acc-chev{transform:rotate(90deg)}
+.acc.open .acc-head{background:#eef2ff}
+.acc-body{display:none;padding:0 6px 16px}.acc.open .acc-body{display:block}
+.acc-body .toolgrid{margin-top:8px}
 </style>
 </head><body>
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
@@ -89,7 +101,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
 <p class="hint">Pick a teacher and a class, then press Assign.</p>
 <div class="formrow"><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button></div>
-<div class="listlabel">Who has what</div><div id="assignments"></div></section>
+<div class="listlabel">Who has what</div><p class="hint" style="margin:0 0 4px">Tap a teacher to see their classes. Tick a class to give it to them; untick to take it away.</p><div id="assignments"></div></section>
 
 <section class="card"><div class="card-head"><div class="stepnum">4</div><h2>Tools and content</h2></div>
 <p class="hint">New classes start with no tools. Choose a class, then tap only the tools its teacher should get. Green = on. Changes save instantly.</p>
@@ -202,6 +214,36 @@ function renderPrincipalAssignments(){
    }catch(error){console.error(error);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not update principal. Try again.";}
  });
 }
+// "Who has what": one row per teacher with a summary; only one teacher's class
+// checkboxes are open at a time, and that teacher stays open across saves.
+let openAssignTeacher="";
+function renderAssignments(){
+ const byName=([a,x],[b,y])=>String(x?.name||x?.email||a).localeCompare(String(y?.name||y?.email||b));
+ const teachers=Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).sort(byName);
+ const classes=Object.entries(classData).sort(byName);
+ if(!teacherData[openAssignTeacher])openAssignTeacher="";
+ q("assignments").innerHTML=teachers.map(([tid,t])=>{
+  const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]),open=tid===openAssignTeacher;
+  const summary=ids.length?ids.length+(ids.length===1?' class: ':' classes: ')+ids.map(id=>safe(classData[id]?.name||id)).join(", "):'No classes yet';
+  // A class id left on the teacher after its class was deleted still gets a box so it can be removed.
+  const rows=classes.map(([cid,c])=>[cid,c?.name||cid]).concat(ids.filter(id=>!classData[id]).map(id=>[id,id+" (deleted class)"]));
+  const boxes=rows.length?'<div class="toolgrid">'+rows.map(([cid,label])=>'<label class="tool"><input type="checkbox" data-assign-teacher="'+safe(tid)+'" value="'+safe(cid)+'"'+(t.classIds?.[cid]?' checked':'')+'><span>'+safe(label)+'</span></label>').join("")+'</div>':'<small>No classes yet. Add one in step 2.</small>';
+  return '<div class="acc'+(open?' open':'')+'" data-acc="'+safe(tid)+'"><button type="button" class="acc-head" data-acc-toggle="'+safe(tid)+'" aria-expanded="'+open+'"><span class="acc-name"><b>'+safe(t.name||t.email)+'</b><small'+(ids.length?'':' class="none"')+'>'+summary+'</small></span><span class="acc-chev" aria-hidden="true">&#9654;</span></button><div class="acc-body">'+boxes+'</div></div>';
+ }).join("")||'<small>No teachers yet. Add one in step 1.</small>';
+}
+q("assignments").addEventListener("click",e=>{
+ const head=e.target.closest("[data-acc-toggle]");if(!head)return;
+ openAssignTeacher=openAssignTeacher===head.dataset.accToggle?"":head.dataset.accToggle;
+ q("assignments").querySelectorAll("[data-acc]").forEach(a=>{const on=a.dataset.acc===openAssignTeacher;a.classList.toggle("open",on);a.querySelector("[data-acc-toggle]").setAttribute("aria-expanded",String(on));});
+});
+q("assignments").addEventListener("change",async e=>{
+ const box=e.target.closest("[data-assign-teacher]");if(!box)return;
+ const tid=box.dataset.assignTeacher,cid=box.value;openAssignTeacher=tid;box.disabled=true;
+ try{
+  if(box.checked)await assignClass(tid,cid);
+  else if(await unassign(tid,cid)===false){box.checked=true;box.disabled=false;}
+ }catch(err){console.error(err);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not save. Please try again.";}
+});
 async function load(){
  const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};schoolData=B3SchoolScope.normalizeSchools((await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val());
  await reconcilePrincipals(teacherData,classData);
@@ -211,9 +253,7 @@ async function load(){
  // A class can have several teachers: list every teacher assigned to it.
  const classTeachers={};Object.values(teacherData).filter(t=>t&&!B3PrincipalScope.principal(t)).forEach(t=>Object.keys(t.classIds||{}).forEach(c=>{if(t.classIds[c]===true)(classTeachers[c]=classTeachers[c]||[]).push(t.name||t.email||"Teacher")}));
  Object.entries(classData).forEach(([id,v])=>{const names=(classTeachers[id]||[]).sort((a,b)=>String(a).localeCompare(String(b)));q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||id)+'</b><small data-class-teachers="'+safe(id)+'">'+(names.length?(names.length===1?'Teacher: ':'Teachers: ')+names.map(safe).join(", "):'No teacher yet')+'</small></span><span class="rowbtns">'+classSchoolPicker(id,v)+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</span></div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
- const assignmentLines=[];
- Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
- q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
+ renderAssignments();
  q("libraryTeacherSelect").innerHTML='<option value="">Choose teacher</option>'+Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).map(([id,v])=>'<option value="'+safe(id)+'">'+safe(v.name||v.email)+'</option>').join("");q("libraryGrant").innerHTML="";
  renderPrincipalAssignments();
  renderSchools();
@@ -247,7 +287,8 @@ async function deletePrincipal(id){
  await db.ref().update(updates);q("status").textContent="Principal removed.";await load();
 }
 q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=q("classSchool").value;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});q("className").value="";q("status").textContent="Class added ✓";await load()};
-q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}await assignClass(t,c)};
+async function assignClass(t,c){const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Schools (owner only). One school per teacher, stored on the invitation. See school-scope.js. ----
 const SCHOOLS_PATH=()=>"b3Games/workspaces/"+WS+"/schools";
 function schoolOptions(selected,blank){return (blank?'<option value="">'+blank+'</option>':'')+Object.entries(schoolData).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,sc])=>'<option value="'+safe(id)+'"'+(id===selected?' selected':'')+'>'+safe(sc.name)+'</option>').join("")}
@@ -329,12 +370,12 @@ async function teacherUidFor(inviteId){
 }
 async function unassign(inviteId,classId){
  const t=teacherData[inviteId]||{},cname=classData[classId]?.name||classId;
- if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return;
+ if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return false;
  const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId+"/classIds/"+classId]:null};
  const hasRemaining=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);
  if(!hasRemaining)updates[root+"/teacherInvites/"+inviteId+"/active"]=false;
  if(uid){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;if(!hasRemaining)updates[root+"/teachers/"+uid+"/active"]=false;updates[root+"/classes/"+classId+"/teacherIds/"+uid]=null;}
- await db.ref().update(updates);q("status").textContent="Unassigned.";await load();
+ await db.ref().update(updates);q("status").textContent="Unassigned.";await load();return true;
 }
 async function deleteTeacher(inviteId){
  const t=teacherData[inviteId]||{};
