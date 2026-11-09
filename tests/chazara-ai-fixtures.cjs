@@ -1,23 +1,20 @@
 'use strict';
 /**
  * Fictional fixtures for Chazara AI Practice tests.
- * Fake providers stand in for ffmpeg, Google Speech-to-Text and Claude so the
+ * Fake providers stand in for ffmpeg and the local Whisper model so the
  * DECISION LOGIC can be tested. They prove nothing about real recognition
  * accuracy — see scripts/chazara-ai-audio-eval.cjs for real-audio validation.
  */
 
 const PESUKIM = {
   '18_1': {
-    hebrew: 'וַיֵּרָא אֵלָיו ה׳ בְּאֵלֹנֵי מַמְרֵא וְהוּא יֹשֵׁב פֶּתַח הָאֹהֶל כְּחֹם הַיּוֹם',
-    meaning: 'Hashem appeared to Avraham in the plains of Mamre while he was sitting at the entrance of the tent in the heat of the day.'
+    hebrew: 'וַיֵּרָא אֵלָיו ה׳ בְּאֵלֹנֵי מַמְרֵא וְהוּא יֹשֵׁב פֶּתַח הָאֹהֶל כְּחֹם הַיּוֹם'
   },
   '18_2': {
-    hebrew: 'וַיִּשָּׂא עֵינָיו וַיַּרְא וְהִנֵּה שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים עָלָיו וַיַּרְא וַיָּרָץ לִקְרָאתָם מִפֶּתַח הָאֹהֶל וַיִּשְׁתַּחוּ אָרְצָה',
-    meaning: 'He lifted his eyes and saw three men standing near him; he ran from the entrance of the tent to greet them and bowed down to the ground.'
+    hebrew: 'וַיִּשָּׂא עֵינָיו וַיַּרְא וְהִנֵּה שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים עָלָיו וַיַּרְא וַיָּרָץ לִקְרָאתָם מִפֶּתַח הָאֹהֶל וַיִּשְׁתַּחוּ אָרְצָה'
   },
   '18_3': {
-    hebrew: 'וַיֹּאמַר אֲדֹנָי אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ אַל נָא תַעֲבֹר מֵעַל עַבְדֶּךָ',
-    meaning: 'He said: My lords, if I have found favor in your eyes, please do not pass away from your servant.'
+    hebrew: 'וַיֹּאמַר אֲדֹנָי אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ אַל נָא תַעֲבֹר מֵעַל עַבְדֶּךָ'
   }
 };
 
@@ -56,8 +53,8 @@ function synth(kind, seconds = 12, sampleRate = 16000) {
   return pcm;
 }
 
-function fakeProviders({ judgeFails = false, recognizeFails = false, judgeInvalid = false } = {}) {
-  const calls = { decode: 0, recognize: 0, judge: 0 };
+function fakeProviders({ recognizeFails = false } = {}) {
+  const calls = { decode: 0, recognize: 0, languages: [] };
   const specs = new WeakMap();
   return {
     calls,
@@ -69,31 +66,13 @@ function fakeProviders({ judgeFails = false, recognizeFails = false, judgeInvali
       specs.set(pcm, spec);
       return pcm;
     },
-    recognize: async ({ pcm, language, hints }) => {
+    // Stands in for the local Whisper pass: returns what the scenario says was heard.
+    recognize: async ({ pcm, language }) => {
       calls.recognize++;
-      if (recognizeFails) throw Object.assign(new Error('DEADLINE_EXCEEDED'), { code: 4 });
+      calls.languages.push(language);
+      if (recognizeFails) throw Object.assign(new Error('model failed to load'), { code: 'ENOMEM' });
       const spec = specs.get(pcm) || {};
-      if (language === 'en-US') return { transcript: spec.en || '', confidence: 0.8 };
-      if (hints && hints.length) return { transcript: spec.he || '', confidence: 0.8 };
-      return { transcript: spec.heUnboosted !== undefined ? spec.heUnboosted : (spec.he || ''), confidence: 0.7 };
-    },
-    judge: async items => {
-      calls.judge++;
-      if (judgeFails) throw Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
-      if (judgeInvalid) throw Object.assign(new Error('Invalid judge output'), { code: 'judge_invalid' });
-      const rows = {};
-      for (const it of items) {
-        // The fake judge reads a verdict planted in the English transcript: [[most]] etc.
-        const m = /\[\[(\w+)(?:\|(\w+))?\]\]/.exec(it.englishTranscript + ' ' + it.hebrewTranscript) || [];
-        const cov = m[1] || 'none', flag = m[2] || '';
-        const coverage = ['most', 'some', 'little', 'none'].includes(cov) ? cov : 'none';
-        // Key ideas consistent with the verdict, unless the scenario plants an inconsistent one.
-        const conveyed = flag === 'inconsistent' ? 1 : { most: 3, some: 1, little: 0, none: 0 }[coverage];
-        const keyIdeas = ['who appeared', 'where', 'what he was doing'].map((idea, i) => ({ idea, conveyed: i < conveyed }));
-        rows[it.id] = { id: it.id, keyIdeas, meaningCoverage: coverage,
-          contradicts: flag === 'contradicts', offTopic: flag === 'offTopic', nonsense: flag === 'nonsense', tooGarbledToJudge: flag === 'garbled' };
-      }
-      return { rows, usage: { inputTokens: 1500, outputTokens: 300 } };
+      return { transcript: spec.heard || '' };
     }
   };
 }

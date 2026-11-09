@@ -1,21 +1,33 @@
 'use strict';
 /**
- * Real service adapters for the Chazara AI Practice pipeline.
- * Loaded only by the deployed Cloud Function; unit tests inject fakes instead.
+ * Service adapters for the Chazara AI Practice pipeline. No paid AI services.
+ * Loaded only by the deployed Cloud Function and the offline evaluation script;
+ * unit tests inject fakes instead.
  *
  *  - decode:    ffmpeg (bundled ffmpeg-static) -> 16 kHz mono 16-bit PCM, in memory
- *  - recognize: Google Cloud Speech-to-Text v1 (same service Posuk Practice uses)
- *  - judge:     Claude Haiku 5.5 via the official Anthropic SDK (key from Secret Manager)
+ *  - recognize: open-source Whisper running locally inside the function
+ *               (transformers.js + ONNX Runtime). No per-request fee; the model is
+ *               downloaded once per function instance and kept in memory.
  * Audio is never written to Storage or the database.
  */
 const { spawn } = require('node:child_process');
 const { pcmFromBuffer } = require('./audio-signal.cjs');
 
 const MAX_SEGMENT_SECONDS = 62;
-// Claude Haiku 5.5: low cost for a short, structured judging task. Effort 'high' for
-// strict instruction following (thinking is adaptive and on by default).
-const JUDGE_MODEL = process.env.CHAZARA_AI_JUDGE_MODEL || 'claude-haiku-5-5';
-const JUDGE_EFFORT = process.env.CHAZARA_AI_JUDGE_EFFORT || 'high';
+// Multilingual Whisper "small" (Hebrew + Yiddish capable), 8-bit quantised for CPU.
+// Change without a code edit via environment variables, e.g. Xenova/whisper-base for speed.
+const WHISPER_MODEL = process.env.CHAZARA_AI_WHISPER_MODEL || 'Xenova/whisper-small';
+const WHISPER_DTYPE = process.env.CHAZARA_AI_WHISPER_DTYPE || 'q8';
+const LANGUAGES = { he: 'hebrew', en: 'english', yi: 'yiddish' };
+
+// Phrases Whisper is known to invent on near-silent or noisy audio (from its subtitle training data).
+const HALLUCINATIONS = [/תודה רבה\.?$/u, /תודה שצפיתם/u, /כתוביות/u, /thanks? for watching/i, /subtitles? by/i, /^\s*\.+\s*$/];
+
+function cleanTranscript(text) {
+  let t = String(text || '').replace(/\s+/g, ' ').trim();
+  for (const re of HALLUCINATIONS) t = t.replace(re, '').trim();
+  return t;
+}
 
 function decodeWithFfmpeg(ffmpegPath) {
   return (buffer, _mime) => new Promise((resolve, reject) => {
@@ -37,47 +49,26 @@ function decodeWithFfmpeg(ffmpegPath) {
   });
 }
 
-function googleRecognizer(speechClient, { timeoutMs = 25000 } = {}) {
-  return async ({ pcm, sampleRate, language, hints }) => {
-    const content = Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength).toString('base64');
-    const config = {
-      encoding: 'LINEAR16',
-      sampleRateHertz: sampleRate,
-      languageCode: language === 'he-IL' ? 'iw-IL' : 'en-US',
-      enableAutomaticPunctuation: false,
-      profanityFilter: true,
-      model: 'default'
-    };
-    // Moderate boost only: enough for close calls, not enough to force the
-    // expected words onto unrelated audio. A second unboosted pass confirms.
-    if (hints && hints.length) config.speechContexts = [{ phrases: hints.filter(h => h.length <= 100).slice(0, 80), boost: 8 }];
-    const [response] = await speechClient.recognize({ audio: { content }, config }, { timeout: timeoutMs });
-    const results = response.results || [];
-    const transcript = results.map(r => r.alternatives?.[0]?.transcript || '').join(' ').trim();
-    const conf = results.map(r => r.alternatives?.[0]?.confidence).filter(v => typeof v === 'number' && v > 0);
-    return { transcript, confidence: conf.length ? conf.reduce((a, b) => a + b, 0) / conf.length : undefined };
+/**
+ * Local Whisper recognizer. `loadPipeline` is injectable for tests; by default it
+ * lazily imports transformers.js (ESM) and builds the pipeline once per instance.
+ */
+function whisperRecognizer({ model = WHISPER_MODEL, dtype = WHISPER_DTYPE, cacheDir = process.env.CHAZARA_AI_MODEL_CACHE || '/tmp/chazara-ai-models', loadPipeline } = {}) {
+  let asrPromise = null;
+  const load = loadPipeline || (async () => {
+    const { pipeline, env } = await import('@huggingface/transformers');
+    env.cacheDir = cacheDir;
+    return pipeline('automatic-speech-recognition', model, { dtype });
+  });
+  return async ({ pcm, sampleRate, language }) => {
+    if (sampleRate !== 16000) throw new Error('Whisper needs 16 kHz audio');
+    if (!asrPromise) asrPromise = load().catch(e => { asrPromise = null; throw e; });
+    const asr = await asrPromise;
+    const audio = new Float32Array(pcm.length);
+    for (let i = 0; i < pcm.length; i++) audio[i] = pcm[i] / 32768;
+    const out = await asr(audio, { language: LANGUAGES[language] || 'hebrew', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+    return { transcript: cleanTranscript(Array.isArray(out) ? out.map(o => o.text).join(' ') : out && out.text) };
   };
 }
 
-function claudeJudge(anthropicClient, { model = JUDGE_MODEL, effort = JUDGE_EFFORT, timeoutMs = 30000 } = {}) {
-  return async ({ system, user, schema }) => {
-    // Haiku 5.5 has no server-side refusal fallback, so no `fallbacks` parameter;
-    // a refusal is handled below as "checker unavailable" (the child is never blamed).
-    const response = await anthropicClient.messages.create({
-      model,
-      max_tokens: 8000, // thinking counts toward this; leave room before the JSON answer
-      output_config: { effort, format: { type: 'json_schema', schema } },
-      system,
-      messages: [{ role: 'user', content: user }]
-    }, { timeout: timeoutMs, maxRetries: 1 });
-    if (response.stop_reason === 'refusal') throw Object.assign(new Error('Checker declined'), { code: 'judge_refusal' });
-    if (response.stop_reason === 'max_tokens') throw Object.assign(new Error('Checker ran out of room'), { code: 'judge_invalid' });
-    // Read text blocks by type: the response can start with thinking blocks.
-    const text = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-    let json;
-    try { json = JSON.parse(text); } catch (_) { throw Object.assign(new Error('Checker returned unreadable output'), { code: 'judge_invalid' }); }
-    return { json, usage: { inputTokens: response.usage?.input_tokens || 0, outputTokens: response.usage?.output_tokens || 0 } };
-  };
-}
-
-module.exports = { decodeWithFfmpeg, googleRecognizer, claudeJudge, MAX_SEGMENT_SECONDS, JUDGE_MODEL, JUDGE_EFFORT };
+module.exports = { decodeWithFfmpeg, whisperRecognizer, cleanTranscript, MAX_SEGMENT_SECONDS, WHISPER_MODEL, WHISPER_DTYPE };

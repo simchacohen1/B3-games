@@ -4,7 +4,7 @@
  *
  * Data (all under b3Private/, which database rules deny to every browser):
  *   b3Private/chazaraAiPractice/config                          owner switch + limit overrides
- *   b3Private/chazaraAiPractice/assignments/{classId}/{id}      teacher-approved Hebrew + meaning
+ *   b3Private/chazaraAiPractice/assignments/{classId}/{id}      teacher-approved Hebrew text
  *   b3Private/chazaraAiPractice/progress/{classId}/{id}/{sid}   attempts / last outcome (no audio, no transcript)
  *   b3Private/chazaraAiPractice/inflight/{sid}                  one check at a time + duplicate-request replay
  *   b3Private/chazaraAiPractice/usage/limits                    shared rate counters
@@ -33,8 +33,10 @@ const COOLDOWN_MS = 4000;          // minimum gap between two checks by one stud
 
 const DEFAULT_LIMITS = { minute: 20, day: 150, month: 1500, studentDay: 15, classDay: 120 };
 // List-price estimates used only for the owner's usage report (verify in the billing console).
-// Claude Haiku 5.5 list price for prompts up to 100K tokens (ours are ~2K).
-const PRICES = { speechPerMinute: 0.024, inputPerMTok: 0.1, outputPerMTok: 0.5 };
+// No paid AI services: the only cost is the function's own compute while Whisper runs.
+// Cloud Functions 2nd gen (Cloud Run) tier-1 list prices, before the monthly free tier
+// (180,000 vCPU-seconds + 360,000 GiB-seconds per billing account, shared with other functions).
+const PRICES = { vcpuSecond: 0.000024, gibSecond: 0.0000025, vcpu: 2, memoryGiB: 4 };
 
 const SEFARIM = ['Bereishis', 'Shemos', 'Vayikra', 'Bamidbar', 'Devarim'];
 const HEB_NUM = n => {
@@ -122,11 +124,10 @@ function cleanAssignment(input, existing) {
   const pesukim = {};
   for (let v = from; v <= to; v++) {
     const k = perek + '_' + v, row = given[k] || {};
-    const hebrew = clean(row.hebrew, 700), meaning = clean(row.meaning, 1500);
+    const hebrew = clean(row.hebrew, 700); // a meaning field, if sent, is ignored (no translation key)
     if (mode === 'ai' && !hebrew) fail(400, 'Add the Hebrew text for ' + pasukLabel(perek, v) + '.');
-    if (mode === 'ai' && meaning.split(/\s+/).filter(Boolean).length < 3) fail(400, 'Add the approved English or Yiddish meaning for ' + pasukLabel(perek, v) + '.');
     if (hebrew && !/[א-ת]/.test(hebrew)) fail(400, 'The Hebrew text for ' + pasukLabel(perek, v) + ' must be in Hebrew letters.');
-    pesukim[k] = { perek, posuk: v, hebrew, meaning };
+    pesukim[k] = { perek, posuk: v, hebrew };
   }
   const title = clean(input.title, 120) || (sefer + ' ' + perek + ':' + from + (to > from ? '-' + to : ''));
   return {
@@ -144,7 +145,6 @@ function orderedPesukim(a) {
 function studentView(id, a, progress) {
   return {
     id, title: a.title, mode: a.mode, sefer: a.sefer, perek: a.perek, from: a.from, to: a.to,
-    // The approved meaning is the answer key: it is never sent to students.
     pesukim: orderedPesukim(a).map(p => ({ id: p.perek + '_' + p.posuk, perek: p.perek, posuk: p.posuk, label: pasukLabel(p.perek, p.posuk), hebrew: p.hebrew })),
     progress: progress ? { attempts: progress.attempts || 0, lastOutcome: progress.lastOutcome || null, excellent: (progress.excellentCount || 0) > 0 } : null
   };
@@ -199,7 +199,8 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
     const month = new Date(now()).toISOString().slice(0, 7);
     const u = (await store.get(ROOT + '/usage/months/' + month)) || {};
     const evaluations = u.evaluations || 0;
-    const cost = (u.speechSeconds || 0) / 60 * PRICES.speechPerMinute + (u.inputTokens || 0) / 1e6 * PRICES.inputPerMTok + (u.outputTokens || 0) / 1e6 * PRICES.outputPerMTok;
+    // Compute while checking (before the free tier, which usually covers it).
+    const cost = (u.totalMs || 0) / 1000 * (PRICES.vcpu * PRICES.vcpuSecond + PRICES.memoryGiB * PRICES.gibSecond);
     return { ok: true, month, ...u, estimatedCostUsd: Math.round(cost * 100) / 100,
       estimatedCostPerEvaluationUsd: evaluations ? Math.round(cost / evaluations * 1000) / 1000 : null,
       averageMs: evaluations ? Math.round((u.totalMs || 0) / evaluations) : null, config: await config(store) };
@@ -220,11 +221,11 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
     const cfg = await config(store);
     if (!cfg.enabled) fail(503, 'AI Practice is not switched on yet. Ask your teacher.');
 
-    // The answer key comes from the server, never from the browser.
+    // The pasuk text comes from the server, never from the browser.
     const a = await store.get(ROOT + '/assignments/' + student.classId + '/' + assignmentId);
     if (!a || a.active === false || a.mode !== 'ai') fail(404, 'This AI Practice is not available.');
     const pesukim = orderedPesukim(a);
-    if (!pesukim.length || pesukim.some(p => !p.hebrew || !p.meaning)) fail(409, 'Your teacher has not finished this AI Practice yet.');
+    if (!pesukim.length || pesukim.some(p => !p.hebrew)) fail(409, 'Your teacher has not finished this AI Practice yet.');
 
     if (!Array.isArray(files) || files.length !== pesukim.length) fail(400, 'Please record every pasuk, then press Finish.');
     let total = 0;
@@ -261,7 +262,7 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
     }
     try {
       const out = await evaluateAttempt({
-        items: pesukim.map(p => ({ id: p.perek + '_' + p.posuk, label: pasukLabel(p.perek, p.posuk), hebrew: p.hebrew, meaning: p.meaning })),
+        items: pesukim.map(p => ({ id: p.perek + '_' + p.posuk, label: pasukLabel(p.perek, p.posuk), hebrew: p.hebrew })),
         segments: files.map(f => f.buffer), mimeType: files[0].mimeType, providers
       });
       result = out.decision; usage = out.usage; elapsedMs = out.elapsedMs;
@@ -288,8 +289,7 @@ function createService({ store, providers, now = () => Date.now(), newId = () =>
       const c = cur || {}, outcomes = { ...(c.outcomes || {}) };
       outcomes[result.outcome] = (outcomes[result.outcome] || 0) + 1;
       return { evaluations: (c.evaluations || 0) + 1, outcomes,
-        speechSeconds: Math.round(((c.speechSeconds || 0) + (usage?.speechSeconds || 0)) * 10) / 10,
-        inputTokens: (c.inputTokens || 0) + (usage?.inputTokens || 0), outputTokens: (c.outputTokens || 0) + (usage?.outputTokens || 0),
+        audioSeconds: Math.round(((c.audioSeconds || 0) + (usage?.audioSeconds || 0)) * 10) / 10,
         totalMs: (c.totalMs || 0) + elapsedMs };
     }));
     await Promise.all(writes);

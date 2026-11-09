@@ -1,21 +1,25 @@
 'use strict';
 /**
- * Chazara AI Practice — step 5: turn the evidence into one of four outcomes.
+ * Chazara AI Practice — turn the evidence into one of four outcomes.
  *
- * Pure function, no AI. Rules (see docs/chazara-ai-practice.md):
- *  - "excellent" only when EVERY pasuk has clear audio, strong Hebrew reading
- *    (confirmed by a second, unboosted recognition pass) AND a strong meaning.
- *    Good reading never makes up for no translation, or vice versa.
- *  - Uncertainty (noise, garbled recognition, unconfirmed reading) never counts
- *    as the child's mistake: it leads to "unclear", not "try again".
- *  - Messages are fixed, kind sentences. No claims about specific words.
+ * Casual practice, deliberately lenient. Only two checks per pasuk:
+ *   1. reading:     the Hebrew heard roughly matches the assigned pasuk
+ *                   (existing in-order word matching, low bar);
+ *   2. translation: the child said some extra words AFTER the reading.
+ *                   What those words mean is NOT judged.
+ *
+ *   both parts on every pasuk            -> Excellent!
+ *   at least one part somewhere          -> Almost There!
+ *   silence, gibberish, unrelated talk   -> Let's Try Again!  (no pasuk reading heard)
+ *   noisy/distorted audio, or a clear
+ *   voice the recognizer could not read  -> Couldn't Hear Clearly
+ *
+ * Pure function, no AI. Messages are fixed, kind sentences; no claims about specific words.
  */
 
 const THRESHOLDS = {
-  readingStrong: 0.7,     // share of pasuk words heard in order
-  readingPartial: 0.35,
-  readingWeak: 0.15,
-  corroborate: 0.4        // unboosted pass must independently find this much
+  reading: 0.3,       // share of pasuk words heard in order ("roughly matches")
+  extraWords: 3       // words heard after the reading that count as a translation attempt
 };
 
 const MESSAGES = {
@@ -26,9 +30,9 @@ const MESSAGES = {
 };
 
 const TIPS = {
-  explain: 'Next time, explain what the pasuk means too.',
-  read: 'Remember to read the pasuk in Hebrew too.',
-  practice: 'Read it slowly, then say what it means in your own words.',
+  explain: 'After you read the pasuk, say what it means.',
+  read: 'Start by reading the pasuk in Hebrew, then say what it means.',
+  missing: "Don't forget to do every pasuk.",
   both: 'Read the Hebrew words first, then say what they mean.',
   short: 'Take your time: read the whole pasuk, then explain it.',
   quiet: 'Try a quieter spot, away from other voices.',
@@ -36,89 +40,48 @@ const TIPS = {
   mic: 'Check that the microphone is on and not covered.'
 };
 
-function readingLevel(reading, t = THRESHOLDS) {
-  if (!reading || !reading.hinted) return 'none';
-  const c = reading.hinted.coverage;
-  if (c >= t.readingStrong) {
-    if (!reading.unhinted) return 'uncertain';
-    return reading.unhinted.coverage >= t.corroborate ? 'strong' : 'uncertain';
-  }
-  if (c >= t.readingPartial) return 'partial';
-  if (c >= t.readingWeak) return 'weak';
-  return 'none';
-}
-
-const low = level => level === 'none' || level === 'weak';
-
-function gradePasuk(p, anyAudioOk) {
+/** Per-pasuk evidence -> 'both' | 'reading' | 'none' | 'unheard' | 'unsure'. */
+function gradePasuk(p, anyAudioOk, t = THRESHOLDS) {
   if (p.audioStatus === 'noisy') return 'unheard';
-  if (p.audioStatus === 'silent') return anyAudioOk ? 'missing' : 'unheard';
-  if (p.audioStatus === 'too_short') return 'missing';
-  const r = p.readingLevel, m = p.meaningLevel;
-  if (r === 'strong' && m === 'strong') return 'good';
-  if (r === 'uncertain' || m === 'uncertain') {
-    // Uncertainty only matters if it could change the result.
-    if (r === 'uncertain' && m !== 'uncertain' && low(m)) return 'partial_uncertain';
-    return 'uncertain';
-  }
-  if (low(r) && low(m)) return 'none';
-  return 'partial';
+  if (p.audioStatus === 'silent') return anyAudioOk ? 'none' : 'silent';
+  if (p.audioStatus === 'too_short') return 'none';
+  if (p.recognitionFailed) return 'unsure';
+  const read = (p.readingCoverage || 0) >= t.reading;
+  if (!read) return 'none';                       // no pasuk heard: gibberish/unrelated/translation alone
+  return (p.wordsAfterReading || 0) >= t.extraWords ? 'both' : 'reading';
 }
 
-function decide(pesukim) {
+function decide(pesukim, t = THRESHOLDS) {
   const anyAudioOk = pesukim.some(p => p.audioStatus === 'ok');
-  const rows = pesukim.map(p => ({ ...p, grade: gradePasuk(p, anyAudioOk) }));
+  const rows = pesukim.map(p => ({ ...p, grade: gradePasuk(p, anyAudioOk, t) }));
   const grades = rows.map(r => r.grade);
   const has = g => grades.includes(g);
-  const all = (...gs) => grades.every(g => gs.includes(g));
+  const all = g => grades.every(x => x === g);
   let outcome, reason, tips = [];
 
-  if (all('unheard') || has('unheard')) {
-    outcome = 'unclear';
-    reason = rows.some(r => r.audioStatus === 'noisy') ? 'noisy' : 'silent';
-    tips = reason === 'noisy' ? [TIPS.quiet, TIPS.close] : [TIPS.mic, TIPS.close];
-  } else if (all('good')) {
-    outcome = 'excellent';
-    reason = 'complete';
-  } else if (all('missing')) {
+  if (has('unheard')) {
+    outcome = 'unclear'; reason = 'noisy'; tips = [TIPS.quiet, TIPS.close];
+  } else if (all('silent')) {
+    outcome = 'try_again'; reason = 'silent'; tips = [TIPS.mic, TIPS.close];
+  } else if (has('unsure') && grades.every(g => g === 'unsure' || g === 'both')) {
+    outcome = 'unclear'; reason = 'unsure'; tips = [TIPS.close];
+  } else if (all('both')) {
+    outcome = 'excellent'; reason = 'complete';
+  } else if (grades.every(g => g === 'none' || g === 'unsure' || g === 'silent')) {
     outcome = 'try_again';
-    reason = 'too_short';
-    tips = [TIPS.short];
-  } else if (has('uncertain') && grades.every(g => ['good', 'uncertain'].includes(g))) {
-    outcome = 'unclear';
-    reason = 'unsure';
-    tips = [TIPS.close];
-  } else if (grades.every(g => ['none', 'missing', 'uncertain'].includes(g))) {
-    // Nothing usable was evidently correct. If part of it was too unclear to
-    // judge, ask for a clearer recording rather than blaming the child.
-    outcome = has('uncertain') ? 'unclear' : 'try_again';
-    reason = has('uncertain') ? 'unsure' : (rows.some(r => r.nonsense) ? 'nonsense' : rows.some(r => r.offTopic) ? 'off_topic' : 'not_matching');
-    tips = has('uncertain') ? [TIPS.close] : [TIPS.both];
+    reason = rows.every(r => r.audioStatus === 'too_short') ? 'too_short' : 'no_pasuk';
+    tips = [reason === 'too_short' ? TIPS.short : TIPS.both];
   } else {
     outcome = 'almost';
-    reason = 'partial';
-    const graded = rows.filter(r => !['missing', 'unheard'].includes(r.grade));
-    const readAll = graded.length && graded.every(r => r.readingLevel === 'strong');
-    const meanAll = graded.length && graded.every(r => r.meaningLevel === 'strong');
-    if (rows.length > 1 && rows.some(r => r.grade === 'missing' || r.grade === 'none')) reason = 'missing_pasuk';
-    else if (readAll && !meanAll) reason = 'needs_meaning';
-    else if (meanAll && !readAll) reason = 'needs_reading';
-    tips = reason === 'needs_meaning' ? [TIPS.explain] : reason === 'needs_reading' ? [TIPS.read] : [TIPS.practice];
+    if (rows.length > 1 && grades.some(g => g === 'none' || g === 'unsure')) { reason = 'missing_pasuk'; tips = [TIPS.missing]; }
+    else { reason = 'needs_explanation'; tips = [TIPS.explain]; }
   }
 
-  // Per-pasuk stars are only shown when the evidence for them is solid.
   const showPesukim = outcome === 'excellent' || outcome === 'almost';
   return {
-    outcome,
-    reason,
-    ...MESSAGES[outcome],
-    tips,
-    pesukim: rows.map(r => ({
-      id: r.id,
-      label: r.label,
-      status: !showPesukim ? null : r.grade === 'good' ? 'great' : 'practice'
-    }))
+    outcome, reason, ...MESSAGES[outcome], tips,
+    pesukim: rows.map(r => ({ id: r.id, label: r.label, status: !showPesukim ? null : r.grade === 'both' ? 'great' : 'practice' }))
   };
 }
 
-module.exports = { decide, readingLevel, gradePasuk, THRESHOLDS, MESSAGES, TIPS };
+module.exports = { decide, gradePasuk, THRESHOLDS, MESSAGES, TIPS };

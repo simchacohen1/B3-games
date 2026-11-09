@@ -8,7 +8,6 @@
   'use strict';
   var ENDPOINT = window.CHAZARA_AI_ENDPOINT || 'https://us-central1-b3-games.cloudfunctions.net/chazaraAiPractice';
   var SEFARIM = [['Bereishis', 'Genesis'], ['Shemos', 'Exodus'], ['Vayikra', 'Leviticus'], ['Bamidbar', 'Numbers'], ['Devarim', 'Deuteronomy']];
-  var KEHOT = 'The Kehot Chumash; Chabad House Publications, Los Angeles';
   var OUTCOME_WORDS = { excellent: '⭐ Excellent', almost: 'Almost there', try_again: 'Try again', unclear: "Couldn't hear" };
   var ui = { panel: null, classId: '', data: null, editing: null, scopeSig: '' };
 
@@ -58,13 +57,7 @@
     var book = (SEFARIM.filter(function (s) { return s[0] === sefer; })[0] || SEFARIM[0])[1];
     var he = await fetch('https://www.sefaria.org/api/texts/' + book + '.' + perek + '?context=0&pad=0').then(function (r) { if (!r.ok) throw new Error('Sefaria ' + r.status); return r.json(); });
     var hebrew = (he.he || []).map(function (h) { return abbreviateShaimos(stripTags(h)).replace(/[׃]/g, '').trim(); });
-    var english = [];
-    try {
-      var en = await fetch('https://www.sefaria.org/api/v3/texts/' + encodeURIComponent(book + ' ' + perek) + '?version=' + encodeURIComponent('english|' + KEHOT)).then(function (r) { return r.ok ? r.json() : null; });
-      var v = en && Array.isArray(en.versions) ? en.versions[0] : null;
-      english = v && Array.isArray(v.text) ? v.text.map(stripTags) : [];
-    } catch (_) { english = []; }
-    return { hebrew: hebrew, english: english };
+    return { hebrew: hebrew };
   }
 
   // ---------- rendering ----------
@@ -145,7 +138,7 @@
   function openEditor(a) {
     var copy = a ? JSON.parse(JSON.stringify(a)) : { title: '', mode: 'regular', sefer: 'Bereishis', perek: '', from: '', to: '', pesukim: [], active: true };
     var map = {};
-    (copy.pesukim || []).forEach(function (p) { map[p.perek + '_' + p.posuk] = { hebrew: p.hebrew || '', meaning: p.meaning || '' }; });
+    (copy.pesukim || []).forEach(function (p) { map[p.perek + '_' + p.posuk] = { hebrew: p.hebrew || '' }; });
     ui.editing = { id: a ? a.id : null, form: copy, pesukim: map, checked: false, status: '' };
     render();
     var f = ui.panel.querySelector('#aipTitleInput'); if (f) f.focus();
@@ -167,7 +160,7 @@
 
     var modes = el('div', { role: 'radiogroup', 'aria-label': 'Chazara type', style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin:12px 0' });
     [['regular', '👂 Regular Chazara', 'Students record in their chart and you review the recording (same as today).'],
-     ['ai', '🤖 AI Practice', 'Students record the reading + translation and get instant feedback. No teacher review, no points.']].forEach(function (m) {
+     ['ai', '🤖 AI Practice', 'Students record the reading + translation and get instant, friendly feedback. No teacher review, no points.']].forEach(function (m) {
       var radio = el('input', { type: 'radio', name: 'aipMode', value: m[0], checked: f.mode === m[0], onchange: function () { f.mode = m[0]; render(); } });
       modes.appendChild(el('label', { style: 'display:flex;gap:8px;align-items:flex-start;border:2px solid ' + (f.mode === m[0] ? '#6366f1' : '#e5e7eb') + ';border-radius:12px;padding:10px;cursor:pointer' }, [radio, el('span', {}, [el('b', { text: m[1] }), el('br'), el('span', { class: 'sub', text: m[2] })])]));
     });
@@ -175,23 +168,17 @@
 
     var load = el('button', { type: 'button', text: '📖 Load the pesukim text', onclick: function () { loadText(load); } });
     box.appendChild(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [load,
-      el('span', { class: 'sub', text: f.mode === 'ai' ? 'Loads the Hebrew and a suggested English meaning (Kehot). Please check and edit them.' : 'Loads the Hebrew text so students see it.' })]));
+      el('span', { class: 'sub', text: 'Loads the Hebrew text so students see it. Please check it.' })]));
 
     var n = Number(f.to || f.from) - Number(f.from) + 1;
     if (f.perek && f.from && n >= 1 && n <= 6) {
       for (var v = Number(f.from); v <= Number(f.to || f.from); v++) {
         (function (k, v) {
-          var row = e.pesukim[k] || (e.pesukim[k] = { hebrew: '', meaning: '' });
+          var row = e.pesukim[k] || (e.pesukim[k] = { hebrew: '' });
           var heb = el('textarea', { dir: 'rtl', lang: 'he', rows: '2', style: 'width:100%;font-size:20px;font-family:"Noto Serif Hebrew","Times New Roman",serif', 'aria-label': 'Hebrew text for pasuk ' + v, oninput: function () { row.hebrew = heb.value; } });
           heb.value = row.hebrew;
           var block = el('div', { style: 'background:#f8fafc;border-radius:12px;padding:10px;margin:8px 0' }, [
             el('div', { style: 'direction:rtl;text-align:right;font-weight:900', text: 'פרק ' + hebNum(f.perek) + ' · פסוק ' + hebNum(v) }), heb]);
-          if (f.mode === 'ai') {
-            var mean = el('textarea', { rows: '3', style: 'width:100%;font-size:15px', placeholder: 'Approved meaning in English or Yiddish — the answer key students are checked against', 'aria-label': 'Approved meaning for pasuk ' + v, oninput: function () { row.meaning = mean.value; } });
-            mean.value = row.meaning;
-            block.appendChild(el('label', { style: 'display:block;font-size:12px;font-weight:bold;color:#475569;margin-top:6px', text: 'Approved meaning (English or Yiddish)' }));
-            block.appendChild(mean);
-          }
           box.appendChild(block);
         })(f.perek + '_' + v, v);
       }
@@ -200,7 +187,7 @@
     }
     if (f.mode === 'ai') {
       var chk = el('input', { type: 'checkbox', checked: e.checked, onchange: function () { e.checked = chk.checked; } });
-      box.appendChild(el('label', { style: 'display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:bold' }, [chk, 'I checked the Hebrew text and the meanings. Students will be checked against what I approved here.']));
+      box.appendChild(el('label', { style: 'display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:bold' }, [chk, 'I checked the Hebrew text. Students\' readings are compared with it.']));
     }
     var save = el('button', { type: 'button', class: 'approve-all', text: e.id ? 'Save changes' : 'Create assignment', onclick: function () { saveEditor(save); } });
     var cancel = el('button', { type: 'button', text: 'Cancel', onclick: function () { ui.editing = null; render(); } });
@@ -216,20 +203,19 @@
     try {
       var t = await fetchPesukim(f.sefer, f.perek);
       for (var v = Number(f.from); v <= Number(f.to || f.from); v++) {
-        var k = f.perek + '_' + v, row = e.pesukim[k] || (e.pesukim[k] = { hebrew: '', meaning: '' });
+        var k = f.perek + '_' + v, row = e.pesukim[k] || (e.pesukim[k] = { hebrew: '' });
         if (!row.hebrew && t.hebrew[v - 1]) row.hebrew = t.hebrew[v - 1];
-        if (f.mode === 'ai' && !row.meaning && t.english[v - 1]) row.meaning = t.english[v - 1];
       }
-      e.status = 'Loaded. Please check the text' + (f.mode === 'ai' ? ' and edit the meanings to match how you teach them.' : '.');
+      e.status = 'Loaded. Please check the text.';
     } catch (err) { e.status = 'Could not load the text (' + err.message + '). You can type or paste it instead.'; }
     render();
   }
 
   async function saveEditor(btn) {
     var e = ui.editing, f = e.form;
-    if (f.mode === 'ai' && !e.checked) { e.status = 'Please tick the box to confirm you checked the text and meanings.'; return render(); }
+    if (f.mode === 'ai' && !e.checked) { e.status = 'Please tick the box to confirm you checked the Hebrew text.'; return render(); }
     var pesukim = {};
-    for (var v = Number(f.from); v <= Number(f.to || f.from); v++) { var k = f.perek + '_' + v; pesukim[k] = e.pesukim[k] || { hebrew: '', meaning: '' }; }
+    for (var v = Number(f.from); v <= Number(f.to || f.from); v++) { var k = f.perek + '_' + v; pesukim[k] = { hebrew: (e.pesukim[k] || {}).hebrew || '' }; }
     btn.disabled = true;
     try {
       await api({ action: 'teacherSave', classId: ui.classId, assignmentId: e.id || undefined,

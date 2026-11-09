@@ -114,7 +114,7 @@ function mergedMatch(refJoined, heardJoined) {
  */
 function alignCoverage(refTokens, heardTokens) {
   const R = refTokens, H = heardTokens, n = R.length, m = H.length;
-  if (!n) return { matched: 0, total: 0, coverage: 0 };
+  if (!n) return { matched: 0, total: 0, coverage: 0, looseCoverage: 0, lastHeard: -1 };
   // best[i][j] = most pasuk words matched using R[0..i) and H[0..j)
   const best = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
   for (let i = 1; i <= n; i++) {
@@ -150,13 +150,23 @@ function alignCoverage(refTokens, heardTokens) {
   }
   // A one-word pasuk cannot form a run; let a single match count there.
   const runMatched = n === 1 ? matched : inRun.size;
-  return { matched, total: n, coverage: runMatched / n, looseCoverage: matched / n };
+  // Index of the last heard token that matched a pasuk word (-1 if none). Anything
+  // heard after it is speech that came after the reading (e.g. the translation).
+  const lastHeard = pairs.reduce((mx, [, h]) => Math.max(mx, h), -1);
+  return { matched, total: n, coverage: runMatched / n, looseCoverage: matched / n, lastHeard };
 }
 
 function hebrewCoverage(pasukText, heardText) {
-  const ref = tokenize(pasukText), heard = tokenize(heardText);
+  const ref = tokenize(pasukText);
+  // Every spoken word, in order, in any script (Whisper may write an English or
+  // Yiddish translation in Latin or Hebrew letters). Only Hebrew words are matched
+  // against the pasuk; all words after the last matched one count as "after".
+  const all = String(heardText || '').normalize('NFC').split(/\s+/).map(w => w.replace(/[^\p{L}\p{N}'\u0591-\u05C7\u05F3]/gu, '')).filter(Boolean);
+  const heard = [], position = [];
+  all.forEach((w, i) => { for (const t of tokenize(w)) { heard.push(t); position.push(i); } });
   const result = alignCoverage(ref, heard);
-  return { ...result, heardWords: heard.length };
+  const lastWord = result.lastHeard >= 0 ? position[result.lastHeard] : -1;
+  return { ...result, heardWords: all.length, wordsAfterReading: lastWord >= 0 ? all.length - 1 - lastWord : 0 };
 }
 
 module.exports = { normalizeHebrew, tokenize, wordSimilarity, wordsMatch, alignCoverage, hebrewCoverage, SHEM_MARK };

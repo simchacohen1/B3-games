@@ -182,7 +182,7 @@ async function main() {
     const b = JSON.parse(route.request().postData() || '{}');
     if (b.action === 'teacherSave') { saved.push(b); return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, id: 'new1' }) }); }
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, aiEnabled: false, assignments: [
-      { id: 'aiOne', title: 'Vayeira 1–2', mode: 'ai', sefer: 'Bereishis', perek: 18, from: 1, to: 2, active: true, pesukim: [{ perek: 18, posuk: 1, hebrew: HEB['18_1'], meaning: 'Hashem appeared to Avraham.' }, { perek: 18, posuk: 2, hebrew: HEB['18_2'], meaning: 'He saw three men.' }],
+      { id: 'aiOne', title: 'Vayeira 1–2', mode: 'ai', sefer: 'Bereishis', perek: 18, from: 1, to: 2, active: true, pesukim: [{ perek: 18, posuk: 1, hebrew: HEB['18_1'] }, { perek: 18, posuk: 2, hebrew: HEB['18_2'] }],
         completion: { stu_a: { attempts: 3, lastOutcome: 'excellent', excellent: true, lastAt: Date.UTC(2026, 10, 9) }, stu_b: { attempts: 1, lastOutcome: 'almost', excellent: false } } },
       { id: 'regOne', title: 'Teacher Chazara', mode: 'regular', sefer: 'Bereishis', perek: 18, from: 3, to: 3, active: true, pesukim: [] }] }) });
   });
@@ -208,7 +208,7 @@ async function main() {
     await nums[0].fill('18'); await nums[1].fill('1'); await nums[2].fill('1');
     await tpage.check('input[name=aipMode][value=ai]');
     await tpage.fill('textarea[aria-label="Hebrew text for pasuk 1"]', HEB['18_1']);
-    await tpage.fill('textarea[aria-label="Approved meaning for pasuk 1"]', 'Hashem appeared to Avraham at Mamre while he sat at his tent door in the heat of the day.');
+    assert.equal(await tpage.$$eval('textarea', t => t.length), 1, 'only the Hebrew text box: no meaning field');
     assert.equal(await tpage.$eval('textarea[aria-label="Hebrew text for pasuk 1"]', e => getComputedStyle(e).direction), 'rtl');
     await tpage.click('text=Create assignment');
     assert.match(await tpage.textContent('fieldset'), /tick the box/);
@@ -219,7 +219,8 @@ async function main() {
     assert.equal(saved.length, 1);
     assert.equal(saved[0].assignment.mode, 'ai');
     assert.equal(saved[0].classId, 'class_one');
-    assert.match(saved[0].assignment.pesukim['18_1'].meaning, /tent door/);
+    assert.equal(saved[0].assignment.pesukim['18_1'].hebrew, HEB['18_1']);
+    assert.equal(saved[0].assignment.pesukim['18_1'].meaning, undefined);
   });
   await tpage.click('#aiPracticeTeacherPanel summary');
   await tpage.screenshot({ path: path.join(OUT, '8-teacher.png'), fullPage: true });
