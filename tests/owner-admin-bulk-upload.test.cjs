@@ -130,7 +130,8 @@ test('Undo CSV Import: tick both import runs, review, one confirmation; earlier 
  assert.match(review,/<b>1<\/b> kept for you to review/);
  assert.match(review,/<b>1<\/b> other student account\(s\) are not touched/);
  assert.match(review,/Had students before\. They stay\./);
- assert.match(review,/Had no students before this import/);
+ assert.match(review,/Classes \(2\): none are deleted/);
+ assert.match(review,/b2_et_afternoon\)<\/small><\/td><td[^>]*>17<\/td><td[^>]*>16<\/td><td[^>]*>1<\/td><td><small>Had no students before the import/,'one class row for both runs');
  assert.ok(!/482731|400000|500000/.test(review),'no passcodes on screen');
  assert.ok(!review.includes('old_moshe'),'the earlier student is not in the undo list');
 
@@ -146,6 +147,8 @@ test('Undo CSV Import: tick both import runs, review, one confirmation; earlier 
  h.el('rbConfirm').value='undo 22';await h.el('rbRun').onclick();
  assert.match(h.el('rbArea').innerHTML,/Done\.<\/b> 22 account\(s\) removed, 0 put back as before, 1 kept for review/);
  assert.equal(h.calls.filter(c=>c.action==='rollbackExecute').length,2);
+ assert.equal((h.el('undoBatches').innerHTML.match(/already undone/g)||[]).length,2,'undone imports are marked');
+ assert.equal(h.el('status').textContent,'');
  assert.deepEqual(Object.keys(h.tree.b3Games.students).sort(),['old_moshe',worked].sort());
  assert.equal(JSON.stringify(h.tree.b3Games.students.old_moshe),before,'earlier student identical');
  assert.equal(h.tree.b3Private.passcodes.old_moshe.passcode,'482731');
