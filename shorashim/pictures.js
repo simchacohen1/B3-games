@@ -11,7 +11,9 @@
    - an owner screenshot already in Firebase Storage (older feature, still shown)
    - a picture a teacher added: "teacher-picture:<teacherUid>/<pictureId>",
      stored at shorashimTeacherPictures/<teacherUid>/<pictureId>/data as a
-     small image data URL. */
+     small image data URL. Only that teacher (and the owner/admins) can read it there.
+     When the teacher ticks it, a copy goes to <class space>/pictures/<teacherUid>/<pictureId>,
+     which that class's students can read. Unticking it deletes the copy. */
 (function(root){
 'use strict';
 const ILLUSTRATIONS={"1-raah":[{"src":"assets/illustrations/seeing-binoculars.svg","label":"Looking through binoculars"}],"1-eilon":[{"src":"assets/illustrations/grove.svg","label":"A grove of trees"}],"1-yashav":[{"src":"assets/illustrations/sitting.svg","label":"A person sitting"}],"1-petach":[{"src":"assets/illustrations/entrance.svg","label":"A doorway entrance"}],"1-ohel":[{"src":"assets/illustrations/tent.svg","label":"A tent"}],"1-chom":[{"src":"assets/illustrations/heat.svg","label":"Hot sun and thermometer"}],"1-yom":[{"src":"assets/illustrations/day.svg","label":"A bright daytime scene"}],"2-nasa":[{"src":"assets/illustrations/carrying.svg","label":"A person carrying a box"}],"2-ayin":[{"src":"assets/illustrations/eye.svg","label":"A close-up eye"}],"2-shalosh":[{"src":"assets/illustrations/three-people.svg","label":"Three people"}]};
@@ -113,19 +115,63 @@ function imgAttrs(value){
   return isTeacherPicture(v)&&!cache.has(v)?attrs+' data-teacher-picture="'+escAttr(v)+'"':attrs;
 }
 
+// The class space whose ticked pictures this page shows: a path, or a function returning one
+// (the student page changes class space after sign-in).
+let classSpace='';
+function setClassSpace(space){classSpace=space;}
+function currentClassSpace(){const s=typeof classSpace==='function'?classSpace():classSpace;return typeof s==='string'?s:'';}
+function classCopyPath(value,space=currentClassSpace()){
+  const r=parseRef(value);if(!r)throw new Error('Not a teacher picture.');
+  if(!space)throw new Error('No class is open.');
+  return space+'/pictures/'+r.uid+'/'+r.id;
+}
+function signedInUid(){try{return root.firebase&&root.firebase.auth?(root.firebase.auth().currentUser||{}).uid||'':'';}catch(_){return '';}}
+function readData(path){
+  return root.firebase.database().ref(path+'/data').once('value').then(snap=>{const v=snap.val();return validDataUrl(v)?v:null;});
+}
+
 const cache=new Map(),pending=new Map();
+// Students only ever read the class copy. A teacher reads their own original, or the class copy
+// of a picture another teacher of the same class ticked.
 function resolve(value){
   const key=String(value||'');
   if(!isTeacherPicture(key))return Promise.resolve(null);
   if(cache.has(key))return Promise.resolve(cache.get(key));
   if(pending.has(key))return pending.get(key);
   if(!(root.firebase&&root.firebase.database))return Promise.resolve(null);
-  const p=root.firebase.database().ref(picturePath(key)+'/data').once('value')
-    .then(snap=>{const v=snap.val();if(validDataUrl(v)){cache.set(key,v);return v;}return null;})
+  const own=parseRef(key).uid===signedInUid(),space=currentClassSpace();
+  const sources=[...(own?[picturePath(key)]:[]),...(space?[classCopyPath(key,space)]:[])];
+  const p=sources.reduce((prev,path)=>prev.then(found=>found||readData(path).catch(()=>null)),Promise.resolve(null))
+    .then(v=>{if(v)cache.set(key,v);return v;})
     .catch(err=>{console.warn('Could not load teacher picture',err);return null;})
     .finally(()=>pending.delete(key));
   pending.set(key,p);
   return p;
+}
+// Teacher ticked a picture: copy it into the class so the class's students can see it.
+async function publishToClass(value){
+  const path=classCopyPath(value),db=root.firebase.database();
+  const existing=await db.ref(path+'/createdAt').once('value').then(s=>s.exists()).catch(()=>false);
+  if(existing)return;
+  let data=null;
+  if(parseRef(value).uid===signedInUid())data=await readData(picturePath(value)).catch(()=>null);
+  if(!data)throw new Error('Only the teacher who added this picture can show it to students.');
+  await db.ref(path).set({data,createdAt:Date.now()});
+  cache.set(String(value),data);
+}
+// Teacher unticked a picture (or the word was removed): students can no longer read it.
+function unpublishFromClass(value){return root.firebase.database().ref(classCopyPath(value)).remove();}
+function tickedTeacherPictures(catalog){
+  const out=new Set();
+  Object.values(catalog||{}).forEach(list=>(Array.isArray(list)?list:Object.values(list||{})).forEach(item=>
+    (Array.isArray(item?.art)?item.art:[]).forEach(v=>{if(isTeacherPicture(v))out.add(String(v));})));
+  return out;
+}
+function mentionedTeacherPictures(catalog){
+  const out=tickedTeacherPictures(catalog);
+  Object.values(catalog||{}).forEach(list=>(Array.isArray(list)?list:Object.values(list||{})).forEach(item=>
+    (Array.isArray(item?.customArt)?item.customArt:[]).forEach(v=>{if(isTeacherPicture(v))out.add(String(v));})));
+  return out;
 }
 function remember(value,dataUrl){if(isTeacherPicture(value)&&validDataUrl(dataUrl))cache.set(String(value),dataUrl);}
 function setImg(img,value){
@@ -180,7 +226,8 @@ function compressImage(file){
   });
 }
 
-const api={ILLUSTRATIONS,DRAWING_LABELS,PICTURE_ROOT,REF_PREFIX,MAX_DATA_URL_CHARS,INPUT_TYPES,pictureSvg,semanticDrawingKinds,semanticIllustrations,isScreenshotUrl,isAssetIllustration,isDrawing,isTeacherPicture,isImageValue,isEmojiValue,makeRef,parseRef,picturePath,validDataUrl,newPictureId,labelFor,builtInOptionsFor,srcFor,imgAttrs,resolve,remember,setImg,hydrate,compressImage};
+const api={ILLUSTRATIONS,DRAWING_LABELS,PICTURE_ROOT,REF_PREFIX,MAX_DATA_URL_CHARS,INPUT_TYPES,pictureSvg,semanticDrawingKinds,semanticIllustrations,isScreenshotUrl,isAssetIllustration,isDrawing,isTeacherPicture,isImageValue,isEmojiValue,makeRef,parseRef,picturePath,validDataUrl,newPictureId,labelFor,builtInOptionsFor,srcFor,imgAttrs,resolve,remember,setImg,hydrate,compressImage,
+  setClassSpace,classCopyPath,publishToClass,unpublishFromClass,tickedTeacherPictures,mentionedTeacherPictures};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.B3ShorashimPictures=api;
 })(typeof window==='undefined'?globalThis:window);

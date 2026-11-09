@@ -141,26 +141,109 @@ test('adding a picture stores it under the teacher\'s own account as an unticked
 
 test('scripts load in the right order on both pages',()=>{
   const t=s=>teacherHtml.indexOf(s);
-  assert.ok(t('pictures.js?v=20261107-pictures-1')>=0&&t('pictures.js?v=')<t('teacher.js?v=')&&t('teacher.js?v=')<t('teacher-add-picture.js?v='));
+  assert.ok(t('pictures.js?v=20261109-pictures-2')>=0&&t('pictures.js?v=')<t('teacher.js?v=')&&t('teacher.js?v=')<t('teacher-add-picture.js?v='));
   assert.equal(teacherHtml.includes('teacher-screenshot.js'),false);
   const s=x=>studentHtml.indexOf(x);
-  assert.ok(s('pictures.js?v=20261107-pictures-1')>=0&&s('pictures.js?v=')<s('app.js?v=20261107-pictures-1'));
+  assert.ok(s('pictures.js?v=20261109-pictures-2')>=0&&s('pictures.js?v=')<s('app.js?v=20261109-pictures-2'));
   assert.equal(studentHtml.includes('teacher-add-picture.js'),false);
   assert.equal(fs.existsSync('shorashim/teacher-screenshot.js'),false);
 });
 
-test('rules: teacher pictures are written only by that active teacher and read one at a time',()=>{
+test('rules: teacher pictures are written and read only by that active teacher (plus owner/admins)',()=>{
   for(const r of [rules,hardened]){
     const node=r.shorashimTeacherPictures;
     assert.ok(node,'node exists');
-    assert.equal(node['.read'],undefined);assert.equal(node.$uid['.read'],undefined,'nobody can list a teacher\'s pictures');
+    assert.equal(node['.read'],undefined);
+    // Students never read a teacher's own pictures; they read the class copy of ticked ones.
+    assert.match(node.$uid['.read'],/^\(auth != null && \$uid == auth\.uid && root\.child\('b3Games\/workspaces\/b3-2026\/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true\) \|\| \(auth != null && \(auth\.token\.email == 'simcha5770@gmail\.com' && auth\.token\.email_verified == true \|\| root\.child\('b3Games\/admins\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true\)\)$/);
+    assert.equal(node.$uid['.read'].includes('b3StudentId'),false);
     const pic=node.$uid.$pictureId;
-    assert.equal(pic['.read'],'auth != null');
-    assert.match(pic['.write'],/\$uid == auth\.uid && root\.child\('b3Games\/workspaces\/b3-2026\/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true && \(!data\.exists\(\) \|\| !newData\.exists\(\)\)/);
+    assert.equal(pic['.read'],undefined);
+    assert.match(pic['.write'],/\$uid == auth\.uid && root\.child\('b3Games\/workspaces\/b3-2026\/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true\) && \(!data\.exists\(\) \|\| !newData\.exists\(\)\)/);
     assert.match(pic['.validate'],/length <= 200000/);
     for(const t of ['webp','jpeg','png'])assert.ok(pic['.validate'].includes(`beginsWith('data:image/${t};base64,')`));
     assert.equal(pic['.validate'].includes('svg'),false);
     assert.equal(pic.$other['.validate'],false);
   }
   assert.match(additive,/\['shorashimTeacherPictures'\]/);
+});
+
+// ---- Follow-up (#627): students read only class copies of ticked pictures ----
+function fakeFirebase(uid,store,denied=()=>false){
+  const db={ref:path=>({
+    once:async()=>{if(denied(path,'read'))throw Object.assign(new Error('permission_denied'),{code:'PERMISSION_DENIED'});
+      const parts=path.split('/');let v=store;for(const k of parts){v=v==null?undefined:v[k];}
+      return {val:()=>v===undefined?null:v,exists:()=>v!==undefined&&v!==null};},
+    set:async value=>{if(denied(path,'write'))throw new Error('permission_denied');
+      const parts=path.split('/'),last=parts.pop();let o=store;for(const k of parts)o=o[k]=o[k]||{};o[last]=value;},
+    remove:async()=>{const parts=path.split('/'),last=parts.pop();let o=store;for(const k of parts){if(!o[k])return;o=o[k];}delete o[last];}
+  })};
+  return {database:()=>db,auth:()=>({currentUser:uid?{uid}:null})};
+}
+function freshPictures(firebase){
+  // Load a separate copy of pictures.js with its own cache and its own window.firebase.
+  const code=read('shorashim/pictures.js');
+  const win={firebase};
+  vm.runInNewContext(code,{window:win,globalThis:win,URL,console,setTimeout});
+  return win.B3ShorashimPictures;
+}
+const DATA='data:image/webp;base64,UklGRhYAAABXRUJQVlA4';
+const SPACE='posukPractice/shorashimLearning/classes/alpha';
+
+test('teacher picture: ticking copies it into the class; unticking deletes the copy',async()=>{
+  const store={shorashimTeacherPictures:{t1:{'pic-000001':{data:DATA,createdAt:1}}}};
+  const P2=freshPictures(fakeFirebase('t1',store));
+  P2.setClassSpace(SPACE);
+  const ref='teacher-picture:t1/pic-000001';
+  assert.equal(P2.classCopyPath(ref),SPACE+'/pictures/t1/pic-000001');
+  await P2.publishToClass(ref);
+  assert.equal(store.posukPractice.shorashimLearning.classes.alpha.pictures.t1['pic-000001'].data,DATA);
+  await P2.unpublishFromClass(ref);
+  assert.equal(store.posukPractice.shorashimLearning.classes.alpha.pictures.t1['pic-000001'],undefined);
+});
+
+test('teacher picture: another teacher cannot share a picture that is not theirs',async()=>{
+  const store={shorashimTeacherPictures:{t1:{'pic-000001':{data:DATA,createdAt:1}}}};
+  const P2=freshPictures(fakeFirebase('t2',store,p=>p.startsWith('shorashimTeacherPictures/t1')));
+  P2.setClassSpace(SPACE);
+  await assert.rejects(P2.publishToClass('teacher-picture:t1/pic-000001'),/Only the teacher who added this picture/);
+  assert.equal(store.posukPractice,undefined,'nothing was copied');
+});
+
+test('student page reads only the class copy, never the teacher original',async()=>{
+  const reads=[];
+  const store={shorashimTeacherPictures:{t1:{'pic-000001':{data:DATA,createdAt:1},'pic-000002':{data:DATA,createdAt:1}}},
+    posukPractice:{shorashimLearning:{classes:{alpha:{pictures:{t1:{'pic-000001':{data:DATA,createdAt:2}}}}}}}};
+  const fb=fakeFirebase('student_uid',store,(p,kind)=>{if(kind==='read')reads.push(p);return p.startsWith('shorashimTeacherPictures');});
+  const P2=freshPictures(fb);
+  let space=SPACE;P2.setClassSpace(()=>space);
+  assert.equal(await P2.resolve('teacher-picture:t1/pic-000001'),DATA,'ticked picture shows from the class copy');
+  assert.equal(await P2.resolve('teacher-picture:t1/pic-000002'),null,'unticked picture has no class copy, so nothing shows');
+  assert.equal(reads.some(p=>p.startsWith('shorashimTeacherPictures')),false,'the student never asks for the original');
+});
+
+test('tickedTeacherPictures and mentionedTeacherPictures find pictures across tracks',()=>{
+  const catalog={shorashim:[{art:['👀','teacher-picture:t1/pic-000001'],customArt:['teacher-picture:t1/pic-000001','teacher-picture:t1/pic-000002']}],
+    prefix:{0:{art:['teacher-picture:t2/pic-000003']}},suffix:[]};
+  assert.deepEqual([...P.tickedTeacherPictures(catalog)].sort(),['teacher-picture:t1/pic-000001','teacher-picture:t2/pic-000003']);
+  assert.deepEqual([...P.mentionedTeacherPictures(catalog)].sort(),['teacher-picture:t1/pic-000001','teacher-picture:t1/pic-000002','teacher-picture:t2/pic-000003']);
+});
+
+test('teacher page shares a picture with the class before ticking it and cleans up on save',()=>{
+  assert.match(teacherJs,/window\.B3ShorashimPictures\.setClassSpace\(SPACE\)/);
+  const toggle=teacherJs.slice(teacherJs.indexOf('async function togglePictureChoice('));
+  assert.ok(toggle.indexOf('publishToClass(v)')>0&&toggle.indexOf('publishToClass(v)')<toggle.indexOf('item.art=[...selected,v]'),'copy first, tick second');
+  assert.match(teacherJs,/async function saveCatalog\(\)\{.*\.set\(state\.catalog\);await syncClassPictures\(\);/);
+  assert.match(teacherJs,/unpublishFromClass\(v\)/);
+  assert.match(app,/B3ShorashimPictures\.setClassSpace\(\(\)=>CLOUD_ROOT\)/);
+});
+
+test('teachers can add a picture three ways: file, paste and camera snapshot',()=>{
+  assert.match(addPicture,/📁 Add picture from computer/);
+  assert.match(addPicture,/Ctrl\+V to paste/);
+  assert.match(addPicture,/📷 Take snapshot/);
+  assert.match(addPicture,/getUserMedia\(\{ video:/);
+  assert.match(addPicture,/getTracks\(\)\.forEach\(t => t\.stop\(\)\)/,'camera is turned off');
+  assert.match(addPicture,/new File\(\[blob\], 'snapshot\.png', \{ type: 'image\/png' \}\)/);
+  assert.match(addPicture,/\[data-picture-camera\]/);
 });
