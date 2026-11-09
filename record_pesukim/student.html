@@ -10,6 +10,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="posuk-practice-scroll"></script>
+<script>
+/* חידון (quiz) mode. The AI comprehension questions (tap the Hebrew words)
+   live in their own home tile, which opens this same page with ?mode=quiz.
+   Quiz mode shows only the Understand task; the normal practice page shows
+   only Read and Translate. Saved attempts, grading, teacher review and
+   Chazara scores are the same records either way. Old links that ask for
+   tab=comprehension (Chazara, My Progress) are sent to quiz mode. */
+(function(){
+  var p = new URLSearchParams(location.search);
+  if(p.get('mode') !== 'quiz' && p.get('tab') === 'comprehension'){
+    p.set('mode', 'quiz');
+    location.replace(location.pathname + '?' + p.toString() + location.hash);
+  }
+  window.B3_QUIZ_MODE = p.get('mode') === 'quiz';
+  document.documentElement.classList.toggle('quiz-mode', window.B3_QUIZ_MODE);
+  if(window.B3_QUIZ_MODE){
+    document.title = 'Chumash חידון';
+    document.addEventListener('DOMContentLoaded', function(){
+      var h = document.querySelector('header.top h1'), d = document.querySelector('header.top p');
+      if(h) h.textContent = '🧠 Chumash חידון';
+      if(d) d.textContent = 'Answer questions about the posuk by tapping the Hebrew words.';
+    });
+  }
+})();
+</script>
+<style>
+  html.quiz-mode .task-tabs{ display:none; }
+  html.quiz-mode #comprehensionPanel .step-chip{ display:none; }
+  html:not(.quiz-mode) #tabComprehensionBtn{ display:none; }
+</style>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1963,7 +1993,7 @@ let comprehensionScore = null;     // 0-100, supplementary to the verdict tier a
 let comprehensionFeedback = "";
 
 /* ---------- Tabs (one task visible at a time) ---------- */
-let activeTab = 'reading'; // 'reading' | 'comprehension'
+let activeTab = window.B3_QUIZ_MODE ? 'comprehension' : 'reading'; // 'reading' | 'translate' | 'comprehension'
 
 /* ---------- Autosave tracking ----------
    Each task is graded and saved automatically the moment grading
@@ -3400,6 +3430,9 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
    Switching tabs never loses anything already recorded — it's purely a
    visibility toggle. */
 function setActiveTab(tab){
+  // Quiz mode is only the Understand task; practice mode never shows it.
+  if(window.B3_QUIZ_MODE) tab = 'comprehension';
+  else if(tab === 'comprehension') tab = 'reading';
   activeTab = tab;
   document.getElementById('readingPanel').classList.toggle('hidden', tab !== 'reading');
   document.getElementById('translationPanel').classList.toggle('hidden', tab !== 'translate');
@@ -3432,7 +3465,8 @@ function hideNudge(){
 // translation -> comprehension) so the nudge always points to the next
 // natural step rather than jumping around.
 function nextUnfinishedTask(justSaved){
-  const order = ['hebrew', 'translation', 'comprehension'];
+  // Understand lives in its own חידון tile now, so never nudge toward it.
+  const order = window.B3_QUIZ_MODE ? [] : ['hebrew', 'translation'];
   for(const t of order){
     if(t !== justSaved && !attemptSaved[t]) return t;
   }
