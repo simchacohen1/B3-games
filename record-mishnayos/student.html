@@ -2471,7 +2471,9 @@ function enterApp(){
   // Nothing is selectable until we know which class's practice window applies.
   practiceScopeReady = false;
   rebuildPerekOptionsForClassLimit();
-  window.FunTorahStudentClass.resolve(db, studentId).catch(err => {
+  // Every read below is time-limited: a stalled database read must not leave
+  // the student with nothing to pick (and so no Hebrew) forever.
+  promiseWithTimeout(window.FunTorahStudentClass.resolve(db, studentId), 12000, 'Class membership').catch(err => {
     console.error('Could not read class membership', err);
     return {ownSpace:false};
   }).then(cls => {
@@ -2482,17 +2484,17 @@ function enterApp(){
     }
     // B3's own classes (et/wt): a class may have its own window that
     // overrides the shared default one.
-    return resolveLegacyClassId(cls).then(id => {
+    return promiseWithTimeout(resolveLegacyClassId(cls), 12000, 'Legacy class lookup').then(id => {
       if(id) classOverridePath = 'posukPractice/mishnayos/settings/classPracticeLimits/' + id;
-    });
+    }, err => console.error('Could not look up legacy class', err));
   }).then(() => {
     startPracticeLimitListener();
     // Load the boundary explicitly before honoring a deep link. The live
     // listener above keeps it updated afterward, but this one-time read avoids
     // a race where a bookmarked future posuk could open before the limit arrives.
     return Promise.all([
-      db.ref(practiceLimitPath).once('value'),
-      classOverridePath ? db.ref(classOverridePath).once('value').catch(() => null) : Promise.resolve(null)
+      promiseWithTimeout(db.ref(practiceLimitPath).once('value'), 12000, 'Practice window'),
+      classOverridePath ? promiseWithTimeout(db.ref(classOverridePath).once('value'), 12000, 'Class practice window').catch(() => null) : Promise.resolve(null)
     ]).then(([snap, ovSnap]) => {
       defaultLimitVal = snap.val();
       overrideLimitVal = ovSnap ? ovSnap.val() : null;
@@ -3087,15 +3089,31 @@ function updateNavArrows(){
 let mishnayosDataPromise = null;
 const sectionInfoCache = {}; // perek -> [{mishnah, part, partsCount, lines, mishnahLines, startLine, endLine}]
 let MISHNAYOS_DATA = null;
+/* One try of the Hebrew file, given up after 15 seconds so a stalled
+   connection cannot leave "Loading the Mishnayos…" on screen forever. */
+function fetchMishnayosDataOnce(cacheMode){
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = setTimeout(() => { if(controller) controller.abort(); }, 15000);
+  return fetch(MISHNAYOS_DATA_URL, { cache:cacheMode, signal: controller ? controller.signal : undefined })
+    .then(res => { if(!res.ok) throw new Error('Mishnah text HTTP ' + res.status); return res.json(); })
+    .then(data => {
+      if(!data || !Array.isArray(data.perakim) || !data.perakim.length) throw new Error('Mishnah text file is empty');
+      return data;
+    })
+    .finally(() => clearTimeout(timer));
+}
 function loadMishnayosData(){
   if(!mishnayosDataPromise){
-    mishnayosDataPromise = fetch(MISHNAYOS_DATA_URL, { cache:'force-cache' })
-      .then(res => { if(!res.ok) throw new Error('Mishnah text HTTP ' + res.status); return res.json(); })
+    // Second try skips the browser cache in case a bad copy was stored.
+    mishnayosDataPromise = fetchMishnayosDataOnce('force-cache')
+      .catch(err => { console.warn('Mishnah text: first try failed, retrying', err); return fetchMishnayosDataOnce('reload'); })
       .then(data => { MISHNAYOS_DATA = data; return data; })
       .catch(err => { mishnayosDataPromise = null; throw err; });
   }
   return mishnayosDataPromise;
 }
+// Start downloading the Hebrew right away, before a perek is chosen.
+loadMishnayosData().catch(() => {});
 function sectionsForPerek(data, perekNum){
   if(sectionInfoCache[perekNum]) return sectionInfoCache[perekNum];
   const perek = data.perakim[perekNum - 1];

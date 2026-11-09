@@ -8,10 +8,11 @@
  *   record-mishnayos/data/<key>.he.json
  *       Public. Hebrew (Torat Emet 357, public domain) split into display
  *       lines for the Mishnah Seduras layout.
- *   backend/functions/data/mishnayos/<key>.en.json
+ *   backend/functions/_answer-key/mishnayos/<key>.en.json
  *       Teacher answer key ONLY. Rabbi Shraga Silverstein translation
- *       (CC-BY). Lives with the Cloud Functions, never on the public site,
- *       so students cannot download it.
+ *       (CC-BY). Lives with the Cloud Functions, never on the public site
+ *       (GitHub Pages skips folders starting with _), so students cannot
+ *       download it.
  *
  * Re-run only when the text needs refreshing. Students never call Sefaria.
  */
@@ -185,7 +186,7 @@ async function main() {
   }
 
   const heOut = path.join(ROOT, 'record-mishnayos', 'data', key + '.he.json');
-  const enOut = path.join(ROOT, 'backend', 'functions', 'data', 'mishnayos', key + '.en.json');
+  const enOut = path.join(ROOT, 'backend', 'functions', '_answer-key', 'mishnayos', key + '.en.json');
   fs.mkdirSync(path.dirname(heOut), { recursive: true });
   fs.mkdirSync(path.dirname(enOut), { recursive: true });
   fs.writeFileSync(heOut, JSON.stringify(he, null, 1) + '\n');

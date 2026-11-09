@@ -1589,13 +1589,26 @@ async function loadAnswerKeyTab(){
   try{
     const user = firebase.auth().currentUser;
     if(!user) throw Object.assign(new Error('Sign in with your teacher Google account.'), { shown:true });
-    const res = await fetch(MISHNAYOS_ANSWER_KEY_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + await user.getIdToken() },
-      body: JSON.stringify({ maseches: MASECHES_KEY, perek: answerKeyPerek })
-    });
+    // Give up after 25 seconds (a cold start is usually under 10) so the tab
+    // never sits on "Loading answer key…" forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    let res;
+    try{
+      res = await fetch(MISHNAYOS_ANSWER_KEY_URL, {
+        method:'POST',
+        signal: controller.signal,
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + await user.getIdToken() },
+        body: JSON.stringify({ maseches: MASECHES_KEY, perek: answerKeyPerek })
+      });
+    }catch(netErr){
+      throw Object.assign(new Error(netErr && netErr.name === 'AbortError'
+        ? 'The answer key service took too long to answer. Please try again.'
+        : 'Could not reach the answer key service. Check the internet connection and try again.'), { shown:true, retry:true });
+    }finally{ clearTimeout(timer); }
     const data = await res.json().catch(() => ({}));
-    if(!res.ok) throw Object.assign(new Error(data.error || ('Answer key service returned ' + res.status)), { shown:true });
+    if(res.status === 404) throw Object.assign(new Error('The answer key service is not set up on the server yet (mishnayosAnswerKey is not deployed). Ask the site admin to deploy the Mishnayos functions.'), { shown:true });
+    if(!res.ok) throw Object.assign(new Error(data.error || ('Answer key service returned ' + res.status)), { shown:true, retry: res.status >= 500 || res.status === 429 });
     const [chunkSnap, questionSnap] = await Promise.all([
       db.ref('posukPractice/mishnayos/answerKey/translationChunks').once('value').catch(() => null),
       db.ref('posukPractice/mishnayos/answerKey/generatedQuestions').once('value').catch(() => null)
@@ -1624,6 +1637,14 @@ async function loadAnswerKeyTab(){
     console.error(err);
     body.className = 'empty-msg';
     body.textContent = err.shown ? err.message : 'Could not load the answer key.';
+    if(!err.shown || err.retry){
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = 'Try again';
+      retry.style.cssText = 'display:block;margin:12px auto 0;padding:8px 18px;border-radius:10px;border:0;background:var(--gold);color:var(--navy);font-weight:700;cursor:pointer;';
+      retry.onclick = () => loadAnswerKeyTab();
+      body.appendChild(retry);
+    }
   }
 }
 

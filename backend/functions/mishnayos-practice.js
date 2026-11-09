@@ -6,8 +6,9 @@
  * English answer key (Rabbi Shraga Silverstein, via Sefaria, CC-BY) is NEVER
  * sent to a student's browser. The student page sends only
  * {maseches, perek, section}; these functions look up the Hebrew and the
- * translation from data/mishnayos/*.en.json, which ships with the functions
- * and is not on the public website.
+ * translation from _answer-key/mishnayos/*.en.json, which ships with the functions
+ * and is not on the public website (the leading _ keeps GitHub Pages from
+ * publishing that folder).
  *
  * Firebase paths (all written here with the Admin SDK; students cannot write):
  *   posukPractice/mishnayos/translationChunks/<key>        Hebrew chunks only (students read)
