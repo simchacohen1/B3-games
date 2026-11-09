@@ -38,7 +38,8 @@ const PRODUCTION_STUDENT_NAMES = [
   'Arik Traxler', 'Ari Greenberg', 'Zev Rosenfeld', 'Levi Schtroks',
   'Yisroel Aryeh Simmonds', 'Leibel Vogel', 'Yisroel Arye Leib Wolf', 'Rabbi Cohen'
 ];
-const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'tests', 'e2e', 'backend', 'docs', 'staging', 'staging-build']);
+const OWNER_SIGNIN_MARKER = 'data-b3-staging-owner-signin';
+const EXCLUDED_DIRS =new Set(['.git', 'node_modules', 'tests', 'e2e', 'backend', 'docs', 'staging', 'staging-build']);
 
 function requiredStagingUrl(value, name, blockedHost) {
   let parsed;
@@ -137,6 +138,15 @@ function stageSource(siteRoot, env = process.env) {
       if (!content.includes(productionHost)) throw new Error('Cannot find the learning-service host allowlist in paid-api.js.');
       const stagingHost = new URL(functionsOrigin).hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       content = content.split(productionHost).join(stagingHost);
+    }
+    if (relative === 'owner-admin.html') {
+      // Issue #710: the one-click "Sign in as staging owner" button exists only
+      // in this packaged copy. The live owner-admin.html is never edited and
+      // never loads the script.
+      if (!content.includes('id="gate"') || content.split('</body>').length !== 2) {
+        throw new Error('Cannot add the staging owner sign-in button to owner-admin.html.');
+      }
+      content = content.replace('</body>', '<script ' + OWNER_SIGNIN_MARKER + ' src="staging/owner-signin.js"></script>\n</body>');
     }
     if (relative === 'chossid-lamdan.html') {
       const fictionalRoster = "const DEFAULT_DATA={date:'2026-10-26',classes:[" +
@@ -251,6 +261,7 @@ function stageSource(siteRoot, env = process.env) {
   // A small page to sign in to the staging test accounts (owner, teachers) with email and password. Staging builds only:
   // the source is a .template file so the live site never serves it as a page.
   fs.copyFileSync(path.join(__dirname, 'owner-signin.template'), path.join(stageDir, 'owner-signin.html'));
+  fs.copyFileSync(path.join(__dirname, 'owner-signin.js'), path.join(stageDir, 'owner-signin.js'));
 
   const outputFiles = listFiles(root);
   const violations = [];

@@ -11,3 +11,5 @@ exports.classWorksheets = require('./class-worksheets').classWorksheets;
 exports.studentRewardsTeacher = require('./rewards-teacher').studentRewardsTeacher;
 exports.studentLocks = require('./student-locks').studentLocks;
 exports.funTorahClassAccess = require('./class-access').funTorahClassAccess;
+// Staging only (#710). Never add this to the production backend/functions codebase.
+exports.stagingOwnerSignIn = require('./staging-owner-signin').stagingOwnerSignIn;
