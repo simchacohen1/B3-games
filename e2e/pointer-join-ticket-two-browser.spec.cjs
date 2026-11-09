@@ -200,6 +200,8 @@ test('screen sharing still reaches an admitted student', async ({ browser }) => 
 
 test('activity-page screen sharing reaches the teacher over real PeerJS and restarts cleanly', async ({ browser }) => {
   const t = await startTeacher(browser);
+  // Only this test's backend calls count (earlier tests deliberately cause refusals).
+  const logStart = backend.log.length, ownLog = () => backend.log.slice(logStart);
   let session = backend.publishActivityRequest(t.room);
   const sessionUrl = 'http://127.0.0.1:9009/b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + encodeURIComponent(t.room) + '.json?ns=demo-pointer-test';
   const writeSession = async value => {
@@ -212,28 +214,30 @@ test('activity-page screen sharing reaches the teacher over real PeerJS and rest
   const page = await context.newPage();
   page.on('pageerror', e => console.log('activity pageerror:', e.message));
   await page.goto(BASE + '/activity-test.html');
-  await expect(page.getByRole('dialog', { name: 'Teacher screen sharing request' })).toBeVisible({ timeout: 20000 });
+  // The full-page request dialog was removed in #187; the student now sees the small Share My Screen button.
+  const shareButton = page.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
+  await expect(shareButton).toBeVisible({ timeout: 20000 });
 
   for (let cycle = 0; cycle < 3; cycle++) {
     if (cycle > 0) {
       session = backend.publishActivityRequest(t.room, Date.now() + cycle);
       await writeSession(session);
-      await expect(page.getByRole('dialog', { name: 'Teacher screen sharing request' })).toBeVisible();
+      await expect(shareButton).toBeVisible({ timeout: 20000 });
     }
-    await page.getByRole('button', { name: 'Share My Screen' }).click();
+    await shareButton.click();
     await expect.poll(() => t.page.locator('#activityScreenTray video').count(), { timeout: 30000 }).toBe(1);
     await expect.poll(() => t.page.locator('#activityScreenTray video').evaluate(v => v.videoWidth), { timeout: 15000 }).toBe(320);
     const firstPixel = await t.page.locator('#activityScreenTray video').evaluate(v => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.drawImage(v, 0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data]; });
     await expect.poll(() => t.page.locator('#activityScreenTray video').evaluate(v => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.drawImage(v, 0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data]; }), { timeout: 8000 }).not.toEqual(firstPixel);
-    expect(backend.log.filter(l => l.action === 'verify' && l.status === 200).length).toBe(cycle + 1);
+    expect(ownLog().filter(l => l.action === 'verify' && l.status === 200).length).toBe(cycle + 1);
     if (cycle === 2) await t.page.evaluate(() => window.ClassPointerActivityShares.closeAll());
     else await page.locator('#fttActivityScreenShare button').first().click();
     await expect.poll(() => t.page.locator('#activityScreenTray video').count()).toBe(0);
     await expect.poll(() => page.evaluate(() => window.__captureStreams.at(-1).getVideoTracks()[0].readyState)).toBe('ended');
   }
-  expect(backend.log.filter(l => l.action === 'permissions' && l.status === 200)).toHaveLength(3);
-  expect(backend.log.filter(l => l.action === 'issue' && l.status === 200)).toHaveLength(3);
-  expect(backend.log.filter(l => l.status === 403), 'no Firebase authorization 403 responses').toHaveLength(0);
+  expect(ownLog().filter(l => l.action === 'permissions' && l.status === 200)).toHaveLength(3);
+  expect(ownLog().filter(l => l.action === 'issue' && l.status === 200)).toHaveLength(3);
+  expect(ownLog().filter(l => l.status === 403), 'no Firebase authorization 403 responses').toHaveLength(0);
   await context.close(); await t.context.close();
 });
 

@@ -63,7 +63,8 @@ function init(){
   shareState.disabled=real.disabled;
   shareState.classList.toggle("cp-share-on",on&&!real.disabled);
   shareState.classList.toggle("cp-share-off",!on&&!real.disabled);
-  shareState.textContent=real.disabled?"Student sharing: waiting for class":on?"Student sharing: ON · click to turn off":"Student sharing: OFF · click to turn on";
+  shareState.textContent=real.disabled?"Student screen sharing: waiting for class":on?"Student screen sharing: ON · turn off":"Student screen sharing: off · turn on";
+  shareState.title=on?"Students can share their screens with you. Click to stop all student screen sharing.":"Students cannot share their screens right now. Click to let them (or open the Student screens tab).";
   shareState.setAttribute("aria-pressed",String(on));
  }
  shareState.addEventListener("click",()=>{const real=$("cpShareEnabled");if(real&&!real.disabled)real.click();setTimeout(syncShareState,0)});
@@ -94,7 +95,7 @@ function init(){
   ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows his name.'],
   ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. He clicks it and chooses Entire Screen. His screen appears here as a tile, and the list on top shows who has not shared yet.'],
   ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. He sees your marks on his own screen. 🧽 Clear takes them off.'],
-  ['When you are done','Use the red Stop button to stop what students are watching. The Student sharing button in the top bar turns screen sharing off for the whole class.']
+  ['When you are done','Click the red Stop sharing button to stop what students are watching. Student screen sharing: ON · turn off (top bar) stops all student screens. To end the class, close this page; students go back to what they were doing.']
  ]){const li=el('li');li.append(el('strong',null,head),el('span',null,text));steps.append(li)}
  const note=el('p','cp-guide-note','The browser always asks a student before his screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
  const guideOk=el('button','cp-guide-ok','Got it');guideOk.type='button';
@@ -137,14 +138,14 @@ function init(){
  const everyoneSelect=el('select');everyoneSelect.id='cpEveryoneLevel';
  for(const [v,t] of LEVEL_LONG){const o=el('option',null,t);o.value=v;everyoneSelect.append(o)}
  everyoneLabel.append(everyoneSelect);
- everyone.append(everyoneLabel,el('span','cp-everyone-help','Change one student below if needed.'));
+ everyone.append(everyoneLabel,el('span','cp-everyone-help','Nothing = watch only. Pointer, + Highlight and + Pen let students mark your lesson. Change one student below if needed.'));
  everyoneSelect.addEventListener('change',()=>{everyoneSelect.dataset.level=everyoneSelect.value;window.ClassPointerRoster?.setAll(everyoneSelect.value)});
  sidebar.append(everyone);
 
  /* One table: name, level on my screen, screen sharing, whiteboard. */
  const table=el('div','cp-student-table');table.setAttribute('role','group');table.setAttribute('aria-label','Student permissions');
  const tableHead=el('div','cp-student-head');
- tableHead.append(el('span',null,'Name'),el('span',null,'On my screen'));
+ tableHead.append(el('span',null,'Name'),el('span',null,'Can use on my lesson'));
  const tableBody=el('div','cp-student-body');
  table.append(tableHead,tableBody);
  sidebar.append(table);
@@ -294,7 +295,7 @@ function init(){
  const live=el('span','cp-live-chip','Live');
  const tabControls=$('tabControls');
  const switchWrap=el('div','cp-switch-wrap');
- const switchBtn=el('button','cp-switch-btn','Switch');switchBtn.type='button';
+ const switchBtn=el('button','cp-switch-btn','Switch lesson');switchBtn.type='button';
  switchBtn.setAttribute('aria-haspopup','true');switchBtn.setAttribute('aria-expanded','false');switchBtn.setAttribute('aria-controls','cpSwitchMenu');
  const switchMenu=el('div','cp-switch-menu');switchMenu.id='cpSwitchMenu';switchMenu.hidden=true;
  switchMenu.append(el('small',null,'Switch to'));

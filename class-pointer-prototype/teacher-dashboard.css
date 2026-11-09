@@ -251,7 +251,7 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 
 .cp-share-state{min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #6b7894;background:#2a3a5c;color:#fff;font-weight:800;font-size:15px;margin:0;cursor:pointer}
 .cp-share-state.cp-share-on{background:#16a34a;border-color:#bbf7d0}
-.cp-share-state.cp-share-off{background:#dc2626;border-color:#fecaca}
+.cp-share-state.cp-share-off{background:#334155;border-color:#94a3b8}
 .cp-share-state:disabled{opacity:.6;cursor:not-allowed}
 .cp-share-state[hidden]{display:none}
 
@@ -298,5 +298,5 @@ dialog.cp-guide::backdrop{background:#0f172a99}
 .cp-guide-ok{display:block;margin-left:auto;min-height:44px;padding:0 26px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:700 16px system-ui,sans-serif;cursor:pointer}
 .cp-guide-ok:focus-visible,.cp-guide-x:focus-visible{outline:3px solid #f5b800;outline-offset:2px}
 /* On Student screens / Student whiteboards the lesson drawing tools do nothing, so only Stop, View and Students stay. */
-body.cp-student-workspace #teacherDock>.tb-group:not(:has(#cpDockStop)){display:none!important}
+body.cp-student-workspace #teacherDock>.tb-group:not(:has(#cpDockStop)),body.cp-viewing-student #teacherDock>.tb-group:not(:has(#cpDockStop)){display:none!important}
 body.cp-student-workspace #teacherDock>.tb-spacer{display:none}

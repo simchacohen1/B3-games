@@ -64,6 +64,8 @@
       entry.enlarge.title=big?'Return to all student screens (sharing continues)':'Show '+entry.name+'’s screen large';
     }
     if(focused)students.get(focused).enlarge.focus?.({preventScroll:true});
+    // While a student's screen is open large, hide the lesson drawing tools so only one Point/Pen toolbar shows.
+    document.body?.classList?.toggle('cp-viewing-student',!!focused);
   }
   document.addEventListener?.('keydown',event=>{if(event.key==='Escape'&&focused){event.stopPropagation();setFocus(null)}},true);
   // The adaptive gallery owns the full lesson area; avoid a duplicate floating tray on top.

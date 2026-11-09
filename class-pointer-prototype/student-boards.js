@@ -963,8 +963,8 @@
       if(revision!==workspaceRevision)return;
       await dashboard.requestStudentDestination(destination,policy());
       B.status(destination==='screens'
-        ?'Sent this class to Screen Sharing. Each boy clicks Share my screen and approves the browser prompt.'
-        :'Opened individual whiteboards over the students’ current activities. Their work appears here.');
+        ?'Every student now sees a Share My Screen button. Their screens appear here. Click My screen to bring them back to your lesson.'
+        :'Every student now has his own whiteboard. Their work appears here. Click My screen to bring them back to your lesson.');
     }catch(error){
       B.fail('Could not send the class: '+(error?.message||'Please try again.'));
     }finally{buttons.forEach(b=>b.disabled=false)}
