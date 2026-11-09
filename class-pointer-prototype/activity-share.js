@@ -80,7 +80,9 @@
           try{presenceConn.send(message)}catch{}
         }
       },status:()=>{},callTeacher:null};
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-twoway1',root).href);
+    // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-annotate1',root).href);
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -112,6 +114,7 @@
     // surfaces and explicitly permitted share controls can receive interaction.
     window.B3PointerAssignedUI={allowsEvent(target){
       if(!sameStudent())return false;
+      if(window.FTTAnnotate?.owns?.(target))return true;
       if(holder.contains?.(target) && active && permissionReady && permission.screenSharingDenied!==true)return true;
       return admitted && ((lessonActive && lessonOverlay.contains?.(target)) ||
         document.getElementById('fttEmbeddedPointerStage')?.contains?.(target) ||
@@ -463,7 +466,7 @@
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       // My screen is no longer shared: take the teacher's marks off it.
-      if(prior)window.ClassPointerBoards?.clearScreenMarks?.();
+      if(prior){window.ClassPointerBoards?.clearScreenMarks?.();window.FTTAnnotate?.setReason('sharing',false)}
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
@@ -555,6 +558,7 @@
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('✅ Your teacher can see your screen. Click Stop Sharing when your teacher says.');
+        window.FTTAnnotate?.setReason('sharing',true);
       }catch(error){
         captured?.getTracks().forEach(t=>t.stop());
         // A failure must release media/peer resources without erasing the error or reopening a blocking dialog.

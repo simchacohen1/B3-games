@@ -57,12 +57,23 @@
     const edits=el('span','cp-screen-group');edits.append(undo,clear);
     bar.append(tools,swatches,edits,help);
     // The toolbar sits above the picture (never over the student's work); the ink layer sits exactly on the picture.
-    host.prepend(bar);host.append(canvas);
+    // With the shared drawing toolbar (annotation-toolbar.js) loaded, that toolbar is used instead of this small one.
+    const FA=window.FTTAnnotate;
+    if(!FA)host.prepend(bar);host.append(canvas);
     // Clicks here must never move the teacher's own lesson pointer or close the enlarged view.
     for(const type of ['pointerdown','pointermove','pointerup','click','dblclick','wheel'])bar.addEventListener(type,e=>e.stopPropagation());
 
-    let draft=null,pid=null,livePoint=null,liveTimer=0,lastLive=0,frame=0,lastTarget=null;
+    let draft=null,pid=null,livePoint=null,liveTimer=0,lastLive=0,frame=0,lastTarget=null,pushed=false;
     function current(){const t=getTarget();return t&&t.id&&video.srcObject&&video.videoWidth?t:null}
+    // The student's screen as a surface for the shared toolbar. It opens by itself when the screen is shown large.
+    const surface=FA&&{id:'screen',idPrefix:'t',autoOpen:true,renders:true,drawsPoint:true,defaultTool:'hand',
+      maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+      historyKey:()=>'screen:'+(current()?.id||''),
+      label:()=>{const t=current();return t?'You are drawing on '+t.name+'’s screen. They see it live.':''},
+      rect:()=>current()&&!canvas.hidden?canvas.getBoundingClientRect():null,
+      getItems:()=>{const t=current();return t?record(t.id).strokes:[]},
+      setItems(list){const t=current();if(!t)return;record(t.id).strokes=list.slice(-MAX_STROKES);sendMarks(t);schedule()},
+      live(d,p){if(!current())return;draft=d;livePoint=p;sendLive(!d&&!p);schedule()}};
     function sendMarks(t){sendTo(t,{type:'board-screen-marks',strokes:record(t.id).strokes})}
     function sendLive(force){
       const t=current();if(!t)return;
@@ -82,6 +93,7 @@
     function pos(e){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return null;const p={x:round((e.clientX-r.left)/r.width),y:round((e.clientY-r.top)/r.height)};return valid(p)?p:null}
     function drawStroke(ctx,s,w,h){
       const pts=s.points;if(!pts.length)return;
+      if(window.FTTAnnotate){window.FTTAnnotate.drawItem(ctx,s,p=>[p.x*w,p.y*h],w);return}
       ctx.save();ctx.globalAlpha=s.tool==='highlight'?.38:1;ctx.strokeStyle=s.color;ctx.fillStyle=s.color;ctx.lineCap='round';ctx.lineJoin='round';
       ctx.lineWidth=Math.max(2,s.size*w);ctx.beginPath();ctx.moveTo(pts[0].x*w,pts[0].y*h);
       if(pts.length===1)ctx.lineTo(pts[0].x*w+.1,pts[0].y*h);
@@ -101,12 +113,14 @@
       help.textContent=!t?'':shared.tool==='watch'?'Choose 👆 Point or ✏️ Pen to show '+t.name+' something. They see it on their own screen.':
         shared.tool==='point'?t.name+' sees your red pointer on their screen.':t.name+' sees your drawing on their screen. Use 🧽 Clear when you are done.';
       canvas.style.cursor=shared.tool==='watch'?'default':shared.tool==='point'?'none':'crosshair';
-      canvas.style.pointerEvents=shared.tool==='watch'?'none':'auto';
+      canvas.style.pointerEvents=shared.tool==='watch'||FA?'none':'auto';
+      if(surface&&pushed&&!box){pushed=false;FA.release(surface)}
       if(!box)return;
       Object.assign(canvas.style,{left:box.left+'px',top:box.top+'px',width:box.width+'px',height:box.height+'px'});
       const dpr=Math.min(window.devicePixelRatio||1,2),pw=Math.round(box.width*dpr),ph=Math.round(box.height*dpr);
       if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph}
       const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,box.width,box.height);
+      if(surface&&!pushed){pushed=true;FA.push(surface)}
       for(const s of r.strokes)drawStroke(ctx,s,box.width,box.height);
       if(draft)drawStroke(ctx,draft,box.width,box.height);
       if(livePoint){
