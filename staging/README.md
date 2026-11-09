@@ -17,6 +17,15 @@ The `firebase.staging.json` config names the staging Hosting site, staging datab
 
 `fictional-accounts.json` describes the fictional owner, principal, two teachers, three students, and three separate classes. Run `provision-fictional-accounts.ps1` only against the staging project. It refuses to overwrite a non-empty database. Passwords and passcodes are written to ignored local file `test-credentials.local.json`; never commit or post that file or its values. The accounts are test-only and must not be reused for real people.
 
+### One-click staging owner sign-in (issue #710)
+
+On `https://fun-torah-tools-staging.web.app/owner-admin.html` the sign-in box has an extra **Sign in as staging owner** button. It signs in as the fictional `owner@funtorahtools-staging.test` account with no Google account or password.
+
+- The button is added only to the packaged staging copy of `owner-admin.html` (`prepare-site.cjs` adds `staging/owner-signin.js`). The live `owner-admin.html` is not edited and never loads it. The script also refuses to run unless the page is on the staging host and connected to the staging Firebase project.
+- The server side is the `stagingOwnerSignIn` function in `backend/functions-staging` only. It refuses to run outside project `fun-torah-tools-staging` and can only sign in the fictional owner account. Never copy it into `backend/functions`.
+- Anyone who can open the staging site can use the button, so keep staging data fictional.
+- It does not work on preview-channel links, only the main staging address.
+
 ## Build and checks
 
 Build the static package with:
