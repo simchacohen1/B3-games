@@ -4,6 +4,7 @@
 // student's id and name.
 const crypto=require('node:crypto');
 const {PRIVATE,clean,key,equal,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
+const {loadStudentProfiles}=require('./student-directory.cjs');
 const fail=(code,message,extra)=>{throw Object.assign(new Error(message),{code},extra);};
 const normalize=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -72,17 +73,18 @@ async function authenticate(store,body,now){
   const typed=clean(body.name),pin=clean(body.pin);
   if(!normalize(typed))fail(400,'Please type your name.');
   if(!pin||pin.length>100)fail(400,'Please enter your passcode.');
-  const [central,legacyRows]=await Promise.all([get('b3Games/students'),get('posukPractice/allowedStudents')]);
+  // Issue #667: read the id list and small profiles, not every full student record.
+  const [{ids:centralIds,profiles},legacyRows]=await Promise.all([loadStudentProfiles(get,store.keys),get('posukPractice/allowedStudents')]);
   const sameName=(id,row)=>normalize(row?.name)===normalize(typed)||normalize(id)===normalize(typed);
   const ids=new Set();
-  Object.entries(central||{}).forEach(([id,row])=>{if(key(id)&&row?.profile&&row.profile.active!==false&&sameName(id,row.profile))ids.add(id)});
-  Object.entries(legacyRows||{}).forEach(([id,row])=>{if(key(id)&&row&&row.active!==false&&!central?.[id]?.profile&&sameName(id,row))ids.add(id)});
+  Object.entries(profiles).forEach(([id,profile])=>{if(key(id)&&profile&&profile.active!==false&&sameName(id,profile))ids.add(id)});
+  Object.entries(legacyRows||{}).forEach(([id,row])=>{if(key(id)&&row&&row.active!==false&&!profiles[id]&&sameName(id,row))ids.add(id)});
   const matches=[];
   for(const id of ids){const code=await readPasscode(get,id,{allowLegacyDefault:true});if(equal(code.passcode,pin))matches.push({id,code});}
   if(matches.length>1)fail(409,'More than one student has this name and passcode. Ask your teacher for a different passcode.');
   if(!matches.length)fail(401,'Check your name and passcode.',{wrongCredentials:true});
   const {id,code}=matches[0];
-  const profile=central?.[id]?.profile||null,legacy=legacyRows?.[id]||null;
+  const profile=profiles[id]||null,legacy=legacyRows?.[id]||null;
   if(profile?.active===false)fail(403,'Your access is turned off. Ask your teacher.');
   const name=String(profile?.name||legacy?.name||typed);
   // Move a passcode found in an old public location into private storage.
@@ -99,7 +101,7 @@ async function authenticate(store,body,now){
    // Check legacy accounts too. Private values are rechecked inside a single
    // transaction so two boys cannot claim the same PIN at the same time.
    const fallback={};
-   for(const other of new Set([...Object.keys(central||{}),...Object.keys(legacyRows||{})].filter(key))){
+   for(const other of new Set([...centralIds,...Object.keys(legacyRows||{})].filter(key))){
     fallback[other]=(await readPasscode(get,other,{allowLegacyDefault:true})).passcode;
    }
    let reason=null;
@@ -123,7 +125,7 @@ async function authenticate(store,body,now){
    await store.update(updates);
   }
   const privateCode=await get(PRIVATE+id);
-  const memberships=central?.[id]?.memberships||{};
+  const memberships=await get('b3Games/students/'+id+'/memberships')||{};
   const activeMembership=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId);
   const legacyClassId=profile?.classId||legacy?.classId||null;
   const removedOnPurpose=legacyClassId&&memberships['b3-2026_'+legacyClassId]?.active===false;

@@ -1,6 +1,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const {readPasscode}=require('./student-passcodes.cjs');
+const {loadStudentProfiles}=require('./student-directory.cjs');
 const normalize=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
@@ -10,8 +11,12 @@ async function resolveStudent(get,body){
  const name=String(body.name||'').trim(),pin=String(body.pin||'').trim();
  if(!name||!pin)fail(400,'Enter your name and individual passcode.');
 
- const all=await get('b3Games/students')||{};
- const legacyAll=await get('posukPractice/allowedStudents')||{};
+ // Issue #667: the full student tree is several MB. Read it lazily, and only the
+ // small profiles, when a name search or legacy fallback actually needs it.
+ let directory=null,legacyRows=null;
+ const loadDirectory=async()=>directory||(directory=await loadStudentProfiles(get));
+ const loadLegacy=async()=>legacyRows||(legacyRows=await get('posukPractice/allowedStudents')||{});
+ const hasProfile=async sid=>directory?!!directory.profiles[sid]:!!(await get('b3Games/students/'+sid+'/profile'));
  let id=String(body.b3StudentId||'').trim(),profile;
 
  const sameName=(sid,p)=>normalize(p?.name)===normalize(name)||normalize(sid)===normalize(name);
@@ -25,20 +30,20 @@ async function resolveStudent(get,body){
   profile=await get('b3Games/students/'+id+'/profile');
   if(profile&&profile.active!==false&&sameName(id,profile)&&await pinOkFor(id))profile={...profile,passcode:pin};
  }else{
-  const named=Object.entries(all).filter(([sid,r])=>r?.profile?.active!==false&&sameName(sid,r.profile));
+  const named=Object.entries((await loadDirectory()).profiles).filter(([sid,p])=>p?.active!==false&&sameName(sid,p));
   const matches=[];
-  for(const [sid,row] of named){
-   if(await pinOkFor(sid))matches.push([sid,row]);
+  for(const [sid,p] of named){
+   if(await pinOkFor(sid))matches.push([sid,p]);
   }
   if(matches.length>1)fail(409,'More than one account matches. Sign in from the main site.');
-  if(matches.length){id=matches[0][0];profile={...matches[0][1].profile,passcode:pin};}
+  if(matches.length){id=matches[0][0];profile={...matches[0][1],passcode:pin};}
  }
 
  if(!profile){
   const legacyMatches=[];
   // The old list is only a fallback for students with no central profile; a
   // blocked central profile must never be bypassed through it.
-  for(const [sid,row] of Object.entries(legacyAll))if(row&&row.active!==false&&!all[sid]?.profile&&sameName(sid,row)&&await pinOkFor(sid))legacyMatches.push([sid,row]);
+  for(const [sid,row] of Object.entries(await loadLegacy()))if(row&&row.active!==false&&sameName(sid,row)&&!(await hasProfile(sid))&&await pinOkFor(sid))legacyMatches.push([sid,row]);
   if(legacyMatches.length>1)fail(409,'More than one account matches. Sign in from the main site.');
   if(legacyMatches.length){
    id=legacyMatches[0][0];
@@ -50,7 +55,7 @@ async function resolveStudent(get,body){
  if(!profile){
   id=id||name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
   if(!key(id))fail(401,'Check your name and passcode.');
-  const old=all[id]?.profile?null:await get('posukPractice/allowedStudents/'+id);
+  const old=(await hasProfile(id))?null:await get('posukPractice/allowedStudents/'+id);
   if(old)profile={...old,passcode:await codeFor(id)};
  }
 
