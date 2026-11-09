@@ -31,7 +31,7 @@ paragraph's first word and are more reliable.
 
 | What | Where |
 | --- | --- |
-| Audio | Save it here as `audio.mp3`. After replacing it later, change `audio: 'audio.mp3'` in `story.js` to `'audio.mp3?v=2'` so browsers load the new file. |
+| Audio | Save it here as `audio.mp3`. After replacing it later, bump the number in `audio: 'audio.mp3?v=1'` in `story.js` so browsers load the new file. |
 | Title, credit | `title`, `titleYi`, `credit`, `blurb` in `story.js` |
 | Yiddish text | `paras` in `story.js`, one string per paragraph, original wording |
 | English intro (optional) | `intro` in `story.js` |
@@ -39,5 +39,5 @@ paragraph's first word and are more reliable.
 | Word timings (optional) | `word-times.js`, same format as `../word-times.js` but counting paragraphs from 0 in `paras` |
 | Pictures | Image files go in the `pictures/` folder here and are listed in `pictures` in `story.js`: `{src: 'pictures/01.jpg', at: 75.8, para: 1, caption: '...'}`. `at` is the second in the audio when the picture appears (it can change in the middle of a paragraph); `para` is the paragraph it belongs to. If no picture has `at`, pictures change by paragraph instead. With no pictures the panel says "Pictures coming soon". |
 
-After changing `story.js`, bump `story.js?v=1` in both `index.html` (this folder)
+After changing `story.js`, bump the `story.js?v=` number in both `index.html` (this folder)
 and `../index.html` so students get the new version.
