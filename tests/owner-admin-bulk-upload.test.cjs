@@ -163,6 +163,7 @@ test('Undo CSV Import: tick both import runs, review, one confirmation; earlier 
  for(const id of Object.keys(h.tree.b3Private.importRollbacks))await h.ctx.undoPutBack(id);
  assert.equal(Object.keys(h.tree.b3Games.students).length,24);
  assert.equal(named(h,'Moshe Fict').length,3);
+ assert.ok(!h.el('undoBatches').innerHTML.includes('already undone'),'after putting back, the imports can be undone again');
 });
 test('Undo CSV Import: if anything changes after the review, nothing is removed',async()=>{
  const h=harness(),t=Date.parse('2026-11-09T17:49:11Z');

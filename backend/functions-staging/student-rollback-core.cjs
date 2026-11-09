@@ -257,7 +257,7 @@ async function rollbackUndo(store,identity,body,now=Date.now()){
   updates[where+'/done/'+id]={at:now,by:identity.uid,action:'undone'};
   await store.update(updates);restored++;
  }
- await store.update({[AUDIT+crypto.randomUUID()]:{action:'rollbackUndo',rollbackId,by:identity.uid,byEmail:String(identity.email||''),at:now,restored}});
+ await store.update({...(restored?{[where+'/status']:'put-back'}:{}),[AUDIT+crypto.randomUUID()]:{action:'rollbackUndo',rollbackId,by:identity.uid,byEmail:String(identity.email||''),at:now,restored}});
  return {ok:true,restored,skipped};
 }
 
