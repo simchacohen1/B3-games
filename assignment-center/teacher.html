@@ -51,6 +51,7 @@ main{max-width:1100px;margin:24px auto;padding:0 18px 72px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 2px 10px rgba(26,39,68,.07)}
 .muted{color:var(--muted)}
 .badge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 11px;font-size:13px;font-weight:700;background:#e6eef8;color:#2d5486;margin:2px 4px 2px 0;line-height:1.3}
+.badge[hidden]{display:none}
 .badge.late{background:var(--red-bg);color:var(--red)}
 .badge.ok{background:var(--green-bg);color:#1a7a47}
 .badge.wait{background:var(--orange-bg);color:#9a5f00}
@@ -187,18 +188,25 @@ main .screen[hidden],.wizard-step[hidden]{display:none!important}
 .step-review p{margin:0;color:var(--muted)}
 .step-actions-final{align-items:flex-start}
 
-.home-conversation{border:2px solid #d4e8ff;border-radius:14px;background:#f5f9ff;padding:14px;margin:14px 0}
-.home-conversation h4{font-size:16px;font-weight:800;margin:0 0 10px;color:var(--navy)}
-.conversation-history{display:grid;gap:8px;max-height:240px;overflow:auto}
-.conversation-message{background:#fff;border:1.5px solid #dce9f5;border-radius:11px;padding:10px 12px}
-.conversation-message.mine{border-color:#a2d8b4;background:#f4fff8}
-.conversation-message strong{font-size:13px;color:var(--muted);font-weight:700}
-.conversation-message p{margin:5px 0 0;font-size:15px}
-.conversation-message button{min-height:38px;font-size:14px}
-.conversation-message .conversation-listen{display:block;margin:8px 0 0}
-.conversation-message audio{display:block;max-width:100%;width:300px;margin-top:8px}
-.conversation-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.conversation-feedback{min-height:20px;margin:5px 0;color:var(--muted);font-size:14px}
+/* Message threads are styled once, in homework-common.js. */
+.page-notice{display:flex;align-items:center;gap:10px;padding:12px 16px;margin:0 0 16px;border-radius:14px;font-weight:800;font-size:15px}
+.page-notice[hidden]{display:none}
+.page-notice.good{background:var(--green-bg);border:1.5px solid #9bdcb4;color:#15673a}
+.page-notice.err{background:var(--red-bg);border:1.5px solid #f2b3b3;color:#a32b2b}
+.page-notice button{margin:0 0 0 auto}
+.badge.new-msg{background:#f0b429;color:#3d2a00}
+.choice .badge.new-msg{font-size:12px;vertical-align:middle}
+.review-work{background:#fff;border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:12px;padding:12px 16px;margin:6px 0 10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.5}
+.review-work.empty{color:var(--muted);font-style:italic}
+.review-grade{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:12px;align-items:start;margin-top:12px}
+.review-grade label{margin-top:0}
+.review-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.review-actions button{margin:0}
+.review-actions .msg{flex-basis:100%}
+.detail-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.detail-actions button{margin:0}
+.detail-actions .msg{flex-basis:100%;margin-top:0}
+@media(max-width:560px){.review-grade{grid-template-columns:1fr}}
 
 .student-progress{border:1px solid var(--border);border-radius:12px;padding:10px 13px;margin:8px 0;background:#fafcff}
 .student-progress>summary{cursor:pointer;font-weight:700;font-size:14px}
@@ -274,10 +282,11 @@ button.link:hover{background:none;color:var(--navy)}
 <div id="signin" class="card"><p>Sign in with your authorized teacher account.</p><button id="go">Sign in with Google</button><div id="signinMsg" class="msg err"></div></div>
 <div id="app" style="display:none">
   <div class="classbar"><label for="cls">Your class</label><select id="cls" aria-label="Choose an authorized class"></select></div>
+  <div id="pageNotice" class="page-notice" role="status" aria-live="polite" hidden></div>
   <section class="screen" id="screenHome" aria-labelledby="homeTitle"><h1 id="homeTitle">What would you like to do?</h1><p class="muted">Choose one task. Your class is <span id="homeClass"></span>.</p>
     <div class="home-grid"><button class="choice create" id="openCreate"><span class="icon" aria-hidden="true">＋</span><strong>Create Assignment</strong><small>Make homework or a class assignment, step by step.</small></button>
     <button class="choice check" id="openCheck"><span class="icon" aria-hidden="true">✓</span><strong>Check Assignments <span class="badge wait" id="reviewCount" title="Students waiting for your check">0</span></strong><small>Student work waiting for your review. Approve it or send it back with a note.</small></button>
-    <button class="choice assign" id="openAssignments"><span class="icon" aria-hidden="true">▣</span><strong>Reports</strong><small>See every assignment, how many students are done, and each student's grades.</small></button>
+    <button class="choice assign" id="openAssignments"><span class="icon" aria-hidden="true">▣</span><strong>Reports <span class="badge new-msg" id="notesCount" title="New notes from students about an assignment" hidden>0</span></strong><small>See every assignment, how many students are done, and each student's grades.</small></button>
     <button class="choice messages" id="openMessages" hidden><span class="icon" aria-hidden="true">💬</span><strong>Messages from students <span class="badge wait" id="messagesCount" title="New messages from students" hidden>0</span></strong><small>Voice and text messages that are not about one assignment. Pick a student to read and reply.</small></button></div>
     <button class="sec" id="openPreview">Preview Student View <span class="muted">· read-only sample</span></button>
   </section>
@@ -320,10 +329,12 @@ var WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
 if(!H.isAllowedRuntime()){$('signinMsg').textContent='Homework is not available on this site.';$('go').disabled=true;return}
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 var auth=firebase.auth();
-var state={openReview:{},classId:'',data:null,editing:null,editingPublication:null,createStep:1,reportView:'assignments',reportSort:'newest',detailSort:'name',openAssignmentId:null,openStudentId:null,openNotes:null};
+var state={openReview:{},classId:'',data:null,editing:null,editingPublication:null,createStep:1,reportView:'assignments',reportSort:'newest',detailSort:'name',openAssignmentId:null,openStudentId:null,openNotes:null,reviewDrafts:{}};
 function setLabel(v){var r=document.querySelector('input[name=label][value='+(v==='classwork'?'classwork':'homework')+']');if(r)r.checked=true}
 function chosenLabel(){var r=document.querySelector('input[name=label]:checked');return r?r.value:'homework'}
 function say(box,m,good){box.textContent=m;box.className='msg '+(good?'good':'err')}
+// One notice under the class bar: confirmations fade out, load errors stay with a Try again button.
+var noticeTimer=0;function notice(m,good){var n=$('pageNotice');clearTimeout(noticeTimer);if(!m){n.hidden=true;return}n.replaceChildren(document.createTextNode(m));n.className='page-notice '+(good?'good':'err');n.hidden=false;if(!good){var retry=el('button','Try again','sec');retry.type='button';retry.onclick=function(){notice('');load()};n.append(retry)}else noticeTimer=setTimeout(function(){n.hidden=true},6000)}
 async function api(body){var t=await auth.currentUser.getIdToken();return H.call(Object.assign({classId:state.classId},body),t)}
 function showScreen(id){document.querySelectorAll('#app .screen').forEach(function(s){s.hidden=s.id!==id});window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('.backHome').forEach(function(b){b.onclick=function(){showScreen('screenHome')}});
@@ -368,9 +379,11 @@ auth.onAuthStateChanged(async function(u){
 $('cls').onchange=function(){state.classId=$('cls').value;document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;resetForm();load()};
 document.querySelectorAll('input[name=aud]').forEach(function(r){r.onchange=function(){$('studentPick').style.display=r.value==='some'&&r.checked?'':'none'}});
 
+// Coming back to this tab picks up new hand-ins and notes, unless the teacher is typing or making an assignment.
+document.addEventListener('visibilitychange',function(){var a=document.activeElement;if(!document.hidden&&state.classId&&state.data&&$('screenCreate').hidden&&!(a&&/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)))load()});
 async function load(){
-  try{state.data=await api({action:'teacherList'});buildPick();document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;renderOpenScreens();renderReview();renderMessages()}
-  catch(e){$('list').replaceChildren(el('div',e.message,'card msg err'))}
+  try{state.data=await api({action:'teacherList'});buildPick();document.querySelectorAll('.className').forEach(function(n){n.textContent=$('cls').selectedOptions[0].textContent});$('homeClass').textContent=$('cls').selectedOptions[0].textContent;renderOpenScreens();renderReview();renderMessages();renderNotesCount();if($('pageNotice').classList.contains('err'))notice('')}
+  catch(e){notice('Could not load your class: '+(e.message||'please try again.'),false)}
 }
 function buildPick(){
   $('studentPick').replaceChildren();
@@ -387,7 +400,7 @@ async function submitForm(publishRequested){
   if(!$('assigned').value){say($('formMsg'),'Choose a start date.');document.querySelector('.optional-settings').open=true;$('assigned').focus();return}
   if($('due').value&&$('due').value<$('assigned').value){say($('formMsg'),'The due date needs to be the same as or later than the start date.');document.querySelector('.optional-settings').open=true;$('due').focus();return}
   if(!state.editing&&document.querySelector('input[name=aud]:checked').value==='some'&&!$('studentPick').querySelector('input:checked')){say($('formMsg'),'Pick at least one student, or choose everyone in the class.');$('studentPick').scrollIntoView({block:'center'});return}
-  var button=publishRequested?$('publishNow'):$('save'),wasEditing=!!state.editing;button.disabled=true;$('save').disabled=true;$('publishNow').disabled=true;
+  var button=publishRequested?$('publishNow'):$('save'),wasEditing=!!state.editing,createdNow=false;button.disabled=true;$('save').disabled=true;$('publishNow').disabled=true;
   try{
     var id=state.editing;
     if(wasEditing){
@@ -400,13 +413,13 @@ async function submitForm(publishRequested){
         assignedAt:H.assignedFromInput($('assigned').value),dueAt:H.dueFromInput($('due').value),
         targetAmount:$('target').value,targetUnit:$('targetUnit').value};
       if(document.querySelector('input[name=aud]:checked').value==='some')body.studentIds=Array.prototype.map.call($('studentPick').querySelectorAll('input:checked'),function(c){return c.value});
-      var created=await api(body);id=created.id;state.editing=id;state.editingPublication='draft';
+      var created=await api(body);id=created.id;state.editing=id;state.editingPublication='draft';createdNow=true;
     }
     if(publishRequested&&state.editingPublication!=='published'){
       await api({action:'publish',assignmentId:id});state.editingPublication='published';
     }
     resetForm();await load();say($('listNotice'),publishRequested?'Published. Students can see this assignment now.':wasEditing?'Changes saved.':'Draft saved. It is not visible to students yet.',true);state.openAssignmentId=null;renderReports();showScreen('screenAssignments');
-  }catch(e){say($('formMsg'),state.editing?'Your draft is saved, but it was not shared. Use Publish to Students to try again.':e.message)}finally{$('save').disabled=false;$('publishNow').disabled=false}
+  }catch(e){say($('formMsg'),createdNow&&publishRequested?'Your draft is saved, but it was not shared yet. Press Publish to Students to try again.':(e.message||'Could not save. Please try again.'))}finally{$('save').disabled=false;$('publishNow').disabled=false}
 }
 $('save').onclick=function(){submitForm(false)};$('publishNow').onclick=function(){submitForm(true)};
 // ---------- Reports ----------
@@ -445,7 +458,7 @@ function renderReports(){var d=state.data,box=$('list');if(!d)return;box.replace
   if(!d.assignments.length){box.append(el('div','No assignments yet. Choose Create Assignment to make your first one.','card muted'));return}
   sortedAssignments().forEach(function(a){var p=pubOf(a),row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
     var top=el('div',null,'row-top'),name=el('span',null,'row-name');name.append(document.createTextNode(a.title+' '),labelBadge(a));if(p==='draft')name.append(el('span','Draft · students can’t see it','badge state'));if(p==='archived')name.append(el('span','Archived','badge state'));top.append(name,el('span',dateLine(a),'row-dates'));row.append(top);
-    if(p!=='draft')row.append(countLine(assignmentCounts(a)));
+    if(p!=='draft')row.append(countLine(assignmentCounts(a)));var fresh=newNotesIn(a);if(fresh)name.append(el('span','💬 '+fresh+' new','badge new-msg'));
     row.onclick=function(){openAssignment(a.id)};box.append(row)})}
 // One row per student across every assignment they were given (drafts are not counted: students never saw them).
 function studentSummaries(){var map={},d=state.data;Object.keys(d.students||{}).forEach(function(id){map[id]={id:id,name:d.students[id].name,given:0,done:0,handedIn:0,pastDue:0}});
@@ -472,18 +485,18 @@ function renderAssignmentDetail(){var root=$('oneAssignment'),a=findAssignment(s
   if(a.items&&a.items.length){var il=el('ol',null,'hwi-list');a.items.forEach(function(item){var d=HI.describe(item);il.append(el('li',HI.title(item)+(d?' — '+d:'')+(item.note?' — '+item.note:'')))});card.append(el('strong','Checklist ('+a.items.length+' items)'),il)}
   if(p!=='draft'){card.append(countLine(c),countDetail(c))}else card.append(el('p','Students can’t see this yet. Publish it to send it to them.','count-detail'));
   var ed=el('button','Edit','sec');ed.disabled=p==='archived';ed.onclick=function(){startEdit(a)};
-  var pub=el('button',p==='published'?'Unpublish':'Publish to Students',p==='published'?'sec':'');pub.disabled=p==='archived';pub.onclick=async function(){pub.disabled=true;try{await api({action:p==='published'?'unpublish':'publish',assignmentId:a.id});await load()}catch(e){alert(e.message);pub.disabled=false}};
-  var arc=el('button',p==='archived'?'Archived':'Archive','sec');arc.disabled=p==='archived';arc.onclick=async function(){if(!confirm('Archive "'+a.title+'"? Student work will be kept.'))return;arc.disabled=true;try{await api({action:'archive',assignmentId:a.id});await load()}catch(e){alert(e.message);arc.disabled=false}};
-  var actions=el('div');actions.append(ed,pub,arc);card.append(actions);root.append(card);
+  var pub=el('button',p==='published'?'Unpublish':'Publish to Students',p==='published'?'sec':'');pub.disabled=p==='archived';var actMsg=el('div',null,'msg');actMsg.setAttribute('role','status');pub.onclick=async function(){pub.disabled=true;try{await api({action:p==='published'?'unpublish':'publish',assignmentId:a.id});await load();notice(p==='published'?'Unpublished. Students can no longer see “'+a.title+'”.':'Published. Students can see “'+a.title+'” now.',true)}catch(e){say(actMsg,e.message);pub.disabled=false}};
+  var arc=el('button',p==='archived'?'Archived':'Archive','sec');arc.disabled=p==='archived';arc.onclick=async function(){if(!confirm('Archive "'+a.title+'"? Student work will be kept.'))return;arc.disabled=true;try{await api({action:'archive',assignmentId:a.id});await load();notice('Archived “'+a.title+'”. Student work is kept.',true)}catch(e){say(actMsg,e.message);arc.disabled=false}};
+  var actions=el('div',null,'detail-actions');actions.append(ed,pub,arc,actMsg);card.append(actions);root.append(card);
   var ids=Object.keys(a.students||{}),tableCard=el('div',null,'card'),tools=el('div',null,'table-tools');tools.append(el('h2','Students'));
   var sortLabel=el('label',null,'sort-box');sortLabel.append(document.createTextNode('Sort: '));var sortSel=el('select');[['name','Student name (A–Z)'],['status','Status']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];sortSel.append(op)});sortSel.value=state.detailSort;sortSel.setAttribute('aria-label','Sort students');sortSel.onchange=function(){state.detailSort=sortSel.value;renderAssignmentDetail()};sortLabel.append(sortSel);tools.append(sortLabel);tableCard.append(tools);
   if(!ids.length){tableCard.append(el('p','No students are assigned yet.','muted'));root.append(tableCard);return}
   ids.sort(function(x,y){var sx=a.students[x],sy=a.students[y],byName=String(sx.name).localeCompare(String(sy.name));if(state.detailSort==='status'){var ox=STATUS_ORDER[sx.status]??9,oy=STATUS_ORDER[sy.status]??9;return ox-oy||(isPastDue(sy)?1:0)-(isPastDue(sx)?1:0)||byName}return byName});
   var wrap=el('div',null,'tablewrap'),t=el('table',null,'report-table'),hr=el('tr');['Student','Status','Handed in','Grade','Your comment','Notes'].forEach(function(x){hr.append(el('th',x))});var thead=el('thead');thead.append(hr);t.append(thead);var tb=el('tbody');
   ids.forEach(function(id){var s=a.students[id],tr=el('tr'),nameTd=el('td'),nb=el('button',s.name,'link');nb.onclick=function(){openStudent(id)};nameTd.append(nb);var st=el('td');st.append(statusCell(s));if(a.items&&a.items.length)st.append(HI.progressTag(a,s));var g=el('td',null,'grade');g.append(gradeCell(s));var cm=el('td');cm.append(commentCell(s));
-    var n=(s.messages||[]).length,newNotes=H.unreadCount(s.messages,'teacher'),notesTd=el('td'),open=state.openNotes===id,nbtn=el('button',(open?'Hide':'Open')+(n?' ('+n+')':''),'sec');if(newNotes&&!open)nbtn.append(el('span',newNotes+' new','conversation-unread'));nbtn.setAttribute('aria-expanded',String(open));nbtn.setAttribute('aria-label',(open?'Hide':'Open')+' notes with '+s.name);nbtn.onclick=function(){state.openNotes=open?null:id;renderAssignmentDetail()};notesTd.append(nbtn);
+    var n=(s.messages||[]).length,newNotes=H.unreadCount(s.messages,'teacher'),notesTd=el('td'),open=state.openNotes===id,nbtn=el('button',open?'Hide notes':'💬 Notes'+(n?' · '+n:''),'sec');if(newNotes&&!open)nbtn.append(el('span',newNotes+' new','conversation-unread'));nbtn.setAttribute('aria-expanded',String(open));nbtn.setAttribute('aria-label',(open?'Hide':'Open')+' notes with '+s.name);nbtn.onclick=function(){state.openNotes=open?null:id;renderAssignmentDetail()};notesTd.append(nbtn);
     tr.append(nameTd,st,el('td',s.submittedAt?H.when(s.submittedAt):'—'),g,cm,notesTd);tb.append(tr);
-    if(open){var nr=el('tr',null,'notes-row'),cell=el('td');cell.colSpan=6;if(s.answer)cell.append(el('p','Student work: '+s.answer));cell.append(H.conversation({role:'teacher',studentName:s.name,messages:s.messages||[],send:function(body){return api(Object.assign({assignmentId:a.id,studentId:id},body))},onSent:load}));nr.append(cell);tb.append(nr)}});
+    if(open){var nr=el('tr',null,'notes-row'),cell=el('td');cell.colSpan=6;if(s.answer)cell.append(el('strong','What '+s.name+' handed in'),el('div',s.answer,'review-work'));cell.append(H.conversation({role:'teacher',studentName:s.name,threadKey:'a-'+a.id+'-'+id,title:'Notes with '+s.name,messages:s.messages||[],send:function(body){return api(Object.assign({assignmentId:a.id,studentId:id},body))},onSent:load,onRead:function(){markSeen(s)}}));nr.append(cell);tb.append(nr)}});
   t.append(tb);wrap.append(t);tableCard.append(wrap);root.append(tableCard)}
 function renderStudentDetail(){var root=$('oneStudent'),id=state.openStudentId,d=state.data;root.replaceChildren();if(!d)return;
   var rows=d.assignments.filter(function(a){return pubOf(a)!=='draft'&&a.students&&a.students[id]}).sort(function(a,b){return (givenAt(b)||0)-(givenAt(a)||0)});
@@ -518,7 +531,47 @@ function renderMessages(){var threads=messageThreads(),box=$('messagesBox');
     messages:threads[id]||[],send:function(body){return api(Object.assign({studentId:id},body))},onSent:load,
     onRead:function(){(threads[id]||[]).forEach(function(m){m.unread=false});var n=$('messagesCount'),left=ids.reduce(function(t,x){return t+newFor(x)},0);n.textContent=String(left);n.hidden=!left;var opt=sel.querySelector('option[value="'+id+'"]');if(opt)opt.textContent=name+((threads[id]||[]).length?' · '+plural(threads[id].length,'message'):'')}}));
 }
-function renderReview(){var box=$('reviewList');box.replaceChildren();var waiting=[];state.data.assignments.forEach(function(a){Object.keys(a.students||{}).forEach(function(id){var s=a.students[id];if(s.status==='submitted')waiting.push({a:a,id:id,s:s})})});$('reviewCount').textContent=String(waiting.length);$('reviewSummary').textContent=waiting.length?(waiting.length===1?'1 student is':waiting.length+' students are')+' waiting for you to check their work.':'Nothing is waiting for review. You can check again later.';if(!waiting.length){box.append(el('div','You’re all caught up! When students hand in work, it will show up here.','card muted'));return}waiting.forEach(function(x){var a=x.a,s=x.s,key=a.id+'|'+x.id,d=el('details',null,'card review-item'),sum=el('summary',null,'review-sum'),c=el('div',null,'review-body');d.open=!!state.openReview[key];d.addEventListener('toggle',function(){if(d.open)state.openReview[key]=1;else delete state.openReview[key]});sum.append(el('span',s.name,'review-name'),el('span','For: '+a.title,'badge'));d.append(sum,c);c.append(el('p','Student work','muted'),el('blockquote',s.answer||'No written answer was added.'));if(a.targetUnit==='minutes'&&s.progress)c.append(el('p','Practice time: '+s.progress+' minutes'));c.append(H.conversation({role:'teacher',studentName:s.name,messages:s.messages||[],send:function(body){return api(Object.assign({assignmentId:a.id,studentId:x.id},body))},onSent:load}));var fb=el('textarea');fb.placeholder='Write a kind note or correction';fb.maxLength=500;fb.setAttribute('aria-label','Feedback for '+s.name);var stars=el('select');[['','No stars'],['5','★★★★★'],['4','★★★★'],['3','★★★'],['2','★★'],['1','★']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];stars.append(op)});stars.setAttribute('aria-label','Stars for '+s.name);var msg=el('div',null,'msg');msg.setAttribute('aria-live','polite');var approve=el('button','Approve work','primary-action');approve.setAttribute('aria-label','Approve work by '+s.name);var back=el('button','Return for Corrections','sec');back.onclick=async function(){if(!fb.value.trim()){say(msg,'Add a short note so the student knows what to fix.');fb.focus();return}back.disabled=true;try{await api({action:'return',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});await load()}catch(e){say(msg,e.message);back.disabled=false}};approve.onclick=async function(){approve.disabled=true;try{await api({action:'approve',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});await load()}catch(e){say(msg,e.message);approve.disabled=false}};c.append(el('label','Feedback for the student'),fb,el('label','Optional stars'),stars,approve,back,msg);box.append(d)})}
+// ---------- New notes from students about one assignment ----------
+function newNotesIn(a){return Object.keys(a.students||{}).reduce(function(n,id){return n+H.unreadCount(a.students[id].messages,'teacher')},0)}
+function renderNotesCount(){var d=state.data,total=0;if(d)d.assignments.forEach(function(a){total+=newNotesIn(a)});var b=$('notesCount');b.textContent='💬 '+total+' new';b.hidden=!total}
+function markSeen(s){(s.messages||[]).forEach(function(m){m.unread=false});renderNotesCount()}
+// ---------- Check Assignments ----------
+// Oldest hand-in first. What the teacher types (feedback, stars) is kept while the list redraws, e.g. after sending a note.
+function renderReview(){var box=$('reviewList');box.replaceChildren();var waiting=[];
+  state.data.assignments.forEach(function(a){Object.keys(a.students||{}).forEach(function(id){var s=a.students[id];if(s.status==='submitted')waiting.push({a:a,id:id,s:s})})});
+  waiting.sort(function(x,y){return (x.s.submittedAt||0)-(y.s.submittedAt||0)||String(x.s.name).localeCompare(String(y.s.name))});
+  $('reviewCount').textContent=String(waiting.length);
+  $('reviewSummary').textContent=waiting.length?(waiting.length===1?'1 student is':waiting.length+' students are')+' waiting for you to check their work. Open one to read it, then approve it or send it back with a note.':'Nothing is waiting for review. You can check again later.';
+  if(!waiting.length){box.append(el('div','You’re all caught up! When students hand in work, it will show up here.','card muted'));return}
+  waiting.forEach(function(x){var a=x.a,s=x.s,key=a.id+'|'+x.id,draft=state.reviewDrafts[key]||(state.reviewDrafts[key]={feedback:'',stars:''});
+    var d=el('details',null,'card review-item'),sum=el('summary',null,'review-sum'),c=el('div',null,'review-body');
+    d.open=!!state.openReview[key];d.addEventListener('toggle',function(){if(d.open)state.openReview[key]=1;else delete state.openReview[key]});
+    sum.append(el('span',s.name,'review-name'),el('span','For: '+a.title,'badge'));
+    if(s.submittedAt)sum.append(el('span','Handed in '+H.when(s.submittedAt),'badge'));
+    var fresh=H.unreadCount(s.messages,'teacher'),freshTag=fresh?el('span','💬 '+fresh+' new','badge new-msg'):null;if(freshTag)sum.append(freshTag);
+    d.append(sum,c);
+    c.append(el('strong','What '+s.name+' handed in'),el('div',s.answer||'No written answer was added.','review-work'+(s.answer?'':' empty')));
+    if(a.items&&a.items.length)c.append(HI.progressTag(a,s));
+    if(a.targetUnit==='minutes'&&s.progress)c.append(el('p','Practice time: '+s.progress+' minutes','muted'));
+    c.append(H.conversation({role:'teacher',studentName:s.name,threadKey:'a-'+a.id+'-'+x.id,title:'Notes with '+s.name,messages:s.messages||[],
+      send:function(body){return api(Object.assign({assignmentId:a.id,studentId:x.id},body))},onSent:load,onRead:function(){markSeen(s);if(freshTag)freshTag.remove()}}));
+    var grade=el('div',null,'review-grade'),fbWrap=el('div'),starWrap=el('div');
+    var fbId='fb-'+a.id+'-'+x.id,starId='stars-'+a.id+'-'+x.id;
+    var fbLabel=el('label','Feedback for '+s.name);fbLabel.htmlFor=fbId;
+    var fb=el('textarea');fb.id=fbId;fb.placeholder='Write a kind note or correction';fb.maxLength=500;fb.value=draft.feedback;fb.oninput=function(){draft.feedback=fb.value};
+    var starLabel=el('label','Stars (optional)');starLabel.htmlFor=starId;
+    var stars=el('select');stars.id=starId;[['','No stars'],['5','★★★★★  5 stars'],['4','★★★★  4 stars'],['3','★★★  3 stars'],['2','★★  2 stars'],['1','★  1 star']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];stars.append(op)});stars.value=draft.stars;stars.onchange=function(){draft.stars=stars.value};
+    fbWrap.append(fbLabel,fb);starWrap.append(starLabel,stars);grade.append(fbWrap,starWrap);c.append(grade);
+    var msg=el('div',null,'msg');msg.setAttribute('aria-live','polite');
+    var approve=el('button','Approve work','primary-action');approve.type='button';approve.setAttribute('aria-label','Approve work by '+s.name);
+    var back=el('button','Return for Corrections','sec');back.type='button';back.setAttribute('aria-label','Return work to '+s.name+' for corrections');
+    function busy(on){approve.disabled=back.disabled=on}
+    function done(text){delete state.reviewDrafts[key];delete state.openReview[key];notice(text,true)}
+    back.onclick=async function(){if(!fb.value.trim()){say(msg,'Add a short note so '+s.name+' knows what to fix.');fb.focus();return}busy(true);say(msg,'Sending back…',true);
+      try{await api({action:'return',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});done('Sent back to '+s.name+' with your note. It is on their To Do list again.');await load()}catch(e){say(msg,e.message);busy(false)}};
+    approve.onclick=async function(){busy(true);say(msg,'Approving…',true);
+      try{await api({action:'approve',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});done('Approved '+s.name+'’s work on “'+a.title+'”.');await load()}catch(e){say(msg,e.message);busy(false)}};
+    var actions=el('div',null,'review-actions');actions.append(approve,back,msg);c.append(actions);box.append(d)})}
 })();
 </script>
 <script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home" data-mode="inline"></script></body></html>

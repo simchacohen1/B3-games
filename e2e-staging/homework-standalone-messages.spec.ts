@@ -57,7 +57,7 @@ test('fictional student and teacher use standalone messages with a recording ind
   await studentPage.goto(HOMEWORK_SITE + '/assignment-center/student.html', { waitUntil: 'domcontentloaded' });
   await expectStagingIsolation(studentPage);
   const panel = studentPage.locator('#generalMessages');
-  await expect(panel).toContainText('Message your teacher');
+  await expect(panel).toContainText('Messages with your teacher');
   // There is no homework at all, yet the student can still reach the teacher.
   await expect(studentPage.locator('#list')).toContainText('No homework for you right now');
   await panel.getByRole('button', { name: /1 new message from your teacher/ }).click();

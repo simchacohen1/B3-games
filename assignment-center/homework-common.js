@@ -83,7 +83,9 @@
   }
   // ---- Notes thread (typed messages + voice notes), shared by student and teacher pages ----
   var VOICE_MAX_MS = 15000, VOICE_MAX_BYTES = 100000, VOICE_SAFE_BYTES = 88000;
-  var openThreads = {}, threadNotices = {};
+  // Kept per thread so a page redraw (new data, another thread sending) never loses an open box,
+  // its last notice, or a half-typed message.
+  var openThreads = {}, threadNotices = {}, threadDrafts = {};
   function unreadCount(messages, role) {
     return (messages || []).filter(function (m) { return m && m.unread && m.role !== role; }).length;
   }
@@ -93,8 +95,21 @@
   function recClock(elapsed) { return clock(Math.floor(Math.min(elapsed, VOICE_MAX_MS) / 1000) * 1000) + ' · ' + clock(VOICE_MAX_MS - elapsed) + ' left'; }
   function sentAt(ts) {
     if (!ts) return '';
-    try { return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+    try { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
     catch (e) { return ''; }
+  }
+  // "Today", "Yesterday", or "Mon, Nov 3": the divider shown above each day's messages.
+  function dayLabel(ts, now) {
+    if (!ts) return '';
+    var d = new Date(ts), today = new Date(now || Date.now());
+    var start = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+    var diff = Math.round((start(today) - start(d)) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    try {
+      return d.toLocaleDateString([], d.getFullYear() === today.getFullYear()
+        ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) { return ''; }
   }
   // The server accepts audio/webm, audio/ogg, audio/mp4 and audio/mpeg. Safari/iPad report mp4 under a few names.
   function audioType(type) {
@@ -109,13 +124,42 @@
     if (!root.document || document.getElementById('homework-conversation-styles')) return;
     var style = document.createElement('style'); style.id = 'homework-conversation-styles';
     style.textContent = [
+      /* One chat look for every notes thread, on both the student and teacher pages. */
+      '.home-conversation{border:1.5px solid #d4e3f5;border-radius:16px;background:#f6f9fd;padding:14px;margin:14px 0}',
+      '.home-conversation h4{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:16px;font-weight:800;margin:0 0 10px;color:#1a2744}',
+      '.conversation-content{padding-top:10px}',
+      '.conversation-history{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding:2px 2px 6px;overscroll-behavior:contain}',
+      '.conversation-history>.muted{margin:6px 0;text-align:center;font-size:14px;color:#5b7290}',
+      '.conversation-day{align-self:center;margin:6px 0 2px;padding:2px 10px;border-radius:999px;background:#e6edf6;color:#5b7290;font-size:12px;font-weight:800}',
+      '.conversation-message{align-self:flex-start;max-width:min(85%,520px);background:#fff;border:1px solid #dbe6f3;border-radius:16px 16px 16px 5px;padding:8px 12px 9px;box-shadow:0 1px 2px rgba(26,39,68,.06)}',
+      '.conversation-message.mine{align-self:flex-end;background:#e2f5e9;border-color:#b5e0c4;border-radius:16px 16px 5px 16px}',
+      '.conversation-message.unread{border-color:#f0b429;background:#fffaeb;box-shadow:0 0 0 2px rgba(240,180,41,.25)}',
+      '.conversation-message p{margin:3px 0 0;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}',
       '.conversation-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px}',
-      '.conversation-time{font-size:12px;color:#6b7c93}',
-      '.conversation-new,.conversation-unread{display:inline-block;padding:1px 8px;border-radius:999px;background:#f0b429;color:#3d2a00;font-size:12px;font-weight:800}',
-      '.conversation-unread{margin-left:8px;vertical-align:middle}',
-      '.conversation-toggle.has-unread{background:#fff3c4!important;border-color:#f0b429!important;color:#5c3b00!important;font-weight:800}',
-      '.conversation-message.unread{border-color:#f0b429!important;background:#fffaeb!important}',
+      '.conversation-message.mine .conversation-who{justify-content:flex-end}',
+      '.conversation-who strong{font-size:12.5px;font-weight:800;color:#5b7290}',
       '.conversation-message.theirs.from-teacher strong{color:#1d4ed8}',
+      '.conversation-message.theirs.from-student strong{color:#6d3fc0}',
+      '.conversation-time{font-size:12px;color:#6b7c93}',
+      '.conversation-new,.conversation-unread{display:inline-block;padding:1px 8px;border-radius:999px;background:#f0b429;color:#3d2a00;font-size:12px;font-weight:800;line-height:1.5}',
+      '.conversation-unread{margin-left:8px;vertical-align:middle}',
+      '.conversation-message .conversation-listen{display:inline-flex;align-items:center;gap:6px;margin:6px 0 0!important;min-height:36px;padding:6px 14px;border-radius:999px;font-size:14px}',
+      '.conversation-message audio{display:block;max-width:100%;width:280px;margin-top:6px}',
+      '.conversation-toggle{display:flex!important;align-items:center;width:100%;text-align:left;min-height:46px;margin:0!important;background:#fff!important;border:1.5px solid #c9dbef!important;color:#1a2744!important;border-radius:12px!important;font-weight:700!important}',
+      '.conversation-toggle::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(45deg);transition:transform .15s;flex:none}',
+      '.conversation-toggle[aria-expanded="true"]::after{transform:rotate(225deg)}',
+      '.conversation-toggle.has-unread{background:#fff3c4!important;border-color:#f0b429!important;color:#5c3b00!important;font-weight:800!important}',
+      '.conversation-compose{margin-top:10px}',
+      '.conversation-compose textarea{display:block;width:100%;min-height:46px;max-height:180px;margin:0;padding:11px 14px;border:1.5px solid #c9dbef;border-radius:14px;background:#fff;font:inherit;font-size:15px;line-height:1.4;resize:none;overflow-y:auto}',
+      '.conversation-compose textarea:focus{outline:none;border-color:#4a9eed;box-shadow:0 0 0 3px rgba(74,158,237,.18)}',
+      '.conversation-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}',
+      '.conversation-actions button{margin:0!important;min-height:42px}',
+      '.conversation-actions .conversation-send{order:3;margin-left:auto!important}',
+      '.conversation-hint{order:2;font-size:12px;color:#6b7c93}',
+      '@media (pointer:coarse){.conversation-hint{display:none}}',
+      '.conversation-feedback{min-height:20px;margin:6px 0 0;color:#5b7290;font-size:14px;font-weight:600}',
+      '.conversation-feedback.is-error{color:#c03030}',
+      '.conversation-feedback.is-good{color:#17834a}',
       '.conversation-recording{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding:10px 12px;border-radius:12px;background:#fff1f1;border:1.5px solid #f5b5b5;color:#8a1c1c;font-weight:700}',
       '.conversation-recording[hidden]{display:none}',
       '.rec-dot{width:14px;height:14px;border-radius:50%;background:#e02424;flex:none;animation:recPulse 1.2s ease-out infinite}',
@@ -127,7 +171,7 @@
       '.rec-meter span{display:block;height:100%;width:100%;background:linear-gradient(90deg,#16a34a,#eab308 70%,#e02424);transform-origin:left center;transform:scaleX(0);transition:transform .08s linear}',
       '.conversation-recording button{margin:0!important;min-height:36px}',
       '.general-messages h4{margin-top:0}',
-      '.message-picker{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}',
+      '.message-picker{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px;font-weight:700}',
       '.message-picker select{max-width:100%}',
       '.conversation-record[data-recording="true"]{background:#e02424!important;border-color:#e02424!important;color:#fff!important}'
     ].join('\n');
@@ -168,9 +212,10 @@
     box.append(heading);
     var toggle = null, content = el('div', null, 'conversation-content');
     var key = options.threadKey ? String(options.threadKey) : '';
+    var other = role === 'teacher' ? (options.studentName || 'this student') : 'your teacher';
     function toggleText() {
-      if (unread && !marked) return '💬 ' + unread + ' new ' + (unread === 1 ? 'message' : 'messages') + ' from your teacher';
-      return messages.length ? '💬 Read messages · ' + messages.length : '💬 Message your teacher';
+      if (unread && !marked) return '💬 ' + unread + ' new ' + (unread === 1 ? 'message' : 'messages') + ' from ' + other;
+      return messages.length ? '💬 Read messages · ' + messages.length : '💬 Message ' + other;
     }
     // Tell the server this side has now seen the thread, so the "new" count clears on the next load.
     function markRead() {
@@ -206,8 +251,16 @@
     }
     var history = el('div', null, 'conversation-history');
     var feedback = el('p', null, 'conversation-feedback'); feedback.setAttribute('aria-live', 'polite');
-    if (key && threadNotices[key]) { feedback.textContent = threadNotices[key]; delete threadNotices[key]; }
+    function tell(text, tone) {
+      feedback.textContent = text || '';
+      feedback.classList.toggle('is-error', tone === 'error');
+      feedback.classList.toggle('is-good', tone === 'good');
+    }
+    if (key && threadNotices[key]) { tell(threadNotices[key], 'good'); delete threadNotices[key]; }
+    var lastDay = '';
     messages.slice(-30).forEach(function (message) {
+      var day = dayLabel(message.createdAt);
+      if (day && day !== lastDay) { history.append(el('div', day, 'conversation-day')); lastDay = day; }
       var mine = message.role === role;
       var isNew = !mine && !!message.unread;
       var item = el('article', null, 'conversation-message ' + (mine ? 'mine' : 'theirs') +
@@ -228,14 +281,14 @@
             var player = el('audio'); player.controls = true; player.preload = 'auto';
             var type = String(audio.voiceDataURL || '').slice(5).split(';')[0];
             var cantPlay = 'This voice note was recorded on a different kind of device and can’t play here. Try opening it in Chrome or on a computer.';
-            if (type && player.canPlayType && !player.canPlayType(type)) feedback.textContent = cantPlay;
-            player.onerror = function () { feedback.textContent = cantPlay; };
+            if (type && player.canPlayType && !player.canPlayType(type)) tell(cantPlay, 'error');
+            player.onerror = function () { tell(cantPlay, 'error'); };
             player.src = audio.voiceDataURL;
             listen.replaceWith(player);
             var playing = player.play && player.play();
             if (playing && playing.catch) playing.catch(function () { /* the player controls are there to press */ });
           } catch (error) {
-            feedback.textContent = error.message || 'This voice note could not play.';
+            tell(error.message || 'This voice note could not play.', 'error');
             listen.disabled = false; listen.textContent = '▶ Play voice note';
           }
         };
@@ -246,11 +299,28 @@
     if (!messages.length) history.append(el('p', options.emptyText || 'No notes yet. Send a message if you have a question.', 'muted'));
     content.append(history);
     if (messages.length) setTimeout(function () { history.scrollTop = history.scrollHeight; }, 0);
-    var note = el('textarea'); note.maxLength = 500; note.placeholder = role === 'teacher' ? 'Write a kind note or correction' : 'Ask your teacher a question';
-    note.setAttribute('aria-label', 'Write a message');
+    var compose = el('div', null, 'conversation-compose');
+    var note = el('textarea'); note.maxLength = 500; note.rows = 1;
+    note.placeholder = role === 'teacher' ? 'Write a note…' : 'Write a message…';
+    note.setAttribute('aria-label', role === 'teacher' ? 'Write a message to ' + other : 'Write a message to your teacher');
+    // The box grows with the message (up to a limit) instead of showing a scroll bar for two lines.
+    function fit() { note.style.height = 'auto'; note.style.height = Math.min(note.scrollHeight + 3, 180) + 'px'; }
+    if (key && threadDrafts[key]) note.value = threadDrafts[key];
+    note.addEventListener('input', function () {
+      if (key) { if (note.value) threadDrafts[key] = note.value; else delete threadDrafts[key]; }
+      fit();
+    });
+    // Enter sends and Shift+Enter starts a new line, like other chat apps. Phones and tablets keep Enter as a new line.
+    var finePointer = !!(root.matchMedia && root.matchMedia('(pointer:fine)').matches);
+    note.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing || !finePointer) return;
+      event.preventDefault();
+      if (!sendText.disabled) sendText.click();
+    });
     var actions = el('div', null, 'conversation-actions');
     var sendText = el('button', 'Send message', 'conversation-send'); sendText.type = 'button';
     var record = el('button', '🎙 Record voice note', 'conversation-record sec'); record.type = 'button';
+    var hint = el('span', 'Enter to send · Shift+Enter for a new line', 'conversation-hint');
     // Recording panel: pulsing red dot, time left, live sound meter, cancel.
     var panel = el('div', null, 'conversation-recording'); panel.hidden = true;
     var recLabel = el('span', 'Recording', 'rec-label'), recTime = el('span', recClock(0), 'rec-time');
@@ -261,14 +331,16 @@
     panel.append(el('span', null, 'rec-dot'), recLabel, recTime, meter, cancel);
     async function send(payload, notice) {
       await options.send(Object.assign({ action: 'comment' }, payload));
-      if (key) { openThreads[key] = true; threadNotices[key] = notice; } // the page may redraw this box
-      if (options.onSent) await options.onSent();
+      note.value = ''; fit();
+      if (key) { openThreads[key] = true; threadNotices[key] = notice; delete threadDrafts[key]; } // the page may redraw this box
+      // The message is already sent; a failed refresh afterwards must not say it wasn't.
+      if (options.onSent) { try { await options.onSent(); } catch (e) { /* the next refresh will show it */ } }
     }
     sendText.onclick = async function () {
-      if (!note.value.trim()) { feedback.textContent = 'Type a message, or record a voice note, before sending.'; note.focus(); return; }
-      sendText.disabled = true;
-      try { await send({ text: note.value.trim() }, 'Message sent.'); note.value = ''; feedback.textContent = 'Message sent.'; }
-      catch (error) { feedback.textContent = error.message || 'Message could not be sent.'; }
+      if (!note.value.trim()) { tell('Type a message, or record a voice note, before sending.', 'error'); note.focus(); return; }
+      sendText.disabled = true; tell('Sending…');
+      try { await send({ text: note.value.trim() }, 'Message sent.'); tell('Message sent.', 'good'); }
+      catch (error) { tell(error.message || 'Message could not be sent.', 'error'); }
       finally { sendText.disabled = false; }
     };
     var rec = null;
@@ -281,9 +353,9 @@
     record.onclick = async function () {
       if (rec) { stopRecording(false); return; }
       if (!root.navigator?.mediaDevices?.getUserMedia || !root.MediaRecorder) {
-        feedback.textContent = 'Voice notes are not supported in this browser. You can send a written message.'; return;
+        tell('Voice notes are not supported in this browser. You can send a written message.', 'error'); return;
       }
-      record.disabled = true; feedback.textContent = 'Starting the microphone…';
+      record.disabled = true; tell('Starting the microphone…');
       var stream;
       try {
         stream = await root.navigator.mediaDevices.getUserMedia({ audio: true });
@@ -304,7 +376,7 @@
           stream.getTracks().forEach(function (track) { track.stop(); });
           rec = null; panel.hidden = true; meterBar.style.transform = 'scaleX(0)';
           record.dataset.recording = 'false'; record.textContent = '🎙 Record voice note'; sendText.disabled = false;
-          if (r.cancelled) { feedback.textContent = 'Recording cancelled. Nothing was sent.'; record.disabled = false; return; }
+          if (r.cancelled) { tell('Recording cancelled. Nothing was sent.'); record.disabled = false; return; }
           record.disabled = true;
           try {
             if (Date.now() - r.started < 700) throw new Error('That was too short. Press Record, speak, then press Stop & send.');
@@ -312,21 +384,21 @@
             var blob = new Blob(r.chunks, { type: type });
             if (!blob.size) throw new Error('Nothing was recorded. Check your microphone and try again.');
             if (blob.size > VOICE_MAX_BYTES) throw new Error('That recording was too large. Please try a shorter note.');
-            feedback.textContent = 'Sending voice note…';
+            tell('Sending voice note…');
             var voiceDataURL = await new Promise(function (resolve, reject) {
               var reader = new FileReader(); reader.onload = function () { resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(blob);
             });
             var typed = note.value.trim();
             await send(typed ? { voiceDataURL: voiceDataURL, text: typed } : { voiceDataURL: voiceDataURL }, 'Voice note sent.');
-            note.value = ''; feedback.textContent = 'Voice note sent.';
-          } catch (error) { feedback.textContent = error.message || 'Voice note could not be sent.'; }
+            tell('Voice note sent.', 'good');
+          } catch (error) { tell(error.message || 'Voice note could not be sent.', 'error'); }
           finally { record.disabled = false; }
         };
         recorder.start(1000);
         r.started = Date.now();
         record.dataset.recording = 'true'; record.disabled = false; record.textContent = '■ Stop & send'; sendText.disabled = true;
         panel.hidden = false; recTime.textContent = recClock(0);
-        feedback.textContent = 'Recording now. Speak your note, then press Stop & send.';
+        tell('Recording now. Speak your note, then press Stop & send.');
         r.stopMeter = startMeter(stream, function (level) {
           if (level > r.peak) r.peak = level;
           meterBar.style.transform = 'scaleX(' + level.toFixed(3) + ')';
@@ -337,23 +409,25 @@
           var elapsed = Date.now() - r.started;
           recTime.textContent = recClock(elapsed);
           if (r.stopMeter && elapsed > 3000 && r.peak < 0.03)
-            feedback.textContent = 'We can’t hear anything yet. Check that your microphone is on and not muted.';
+            tell('We can’t hear anything yet. Check that your microphone is on and not muted.', 'error');
           if (elapsed >= VOICE_MAX_MS && recorder.state === 'recording') recorder.stop();
         }, 250);
       } catch (error) {
         if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
         rec = null; panel.hidden = true;
         record.dataset.recording = 'false'; record.textContent = '🎙 Record voice note'; record.disabled = false; sendText.disabled = false;
-        feedback.textContent = error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : 'Could not start recording. You can send a written message.';
+        tell(error.name === 'NotAllowedError' ? 'Allow microphone access to record a note.' : 'Could not start recording. You can send a written message.', 'error');
       }
     };
-    actions.append(sendText, record); content.append(note, actions, panel, feedback); box.append(content);
+    actions.append(record, hint, sendText); compose.append(note, actions, panel, feedback);
+    content.append(compose); box.append(content);
+    if (note.value) setTimeout(fit, 0);
     return box;
   }
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
     isStagingRuntime: function () { return isStagingRuntime; }, isAllowedRuntime: function () { return isStagingRuntime || isLiveRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
     dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
-    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts };
+    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts, dayLabel: dayLabel };
   if (root.document && root.document.head) addConversationStyles(); // "N new" tags can show before any notes box
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);
