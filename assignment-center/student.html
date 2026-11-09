@@ -346,6 +346,7 @@ function cardBody(a){
   if(a.assignedAt!=null)meta.append(el('span','Assigned '+H.when(a.assignedAt),'badge'));
   c.append(meta);
   if(a.details)c.append(el('p',a.details));
+  if(a.instructionVoice)c.append(H.instructionPlayer(function(){return call({action:'instructionVoiceRead',assignmentId:a.id})}));
   if(a.targetAmount)c.append(el('p','Target: '+a.targetAmount+' '+(a.targetUnit||'items')+(a.targetUnit==='minutes'?' · done so far: '+a.progress+' minutes':''),'muted'));
   // Checklist homework (#649): each item opens the activity in homework mode and ticks itself when finished.
   var hasItems=!!(a.items&&a.items.length);

@@ -150,13 +150,28 @@ test('the rewards function routes the new actions with the right checks', () => 
   assert.equal(require('../backend/functions/student-practice-auth.cjs').toolForSource('posuk-submit'), 'posuk-practice-scroll');
 });
 
-test('pages: Posuk Practice has no AI grading calls on its path; Test Me keeps Understand', () => {
+test('pages: Posuk Practice has no AI grading calls on its path; Chumash חידון keeps Understand', () => {
   const html = fs.readFileSync('record_pesukim/student.html', 'utf8');
-  assert.match(html, /POSUK_TOOL_MODE = new URLSearchParams\(location\.search\)\.get\('tool'\) === 'test-me'/);
+  // Quiz mode (the live Chumash חידון tile, #693) is the one Understand mode; old ?tool=test-me links map to it.
+  assert.match(html, /B3_QUIZ_MODE = p\.get\('mode'\) === 'quiz' \|\| p\.get\('tool'\) === 'test-me'/);
+  assert.match(html, /POSUK_TOOL_MODE = window\.B3_QUIZ_MODE \? 'test-me' : 'practice'/);
   assert.match(html, /if\(window\.POSUK_TOOL_MODE === 'practice'\) return;\s*\n\s*\n\s*const msg = document\.getElementById\('comprehensionGradingMsg'\)/);
   assert.doesNotMatch(html, /\n\s*loadOrGenerateTranslationChunks\(\);\n\}/);
   assert.doesNotMatch(html, /\n  wakeScorer\(\);/);
   assert.match(html, /action:'posuk-submit'/);
   const index = fs.readFileSync('index.html', 'utf8');
-  assert.match(index, /href="record_pesukim\/student\.html\?tool=test-me"[^>]*>.*Chumash Test Me/);
+  assert.match(index, /href="record_pesukim\/student\.html\?mode=quiz"[^>]*>.*Chumash חידון/);
+  assert.doesNotMatch(index, /Chumash Test Me/);
+});
+
+test('staging functions carry the same Posuk review actions and never use the production bucket', () => {
+  const norm = p => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+  assert.equal(norm('backend/functions-staging/posuk-review-core.cjs'), norm('backend/functions/posuk-review-core.cjs'));
+  const staging = norm('backend/functions-staging/student-rewards-auto-award.js');
+  assert.match(staging, /action==="posuk-submit"/);
+  assert.match(staging, /action==="posuk-grade"/);
+  assert.match(staging, /'teacher-set-recording-full-review','posuk-grade'\]/);
+  assert.match(staging, /act\.startsWith\('posuk-'\)\?'posuk-practice-scroll'/);
+  assert.doesNotMatch(staging, /b3-games\.firebasestorage\.app/);
+  assert.equal(require('../backend/functions-staging/student-practice-auth.cjs').toolForSource('posuk-submit'), 'posuk-practice-scroll');
 });

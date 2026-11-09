@@ -13,6 +13,7 @@
 <script src="shorashim/units.js?v=20261106-units-1"></script>
 <script src="school-scope.js?v=20261107"></script>
 <script src="student-scope.js?v=20261108"></script>
+<script src="bulk-roster.js?v=20261109-706"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -112,19 +113,43 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 </section>
 
 <section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
-<p class="hint">Upload a CSV to add teachers, principals, students, and classes all at once. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
-<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>type</code> (teacher / principal / student / class), <code>name</code>, <code>email</code> (teachers &amp; principals), <code>passcode</code> (students' individual sign-in passcode), <code>class</code> (class name; required for students). One row per person or class. Classes in the file are created first.</p>
-<div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Preview</button></div>
+<p class="hint">Upload a CSV to add classes, teachers, principals and students. <b>Each person is on one row.</b> Put every class a student or teacher is in into the <code>Classes</code> column, separated by semicolons, for example <code>B2 ET Morning; B2 ET Afternoon</code>. A student with five classes is still one row, one passcode and one account. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
+<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>Type</code> (Class, Principal, Teacher, Student), <code>Name</code>, <code>Email</code> (teachers and principals), <code>Passcode</code> (students, exactly 6 digits), <code>Classes</code>, and optional <code>Student ID</code> (your own roster number, used to recognise the student next time). Classes first, then teachers and principals, then students. Older files with one row per class still work: rows with the same name and passcode become one student.</p>
+<div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Check file</button></div>
 <div id="bulkPreviewArea" style="display:none;margin-top:12px">
-  <div id="bulkSummary" style="margin-bottom:10px;font-weight:700;font-size:16px"></div>
+  <div id="bulkSummary" style="margin-bottom:10px;font-size:16px"></div>
   <div id="bulkTable" style="overflow-x:auto;font-size:15px"></div>
   <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-    <button id="bulkImport" type="button" style="background:#16a34a">&#x2705; Import all</button>
+    <button id="bulkImport" type="button" style="background:#16a34a">&#x2705; Import these changes</button>
     <button id="bulkCancel" type="button" style="background:#fff;color:#b91c1c;border:1px solid #fecaca">Cancel</button>
   </div>
 </div>
 <div id="bulkProgress" style="display:none;margin-top:12px;font-weight:700;font-size:16px"></div>
-<div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:220px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
+<div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:260px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
+</section>
+
+<section class="card" id="bulkManageCard"><div class="card-head"><h2>&#x1F9F9; Students &rarr; Bulk Management</h2></div>
+<p class="hint">Find students by class, import, creation date or name. Preview shows each account's history and any saved student work. Only accounts with <b>no</b> student work can be deleted, every deletion is backed up first and can be undone, and the server checks everything again.</p>
+<div class="formrow"><button id="bmLoad" type="button">Load students</button><button id="bmAudit" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Audit log</button></div>
+<div id="bmArea" style="display:none">
+ <div class="formrow" style="flex-wrap:wrap">
+  <select id="bmClass" aria-label="Class"><option value="">All classes</option></select>
+  <select id="bmBatch" aria-label="Import"><option value="">Any import</option><option value="-">Not from an import</option></select>
+  <label style="font-size:14px">Created from <input id="bmFrom" type="date"></label><label style="font-size:14px">to <input id="bmTo" type="date"></label>
+  <input id="bmSearch" type="search" placeholder="Name or ID" aria-label="Search students">
+ </div>
+ <div class="formrow"><button id="bmSelectShown" type="button">Select all shown</button><button id="bmClear" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Clear selection</button><span id="bmCount" style="font-weight:700"></span></div>
+ <div id="bmList" style="max-height:420px;overflow:auto;font-size:15px"></div>
+ <div class="formrow" style="margin-top:10px"><button id="bmPreview" type="button">Preview selected</button><button id="bmExport" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Export backup of selected</button></div>
+ <div id="bmPreviewArea"></div>
+ <h3 style="margin-top:22px">Undo an import</h3>
+ <p class="hint">Choose an import. The preview lists every account it created (only removed if it is still empty and matches the import's own audit record), every existing account it changed (put back as it was), and anything that needs your review. Classes and teachers are never deleted.</p>
+ <div class="formrow"><select id="rbBatch" aria-label="Import to undo"><option value="">Choose an import</option></select><button id="rbPreview" type="button">Preview undo</button></div>
+ <div id="rbArea"></div>
+ <h3 style="margin-top:22px">Earlier removals</h3>
+ <div id="rbHistory"></div>
+</div>
+<div id="bmAuditArea" style="margin-top:10px"></div>
 </section>
 </div>
 <div id="status" class="toast"></div>
@@ -444,189 +469,216 @@ q("libraryTeacherSelect").onchange=renderLibraryGrant;
 q("toolClassSelect").onchange=renderToolGrants;
 
 // ---- Bulk upload -------------------------------------------------------
-// Classes, teacher invites and principal invites are written exactly as the
-// single-add controls above write them. Students are created through the
-// trusted funTorahManageStudents function so the passcode is stored only in
-// private storage (never in a public profile) and sign-in works immediately.
-const BULK_TEMPLATE_ROWS=[
-  "type,name,email,passcode,class",
-  "class,Grade 5,,,",
-  "teacher,Rabbi Cohen,rabbicohen@gmail.com,,Grade 5",
-  "principal,Mrs. Levi,mrslevi@gmail.com,,",
-  "student,Moshe Goldberg,,pass123,Grade 5",
-  "student,Chana Stern,,pass456,Grade 5",
-];
-const BULK_TYPES=["teacher","principal","student","class"];
+// Issue #706. The browser only reads the CSV (bulk-roster.js) and shows what
+// the server plans to do. Everything else - which students already have an
+// account, creating accounts, adding classes, recording the import so it can
+// be undone - is decided and written by funTorahManageStudents, owner only.
+// One student = one account, with one membership for each class.
 const MANAGE_STUDENTS_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents";
-q("bulkDownloadTemplate").onclick=function(e){
-  e.preventDefault();
+const manageUrl=()=>MANAGE_STUDENTS_URL.replace("-b3-games.",firebase.app().options.projectId==="fun-torah-tools-staging"?"-fun-torah-tools-staging.":"-b3-games.");
+async function manageCall(body,timeout=290000){
+  const response=await fetch(manageUrl(),{method:"POST",signal:AbortSignal.timeout(timeout),
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},body:JSON.stringify(body)});
+  let result={};try{result=await response.json();}catch(_){}
+  if(!response.ok)throw new Error(result.error||"The server could not do this. Please try again.");
+  return result;
+}
+function downloadFile(name,text,type){
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([BULK_TEMPLATE_ROWS.join("\n")],{type:"text/csv"}));
-  a.download="bulk-upload-template.csv";a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-};
-function splitCSVLine(line){
-  const fields=[];let cur="",inQ=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
-    else if(ch===","&&!inQ){fields.push(cur.trim());cur="";}
-    else cur+=ch;
+  a.href=URL.createObjectURL(new Blob([text],{type:type||"text/csv"}));
+  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+const bulkClassName=id=>(classData[id]&&classData[id].name)||id;
+const bulkList=(items,fmt)=>items.length?'<ul style="margin:4px 0 10px;padding-left:20px">'+items.map(fmt).join("")+'</ul>':'<p style="margin:4px 0 10px;color:#64748b">None</p>';
+let bulkState=null;
+q("bulkDownloadTemplate").onclick=function(e){e.preventDefault();downloadFile("bulk-upload-template.csv",FTTBulkRoster.TEMPLATE_ROWS.join("\n")+"\n");};
+function bulkReset(){q("bulkPreviewArea").style.display="none";q("bulkFile").value="";bulkState=null;}
+function bulkBody(){
+  const p=bulkState.plan;
+  return {batchId:bulkState.batchId,label:bulkState.fileName,
+    classes:p.classesToCreate.concat(p.existingClassesInFile),
+    staff:p.staff.map(s=>({role:s.role,name:s.name,email:s.email,classes:s.classes})),
+    students:p.students.map(s=>({key:s.key,name:s.name,passcode:s.passcode,rosterId:s.rosterId,classes:s.classes,decision:bulkState.decisions[s.key]||null}))};
+}
+function renderBulkPreview(){
+  const sv=bulkState.server,p=bulkState.plan,sm=sv.summary;
+  const warn=p.warnings.length?'<details style="margin:6px 0"><summary>'+p.warnings.length+' thing(s) to check</summary>'+bulkList(p.warnings,w=>'<li>'+safe(w)+'</li>')+'</details>':"";
+  const errs=sv.errors.length?'<div style="color:#b91c1c;font-weight:700">&#x26A0;&#xFE0F; '+sv.errors.length+' problem(s). Nothing can be imported until they are fixed:</div>'+bulkList(sv.errors,e=>'<li>'+safe(e)+'</li>'):"";
+  q("bulkSummary").innerHTML=errs+'<b>Ready to import:</b> '+[sm.classesCreate+" new class(es)",sm.staffCreate+" new teacher/principal(s)",sm.staffUpdate+" teacher(s) getting classes",sm.studentsCreate+" new student(s)",sm.studentsUpdate+" existing student(s) getting classes",sm.membershipsAdd+" class place(s) to add",sm.studentsUnchanged+" already done (skipped)",sm.conflicts+" need your decision"].join(" &middot; ")+warn+(sv.batchStatus!=="new"?'<p class="hint">This file was imported before (status: '+safe(sv.batchStatus)+'). Only what is still missing will be added.</p>':"");
+  const create=sv.students.filter(s=>s.status==="create"),update=sv.students.filter(s=>s.status==="update"),same=sv.students.filter(s=>s.status==="unchanged");
+  const cls=ids=>ids.map(bulkClassName).map(safe).join(", ");
+  let html="";
+  html+='<h3>Classes to create</h3>'+bulkList(sv.classes.filter(c=>c.status==="create"),c=>'<li>'+safe(c.name)+'</li>');
+  html+='<h3>Teachers and principals</h3>'+bulkList(sv.staff.filter(s=>s.status!=="unchanged"),s=>'<li>'+safe(s.name)+' ('+safe(s.email)+') &mdash; '+(s.status==="create"?"new "+s.role:"add classes")+(s.addClassIds.length?": "+cls(s.addClassIds):"")+'</li>');
+  html+='<h3>New students ('+create.length+')</h3>'+bulkList(create,s=>'<li>'+safe(s.name)+' &mdash; '+cls(s.addClassIds)+'</li>');
+  html+='<h3>Existing students getting classes ('+update.length+')</h3>'+bulkList(update,s=>'<li>'+safe(s.name)+' <small>('+safe(s.studentId)+', matched by '+safe(s.matchedBy)+')</small> &mdash; add '+cls(s.addClassIds)+(s.alreadyClassIds.length?'; already in '+cls(s.alreadyClassIds):"")+'</li>');
+  html+='<details><summary>Already done, skipped ('+same.length+')</summary>'+bulkList(same,s=>'<li>'+safe(s.name)+'</li>')+'</details>';
+  if(sv.conflicts.length){
+    html+='<h3 style="color:#b45309">Need your decision ('+sv.conflicts.length+')</h3><p class="hint">These names already have an account. Choose for each one. Rows you leave on "Skip" are not imported.</p>';
+    html+=sv.conflicts.map(c=>{
+      const d=bulkState.decisions[c.key],opt=(v,l,dis)=>'<label style="display:block"><input type="radio" name="bc_'+safe(c.key)+'" data-conflict="'+safe(c.key)+'" value="'+safe(v)+'"'+((d?(d.type==="same"?"same:"+d.studentId:"new"):"")===v?" checked":"")+(dis?" disabled":"")+'> '+l+'</label>';
+      return '<div class="entry"><b>'+safe(c.name)+'</b> <small>'+safe(c.reason)+'</small>'+opt("","Skip this row for now")+
+        c.candidates.map(k=>opt("same:"+k.studentId,"Same child: add the classes to "+safe(k.name)+' <small>('+safe(k.studentId)+(k.createdAt?", created "+new Date(k.createdAt).toLocaleDateString():"")+((c.samePasscode||[]).includes(k.studentId)?", same passcode":"")+')</small>')).join("")+
+        opt("new","A different child: create a new account"+(c.allowNew?"":" (not possible: same name and passcode)"),!c.allowNew)+'</div>';
+    }).join("");
   }
-  fields.push(cur.trim());
-  return fields;
-}
-function parseBulkCSV(text){
-  const lines=String(text||"").replace(/^﻿/,"").replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
-  if(!lines.length)return[];
-  const header=splitCSVLine(lines[0]).map(h=>h.toLowerCase());
-  const col=k=>header.indexOf(k);
-  // "password" is accepted as an older name for the passcode column.
-  const passCol=col("passcode")>=0?"passcode":"password";
-  return lines.slice(1).map((line,i)=>{
-    const fields=splitCSVLine(line);
-    const get=k=>col(k)>=0?String(fields[col(k)]||"").trim():"";
-    return{row:i+2,type:get("type").toLowerCase(),name:get("name"),email:get("email").toLowerCase(),passcode:get(passCol),cls:get("class")};
-  }).filter(r=>r.type||r.name);
-}
-const bulkNameKey=s=>String(s||"").trim().toLowerCase();
-function bulkValidate(rows){
-  const errors=[];
-  const knownClasses=new Set(Object.values(classData||{}).map(c=>bulkNameKey(c&&c.name)));
-  rows.forEach(r=>{if(r.type==="class"&&r.name)knownClasses.add(bulkNameKey(r.name));});
-  rows.forEach(r=>{
-    const at="Row "+r.row+": ";
-    if(!BULK_TYPES.includes(r.type)){errors.push(at+'unknown type "'+r.type+'"');return;}
-    if(!r.name){errors.push(at+"missing name");return;}
-    if(r.name.length>100)errors.push(at+"name is longer than 100 characters");
-    if((r.type==="teacher"||r.type==="principal")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))errors.push(at+r.type+" needs a valid email");
-    if(r.type==="student"){
-      if(!r.cls)errors.push(at+"student needs a class");
-      if(!r.passcode)errors.push(at+"student needs a passcode");
-      else if(r.passcode.length>100)errors.push(at+"passcode is longer than 100 characters");
-    }
-    if(r.cls&&(r.type==="student"||r.type==="teacher")&&!knownClasses.has(bulkNameKey(r.cls)))errors.push(at+'class "'+r.cls+'" does not exist and is not in this file');
+  q("bulkTable").innerHTML=html;
+  q("bulkTable").querySelectorAll("[data-conflict]").forEach(r=>r.onchange=()=>{
+    const v=r.value;if(!v)delete bulkState.decisions[r.dataset.conflict];
+    else bulkState.decisions[r.dataset.conflict]=v==="new"?{type:"new"}:{type:"same",studentId:v.slice(5)};
+    bulkState.dirty=true;q("bulkImport").textContent="Check decisions again";
   });
-  return errors;
+  q("bulkPreviewArea").style.display="";
+  q("bulkImport").disabled=sv.errors.length>0;q("bulkImport").textContent="✅ Import these changes";bulkState.dirty=false;
 }
-function bulkReset(){
-  q("bulkPreviewArea").style.display="none";
-  q("bulkFile").value="";
-  delete q("bulkFile")._parsedRows;
+async function bulkServerPreview(){
+  q("bulkSummary").textContent="Checking with the server...";q("bulkPreviewArea").style.display="";q("bulkTable").innerHTML="";q("bulkImport").disabled=true;
+  bulkState.server=await manageCall({action:"importPreview",...bulkBody()});
+  renderBulkPreview();
 }
 q("bulkPreview").onclick=function(){
   const file=q("bulkFile").files[0];
   if(!file){q("status").textContent="Choose a CSV file first.";return;}
   const reader=new FileReader();
-  reader.onload=function(e){
-    const rows=parseBulkCSV(e.target.result);
-    if(!rows.length){q("status").textContent="No data rows found in CSV.";return;}
-    const errors=bulkValidate(rows);
-    const count=t=>rows.filter(r=>r.type===t).length;
-    const summary=count("teacher")+" teacher(s), "+count("principal")+" principal(s), "+count("class")+" class(es), "+count("student")+" student(s)";
-    const errHtml=errors.length?'<span style="color:#b91c1c">&#x26A0;&#xFE0F; '+errors.length+' issue(s) found. Fix the file and preview again:</span><ul style="margin:6px 0 0;padding-left:18px">'+errors.map(e=>'<li>'+safe(e)+'</li>').join("")+'</ul><br>':"";
-    q("bulkSummary").innerHTML=errHtml+"Found: "+safe(summary);
-    const td=v=>'<td style="padding:5px 10px;border-bottom:1px solid #e2e8f0">'+v+'</td>';
-    // Passcodes are not shown on screen; the preview only confirms one is set.
-    const tbody=rows.map(r=>'<tr>'+td(r.row)+td(safe(r.type))+td(safe(r.name))+td(r.type==="student"?(r.passcode?"passcode set":"&mdash;"):safe(r.email||"—"))+td(safe(r.cls||"—"))+'</tr>').join("");
-    q("bulkTable").innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr>'+["Row","Type","Name","Email / Passcode","Class"].map(h=>'<th style="text-align:left;padding:7px 10px;background:#f1f5f9;border-bottom:2px solid #e2e8f0">'+h+'</th>').join("")+'</tr></thead><tbody>'+tbody+'</tbody></table>';
-    q("bulkPreviewArea").style.display="";
-    q("bulkLog").style.display="none";
-    q("bulkProgress").style.display="none";
-    q("bulkImport").disabled=errors.length>0;
-    q("bulkCancel").disabled=false;
-    q("bulkFile")._parsedRows=errors.length?null:rows;
+  reader.onload=async function(e){
+    const text=e.target.result,parsed=FTTBulkRoster.parse(text);
+    const plan=FTTBulkRoster.plan(parsed,Object.values(classData||{}).map(c=>c&&c.name).filter(Boolean));
+    q("bulkLog").style.display="none";q("bulkProgress").style.display="none";
+    if(plan.errors.length){
+      q("bulkPreviewArea").style.display="";q("bulkImport").disabled=true;q("bulkTable").innerHTML="";
+      q("bulkSummary").innerHTML='<span style="color:#b91c1c;font-weight:700">&#x26A0;&#xFE0F; '+plan.errors.length+' problem(s). Fix the file and check it again:</span>'+bulkList(plan.errors,x=>'<li>'+safe(x)+'</li>');
+      return;
+    }
+    bulkState={plan,batchId:FTTBulkRoster.batchIdFor(text),fileName:file.name,decisions:{}};
+    try{await bulkServerPreview();}catch(err){console.error(err);q("bulkSummary").textContent="Could not check the file: "+err.message;}
   };
   reader.readAsText(file);
 };
 q("bulkCancel").onclick=bulkReset;
-async function bulkCreateStudent(classId,name,passcode){
-  const response=await fetch(MANAGE_STUDENTS_URL,{
-    method:"POST",signal:AbortSignal.timeout(15000),
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+await auth.currentUser.getIdToken()},
-    body:JSON.stringify({action:"create",classId,name,passcode})
-  });
-  let result={};try{result=await response.json();}catch(_){}
-  if(!response.ok)throw new Error(result.error||"Could not create the student.");
-  return result;
-}
 q("bulkImport").onclick=async function(){
-  const rows=q("bulkFile")._parsedRows;
-  if(!rows){q("status").textContent="Preview the CSV first.";return;}
+  if(!bulkState||!bulkState.server)return;
+  if(bulkState.dirty){try{await bulkServerPreview();}catch(err){q("status").textContent=err.message;}return;}
+  const sm=bulkState.server.summary;
+  if(!confirm("Import now?\n\n"+sm.studentsCreate+" new student account(s)\n"+sm.studentsUpdate+" existing student(s) get classes\n"+sm.classesCreate+" new class(es)\n"+(sm.staffCreate+sm.staffUpdate)+" teacher/principal change(s)\n"+sm.conflicts+" row(s) skipped for review"))return;
   q("bulkImport").disabled=true;q("bulkCancel").disabled=true;q("bulkPreview").disabled=true;
-  const prog=q("bulkProgress"),logEl=q("bulkLog"),log=[];
-  prog.style.display="";logEl.style.display="";logEl.innerHTML="";
-  const root="b3Games/workspaces/"+WS,TS=firebase.database.ServerValue.TIMESTAMP,total=rows.length;
-  let done=0,failed=0;
-  const addLog=(msg,ok)=>{if(!ok)failed++;log.push((ok?"&#x2705; ":"&#x26A0;&#xFE0F; ")+safe(msg));logEl.innerHTML=log.join("<br>");logEl.scrollTop=logEl.scrollHeight;};
-  const step=()=>{prog.textContent="Importing... "+done+" / "+total;};
-  const ofType=t=>rows.filter(r=>r.type===t);
+  const prog=q("bulkProgress"),logEl=q("bulkLog");prog.style.display="";logEl.style.display="";logEl.innerHTML="";
+  prog.textContent="Importing... please keep this page open.";
   try{
-    step();
-    const liveClasses=(await db.ref(root+"/classes").once("value")).val()||{};
-    const classNameToId={};
-    Object.entries(liveClasses).forEach(([id,c])=>{if(c&&c.name)classNameToId[bulkNameKey(c.name)]=id;});
-    // Classes first, so the rows below can refer to them by name.
-    for(const r of ofType("class")){
-      const lk=bulkNameKey(r.name);
-      if(classNameToId[lk]){addLog('Class "'+r.name+'" already exists (skipped)',true);done++;step();continue;}
-      // Names without Latin letters or digits produce an empty key; never write to the classes root.
-      let cid=key(r.name)||"class";
-      if(liveClasses[cid]||(await db.ref(root+"/classes/"+cid).once("value")).exists())cid+="_"+Date.now().toString().slice(-6);
-      try{
-        await db.ref(root+"/classes/"+cid).set({name:r.name,active:true});
-        classNameToId[lk]=cid;liveClasses[cid]={name:r.name,active:true};
-        addLog('Class "'+r.name+'" created',true);
-      }catch(err){addLog('Class "'+r.name+'": '+err.message,false);}
-      done++;step();
-    }
-    // Teachers: an invite, active once a class is assigned (same as Add teacher + Assign).
-    for(const r of ofType("teacher")){
-      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
-      try{
-        if((await ref.once("value")).exists()){addLog("Teacher "+r.email+" already exists (skipped; assign classes above)",true);done++;step();continue;}
-        const classId=r.cls?classNameToId[bulkNameKey(r.cls)]:"";
-        if(r.cls&&!classId){addLog("Teacher "+r.email+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
-        const invite={email:r.email,name:r.name||r.email,role:"teacher",active:!!classId,updatedAt:TS};
-        if(classId)invite.classIds={[classId]:true};
-        await ref.set(invite);
-        addLog("Teacher "+r.name+" ("+r.email+") added"+(classId?" and assigned to "+r.cls:", inactive until a class is assigned"),true);
-      }catch(err){addLog("Teacher "+r.email+": "+err.message,false);}
-      done++;step();
-    }
-    // Principals: same record as Add principal; supervision is chosen above afterwards.
-    for(const r of ofType("principal")){
-      const ref=db.ref(root+"/teacherInvites/"+key(r.email));
-      try{
-        if((await ref.once("value")).exists()){addLog("Principal "+r.email+" already exists (skipped)",true);done++;step();continue;}
-        await ref.set({email:r.email,name:r.name||r.email,role:"principal",accountType:"principal",active:false,updatedAt:TS});
-        addLog("Principal "+r.name+" ("+r.email+") added; select supervised teachers to activate",true);
-      }catch(err){addLog("Principal "+r.email+": "+err.message,false);}
-      done++;step();
-    }
-    // Students: created by the trusted backend, one request per student.
-    for(const r of ofType("student")){
-      const classId=classNameToId[bulkNameKey(r.cls)];
-      if(!classId){addLog("Student "+r.name+': class "'+r.cls+'" not found (skipped)',false);done++;step();continue;}
-      const members=(liveClasses[classId]&&liveClasses[classId].members)||{};
-      if(Object.values(members).some(m=>m&&bulkNameKey(m.name)===bulkNameKey(r.name))){addLog("Student "+r.name+" is already in "+r.cls+" (skipped)",true);done++;step();continue;}
-      try{
-        const result=await bulkCreateStudent(classId,r.name,r.passcode);
-        ((liveClasses[classId]=liveClasses[classId]||{}).members=members)[result.studentId||r.name]={name:r.name,active:true};
-        addLog("Student "+r.name+" added to "+r.cls,true);
-      }catch(err){addLog("Student "+r.name+": "+err.message,false);}
-      done++;step();
-    }
-    prog.textContent="Done! "+done+" row(s) processed"+(failed?", "+failed+" need attention (see list below).":".");
+    const r=await manageCall({action:"importApply",...bulkBody(),planHash:bulkState.server.planHash});
+    const c=r.counts;
+    prog.textContent=(r.status==="partial"?"Finished with problems. ":"Done! ")+c.studentsCreated+" student(s) created, "+c.studentsUpdated+" updated, "+c.studentsUnchanged+" already done, "+c.classesCreated+" class(es) created, "+c.staffChanged+" teacher/principal change(s)."+(c.failed?" "+c.failed+" failed: run the same file again to finish.":"")+(c.conflictsSkipped?" "+c.conflictsSkipped+" skipped for review.":"");
+    logEl.innerHTML='<p>Import id: <code>'+safe(r.batchId)+'</code> (use it in Bulk Management to undo).</p>'+
+      bulkList(r.failed,f=>'<li>&#x26A0;&#xFE0F; '+safe(f.what+" "+f.name+": "+f.error)+'</li>')+
+      bulkList(r.conflicts,f=>'<li>Skipped: '+safe(f.name+" - "+f.reason)+'</li>')+'<button type="button" id="bulkResultsCsv">Download results CSV</button>';
+    q("bulkResultsCsv").onclick=()=>downloadFile("import-results-"+r.batchId+".csv",FTTBulkRoster.toCsv([["Name","Result","Student ID","Classes added"],...r.students.map(s=>[s.name,s.status,s.studentId,(s.addedClassIds||[]).map(bulkClassName).join("; ")]),...r.failed.map(f=>[f.name,"FAILED: "+f.error,"",""]),...r.conflicts.map(f=>[f.name,"SKIPPED: "+f.reason,"",""])]));
   }catch(err){
     console.error(err);
-    prog.textContent="Import stopped: "+err.message+" ("+done+" of "+total+" rows processed).";
+    prog.textContent="Import stopped: "+err.message+" Nothing is half-made. Check the file again to continue where it stopped.";
   }finally{
-    delete q("bulkFile")._parsedRows;
-    q("bulkFile").value="";
     q("bulkCancel").disabled=false;q("bulkPreview").disabled=false;
     await load();
   }
+};
+
+// ---- Bulk Management and undoing an import (owner only) ------------------
+let bm={students:[],batches:[],selected:new Set(),classes:{}};
+const fmtDate=t=>t?new Date(t).toLocaleString():"";
+function bmFiltered(){
+  const c=q("bmClass").value,b=q("bmBatch").value,t=q("bmSearch").value.trim().toLowerCase();
+  const from=q("bmFrom").value?Date.parse(q("bmFrom").value+"T00:00"):0,to=q("bmTo").value?Date.parse(q("bmTo").value+"T23:59:59"):Infinity;
+  return bm.students.filter(s=>(!c||s.classIds.includes(c))&&(!b||(b==="-"?!s.importBatchId:s.importBatchId===b))&&(!t||s.name.toLowerCase().includes(t)||s.studentId.toLowerCase().includes(t))&&(!(from||to<Infinity)||(s.createdAt&&s.createdAt>=from&&s.createdAt<=to)));
+}
+function bmRender(){
+  const list=bmFiltered();
+  q("bmList").innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr><th></th><th style="text-align:left">Name</th><th style="text-align:left">Classes</th><th style="text-align:left">Created</th><th style="text-align:left">Import</th></tr></thead><tbody>'+
+    list.map(s=>'<tr style="border-top:1px solid #e2e8f0"><td><input type="checkbox" data-bm="'+safe(s.studentId)+'"'+(bm.selected.has(s.studentId)?" checked":"")+' aria-label="Select '+safe(s.name)+'"></td><td><b>'+safe(s.name)+'</b><br><small>'+safe(s.studentId)+(s.savedWork.length?' &middot; saved work':"")+(s.active?"":" &middot; turned off")+'</small></td><td>'+s.classIds.map(id=>safe(bm.classes[id]?bm.classes[id].name:id)).join(", ")+'</td><td><small>'+safe(fmtDate(s.createdAt))+'</small></td><td><small>'+safe(s.importBatchId||"")+'</small></td></tr>').join("")+'</tbody></table>';
+  q("bmList").querySelectorAll("[data-bm]").forEach(x=>x.onchange=()=>{x.checked?bm.selected.add(x.dataset.bm):bm.selected.delete(x.dataset.bm);q("bmCount").textContent=bm.selected.size+" selected";});
+  q("bmCount").textContent=list.length+" shown, "+bm.selected.size+" selected";
+}
+async function bmLoad(){
+  q("bmLoad").disabled=true;
+  try{
+    const r=await manageCall({action:"studentsOverview"},60000);
+    bm.students=r.students.sort((a,b)=>a.name.localeCompare(b.name));bm.batches=r.batches;bm.classes=r.classes;bm.selected.clear();
+    q("bmClass").innerHTML='<option value="">All classes</option>'+Object.entries(r.classes).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,c])=>'<option value="'+safe(id)+'">'+safe(c.name)+' ('+safe(id)+')</option>').join("");
+    const batchOpt=b=>'<option value="'+safe(b.id)+'">'+safe((b.kind==="legacy"?b.label:"Import "+(b.label||b.id))+" - "+fmtDate(b.createdAt))+'</option>';
+    q("bmBatch").innerHTML='<option value="">Any import</option><option value="-">Not from an import</option>'+r.batches.map(batchOpt).join("");
+    q("rbBatch").innerHTML='<option value="">Choose an import</option>'+r.batches.map(batchOpt).join("");
+    q("rbHistory").innerHTML=bulkList(r.rollbacks,x=>'<li><code>'+safe(x.id)+'</code> '+safe(x.status)+' '+safe(fmtDate(x.startedAt))+' &middot; '+x.backups+' backed-up account(s) <button type="button" data-undo="'+safe(x.id)+'" style="padding:4px 10px">Put them back</button></li>');
+    q("rbHistory").querySelectorAll("[data-undo]").forEach(b=>b.onclick=async()=>{
+      if(!confirm("Put back every account removed by "+b.dataset.undo+"? Accounts that exist again are skipped."))return;
+      try{const u=await manageCall({action:"rollbackUndo",rollbackId:b.dataset.undo});q("status").textContent=u.restored+" account(s) put back.";await bmLoad();await load();}catch(err){q("status").textContent=err.message;}
+    });
+    q("bmArea").style.display="";bmRender();
+  }catch(err){console.error(err);q("status").textContent="Could not load students: "+err.message;}
+  finally{q("bmLoad").disabled=false;}
+}
+q("bmLoad").onclick=bmLoad;
+["bmClass","bmBatch","bmFrom","bmTo"].forEach(id=>q(id).onchange=bmRender);q("bmSearch").oninput=bmRender;
+q("bmSelectShown").onclick=()=>{bmFiltered().forEach(s=>bm.selected.add(s.studentId));bmRender();};
+q("bmClear").onclick=()=>{bm.selected.clear();bmRender();q("bmPreviewArea").innerHTML="";};
+let bmBackupDone=false;
+async function bmExport(ids,name){
+  const r=await manageCall({action:"exportBackup",studentIds:ids});
+  downloadFile(name,JSON.stringify(r,null,1),"application/json");return r;
+}
+q("bmExport").onclick=async()=>{const ids=[...bm.selected];if(!ids.length){q("status").textContent="Select students first.";return}try{await bmExport(ids,"students-backup-"+Date.now()+".json");bmBackupDone=true;}catch(err){q("status").textContent=err.message;}};
+q("bmPreview").onclick=async()=>{
+  const ids=[...bm.selected];if(!ids.length){q("status").textContent="Select students first.";return}
+  bmBackupDone=false;q("bmPreviewArea").innerHTML="<p>Checking every selected account and its linked student data...</p>";
+  try{
+    const p=await manageCall({action:"bulkPreview",studentIds:ids});
+    const batch=q("bmBatch").value&&q("bmBatch").value!=="-"?bm.batches.find(b=>b.id===q("bmBatch").value):null;
+    const existedBefore=r=>batch?(r.importBatchId===batch.id?"No, made by this import":"Yes"):"";
+    q("bmPreviewArea").innerHTML='<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr><th style="text-align:left">Student</th><th style="text-align:left">Classes</th><th style="text-align:left">History</th>'+(batch?'<th style="text-align:left">Existed before this import?</th>':"")+'<th style="text-align:left">Linked data</th><th>Can delete</th></tr></thead><tbody>'+
+      p.records.map(r=>'<tr style="border-top:1px solid #e2e8f0"><td><b>'+safe(r.name)+'</b><br><small>'+safe(r.studentId)+'</small></td><td>'+r.classIds.map(id=>safe(bm.classes[id]?bm.classes[id].name:id)).join(", ")+'</td><td><small>'+r.history.map(h=>safe(h.action+" "+h.classId+" "+fmtDate(h.at))).join("<br>")+'</small></td>'+(batch?'<td>'+existedBefore(r)+'</td>':"")+'<td><small>'+(r.linked.length?r.linked.slice(0,4).map(safe).join("<br>")+(r.linked.length>4?"<br>+"+(r.linked.length-4)+" more":""):"none")+'</small></td><td>'+(r.deletable?"Yes":'<span style="color:#b91c1c">No</span><br><small>'+r.reasons.map(safe).join("<br>")+'</small>')+'</td></tr>').join("")+'</tbody></table>'+
+      (p.deletableCount?'<div class="notice" style="margin-top:10px;background:#fef2f2;border-color:#fecaca"><b>Delete '+p.deletableCount+' account(s) with no student work.</b> First download the backup. Then type <code>DELETE '+p.deletableCount+'</code>.<div class="formrow" style="margin-top:8px"><button type="button" id="bmBackup">1. Download backup</button><input id="bmConfirm" placeholder="DELETE '+p.deletableCount+'" aria-label="Type to confirm"><button type="button" id="bmDelete" class="danger" disabled>2. Delete</button></div></div>':'<p>None of the selected accounts can be deleted.</p>');
+    if(!p.deletableCount)return;
+    q("bmBackup").onclick=async()=>{try{await bmExport(ids,"students-backup-before-delete-"+Date.now()+".json");bmBackupDone=true;q("bmDelete").disabled=false;}catch(err){q("status").textContent=err.message;}};
+    q("bmDelete").onclick=async()=>{
+      if(!bmBackupDone){q("status").textContent="Download the backup first.";return;}
+      q("bmDelete").disabled=true;
+      try{
+        const r=await manageCall({action:"bulkDelete",studentIds:ids,previewHash:p.previewHash,backupConfirmed:true,confirmText:q("bmConfirm").value});
+        q("bmPreviewArea").innerHTML='<p><b>'+r.removed+' account(s) deleted.</b> Undo id: <code>'+safe(r.rollbackId)+'</code>'+(r.failed.length?" &middot; "+r.failed.length+" failed (try again)":"")+'</p>';
+        await bmLoad();await load();
+      }catch(err){q("status").textContent=err.message;q("bmDelete").disabled=false;}
+    };
+  }catch(err){console.error(err);q("bmPreviewArea").textContent="Could not preview: "+err.message;}
+};
+function rbSource(){
+  const b=bm.batches.find(x=>x.id===q("rbBatch").value);if(!b)return null;
+  return b.kind==="legacy"?{legacy:{from:b.from,to:b.to,createdBy:b.createdBy}}:{batchId:b.id};
+}
+q("rbPreview").onclick=async()=>{
+  const src=rbSource();if(!src){q("status").textContent="Choose an import.";return}
+  q("rbArea").innerHTML="<p>Checking every account from this import against the live database...</p>";
+  try{
+    const m=await manageCall({action:"rollbackPreview",...src});
+    const s=m.summary,act=s.newSafe+s.existingModified,label={NEW_SAFE:"New, will be removed",EXISTING_MODIFIED:"Existing, classes put back",NEW_HAS_DATA:"New but has student work: kept, review",UNCERTAIN:"Uncertain: kept, review",ALREADY_REMOVED:"Already removed",MISSING:"Gone already"};
+    const groups=Object.keys(label).map(k=>[k,m.records.filter(r=>r.status===k)]).filter(([,v])=>v.length);
+    q("rbArea").innerHTML='<p><b>'+s.newSafe+'</b> new account(s) to remove &middot; <b>'+s.existingModified+'</b> existing account(s) to put back &middot; <b>'+(s.newHasData+s.uncertain)+'</b> to review (kept) &middot; <b>'+s.preservedUntouched+'</b> other student accounts not touched'+(s.alreadyRemoved?' &middot; '+s.alreadyRemoved+' already removed':"")+'</p>'+
+      groups.map(([k,v])=>'<details'+(k!=="NEW_SAFE"?" open":"")+'><summary>'+safe(label[k])+' ('+v.length+')</summary>'+bulkList(v,r=>'<li>'+safe(r.name)+' <small>('+safe(r.studentId)+')</small> &mdash; '+r.classIds.map(id=>safe(bm.classes[id]?bm.classes[id].name:id)).join(", ")+(r.reasons&&r.reasons.length&&k!=="NEW_SAFE"?'<br><small>'+r.reasons.map(safe).join("; ")+'</small>':"")+'</li>')+'</details>').join("")+
+      '<button type="button" id="rbCsv" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Download this list (CSV)</button>'+
+      (act?'<div class="notice" style="margin-top:10px;background:#fef2f2;border-color:#fecaca"><b>Undo this import.</b> First download the backup. Then type <code>ROLL BACK '+act+'</code>. If anything changed since this preview, nothing happens and you are asked to preview again.<div class="formrow" style="margin-top:8px"><button type="button" id="rbBackup">1. Download backup</button><input id="rbConfirm" placeholder="ROLL BACK '+act+'" aria-label="Type to confirm"><button type="button" id="rbRun" class="danger" disabled>2. Undo import</button></div></div>':"<p>Nothing to undo.</p>");
+    q("rbCsv").onclick=()=>downloadFile("undo-preview-"+m.rollbackId+".csv",FTTBulkRoster.toCsv([["Status","Student ID","Name","Classes","Reasons"],...m.records.map(r=>[r.status,r.studentId,r.name,r.classIds.map(id=>bm.classes[id]?bm.classes[id].name:id).join("; "),(r.reasons||[]).join(" | ")])]));
+    if(!act)return;
+    let backed=false;
+    q("rbBackup").onclick=async()=>{try{const ids=m.records.filter(r=>r.status==="NEW_SAFE"||r.status==="EXISTING_MODIFIED").map(r=>r.studentId);for(let i=0;i<ids.length;i+=500)await bmExport(ids.slice(i,i+500),"undo-backup-"+m.rollbackId+"-"+(i/500+1)+".json");backed=true;q("rbRun").disabled=false;}catch(err){q("status").textContent=err.message;}};
+    q("rbRun").onclick=async()=>{
+      if(!backed)return;q("rbRun").disabled=true;q("rbArea").insertAdjacentHTML("beforeend","<p id='rbWorking'>Working... keep this page open.</p>");
+      try{
+        const r=await manageCall({action:"rollbackExecute",...src,manifestHash:m.manifestHash,backupConfirmed:true,confirmText:q("rbConfirm").value});
+        q("rbArea").innerHTML='<p><b>'+(r.status==="complete"?"Done.":"Finished with problems.")+'</b> '+r.removed+' removed, '+r.restored+' put back, '+r.skipped.length+' kept for review.'+(r.failed.length?' '+r.failed.length+' failed: preview again and run again to finish.':"")+' Undo id: <code>'+safe(r.rollbackId)+'</code></p>';
+        await bmLoad();await load();
+      }catch(err){q("status").textContent=err.message;q("rbRun").disabled=false;const w=q("rbWorking");if(w)w.remove();}
+    };
+  }catch(err){console.error(err);q("rbArea").textContent="Could not preview: "+err.message;}
+};
+q("bmAudit").onclick=async()=>{
+  try{const r=await manageCall({action:"auditLog"},60000);
+    q("bmAuditArea").innerHTML='<h3>Audit log</h3>'+bulkList(r.entries,e=>'<li>'+safe(fmtDate(e.at))+' &middot; <b>'+safe(e.action)+'</b> by '+safe(e.byEmail||e.by)+' &middot; '+safe(JSON.stringify(e.counts||{removed:e.removed,restored:e.restored,failed:e.failed}))+(e.batchId?' &middot; '+safe(e.batchId):"")+(e.rollbackId?' &middot; '+safe(e.rollbackId):"")+'</li>');
+  }catch(err){q("status").textContent=err.message;}
 };
 // ---- End bulk upload ---------------------------------------------------
 

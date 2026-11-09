@@ -222,7 +222,21 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.route('https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer', route =>
     route.fulfill(syntheticJson({verdict: 'correct', feedback: 'You found the right words!', gradingVersion: 'semantic-v1'})));
   await page.route('https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward', route =>
-    route.fulfill(syntheticJson({ok: true, awarded: false})));
+    /"action":"posuk-submit"/.test(route.request().postData() || '') ? route.fallback() : route.fulfill(syntheticJson({ok: true, awarded: false})));
+  // The server checks the recording in the production bucket name; send the
+  // student's real upload to that bucket in the Storage emulator.
+  await page.route(/\/v0\/b\/synthetic\.invalid\/o.*_combined_/, route =>
+    route.continue({url: route.request().url().replace('/b/synthetic.invalid/', '/b/b3-games.firebasestorage.app/')}));
+  // Listen asks the speech service to read the instructions; answer with a tiny real sound.
+  const spokenTexts: string[] = [];
+  const wav = Buffer.alloc(44 + 800); wav.write('RIFF', 0); wav.writeUInt32LE(36 + 800, 4); wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(8000, 28);
+  wav.writeUInt16LE(1, 32); wav.writeUInt16LE(8, 34); wav.write('data', 36); wav.writeUInt32LE(800, 40); wav.fill(128, 44);
+  await page.route('https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech', route => {
+    if (route.request().method() === 'OPTIONS') return route.fallback();
+    spokenTexts.push(String(JSON.parse(route.request().postData() || '{}').text || ''));
+    return route.fulfill(syntheticJson({audioContent: wav.toString('base64')}));
+  });
   await page.addInitScript(() => {
     const english = Array(30).fill(''); english[0] = 'And the Lord appeared to him by the oaks of Mamre.';
     const kehot = Array(30).fill(''); kehot[0] = english[0];
@@ -233,20 +247,101 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   page.on('request', request => {
     if (request.url().startsWith(`http://127.0.0.1:${DB_PORT}/`) && request.url().includes('/classes/')) posukClassReads.push(request.url());
   });
-  await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1&tab=reading`);
+  await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1`);
   await expect(page.locator('#app')).toBeVisible();
   await expect(page.locator('#posukText')).toContainText('אֵלָיו');
-  await page.locator('#hebrewRecordBtn').click();
-  await expect(page.locator('#hebrewStatus')).toContainText('Recording', {timeout: 10000});
+  // Posuk Practice (#694): one combined Read & Translate step, one microphone.
+  await expect(page.locator('#combinedPanel')).toBeVisible();
+  for (const gone of ['.task-tabs', '#readingPanel', '#translationPanel', '#comprehensionPanel']) await expect(page.locator(gone)).toBeHidden();
+  await expect(page.locator('#combinedPanel .instruction-copy')).toContainText('Read a few Hebrew words, then say what they mean in English');
+  await page.locator('#combinedInstructionBtn').click();
+  await expect.poll(() => spokenTexts.join(' | ')).toContain('Read a few Hebrew words out loud, then say what those words mean in English');
+  expect(spokenTexts.join(' | ')).toContain('The recording keeps going the whole time');
   const attemptsPath = `posukPractice/attempts/${ariId}/Vayeira_18_1`;
-  await expect.poll(async()=>Object.values(await readFixture(attemptsPath) || {}).some((row: any)=>row.hebrewScore===100), {timeout: 30000}).toBe(true);
-  await page.locator('#tabTranslateBtn').click();
-  const translationPiece = page.locator('#chunkPillDisplay .chunk-token').first();
-  await expect(translationPiece).toBeVisible();
-  await translationPiece.click();
-  await expect(translationPiece).toHaveClass(/tap-recording/, {timeout: 10000});
-  await expect.poll(async()=>Object.values(await readFixture(attemptsPath) || {}).some((row: any)=>row.translationChunkResults?.[0]?.verdict==='correct'), {timeout: 30000}).toBe(true);
-  await page.locator('#tabComprehensionBtn').click();
+  const rewardBalancePath = `studentRewards/students/${ariId}/rewardBalance`;
+  await writeFixture(`studentRewards/students/${ariId}`, {name: 'Ari Example', rewardBalance: 3});
+  await page.locator('#combinedRecordBtn').click();
+  await expect(page.locator('#combinedStatus')).toContainText('Recording', {timeout: 10000});
+  // The full posuk stays on screen, unblurred, for the whole recording.
+  await expect(page.locator('#posukText')).toBeVisible();
+  expect(await page.locator('.recording-ready-blur').count()).toBe(0);
+  expect(await page.locator('#posukText').evaluate(el => getComputedStyle(el).filter)).toBe('none');
+  await page.waitForTimeout(1800);
+  await expect(page.locator('#combinedStatus')).toContainText('Recording');
+  await page.locator('#combinedRecordBtn').click();
+  await expect(page.locator('#combinedStatus')).toContainText('Recorded');
+  await expect(page.locator('#combinedAudioPlayback')).toBeVisible();
+  expect(await page.locator('#combinedAudioPlayback').getAttribute('src')).toMatch(/^blob:/);
+  // Record again throws the recording away; a second recording can then be sent.
+  await page.locator('#combinedDeleteBtn').click();
+  await expect(page.locator('#combinedSubmitBtn')).toBeHidden();
+  await page.locator('#combinedRecordBtn').click();
+  await expect(page.locator('#combinedStatus')).toContainText('Recording', {timeout: 10000});
+  await page.waitForTimeout(1800);
+  await page.locator('#combinedRecordBtn').click();
+  await expect(page.locator('#combinedSubmitBtn')).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#combinedSubmitBtn').click();
+  await expect(page.locator('#combinedMsg')).toContainText('Sent to your teacher', {timeout: 30000});
+  const reviewPath = `posukPractice/reviews/${ariId}/Vayeira_18_1`;
+  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 20000}).toBe('pending');
+  const savedAttempt: any = Object.values(await readFixture(attemptsPath) || {}).find((row: any) => row.combinedAudioStoragePath);
+  expect(savedAttempt.combinedAudioStoragePath).toContain(`posukPractice/${ariId}/Vayeira_18_1_combined_`);
+  expect(await readFixture(rewardBalancePath)).toBe(-2); // 3 − 5: the charge may go below zero
+  // Locked until the teacher grades it, also after a reload.
+  await expect(page.locator('#combinedStateBox')).toContainText('You sent this to your teacher');
+  await expect(page.locator('#combinedRecordStage')).toBeHidden();
+  await page.reload();
+  await expect(page.locator('#combinedStateBox')).toContainText('You sent this to your teacher');
+  await expect(page.locator('#combinedRecordStage')).toBeHidden();
+  // The student cannot grade or re-open their own posuk.
+  const selfWrite = await page.evaluate(async path => { try { await (window as any).firebase.database().ref(path).update({status: 'gold'}); return 'written'; } catch (e) { return 'denied'; } }, reviewPath);
+  expect(selfWrite).toBe('denied');
+  await page.goto(`${origin}/record_pesukim/progress.html`);
+  await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('.review-group').filter({hasText: 'Waiting for your teacher'}).locator('.review-tile')).toContainText('18:1');
+
+  // The teacher hears it in To Grade and marks it gold standard.
+  const posukTeacherContext=await browser.newContext(),posukTeacherPage=await posukTeacherContext.newPage();
+  await configureBrowser(posukTeacherPage,pageErrors,failedFirebase);
+  await posukTeacherPage.goto(`${origin}/teacher-home.html?signin=1`);
+  await posukTeacherPage.getByRole('button',{name:'Sign in with Google'}).click();
+  await expect(posukTeacherPage.locator('#classes .class-card h2')).toHaveText(['Pilot Room Alpha']);
+  const posukTeacherReads:string[]=[];
+  posukTeacherPage.on('request',request=>{ if(request.url().startsWith(`http://127.0.0.1:${DB_PORT}/`))posukTeacherReads.push(request.url()); });
+  await posukTeacherPage.goto(`${origin}/record_pesukim/teacher.html?class=${CLASS_ID}`);
+  const gradeCard=posukTeacherPage.locator('.grade-card').filter({hasText:'Ari Example'});
+  await expect(gradeCard).toBeVisible({timeout:20000});
+  await expect(gradeCard).toContainText('Posuk 1');
+  await expect(gradeCard.locator('.grade-hebrew')).toContainText('אֵלָיו');
+  await expect(gradeCard.locator('audio')).toHaveCount(1);
+  await expect(posukTeacherPage.locator('#gradeTabCount')).toHaveText('1');
+  await gradeCard.locator('[data-choice="gold"]').click();
+  await gradeCard.locator('[data-field="mistakes"]').fill('1');
+  await gradeCard.locator('[data-field="bonus"]').fill('2');
+  await gradeCard.locator('[data-field="note"]').fill('Beautiful reading');
+  await expect(gradeCard.locator('[data-field="points"]')).toHaveText('= 11 points');
+  await gradeCard.locator('[data-save]').click();
+  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 20000}).toBe('gold');
+  expect(await readFixture(rewardBalancePath)).toBe(9); // −2 + (10 − 1 mistake + 2 bonus)
+  await expect(posukTeacherPage.locator('.graded-row').filter({hasText:'Ari Example'})).toContainText('Gold standard',{timeout:15000});
+  await expect(posukTeacherPage.locator('.grade-card')).toHaveCount(0);
+  expect(posukTeacherReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
+  await posukTeacherContext.close();
+
+  // The student sees the grade, the bonus notice and the one-month lock.
+  await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1`);
+  await expect(page.locator('#combinedStateBox')).toContainText('Gold standard');
+  await expect(page.locator('#combinedRecordStage')).toBeHidden();
+  await expect(page.locator('#bonusNotices')).toContainText('2 bonus points');
+  await page.goto(`${origin}/record_pesukim/progress.html`);
+  await expect(page.locator('.review-group').filter({hasText: 'Gold standard'}).locator('.review-tile')).toContainText('18:1');
+  await expect(page.locator('.review-group').filter({hasText: 'Waiting for your teacher'}).locator('.review-tile')).toHaveCount(0);
+  // Understand questions live in the separate Chumash חידון tile (?mode=quiz).
+  await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1&mode=quiz`);
+  await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#readingPanel')).toBeHidden();
+  await expect(page.locator('#combinedPanel')).toBeHidden();
   await expect(page.locator('#questionText')).toContainText('What happened to Abraham?');
   await page.locator('#questionWordChoices .word-choice').nth(0).click();
   await page.locator('#questionWordChoices .word-choice').nth(1).click();
@@ -254,21 +349,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#comprehensionResult')).toContainText('Got it!', {timeout: 15000});
   await expect.poll(async()=>Object.values(await readFixture(attemptsPath) || {}).some((row: any)=>row.questionResults?.[0]?.verdict==='correct'), {timeout: 30000}).toBe(true);
   expect(posukClassReads.some(url => url.includes('/classes/et/') || url.includes('/classes/wt/'))).toBe(false);
-  await expect(page.locator('#readingCheck')).not.toHaveClass(/hidden/);
-  await expect(page.locator('#translateCheck')).not.toHaveClass(/hidden/);
   await expect(page.locator('#comprehensionCheck')).not.toHaveClass(/hidden/);
   await page.reload();
   await expect(page.locator('#app')).toBeVisible();
-  await page.goto(`${origin}/record_pesukim/progress.html`);
-  await expect(page.locator('#app')).toBeVisible();
-  await page.locator('#readingTabBtn').click();
-  await expect(page.locator('.posuk-tile').filter({hasText: '100%'}).first()).toBeVisible();
-  await page.locator('#translateTabBtn').click();
-  await expect(page.locator('.posuk-tile').filter({hasText: '100%'}).first()).toBeVisible();
-  await page.locator('#comprehensionTabBtn').click();
-  await expect(page.locator('.posuk-tile').filter({hasText: /Got it|Perfect|100%/}).first()).toBeVisible();
-  await page.locator('#perekList .posuk-tile').first().click();
-  await expect(page.locator('#app')).toBeVisible();
+  // Chazara still unlocks a posuk from the earlier computer-graded scores
+  // (existing students have them). Whether a teacher's gold standard should
+  // also unlock Chazara is an open owner question on #694.
+  await writeFixture(`${attemptsPath}/legacy_ai_scores`, {hebrewScore: 100, translationTotal: 1, translationChunkResults: [{verdict: 'correct', chunkIndex: 0}]});
   // Chazara consumes this student's persisted Posuk mastery and keeps its
   // own class-attributed review and recording history.
   await page.goto(`${origin}/chazara/index.html`);
