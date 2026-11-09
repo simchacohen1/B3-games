@@ -246,7 +246,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await translationPiece.click();
   await expect(translationPiece).toHaveClass(/tap-recording/, {timeout: 10000});
   await expect.poll(async()=>Object.values(await readFixture(attemptsPath) || {}).some((row: any)=>row.translationChunkResults?.[0]?.verdict==='correct'), {timeout: 30000}).toBe(true);
-  await page.locator('#tabComprehensionBtn').click();
+  await expect(page.locator('#readingCheck')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#translateCheck')).not.toHaveClass(/hidden/);
+  // Understand questions live in the separate Chumash חידון tile (?mode=quiz).
+  await expect(page.locator('#tabComprehensionBtn')).toBeHidden();
+  await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1&mode=quiz`);
+  await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#readingPanel')).toBeHidden();
   await expect(page.locator('#questionText')).toContainText('What happened to Abraham?');
   await page.locator('#questionWordChoices .word-choice').nth(0).click();
   await page.locator('#questionWordChoices .word-choice').nth(1).click();
@@ -254,8 +260,6 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(page.locator('#comprehensionResult')).toContainText('Got it!', {timeout: 15000});
   await expect.poll(async()=>Object.values(await readFixture(attemptsPath) || {}).some((row: any)=>row.questionResults?.[0]?.verdict==='correct'), {timeout: 30000}).toBe(true);
   expect(posukClassReads.some(url => url.includes('/classes/et/') || url.includes('/classes/wt/'))).toBe(false);
-  await expect(page.locator('#readingCheck')).not.toHaveClass(/hidden/);
-  await expect(page.locator('#translateCheck')).not.toHaveClass(/hidden/);
   await expect(page.locator('#comprehensionCheck')).not.toHaveClass(/hidden/);
   await page.reload();
   await expect(page.locator('#app')).toBeVisible();
