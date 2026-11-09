@@ -178,6 +178,9 @@ test('item links open the real activity at the assigned spot in homework mode', 
   assert.deepEqual([chazara.searchParams.get('hwPerek'), chazara.searchParams.get('hwFrom'), chazara.searchParams.get('hwTo'), chazara.searchParams.get('hwTimes')], ['18', '1', '3', '2']);
   assert.match(HI.itemUrl(a, { id: 'i5', type: 'shorashim' }), /\/shorashim\/index\.html\?hw=A1&hwItem=i5/);
   assert.equal(HI.itemUrl(a, { id: 'i6', type: 'workbook' }), '', 'workbook items are ticked on the homework page');
+  // A student in several classes: the link names the homework's class (#662).
+  const other = new URL(HI.itemUrl({ ...a, classId: 'wt' }, { id: 'i5', type: 'shorashim' }));
+  assert.equal(other.searchParams.get('hwClass'), 'wt');
 });
 
 test('items read clearly for teachers and students', () => {

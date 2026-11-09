@@ -11,6 +11,8 @@
   'use strict';
   var params = new URLSearchParams(root.location.search);
   var assignmentId = params.get('hw') || '', itemId = params.get('hwItem') || '';
+  // Which class this homework is in (a student may be in several). The server still checks it.
+  var hwClass = /^[A-Za-z0-9_-]{1,100}$/.test(params.get('hwClass') || '') ? params.get('hwClass') : '';
   var KEY = /^[A-Za-z0-9_-]{1,100}$/;
   var active = KEY.test(assignmentId) && KEY.test(itemId);
   var script = document.currentScript;
@@ -123,7 +125,7 @@
   function complete() {
     if (api.isDone()) { showDone(); return Promise.resolve(true); }
     if (saving) return saving;
-    var auth = { studentId: ss('b3Games_studentId'), studentName: ss('b3Games_studentName'), pin: ss('b3Games_classPin'), classId: ss('b3Games_studentClass') };
+    var auth = { studentId: ss('b3Games_studentId'), studentName: ss('b3Games_studentName'), pin: ss('b3Games_classPin'), classId: hwClass || ss('b3Games_studentClass') };
     if (!auth.studentId || !auth.pin) {
       setStatus('Finished! (Preview only: sign in as a student to tick homework.)');
       return Promise.resolve(false);

@@ -42,7 +42,123 @@ async function teacherAccess(store, identity, classId) {
     if (!row || row.active === false || row.classIds?.[classId] !== true)
       fail(403, 'This class is not assigned to your teacher account.');
   }
-  return { cls, id: identity.uid };
+  return { cls, id: identity.uid, owner };
+}
+
+// ---- class subjects --------------------------------------------------------
+// Each class keeps its own subject list (e.g. Chumash, Mishnayos) and which of its
+// teachers teach which subject. Every teacher of a class has the same rights here.
+// Stored next to the homework (server-only tree); a class with no subjects works as before.
+const SUBJECT_MAX = 30;
+const SUBJECT_ACTIONS = ['addSubject', 'renameSubject', 'removeSubject', 'setTeacherSubjects'];
+const settingsPath = classId => base(classId) + '/settings';
+async function classSettings(store, classId) {
+  const raw = (await store.get(settingsPath(classId))) || {};
+  const subjects = {};
+  for (const [id, s] of Object.entries(raw.subjects || {})) if (key(id) && s && text(s.name, 60)) subjects[id] = { name: text(s.name, 60), createdAt: s.createdAt || 0 };
+  const teacherSubjects = {};
+  for (const [uid, map] of Object.entries(raw.teacherSubjects || {})) {
+    if (!key(uid) || !map) continue;
+    const ids = Object.keys(map).filter(id => map[id] === true && has(subjects, id));
+    if (ids.length) teacherSubjects[uid] = ids;
+  }
+  return { subjects, teacherSubjects };
+}
+const subjectList = settings => Object.entries(settings.subjects)
+  .map(([id, s]) => ({ id, name: s.name, createdAt: s.createdAt }))
+  .sort((a, b) => a.name.localeCompare(b.name)).map(({ id, name }) => ({ id, name }));
+// Teachers never see each other's e-mail addresses through this; a display name that is
+// only an address is shortened to the part before the @.
+const teacherName = row => {
+  const n = text(row && (row.displayName || row.name), 80);
+  return n.includes('@') ? n.split('@')[0] : n || 'Teacher';
+};
+async function classTeachers(store, classId, cls) {
+  const ids = Object.keys(cls.teacherIds || {}).filter(uid => key(uid) && cls.teacherIds[uid] === true);
+  const rows = await Promise.all(ids.map(uid => store.get('b3Games/workspaces/' + WS + '/teachers/' + uid)));
+  const out = {};
+  ids.forEach((uid, i) => {
+    const row = rows[i];
+    if (row && row.active !== false && row.classIds?.[classId] === true) out[uid] = { name: teacherName(row) };
+  });
+  return out;
+}
+// Name of whoever posted a homework (for the student "Teacher" filter and teacher reports).
+async function posterNames(store, defs, known) {
+  const names = { ...known };
+  const missing = [...new Set(defs.map(d => d.createdBy).filter(uid => key(uid) && !has(names, uid)))];
+  const rows = await Promise.all(missing.map(uid => store.get('b3Games/workspaces/' + WS + '/teachers/' + uid)));
+  missing.forEach((uid, i) => { names[uid] = { name: teacherName(rows[i]) }; });
+  return names;
+}
+const subjectOf = (def, settings) => (def.subjectId && settings.subjects[def.subjectId]?.name) || def.subject || '';
+const hasSubject = def => !!(def.subjectId || def.subject);
+// A teacher sees homework they posted and every homework without a subject; the owner sees all.
+const visibleTo = (def, actorId, owner) => owner || !hasSubject(def) || def.createdBy === actorId;
+// Which subjects this teacher may tag homework with. A teacher with no subjects linked
+// in this class may use any of them (so a new class works before links are set up).
+function allowedSubjectIds(settings, actorId, owner) {
+  const mine = settings.teacherSubjects[actorId];
+  return owner || !mine ? Object.keys(settings.subjects) : mine;
+}
+// Resolves {subjectId, subject} from a create/edit request. undefined = keep / not sent.
+function pickSubject(body, settings, actorId, owner, current) {
+  if (body.subjectId === undefined && body.subject === undefined) return current;
+  const sid = body.subjectId == null ? '' : String(body.subjectId);
+  if (sid) {
+    if (!key(sid) || !has(settings.subjects, sid)) fail(400, 'Choose a subject from this class\'s list.');
+    if (!allowedSubjectIds(settings, actorId, owner).includes(sid) && sid !== current.subjectId)
+      fail(403, 'You are not linked to that subject in this class.');
+    return { subjectId: sid, subject: settings.subjects[sid].name };
+  }
+  // Free-text subjects are only kept for classes that have not set up a subject list yet.
+  const free = body.subjectId === undefined ? text(body.subject, 60) : '';
+  if (free && Object.keys(settings.subjects).length) fail(400, 'Choose a subject from this class\'s list.');
+  return { subjectId: '', subject: free };
+}
+async function subjectAction(store, classId, cls, body, actorId, now, newId) {
+  const raw = (await store.get(settingsPath(classId))) || {};
+  const subjects = { ...(raw.subjects || {}) };
+  const sameName = (name, except) => Object.entries(subjects).some(([id, s]) => id !== except && String(s?.name || '').toLowerCase() === name.toLowerCase());
+  if (body.action === 'addSubject' || body.action === 'renameSubject') {
+    const name = text(body.name, 60);
+    if (!name) fail(400, 'Type a subject name.');
+    const id = body.action === 'addSubject' ? newId() : String(body.subjectId || '');
+    if (body.action === 'renameSubject' && (!key(id) || !has(subjects, id))) fail(404, 'That subject was not found.');
+    if (body.action === 'addSubject' && (!key(id) || Object.keys(subjects).length >= SUBJECT_MAX)) fail(429, 'This class already has ' + SUBJECT_MAX + ' subjects.');
+    if (sameName(name, id)) fail(409, 'This class already has a subject with that name.');
+    await store.set(settingsPath(classId) + '/subjects/' + id,
+      { ...(subjects[id] || { createdAt: now, createdBy: actorId }), name, updatedAt: now, updatedBy: actorId });
+    return { ok: true, id };
+  }
+  if (body.action === 'removeSubject') {
+    const id = String(body.subjectId || '');
+    if (!key(id) || !has(subjects, id)) fail(404, 'That subject was not found.');
+    // Homework already tagged keeps its subject name, so nothing a student did is lost.
+    const tx = await store.tx(settingsPath(classId), cur => {
+      const next = { ...(cur || {}), subjects: { ...(cur?.subjects || {}) }, teacherSubjects: {} };
+      delete next.subjects[id];
+      for (const [uid, map] of Object.entries(cur?.teacherSubjects || {})) {
+        const kept = { ...(map || {}) };
+        delete kept[id];
+        if (Object.keys(kept).length) next.teacherSubjects[uid] = kept;
+      }
+      return next;
+    });
+    if (!tx || tx.committed === false) fail(409, 'The subject could not be removed. Please try again.');
+    return { ok: true };
+  }
+  if (body.action === 'setTeacherSubjects') {
+    const uid = String(body.teacherId || '');
+    const teachers = await classTeachers(store, classId, cls);
+    if (!key(uid) || !has(teachers, uid)) fail(404, 'That teacher is not in this class.');
+    if (!Array.isArray(body.subjectIds)) fail(400, 'Choose subjects.');
+    const ids = [...new Set(body.subjectIds.map(String))];
+    if (ids.some(id => !key(id) || !has(subjects, id))) fail(400, 'Choose subjects from this class\'s list.');
+    await store.set(settingsPath(classId) + '/teacherSubjects/' + uid, ids.length ? Object.fromEntries(ids.map(id => [id, true])) : null);
+    return { ok: true };
+  }
+  fail(400, 'Unknown action.');
 }
 
 async function authorizedClasses(store, identity) {
@@ -99,9 +215,11 @@ function publicMessages(rec, viewer) {
     text: message.text || '', voice: !!message.voice, createdAt: message.createdAt,
     unread: message.role !== viewer && Number(message.createdAt) > readAt })) : [];
 }
-function present(def, rec, now) {
+function present(def, rec, now, settings = { subjects: {} }, posters = {}) {
   return {
-    id: def.id, type: def.type, title: def.title, details: def.details, assignedAt: def.assignedAt ?? def.createdAt,
+    id: def.id, type: def.type, title: def.title, details: def.details,
+    subject: subjectOf(def, settings), subjectId: def.subjectId || '',
+    teacherId: def.createdBy || '', teacher: posters[def.createdBy]?.name || '', assignedAt: def.assignedAt ?? def.createdAt,
     dueAt: def.dueAt ?? null, targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
     targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
     status: rec.status, late: isLate(def, rec, now),
@@ -215,14 +333,20 @@ async function markRead(store, path, role, now) {
 // ---- teacher actions -------------------------------------------------------
 async function teacherDo(store, identity, body, now, newId) {
   const classId = body.classId;
-  const { cls, id: actorId } = await teacherAccess(store, identity, classId);
+  const { cls, id: actorId, owner } = await teacherAccess(store, identity, classId);
+  if (SUBJECT_ACTIONS.includes(body.action)) return subjectAction(store, classId, cls, body, actorId, now, newId);
+  const settings = await classSettings(store, classId);
   const members = await activeMembers(store, cls);
-  const defs = (await store.get(base(classId) + '/definitions')) || {};
+  const allDefs = (await store.get(base(classId) + '/definitions')) || {};
+  // Everything below only ever sees homework this teacher may see (see visibleTo).
+  const defs = Object.fromEntries(Object.entries(allDefs).filter(([, d]) => d && visibleTo(d, actorId, owner)));
   const allRecords = (await store.get(base(classId) + '/students')) || {};
   const teacher = { id: actorId, role: 'teacher', authenticated: true };
 
   if (body.action === 'teacherList') {
     const rows = [];
+    const teachers = await classTeachers(store, classId, cls);
+    const posters = await posterNames(store, Object.values(defs), teachers);
     for (const def of Object.values(defs).sort((a, b) => b.createdAt - a.createdAt)) {
       const students = {};
       const counts = { assigned: 0, in_progress: 0, submitted: 0, approved: 0, returned: 0, missing: 0 };
@@ -236,6 +360,8 @@ async function teacherDo(store, identity, body, now, newId) {
           itemsDone: hwItems.doneMap(def, rec), messages: publicMessages(rec, 'teacher') };
       }
       rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details,
+        subject: subjectOf(def, settings), subjectId: def.subjectId || '', createdBy: def.createdBy || '',
+        postedBy: posters[def.createdBy]?.name || '', mine: def.createdBy === actorId,
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
@@ -246,7 +372,10 @@ async function teacherDo(store, identity, body, now, newId) {
     const threads = await Promise.all(sids.map(sid => generalThread(store, generalPath(classId, sid), 'teacher')));
     const messages = {};
     sids.forEach((sid, i) => { messages[sid] = threads[i]; });
-    return { ok: true, students: members, assignments: rows, messages };
+    const teacherRows = {};
+    for (const [uid, t] of Object.entries(teachers)) teacherRows[uid] = { name: t.name, subjectIds: settings.teacherSubjects[uid] || [] };
+    return { ok: true, students: members, assignments: rows, messages, subjects: subjectList(settings), teachers: teacherRows,
+      me: { id: actorId, owner, subjectIds: allowedSubjectIds(settings, actorId, owner), linked: !!settings.teacherSubjects[actorId] } };
   }
 
   if (body.action === 'create') {
@@ -260,10 +389,11 @@ async function teacherDo(store, identity, body, now, newId) {
     const targetUnit = String(body.targetUnit || (body.type === 'shorashim' ? 'minutes' : body.type === 'weeklyQuiz' ? 'questions' : ''));
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
     const label = cleanLabel(body.label, 'homework');
+    const subject = pickSubject(body, settings, actorId, owner, { subjectId: '', subject: '' }); // optional, e.g. Chumash, Mishnayos
     const assignedAt = body.assignedAt == null ? now : Number(body.assignedAt);
     if (!Number.isSafeInteger(assignedAt) || assignedAt < 0) fail(400, 'Choose a valid assigned date.');
     if (def.dueAt != null && def.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
-    if (Object.keys(defs).length >= 300) fail(429, 'Too many assignments in this class. Delete old ones first.');
+    if (Object.keys(allDefs).length >= 300) fail(429, 'Too many assignments in this class. Delete old ones first.');
     let audience = 'all';
     if (Array.isArray(body.studentIds) && body.studentIds.length) {
       audience = [...new Set(body.studentIds)].filter(s => key(s) && has(members, s));
@@ -271,7 +401,7 @@ async function teacherDo(store, identity, body, now, newId) {
     }
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
-    const full = { id, ...def, ...(items ? { items } : {}), label, assignedAt, targetAmount, targetUnit,
+    const full = { id, ...def, ...(items ? { items } : {}), label, ...subject, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
     await store.set(base(classId) + '/definitions/' + id, full);
@@ -346,6 +476,7 @@ async function teacherDo(store, identity, body, now, newId) {
         dueAt: body.dueAt === undefined ? def.dueAt : body.dueAt });
     } catch (e) { fail(400, 'Check the title, instructions and due date.'); }
     const label = cleanLabel(body.label, labelOf(def));
+    const subject = pickSubject(body, settings, actorId, owner, { subjectId: def.subjectId || '', subject: def.subject || '' });
     const assignedAt = body.assignedAt === undefined ? def.assignedAt : Number(body.assignedAt);
     if (assignedAt != null && (!Number.isSafeInteger(assignedAt) || assignedAt < 0)) fail(400, 'Choose a valid assigned date.');
     if (next.dueAt != null && assignedAt != null && next.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -356,7 +487,7 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
     const kept = { ...def };
     delete kept.items;
-    await store.set(base(classId) + '/definitions/' + def.id, { ...kept, ...next, ...(items.length ? { items } : {}), label, assignedAt, targetAmount,
+    await store.set(base(classId) + '/definitions/' + def.id, { ...kept, ...next, ...(items.length ? { items } : {}), label, ...subject, assignedAt, targetAmount,
       targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
     return { ok: true };
   }
@@ -385,6 +516,16 @@ async function teacherDo(store, identity, body, now, newId) {
 }
 
 // ---- student actions -------------------------------------------------------
+// Every class this student may open homework in, for the class switcher. Same checks as
+// sign-in (active membership on both sides, active class) plus Homework turned on.
+async function studentClasses(store, sid, profile) {
+  const memberships = (await store.get('b3Games/students/' + sid + '/memberships')) || {};
+  const ids = new Set(Object.values(memberships).filter(m => m && m.active !== false && m.workspaceId === WS && key(m.classId)).map(m => m.classId));
+  if (!Object.keys(memberships).length && ['et', 'wt'].includes(profile?.classId)) ids.add(profile.classId);
+  const rows = await Promise.all([...ids].map(async id => [id, await store.get('b3Games/workspaces/' + WS + '/classes/' + id)]));
+  return rows.filter(([, c]) => c && c.active !== false && c.toolGrants?.homework === true && c.members?.[sid] && c.members[sid].active !== false)
+    .map(([id, c]) => ({ id, name: String(c.name || id) })).sort((a, b) => a.name.localeCompare(b.name));
+}
 async function studentDo(store, body, now, ip, newId) {
   const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
     () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
@@ -404,15 +545,17 @@ async function studentDo(store, body, now, ip, newId) {
 
   if (body.action === 'studentList') {
     const out = [];
-    for (const def of Object.values(defs)) {
-      if (!mine(def)) continue;
+    const shown = Object.values(defs).filter(mine);
+    const [settings, posters, classes] = await Promise.all([classSettings(store, classId),
+      posterNames(store, shown, {}), studentClasses(store, sid, student.profile)]);
+    for (const def of shown) {
       let rec = await store.get(recordPath(classId, sid, def.id));
       if (!rec) { rec = newRecord(def, now); await store.set(recordPath(classId, sid, def.id), rec); }
-      out.push(present(def, rec, now));
+      out.push(present(def, rec, now, settings, posters));
     }
     const order = { returned: 0, assigned: 1, in_progress: 1, submitted: 2, approved: 3 };
     out.sort((a, b) => order[a.status] - order[b.status] || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity));
-    return { ok: true, name: student.profile?.name || '', assignments: out,
+    return { ok: true, name: student.profile?.name || '', classId, classes, assignments: out,
       openCount: out.filter(a => OPEN.includes(a.status)).length,
       general: { messages: await generalThread(store, generalPath(classId, sid), 'student') } };
   }
@@ -500,7 +643,7 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return authorizedClasses(store, auth.identity);
   }
-  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return'].includes(a)) {
+  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return', ...SUBJECT_ACTIONS].includes(a)) {
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
