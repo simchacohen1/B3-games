@@ -68,6 +68,40 @@
   const errorText=e=>e?.code==='storage/unauthorized'?'Library access was denied. Please sign in as your teacher account.':(e?.message||'Library unavailable. Check Firebase Storage and its security rules.');
   let currentFile=null,activeId=null,openedPage=1;
   const setStatus=s=>{status.textContent=s};
+  // ---------- Remember the place in this browser too ----------
+  // The page, layout, zoom and scroll place are written here at once, so closing the tab right after a
+  // page turn keeps the place. Library PDFs are known by their library id; a PDF opened straight from
+  // the computer is known by its name, size and date. (Helpers: saved-work-core.js.)
+  const Places=window.FTTSavedWorkCore;
+  let localKey=null,lastPlace=null,placeTimer,openingSaved=false;
+  const placeKey=()=>activeId?'lib:'+activeId:localKey;
+  function readPlace(key){try{return Places?Places.readPosition(localStorage,key):null}catch(_){return null}}
+  function notePlace(){
+    const key=placeKey();
+    if(!Places||!key)return;
+    lastPlace={key,place:{page:window.ClassPointerPdf.currentPage()+1,layout:window.ClassPointerPdf.getLayout(),...window.ClassPointerPdf.getView?.(),at:Date.now()}};
+    clearTimeout(placeTimer);placeTimer=setTimeout(writePlace,400);
+  }
+  function writePlace(){
+    clearTimeout(placeTimer);const saving=lastPlace;lastPlace=null;
+    if(saving)try{Places.savePosition(localStorage,saving.key,saving.place)}catch(_){}
+  }
+  // A PDF opened from the computer: go back to where it was left last time on this computer.
+  function resumeLocal(file){
+    const key=openingSaved?null:Places?.fingerprint(file),saved=key&&readPlace(key);
+    if(!key)return;
+    // Start remembering only once the old place is back, so opening never saves "page 1".
+    setTimeout(()=>{
+      if(currentFile!==file||activeId)return;
+      if(saved){
+        const pdf=window.ClassPointerPdf,now=pdf.getLayout();
+        if(saved.layout&&(saved.layout.spread?(!now.spread||now.rtl!==saved.layout.rtl||now.shift!==saved.layout.shift):now.spread))pdf.setLayout(saved.layout);
+        pdf.goToPage(saved.page-1);
+        if(saved.top!=null)pdf.setView?.(saved);
+      }
+      localKey=key;
+    },0);
+  }
   async function refresh(successMessage=''){
     items.replaceChildren();setStatus('Loading…');
     try{
@@ -85,18 +119,27 @@
         open.onclick=async()=>{setStatus('Opening '+name.textContent+'…');open.disabled=true;try{
           const blob=await privateDownload(ref);
           const file=new File([blob],name.textContent+'.pdf',{type:'application/pdf'});
-          const opened=await window.ClassPointerPdf.openFile(file);if(!opened)throw Error('PDF could not be opened');
+          openingSaved=true;
+          const opened=await window.ClassPointerPdf.openFile(file).finally(()=>{openingSaved=false});if(!opened)throw Error('PDF could not be opened');
+          // The place kept in this browser wins when it is newer than the one saved with the PDF
+          // (for example the tab was closed before the saved one could be written).
+          const local=readPlace('lib:'+meta.name),newer=local&&local.at>(Number(meta.customMetadata?.placeAt)||0)?local:null;
+          let savedView=null;try{savedView=JSON.parse(meta.customMetadata?.view||'null')}catch(_){}
+          const layout=newer?.layout||savedLayout,view=newer?(newer.top!=null?newer:null):savedView;
           // Keep the saved page in its own variable: changing the layout reports "page 1" back
           // through onPageChanged, which must not replace the page we are about to resume on.
-          const resumePage=Number.isFinite(page)&&page>0?page:1;
-          if(savedLayout){
+          const resumePage=newer?newer.page:(Number.isFinite(page)&&page>0?page:1);
+          if(layout){
             // The viewer keeps the layout of the PDF that was open before, so put this PDF's own layout back.
             const now=window.ClassPointerPdf.getLayout();
-            if(savedLayout.spread?(!now.spread||now.rtl!==savedLayout.rtl||now.shift!==savedLayout.shift):now.spread)window.ClassPointerPdf.setLayout(savedLayout);
+            if(layout.spread?(!now.spread||now.rtl!==layout.rtl||now.shift!==layout.shift):now.spread)window.ClassPointerPdf.setLayout(layout);
           }
           // Only start remembering once the saved layout is back, so opening never saves "page 1".
           activeId=meta.name;openedPage=resumePage;
-          window.ClassPointerPdf.goToPage(resumePage-1);dialog.close();
+          window.ClassPointerPdf.goToPage(resumePage-1);
+          // Then the zoom and the exact scroll place inside the page, when they were saved.
+          if(view)window.ClassPointerPdf.setView?.(view);
+          dialog.close();
         }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
         const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
         rename.onclick=async()=>{const next=prompt('New PDF name:',name.textContent);if(!next?.trim())return;try{await ref.updateMetadata({customMetadata:{...(meta.customMetadata||{}),displayName:next.trim().slice(0,100)}});await refresh()}catch(e){setStatus(errorText(e))}};
@@ -138,7 +181,8 @@
   function scheduleSave(page){
     if(!activeId)return;
     clearTimeout(pageTimer);
-    pendingSave={id:activeId,page:page||openedPage||1,layout:JSON.stringify(window.ClassPointerPdf.getLayout())};
+    const view=window.ClassPointerPdf.getView?.();
+    pendingSave={id:activeId,page:page||openedPage||1,layout:JSON.stringify(window.ClassPointerPdf.getLayout()),placeAt:String(Date.now()),...(view?{view:JSON.stringify(view)}:{})};
     pageTimer=setTimeout(flushSave,2500);
   }
   // Write the waiting page now. Also called when the PDF is closed or another one is opened,
@@ -149,14 +193,20 @@
     (async()=>{
       try{
         const ref=(await teacherPrefix()).child(saving.id);const m=await ref.getMetadata();
-        await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(saving.page),layout:saving.layout}});
+        await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(saving.page),layout:saving.layout,placeAt:saving.placeAt,...(saving.view?{view:saving.view}:{})}});
       }catch(_){}
     })();
   }
+  // Leaving or hiding the page: keep the place now, while there is still time.
+  const keepNow=()=>{writePlace();flushSave()};
+  window.addEventListener?.('pagehide',keepNow);
+  document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='hidden')keepNow()});
   window.PointerPdfLibrary={
-    onOpened(file){flushSave();currentFile=file;activeId=null},
-    onClosed(){flushSave();currentFile=null;activeId=null},
-    onPageChanged(page){openedPage=page;scheduleSave(page)},
-    onLayoutChanged(){scheduleSave(window.ClassPointerPdf.currentPage()+1)}
+    onOpened(file){keepNow();currentFile=file;activeId=null;localKey=null;resumeLocal(file)},
+    onClosed(){keepNow();currentFile=null;activeId=null;localKey=null},
+    onPageChanged(page){openedPage=page;scheduleSave(page);notePlace()},
+    onLayoutChanged(){scheduleSave(window.ClassPointerPdf.currentPage()+1);notePlace()},
+    // Zoom or scroll inside the page (pdf-mode.js calls this whenever the view moves).
+    onViewChanged(){scheduleSave(openedPage);notePlace()}
   };
 })();

@@ -54,8 +54,11 @@
     const left=(lay?.lefts[0]||0)*W,top=(lay?.tops[0]||0)*W,pw=(lay?.widths[0]||1)*W,ph=(lay?.heights[0]||H/W)*W;
     if(boardBackground?.complete&&boardBackground.naturalWidth)ctx.drawImage(boardBackground,left,top,pw,ph);
     for(const picture of boardPictures)ctx.drawImage(picture.image,picture.x*W,picture.y*H,picture.w*W,picture.h*H);
-    // Match the document ink's coordinate system, widths and opacity.
-    const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes;
+    paintInk(ctx,canvas,draft?[...strokes,{...draft,owner:B.owner()}]:strokes,W,H);
+  }
+  // Paint marks on a canvas, matching the document ink's coordinate system, widths and opacity.
+  // W and H are the size of the whole document in the canvas's current drawing units.
+  function paintInk(ctx,canvas,all,W,H){
     // Same as the live SVG ink: transparency is applied once per owner and tool group,
     // so a person's overlapping highlights stay one flat layer in the video students see.
     const penTools=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
@@ -146,6 +149,8 @@
     flipBtn=button('⇄ Flip sides','Swap which side the first page of each pair is on',()=>changeLayout({rtl:!layoutOpts.rtl}),'pdf-btn pdf-spread-only');
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
+    button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
+    button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     movePicturesBtn=button('🖼 Move pictures','Move, resize or remove pictures pasted on the whiteboard',()=>editBoardPictures(),'pdf-btn pdf-board-pictures');movePicturesBtn.hidden=true;
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
     const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ '+navWord()+' controls':'▾ Hide'},'pdf-btn pdf-toggle');
@@ -208,6 +213,7 @@
     if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent='▴ '+navWord()+' controls';
     nav.querySelectorAll('.pdf-jump,.pdf-two,.pdf-spread-only').forEach(node=>node.hidden=webMode);
     if(movePicturesBtn)movePicturesBtn.hidden=!(isBoardOpen()&&boardPictures.length&&!pictureEdits.length);
+    nav.querySelectorAll('.pdf-board-only').forEach(node=>node.hidden=!isBoardOpen()||!window.ClassPointerClipboard);
     nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent='✕ Close '+navWord().toLowerCase().replace('pdf','PDF');node.title='Close the '+navWord().toLowerCase().replace('pdf','PDF')+' for everyone'}});
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
     if(document.activeElement!==pageInput)pageInput.value=String(currentPage()+1);
@@ -232,7 +238,7 @@
   function afterMove(forceSend){
     scheduleRender();updateControls();B.redraw();
     if(isTeacher)B.refreshActivityMarks?.();
-    if(isTeacher&&!webMode&&!notReady()){const page=currentPage()+1;if(page!==lastRememberedPage){lastRememberedPage=page;window.PointerPdfLibrary?.onPageChanged(page)}}
+    if(isTeacher&&!webMode&&!notReady()){const page=currentPage()+1;if(page!==lastRememberedPage){lastRememberedPage=page;window.PointerPdfLibrary?.onPageChanged(page)}window.PointerPdfLibrary?.onViewChanged?.()}
     if(isTeacher&&(forceSend||Date.now()>quietUntil))scheduleViewSend(forceSend);
   }
   scroller.addEventListener('scroll',()=>{if(Date.now()<quietUntil)return;cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>afterMove())});
@@ -469,7 +475,7 @@
       boardSize=board?{w:width,h:height}:null;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
       if(board)startBoardPresentation(dataUrl);
-      B.status(board?(opts.status||'Whiteboard open.')+' Paste a screenshot with Ctrl+V to put it on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
+      B.status(board?(opts.status||'Whiteboard open.')+' Press Ctrl+V or 📋 Paste to put a copied picture or words on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
     }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
@@ -716,19 +722,25 @@
     for(const item of pictureEdits)item.el.remove();
     pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
   }
-  function loadPicture(blob){
+  // source: a picture file, or a data: URL from a saved whiteboard.
+  function loadPicture(source){
     return new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(blob),image=new Image();
-      image.onload=()=>{URL.revokeObjectURL(url);image.naturalWidth&&image.naturalHeight?resolve(image):reject(Error('empty'))};
-      image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This picture could not be read.'))};
+      const saved=typeof source==='string',url=saved?source:URL.createObjectURL(source),image=new Image(),done=()=>{if(!saved)URL.revokeObjectURL(url)};
+      image.onload=()=>{done();image.naturalWidth&&image.naturalHeight?resolve(image):reject(Error('empty'))};
+      image.onerror=()=>{done();reject(Error('This picture could not be read.'))};
       image.src=url;
     });
   }
-  function composeBoard(){
+  // The blank board with its placed pictures, at full size.
+  function boardCanvas(){
     const c=document.createElement('canvas');c.width=boardSize.w;c.height=boardSize.h;
     const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
     ctx.imageSmoothingQuality='high';
     for(const p of boardPictures)ctx.drawImage(p.image,p.x*c.width,p.y*c.height,p.w*c.width,p.h*c.height);
+    return c;
+  }
+  function composeBoard(){
+    const c=boardCanvas();
     for(const quality of [0.9,0.8,0.65,0.5]){
       const url=c.toDataURL('image/jpeg',quality);
       if(url.length*0.75<Web.MAX_BYTES*0.9){c.width=0;return url}
@@ -816,14 +828,14 @@
   }
   function finishPictureEdit(){
     if(!pictureEdits.length){if(pictureBar)pictureBar.hidden=true;updateControls();return}
-    for(const item of pictureEdits){item.el.remove();boardPictures.push({image:item.image,x:item.x,y:item.y,w:item.w,h:item.h})}
+    for(const item of pictureEdits){item.el.remove();boardPictures.push({image:item.image,x:item.x,y:item.y,w:item.w,h:item.h,after:item.after})}
     pictureEdits=[];if(pictureBar)pictureBar.hidden=true;
     publishBoard().then(()=>{updateControls();if(isBoardOpen())B.status('Picture is on the whiteboard for everyone. Use ✒️ Pen to write on it, or 🖼 Move pictures to change it.')});
   }
   function editBoardPictures(){
     if(!isBoardOpen()||!boardPictures.length)return;
     const items=boardPictures;boardPictures=[];
-    for(const p of items)startPictureEdit(p.image,{x:p.x,y:p.y,w:p.w,h:p.h});
+    for(const p of items)startPictureEdit(p.image,{x:p.x,y:p.y,w:p.w,h:p.h,after:p.after});
     publishBoard();
     B.status('Move, resize or remove the pictures, then press ✓ Show to class.');
   }
@@ -839,17 +851,88 @@
     const ratio=image.naturalHeight/image.naturalWidth*(r.width/r.height);
     let w=Math.min(visible.w*0.6,image.naturalWidth/boardSize.w),h=w*ratio;
     if(h>visible.h*0.6){h=visible.h*0.6;w=h/ratio}
-    startPictureEdit(image,{x:visible.x+(visible.w-w)/2,y:visible.y+(visible.h-h)/2,w,h});
+    startPictureEdit(image,{x:visible.x+(visible.w-w)/2,y:visible.y+(visible.h-h)/2,w,h,after:lastTeacherMark()});
+  }
+  // Undo takes back the newest thing the teacher did. A pasted picture counts: it is removed when no pen mark
+  // was made after it. (Otherwise Undo removes that newer mark, as always.)
+  function lastTeacherMark(){const mine=B.highlights().filter(s=>s.owner==='teacher');return mine.length?mine[mine.length-1].id:null}
+  function undoPicture(){
+    const editing=pictureEdits.length>0,last=editing?pictureEdits[pictureEdits.length-1]:boardPictures[boardPictures.length-1];
+    if(!isBoardOpen()||!last||last.after!==lastTeacherMark())return false;
+    if(editing){last.el.remove();pictureEdits.pop();if(!pictureEdits.length)finishPictureEdit()}
+    else{boardPictures.pop();publishBoard().then(updateControls)}
+    B.status('Picture removed.');
+    return true;
+  }
+  // ---------- Paste and Copy on the teacher whiteboard (board-clipboard.js) ----------
+  // Whatever is pasted becomes a picture on the board (words are turned into a picture of the words), so it can be
+  // moved and resized, and it reaches every student the same way the board itself does: joined students get the
+  // new board picture, and students on activity pages see it in the live lesson video.
+  const clipTarget={priority:0,say:text=>B.status(text),
+    active:()=>isBoardOpen()&&!window.ClassPointerBoards?.workspace?.(),
+    async paste(payload){
+      const clip=window.ClassPointerClipboard;
+      if(payload.kind==='image'){await pastePicture(payload.blob);return}
+      const made=await clip.textImage(payload.text);
+      await pastePicture(made.blob);
+      if((payload.cut||made.cut)&&pictureEdits.length)B.status(clip.MSG.textCut+' Move it, then press ✓ Show to class.');
+    },
+    async copy(){
+      const clip=window.ClassPointerClipboard;
+      await clip.copyImage(exportPng());
+      B.status('Copied a picture of the whiteboard. Press '+clip.KEY+'+V to paste it somewhere.');
+    }};
+  // A PNG picture of the whole whiteboard: pictures and everyone's marks.
+  function exportPng(){
+    if(!isBoardOpen())return Promise.reject(Error('The whiteboard is not open.'));
+    const c=boardCanvas();
+    paintInk(c.getContext('2d'),c,strokes,c.width,c.height);
+    return new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of the whiteboard.'))},'image/png'));
+  }
+  // ---------- Save and restore (used by "Save whiteboard") ----------
+  const SAVED_PICTURE=700000;
+  function savedPicture(image){
+    const scale=Math.min(1,1400/Math.max(image.naturalWidth,image.naturalHeight)),c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(image.naturalWidth*scale));c.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(image,0,0,c.width,c.height);
+    let data='';
+    for(const quality of [0.85,0.7,0.5,0.3]){data=c.toDataURL('image/jpeg',quality);if(data.length<=SAVED_PICTURE)break}
+    c.width=0;return data.length<=SAVED_PICTURE?data:null;
+  }
+  // Everything needed to rebuild the teacher whiteboard: its pictures (also ones still being placed) and all marks.
+  // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
+  async function exportWhiteboard(){
+    if(!isBoardOpen())return null;
+    const pictures=[];
+    for(const p of [...boardPictures,...pictureEdits]){const data=savedPicture(p.image);if(data)pictures.push({data,x:p.x,y:p.y,w:p.w,h:p.h})}
+    return{version:1,kind:'lesson-whiteboard',size:{w:boardSize.w,h:boardSize.h},pictures,
+      strokes:B.highlights().map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text}:{})}))};
+  }
+  // Opens the whiteboard exactly as the Whiteboard button does, then puts the saved pictures and marks back for
+  // everyone. Saved data is checked as strictly as anything from the network.
+  async function importWhiteboard(saved){
+    const data=isTeacher?window.ClassPointerClipboard?.cleanLessonBoard(saved,C.cleanStroke):null,open=$('openWhiteboard');
+    if(!data||!open||open.disabled||!B.restoreMarks)return false;
+    const before=docId;open.click();
+    for(let i=0;i<150&&!(isBoardOpen()&&docId!==before);i++)await sleep(100);
+    if(!isBoardOpen()||docId===before)return false;
+    const board=docId;
+    for(const p of data.pictures){
+      let image=null;try{image=await loadPicture(p.data)}catch{}
+      if(!isBoardOpen()||docId!==board)return false;
+      if(image)boardPictures.push({image,x:p.x,y:p.y,w:p.w,h:p.h,after:null});
+    }
+    if(boardPictures.length)await publishBoard();
+    if(!isBoardOpen())return false;
+    B.restoreMarks(data.strokes);updateControls();
+    return true;
   }
   if(isTeacher){
-    document.addEventListener('paste',event=>{
-      if(!isBoardOpen()||!event.clipboardData)return;
-      if(event.target?.closest?.('input,textarea,select,[contenteditable],dialog[open]'))return;
-      const item=Array.from(event.clipboardData.items||[]).find(entry=>entry.kind==='file'&&/^image\/(png|jpeg|gif|webp|bmp)$/.test(entry.type));
-      const file=item?.getAsFile();
-      if(!file)return;
-      event.preventDefault();event.stopImmediatePropagation();
-      void pastePicture(file);
+    const hookClipboard=()=>{window.ClassPointerClipboard?.register(clipTarget);updateControls()};
+    if(window.ClassPointerClipboard)hookClipboard();else document.addEventListener('class-pointer-clipboard-ready',hookClipboard,{once:true});
+    // Undo (the lesson's button, the drawing toolbar and its Ctrl+Z all click this button) also takes back a pasted picture.
+    document.addEventListener('click',event=>{
+      if(event.target?.closest?.('#undoTeacherHighlight')&&undoPicture()){event.preventDefault();event.stopImmediatePropagation()}
     },true);
     document.addEventListener('keydown',event=>{
       if(!pictureEdits.length||event.target?.closest?.('input,textarea,select,[contenteditable]'))return;
@@ -877,9 +960,13 @@
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),
+    // Zoom and scroll place, so a PDF can reopen exactly where it was left (pdf-library.js).
+    getView:()=>{const view=currentView();return{zoom:view.zoom,top:view.top,left:view.left}},
+    setView:view=>{const clean=isTeacher&&!notReady()?P.cleanView(view):null;if(clean){applyView({zoom:clean.zoom,top:clean.top,left:clean.left});scheduleViewSend(true)}},
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
+    exportWhiteboard,importWhiteboard,exportPng,
     presentationStream:()=>boardPresentation
   };
 })();

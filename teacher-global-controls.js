@@ -243,7 +243,7 @@
     if (window.FTTAnnotate) { window.FTTAnnotate.setRole('teacher'); return; }
     if (annotateLoading) return;
     annotateLoading = document.createElement('script');
-    annotateLoading.src = new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1', base).href;
+    annotateLoading.src = new URL('class-pointer-prototype/annotation-toolbar.js?v=20261110-cp770', base).href;
     annotateLoading.async = true;
     annotateLoading.onload = function() { if (authorized && window.FTTAnnotate) window.FTTAnnotate.setRole('teacher'); };
     annotateLoading.onerror = function() { annotateLoading = null; };

@@ -61,7 +61,7 @@ test('screen sharing turns the student toolbar on and off',()=>{
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);
   assert.match(share,/if\(window\.FTTAnnotate\?\.owns\?\.\(target\)\)return true;/);
-  assert.match(share,/annotation-toolbar\.js\?v=20261109-annotate1/);
+  assert.match(share,/annotation-toolbar\.js\?v=20261110-cp770/);
   const boards=read('class-pointer-prototype/student-boards.js');
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);

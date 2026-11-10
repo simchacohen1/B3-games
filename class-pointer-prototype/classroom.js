@@ -95,10 +95,11 @@ function flushPoints(){
 }
 function publish(){
   clearTimeout(pointFlushTimer);pointFlushTimer=null;changedPoints.clear();
+  if(isTeacher)state.presenting=teacherPresenting();
   state.members=[...members.values(),...presence.values()].filter(member=>member.admitted).map(member=>({id:member.id,name:member.name,color:member.color||'#57b8ff',admitted:true,allowed:member.allowed,tools:memberTools(member)}));
   for(const member of members.values())if(member.admitted)send(member.connection,{type:'state',state});
   for(const member of presence.values())if(member.admitted){send(member.connection,{type:'lesson-tools',level:levelOf(member)});send(member.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})}
-  drawPointers();pointerPermission();
+  drawPointers();pointerPermission();syncPresenting();
 }
 function roster(){
   document.dispatchEvent(new CustomEvent('classpointer:roster'));
@@ -175,7 +176,28 @@ document.addEventListener('class-pointer-workspace',event=>{
     if(activityPresentationEnabled)sendActivityLesson(entry);
     else{closeActivityCall(entry);send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:false})}
   }
+  // The tab changed what students see: update "the teacher is showing the lesson" (after the gallery has switched).
+  setTimeout(()=>presentingChanged(),0);
 });
+// ---------- "The teacher is showing the lesson" ----------
+// True while students are being shown the teacher's screen, PDF, webpage or whiteboard (the My screen tab).
+// While it is true students get no Share My Screen button; a share that is already running keeps going.
+// It reaches activity pages and the sharing tab through the lesson record, and joined students through state.
+function teacherPresenting(){
+  return isTeacher&&started&&activityTeacherAuthorized&&(state.sharing||state.pdf===true)&&activityPresentationEnabled&&!window.ClassPointerBoards?.workspace?.();
+}
+let presentingPublished=false;
+function syncPresenting(){
+  if(!isTeacher)return;
+  const now=teacherPresenting();
+  if(now===presentingPublished)return;
+  presentingPublished=now;
+  if(!started)return; // the lesson record is going away with the class
+  Promise.resolve().then(()=>window.ClassPointerDashboard?.setTeacherPresenting?.(now)).catch(()=>{if(presentingPublished===now)presentingPublished=null});
+}
+function presentingChanged(){if(isTeacher&&started&&(state.presenting===true)!==teacherPresenting())publish()}
+// The student gallery opening or closing changes what students see (the tabs are handled in class-pointer-workspace above).
+document.addEventListener('classpointer:sharing-state',()=>setTimeout(presentingChanged,0));
 function callStudent(member){
   member.call?.close();clearTimeout(member.mediaTimer);if(!screen||!member.admitted)return;
   const call=peer.call(member.peerId,screen,{metadata:{generation}});member.call=call;favorTextDetail(call);
@@ -583,6 +605,8 @@ function joinClass(event){
       if(message.type==='state'){
         if(!admitted)joinSucceeded();
         clearTimeout(joinTimer);joining=false;admitted=true;$('joinForm').hidden=true;$('leaveClass').hidden=autoJoin;state=message.state;
+        // The Share My Screen panel hides its button while the teacher is showing the lesson (student-boards.js).
+        document.dispatchEvent(new Event('classpointer:teacher-presenting'));
         if(!live()){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo();window.ClassPointerPdf?.reset()}else if(!state.sharing)clearStudentVideo();status(state.sharing?'Class connected.':state.pdf?'Class connected. Following your teacher in the '+(state.documentKind==='webpage'?'webpage.':state.documentKind==='whiteboard'?'whiteboard.':'PDF.'):'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
       }
       // Only a deliberate removal by the teacher shows the removal message.
@@ -718,6 +742,8 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   lessonKind:()=>state.sharing?'screen':state.pdf===true?(state.documentKind||'pdf'):null,
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   sendTeacher:message=>send(teacherConnection,message),started:()=>started,
+  // Is the teacher showing the lesson to students right now? (No new student screen shares while this is true.)
+  presenting:()=>isTeacher?teacherPresenting():state?.presenting===true,
   // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
   callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,presence:()=>presence,sharing:()=>state.sharing,stopSharing,
   navigating:()=>navigating,
@@ -725,7 +751,9 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
-  resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()}};
+  resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
+  // Teacher only: put the marks of a saved whiteboard back for everyone (pdf-mode.js importWhiteboard).
+  restoreMarks(list){if(!isTeacher)return;state.points={};highlightStore.restore(list);publishHighlights();publish()}};
 function setNavigation(on){
   if(navigating===on)return;
   navigating=on;cancelHover();hideOwnPointer();highlighter?.cancel();

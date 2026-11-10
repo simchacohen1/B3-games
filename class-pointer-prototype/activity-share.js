@@ -74,7 +74,7 @@
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
     document.body.append(boardStage);
     const boardCss=document.createElement('link');boardCss.rel='stylesheet';
-    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261109-twoway1',root).href;
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261110-cp770',root).href;
     document.head.append(boardCss);
     window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
       sendTeacher:message=>{
@@ -83,8 +83,12 @@
         }
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-annotate1',root).href);
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261110-cp770',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/board-clipboard.js?v=20261110-cp770',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261110-cp770',root).href);
+    // Save and My files for the student's own whiteboard.
+    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261110-cp770',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261110-cp770',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -104,6 +108,11 @@
     if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
     else document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
+    // While the teacher is showing the lesson (screen, PDF, webpage or whiteboard) nobody starts a new share.
+    // A share that is already running keeps going, with its Stop button.
+    const presenting=()=>latestSession?.teacherPresenting===true;
+    const WAIT_FOR_LESSON='Your teacher is showing the lesson now. You can share your screen when the lesson stops.';
+    const SHARING_TEXT='✅ Your teacher can see your screen. Click Stop Sharing when your teacher says.';
     // ---------- Dedicated sharing tab ----------
     // Capturing inside an activity page ends the share as soon as the student opens another page.
     // So Share My Screen opens one small sharing tab (student-share-window.html) that asks for the
@@ -119,6 +128,7 @@
       if(!persistentShareWindow)return;
       tell({type:'holder',open:true,sharing:!!stream});
       const text=stream?'📺 You’re sharing your screen. Go back to your other tab to keep working.':
+        active&&presenting()?WAIT_FOR_LESSON:
         active?'Choose Entire Screen in the box that pops up, then click Share.':
         permissionReady?'Screen sharing is off right now. You can close this tab.':'';
       if(headline&&text)headline.textContent=text;
@@ -136,12 +146,14 @@
       const s=holderState;
       fallback.hidden=true;
       if(s?.sharing){btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';label.textContent='📺 You’re sharing your screen. Keep working here.'}
-      else if(s?.open){btn.textContent='✖ Cancel';btn.style.background='#64748b';label.textContent='Choose Entire Screen in the sharing tab that opened.'}
+      else if(s?.open){btn.textContent='✖ Cancel';btn.style.background='#64748b';label.textContent=presenting()?WAIT_FOR_LESSON:'Choose Entire Screen in the sharing tab that opened.'}
       else{btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent=IDLE_TEXT}
-      holder.style.display=(active&&permissionReady)||s?.open?'flex':'none';
+      // No Share My Screen button while the teacher is showing the lesson. A running share keeps its Stop button.
+      holder.style.display=(active&&permissionReady&&!presenting())||s?.open?'flex':'none';
     }
     function openHolder(){
       if(!active||!sameStudent())return;
+      if(presenting()){showLinked();return}
       // Opened straight from the click so the browser allows the new tab.
       let win=null;
       try{win=window.open(new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root).href,HOLDER_NAME)}catch{}
@@ -155,13 +167,19 @@
         if(persistentShareWindow){
           if(m.type==='ping')report();
           else if(m.type==='stop')studentStop();
+          // His other tab heard the teacher end the lesson: do not wait to see whether the lesson comes back.
+          else if(m.type==='lesson-ended')lessonEnded(m.room);
           return;
         }
         if(m.type!=='holder')return;
         const wasSharing=holderState?.sharing===true;
         holderState=m.open?{open:true,sharing:m.sharing===true}:null;holderSeen=Date.now();
         // My screen is no longer shared: take the teacher's marks off this page.
-        if(wasSharing&&!holderState?.sharing)window.ClassPointerBoards?.clearScreenMarks?.();
+        if(wasSharing&&!holderState?.sharing){
+          window.ClassPointerBoards?.clearScreenMarks?.();
+          // Tell the teacher's page now, so the screen tile goes away at once instead of freezing for a while.
+          if(admitted&&presenceConn?.open){try{presenceConn.send({type:'board-screen',sharing:false,from:'share-tab'})}catch{}}
+        }
         showLinked();
       };
       if(!persistentShareWindow){
@@ -194,6 +212,8 @@
         document.getElementById('fttReturnPointerBoard')?.contains?.(target) || reopen.contains?.(target));
     }};
     const later=(fn,ms)=>typeof setTimeout==='function'?setTimeout(fn,ms):0,cancelLater=t=>{if(t&&typeof clearTimeout==='function')clearTimeout(t)};
+    // A long background wait.
+    const quietLater=(fn,ms)=>{const t=later(fn,ms);t?.unref?.();return t};
     const removedRoom=()=>{try{return sessionStorage.getItem('classPointerRemovedRoom')||''}catch{return''}};
     function activityName(){
       if(persistentShareWindow)return 'Screen sharing window';
@@ -453,10 +473,12 @@
           if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
           if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[]};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
-          if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
+          // The teacher pressed Stop viewing on this student's screen: end the share in his sharing tab.
+          if(message.type==='share-stop'){if(admitted&&holderState?.open)tell({type:'stop'});return}
+          if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}if(holderState?.open)tell({type:'stop'});stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
           if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
-          if(message.type==='ended'){stopPresence()}
+          if(message.type==='ended'){stopPresence();tell({type:'lesson-ended',room});lessonEnded(room)}
         });
         const lost=()=>{if(presenceConn===conn){presenceConn=null;retryPresence()}};
         conn.on('close',lost);conn.on('error',lost);
@@ -483,6 +505,7 @@
         holderState=null;
         try{sessions.off('value',onSessions)}catch{}
         latestSession=null;active=null;presenceTarget='';presenceDelay=0;presenceFailures=0;
+        cancelLater(sessionGoneTimer);sessionGoneTimer=null;cancelLater(permissionRetryTimer);permissionRetryTimer=null;
         permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';
         // The "removed from this lesson" note belongs to the previous boy's browser session only.
         try{sessionStorage.removeItem('classPointerRemovedRoom')}catch{}
@@ -509,47 +532,78 @@
     identityTimer?.unref?.();
     window.addEventListener('pagehide',()=>{if(identityTimer)clearInterval(identityTimer)},{once:true});
 
-    async function watchPermission(session){
+    // A failed check (school network hiccup, busy server) must never end a share that is running. Only a clear
+    // "no" from the school server, or the teacher turning sharing off, does. A failed check is tried again quietly.
+    let permissionRetryTimer=null,permissionRetries=0;
+    function retryPermission(key){
+      cancelLater(permissionRetryTimer);permissionRetryTimer=null;
+      if(permissionRetries>=6)return;
+      permissionRetryTimer=quietLater(()=>{
+        permissionRetryTimer=null;
+        if(permissionKey===key&&latestSession)void watchPermission(latestSession,true);
+      },Math.min(30000,3000*2**permissionRetries++));
+    }
+    // The lesson record can vanish for a moment when the teacher's own internet blinks (see onSessions).
+    const SESSION_GRACE=30000;let sessionGoneTimer=null,endedRoom='';
+    // Calling the teacher again after a dropped connection (see connectShare).
+    const RECALL_DELAYS=[1000,2000,4000,8000,15000,30000,30000,30000];
+    let recallTimer=null,recallAttempts=0,watchTimer=null,everLinked=false;
+    async function watchPermission(session,again){
       const request=session?.destinationRequest,at=request?.at||session?.shareRequest?.at;
       const hasRequest=(request&&['screens','boards'].includes(request.mode))||(session?.studentScreenSharing===true&&Number.isFinite(at));
       // Sharing enabled without a request: the student may start sharing himself.
       const enabledOnly=!hasRequest&&session?.studentScreenSharing===true;
       if(!hasRequest&&!enabledOnly){permissionKey='';permission={};permissionReady=false;refreshSessionState();return}
       const key=session.roomId+':'+String(session.permissionRevision||'')+':'+(enabledOnly?'enabled':String(at||''));
-      if(permissionKey===key&&permissionReady)return;
+      // Nothing about permissions changed, but something else on the lesson record may have (the teacher
+      // started or stopped showing the lesson): bring the button up to date.
+      if(permissionKey===key&&permissionReady&&again!==true){refreshSessionState();return}
+      if(permissionKey!==key){permissionRetries=0;cancelLater(permissionRetryTimer);permissionRetryTimer=null}
       // Until his own permission is confirmed the button is hidden, so a teacher's change hides it at once.
       // (A share already running is not interrupted while the check is in progress.)
       const keep=permission;permissionKey=key;permission={};permissionReady=false;const current=++permissionRequest;
       if(!stream&&!holderState?.open)holder.style.display='none';else if(stream){permission=keep;permissionReady=true}
+      // unsure: no clear answer came back (no internet, time-out, busy or broken server).
+      let unsure=false;
       try{
-        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'permissions',studentId:id,pin,classId,room:session.roomId}),signal:AbortSignal.timeout(10000)});
-        const result=await response.json();
+        let response,result;
+        try{
+          response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({action:'permissions',studentId:id,pin,classId,room:session.roomId}),signal:AbortSignal.timeout(10000)});
+          result=await response.json();
+        }catch(error){unsure=true;throw error}
         if(current!==permissionRequest||latestSession?.roomId!==session.roomId||permissionKey!==key)return;
         if(response.ok&&result?.ok){
-          permission={screenSharingDenied:result.screenSharingDenied===true,whiteboardDenied:result.whiteboardDenied===true};permissionReady=true;
+          permission={screenSharingDenied:result.screenSharingDenied===true,whiteboardDenied:result.whiteboardDenied===true};permissionReady=true;permissionRetries=0;
         }else if(enabledOnly&&response.status===403&&/no active student activity request/i.test(result?.error||'')){
           // The sharing service in use does not answer this question without a request yet; it still
           // refuses a student the teacher turned off when he tries to share.
           permission={};permissionReady=true;
-        }else throw Error(result?.error||'Could not check your sharing permissions.');
+        }else{
+          unsure=response.status===429||response.status>=500;
+          throw Error(result?.error||'Could not check your sharing permissions.');
+        }
       }catch{
         if(current===permissionRequest&&permissionKey===key){
           if(enabledOnly){permission={};permissionReady=true}
-          else{permission={};permissionReady=false;status('Could not check sharing permissions. Ask your teacher to resend.');}
+          // A share that is running keeps its last known permission; the check is simply tried again.
+          else if(unsure&&(stream||holderState?.sharing)){permission=keep;permissionReady=true}
+          else{permission={};permissionReady=false;status(unsure?'Checking with your teacher. One moment…':'Could not check sharing permissions. Ask your teacher to resend.');}
+          if(unsure&&!enabledOnly)retryPermission(key);
         }
       }
       refreshSessionState();
     }
     function stop(){
+      cancelLater(recallTimer);recallTimer=null;recallAttempts=0;cancelLater(watchTimer);watchTimer=null;everLinked=false;
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       // My screen is no longer shared: take the teacher's marks off it.
       if(prior){window.ClassPointerBoards?.clearScreenMarks?.();window.FTTAnnotate?.setReason('sharing',false)}
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
       if(!persistentShareWindow){showLinked();return}
-      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
-      label.textContent=IDLE_TEXT;
+      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';btn.hidden=presenting();
+      label.textContent=presenting()?WAIT_FOR_LESSON:IDLE_TEXT;
       fallback.hidden=true;
       if(prior)report();
     }
@@ -561,33 +615,162 @@
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;
       if(!persistentShareWindow){showLinked();return}
-      holder.style.display=active?'flex':'none';report();
+      holder.style.display=active?'flex':'none';
+      // No start button while the teacher is showing the lesson; Stop Sharing always stays.
+      const wait=!stream&&presenting();
+      btn.hidden=wait;
+      if(!stream&&!busy){if(wait)label.textContent=WAIT_FOR_LESSON;else if(label.textContent===WAIT_FOR_LESSON)label.textContent=IDLE_TEXT}
+      report();
       // The sharing tab asks for the screen by itself as soon as it knows sharing is allowed.
-      if(active&&!autoTried&&!stream&&!busy){autoTried=true;void beginShare()}
+      if(active&&!autoTried&&!stream&&!busy&&!wait){autoTried=true;void beginShare()}
     }
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
-        &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
+        // A lesson this page is already following is not dropped just because it has run for a long time.
+        &&Number.isFinite(v.createdAt)&&(Date.now()-v.createdAt<14400000||key===latestSession?.roomId)&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
     async function onSessions(snapshot){
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
+        cancelLater(sessionGoneTimer);sessionGoneTimer=null;
         latestSession=null;active=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';
         followSession(null);
         return;
       }
       const next=current(snapshot.val());
+      if(!next&&latestSession&&latestSession.roomId!==endedRoom&&(stream||(admitted&&presenceConn?.open))){
+        // The lesson record is gone. That also happens for a moment when the teacher's own internet blinks,
+        // and then it comes straight back. Wait a little before ending a running share or leaving the class.
+        const gone=latestSession.roomId;
+        if(!sessionGoneTimer)sessionGoneTimer=quietLater(()=>{sessionGoneTimer=null;if(latestSession?.roomId===gone)void applySession(null)},SESSION_GRACE);
+        return;
+      }
+      cancelLater(sessionGoneTimer);sessionGoneTimer=null;
+      await applySession(next);
+    }
+    async function applySession(next){
       latestSession=next;
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     }
-    function onSessionsError(){stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()}
+    // The teacher ended the lesson on purpose: no waiting.
+    function lessonEnded(room){
+      if(typeof room!=='string'||!room)return;
+      endedRoom=room;
+      if(sessionGoneTimer&&latestSession?.roomId===room){cancelLater(sessionGoneTimer);sessionGoneTimer=null;void applySession(null)}
+    }
+    function onSessionsError(){cancelLater(sessionGoneTimer);sessionGoneTimer=null;stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()}
     sessions.on('value',onSessions,onSessionsError);
+    // ---------- Keeping a running share connected ----------
+    // The picture travels over a direct connection that a school network can drop for a moment. While the
+    // screen is still being captured and sharing is still allowed, the sharing tab quietly gets a fresh
+    // ticket and calls the teacher again (a few tries, waiting longer each time) instead of ending the share.
+    function dropCall(){
+      cancelLater(watchTimer);watchTimer=null;
+      const oldCall=call;call=null;try{oldCall?.close()}catch{}
+      const oldPeer=peer;peer=null;try{oldPeer?.destroy()}catch{}
+    }
+    async function issueTicket(lesson){
+      // A missing, blocked or unavailable Cloud Function can surface as a
+      // generic "Failed to fetch" after the student approves screen capture.
+      let response;
+      try{
+        response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
+          signal:AbortSignal.timeout(15000)});
+      }catch{
+        const error=new Error('Activity sharing service unavailable. Please retry or ask your teacher.');
+        error.code='ACTIVITY_SHARE_NETWORK';throw error;
+      }
+      let ticket;
+      try{ticket=await response.json()}catch{
+        const error=new Error('Activity sharing service returned an invalid response. Please retry or ask your teacher.');
+        error.code='ACTIVITY_SHARE_NETWORK';throw error;
+      }
+      if(!response.ok||!ticket?.ok){
+        const error=new Error(ticket?.error||'Screen sharing is not allowed.');
+        error.status=response.status;
+        if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
+        if(response.status===403&&/turned off your screen sharing/i.test(ticket?.error||''))error.code='ACTIVITY_SHARE_DENIED';
+        throw error;
+      }
+      return ticket;
+    }
+    // resume: calling again for a share that is already running (the teacher's page keeps the same tile).
+    async function connectShare(lesson,captured,resume){
+      const usable=()=>active?.roomId===lesson.roomId&&captured.active&&(!resume||stream===captured);
+      const ticket=await issueTicket(lesson);
+      if(!usable())throw Error('The lesson ended or sharing permission changed.');
+      if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
+      const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
+      peer=connection;
+      await new Promise((resolve,reject)=>{
+        const timeout=setTimeout(()=>reject(Error('Connection timed out')),15000);
+        connection.once('open',()=>{clearTimeout(timeout);resolve()});
+        connection.once('error',e=>{clearTimeout(timeout);reject(e)});
+      });
+      if(peer!==connection||!usable())throw Error('The lesson ended or sharing permission changed.');
+      const media=connection.call(lesson.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token,...(resume?{resume:true}:{})}});
+      if(!media)throw Error('The teacher is not connected.');
+      call=media;if(!resume)stream=captured;
+      const lost=()=>{if(call===media)connectionLost()};
+      media.on('close',lost);media.on('error',lost);
+      // The connection service socket may drop while the picture keeps flowing: reconnect it, do not end the share.
+      connection.on?.('disconnected',()=>{if(peer===connection&&!connection.destroyed){try{connection.reconnect()}catch{}}});
+      // The teacher's page could not be reached at all (its own connection is down for a moment): call again later.
+      connection.on?.('error',error=>{if(peer===connection&&error?.type==='peer-unavailable')lost()});
+      let linked=false,dropTimer=null;
+      const isLinked=()=>['connected','completed'].includes(media.peerConnection?.iceConnectionState);
+      media.on('iceStateChanged',state=>{
+        if(call!==media)return;
+        if(state==='connected'||state==='completed'){
+          linked=true;everLinked=true;recallAttempts=0;cancelLater(watchTimer);watchTimer=null;cancelLater(dropTimer);dropTimer=null;
+          if(stream===captured)status(SHARING_TEXT);
+        }else if(state==='disconnected'&&!dropTimer){
+          // The browser gives up by itself only after a long while. If the picture is still cut off after a
+          // few seconds, call again now; the teacher keeps seeing the last picture meanwhile.
+          dropTimer=quietLater(()=>{dropTimer=null;if(call===media&&!isLinked())lost()},12000);
+        }
+      });
+      // The call never connected (teacher unreachable or the school network blocked it): try again.
+      watchTimer=quietLater(()=>{watchTimer=null;if(call===media&&!linked&&!isLinked())lost()},25000);
+    }
+    function connectionLost(){
+      if(!stream)return;
+      // A brand-new share that never reached the teacher is not retried in the background: say so plainly.
+      if(!everLinked){giveUp('Your screen did not reach your teacher. Click Share My Screen to try again.');return}
+      dropCall();
+      scheduleRecall();
+    }
+    function giveUp(text){stop();status(text||'Sharing stopped. Click Share My Screen to share again, or close this tab.')}
+    function scheduleRecall(){
+      if(recallTimer||!stream)return;
+      if(!active||!stream.active||!sameStudent()||recallAttempts>=RECALL_DELAYS.length){giveUp();return}
+      status('Reconnecting to your teacher…');
+      recallTimer=quietLater(async()=>{
+        recallTimer=null;
+        const captured=stream,lesson=active;
+        if(!captured)return;
+        if(!lesson||!captured.active||!sameStudent()){giveUp();return}
+        recallAttempts++;
+        try{await connectShare(lesson,captured,true)}
+        catch(error){
+          if(stream!==captured)return; // stopped in the meantime
+          dropCall();
+          // The teacher turned this student off: a clear no. Everything else is tried again.
+          if(error?.code==='ACTIVITY_SHARE_DENIED'){giveUp(error.message);permission={...permission,screenSharingDenied:true};refreshSessionState();return}
+          if(error?.status===401){giveUp('Please sign in again, then share your screen.');return}
+          scheduleRecall();
+        }
+      },RECALL_DELAYS[recallAttempts]);
+    }
     async function beginShare(){
       if(stream){studentStop();return}
       if(busy||!active||!sameStudent())return;
+      // Starting a new share is blocked while the teacher is showing the lesson (not only hidden).
+      if(presenting()){status(WAIT_FOR_LESSON);return}
       const lesson=active;
       busy=true;btn.disabled=true;
       let captured=null;
@@ -602,47 +785,13 @@
         const displaySurface=captured.getVideoTracks()[0]?.getSettings?.().displaySurface;
         if(displaySurface&&displaySurface!=='monitor')throw Error('Please choose Entire Screen in the browser picker.');
         if(!sameStudent()||active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        // The teacher began showing the lesson while the screen picker was open.
+        if(presenting())throw Error(WAIT_FOR_LESSON);
         status('Connecting to teacher…');
-        // A missing, blocked or unavailable Cloud Function can surface as a
-        // generic "Failed to fetch" after the student approves screen capture.
-        let response;
-        try{
-          response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
-            signal:AbortSignal.timeout(15000)});
-        }catch{
-          const error=new Error('Activity sharing service unavailable. Please retry or ask your teacher.');
-          error.code='ACTIVITY_SHARE_NETWORK';throw error;
-        }
-        let ticket;
-        try{ticket=await response.json()}catch{
-          const error=new Error('Activity sharing service returned an invalid response. Please retry or ask your teacher.');
-          error.code='ACTIVITY_SHARE_NETWORK';throw error;
-        }
-        if(!response.ok||!ticket?.ok){
-          const error=new Error(ticket?.error||'Screen sharing is not allowed.');
-          if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
-          if(response.status===403&&/turned off your screen sharing/i.test(ticket?.error||''))error.code='ACTIVITY_SHARE_DENIED';
-          throw error;
-        }
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
-        if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
-        const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
-        peer=connection;
-        await new Promise((resolve,reject)=>{
-          const timeout=setTimeout(()=>reject(Error('Connection timed out')),15000);
-          connection.once('open',()=>{clearTimeout(timeout);resolve()});
-          connection.once('error',e=>{clearTimeout(timeout);reject(e)});
-        });
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
-        const media=connection.call(lesson.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
-        if(!media)throw Error('The teacher is not connected.');
-        call=media;stream=captured;
+        await connectShare(lesson,captured,false);
         captured.getVideoTracks()[0]?.addEventListener('ended',studentStop,{once:true});
-        const lost=()=>{if(call!==media)return;stop();status('Sharing stopped. Click Share My Screen to share again, or close this tab.')};
-        media.on('close',lost);media.on('error',lost);
-        btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('✅ Your teacher can see your screen. Click Stop Sharing when your teacher says.');
+        btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';btn.hidden=false;
+        status(SHARING_TEXT);
         window.FTTAnnotate?.setReason('sharing',true);
         report();
       }catch(error){

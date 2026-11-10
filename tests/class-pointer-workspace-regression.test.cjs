@@ -12,9 +12,13 @@ test('teacher maximizing never requests native browser fullscreen',()=>{
  assert.match(s,/stage\.classList\.add\('lesson-fullscreen'\)/);
 });
 test('teacher share controls preserve existing share sources',()=>{
- const s=read('teacher-toolbar.js');
- for(const id of ['shareScreen','openBrowserTab','openPdf','openWebpage','openWhiteboard','stopScreen'])
+ // The old dock's Present menu is gone (#770): the drawing toolbar's Lesson menu offers the same sources.
+ const s=read('classroom-annotate.js');
+ for(const id of ['shareScreen','openBrowserTab','openPdf','openWebpage','openWhiteboard'])
    assert.ok(s.includes("'"+id+"'"),'Missing share source: '+id);
+ // Stop goes through the one red Stop button, which stops a shared screen with the original #stopScreen.
+ assert.match(s,/label:stopLabel\(\),danger:true,onClick:\(\)=>click\('cpStopBtn'\)/);
+ assert.match(read('teacher-dashboard.js'),/if\(sharingScreen\(\)\)stopScreen\.click\(\);/);
 });
 test('student screens default to screens but whiteboard choice remains',()=>{
  const s=read('student-boards.js');

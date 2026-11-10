@@ -22,6 +22,41 @@
     sessionWrites=pending;
     return pending;
   }
+  // ---------- Keep the lesson open through a short teacher network drop ----------
+  // Firebase removes the lesson record (onDisconnect) the moment this page's database connection drops, even
+  // for a second. Without putting it back, every student is dropped from the class and every shared screen
+  // stops, while this page still looks open. So remember the record, and when it disappears while the lesson
+  // is still open here, set up the cleanup again and write the record back.
+  let lastRow=null,lastPolicyRows=null,rowWatch=null;
+  function stopRowWatch(){const stop=rowWatch;rowWatch=null;lastRow=null;lastPolicyRows=null;try{stop?.()}catch{}}
+  function watchRow(ref,policyRef,context){
+    stopRowWatch();
+    if(typeof ref.on!=='function')return;
+    const mine=revision;let restores=0,last=0,busy=false;
+    const live=()=>!ending&&activeRef===ref&&revision===mine;
+    const rearm=()=>Promise.all([ref.onDisconnect().remove(),policyRef.onDisconnect().remove()]);
+    const onValue=snapshot=>{
+      const row=snapshot.val();
+      if(row&&row.roomId===ref.key){lastRow=row;return}
+      if(!lastRow||!live()||busy)return;
+      const user=firebase.auth?.().currentUser;
+      if(!user||user.uid!==context.user.uid)return;
+      // Never loop: a few tries, spaced out. A refused write stops the tries.
+      if(restores>=20||Date.now()-last<3000)return;
+      restores++;last=Date.now();busy=true;
+      // A change that landed on the missing record (a lone child) is kept on top of the remembered record.
+      const restored={...lastRow,...(row&&typeof row==='object'?row:{})},policy=lastPolicyRows;
+      rearm().then(()=>{if(live())return Promise.all([policy?policyRef.set(policy):null,ref.set(restored)])})
+        .catch(error=>{restores=99;if(typeof console!=='undefined')console.warn('Class Pointer could not restore the lesson record',error)})
+        .finally(()=>{busy=false});
+    };
+    ref.on('value',onValue);
+    let connected=null,first=true;
+    // Cleanup instructions are forgotten by the server after every disconnect: give them again on reconnect.
+    const onConnected=snapshot=>{if(snapshot.val()!==true)return;if(first){first=false;return}if(live())rearm().catch(()=>{})};
+    try{connected=context.db.ref('.info/connected');connected.on('value',onConnected)}catch{connected=null}
+    rowWatch=()=>{try{ref.off('value',onValue)}catch{}try{connected?.off('value',onConnected)}catch{}};
+  }
   // ---------- Teacher sign-in guard ----------
   // Firebase keeps ONE signed-in account per browser profile, shared by every tab. If a student (or
   // another account) signs in in another tab of this same browser, this page's teacher session is
@@ -115,6 +150,7 @@
       await context.db.ref(permissionPath(ref.key)).set(rows);
       const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
       window.ClassPointerActivityShares?.revokeStudents(denied);
+      if(activeRef===ref)lastPolicyRows=rows;
       return ref.update({permissionRevision:firebase.database.ServerValue.TIMESTAMP});
     });
   },
@@ -129,7 +165,8 @@
     await Promise.all([ref.onDisconnect().remove(),policyRef.onDisconnect().remove()]);
     if(current!==revision){await Promise.all([ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()]);return}
     await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
-    if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()])}
+    if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()]);return}
+    watchRow(ref,policyRef,context);
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
@@ -154,6 +191,7 @@
       await context.db.ref(permissionPath(ref.key)).set(rows);
       const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
       window.ClassPointerActivityShares?.revokeStudents(denied);
+      if(activeRef===ref)lastPolicyRows=rows;
       return ref.update({
         // Moving to whiteboards changes what is displayed, not the student's
         // already approved Entire Screen capture. Only an explicit Disable
@@ -171,6 +209,13 @@
       await ref.child('studentScreenSharing').set(enabled===true);
       if(enabled!==true)window.ClassPointerActivityShares?.closeAll();
     });
+  },async setTeacherPresenting(presenting){
+    // Students see no Share My Screen button while the teacher is showing the lesson (screen, PDF, webpage or
+    // whiteboard). A share that is already running is not touched. Best effort: never blocks teaching.
+    const ref=activeRef;if(!ref)return;
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)return;
+    await writeSession(ref,()=>ref.child('teacherPresenting').set(presenting===true));
   },async end(){
     revision++;
     const ref=activeRef,policyRef=activePolicyRef;
@@ -180,6 +225,7 @@
     // or another attempt can still remove the previous classroom session.
     ending=true;
     try{
+      stopRowWatch();
       // Drain writes already sent; queued changes are invalidated by revision.
       // The final removal must happen after them so no child can resurrect a room.
       await sessionWrites.catch(()=>{});

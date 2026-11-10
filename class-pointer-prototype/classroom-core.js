@@ -18,6 +18,11 @@
       if(this.strokes.length>=400||(pen?mine.filter(s=>['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(s.tool)).length>=150:(mine.filter(s=>s.tool!=='pen').length>=40||this.strokes.filter(s=>s.tool!=='pen').length>=240)))return false;this.strokes.push({...stroke,owner,id:'h'+(++this.sequence)});return true}
     edit(owner,action,id){if(action==='erase'){const i=this.strokes.findIndex(s=>s.owner===owner&&s.id===id);if(i>=0)this.strokes.splice(i,1);return}if(action==='clear'){this.strokes=this.strokes.filter(s=>s.owner!==owner);return}if(action==='undo'){const i=this.strokes.findLastIndex(s=>s.owner===owner);if(i>=0)this.strokes.splice(i,1)}}
     reset(){this.strokes=[]}
+    // Put saved marks back (a saved whiteboard). Every mark is checked again. The teacher's marks are the
+    // teacher's again; all others become "saved" marks that no student owns. At most 400 marks, as always.
+    restore(list){this.strokes=[];
+      for(const value of Array.isArray(list)?list:[]){if(this.strokes.length>=400)break;const stroke=cleanStroke(value);if(stroke)this.strokes.push({...stroke,owner:value.owner==='teacher'?'teacher':'saved',id:'h'+(++this.sequence)})}
+      return this.strokes.length}
   }
   function pointStyle(point){return{tool:tools.includes(point?.tool)?point.tool:'target',color:[...colors,...inkColors,'#ffcc00'].includes(point?.color)?point.color:null}}
   function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,32):''}
