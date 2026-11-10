@@ -591,7 +591,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
-<script src="word-marks.js?v=20261110-wordmarks"></script>
+<script src="word-marks.js?v=20261110-wordtap"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 
@@ -4305,18 +4305,23 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .grade-card{ background:#fff; border:2px solid #e6dcc4; border-radius:14px; padding:14px 16px; margin:0 0 14px; }
   .grade-card h3{ margin:0 0 4px; font-size:1.05rem; }
   .grade-meta{ color:var(--ink-soft); font-size:.85rem; margin-bottom:8px; }
-  .grade-hebrew{ direction:rtl; text-align:right; font-family:'Frank Ruhl Libre','David',serif; font-size:2.8rem; line-height:1.5; background:#fbf7ee; border-radius:10px; padding:12px 14px; margin:8px 0; display:flex; flex-wrap:wrap; gap:8px 6px; }
-  .grade-word{ font:inherit; color:var(--ink); background:transparent; border:2px solid transparent; border-radius:10px; padding:0 8px; margin:0; cursor:pointer; line-height:1.4; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-  .grade-word:hover{ border-color:#d9cba6; }
-  .grade-word:focus-visible{ outline:3px solid #2f6fd0; outline-offset:1px; }
-  .grade-word.marked{ font-weight:700; }
-  .grade-word[data-mark="skipped"]{ text-decoration:line-through; }
-  .grade-mode{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin:10px 0 4px; font-weight:700; }
-  .grade-mode select{ font:inherit; font-weight:700; padding:6px 10px; border-radius:10px; border:2px solid #cfc3a6; border-left-width:12px; background:#fff; max-width:100%; }
-  .grade-mode .muted{ font-weight:600; }
-  .wm-legend{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.78rem; color:var(--ink-soft); font-weight:600; margin:0 0 4px; }
-  .wm-legend-item{ display:inline-flex; align-items:center; gap:5px; }
-  .wm-swatch{ width:12px; height:12px; border-radius:3px; display:inline-block; }
+  /* The player stays in view while the teacher taps words further down a long posuk. */
+  .grade-audio{ position:sticky; top:0; z-index:3; background:#fff; padding:6px 0; }
+  .grade-audio audio{ display:block; width:100%; max-width:560px; height:46px; }
+  .grade-hint{ display:flex; flex-wrap:wrap; gap:6px 18px; align-items:center; margin:8px 0 2px; font-size:.86rem; font-weight:700; color:var(--ink-soft); }
+  .grade-hint b{ color:#b3261e; }
+  .grade-hint .grade-clear{ margin-inline-start:auto; font:inherit; font-weight:800; color:var(--ink); background:#fff; border:2px solid #cfc3a6; border-radius:999px; padding:6px 14px; cursor:pointer; }
+  .grade-hint .grade-clear[hidden]{ display:none; }
+  /* One column per word: the big word (tap = read wrong), then a small T (tap = translation wrong). */
+  .grade-hebrew{ direction:rtl; background:#fbf7ee; border-radius:12px; padding:12px 10px; margin:8px 0; display:flex; flex-wrap:wrap; gap:14px 6px; }
+  .grade-unit{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .grade-word{ font-family:'Frank Ruhl Libre','David',serif; font-weight:500; font-size:clamp(2.3rem, 5.2vw, 3.4rem); line-height:1.75; color:var(--ink); background:#fff; border:2px solid #e6dcc4; border-radius:12px; padding:0 14px; min-width:64px; min-height:64px; margin:0; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  .grade-t{ font:800 1rem/1 'Quicksand',sans-serif; color:#7a8797; background:#fff; border:2px solid #d9cba6; border-radius:10px; min-width:56px; width:70%; height:38px; padding:0; margin:0; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  @media (hover:hover){ .grade-word:hover, .grade-t:hover{ border-color:#b9a878; } }
+  .grade-word:focus-visible, .grade-t:focus-visible{ outline:3px solid #2f6fd0; outline-offset:1px; }
+  .grade-word:active, .grade-t:active{ transform:scale(.96); }
+  .grade-word[aria-pressed="true"]{ background:#fde3e0; border-color:#c62828; color:#8f1d1d; }
+  .grade-t[aria-pressed="true"]{ background:#c62828; border-color:#c62828; color:#fff; }
   .wm-chips{ display:flex; flex-wrap:wrap; gap:6px; width:100%; }
   .wm-chip{ display:inline-flex; align-items:baseline; gap:6px; border:1px solid; border-radius:999px; padding:1px 10px; font-size:.78rem; font-weight:700; }
   .wm-chip-word{ font-family:'Frank Ruhl Libre','David',serif; font-size:1.15rem; }
@@ -4370,13 +4375,13 @@ async function loadGradeTab(){
   document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
   let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
     'Gold standard gives +10 points minus 1 per mistake (plus any bonus) and locks the posuk for a month. Not gold lets the student try again. The student already paid 5 points to send it. ' +
-    'Tap any word the student got wrong; tap it again to clear it. If you tap nothing, Save grade records everything correct: gold standard with 0 mistakes.</p>';
+    'Every word and translation starts as correct. Tap a word if it was read wrong. Tap the T under a word if its translation was wrong. Tap again to undo. If you tap nothing, Save grade records everything correct: gold standard with 0 mistakes.</p>';
   if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
   html += pending.map((s, i) => `<div class="grade-card" id="gradeCard_${i}">
       <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
       <div class="grade-meta">Sent ${escapeHtml(new Date(Number(s.submittedAt)).toLocaleString())}${s.durationMs ? ' · ' + formatDuration(Number(s.durationMs) / 1000) : ''}</div>
-      ${gradeWordsMarkup(s, i)}
-      ${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}
+      <div class="grade-audio">${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}</div>
+      ${gradeWordsMarkup(s)}
       <div class="grade-form">
         <span class="grade-choice"><button type="button" class="gold" data-choice="gold">🏅 Gold standard</button><button type="button" class="retry" data-choice="retry">🔁 Not gold — try again</button></span>
         <label>Mistakes <input type="number" min="0" max="100" step="1" value="0" data-field="mistakes"></label>
@@ -4394,38 +4399,47 @@ async function loadGradeTab(){
   mainEl.innerHTML = html;
   pending.forEach((s, i) => wireGradeCard(document.getElementById('gradeCard_' + i), s));
 }
-// The posuk as one tappable button per word, with the marking-mode picker
-// and colour legend above it (Issue #749).
-function gradeWordsMarkup(s, i){
+// The posuk as one large button per word (tap = read wrong) with a small T
+// button under it (tap = translation wrong). Everything starts correct (Issue #749).
+function gradeWordsMarkup(s){
   const words = PosukWordMarks.splitWords(s.hebrewText);
   if(!words.length) return '';
-  return `<div class="grade-mode"><label for="gradeMode_${i}">Marking mode</label>
-        <select id="gradeMode_${i}" data-field="mode">${PosukWordMarks.MARKS.map(m => `<option value="${m.id}">${escapeHtml(m.label)}</option>`).join('')}</select>
-        <span class="muted">Tap a word to mark it. Tap again to clear.</span></div>
-      ${PosukWordMarks.legendHtml()}
-      <div class="grade-hebrew" lang="he">${words.map((w, n) => `<button type="button" class="grade-word" data-word="${n}" aria-pressed="false">${escapeHtml(w)}</button>`).join('')}</div>`;
+  return `<div class="grade-hint"><span>Tap a word = <b>read wrong</b></span><span>Tap T = <b>translation wrong</b></span><span>Tap again to undo</span>
+        <button type="button" class="grade-clear" data-clear="1" hidden>Clear all</button></div>
+      <div class="grade-hebrew" lang="he">${words.map((w, n) => `<span class="grade-unit"><button type="button" class="grade-word" data-word="${n}" aria-pressed="false" aria-label="${escapeHtml(w)}: read wrong">${escapeHtml(w)}</button><button type="button" class="grade-t" data-trans="${n}" dir="ltr" aria-pressed="false" aria-label="${escapeHtml(w)}: translation wrong" title="Translation wrong">T</button></span>`).join('')}</div>`;
 }
 function wireGradeCard(card, s){
   if(!card) return;
   // Default is gold standard: tapping nothing and saving means all correct.
   let choice = 'gold';
+  // Two switches per word; `marks` is what gets saved: {wordIndex: markId}.
   const marks = {};
-  const modeSel = card.querySelector('[data-field="mode"]');
-  const paintMode = () => { if(modeSel) modeSel.style.borderColor = PosukWordMarks.byId[modeSel.value].color; };
-  if(modeSel){ modeSel.onchange = paintMode; paintMode(); }
-  card.querySelectorAll('.grade-word').forEach(btn => btn.onclick = () => {
-    const n = btn.dataset.word;
-    // Same mark again clears it; a different mode re-marks the word.
-    if(marks[n] === modeSel.value) delete marks[n]; else marks[n] = modeSel.value;
-    const mark = marks[n] || '';
-    btn.classList.toggle('marked', !!mark);
-    btn.dataset.mark = mark;
-    btn.style.cssText = mark ? PosukWordMarks.style(mark) : '';
-    btn.setAttribute('aria-pressed', mark ? 'true' : 'false');
-    btn.title = mark ? PosukWordMarks.byId[mark].label : '';
-    card.querySelector('[data-field="mistakes"]').value = String(Object.keys(marks).length);
+  const readWrong = new Set(), transWrong = new Set();
+  const clearBtn = card.querySelector('[data-clear]');
+  const press = (btn, on) => btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  function syncMarks(){
+    Object.keys(marks).forEach(k => delete marks[k]);
+    new Set([...readWrong, ...transWrong]).forEach(n => { marks[n] = PosukWordMarks.markFor(readWrong.has(n), transWrong.has(n)); });
+    // Each tap is one mistake: a word read wrong and translated wrong counts as 2.
+    const count = readWrong.size + transWrong.size;
+    card.querySelector('[data-field="mistakes"]').value = String(count);
+    if(clearBtn) clearBtn.hidden = !count;
     refresh();
-  });
+  }
+  const toggle = (set, btn, n) => { if(set.has(n)) set.delete(n); else set.add(n); press(btn, set.has(n)); syncMarks(); };
+  // One listener for the whole posuk keeps taps instant on a tablet.
+  const wordsBox = card.querySelector('.grade-hebrew');
+  if(wordsBox) wordsBox.onclick = event => {
+    const btn = event.target.closest('button');
+    if(!btn) return;
+    if(btn.dataset.word !== undefined) toggle(readWrong, btn, btn.dataset.word);
+    else if(btn.dataset.trans !== undefined) toggle(transWrong, btn, btn.dataset.trans);
+  };
+  if(clearBtn) clearBtn.onclick = () => {
+    readWrong.clear(); transWrong.clear();
+    card.querySelectorAll('.grade-word, .grade-t').forEach(b => press(b, false));
+    syncMarks();
+  };
   const field = n => card.querySelector('[data-field="' + n + '"]');
   const saveBtn = card.querySelector('[data-save]');
   function refresh(){
