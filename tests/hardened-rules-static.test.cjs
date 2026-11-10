@@ -60,3 +60,26 @@ test('Shorashim legacy teacher reads follow the student profile class and active
   }
   assert.ok(shorashim.leaderboards.match.$pairCount.$studentId['.read']);
 });
+// Owner Admin, the owner's class pickers and teacher preview list whole collections.
+// A rule on one record does not allow listing its parent, so the owner needs these.
+test('owner and active admins can list the collections Owner Admin needs; nobody else can',()=>{
+  const OWNER_OR_ADMIN="auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)";
+  const ws=rules.b3Games.workspaces.$workspaceId;
+  assert.equal(rules.b3Games.students['.read'],OWNER_OR_ADMIN);
+  for(const list of ['classes','teachers','schools','students','contentGrants','meta','siteSettings'])assert.equal(ws[list]['.read'],OWNER_OR_ADMIN,list+' list');
+  for(const list of ['schools','students','contentGrants','meta','siteSettings'])assert.equal(ws[list]['.write'],OWNER_OR_ADMIN,list+' write');
+  // Listing must not open writes that were owner-only, or the whole workspace.
+  assert.equal(ws['.read'],undefined);assert.equal(ws['.write'],undefined);
+  assert.equal(ws.classes['.write'],undefined);assert.equal(ws.teachers['.write'],undefined);assert.equal(rules.b3Games.students['.write'],undefined);
+  assert.doesNotMatch(ws.teachers.$uid['.write'],/admins/,'only the owner writes teacher records');
+});
+test('a teacher can read one school record (name and Nigri flag) but cannot list or change schools',()=>{
+  const schools=rules.b3Games.workspaces.$workspaceId.schools;
+  assert.match(schools.$schoolId['.read'],/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true/);
+  assert.doesNotMatch(schools['.read'],/teachers\//);
+  assert.equal(schools.$schoolId['.write'],undefined);
+});
+test('staging rules are the hardened rules with only the owner email swapped',()=>{
+  const staging=fs.readFileSync('staging/database.rules.json','utf8').replaceAll('owner@funtorahtools-staging.test','simcha5770@gmail.com');
+  assert.deepEqual(JSON.parse(staging).rules,rules);
+});
