@@ -14,6 +14,7 @@
 <script src="school-scope.js?v=20261107"></script>
 <script src="student-scope.js?v=20261108"></script>
 <script src="bulk-roster.js?v=20261109-706"></script>
+<script src="class-split.js?v=20261109-728"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -144,6 +145,12 @@ small.warn{display:block;color:#b45309;margin-top:4px}
 <div id="studentImport"></div>
 <div class="formrow"><input id="studentSearch" type="search" placeholder="Find a student" aria-label="Find a student"></div>
 <div id="studentList"></div>
+</section>
+
+<section class="card hidden" id="classSplitCard" data-view="split"><div class="card-head"><h2>&#x2702;&#xFE0F; Split ET and WT into morning and afternoon</h2></div>
+<p class="hint">Makes four classes &mdash; B3 ET morning, B3 ET afternoon, B3 WT morning and B3 WT afternoon &mdash; in the same school as ET and WT, and enrolls the students who are in ET and WT now. Every student starts ticked for both sessions; untick the session a student does not attend. <b>ET and WT, with their homework, records and passcodes, are not changed.</b> Later, once the new classes are working, you can retire ET and WT from here without deleting anything.</p>
+<div class="formrow"><button id="classSplitOpen" type="button">Check ET and WT</button></div>
+<div id="classSplitArea"></div>
 </section>
 
 <section class="card hidden" id="bulkUploadCard" data-view="bulk"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
@@ -800,6 +807,9 @@ q("bmAudit").onclick=async()=>{
 };
 // ---- End bulk upload ---------------------------------------------------
 
+// ---- Split ET and WT (Issue #728): drawn by class-split.js, decided by the server ----
+FTTClassSplit.mount({area:q("classSplitArea"),openButton:q("classSplitOpen"),call:body=>manageCall(body,120000),reload:()=>load(),notify:text=>{q("status").textContent=text},schoolName:id=>schoolData[id]?schoolData[id].name:id});
+
 // ---- Classes: which school each class belongs to ------------------------
 function classSchoolPicker(classId,cls){const cur=cls&&cls.schoolId||"",known=!!schoolData[cur];return '<select class="schoolpick'+(known?'':' noschool')+'" data-class-school="'+safe(classId)+'" aria-label="School for '+safe(cls&&cls.name||classId)+'">'+(known?'':'<option value="" selected>No school</option>')+schoolOptions(cur)+'</select>'}
 function renderClassSchoolMove(){
@@ -927,7 +937,8 @@ q("studentOrphans").addEventListener("change",onStudentChange);
 // render() shows only the cards of the open view and fills them with the open
 // school's data. Nothing outside the open school is listed anywhere except the
 // "no school yet" leftovers on the Schools page.
-const SECTIONS=[["principals","🎓","Principals"],["teachers","👤","Teachers"],["classes","📚","Classes"],["students","👥","Students"],["bulk","📋","Bulk Upload"],["undo","↩️","Undo Import"],["manage","🧹","Bulk Manage"]];
+const showSection=([id])=>id!=="split"||["et","wt"].some(c=>classData[c]&&(!schoolData[classData[c].schoolId]||classData[c].schoolId===nav.school));
+const SECTIONS=[["principals","🎓","Principals"],["teachers","👤","Teachers"],["classes","📚","Classes"],["students","👥","Students"],["split","✂️","Split ET / WT"],["bulk","📋","Bulk Upload"],["undo","↩️","Undo Import"],["manage","🧹","Bulk Manage"]];
 const navPath=(...parts)=>parts.filter(Boolean).map(encodeURIComponent).join("/");
 const byName=(a,b)=>String(a||"").localeCompare(String(b||""));
 const inSchool=o=>!!o&&!!nav.school&&o.schoolId===nav.school;
@@ -970,7 +981,7 @@ function render(){
 function renderNav(view){
  const sc=schoolData[nav.school],section=SECTIONS.find(s=>s[0]===nav.section),cls=classData[nav.classId];
  q("oaNav").innerHTML='<button type="button" class="oa-nav-btn'+(view==="schools"?' oa-active':'')+'" data-go="">🏫 Schools</button>'+
-  (sc?'<button type="button" class="oa-nav-label" data-go="'+safe(navPath(nav.school))+'">'+safe(sc.name)+'</button>'+SECTIONS.map(([id,icon,label])=>'<button type="button" class="oa-nav-btn oa-sub'+(nav.section===id?' oa-active':'')+'" data-go="'+safe(navPath(nav.school,id))+'">'+icon+' '+label+'</button>').join(""):'');
+  (sc?'<button type="button" class="oa-nav-label" data-go="'+safe(navPath(nav.school))+'">'+safe(sc.name)+'</button>'+SECTIONS.filter(showSection).map(([id,icon,label])=>'<button type="button" class="oa-nav-btn oa-sub'+(nav.section===id?' oa-active':'')+'" data-go="'+safe(navPath(nav.school,id))+'">'+icon+' '+label+'</button>').join(""):'');
  const crumbs=[];
  if(sc){
   crumbs.push(["Schools",""],[sc.name,navPath(nav.school)]);
@@ -982,7 +993,7 @@ function renderNav(view){
 function renderSchoolHome(){
  const count={principals:Object.values(teacherData).filter(p=>B3PrincipalScope.principal(p)&&inSchool(p)).length,teachers:schoolTeachers().length,classes:schoolClassIds().length,students:schoolStudentIds().length};
  q("schoolTitle").textContent=schoolData[nav.school].name;
- q("schoolTiles").innerHTML=SECTIONS.map(([id,icon,label])=>'<button type="button" class="tile" data-go="'+safe(navPath(nav.school,id))+'"><span aria-hidden="true">'+icon+'</span><b>'+label+'</b>'+(id in count?'<small>'+count[id]+'</small>':'')+'</button>').join("");
+ q("schoolTiles").innerHTML=SECTIONS.filter(showSection).map(([id,icon,label])=>'<button type="button" class="tile" data-go="'+safe(navPath(nav.school,id))+'"><span aria-hidden="true">'+icon+'</span><b>'+label+'</b>'+(id in count?'<small>'+count[id]+'</small>':'')+'</button>').join("");
 }
 function renderTeachers(){
  const list=schoolTeachers();

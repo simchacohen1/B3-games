@@ -5,11 +5,15 @@ const tools=require('./student-tool-policy.js');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const imports=require('./student-import-core.cjs');
 const rollback=require('./student-rollback-core.cjs');
+const classSplit=require('./class-split-core.cjs');
 const BULK_ACTIONS={
  importPreview:imports.importPreview,importApply:imports.importApply,
  rollbackPreview:rollback.rollbackPreview,rollbackExecute:rollback.rollbackExecute,rollbackUndo:rollback.rollbackUndo,
  studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
- exportBackup:rollback.exportBackup,auditLog:rollback.auditLog
+ exportBackup:rollback.exportBackup,auditLog:rollback.auditLog,
+ // Issue #728: split legacy ET/WT into morning and afternoon classes.
+ classSplitPreview:classSplit.classSplitPreview,classSplitCreate:classSplit.classSplitCreate,classSplitEnroll:classSplit.classSplitEnroll,
+ classSplitRetire:classSplit.classSplitRetire,classSplitRestore:classSplit.classSplitRestore
 };
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
