@@ -481,6 +481,40 @@
     localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(normalizeSettings(settings)));
   }
 
+  // Owner as a teacher (#726). The owner also teaches classes. Owner mode is
+  // the default and is unchanged. Only when the owner switched this browser to
+  // "Teacher view" is the owner's access NARROWED to the classes assigned to
+  // the owner's own email in Owner Admin (see owner-teacher-view.js). Any
+  // doubt (no classes, a failed load or read) keeps the normal owner access.
+  // This never applies to another account and never adds access.
+  function ownerTeacherViewWanted() {
+    try { return localStorage.getItem("b3OwnerViewMode") === "teacher"; } catch (e) { return false; }
+  }
+  function loadOwnerTeacherView() {
+    if (window.B3OwnerTeacherView) return Promise.resolve(window.B3OwnerTeacherView);
+    return new Promise(function (resolve, reject) {
+      const tag = document.createElement("script");
+      tag.src = SITE_BASE + "owner-teacher-view.js?v=20261109-726";
+      tag.onload = function () { if (window.B3OwnerTeacherView) resolve(window.B3OwnerTeacherView); else reject(new Error("Teacher view is unavailable.")); };
+      tag.onerror = function () { reject(new Error("Teacher view could not load.")); };
+      document.head.appendChild(tag);
+    });
+  }
+  function readOwnerAccess(services, user) {
+    const full = { authorized:true, role:"admin", classIds:["*"] };
+    if (!ownerTeacherViewWanted()) return Promise.resolve(full);
+    return loadOwnerTeacherView().then(function (view) {
+      return view.resolve(services.db, WORKSPACE_ID, user);
+    }).then(function (teaching) { return teaching || full; }).catch(function () { return full; });
+  }
+  // The "Teacher view" reminder with the way back to Owner Admin.
+  function showOwnerTeacherView(access) {
+    const view = window.B3OwnerTeacherView;
+    if (!view) return;
+    if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access); }, { once:true }); return; }
+    if (access && access.ownerTeacherView === true && !getActingStudent()) view.mountBanner(SITE_BASE); else view.unmountBanner();
+  }
+
   let currentAccess = { authorized: false, role: "", classIds: [] };
   // Popup completion and Firebase's auth-state callback can request the same
   // authorization check at the same time. Share only in-flight work for this
@@ -494,7 +528,7 @@
   function readUserAccessFromFirebase(user) {
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
-    if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
+    if (isBootstrapAdmin(user)) return readOwnerAccess(services, user);
 
     // Established admins/teachers are the common case. Resolve those two small
     // records first instead of always downloading the entire teacherInvites
@@ -1123,6 +1157,7 @@
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
+        showOwnerTeacherView(access);
         setSignedInHint(access.authorized);
         callback(user, access.authorized, access);
         endAuthChecking();

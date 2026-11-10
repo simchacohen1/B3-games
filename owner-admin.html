@@ -12,6 +12,7 @@
 <script src="principal-scope.js?v=20261025"></script>
 <script src="shorashim/units.js?v=20261106-units-1"></script>
 <script src="school-scope.js?v=20261107"></script>
+<script src="owner-teacher-view.js?v=20261109-726"></script>
 <script src="student-scope.js?v=20261108"></script>
 <script src="bulk-roster.js?v=20261109-706"></script>
 <style>
@@ -71,6 +72,7 @@ main{max-width:760px;margin:0 auto}
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
 <div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
 <div id="ownerArea" class="hidden">
+<div id="teacherViewBar" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:16px 24px 0;padding:14px 18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px"><span id="teacherViewInfo" style="flex:1 1 320px;font-size:16px"></span><button id="teacherViewGo" type="button" disabled style="border:0;border-radius:10px;padding:12px 18px;background:#2563eb;color:#fff;font-weight:900;font-size:16px;cursor:pointer">&#x1F468;&#x200D;&#x1F3EB; Switch to Teacher view</button></div>
 <div class="oa-layout">
 <div class="oa-sidebar"><nav>
   <button class="oa-nav-btn" data-target="sec-schools">🏫 Schools</button>
@@ -281,12 +283,25 @@ async function load(){
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  q("libraryTeacherSelect").innerHTML='<option value="">Choose teacher</option>'+Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)).map(([id,v])=>'<option value="'+safe(id)+'">'+safe(v.name||v.email)+'</option>').join("");q("libraryGrant").innerHTML="";
  renderPrincipalAssignments();
+ renderTeacherViewBar();
  renderSchools();
  renderClassSchoolMove();
  await renderToolGrants();
  await loadStudentData();
  renderStudentSection();
 }
+// Owner as a teacher (#726): the owner's own classes come from an ordinary teacher
+// invitation for the owner's email. Teacher view only narrows what this browser shows.
+function renderTeacherViewBar(){
+ const mine=B3OwnerTeacherView.teachingClassIds(teacherData[key(OWNER)]),names=mine.map(id=>classData[id]?.name||id);
+ q("teacherViewInfo").textContent=mine.length
+  ?"You also teach: "+names.join(", ")+". Teacher view shows only these classes. You stay signed in, and can come back here any time."
+  :"Do you teach classes too? Add your own email ("+OWNER+") under Teachers, choose your school, and assign your classes. Then you can switch to Teacher view here without signing out.";
+ q("teacherViewGo").disabled=!mine.length;q("teacherViewGo").style.opacity=mine.length?"1":".5";
+}
+q("teacherViewGo").onclick=()=>B3OwnerTeacherView.toTeacherView();
+// Being in Owner Admin means owner mode (not when shown inside another page).
+if(window.self===window.top)B3OwnerTeacherView.setMode("owner");
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent="Teacher already exists. Assign a class below.";return;}const schoolId=q("teacherSchool").value;if(!schoolData[schoolId]){q("status").textContent="Choose the teacher's school.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP,schoolId:schoolId});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added, but inactive until a class is assigned.";await load()};
 q("addPrincipal").onclick=async()=>{
  const email=q("principalEmail").value.trim().toLowerCase(),name=q("principalName").value.trim();
