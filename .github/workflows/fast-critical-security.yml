@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check backend/functions/student-auth-core.cjs
           node --check backend/functions/student-management-core.cjs
+          node --check backend/functions/class-split-core.cjs
           node --check backend/functions/student-passcodes.cjs
           node --check backend/functions/student-tool-policy.js
           node --check backend/functions/student-auth.js
@@ -46,6 +47,7 @@ jobs:
             tests/firebase-rule-permission-drift.test.cjs \
             tests/student-auth.test.cjs \
             tests/student-management.test.cjs \
+            tests/class-split-728.test.cjs \
             tests/passcode-migration-safety.test.cjs \
             tests/yiddish-backend.test.cjs \
             tests/chazara-teacher-scope.test.cjs
