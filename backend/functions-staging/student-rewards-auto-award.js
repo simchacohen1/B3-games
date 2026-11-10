@@ -1533,7 +1533,7 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="posuk-grade"){
           const result=await posukReview.grade({teacherEmail:teacher.email,scope:teacher.scope,
             studentId:String(body.studentId||''),submissionId:String(body.submissionId||''),
-            gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note});
+            gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note,wordMarks:body.wordMarks});
           return res.status(200).json(result);
         }
         await authorizeChazaraAction(teacher,body);
