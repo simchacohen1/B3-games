@@ -139,3 +139,23 @@ test('classmates: a student reads the roster, live classmates, tag game and lead
   assert.match(tagWrite,/\(\$mode == 'all' \|\| \$mode == 'manhunt'\)/,'students change only the two game states');
   assert.match(rules.b3Games.classGalleryPresence.all.$viewerKey['.write'],/\$viewerKey == 'teacher_' \+ auth\.uid/);
 });
+test('class teachers: Game Show question library and Shorashim class lists follow the class assignment',()=>{
+  const classTeacher=/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true && root\.child\('b3Games\/workspaces\/b3-2026\/teachers\/' \+ auth\.uid \+ '\/classIds\/' \+ \$classId\)\.val\(\) == true/;
+  const show=rules.questionSets.classes.$classId;
+  for(const key of ['library','activeLibraryId'])for(const permission of ['.read','.write']){
+    assert.equal(show[key][permission],show.set[permission],key+permission+' matches the class question set');
+    assert.match(show[key][permission],classTeacher);
+  }
+  const shorashim=rules.posukPractice.shorashimLearning.classes.$classId;
+  for(const list of ['students','recordingEvents']){
+    assert.match(shorashim[list]['.read'],classTeacher,list);
+    assert.doesNotMatch(shorashim[list]['.read'],/b3StudentId|b3ClassId/,'students cannot list classmates\' work');
+    assert.equal(shorashim[list]['.write'],undefined);
+  }
+});
+test('owner-only lists for the legacy Shorashim dashboard and the special-access roster',()=>{
+  const ownerOrAdmin="auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)";
+  assert.equal(rules.posukPractice.shorashimLearning.students['.read'],ownerOrAdmin);
+  assert.equal(rules.posukPractice.shorashimLearning.leaderboards['.read'],ownerOrAdmin);
+  assert.equal(rules.posukPractice.allowedStudents['.read'],ownerOrAdmin);
+});
