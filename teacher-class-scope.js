@@ -38,15 +38,28 @@ async function roster(get,access,selected,tool='chazara',options={}){
  }
  // One profile/membership read per student, even when they are in several classes.
  const unique=[...new Set(candidates.map(row=>row.id))];
+ // Stricter database rules may not let a teacher's browser read a student's profile or
+ // whole membership list (a student can also be in another teacher's class). Only when the
+ // caller passes {partialMemberships:true} is a refused read tolerated: the roster then
+ // reads just the memberships for its own classes and marks the list as incomplete, so
+ // nothing is decided from memberships it could not see. Backend callers never pass it.
+ const tolerant=options?.partialMemberships===true;
  const loaded=Object.fromEntries(await Promise.all(unique.map(async id=>{
   const [profile,memberships]=await Promise.all([
-   get('b3Games/students/'+id+'/profile'),
-   get('b3Games/students/'+id+'/memberships')
+   get('b3Games/students/'+id+'/profile').catch(error=>{if(tolerant)return null;throw error;}),
+   get('b3Games/students/'+id+'/memberships').then(rows=>({rows:rows||{},complete:true}),async error=>{
+    if(!tolerant)throw error;
+    const rows={};
+    await Promise.all(candidates.filter(row=>row.id===id).map(async({classId})=>{
+     try{const row=await get('b3Games/students/'+id+'/memberships/'+WS+'_'+classId);if(row)rows[WS+'_'+classId]=row;}catch(denied){}
+    }));
+    return {rows,complete:false};
+   })
   ]);
-  return [id,{profile,memberships:memberships||{}}];
+  return [id,{profile,memberships:memberships.rows,complete:memberships.complete}];
  })));
  for(const {id,member,classId,cls} of candidates){
-  const {profile,memberships}=loaded[id];
+  const {profile,memberships,complete}=loaded[id];
   if(profile?.active===false)continue;
   const activeIds=Object.values(memberships).filter(m=>m?.active!==false&&m?.workspaceId===WS&&validKey(m.classId)).map(m=>m.classId);
   if(Object.keys(memberships).length&&!activeIds.includes(classId))continue;
@@ -56,7 +69,7 @@ async function roster(get,access,selected,tool='chazara',options={}){
    if(!existing.classIds.includes(classId)){existing.classIds.push(classId);existing.classNames.push(cls.name||classId);}
    continue;
   }
-  result.students[id]={name:profile?.name||member?.name||id,classId,className:cls.name||classId,classIds:[classId],classNames:[cls.name||classId],membershipClassIds:activeIds};
+  result.students[id]={name:profile?.name||member?.name||id,classId,className:cls.name||classId,classIds:[classId],classNames:[cls.name||classId],membershipClassIds:complete?activeIds:null};
  }
  return result;
 }

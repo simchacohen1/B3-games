@@ -318,7 +318,7 @@ async function loadClassScope(user,access){
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};teacherAccess=access;
   }
   const chosenClass=await B3ClassGate.requireInUrl(async p=>(await db.ref(p).once('value')).val(),access,'b3-2026',true);
-  const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,chosenClass==='all'?'':chosenClass,'chazara',{allowAll:chosenClass==='all'});
+  const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,chosenClass==='all'?'':chosenClass,'chazara',{allowAll:chosenClass==='all',partialMemberships:true});
   if(generation!==scopeGeneration)return;
   teacherScope=scope;R=scope.students;$('scopeLabel').textContent=Object.values(scope.classes).map(c=>c.name).join(' + ')+' Chazara activity';
   $('f').innerHTML='<option value="">All assigned students</option>'+Object.entries(scope.classes).map(([id,c])=>'<option value="'+escHtml(id)+'">'+escHtml(c.name)+'</option>').join('');
@@ -342,7 +342,7 @@ async function quietScopeCheck(){
    if(!row||row.active===false)return loadClassScope(auth.currentUser,teacherAccess);
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};
   }
-  const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,(c=>c==='all'?'':c)(new URLSearchParams(location.search).get('class')||''));
+  const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,(c=>c==='all'?'':c)(new URLSearchParams(location.search).get('class')||''),'chazara',{partialMemberships:true});
   if(sig(scope)!==sig(teacherScope))loadClassScope(auth.currentUser,access);
  }catch(error){loadClassScope(auth.currentUser,teacherAccess)}
 }
