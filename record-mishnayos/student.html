@@ -834,6 +834,12 @@
     line-height:1.35;
     color:var(--ink);
   }
+  /* Larger question text in the comprehension quiz */
+  #questionModeBlock .instruction-copy strong{
+    font-size:1.35rem;
+    line-height:1.4;
+    font-weight:800;
+  }
   .instruction-copy span{
     display:block;
     margin-top:3px;
@@ -4567,6 +4573,10 @@ async function gradeCurrentQuestionAnswer(){
   document.getElementById('questionsDoneBlock').classList.toggle('hidden',!allAnswered);
   renderAnsweredQuestionHistory();renderQuestionFinalScore();renderQuestionWordChoices(current,comprehensionQResults[idx]);
   await autosaveComprehensionQuestions();
+  if(allAnswered&&typeof showCelebration==='function'){
+    const correct=comprehensionQuestions.filter((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct').length;
+    setTimeout(()=>showCelebration(correct,comprehensionQuestions.length),600);
+  }
   if(!allAnswered)setTimeout(()=>{
     if(comprehensionMode!=='questions')return;
     const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&(!comprehensionQResults[i]||comprehensionQResults[i].verdict!=='correct'));
@@ -6531,6 +6541,97 @@ async function deleteAttempt(attempt, btnEl){
 }
 </script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
+
+<!-- ===== CELEBRATION OVERLAY ===== -->
+<style>
+#celebrationOverlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.55);
+  align-items:center;justify-content:center;
+}
+#celebrationOverlay.show{ display:flex; }
+#celebrationBox{
+  background:#fffaf0;border-radius:24px;padding:36px 32px 28px;
+  text-align:center;max-width:340px;width:90%;
+  box-shadow:0 8px 40px rgba(0,0,0,.28);
+  animation:celebPop .45s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes celebPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+#celebrationBox .celeb-emoji{ font-size:3.5rem; margin-bottom:8px; }
+#celebrationBox h2{ font-size:1.6rem; margin:0 0 6px; color:#2a1a00; }
+#celebrationBox .celeb-score{ font-size:1.15rem; font-weight:700; color:#8b6914; margin-bottom:20px; }
+#celebrationBox .btn{ font-size:1rem; }
+#confettiCanvas{ position:fixed;inset:0;pointer-events:none;z-index:9998; }
+</style>
+
+<canvas id="confettiCanvas"></canvas>
+<div id="celebrationOverlay" role="dialog" aria-modal="true" aria-labelledby="celebTitle">
+  <div id="celebrationBox">
+    <div class="celeb-emoji">🎉</div>
+    <h2 id="celebTitle">Amazing job!</h2>
+    <div class="celeb-score" id="celebScore"></div>
+    <button class="btn gold" id="celebDoneBtn" style="width:100%">Keep going ▶️</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* Confetti */
+  const canvas=document.getElementById('confettiCanvas');
+  const ctx=canvas.getContext('2d');
+  let pieces=[],rafId=null,running=false;
+  const COLORS=['#f7c948','#e84393','#43c6e8','#5fce62','#ff7b3e','#b96ef7'];
+  function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  function spawnPieces(){
+    pieces=[];
+    for(let i=0;i<140;i++){
+      pieces.push({
+        x:Math.random()*canvas.width, y:-20-Math.random()*200,
+        r:5+Math.random()*6, vx:(Math.random()-.5)*4,
+        vy:3+Math.random()*4, angle:Math.random()*360,
+        spin:(Math.random()-.5)*8,
+        color:COLORS[Math.floor(Math.random()*COLORS.length)],
+        shape:Math.random()<.5?'rect':'circle'
+      });
+    }
+  }
+  function drawFrame(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    pieces.forEach(p=>{
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle*Math.PI/180);
+      ctx.fillStyle=p.color;
+      if(p.shape==='rect'){ctx.fillRect(-p.r,-p.r*.5,p.r*2,p.r);}
+      else{ctx.beginPath();ctx.arc(0,0,p.r*.7,0,Math.PI*2);ctx.fill();}
+      ctx.restore();
+      p.x+=p.vx;p.y+=p.vy;p.angle+=p.spin;p.vy+=.07;
+    });
+    pieces=pieces.filter(p=>p.y<canvas.height+40);
+    if(pieces.length>0||running)rafId=requestAnimationFrame(drawFrame);
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+  function launchConfetti(){
+    running=true;spawnPieces();
+    if(rafId)cancelAnimationFrame(rafId);
+    drawFrame();
+    setTimeout(()=>{running=false;},3000);
+  }
+
+  /* Show overlay */
+  window.showCelebration=function(correct,total){
+    const pct=Math.round(correct/total*100);
+    document.getElementById('celebScore').textContent=correct+' out of '+total+' correct — '+pct+'%!';
+    document.getElementById('celebrationOverlay').classList.add('show');
+    launchConfetti();
+  };
+  document.getElementById('celebDoneBtn').onclick=function(){
+    document.getElementById('celebrationOverlay').classList.remove('show');
+  };
+  document.getElementById('celebrationOverlay').addEventListener('click',function(e){
+    if(e.target===this)this.classList.remove('show');
+  });
+})();
+</script>
 </body>
 </html>
 
