@@ -152,4 +152,69 @@ for (const [name, api] of Object.entries(cores)) {
     const other = await api(store, {}, { action: 'dmInbox', ...student('s2', 'Dan Two', '2222') }, 4);
     assert.ok(!other.groups[0].contacts.some(c => c.id === 'a1'));
   });
+
+  // ---- the owner also teaches a class (#730) ----
+  // The owner's classes come from the owner's own teacher invitation (written in Owner Admin).
+  const ownerSetup = (invite = {}) => {
+    const store = makeStore(), ws = store.data.b3Games.workspaces['b3-2026'];
+    store.data.b3Games.admins.own = { uid: 'own', email: 'Owner.Person@example.org', role: 'admin', active: true };
+    ws.teachers.own = { role: 'owner', active: true };
+    ws.teacherInvites = { owner_person_example_org: { email: 'owner.person@example.org', name: 'Rabbi Owner', role: 'teacher', active: true, classIds: { et: true }, ...invite } };
+    return store;
+  };
+  const contactsOf = async (store, who = student()) => (await api(store, {}, { action: 'dmInbox', ...who }, 1)).groups.flatMap(g => g.contacts);
+
+  test(`${name}: students see the owner as a teacher of the class the owner assigned to themself`, async () => {
+    const store = ownerSetup();
+    const mine = await contactsOf(store);
+    assert.deepEqual(mine.map(c => c.id).sort(), ['own', 'p1', 't1']);
+    const row = mine.find(c => c.id === 'own');
+    assert.equal(row.kind, 'teacher'); assert.equal(row.name, 'Rabbi Owner');
+    // Only in that class: a student of another class does not see the owner.
+    const other = await contactsOf(store, student('s3', 'Eli Three', '3333', 'wt'));
+    assert.ok(!other.some(c => c.id === 'own'));
+    // The student can write first, and the owner finds it in their inbox.
+    await api(store, {}, { action: 'dmSend', ...student(), teacherId: 'own', text: 'Hello Rebbi' }, 2, ids);
+    const owner = { identity: { uid: 'own', email: 'owner.person@example.org', email_verified: true, firebase: { sign_in_provider: 'google.com' } } };
+    const inbox = await api(store, owner, { action: 'dmInbox' }, 3);
+    assert.equal(inbox.groups.find(g => g.id === 'et').contacts.find(c => c.id === 's1').unread, 1);
+  });
+
+  test(`${name}: the owner's email address is never shown to students`, async () => {
+    const mine = await contactsOf(ownerSetup({ name: 'owner.person@example.org' }));
+    assert.equal(mine.find(c => c.id === 'own').name, 'Owner Person');
+    assert.ok(!JSON.stringify(mine).includes('@'));
+  });
+
+  test(`${name}: the owner is not listed without an active, ordinary invitation of their own for that class`, async () => {
+    const cases = {
+      'no invitation': s => { delete s.data.b3Games.workspaces['b3-2026'].teacherInvites; },
+      'inactive invitation': s => { s.data.b3Games.workspaces['b3-2026'].teacherInvites.owner_person_example_org.active = false; },
+      'class not assigned': s => { s.data.b3Games.workspaces['b3-2026'].teacherInvites.owner_person_example_org.classIds = { wt: true }; },
+      'class switched off in the invitation': s => { s.data.b3Games.workspaces['b3-2026'].teacherInvites.owner_person_example_org.classIds = { et: false }; },
+      'principal invitation': s => { s.data.b3Games.workspaces['b3-2026'].teacherInvites.owner_person_example_org.accountType = 'principal'; },
+      "invitation holds another person's email": s => { s.data.b3Games.workspaces['b3-2026'].teacherInvites.owner_person_example_org.email = 'someone.else@example.org'; },
+      'administrator switched off': s => { s.data.b3Games.admins.own.active = false; },
+      'not an administrator': s => { delete s.data.b3Games.admins.own; },
+      'administrator record has no email': s => { delete s.data.b3Games.admins.own.email; }
+    };
+    for (const [label, change] of Object.entries(cases)) {
+      const store = ownerSetup(); change(store);
+      const mine = await contactsOf(store);
+      assert.deepEqual(mine.map(c => c.id).sort(), ['p1', 't1'], label);
+      await assert.rejects(api(store, {}, { action: 'dmSend', ...student(), teacherId: 'own', text: 'Hi' }, 2, ids), /only message your own teachers/, label);
+    }
+  });
+
+  test(`${name}: an invitation alone never makes anyone a contact, and other teachers are unchanged`, async () => {
+    const store = makeStore(), ws = store.data.b3Games.workspaces['b3-2026'];
+    // An invited teacher who has not signed in yet has no teacher record: still not listed.
+    ws.teacherInvites = { new_teacher_example_org: { email: 'new.teacher@example.org', name: 'New Teacher', role: 'teacher', active: true, classIds: { et: true } } };
+    assert.deepEqual((await contactsOf(store)).map(c => c.id).sort(), ['p1', 't1']);
+    // A teacher record wins over an invitation-based entry for the same account.
+    const both = ownerSetup();
+    both.data.b3Games.workspaces['b3-2026'].teachers.own = { active: true, accountType: 'principal', displayName: 'Menahel Owner', classIds: { et: true } };
+    const row = (await contactsOf(both)).find(c => c.id === 'own');
+    assert.equal(row.kind, 'principal'); assert.equal(row.name, 'Menahel Owner');
+  });
 }
