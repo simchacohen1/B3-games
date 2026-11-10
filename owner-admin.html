@@ -119,7 +119,15 @@ small.warn{display:block;color:#b45309;margin-top:4px}
 <section class="card hidden" data-view="classes"><div class="card-head"><h2>Classes</h2></div>
 <p class="hint">Create a class for each group of students. Click a class to see its teachers, students and tools.</p>
 <div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
-<div class="listlabel">Classes in this school</div><div id="classes"></div></section>
+<div class="listlabel">Classes in this school</div><div id="classes"></div>
+<div id="bulkToolBar" style="display:none;position:sticky;bottom:16px;background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:8px;padding:12px 16px;margin-top:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:none;align-items:center;gap:10px;flex-wrap:wrap">
+ <span id="bulkSelCount" style="font-weight:600;white-space:nowrap"></span>
+ <select id="bulkToolSelect" style="flex:1;min-width:160px"><option value="">— choose a tool —</option></select>
+ <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="bulkAction" value="on" checked> Turn ON</label>
+ <label style="display:flex;align-items:center;gap:4px"><input type="radio" name="bulkAction" value="off"> Turn OFF</label>
+ <button id="bulkApply" class="primary">Apply to selected</button>
+ <button id="bulkClearSel" style="margin-left:auto">Clear selection</button>
+</div></section>
 
 <section class="card hidden" data-view="class"><div class="card-head"><h2>Teachers</h2></div>
 <p class="hint">Teachers who have this class. To add one, pick a teacher from this school and press Assign.</p>
@@ -996,7 +1004,36 @@ function renderTeachers(){
 function renderClasses(){
  // A class can have several teachers: list every teacher assigned to it.
  const classTeachers={};Object.values(teacherData).filter(t=>t&&!B3PrincipalScope.principal(t)).forEach(t=>Object.keys(t.classIds||{}).forEach(c=>{if(t.classIds[c]===true)(classTeachers[c]=classTeachers[c]||[]).push(t.name||t.email||"Teacher")}));
- q("classes").innerHTML=schoolClassIds().map(id=>{const v=classData[id],names=(classTeachers[id]||[]).sort(byName),n=classStudentIds(id).length;return '<div class="entry row"><span><button type="button" class="linkbtn" data-go="'+safe(navPath(nav.school,"classes",id))+'">'+safe(v.name||id)+'</button><small data-class-teachers="'+safe(id)+'">'+(names.length?(names.length===1?'Teacher: ':'Teachers: ')+names.map(safe).join(", "):'No teacher yet')+' &middot; '+n+' '+(n===1?'student':'students')+'</small></span><span class="rowbtns">'+classSchoolPicker(id,v)+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+safe(id)+'">Delete</button>')+'</span></div>'}).join("")||'<small>No classes in this school yet.</small>';
+ q("classes").innerHTML=schoolClassIds().map(id=>{const v=classData[id],names=(classTeachers[id]||[]).sort(byName),n=classStudentIds(id).length;return '<div class="entry row"><label class="bulk-check-wrap" title="Select for bulk tool"><input type="checkbox" class="bulk-class-cb" data-class-id="'+safe(id)+'" style="margin-right:6px;cursor:pointer;width:16px;height:16px"></label><span><button type="button" class="linkbtn" data-go="'+safe(navPath(nav.school,"classes",id))+'">'+safe(v.name||id)+'</button><small data-class-teachers="'+safe(id)+'">'+(names.length?(names.length===1?'Teacher: ':'Teachers: ')+names.map(safe).join(", "):'No teacher yet')+' &middot; '+n+' '+(n===1?'student':'students')+'</small></span><span class="rowbtns">'+classSchoolPicker(id,v)+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+safe(id)+'">Delete</button>')+'</span></div>'}).join("")||'<small>No classes in this school yet.</small>';
+ // Wire up bulk toolbar
+ const bar=q("bulkToolBar"),selCount=q("bulkSelCount");
+ // Populate tool dropdown once
+ const toolSel=q("bulkToolSelect");
+ if(toolSel.options.length<=1){PLATFORM_TOOLS.forEach(([id,name])=>{const o=document.createElement("option");o.value=id;o.textContent=name;toolSel.appendChild(o)});}
+ function updateBulkBar(){
+  const checked=q("classes").querySelectorAll(".bulk-class-cb:checked");
+  if(checked.length>0){bar.style.display="flex";selCount.textContent=checked.length+" class"+(checked.length===1?"":"es")+" selected";}
+  else{bar.style.display="none";}
+ }
+ q("classes").addEventListener("change",e=>{if(e.target.classList.contains("bulk-class-cb"))updateBulkBar();});
+ q("bulkClearSel").onclick=()=>{q("classes").querySelectorAll(".bulk-class-cb").forEach(c=>c.checked=false);updateBulkBar();};
+ q("bulkApply").onclick=async()=>{
+  const checked=[...q("classes").querySelectorAll(".bulk-class-cb:checked")];
+  const tool=q("bulkToolSelect").value;
+  const on=document.querySelector('input[name="bulkAction"]:checked')?.value==="on";
+  if(!tool){q("status").textContent="Choose a tool first.";return;}
+  if(!checked.length){q("status").textContent="Select at least one class.";return;}
+  q("bulkApply").disabled=true;q("status").textContent="Saving…";
+  try{
+   const root="b3Games/workspaces/"+WS+"/classes/";
+   const updates={};
+   checked.forEach(cb=>updates[root+cb.dataset.classId+"/toolGrants/"+tool]=on?true:null);
+   await db.ref().update(updates);
+   q("status").textContent="Saved ✓ — "+tool+" turned "+(on?"ON":"OFF")+" for "+checked.length+" class"+(checked.length===1?"":"es")+".";
+   checked.forEach(cb=>cb.checked=false);updateBulkBar();
+  }catch(err){console.error(err);q("status").textContent="Could not save. Please try again.";}
+  finally{q("bulkApply").disabled=false;}
+ };
 }
 // One class: its teachers, its students, and its tools and content.
 function renderClassPage(){
