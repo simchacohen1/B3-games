@@ -976,13 +976,14 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
 }
 
 // Posuk Practice teacher review: one recording, graded by hand (Issue #694).
-// Staging uses this project's own default bucket, never the production one.
+// Staging checks its own bucket, never the production one.
+const POSUK_AUDIO_BUCKET='fun-torah-tools-staging.firebasestorage.app';
 const posukReview=posukReviewCore.createPosukReview({
   rtdb,SR_ROOT,
   resolveRewardStudentId:id=>resolveRewardStudentId(id),
   studentInfo:id=>studentInfo(id),
   fileExists:async path=>{
-    try{const [exists]=await admin.storage().bucket().file(path).exists();return exists;}
+    try{const [exists]=await admin.storage().bucket(POSUK_AUDIO_BUCKET).file(path).exists();return exists;}
     catch(err){console.warn('Posuk recording check failed',err);throw Object.assign(new Error('Recordings cannot be checked on this site (audio storage is not set up).'),{code:503});}
   }
 });
