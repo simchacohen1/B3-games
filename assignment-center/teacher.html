@@ -328,7 +328,7 @@ button.link:hover{background:none;color:var(--navy)}
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
-<script src="../class-confirm-gate.js"></script>
+<script src="../class-confirm-gate.js"></script><script src="../owner-teacher-view.js?v=20261109-726"></script>
 <script src="homework-common.js"></script>
 <script src="messages-ui.js"></script>
 <script src="homework-items.js"></script>
@@ -380,7 +380,16 @@ $('openMessages').onclick=function(){renderMessages();showScreen('screenMessages
 // Messages (#647): one-on-one chats with every student in every class this account may open.
 var dmUnread=0,legacyUnread=0;
 function drawMessagesCount(){var n=dmUnread+legacyUnread;$('messagesCount').textContent=String(n);$('messagesCount').hidden=!n}
-var Msgs=window.HomeworkMessages.create({role:'teacher',call:function(body){return api(body)},
+// Owner in Teacher view (#726): only the owner's own classes. This only filters what is
+// shown; the server still decides what any account may open. Null for everyone else.
+var ownClassIds=null;
+async function dmApi(body){
+  if(!ownClassIds||(body.action!=='dmInbox'&&body.action!=='dmUnread'))return api(body);
+  // The unread count must match the narrowed inbox, so it is counted from the inbox.
+  var d=window.B3OwnerTeacherView.narrowInbox(await api({action:'dmInbox'}),ownClassIds);
+  return body.action==='dmUnread'?{ok:true,unread:d.unread}:d;
+}
+var Msgs=window.HomeworkMessages.create({role:'teacher',call:function(body){return dmApi(body)},
   who:function(c){return {classId:c.classId,studentId:c.id}},
   onUnread:function(n){dmUnread=n;drawMessagesCount()},
   onJump:async function(id,c){
@@ -412,7 +421,11 @@ auth.onAuthStateChanged(async function(u){
   try{
     var token=await u.getIdToken();
     var result=await H.call({action:'authorizedClasses'},token);
-    var classes=Array.isArray(result.classes)?result.classes:[],ids=classes.map(function(c){return c.id});
+    var classes=Array.isArray(result.classes)?result.classes:[];
+    var teaching=window.B3OwnerTeacherView?await window.B3OwnerTeacherView.resolve(firebase.database(),WS,u):null;
+    ownClassIds=teaching?teaching.classIds:null;
+    if(ownClassIds){classes=window.B3OwnerTeacherView.narrow(classes,ownClassIds);window.B3OwnerTeacherView.mountBanner()}
+    var ids=classes.map(function(c){return c.id});
     if(!classes.length){$('signin').style.display='';$('app').style.display='none';say($('signinMsg'),'No authorized homework classes are assigned to this Google account.');return}
     $('cls').replaceChildren();
     classes.forEach(function(c){var o=el('option',c.name||c.id);o.value=c.id;$('cls').append(o)});
