@@ -99,7 +99,10 @@ test('NigriConnect: teachers never send the shared key; password field is cleare
 test('Owner Admin: schools section, required school for new teachers and principals, owner-only move', () => {
   const html = read('owner-admin.html');
   assert.match(html, /<script src="school-scope\.js\?v=\d+"><\/script>/);
-  for (const id of ['schoolsCard', 'schoolMove', 'schoolName', 'addSchool', 'schools', 'teacherSchool', 'principalSchool']) assert.match(html, new RegExp('id="' + id + '"'));
+  for (const id of ['schoolsCard', 'schoolMove', 'schoolName', 'addSchool', 'schools']) assert.match(html, new RegExp('id="' + id + '"'));
+  // The school is the one that is open (issue #722): the add forms have no school dropdown.
+  for (const id of ['teacherSchool', 'principalSchool', 'classSchool']) assert.doesNotMatch(html, new RegExp('id="' + id + '"'));
+  assert.match(html, /const schoolId=nav\.school;if\(!schoolData\[schoolId\]\)/);
   assert.match(html, /if\(!schoolData\[schoolId\]\)\{q\("status"\)\.textContent="Choose the teacher's school\.";return;\}/);
   assert.match(html, /updatedAt:firebase\.database\.ServerValue\.TIMESTAMP,schoolId:schoolId\}/);
   assert.match(html, /Choose the principal's school\./);

@@ -31,7 +31,8 @@ function harness(){
  const els={};
  const el=id=>els[id]??={id,style:{},value:'',textContent:'',innerHTML:'',disabled:false,files:[],scrollTop:0,scrollHeight:0,querySelectorAll:()=>[],insertAdjacentHTML(){} ,remove(){}};
  const downloads=[];
- const ctx={q:el,fetch,WS:'b3-2026',classData:tree.b3Games.workspaces['b3-2026'].classes,
+ const scope={current:null}; // the school that is open in Owner Admin; null = no school scoping
+ const ctx={q:el,fetch,WS:'b3-2026',schoolScope:()=>scope.current,classData:tree.b3Games.workspaces['b3-2026'].classes,
   auth:{currentUser:{getIdToken:async()=>'owner-token'}},
   firebase:{app:()=>({options:{projectId:'b3-games'}}),database:{ServerValue:{TIMESTAMP:{'.sv':'timestamp'}}}},
   safe:s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
@@ -43,7 +44,7 @@ function harness(){
   console,setTimeout,Date,JSON,Object,Promise,Math,Set};
  vm.createContext(ctx);vm.runInContext(block,ctx);
  const settle=()=>new Promise(r=>setTimeout(r,20));
- return {tree,store,el,calls,ctx,
+ return {tree,store,el,calls,ctx,scope,
   check:async(text,name='roster.csv')=>{el('bulkFile').files=[{text,name}];el('bulkPreview').onclick();await settle();},
   importNow:async()=>{await el('bulkImport').onclick();await settle();}};
 }
@@ -176,4 +177,68 @@ test('Undo CSV Import: if anything changes after the review, nothing is removed'
  h.el('rbConfirm').value='UNDO 10';await h.el('rbRun').onclick();
  assert.match(h.el('status').textContent,/changed since the preview/);
  assert.equal(Object.keys(h.tree.b3Games.students).length,10);
+});
+
+// ---- School scope (issue #722): the bulk tools only touch the school that is open ----
+// The same object owner-admin.html's schoolScope() builds, over this harness's classes.
+function scopeFor(h,id,name,{students={},staff={}}={}){
+ const classes=h.tree.b3Games.workspaces['b3-2026'].classes,adopted=[];
+ const placed=c=>!!classes[c]&&!!classes[c].schoolId;
+ h.scope.current={id,name,adopted,
+  hasClass:c=>!!classes[c]&&classes[c].schoolId===id,classPlaced:placed,classOk:c=>!placed(c)||classes[c].schoolId===id,
+  hasStudent:s=>students[s]===id,studentOk:s=>!students[s]||students[s]===id,staffOk:i=>!staff[i]||staff[i]===id,
+  adopt:async what=>{adopted.push(what);}};
+ return h.scope.current;
+}
+test('school scope: a class that belongs to another school stops the upload',async()=>{
+ const h=harness(),classes=h.tree.b3Games.workspaces['b3-2026'].classes;
+ classes.b2_et_morning.schoolId='north';classes.b2_et_afternoon.schoolId='south';
+ scopeFor(h,'north','North School');
+ await h.check(csv(['Student,Scoped Kid,,313233,B2 ET Morning; B2 ET Afternoon']));
+ assert.equal(h.el('bulkImport').disabled,true);
+ assert.match(h.el('bulkSummary').innerHTML,/Class "B2 ET · Afternoon" belongs to another school, not North School/);
+ assert.doesNotMatch(h.el('bulkSummary').innerHTML,/"B2 ET · Morning" belongs/);
+ await h.importNow();
+ assert.ok(!h.calls.some(c=>c.action==='importApply'),'nothing is imported');
+ assert.equal(named(h,'Scoped Kid').length,0);
+});
+test('school scope: a student whose account is in another school stops the upload',async()=>{
+ const h=harness(),classes=h.tree.b3Games.workspaces['b3-2026'].classes;
+ classes.b2_et_morning.schoolId='north';
+ const text=csv(['Student,Moved Kid,,414243,B2 ET Morning']);
+ await h.check(text);await h.importNow();
+ const id=named(h,'Moved Kid')[0].profile.id;
+ scopeFor(h,'north','North School',{students:{[id]:'south'}});
+ await h.check(text); // the same file again: the server recognises the child
+ assert.equal(h.el('bulkImport').disabled,true,h.el('bulkSummary').innerHTML);
+ assert.match(h.el('bulkSummary').innerHTML,/Moved Kid already has an account in another school/);
+});
+test('school scope: what an upload makes is handed to the open school',async()=>{
+ const h=harness(),classes=h.tree.b3Games.workspaces['b3-2026'].classes;
+ classes.b2_et_morning.schoolId='north';
+ const sc=scopeFor(h,'north','North School');
+ await h.check(csv(['Class,New Room,,,','Teacher,New Teacher,new.teacher@example.test,,New Room','Student,Fresh Kid,,515253,B2 ET Morning; New Room']));
+ assert.equal(h.el('bulkImport').disabled,false,h.el('bulkSummary').innerHTML);
+ await h.importNow();
+ assert.match(h.el('bulkProgress').textContent,/Done! 1 student\(s\) created/);
+ assert.equal(sc.adopted.length,1);
+ const newClass=Object.keys(classes).find(c=>classes[c].name==='New Room');
+ assert.deepEqual([...sc.adopted[0].classIds].sort(),['b2_et_morning',newClass].sort());
+ assert.deepEqual([...sc.adopted[0].inviteIds],['new_teacher_example_test']);
+ assert.deepEqual([...sc.adopted[0].studentIds],[named(h,'Fresh Kid')[0].profile.id]);
+});
+test('school scope: Bulk Manage and Undo Import list only the open school',async()=>{
+ const h=harness(),classes=h.tree.b3Games.workspaces['b3-2026'].classes,t=Date.parse('2026-11-09T17:49:11Z');
+ classes.b2_et_morning.schoolId='north';classes.b2_et_afternoon.schoolId='south';
+ for(let i=0;i<10;i++)await manageStudents(h.store,OWNER,{action:'create',classId:'b2_et_morning',name:'North Kid '+i,passcode:String(700000+i)},t+i*100);
+ for(let i=0;i<10;i++)await manageStudents(h.store,OWNER,{action:'create',classId:'b2_et_afternoon',name:'South Kid '+i,passcode:String(800000+i)},t+86400000+i*100);
+ scopeFor(h,'north','North School');
+ await h.el('bmLoad').onclick();
+ assert.match(h.el('bmList').innerHTML,/North Kid 3/);
+ assert.doesNotMatch(h.el('bmList').innerHTML,/South Kid/);
+ assert.match(h.el('bmClass').innerHTML,/b2_et_morning/);assert.doesNotMatch(h.el('bmClass').innerHTML,/b2_et_afternoon/);
+ assert.equal([...h.el('undoBatches').innerHTML.matchAll(/data-undo-batch=/g)].length,1,'only the import into this school');
+ h.scope.current=null;
+ await h.ctx.undoLoad();
+ assert.equal([...h.el('undoBatches').innerHTML.matchAll(/data-undo-batch=/g)].length,2);
 });
