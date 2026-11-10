@@ -20,7 +20,16 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;back
 header{background:#172033;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 h1{margin:0;font-size:24px}.sub{color:#b9c6da;font-size:14px;margin-top:4px}
 .back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:11px 16px;border-radius:10px}
-main{max-width:760px;margin:24px auto 90px;padding:0 16px}
+/* Sidebar layout */
+.oa-layout{display:flex;align-items:flex-start}
+.oa-sidebar{width:190px;flex:none;background:#1e293b;min-height:calc(100vh - 72px);position:sticky;top:0;padding:14px 0;overflow-y:auto;max-height:100vh}
+.oa-sidebar nav{display:flex;flex-direction:column;gap:1px}
+.oa-nav-btn{display:block;width:100%;text-align:left;border:none;background:transparent;color:#cbd5e1;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;border-left:3px solid transparent}
+.oa-nav-btn:hover{background:#2d3f55;color:#fff}
+.oa-nav-btn.oa-active{background:#2d3f55;color:#fff;border-left-color:#3b82f6}
+.oa-main{flex:1;min-width:0;padding:20px 20px 90px}
+main{max-width:760px;margin:0 auto}
+.oa-anchor{display:block;height:1px;margin-top:-1px;visibility:hidden}
 .notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;padding:14px 16px;margin-bottom:18px;line-height:1.45;font-size:16px}
 .card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 4px 14px rgba(15,23,42,.06)}
 .card-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
@@ -60,38 +69,56 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 </style>
 </head><body>
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
-<main>
 <div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
 <div id="ownerArea" class="hidden">
-<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
+<div class="oa-layout">
+<div class="oa-sidebar"><nav>
+  <button class="oa-nav-btn" data-target="sec-schools">🏫 Schools</button>
+  <button class="oa-nav-btn" data-target="sec-teachers">👤 Teachers</button>
+  <button class="oa-nav-btn" data-target="sec-principals">🎓 Principals</button>
+  <button class="oa-nav-btn" data-target="sec-classes">📚 Classes</button>
+  <button class="oa-nav-btn" data-target="sec-assign">🔗 Assign</button>
+  <button class="oa-nav-btn" data-target="sec-tools">🛠 Tools</button>
+  <button class="oa-nav-btn" data-target="sec-students">👥 Students</button>
+  <button class="oa-nav-btn" data-target="sec-bulk">📋 Bulk Upload</button>
+  <button class="oa-nav-btn" data-target="sec-undo">↩️ Undo Import</button>
+  <button class="oa-nav-btn" data-target="sec-manage">🧹 Bulk Manage</button>
+</nav></div>
+<div class="oa-main"><main>
 
+<span id="sec-schools" class="oa-anchor"></span>
 <section class="card" id="schoolsCard"><div class="card-head"><h2>&#x1F3EB; Schools</h2></div>
 <p class="hint">Every teacher belongs to one school. Only you choose it. Teachers in a school with <b>Syncs to Nigri</b> on see the Nigri login and School Marks sync; everyone else never sees Nigri.</p>
 <div id="schoolMove"></div>
 <div class="formrow"><input id="schoolName" placeholder="New school name" maxlength="80"><button id="addSchool" type="button">Add school</button></div>
 <div class="listlabel">Your schools</div><div id="schools"></div></section>
 
+<span id="sec-teachers" class="oa-anchor"></span>
 <section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
 <p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
 <div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><select id="teacherSchool" aria-label="School"><option value="">Choose school</option></select><button id="addTeacher">Add teacher</button></div>
 <div class="listlabel">Your teachers</div><div id="teachers"></div></section>
 
+<span id="sec-principals" class="oa-anchor"></span>
 <section class="card"><div class="card-head"><h2>Principals</h2></div>
 <p class="hint">A principal signs in with Google and can use teacher tools for all classes taught by the teachers you select. Only you can add accounts, assign supervision or change platform-wide settings.</p>
 <div class="formrow"><input id="principalEmail" type="email" placeholder="Principal Google email"><input id="principalName" placeholder="Principal name"><select id="principalSchool" aria-label="School"><option value="">Choose school</option></select><button id="addPrincipal">Add principal</button></div>
 <div id="principals"></div></section>
 
+<span id="sec-classes" class="oa-anchor"></span>
 <section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
 <p class="hint">Create a class for each group of students. Every class belongs to one school.</p>
 <div class="formrow"><input id="className" placeholder="New class name"><select id="classSchool" aria-label="School"><option value="">Choose school</option></select><button id="addClass">Add class</button></div>
 <div id="classSchoolMove"></div>
 <div class="listlabel">Your classes</div><div id="classes"></div></section>
 
+<span id="sec-assign" class="oa-anchor"></span>
 <section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
 <p class="hint">Pick a teacher and a class, then press Assign.</p>
 <div class="formrow"><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button></div>
 <div class="listlabel">Who has what</div><div id="assignments"></div></section>
 
+<span id="sec-tools" class="oa-anchor"></span>
 <section class="card"><div class="card-head"><div class="stepnum">4</div><h2>Tools and content</h2></div>
 <p class="hint">New classes start with no tools. Choose a class, then tap only the tools its teacher should get. Green = on. Changes save instantly.</p>
 <select id="toolClassSelect"><option value="">Choose class</option></select>
@@ -104,6 +131,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <select id="libraryTeacherSelect"><option value="">Choose teacher</option></select>
 <div id="libraryGrant"></div></section>
 
+<span id="sec-students" class="oa-anchor"></span>
 <section class="card" id="studentsCard">
 <div class="card-head"><h2>Students</h2></div>
 <p class="hint">Each student belongs to one school, and only you can choose it. Then tick the classes they are in &mdash; only that school&rsquo;s classes are shown. Ticking adds the student to the class; unticking takes them out (their work is kept). Names, passcodes and sign-in don&rsquo;t change.</p>
@@ -112,6 +140,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="studentList"></div>
 </section>
 
+<span id="sec-bulk" class="oa-anchor"></span>
 <section class="card" id="bulkUploadCard"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
 <p class="hint">Upload a CSV to add classes, teachers, principals and students. <b>Each person is on one row.</b> Put every class a student or teacher is in into the <code>Classes</code> column, separated by semicolons, for example <code>B2 ET Morning; B2 ET Afternoon</code>. A student with five classes is still one row, one passcode and one account. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
 <p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>Type</code> (Class, Principal, Teacher, Student), <code>Name</code>, <code>Email</code> (teachers and principals), <code>Passcode</code> (students, exactly 6 digits), <code>Classes</code>, and optional <code>Student ID</code> (your own roster number, used to recognise the student next time). Classes first, then teachers and principals, then students. Older files with one row per class still work: rows with the same name and passcode become one student.</p>
@@ -128,6 +157,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="bulkLog" style="margin-top:8px;font-size:14px;max-height:260px;overflow-y:auto;background:#f8fafc;border-radius:10px;padding:10px 14px;display:none"></div>
 </section>
 
+<span id="sec-undo" class="oa-anchor"></span>
 <section class="card" id="undoImportCard"><div class="card-head"><h2>&#x21A9;&#xFE0F; Undo CSV Import</h2></div>
 <p class="hint">Takes back a CSV import that went wrong. You choose the import, see every account and class it touches, download a backup, and confirm once. Only accounts the import itself made, and that are still empty, are removed. Students who were on the site before, anything with saved work, classes and teachers are never deleted, and everything removed can be put back.</p>
 <div class="formrow"><button id="undoOpen" type="button">Undo CSV Import</button></div>
@@ -141,6 +171,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 </div>
 </section>
 
+<span id="sec-manage" class="oa-anchor"></span>
 <section class="card" id="bulkManageCard"><div class="card-head"><h2>&#x1F9F9; Students &rarr; Bulk Management</h2></div>
 <p class="hint">Find students by class, import, creation date or name. Preview shows each account's history and any saved student work. Only accounts with <b>no</b> student work can be deleted, every deletion is backed up first and can be undone, and the server checks everything again.</p>
 <div class="formrow"><button id="bmLoad" type="button">Load students</button><button id="bmAudit" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Audit log</button></div>
@@ -159,9 +190,10 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 </div>
 <div id="bmAuditArea" style="margin-top:10px"></div>
 </section>
-</div>
+</div><!-- end ownerArea -->
 <div id="status" class="toast"></div>
-</main>
+</main></div><!-- oa-main -->
+</div><!-- oa-layout -->
 
 <script>
 (function(){
@@ -835,6 +867,28 @@ q("studentList").addEventListener("change",async e=>{
   }catch(err){console.error(err);box.checked=!on;box.disabled=false;q("status").textContent="Could not update the class: "+err.message;}
  }
 });
+
+// ---- Sidebar scroll-nav (all sections stay in DOM; sidebar jumps to anchor) ----
+(function(){
+  const btns=document.querySelectorAll('.oa-nav-btn[data-target]');
+  btns.forEach(btn=>btn.onclick=()=>{
+    const el=document.getElementById(btn.dataset.target);
+    if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}
+    btns.forEach(b=>b.classList.remove('oa-active'));
+    btn.classList.add('oa-active');
+  });
+  // Highlight active section on scroll
+  const anchors=[...document.querySelectorAll('.oa-anchor[id]')];
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const id=e.target.id;
+        btns.forEach(b=>{b.classList.toggle('oa-active',b.dataset.target===id);});
+      }
+    });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  anchors.forEach(a=>observer.observe(a));
+})();
 
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
