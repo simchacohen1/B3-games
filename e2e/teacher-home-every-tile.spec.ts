@@ -35,19 +35,21 @@ test('non-owner teacher opens every tile on the teacher home', async ({ page, br
   await ownerPage.locator('#schoolName').fill('Fictional Pilot School');
   await ownerPage.locator('#addSchool').click();
   await expect(ownerPage.locator('#schools')).toContainText('Fictional Pilot School');
-  await ownerPage.locator('#classSchool').selectOption({ label: 'Fictional Pilot School' });
+  await ownerPage.locator('#schools').getByRole('button',{name:'Fictional Pilot School'}).click();
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
   await ownerPage.locator('#className').fill('Pilot Room Alpha');
   await ownerPage.locator('#addClass').click();
   await expect(ownerPage.locator('#classes')).toContainText('Pilot Room Alpha');
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Teachers'}).click();
   await ownerPage.locator('#teacherEmail').fill('teacher@example.test');
   await ownerPage.locator('#teacherName').fill('Fictional Teacher');
-  await ownerPage.locator('#teacherSchool').selectOption({ label: 'Fictional Pilot School' });
   await ownerPage.locator('#addTeacher').click();
   await expect(ownerPage.locator('#teachers')).toContainText('Fictional Teacher');
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
+  await ownerPage.locator('#classes').getByRole('button',{name:'Pilot Room Alpha'}).click();
   await ownerPage.locator('#teacherSelect').selectOption('teacher_example_test');
-  await ownerPage.locator('#classSelect').selectOption(CLASS_ID);
   await ownerPage.locator('#assign').click();
-  await expect(ownerPage.locator('#assignments')).toContainText('Pilot Room Alpha');
+  await expect(ownerPage.locator('#assignments')).toContainText('Fictional Teacher');
   await ownerContext.close();
   const tools = ['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','gallery','class-gallery','tag','davening','class-pointer','multiplayer-center','name-picker','chavrusa'];
   await env.withSecurityRulesDisabled(async c => {
