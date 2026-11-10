@@ -28,6 +28,9 @@ const ALLOWED_NEW = [
   // reads as posukPractice/attempts.
   ['posukPractice', 'submissions'],
   ['posukPractice', 'reviews'],
+  // Issue #737 (PENDING OWNER REVIEW): grade themes. One theme id per grade (4-8), nothing else.
+  // Publicly readable like the rest of workspaces; writable by the owner, admins and active teachers.
+  ['b3Games', 'workspaces', '$workspaceId', 'gradeThemes'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.

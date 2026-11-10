@@ -1,0 +1,220 @@
+/*
+ * Grade themes (Issue #737). Loaded after the page's own styles.
+ * A theme is only a set of variables; grade-themes.js puts
+ *   class="ftt-themed ftt-theme-<id>"
+ * on <html> (or on one class card on the teacher home).
+ * Pages with no theme class look exactly as before.
+ */
+
+/* ============ Grades 4-5: playful, bright, rounded, emojis ============ */
+.ftt-theme-g45-sunny, .ftt-theme-g45-candy, .ftt-theme-g45-jungle, .ftt-theme-g45-ocean {
+  --ftt-surface: #ffffff; --ftt-text: #1f2a44; --ftt-muted: #5b6b85;
+  --ftt-head-text: #ffffff; --ftt-head-shadow: 0 3px 0 rgba(0, 0, 0, .18);
+  --ftt-head-curve: 50% 50% 0 0 / 100% 100% 0 0;
+  --ftt-radius-lg: 28px; --ftt-radius-md: 22px; --ftt-radius-pill: 999px;
+  --ftt-font-head: 'Fredoka', 'Nunito', Arial, sans-serif; --ftt-font-body: 'Nunito', Arial, sans-serif;
+  --ftt-head-weight: 700; --ftt-head-spacing: .5px;
+}
+.ftt-theme-g45-sunny {
+  --ftt-bg: #fffaf0; --ftt-head-a: #38bdf8; --ftt-head-b: #60c8f5; --ftt-head-c: #7dd3fc; --ftt-head-sub: #e0f5ff;
+  --ftt-title: #0f3b5f; --ftt-accent: #f59e0b; --ftt-border: #fde68a;
+  --ftt-tools-bg: #fff7ed; --ftt-tools-border: #fdba74; --ftt-tools-title: #9a3412;
+  --ftt-c1: #f59e0b; --ftt-c2: #22c55e; --ftt-c3: #ec4899; --ftt-c4: #6366f1; --ftt-c5: #f97316; --ftt-c6: #0ea5e9;
+}
+.ftt-theme-g45-candy {
+  --ftt-bg: #fff5fb; --ftt-head-a: #f472b6; --ftt-head-b: #d98ae0; --ftt-head-c: #c4a0f5; --ftt-head-sub: #fff0fa;
+  --ftt-title: #86198f; --ftt-accent: #ec4899; --ftt-border: #fbcfe8;
+  --ftt-tools-bg: #fdf4ff; --ftt-tools-border: #f0abfc; --ftt-tools-title: #86198f;
+  --ftt-c1: #ec4899; --ftt-c2: #a855f7; --ftt-c3: #f59e0b; --ftt-c4: #06b6d4; --ftt-c5: #f43f5e; --ftt-c6: #8b5cf6;
+}
+.ftt-theme-g45-jungle {
+  --ftt-bg: #f7fdf2; --ftt-head-a: #16a34a; --ftt-head-b: #34b964; --ftt-head-c: #5fd088; --ftt-head-sub: #ecfdf3;
+  --ftt-title: #14532d; --ftt-accent: #16a34a; --ftt-border: #bbf7d0;
+  --ftt-tools-bg: #fefce8; --ftt-tools-border: #fde047; --ftt-tools-title: #713f12;
+  --ftt-c1: #16a34a; --ftt-c2: #ca8a04; --ftt-c3: #ea580c; --ftt-c4: #0d9488; --ftt-c5: #65a30d; --ftt-c6: #d97706;
+}
+.ftt-theme-g45-ocean {
+  --ftt-bg: #f0fbff; --ftt-head-a: #0891b2; --ftt-head-b: #1fb0cf; --ftt-head-c: #4fcbe3; --ftt-head-sub: #ecfeff;
+  --ftt-title: #164e63; --ftt-accent: #0891b2; --ftt-border: #a5f3fc;
+  --ftt-tools-bg: #ecfeff; --ftt-tools-border: #67e8f9; --ftt-tools-title: #155e75;
+  --ftt-c1: #0891b2; --ftt-c2: #2563eb; --ftt-c3: #14b8a6; --ftt-c4: #7c3aed; --ftt-c5: #f97316; --ftt-c6: #0ea5e9;
+}
+
+/* ============ Grades 6-7: cleaner, muted, tighter corners, no emojis ============ */
+.ftt-theme-g67-slate, .ftt-theme-g67-forest, .ftt-theme-g67-sand, .ftt-theme-g67-dusk {
+  --ftt-head-shadow: none; --ftt-head-curve: 0;
+  --ftt-radius-lg: 12px; --ftt-radius-md: 8px; --ftt-radius-pill: 10px;
+  --ftt-font-head: 'Nunito', 'Segoe UI', Arial, sans-serif; --ftt-font-body: 'Nunito', 'Segoe UI', Arial, sans-serif;
+  --ftt-head-weight: 800; --ftt-head-spacing: 0;
+}
+.ftt-theme-g67-slate {
+  --ftt-bg: #f1f5f9; --ftt-surface: #ffffff; --ftt-tile: #f8fafc; --ftt-text: #1e293b; --ftt-muted: #64748b;
+  --ftt-head-a: #334155; --ftt-head-text: #f8fafc; --ftt-head-sub: #cbd5e1;
+  --ftt-accent: #3b82f6; --ftt-border: #dbe2ea;
+}
+.ftt-theme-g67-forest {
+  --ftt-bg: #f3f6f1; --ftt-surface: #ffffff; --ftt-tile: #f6faf6; --ftt-text: #1f2d24; --ftt-muted: #5c6f62;
+  --ftt-head-a: #2f5d46; --ftt-head-text: #f4faf6; --ftt-head-sub: #c9dccf;
+  --ftt-accent: #2f855a; --ftt-border: #d6e1d8;
+}
+.ftt-theme-g67-sand {
+  --ftt-bg: #f7f3ec; --ftt-surface: #fffdf9; --ftt-tile: #fbf7f0; --ftt-text: #3b3024; --ftt-muted: #7a6a58;
+  --ftt-head-a: #7c5e3c; --ftt-head-text: #fffaf2; --ftt-head-sub: #ead9c2;
+  --ftt-accent: #b7791f; --ftt-border: #e5dac8;
+}
+.ftt-theme-g67-dusk {
+  --ftt-bg: #111827; --ftt-surface: #1f2937; --ftt-tile: #273244; --ftt-text: #e5e7eb; --ftt-muted: #a3acb9;
+  --ftt-head-a: #0b1220; --ftt-head-text: #f9fafb; --ftt-head-sub: #a3acb9;
+  --ftt-accent: #818cf8; --ftt-border: #374151;
+}
+
+/* ============ Grade 8: cleanest, sharp corners, serif headings, no emojis ============ */
+.ftt-theme-g8-ink, .ftt-theme-g8-stone, .ftt-theme-g8-midnight, .ftt-theme-g8-charcoal {
+  --ftt-head-shadow: none; --ftt-head-curve: 0;
+  --ftt-radius-lg: 4px; --ftt-radius-md: 2px; --ftt-radius-pill: 4px;
+  --ftt-font-head: Georgia, 'Times New Roman', serif; --ftt-font-body: 'Segoe UI', system-ui, Arial, sans-serif;
+  --ftt-head-weight: 700; --ftt-head-spacing: .2px;
+}
+.ftt-theme-g8-ink {
+  --ftt-bg: #fafafa; --ftt-surface: #ffffff; --ftt-tile: #ffffff; --ftt-text: #111827; --ftt-muted: #6b7280;
+  --ftt-head-a: #111827; --ftt-head-text: #ffffff; --ftt-head-sub: #c7cbd3;
+  --ftt-accent: #2563eb; --ftt-border: #d1d5db;
+}
+.ftt-theme-g8-stone {
+  --ftt-bg: #eef0ec; --ftt-surface: #f8f9f6; --ftt-tile: #fdfdfb; --ftt-text: #2b312b; --ftt-muted: #687068;
+  --ftt-head-a: #4b5548; --ftt-head-text: #f7f8f4; --ftt-head-sub: #d3d9cf;
+  --ftt-accent: #556b2f; --ftt-border: #cfd5cc;
+}
+.ftt-theme-g8-midnight {
+  --ftt-bg: #0b1020; --ftt-surface: #141b2f; --ftt-tile: #1b2440; --ftt-text: #e6e9f2; --ftt-muted: #9aa7bd;
+  --ftt-head-a: #060a16; --ftt-head-text: #f1f5f9; --ftt-head-sub: #9aa7bd;
+  --ftt-accent: #38bdf8; --ftt-border: #2a3554;
+}
+.ftt-theme-g8-charcoal {
+  --ftt-bg: #18181b; --ftt-surface: #232326; --ftt-tile: #2c2c30; --ftt-text: #f4f4f5; --ftt-muted: #a8a8b0;
+  --ftt-head-a: #0f0f11; --ftt-head-text: #fafafa; --ftt-head-sub: #a8a8b0;
+  --ftt-accent: #f59e0b; --ftt-border: #3f3f46;
+}
+/* Shared by both older bands: one accent instead of six colours, flat header. */
+[class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"] {
+  --ftt-head-b: var(--ftt-head-a); --ftt-head-c: var(--ftt-head-a);
+  --ftt-title: var(--ftt-text);
+  --ftt-tools-bg: var(--ftt-surface); --ftt-tools-border: var(--ftt-border); --ftt-tools-title: var(--ftt-text);
+  --ftt-c1: var(--ftt-accent); --ftt-c2: var(--ftt-accent); --ftt-c3: var(--ftt-accent);
+  --ftt-c4: var(--ftt-accent); --ftt-c5: var(--ftt-accent); --ftt-c6: var(--ftt-accent);
+}
+
+/* ==================== Page (theme on <html>) ==================== */
+html.ftt-themed body { background: var(--ftt-bg) !important; color: var(--ftt-text); font-family: var(--ftt-font-body) !important; }
+html.ftt-themed body > h1 {
+  background: linear-gradient(180deg, var(--ftt-head-a) 0%, var(--ftt-head-b) 100%) !important;
+  color: var(--ftt-head-text) !important; font-family: var(--ftt-font-head) !important;
+  font-weight: var(--ftt-head-weight) !important; letter-spacing: var(--ftt-head-spacing); text-shadow: var(--ftt-head-shadow) !important;
+}
+html.ftt-themed body > .subtitle {
+  background: linear-gradient(180deg, var(--ftt-head-b) 0%, var(--ftt-head-c) 100%) !important; color: var(--ftt-head-sub) !important;
+}
+html.ftt-themed body > .subtitle::after { background: var(--ftt-bg) !important; border-radius: var(--ftt-head-curve) !important; }
+html.ftt-themed #studentBar.student-bar, html.ftt-themed .teacher-bar {
+  background: var(--ftt-surface) !important; border-color: var(--ftt-border) !important; border-radius: var(--ftt-radius-pill) !important;
+  color: var(--ftt-text);
+}
+html.ftt-themed #studentBar strong, html.ftt-themed .teacher-bar strong { font-family: var(--ftt-font-head); color: var(--ftt-text); }
+html.ftt-themed #studentBar #studentClassLabel, html.ftt-themed .teacher-bar .sub { color: var(--ftt-muted) !important; }
+html.ftt-themed .teacher-bar p { color: var(--ftt-muted); }
+html.ftt-themed .disabled-note, html.ftt-themed .empty { color: var(--ftt-muted); }
+
+/* ==================== Content (theme on <html> or on one class card) ==================== */
+.class-card.ftt-themed { background: var(--ftt-bg); color: var(--ftt-text); border-radius: var(--ftt-radius-lg); padding: 14px 8px 6px; font-family: var(--ftt-font-body); }
+.ftt-themed .class-card h2, .class-card.ftt-themed h2 { font-family: var(--ftt-font-head); color: var(--ftt-title); font-weight: var(--ftt-head-weight); }
+.ftt-themed .class-card .sub { color: var(--ftt-muted); }
+.ftt-themed .island-intro h2, .ftt-themed .island-intro h3 {
+  font-family: var(--ftt-font-head) !important; color: var(--ftt-title) !important; font-weight: var(--ftt-head-weight) !important;
+}
+.ftt-themed .island-intro p { color: var(--ftt-muted) !important; }
+
+.ftt-themed .game-group[data-game-group="learn"] { --c: var(--ftt-c1) !important; }
+.ftt-themed .game-group[data-game-group="roots"] { --c: var(--ftt-c2) !important; }
+.ftt-themed .game-group[data-game-group="skills"] { --c: var(--ftt-c3) !important; }
+.ftt-themed .game-group[data-game-group="more-learning"] { --c: var(--ftt-c4) !important; }
+.ftt-themed .game-group[data-game-group="class"] { --c: var(--ftt-c5) !important; }
+.ftt-themed .game-group[data-game-group="challenge"] { --c: var(--ftt-c6) !important; }
+.ftt-themed .game-group.island-place {
+  --soft: color-mix(in srgb, var(--c) 16%, #ffffff) !important;
+  --deep: color-mix(in srgb, var(--c) 48%, #000000) !important;
+  background: var(--ftt-surface) !important; border-radius: var(--ftt-radius-lg) !important;
+}
+.ftt-themed .game-group .game-group-icon { border-radius: calc(var(--ftt-radius-lg) * .7); }
+.ftt-themed .game-group .game-group-title { font-family: var(--ftt-font-head) !important; font-weight: var(--ftt-head-weight) !important; }
+.ftt-themed .game-group .game-group-subtitle { color: var(--ftt-muted) !important; }
+.ftt-themed .game-group .game-card { border-radius: var(--ftt-radius-md) !important; }
+.ftt-themed .game-group .card-title { font-family: var(--ftt-font-head) !important; }
+
+.ftt-themed .teacher-tools-section { background: var(--ftt-tools-bg) !important; border-color: var(--ftt-tools-border) !important; border-radius: var(--ftt-radius-lg) !important; }
+.ftt-themed .teacher-tools-section h2, .ftt-themed .teacher-tools-section h3 {
+  font-family: var(--ftt-font-head) !important; color: var(--ftt-tools-title) !important; font-weight: var(--ftt-head-weight);
+}
+.ftt-themed .teacher-tools-subtitle { color: var(--ftt-muted); }
+.ftt-themed .teacher-tool-card { border-radius: calc(var(--ftt-radius-md) * .9) !important; }
+.ftt-themed .teacher-tool-card .card-title { font-family: var(--ftt-font-head) !important; }
+
+/* ---- Older bands only: no emojis, flat tiles, one accent ---- */
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) :is(.card-icon, .yiddish-icon, .game-group-icon, .island-sun) { display: none !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group.island-place {
+  --soft: var(--ftt-tile) !important; --deep: var(--ftt-text) !important;
+  border: 1px solid var(--ftt-border) !important; box-shadow: 0 1px 2px rgba(0, 0, 0, .06) !important;
+}
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group.island-place::before { height: 3px; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group.island-place:hover { transform: none; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .game-group-title { font-size: 21px !important; color: var(--ftt-text) !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .game-card {
+  min-height: 78px !important; padding: 14px 12px !important;
+  border: 1px solid var(--ftt-border) !important; border-left: 4px solid var(--ftt-accent) !important;
+  box-shadow: none !important;
+}
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .game-card:hover {
+  transform: translateY(-2px) !important; border-color: var(--ftt-accent) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, .12) !important;
+}
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .game-card:active { transform: none !important; box-shadow: none !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .card-title { font-size: 17px !important; color: var(--ftt-text) !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .game-group .game-card.activity-closed { background: transparent !important; border: 1px dashed var(--ftt-border) !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .island-intro h2,
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .island-intro h3 { font-size: 28px !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .island-intro p { font-size: 16px !important; font-weight: 600; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .teacher-tools-section { border-style: solid !important; border-width: 1px !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .teacher-tool-card {
+  min-height: 64px; padding: 14px 12px; background: var(--ftt-tile) !important;
+  border: 1px solid var(--ftt-border) !important; box-shadow: none !important;
+}
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .teacher-tool-card .card-title { color: var(--ftt-text) !important; }
+:is([class*="ftt-theme-g67-"], [class*="ftt-theme-g8-"]) .student-tool-controls { color: var(--ftt-text); }
+/* Grade 8: small capitals for section headings. */
+[class*="ftt-theme-g8-"] .game-group .game-group-title { font-size: 17px !important; text-transform: uppercase; letter-spacing: 1.2px; }
+[class*="ftt-theme-g8-"] .game-group .card-title { font-family: var(--ftt-font-body) !important; font-weight: 600 !important; }
+[class*="ftt-theme-g8-"] .teacher-tool-card .card-title { font-family: var(--ftt-font-body) !important; }
+
+/* ==================== Theme picker (looks the same in every theme) ==================== */
+.ftt-tp-overlay { position: fixed; inset: 0; z-index: 10050; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, .55); }
+.ftt-tp-card { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: #fff; color: #1f2937; border-radius: 16px; padding: 20px 22px 18px; text-align: left; font-family: 'Nunito', 'Segoe UI', Arial, sans-serif; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
+.ftt-tp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ftt-tp-head h2 { margin: 0; font-size: 24px; color: #1f2937; font-family: inherit; }
+.ftt-tp-x { border: 0; background: #f1f5f9; color: #334155; width: 36px; height: 36px; border-radius: 50%; font-size: 22px; line-height: 1; cursor: pointer; }
+.ftt-tp-intro { margin: 6px 0 14px; color: #475569; font-size: 15px; }
+.ftt-tp-grade { border-top: 1px solid #e2e8f0; padding: 14px 0; }
+.ftt-tp-grade h3 { margin: 0; font-size: 18px; color: #0f172a; font-family: inherit; }
+.ftt-tp-classes { margin: 2px 0 0; color: #64748b; font-size: 13px; }
+.ftt-tp-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; margin-top: 10px; }
+.ftt-tp-choice { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; font: inherit; color: #1f2937; text-align: left; }
+.ftt-tp-choice:hover { border-color: #94a3b8; }
+.ftt-tp-choice:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.ftt-tp-choice[aria-checked="true"] { border-color: #2563eb; box-shadow: 0 0 0 3px #bfdbfe; }
+.ftt-tp-choice:disabled { opacity: .6; cursor: wait; }
+.ftt-tp-preview { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; height: 62px; padding: 0 6px 6px; border: 1px solid #cbd5e1; border-radius: calc(var(--ftt-radius-md, 8px) * .5 + 2px); overflow: hidden; }
+.ftt-tp-bar { flex: 0 0 calc(100% + 12px); margin: 0 -6px; height: 16px; }
+.ftt-tp-tile { flex: 1; height: 26px; background: var(--ftt-tile, #fff); border: 2px solid; border-radius: calc(var(--ftt-radius-md, 8px) * .5); }
+.ftt-tp-name { font-weight: 800; font-size: 15px; }
+.ftt-tp-tag { position: absolute; top: 4px; right: 4px; background: #1f2937; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; }
+.ftt-tp-empty { color: #475569; margin: 8px 0; }
+.ftt-tp-status { min-height: 20px; margin: 4px 0 10px; color: #166534; font-weight: 700; font-size: 14px; }
+.ftt-tp-status.ftt-tp-error { color: #b91c1c; }
+.ftt-tp-done { border: 0; border-radius: 10px; padding: 10px 22px; background: #2563eb; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }

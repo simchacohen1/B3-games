@@ -425,6 +425,9 @@ document.addEventListener("DOMContentLoaded",function(){
 </script>
 <script src="approval-queue.js?v=20261021-approvals" defer></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
+<!-- Grade themes (#737): last stylesheet so it wins; script not deferred so the saved look is on before first paint. -->
+<link rel="stylesheet" href="grade-themes.css?v=20261110-737">
+<script src="grade-themes.js?v=20261110-737"></script>
 </head>
 <body>
   <h1>Fun Torah Tools</h1>
@@ -503,6 +506,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <div class="teacher-tools-container">
       <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
       <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
+      <button type="button" id="gradeThemeCard" class="teacher-tool-card" style="cursor:pointer;font:inherit"><span class="card-icon">🎨</span><span class="card-title">Class Themes</span></button>
       <a class="teacher-tool-card" id="homeworkCenterCard" href="assignment-center/teacher.html"><span class="card-icon">📚</span><span class="card-title">Homework &amp; Assignments</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
@@ -1238,6 +1242,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("lockedCard").classList.add("hidden");
     el("gamesArea").classList.add("hidden");
     el("teacherToolsSection").classList.add("hidden");
+    globalThis.FTTGradeThemes?.useClass(""); // signed out: normal look (grade themes, #737)
   }
   // Runs once, only after Firebase has said whether someone is already signed in.
   function startTestLinkSignIn(){
@@ -1463,7 +1468,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(sub)sub.textContent="Preview only: these tools are for signed-in teachers.";
     document.querySelectorAll("#teacherToolsSection .teacher-tool-card").forEach(card=>{
       const base=(card.getAttribute("href")||"").split("?")[0];
-      const hide=card.id==="actAsStudentCard"||/^(sync-to-nigri|student-report)\//.test(base)||/^(admin|owner-admin|teacher-home)\.html$/.test(base);
+      const hide=card.id==="actAsStudentCard"||card.id==="gradeThemeCard"||/^(sync-to-nigri|student-report)\//.test(base)||/^(admin|owner-admin|teacher-home)\.html$/.test(base);
       card.classList.toggle("hidden",hide);
       if(hide||card.dataset.guestWired)return;
       card.dataset.guestWired="1";
@@ -1545,6 +1550,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       updateGameGroupVisibility();
       const className=String(myClassRecord?.name||myClassId||"Class");
       el("studentClassLabel").textContent=className;
+      window.FTTGradeThemes?.useClass(className); // grade themes (#737)
       el("lockedCard").classList.add("hidden");
       el("gamesArea").classList.remove("hidden");
       el("specialAccessNote")?.classList.add("hidden");
@@ -1552,6 +1558,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       return;
     }
 
+    window.FTTGradeThemes?.useClass(""); // ET/WT have no grade in the name: normal look
     const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
     let visible=0;
     gameDefinitions.forEach(game=>{
@@ -2512,6 +2519,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function homeClassAccessUrl(){return "admin.html?tab=access&embed=1&class="+encodeURIComponent(homeClassId);}
   function syncHomeClassAccess(){
     el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[homeClassId]||homeClassId);
+    window.FTTGradeThemes?.useClass(homeClassNames[homeClassId]||""); // owner picked a class: show its grade theme
     const frame=el("homeAccessFrame");
     if(!el("homeAccessModal").classList.contains("hidden")&&frame.getAttribute("src")!==homeClassAccessUrl())frame.setAttribute("src",homeClassAccessUrl());
   }
@@ -2581,6 +2589,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     }else{overrideRoster=[];renderStudentOverrideControls();stopApprovalCenter();}
   });
   el("actAsStudentCard").addEventListener("click",()=>settingsApi.openActAsStudentPicker());
+  // Grade themes (#737): the owner can set the look for every grade.
+  el("gradeThemeCard").addEventListener("click",()=>{if(!isGuest())window.FTTGradeThemes?.openPicker({allGrades:true,classNames:Object.values(homeClassNames)});});
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   Promise.resolve().then(restoreStudent).catch(console.warn).finally(()=>{

@@ -87,6 +87,13 @@
       },
       "workspaces": {
         "$workspaceId": {
+          "gradeThemes": {
+            ".read": "auth != null",
+            "$grade": {
+              ".write": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true)",
+              ".validate": "$grade.matches(/^[4-8]$/) && newData.isString() && newData.val().matches(/^g(45|67|8)-[a-z]{2,20}$/)"
+            }
+          },
           "teachers": {
             ".read": "auth != null && (auth.token.email == 'owner@funtorahtools-staging.test' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
             "$uid": {
