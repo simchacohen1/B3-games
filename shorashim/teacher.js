@@ -366,8 +366,6 @@ function smartArtCandidatesFor(english='',front=''){
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
   PEREK19_ART_RULES.forEach(([re,choices])=>{if(re.test(String(english||'').trim()))choices.forEach(add)});
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
-  // Keep the full pool here so Regenerate Pictures can deliberately choose
-  // alternatives that are different from the pictures already on the word.
   return sanitizeClassArtPool(found);
 }
 
@@ -394,8 +392,6 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
   if(!GENERATE_SHORASHIM_ART_URL) return new Map();
 
   const out=new Map(),batchSize=40,totalBatches=Math.ceil(clean.length/batchSize);
-  // Two calls max per batch. The endpoint's Firebase lease/cache makes an
-  // interrupted retry idempotent and prevents duplicate paid generations.
   for(let n=0;n<clean.length;n+=batchSize){
     const batch=clean.slice(n,n+batchSize),batchNumber=Math.floor(n/batchSize)+1;
     onProgress({phase:'request',done:n,total:clean.length,batch:batchNumber,batches:totalBatches});
@@ -413,8 +409,6 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
         break;
       }catch(err){
         console.warn('generateShorashimArt request failed',err);
-        // Retry only transient failures. Authentication/permission failures
-        // fall through immediately to the meaning-matched local illustrations.
         const authFailure=/sign[ -]?in|teacher Google|cannot use the learning tools|permission/i.test(String(err?.message||''));
         const transient=!authFailure&&(!err.status||err.status===408||err.status===429||err.status>=500);
         if(attempt===0&&transient) await new Promise(resolve=>setTimeout(resolve,900));
@@ -427,14 +421,11 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
 }
 
 async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
-  // Automatically fill only missing artwork, including words a teacher already
-  // approved. Never replace selected pictures and never incur API costs on login.
   const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);
   if(!targets.length) return 0;
   const ai=useAI?await generateAiArtForItems(targets,onProgress):new Map();
   let changed=0;
   for(const item of targets){
-    // Recheck immediately before assignment so overlapping tasks cannot replace art.
     if(sanitizeClassArt(item.art).length) continue;
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
     const art=sanitizeClassArt(pool);
@@ -455,7 +446,6 @@ function mergeCatalogWithoutReplacingPictures(current,local){
   for(const candidate of (local?.shorashim||[])){
     const id=String(candidate?.id||''); if(!id)continue;
     if(!index.has(id)){
-      // Migration additions only; preserve the current catalog order and append.
       list.push({...candidate}); index.set(id,list.length-1); continue;
     }
     const existing=list[index.get(id)];
@@ -494,16 +484,12 @@ async function loadAll(){
     $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
     loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
   }
-  // Stricter database rules may refuse the whole class student list. That must not
-  // stop the words, settings or the teacher's library from loading.
   let studentListBlocked=false;
   const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value').catch(err=>{studentListBlocked=true;console.warn('Could not read the class student list',err);return null;}),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
   state.students=(c&&c.val())||{};
   state.leaderboards=d.val()||{};
-  // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
-  // so a word deleted later stays deleted even after page reloads or file updates.
   const needsCatalogSeed=!CLASS_MODE&&!legacyScoped()&&Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
@@ -556,8 +542,8 @@ async function renameUnitLabel(){
   const U=window.B3ShorashimUnits,pf=$('teacherPerekFilter')?.value||'all',list=$('teacherListName')?.value||U.DEFAULT_LIST;
   const key=/^\d+$/.test(pf)?'perek:'+pf:'list:'+list;
   const current=U.unitLabel(key,state.settings.unitLabels),fallback=U.defaultUnitLabel(key);
-  const scope=key.startsWith('perek:')?`all Perek ${pf} words`:`words in “${list}” that have no perek`;
-  const answer=prompt(`Name students see for ${scope}.\nLeave blank to use “${fallback}”.`,current===fallback?'':current);
+  const scope=key.startsWith('perek:')?`all Perek ${pf} words`:`words in "${list}" that have no perek`;
+  const answer=prompt(`Name students see for ${scope}.\nLeave blank to use "${fallback}".`,current===fallback?'':current);
   if(answer===null)return;
   const label=answer.trim().slice(0,80);
   state.settings.unitLabels={...(state.settings.unitLabels||{})};
@@ -573,9 +559,7 @@ async function setShowBooklet(show){
   status('☁️ Saved');
 }
 
-/* ===== Each teacher's own library =====
-   Stored at shorashimLibraries/<teacher uid>, separate from every other teacher and
-   from the owner. A class only sees what its teacher copies into the class. */
+/* ===== Each teacher's own library ===== */
 let teacherLibrary={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{}},teacherLibraryUid='';
 function libraryAvailable(){return CLASS_MODE&&CLASS_ID_VALID&&window.B3ShorashimUnits.validUid(teacherLibraryUid);}
 function libraryRef(){return db.ref(window.B3ShorashimUnits.libraryPath(teacherLibraryUid));}
@@ -593,8 +577,6 @@ async function loadTeacherLibrary(){
   try{
     const v=(await libraryRef().once('value')).val()||{};
     teacherLibrary={catalog:window.B3ShorashimUnits.withAllTracks(v.catalog),settings:v.settings||{}};
-    // One-time, copy-only migration: a teacher who already built words in this class
-    // gets them in their own library. Nothing in the class is moved or changed.
     if(!window.B3ShorashimUnits.countWords(teacherLibrary.catalog)&&window.B3ShorashimUnits.countWords(state.catalog)){
       const added=await saveClassToLibrary();
       renderLibraryStatus(added?`(${added} word${added===1?' was':'s were'} copied from this class to start your library.)`:'');return;
@@ -723,10 +705,7 @@ function renderCatalog(){
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
-      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
-         <div class="mini-actions">
-           <button data-a="regen" class="ghost">↻ Regenerate Pictures</button>
-         </div>`
+      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>`
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
@@ -764,42 +743,10 @@ function renderCatalog(){
     if(mergeDuplicate)mergeDuplicate.onclick=()=>mergeDuplicateWord(id);
     const dismissDuplicate=row.querySelector('[data-a=dismiss-duplicate]');
     if(dismissDuplicate)dismissDuplicate.onclick=()=>dismissDuplicateSuggestion(id);
-    const regen=row.querySelector('[data-a=regen]');
-    if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
       btn.onclick=()=>togglePictureChoice(id,btn.dataset.art);
     });
   });
-}
-
-async function regeneratePictures(id){
-  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
-  if(!item)return;
-  const selected=sanitizeClassArt(item.art||[]);
-  const oldPool=suggestionPoolOf(item);
-  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
-  status('☁️ Looking for more matching pictures…','syncing');
-
-  const ai=await generateAiArtForItems([item]);
-  const candidates=sanitizeClassArtPool([
-    ...(ai.get(String(item.id))||[]),
-    ...smartArtCandidatesFor(item.english,item.front)
-  ]);
-  const fresh=candidates.filter(x=>!oldPool.includes(x));
-
-  if(!fresh.length){
-    status('☁️ No different matching pictures found');
-    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current suggestions were kept.`);
-    return;
-  }
-  // Teacher's selections first, then new suggestions, then older ones (max 20).
-  // Regenerating never changes what students see.
-  item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);
-  item.aiArtGenerated=ai.has(String(item.id));
-  item.aiArtGeneratedAt=Date.now();
-  renderCatalog();
-  await saveCatalog();
-  status(`☁️ Saved • ${fresh.length} new suggestion${fresh.length===1?'':'s'}`);
 }
 
 function englishDuplicateKey(value){
@@ -811,7 +758,6 @@ function duplicateKeeperFor(item){
   if(!key||!englishKey)return null;
   const itemIndex=list.findIndex(x=>x.id===item.id);
   if(itemIndex<=0)return null;
-  // A suggestion is shown only on later appearances when BOTH the Hebrew and English match.
   for(let n=0;n<itemIndex;n++){
     const x=list[n];
     if(!x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key && englishDuplicateKey(x.english)===englishKey)return x;
@@ -834,9 +780,8 @@ async function mergeDuplicateWord(duplicateId){
   const duplicateIndex=list.findIndex(x=>x.id===duplicate.id);
   const keeper=list.slice(0,duplicateIndex).find(x=>!x.hidden && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key && englishDuplicateKey(x.english)===englishKey);
   if(!keeper)return alert('No matching duplicate was found.');
-  if(!confirm(`Merge duplicate “${duplicate.front}” into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
+  if(!confirm(`Merge duplicate "${duplicate.front}" into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
 
-  // Keep the strongest useful metadata from both copies.
   keeper.art=sanitizeClassArt([...(keeper.art||[]),...(duplicate.art||[])]);
   if(!keeper.english&&duplicate.english)keeper.english=duplicate.english;
   if(!keeper.hebrew&&duplicate.hebrew)keeper.hebrew=duplicate.hebrew;
@@ -869,8 +814,8 @@ async function removePictureChoice(id,artValue){
 async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
-async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
-/* Bulk delete: tick words in the current list, then delete them all at once. */
+async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove "${i.front}" from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
+/* Bulk delete */
 const bulkSelected=new Set();
 function updateBulkBar(list){
   const bar=$('teacherBulkBar');if(!bar)return;
@@ -895,7 +840,7 @@ async function deleteSelectedCatalogItems(){
 async function deleteCatalogItem(id){
   const list=state.catalog[currentTrack]||[],i=list.find(x=>x.id===id);
   if(!i)return;
-  if(!confirm(`Permanently delete “${i.front}”?\n\nThis removes the word from Firebase. It will stay deleted after page reloads and future website-file updates. This cannot be undone.`))return;
+  if(!confirm(`Permanently delete "${i.front}"?\n\nThis removes the word from Firebase. It will stay deleted after page reloads and future website-file updates. This cannot be undone.`))return;
   state.catalog[currentTrack]=list.filter(x=>x.id!==id);
   renderCatalog();
   await saveCatalog();
@@ -931,7 +876,7 @@ async function saveEdit(e){
   const proposedFront=$('tFront').value.trim();
   if(currentTrack==='shorashim'){
     const clash=l.find(x=>x.id!==i.id && listNameOf(x)===i.listName && hebrewKey(x.front)===hebrewKey(proposedFront));
-    if(clash){alert(`“${proposedFront}” is already in this list. Edit the existing copy instead of creating a duplicate.`);return;}
+    if(clash){alert(`"${proposedFront}" is already in this list. Edit the existing copy instead of creating a duplicate.`);return;}
   }
   i.front=proposedFront;
   i.english=$('tEnglish').value.trim();
@@ -939,7 +884,6 @@ async function saveEdit(e){
   if(currentTrack==='shorashim'){
     if(perekInput.value===null)delete i.perek;else i.perek=perekInput.value;
     i.hebrew=$('tWord').value.trim();
-    // Fill only missing artwork; editing a translation never replaces a teacher's existing choices.
     if(!sanitizeClassArt(i.art).length){
       i.autoArt=true;
       status('☁️ Creating picture choices…','syncing');
@@ -1020,8 +964,6 @@ $('teacherNewList').onclick=async()=>{
 };
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
-  // The perek must be chosen in the dialog every time (#571). It starts empty and is never
-  // taken from the filter, so words cannot silently land in the wrong perek.
   $('bulkPerek').value='';
   $('bulkNoPerek').checked=false;
   $('bulkPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim');
@@ -1110,7 +1052,6 @@ function openOwnClass(ids){
   }).catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
 }
 if(CLASS_MODE){
-  // Class teachers and B3 teachers use the same verified Google sign-in flow.
   $('teacherGateMsg').textContent='Sign in with your teacher Google account.';
   if(!CLASS_ID_VALID){
     $('teacherGateMsg').textContent='This class link is not valid. Open Shorashim from your teacher home page.';
@@ -1130,7 +1071,6 @@ if(CLASS_MODE){
     }
     const ids=access.classIds||[];
     if(!CLASS_ID){
-      // Never start on a class quietly: ask, then reopen this page with that class.
       $('teacherGoogleSignIn').classList.add('hidden');
       $('teacherGateMsg').textContent='Choose your class.';
       window.B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,window.B3_APP_CONTEXT?.workspaceId)
@@ -1147,8 +1087,6 @@ if(CLASS_MODE){
       $('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');
       openTeacherApp();
     }else if(!CLASS_ID){
-      // Already signed in as a teacher but this link names no class: go to the teacher's class
-      // instead of leaving the sign-in card on screen (issue 410).
       $('teacherGoogleSignIn').classList.add('hidden');
       openOwnClass(ids);
     }else{
@@ -1342,7 +1280,7 @@ async function togglePictureChoice(id,artValue){
   if(!item)return;
   const v=String(artValue);
   const selected=sanitizeClassArt(item.art||[]);
-  item.artPool=suggestionPoolOf(item); // an unselected picture stays as a suggestion
+  item.artPool=suggestionPoolOf(item);
   if(selected.includes(v)){
     item.art=selected.filter(x=>x!==v);
   }else if(selected.length>=ART_STUDENT_MAX){
