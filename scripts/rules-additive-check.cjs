@@ -23,6 +23,11 @@ const ALLOWED_NEW = [
   // the PR, and they go live only with a separately approved rules deploy.
   ['posukPractice', 'mishnayos'],
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'mishnayosPracticeLimit'],
+  // Issue #694 (PENDING OWNER REVIEW): Posuk Practice teacher grading. Server-written only
+  // (.write false); readable by the student, active teachers, admins and the owner, the same
+  // reads as posukPractice/attempts.
+  ['posukPractice', 'submissions'],
+  ['posukPractice', 'reviews'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
