@@ -323,6 +323,7 @@ function generalPanel(messages){
   return c;
 }
 // Each homework is one short row (title + status). Tap it to open the full card.
+var cardRecording=false; // true while a homework microphone is on, so the list does not redraw under it
 var openCards={},typedMins={}; // typedMins keeps unsaved minutes when the list redraws (e.g. a filter chip is tapped)
 function card(a){
   var body=cardBody(a),bucket=a.status==='approved'?'finished':a.status==='submitted'?'handed':'todo';
@@ -354,6 +355,10 @@ function cardBody(a){
   var activityUrl=hasItems?'':H.activityUrl(a.type);
   if(activityUrl&&a.status!=='approved'&&a.status!=='submitted'){var launch=el('a','Start Activity','button-link');launch.href=activityUrl;launch.target='_blank';launch.rel='opener';launch.setAttribute('data-assignment-launch',a.id);c.append(launch);c.append(el('p','When you finish, come back here and press Hand In. The activity does not send your homework by itself.','muted'))}
   if(a.status==='returned'&&a.feedback)c.append(el('div','💬 Teacher’s note: '+a.feedback,'note'));
+  // Every homework always has a microphone (#755): the recording goes straight to the teacher, who hears it when checking the work.
+  c.append(H.recordings({role:'student',key:a.id,messages:a.messages||[],send:function(body){return call(Object.assign({assignmentId:a.id},body))},onSent:refresh,
+    onStart:function(){cardRecording=true},onEnd:function(){cardRecording=false}}));
+  var hasRecording=(a.messages||[]).some(function(m){return m.voice&&m.role==='student'});
   // Messages tab (#647): a message started here arrives tagged to this homework. It never hands anything in.
   var about=el('button','🎤 Message my teacher about this','sec dm-about');about.type='button';about.setAttribute('data-message-about',a.id);
   about.onclick=function(){tabApi.select('messages');Msgs.compose({assignmentId:a.id,assignmentTitle:a.title,contactId:a.teacherId});listBox.querySelector('.home-tabs').scrollIntoView({behavior:'smooth',block:'start'})};c.append(about);
@@ -373,7 +378,7 @@ function cardBody(a){
     c.append(el('label','Minutes I practiced'));
     mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=typedMins[a.id]!=null?typedMins[a.id]:a.progress||0;mins.addEventListener('input',function(){typedMins[a.id]=mins.value});c.append(mins);
   }
-  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':hasItems?'✏️ Anything to tell your teacher? (optional once every item is done)':'✏️ Tell your teacher what you did'));
+  c.append(el('label',a.targetUnit==='minutes'?'Tell your teacher what you practiced (optional)':hasRecording?'✏️ Anything to tell your teacher? (optional — you sent a recording)':hasItems?'✏️ Anything to tell your teacher? (optional once every item is done)':'✏️ Tell your teacher what you did, or record it with the microphone'));
   var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
@@ -387,7 +392,7 @@ function cardBody(a){
   };
   sub.onclick=async function(){
     sub.disabled=true;save.disabled=true;sub.textContent='Handing in…';
-    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);delete openCards[a.id];delete typedMins[a.id];
+    try{await call({action:'submit',assignmentId:a.id,answer:ta.value.trim()?ta.value:hasRecording?'🎤 I recorded my answer.':'',progress:mv()});clearLocal(a.id);delete openCards[a.id];delete typedMins[a.id];
       // Follow the homework to the Handed In tab so it does not just vanish from To Do.
       activeTab='handed';flash='📬 “'+a.title+'” is handed in. Your teacher will check it soon.';await refresh();}
     catch(e){say(msg,e.message);sub.disabled=false;save.disabled=false;sub.textContent=a.status==='returned'?'Fix and Hand In Again':'Hand In Homework';if(e.status===400)ta.focus()}
@@ -404,6 +409,6 @@ async function refresh(){
   }
 }
 refresh();
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&!listBox.querySelector('textarea:focus')&&!Msgs.isRecording())refresh()});
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&!listBox.querySelector('textarea:focus')&&!Msgs.isRecording()&&!cardRecording)refresh()});
 })();
 </script></body></html>
