@@ -56,3 +56,25 @@ test('assigned active teachers can read class media while unassigned teachers ca
   assert.equal(await canReadMedia(db,teacher,'posukPractice/student_a/audio.webm'),true);
   assert.equal(await canReadMedia(db,{...teacher,uid:'teacher-b'},'posukPractice/student_a/audio.webm'),false);
 });
+
+test('a refused request reports which check failed, without changing the decision',async()=>{
+  const rows={
+    'b3Games/admins/teacher-a/active':false,
+    'b3Games/workspaces/b3-2026/teachers/teacher-a':{active:true,classIds:{et:true}},
+    'b3Games/workspaces/b3-2026/classes/et':{active:true,members:{student_a:{active:true}}},
+    'b3Games/workspaces/b3-2026/classes/wt':{active:true,members:{student_b:{active:true}}},
+    'b3Games/students/student_a/profile':{classId:'et'},
+    'b3Games/students/student_b/profile':{classId:'wt'},
+    'b3Games/students/student_c/profile':{}
+  };
+  const db=database(rows),teacher={uid:'teacher-a',email:'a@school.test',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+  const why=async(identity,file)=>{const trace={};const allowed=await canReadMedia(db,identity,file,trace);return allowed?'allowed':trace.reason;};
+  assert.equal(await why(teacher,'posukPractice/student_a/audio.webm'),'allowed');
+  assert.equal(await why(teacher,'posukPractice/student_b/audio.webm'),'teacher-not-assigned-to-class');
+  assert.equal(await why(teacher,'posukPractice/student_c/audio.webm'),'student-profile-has-no-class');
+  assert.equal(await why({...teacher,uid:'teacher-b'},'posukPractice/student_a/audio.webm'),'teacher-not-active');
+  assert.equal(await why({...teacher,firebase:{sign_in_provider:'password'}},'posukPractice/student_a/audio.webm'),'not-a-google-sign-in');
+  assert.equal(await why(teacher,'somewhereElse/student_a/audio.webm'),'path-not-recognised');
+  const student={uid:'s',b3StudentRole:'student',b3StudentId:'student_a',b3ClassId:'et'};
+  assert.equal(await why(student,'posukPractice/student_b/audio.webm'),'student-is-not-the-owner');
+});
