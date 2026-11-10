@@ -83,3 +83,42 @@ test('staging rules are the hardened rules with only the owner email swapped',()
   const staging=fs.readFileSync('staging/database.rules.json','utf8').replaceAll('owner@funtorahtools-staging.test','simcha5770@gmail.com');
   assert.deepEqual(JSON.parse(staging).rules,rules);
 });
+// The hardened file had fallen behind the live rules: strict rules added to
+// firebase-rules.json since October were never copied across.
+const liveRules=JSON.parse(fs.readFileSync('firebase-rules.json','utf8')).rules;
+function permissions(node,path='',out={}){
+  for(const [key,value] of Object.entries(node||{})){
+    if(key==='.read'||key==='.write')out[path+' '+key]=value;
+    else if(value&&typeof value==='object')permissions(value,path+'/'+key,out);
+  }
+  return out;
+}
+test('Weekly Quiz and Multiplayer: every strict live rule is also in the hardened file, unchanged',()=>{
+  for(const root of ['b3Quiz','multiplayerCenter']){
+    const live=permissions(liveRules[root]),hard=permissions(rules[root]);
+    for(const [path,expression] of Object.entries(live)){
+      assert.notEqual(expression,true,root+path+' is not public on live');
+      if(root==='multiplayerCenter')assert.equal(hard[path],expression,root+path);
+      else assert.ok(path in hard,root+path+' exists in the hardened file');
+    }
+  }
+  assert.deepEqual(rules.multiplayerCenter,liveRules.multiplayerCenter);
+  // The live-launch pointers a student's Weekly Quiz page listens to.
+  const settings=rules.b3Quiz.settings;
+  assert.match(settings.activeLaunchByClass.$targetClass['.read'],/auth\.token\.b3ClassId == \$targetClass/);
+  assert.match(settings.studentActiveLaunch.$studentId['.read'],/auth\.token\.b3StudentId == \$studentId/);
+  assert.match(settings.studentAssignments.$studentId['.read'],/auth\.token\.b3StudentId == \$studentId/);
+});
+test('a student can load and save only their own Halacha scrapbook and Gematria stars',()=>{
+  const student=rules.b3Games.students.$studentId;
+  assert.equal(student.halacha['.write'],'auth != null && auth.token.b3StudentId == $studentId');
+  assert.equal(student.halacha['.read'],student.profile['.read'],'same readers as the student profile');
+  assert.equal(student['.read'],undefined);assert.equal(student['.write'],undefined);
+  const own='auth != null && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId';
+  const progress=rules.b3Games.workspaces.$workspaceId.classes.$classId.resources.gematria.progress;
+  assert.equal(progress.$studentId['.read'],own);assert.equal(progress.$studentId['.write'],own);
+  assert.equal(progress['.read'],undefined,'a student cannot list classmates');
+});
+test('the owner can list Posuk Practice work for the approval queue',()=>{
+  for(const list of ['attempts','submissions','reviews'])assert.doesNotMatch(rules.posukPractice[list]['.read'],/b3StudentId|teachers\//,list);
+});
