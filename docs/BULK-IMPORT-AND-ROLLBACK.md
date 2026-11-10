@@ -66,6 +66,12 @@ duplicated. Batch records live in `b3Private/importBatches/<batchId>` (server
 only) and keep, for every existing account that was changed, the previous value
 of each membership and class roster row.
 
+## Undo CSV Import (Owner Admin, its own card)
+1. **Undo CSV Import** lists every import: tracked batches, and older "import runs" found from the server audit entries.
+2. Tick one or more imports and press **Review**. Nothing is written. The review shows the accounts that will be removed, existing students whose classes are put back, anything kept for review, how many other accounts are untouched, and a table of every class it touches (students now, leaving, after, and whether the class had students before the import). Classes and teachers are never deleted.
+3. Download the backup, type `UNDO n` (n = total across the ticked imports) and press **Undo import**. The page then runs the server rollback for each ticked import with the hash of the review; if anything changed, the server refuses and nothing is removed.
+4. **Earlier removals → Put them back** restores from the private server backup.
+
 ## Rollback and Bulk Management (Owner Admin → Students → Bulk Management)
 * Filter by class, import, creation date or name; preview shows each account's
   audit history, every place its id appears in student-data trees, and whether it

@@ -150,13 +150,27 @@ async function buildManifest(store,source){
  }
  const count=k=>records.filter(r=>r.status===k).length;
  const totalStudents=Object.keys(students||{}).length;
- const summary={candidates:candidates.length,newSafe:count('NEW_SAFE'),newHasData:count('NEW_HAS_DATA'),existingModified:count('EXISTING_MODIFIED'),uncertain:count('UNCERTAIN'),alreadyRemoved:count('ALREADY_REMOVED'),missing:count('MISSING'),preservedUntouched:totalStudents-live.length,staffRestores:staffRestores.length};
+ // Classes the undo takes students out of. Classes are never deleted: this
+ // only tells the owner what each class will look like afterwards, and whether
+ // the class had any students before this import (batch record, or for older
+ // imports: no audit history before the run and no other members).
+ const leaving={},candidateIds=new Set(candidates.map(c=>c.studentId));
+ const leave=cid=>{if(validId(cid))leaving[cid]=(leaving[cid]||0)+1;};
+ for(const r of records)if(r.status==='NEW_SAFE')for(const cid of new Set([...r.classIds,...(r.memberOf||[])]))leave(cid);
+ for(const r of restores)if(r.pieces.length&&r.pieces.every(p=>p.ok))for(const p of r.pieces)if(p.before.member==null)leave(p.classId);
+ const classImpact=Object.entries(leaving).map(([cid,n])=>{
+  const c=classes?.[cid]||{},members=Object.keys(c.members||{}),audit=Object.values(c.managementAudit||{}).filter(Boolean);
+  const newWithImport=source.kind==='batch'?batch?.classes?.[cid]?.created===true
+   :!audit.some(a=>(Number(a.at)||0)<source.from)&&members.every(id=>candidateIds.has(id)||audit.some(a=>a.studentId===id&&(Number(a.at)||0)>=source.from));
+  return {classId:cid,name:String(c.name||cid),membersNow:members.length,leaving:n,membersAfter:Math.max(0,members.length-n),newWithImport};
+ }).sort((a,b)=>a.name.localeCompare(b.name));
+ const summary={totalStudents:Object.keys(students||{}).length,classesAffected:classImpact.length,candidates:candidates.length,newSafe:count('NEW_SAFE'),newHasData:count('NEW_HAS_DATA'),existingModified:count('EXISTING_MODIFIED'),uncertain:count('UNCERTAIN'),alreadyRemoved:count('ALREADY_REMOVED'),missing:count('MISSING'),preservedUntouched:totalStudents-live.length,staffRestores:staffRestores.length};
  records.sort((a,b)=>a.status.localeCompare(b.status)||a.name.localeCompare(b.name));
  const manifestHash=hashOf({source,act:records.filter(r=>['NEW_SAFE','ALREADY_REMOVED','EXISTING_MODIFIED'].includes(r.status)).map(r=>[r.studentId,r.status==='ALREADY_REMOVED'?'NEW_SAFE':r.status]).sort(),staff:staffRestores.map(s=>[s.inviteId,s.pieces.filter(p=>p.ok).map(p=>p.classId)])});
- return {source,rollbackId,manifestHash,summary,records,restores,staffRestores,batchKeys:Object.fromEntries(candidates.map(c=>[c.studentId,c.recKey||null])),classes};
+ return {source,rollbackId,manifestHash,summary,records,restores,staffRestores,classImpact,batchKeys:Object.fromEntries(candidates.map(c=>[c.studentId,c.recKey||null])),classes};
 }
 
-const publicManifest=m=>({ok:true,rollbackId:m.rollbackId,manifestHash:m.manifestHash,summary:m.summary,records:m.records,staffRestores:m.staffRestores.map(s=>({email:s.email,classIds:s.pieces.filter(p=>p.ok).map(p=>p.classId),changedSince:s.pieces.filter(p=>!p.ok).map(p=>p.classId)})),source:m.source});
+const publicManifest=m=>({ok:true,rollbackId:m.rollbackId,manifestHash:m.manifestHash,summary:m.summary,records:m.records,classes:m.classImpact,staffRestores:m.staffRestores.map(s=>({email:s.email,classIds:s.pieces.filter(p=>p.ok).map(p=>p.classId),changedSince:s.pieces.filter(p=>!p.ok).map(p=>p.classId)})),source:m.source});
 
 async function rollbackPreview(store,identity,body){
  return publicManifest(await buildManifest(store,readSource(body)));
@@ -243,7 +257,7 @@ async function rollbackUndo(store,identity,body,now=Date.now()){
   updates[where+'/done/'+id]={at:now,by:identity.uid,action:'undone'};
   await store.update(updates);restored++;
  }
- await store.update({[AUDIT+crypto.randomUUID()]:{action:'rollbackUndo',rollbackId,by:identity.uid,byEmail:String(identity.email||''),at:now,restored}});
+ await store.update({...(restored?{[where+'/status']:'put-back'}:{}),[AUDIT+crypto.randomUUID()]:{action:'rollbackUndo',rollbackId,by:identity.uid,byEmail:String(identity.email||''),at:now,restored}});
  return {ok:true,restored,skipped};
 }
 

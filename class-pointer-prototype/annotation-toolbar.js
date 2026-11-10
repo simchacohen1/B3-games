@@ -59,7 +59,7 @@
     const max=opts.maxPoints||MAX_POINTS_DEFAULT;
     if(!Array.isArray(raw.points)||!raw.points.length||raw.points.length>max||!raw.points.every(validPoint))return null;
     const out={id:raw.id,tool,color:raw.color.toLowerCase(),size:raw.size,points:raw.points.map(p=>({x:round(p.x),y:round(p.y)}))};
-    if(['rect','ellipse','line','arrow'].includes(tool)){if(out.points.length!==2)return null}
+    if(['rect','ellipse','line','arrow'].includes(out.tool)){if(out.points.length!==2)return null}
     if(tool==='text'){
       if(typeof raw.text!=='string'||!raw.text.trim()||raw.text.length>MAX_TEXT||out.points.length!==1)return null;
       out.text=raw.text;
@@ -207,8 +207,9 @@
 #fttAnnotate .fa-shapes button{width:42px;height:38px;border:0;border-radius:9px;background:transparent;font-size:18px;cursor:pointer}
 #fttAnnotate .fa-shapes button[aria-pressed="true"]{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
 #fttAnnotate .fa-tip{position:fixed;pointer-events:none;max-width:260px;padding:6px 10px;border-radius:10px;background:#0f172a;color:#fff;font-size:12px;box-shadow:0 4px 14px #0004}
-#fttAnnotate .fa-pencil{position:fixed;left:12px;top:calc(50% - 26px);pointer-events:auto;width:52px;height:52px;border-radius:50%;border:3px solid #fff;background:#2563eb;color:#fff;font-size:24px;line-height:1;cursor:pointer;box-shadow:0 6px 22px #0f172a55;display:grid;place-items:center}
+#fttAnnotate .fa-pencil{position:fixed;left:12px;top:calc(50% - 26px);pointer-events:auto;width:52px;height:52px;border-radius:50%;border:3px solid #fff;background:#2563eb;color:#fff;font-size:24px;line-height:1;cursor:grab;box-shadow:0 6px 22px #0f172a55;display:grid;place-items:center;touch-action:none;user-select:none}
 #fttAnnotate .fa-pencil:hover{background:#1d4ed8}
+#fttAnnotate .fa-pencil.dragging{cursor:grabbing}
 #fttAnnotate .fa-editor{position:fixed;pointer-events:auto;min-width:120px;min-height:1.4em;margin:0;padding:2px 4px;border:2px dashed #3b82f6;border-radius:4px;background:#ffffffd9;resize:none;overflow:hidden;font-family:Arial,"Segoe UI",sans-serif;font-weight:600;line-height:1.25;outline:none;unicode-bidi:plaintext}
 #fttAnnotate[data-side="right"] .fa-bar{left:auto;right:12px}
 #fttAnnotate[data-side="right"] .fa-pencil{left:auto;right:12px}
@@ -221,7 +222,7 @@
   const bar=document.createElement('div');bar.className='fa-bar';bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Drawing tools');bar.setAttribute('aria-orientation','vertical');
   const grip=document.createElement('div');grip.className='fa-grip';grip.textContent='⠿⠿';grip.title='Drag to move the toolbar';
   const pencil=document.createElement('button');pencil.type='button';pencil.className='fa-pencil';pencil.textContent='✏️';
-  pencil.title='Open drawing tools';pencil.setAttribute('aria-label','Open drawing tools');
+  pencil.title='Open drawing tools (drag to move)';pencil.setAttribute('aria-label','Open drawing tools');
   const shapeMenu=document.createElement('div');shapeMenu.className='fa-shapes';shapeMenu.hidden=true;shapeMenu.setAttribute('role','group');shapeMenu.setAttribute('aria-label','Shape');
   const tip=document.createElement('div');tip.className='fa-tip';tip.hidden=true;tip.setAttribute('role','status');
   const btn=(cls,html,title,on)=>{const b=document.createElement('button');b.type='button';b.className=cls;if(html!=null)b.innerHTML=html;b.title=title;b.setAttribute('aria-label',title);b.addEventListener('click',on);return b};
@@ -544,6 +545,63 @@
       Object.assign(bar.style,{left:left+'px',top:top+'px',right:'auto'});placeShapeMenu();
     });
     const end=()=>{start=null;grip.style.cursor=''};grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+  })();
+
+  // Dragging the pencil button — remembers position across sessions.
+  (function(){
+    const STORAGE_KEY='fttPencilPos';
+    let pencilDrag=null,hasMoved=false;
+
+    // Restore saved position.
+    try{
+      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+      if(saved&&Number.isFinite(saved.left)&&Number.isFinite(saved.top)){
+        const left=Math.max(4,Math.min(window.innerWidth-56,saved.left));
+        const top=Math.max(4,Math.min(window.innerHeight-56,saved.top));
+        Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
+      }
+    }catch{}
+
+    pencil.addEventListener('pointerdown',e=>{
+      if(e.button!==0)return;
+      pencilDrag={id:e.pointerId,startX:e.clientX,startY:e.clientY,r:pencil.getBoundingClientRect()};
+      hasMoved=false;
+      try{pencil.setPointerCapture(e.pointerId)}catch{}
+      pencil.classList.add('dragging');
+    });
+    pencil.addEventListener('pointermove',e=>{
+      if(!pencilDrag||e.pointerId!==pencilDrag.id)return;
+      const dx=e.clientX-pencilDrag.startX,dy=e.clientY-pencilDrag.startY;
+      if(!hasMoved&&Math.hypot(dx,dy)<5)return; // ignore tiny jitter
+      hasMoved=true;e.stopPropagation();
+      const left=Math.max(4,Math.min(window.innerWidth-56,pencilDrag.r.left+dx));
+      const top=Math.max(4,Math.min(window.innerHeight-56,pencilDrag.r.top+dy));
+      Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
+    });
+    function endPencilDrag(e){
+      if(!pencilDrag||e.pointerId!==pencilDrag.id)return;
+      pencil.classList.remove('dragging');
+      if(hasMoved){
+        // Save position so it survives page refresh.
+        try{const r=pencil.getBoundingClientRect();localStorage.setItem(STORAGE_KEY,JSON.stringify({left:r.left,top:r.top}))}catch{}
+      }
+      pencilDrag=null;
+    }
+    pencil.addEventListener('pointerup',e=>{
+      endPencilDrag(e);
+      // If the pointer didn't move, treat it as a click to open the bar.
+      if(!hasMoved)openBar();
+    });
+    pencil.addEventListener('pointercancel',endPencilDrag);
+    pencil.addEventListener('lostpointercapture',endPencilDrag);
+
+    // Keep the pencil on-screen if the window resizes.
+    window.addEventListener('resize',()=>{
+      const r=pencil.getBoundingClientRect();
+      const left=Math.max(4,Math.min(window.innerWidth-56,r.left));
+      const top=Math.max(4,Math.min(window.innerHeight-56,r.top));
+      if(left!==r.left||top!==r.top)Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
+    });
   })();
 
   // ---------- Painting ----------
