@@ -791,8 +791,8 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!isAuthorizedTeacher)return;
     const isOwner=currentAccess.role==="admin";
     const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
-    const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
-    const allClasses=classesSnap.val()||{};
+    // The owner lists every class; a teacher reads only their own (see readClassesFor).
+    const allClasses=await window.B3SiteSettings.readClassesFor(currentAccess);
     const classes={};
     Object.entries(allClasses).forEach(([id,row])=>{
       // The owner can manage students in every active platform class.

@@ -18,8 +18,7 @@ function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 const HALACHA_SECTION_IDS=["a","b","c","d","e","f","s2a","s2b","s2c","s2d","s3a","s3b","s3c","s3d","s3e","s4a","s4b","s4c","s4d","s4e","s4f","s6a","s6b","s6c","s6d","s6e","s6f","s6g","s6h","s6i","s6j","s6k"];const SIMAN_ORDER=["א","ב","ג","ד","ו"];
 function doneCount(st){return HALACHA_SECTION_IDS.filter(x=>st&&st[x+"_done"]).length}
 async function editableClassIds(access){
- const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
- const classes=snap.val()||{};
+ const classes=await window.B3SiteSettings.readClassesFor(access); // owner: every class; teacher: own classes only
  if(access?.role==="admin")return Object.entries(classes).filter(([,row])=>row?.active!==false).map(([id])=>id);
  const assigned=new Set((access?.classIds||[]).filter(Boolean));
  return Object.entries(classes).filter(([id,row])=>assigned.has(id)&&row?.active!==false&&row?.toolGrants?.halacha===true).map(([id])=>id);

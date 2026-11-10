@@ -837,8 +837,7 @@ async function renderHalachaTeacherAccess(access){
  const host=document.getElementById("halachaAccessRowsMain");if(!host)return;
  try{
   const ws=(window.B3SiteSettings&&B3SiteSettings.workspaceId)||"b3-2026";
-  const classesSnap=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes").once("value");
-  const classes=classesSnap.val()||{},owner=access&&access.role==="admin";
+  const classes=await window.B3SiteSettings.readClassesFor(access),owner=access&&access.role==="admin";
   const assigned=new Set((access&&access.classIds||[]).filter(Boolean));
   const classIds=Object.entries(classes).filter(([id,row])=>
     row&&row.active!==false&&(owner||(assigned.has(id)&&row.toolGrants?.halacha===true))
