@@ -122,3 +122,20 @@ test('a student can load and save only their own Halacha scrapbook and Gematria 
 test('the owner can list Posuk Practice work for the approval queue',()=>{
   for(const list of ['attempts','submissions','reviews'])assert.doesNotMatch(rules.posukPractice[list]['.read'],/b3StudentId|teachers\//,list);
 });
+// Owner decision (2026-11-10): students may see classmates in their own class.
+// The older ET and WT classes share one gallery, tag game and Shorashim leaderboard, so they count as one group.
+test('classmates: a student reads the roster, live classmates, tag game and leaderboard of their own class only',()=>{
+  const cls=rules.b3Games.workspaces.$workspaceId.classes.$classId,gallery=cls.resources.gallery;
+  const same='auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId';
+  for(const expression of [cls.members['.read'],gallery.presence['.read'],gallery.settings['.read'],gallery.tag['.read'],gallery.tag['.write']])assert.equal(expression,same);
+  assert.match(gallery.presence.$presenceClass.$studentKey['.write'],/auth\.token\.b3StudentId == \$studentKey && auth\.token\.b3ClassId == \$classId/);
+  assert.equal(cls.members['.write'],undefined);assert.equal(gallery.settings['.write'],undefined);
+  const legacy=[rules.b3Games.classGalleryPresence['.read'],rules.b3Games.classGalleryTag.$mode['.read'],rules.posukPractice.shorashimLearning.leaderboards.match.$pairCount['.read']];
+  for(const expression of legacy){
+    assert.match(expression,/^auth != null && \(auth\.token\.b3ClassId == 'et' \|\| auth\.token\.b3ClassId == 'wt' \|\| /);
+    assert.doesNotMatch(expression,/b3StudentId != null|auth != null\)?$/);
+  }
+  const tagWrite=rules.b3Games.classGalleryTag.$mode['.write'];
+  assert.match(tagWrite,/\(\$mode == 'all' \|\| \$mode == 'manhunt'\)/,'students change only the two game states');
+  assert.match(rules.b3Games.classGalleryPresence.all.$viewerKey['.write'],/\$viewerKey == 'teacher_' \+ auth\.uid/);
+});
