@@ -49,7 +49,6 @@
   const newId=prefix=>(prefix||'a')+Date.now().toString(36)+'-'+(++seq).toString(36);
 
   // ---------- Shared drawing (also used by student-boards.js and screen-annotate.js) ----------
-  // Checks a mark that came from somewhere else. Returns a clean copy or null.
   function cleanItem(raw,opts={}){
     if(!raw||typeof raw.id!=='string'||!/^[a-z0-9-]{2,44}$/i.test(raw.id))return null;
     if(opts.idPrefix&&raw.id[0]!==opts.idPrefix)return null;
@@ -66,7 +65,6 @@
     }
     return out;
   }
-  // at(p) turns a 0..1 point into canvas pixels; w is the surface width in pixels.
   function drawItem(ctx,s,at,w){
     const tool=s.tool||'pen',pts=s.points;if(!pts||!pts.length)return;
     ctx.save();
@@ -102,7 +100,6 @@
     ctx.restore();
   }
   const measurer=document.createElement('canvas').getContext('2d');
-  // Box around a mark, in pixels of a surface w×h.
   function boxOf(s,w,h){
     const pts=s.points.map(p=>[p.x*w,p.y*h]);
     if(s.tool==='text'){
@@ -118,7 +115,6 @@
     const dx=bx-ax,dy=by-ay,len=dx*dx+dy*dy,t=len?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/len)):0;
     return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
   }
-  // Is pixel point (px,py) on the mark? inside: a click anywhere inside a closed shape's box counts (Select).
   function hits(s,px,py,w,h,inside){
     const tool=s.tool||'pen',reach=Math.max(7,Math.max(1.5,s.size*w)/2+5),b=boxOf(s,w,h);
     if(px<b.x1-reach||px>b.x2+reach||py<b.y1-reach||py>b.y2+reach)return false;
@@ -140,18 +136,17 @@
   }
 
   // ---------- State ----------
-  let role=null;                 // null | 'student' | 'teacher'
-  const reasons=new Set();       // 'sharing', 'whiteboard', ...
-  const stack=[];                // surfaces pushed by other scripts (top = last)
-  let mode='hidden';             // hidden | mini | open
+  let role=null;
+  const reasons=new Set();
+  const stack=[];
+  let mode='hidden';
   let autoOpened=false;
   const st={tool:'hand',shape:'rect',color:PALETTE[1][0],sizeIndex:1};
   const toolColors={pen:PALETTE[1][0],highlight:PALETTE[6][0],shape:PALETTE[1][0],text:PALETTE[1][0]};
-  const history=new Map();       // surface id -> [items snapshots]
-  const seen=new WeakSet();     // surfaces that have been in use since they were pushed
+  const history=new Map();
+  const seen=new WeakSet();
   let selected=null,drag=null,draft=null,laser=null,editor=null,frame=0,lastSurface=null,lastRectKey='';
 
-  // The whole-window surface: marks stay on this page only.
   const viewport={id:'viewport',idPrefix:'a',items:[],defaultTool:'hand',
     label:()=>role==='teacher'?'Drawing on your screen.':'Drawing on your screen. Your teacher sees it while you share.',
     rect:()=>({left:0,top:0,width:window.innerWidth,height:window.innerHeight}),
@@ -163,7 +158,6 @@
   }
   const isDelegate=s=>!!s.delegate;
   function supports(s,tool){return !s.tools||s.tools.includes(tool)}
-  // Undo history is kept per surface (and per student, for a student's screen).
   const hk=s=>{try{return s.historyKey?.()||s.id}catch{return s.id}};
   function itemsOf(s){try{return (s.getItems?.()||[]).slice()}catch{return[]}}
   function colorsOf(s){return s.colors||PALETTE}
@@ -173,7 +167,7 @@
 
   // ---------- DOM ----------
   const css=`
-#fttAnnotate{position:fixed;inset:0;z-index:${Z};pointer-events:none;font:600 13px system-ui,"Segoe UI",sans-serif}
+#fttAnnotate{position:fixed;inset:0;z-index:${Z};pointer-events:none;font:600 14px system-ui,"Segoe UI",sans-serif}
 #fttAnnotate[hidden],#fttAnnotate [hidden]{display:none!important}
 #fttAnnotate .fa-ink{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
 #fttAnnotate .fa-capture{position:fixed;pointer-events:auto;touch-action:none;background:transparent}
@@ -181,39 +175,39 @@
 #fttAnnotate .fa-capture[data-tool="text"]{cursor:text}
 #fttAnnotate .fa-capture[data-tool="eraser"]{cursor:cell}
 #fttAnnotate .fa-capture[data-tool="select"]{cursor:default}
-#fttAnnotate .fa-bar{position:fixed;left:12px;top:max(12px,calc(50vh - 300px));pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 5px;border-radius:16px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f;max-height:calc(100vh - 24px);overflow:auto;user-select:none}
-#fttAnnotate .fa-grip{cursor:grab;color:#94a3b8;font-size:12px;letter-spacing:-2px;padding:0 0 2px;touch-action:none}
+#fttAnnotate .fa-bar{position:fixed;left:12px;top:max(12px,calc(50vh - 340px));pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;border-radius:18px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f;max-height:calc(100vh - 24px);overflow:auto;user-select:none}
+#fttAnnotate .fa-grip{cursor:grab;color:#94a3b8;font-size:14px;letter-spacing:-2px;padding:0 0 2px;touch-action:none}
 #fttAnnotate button{font:inherit;color:inherit;margin:0;box-shadow:none;text-transform:none;letter-spacing:normal}
-#fttAnnotate .fa-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;min-height:44px;padding:3px 2px;border:0;border-radius:11px;background:transparent;cursor:pointer;line-height:1.05}
+#fttAnnotate .fa-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;width:76px;min-height:58px;padding:4px 2px;border:0;border-radius:13px;background:transparent;cursor:pointer;line-height:1.05}
 #fttAnnotate .fa-tool:hover:enabled{background:#eef2ff}
 #fttAnnotate .fa-tool[aria-pressed="true"]{background:#dbeafe;color:#1e3a8a;box-shadow:inset 0 0 0 2px #3b82f6}
 #fttAnnotate .fa-tool:disabled{opacity:.35;cursor:default}
-#fttAnnotate .fa-ico{font-size:19px;line-height:22px}
-#fttAnnotate .fa-tool[data-tool="text"] .fa-ico{font:800 20px Georgia,serif}
-#fttAnnotate .fa-name{font-size:10px;font-weight:700;margin-top:1px}
-#fttAnnotate .fa-sep{width:40px;height:1px;background:#e2e8f0;margin:3px 0;flex:none}
-#fttAnnotate .fa-colors{display:grid;grid-template-columns:repeat(2,22px);gap:5px;padding:2px 0}
-#fttAnnotate .fa-color{width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;background:var(--c);padding:0;cursor:pointer}
+#fttAnnotate .fa-ico{font-size:26px;line-height:30px}
+#fttAnnotate .fa-tool[data-tool="text"] .fa-ico{font:800 26px Georgia,serif}
+#fttAnnotate .fa-name{font-size:11px;font-weight:700;margin-top:2px}
+#fttAnnotate .fa-sep{width:56px;height:1px;background:#e2e8f0;margin:3px 0;flex:none}
+#fttAnnotate .fa-colors{display:grid;grid-template-columns:repeat(2,24px);gap:5px;padding:2px 0}
+#fttAnnotate .fa-color{width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:var(--c);padding:0;cursor:pointer}
 #fttAnnotate .fa-color[aria-pressed="true"]{outline:3px solid #3b82f6;outline-offset:1px}
-#fttAnnotate .fa-sizes{display:flex;gap:2px}
-#fttAnnotate .fa-size{width:17px;height:24px;border:0;border-radius:6px;background:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
+#fttAnnotate .fa-sizes{display:flex;gap:3px}
+#fttAnnotate .fa-size{width:20px;height:28px;border:0;border-radius:7px;background:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
 #fttAnnotate .fa-size i{display:block;width:var(--d);height:var(--d);border-radius:50%;background:#1f2937}
 #fttAnnotate .fa-size[aria-pressed="true"]{background:#dbeafe}
-#fttAnnotate .fa-small{width:54px;min-height:30px;border:0;border-radius:9px;background:transparent;cursor:pointer;font-size:12px;font-weight:700}
+#fttAnnotate .fa-small{width:76px;min-height:34px;border:0;border-radius:10px;background:transparent;cursor:pointer;font-size:13px;font-weight:700}
 #fttAnnotate .fa-small:hover:enabled{background:#f1f5f9}
 #fttAnnotate .fa-small:disabled{opacity:.35;cursor:default}
 #fttAnnotate .fa-min{background:#f1f5f9}
 #fttAnnotate .fa-shapes{position:fixed;pointer-events:auto;display:flex;gap:4px;padding:5px;border-radius:12px;background:#fff;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f}
-#fttAnnotate .fa-shapes button{width:42px;height:38px;border:0;border-radius:9px;background:transparent;font-size:18px;cursor:pointer}
+#fttAnnotate .fa-shapes button{width:48px;height:44px;border:0;border-radius:10px;background:transparent;font-size:22px;cursor:pointer}
 #fttAnnotate .fa-shapes button[aria-pressed="true"]{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
 #fttAnnotate .fa-tip{position:fixed;pointer-events:none;max-width:260px;padding:6px 10px;border-radius:10px;background:#0f172a;color:#fff;font-size:12px;box-shadow:0 4px 14px #0004}
-#fttAnnotate .fa-pencil{position:fixed;left:12px;top:calc(50% - 26px);pointer-events:auto;width:52px;height:52px;border-radius:50%;border:3px solid #fff;background:#2563eb;color:#fff;font-size:24px;line-height:1;cursor:grab;box-shadow:0 6px 22px #0f172a55;display:grid;place-items:center;touch-action:none;user-select:none}
+#fttAnnotate .fa-pencil{position:fixed;left:12px;top:calc(50% - 32px);pointer-events:auto;width:64px;height:64px;border-radius:50%;border:3px solid #fff;background:#2563eb;color:#fff;font-size:30px;line-height:1;cursor:grab;box-shadow:0 6px 22px #0f172a55;display:grid;place-items:center;touch-action:none;user-select:none}
 #fttAnnotate .fa-pencil:hover{background:#1d4ed8}
 #fttAnnotate .fa-pencil.dragging{cursor:grabbing}
 #fttAnnotate .fa-editor{position:fixed;pointer-events:auto;min-width:120px;min-height:1.4em;margin:0;padding:2px 4px;border:2px dashed #3b82f6;border-radius:4px;background:#ffffffd9;resize:none;overflow:hidden;font-family:Arial,"Segoe UI",sans-serif;font-weight:600;line-height:1.25;outline:none;unicode-bidi:plaintext}
 #fttAnnotate[data-side="right"] .fa-bar{left:auto;right:12px}
 #fttAnnotate[data-side="right"] .fa-pencil{left:auto;right:12px}
-@media (max-height:640px){#fttAnnotate .fa-tool{min-height:36px}#fttAnnotate .fa-name{display:none}}
+@media (max-height:640px){#fttAnnotate .fa-tool{min-height:46px}#fttAnnotate .fa-name{display:none}}
 @media print{#fttAnnotate{display:none!important}}`;
   const root=document.createElement('div');root.id='fttAnnotate';root.hidden=true;root.setAttribute('data-ftt-annotate','');
   const ink=document.createElement('canvas');ink.className='fa-ink';ink.setAttribute('aria-hidden','true');
@@ -244,7 +238,7 @@
   const minBtn=btn('fa-small fa-min','➖ Hide','Shrink the toolbar to a pencil button. Clicks go to the page.',()=>minimize());
   bar.append(sep1,colorBox,sizeBox,sep2,undoBtn,clearBtn,minBtn);
   root.append(ink,capture,shapeMenu,bar,pencil,tip);
-  pencil.addEventListener('click',()=>openBar());
+  // NOTE: no click listener on pencil — the drag handler below opens the bar on tap.
   // Clicks on the toolbar never reach the page or the lesson underneath.
   for(const node of [bar,pencil,shapeMenu])for(const type of ['pointerdown','pointerup','click','dblclick','wheel','contextmenu'])node.addEventListener(type,e=>e.stopPropagation());
 
@@ -261,7 +255,6 @@
     finishEditor(true);
     if(st.tool!==tool){selected=tool==='select'?selected:null;laser=null;try{s.live?.(null,null)}catch{}}
     st.tool=tool;shapeMenu.hidden=tool!=='shape'||!fromClick;placeShapeMenu();
-    // Each drawing tool keeps its own color (the highlighter starts yellow).
     if(toolColors[tool]&&colorsOf(s).some(c=>c[0]===toolColors[tool]))st.color=toolColors[tool];
     applyDelegate();sync();
   }
@@ -281,9 +274,7 @@
     root.hidden=!show;
     if(!show){capture.hidden=true;scheduleRender();return}
     if(lastSurface!==s){
-      // A different surface: keep the tool when it works there, otherwise use the surface's own starting tool.
       if(lastSurface&&lastSurface!==s){selected=null;draft=null;laser=null;finishEditor(true);try{lastSurface.live?.(null,null)}catch{}}
-      // The first time a surface is in use, start with its own tool (Pen on a whiteboard, Hand on a page).
       if(!seen.has(s)){seen.add(s);if(mode==='open'&&s.defaultTool&&supports(s,s.defaultTool))st.tool=s.defaultTool}
       if(!supports(s,st.tool))st.tool=s.defaultTool||'hand';
       lastSurface=s;applyDelegate();
@@ -293,7 +284,6 @@
     for(const [tool,b] of toolButtons){b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));}
     const shapeIcon=SHAPES.find(x=>x[0]===st.shape);toolButtons.get('shape').querySelector('.fa-ico').textContent=shapeIcon?shapeIcon[1]:'◻';
     for(const [shape,b] of shapeButtons)b.setAttribute('aria-pressed',String(shape===st.shape));
-    // Colors and sizes for this surface.
     const colors=colorsOf(s);if(!colors.some(c=>c[0]===st.color))st.color=colors[Math.min(1,colors.length-1)][0];
     const colorKey=colors.map(c=>c[0]).join();
     if(colorBox.dataset.key!==colorKey){
@@ -341,12 +331,11 @@
   function hideAll(){
     finishEditor(false);selected=null;draft=null;laser=null;
     for(const s of [viewport,...stack])try{s.live?.(null,null)}catch{}
-    // A student's marks leave with the toolbar.
     if(role!=='teacher'){viewport.items=[];history.delete('viewport')}
     mode='hidden';sync();
   }
 
-  // ---------- Marks: change, undo, clear ----------
+  // ---------- Marks ----------
   function commit(s,next){
     const hist=history.get(hk(s))||[];hist.push(itemsOf(s));if(hist.length>HISTORY)hist.shift();history.set(hk(s),hist);
     try{s.setItems(next)}catch(e){console.warn('Drawing tools:',e)}
@@ -452,7 +441,6 @@
     const hit=topHit(s,p,true);if(hit?.tool==='text'){e.preventDefault();startEditor(s,hit)}
   });
   for(const type of ['click','contextmenu','wheel'])capture.addEventListener(type,e=>{if(type!=='wheel')e.preventDefault();e.stopPropagation()},{passive:false});
-  // The browser moves focus on mouse down; a new text box must keep it so the typing goes into it.
   capture.addEventListener('mousedown',e=>e.preventDefault());
   capture.addEventListener('click',()=>{if(editor&&document.activeElement!==editor.ta)try{editor.ta.focus({preventScroll:true})}catch{}});
 
@@ -463,7 +451,6 @@
     try{s.setItems(keep)}catch{}if(selected&&!keep.some(i=>i.id===selected))selected=null;scheduleRender();
   }
   function moveItem(s,item,dx,dy){
-    // Keep the whole mark on the surface.
     const xs=item.points.map(p=>p.x),ys=item.points.map(p=>p.y);
     dx=Math.max(-Math.min(...xs),Math.min(1-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(1-Math.max(...ys),dy));
     const moved={...item,id:newId(s.idPrefix),points:item.points.map(p=>({x:round(p.x+dx),y:round(p.y+dy)}))};
@@ -476,7 +463,6 @@
     return false;
   }
 
-  // Text boxes: a real text field while typing, then a mark.
   function startEditor(s,item,p){
     finishEditor(true);
     const r=s.rect();if(!r)return;
@@ -511,7 +497,6 @@
     commit(s,item?items.map(i=>i.id===item.id?mark:i):items.concat(mark));
   }
 
-  // Pointer tool: a dot follows the mouse, without catching any clicks.
   document.addEventListener('pointermove',e=>{
     if(mode!=='open'||st.tool!=='pointer')return;
     const s=surface();if(isDelegate(s))return;const r=s.rect();if(!r)return;
@@ -522,7 +507,6 @@
   document.addEventListener('pointerleave',()=>{if(laser){laser=null;sendLive(true);scheduleRender()}});
   window.addEventListener('blur',()=>{if(laser){laser=null;sendLive(true);scheduleRender()}});
 
-  // Keyboard: Delete removes the selected mark, Ctrl+Z undoes, Escape lets go.
   document.addEventListener('keydown',e=>{
     if(mode!=='open'||root.hidden)return;
     if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
@@ -547,17 +531,17 @@
     const end=()=>{start=null;grip.style.cursor=''};grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
   })();
 
-  // Dragging the pencil button — remembers position across sessions.
+  // Dragging the pencil button — tap opens the bar; drag moves it; position saved across sessions.
   (function(){
     const STORAGE_KEY='fttPencilPos';
+    const SIZE=64; // matches CSS width/height
     let pencilDrag=null,hasMoved=false;
 
-    // Restore saved position.
     try{
       const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
       if(saved&&Number.isFinite(saved.left)&&Number.isFinite(saved.top)){
-        const left=Math.max(4,Math.min(window.innerWidth-56,saved.left));
-        const top=Math.max(4,Math.min(window.innerHeight-56,saved.top));
+        const left=Math.max(4,Math.min(window.innerWidth-SIZE,saved.left));
+        const top=Math.max(4,Math.min(window.innerHeight-SIZE,saved.top));
         Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
       }
     }catch{}
@@ -572,34 +556,31 @@
     pencil.addEventListener('pointermove',e=>{
       if(!pencilDrag||e.pointerId!==pencilDrag.id)return;
       const dx=e.clientX-pencilDrag.startX,dy=e.clientY-pencilDrag.startY;
-      if(!hasMoved&&Math.hypot(dx,dy)<5)return; // ignore tiny jitter
+      if(!hasMoved&&Math.hypot(dx,dy)<5)return;
       hasMoved=true;e.stopPropagation();
-      const left=Math.max(4,Math.min(window.innerWidth-56,pencilDrag.r.left+dx));
-      const top=Math.max(4,Math.min(window.innerHeight-56,pencilDrag.r.top+dy));
+      const left=Math.max(4,Math.min(window.innerWidth-SIZE,pencilDrag.r.left+dx));
+      const top=Math.max(4,Math.min(window.innerHeight-SIZE,pencilDrag.r.top+dy));
       Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
     });
     function endPencilDrag(e){
       if(!pencilDrag||e.pointerId!==pencilDrag.id)return;
       pencil.classList.remove('dragging');
       if(hasMoved){
-        // Save position so it survives page refresh.
         try{const r=pencil.getBoundingClientRect();localStorage.setItem(STORAGE_KEY,JSON.stringify({left:r.left,top:r.top}))}catch{}
       }
       pencilDrag=null;
     }
     pencil.addEventListener('pointerup',e=>{
       endPencilDrag(e);
-      // If the pointer didn't move, treat it as a click to open the bar.
-      if(!hasMoved)openBar();
+      if(!hasMoved)openBar(); // tap = open
     });
     pencil.addEventListener('pointercancel',endPencilDrag);
     pencil.addEventListener('lostpointercapture',endPencilDrag);
 
-    // Keep the pencil on-screen if the window resizes.
     window.addEventListener('resize',()=>{
       const r=pencil.getBoundingClientRect();
-      const left=Math.max(4,Math.min(window.innerWidth-56,r.left));
-      const top=Math.max(4,Math.min(window.innerHeight-56,r.top));
+      const left=Math.max(4,Math.min(window.innerWidth-SIZE,r.left));
+      const top=Math.max(4,Math.min(window.innerHeight-SIZE,r.top));
       if(left!==r.left||top!==r.top)Object.assign(pencil.style,{left:left+'px',top:top+'px',right:'auto'});
     });
   })();
@@ -622,7 +603,6 @@
     }
     for(const it of items)drawItem(ctx,it,at,r.width);
     if(draft&&!s.renders)drawItem(ctx,draft,at,r.width);
-    // Selection box.
     const sel=selected&&itemsOf(s).find(i=>i.id===selected);
     if(sel&&mode==='open'){
       const shown=drag?.moved&&drag.item.id===sel.id?{...sel,points:sel.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))}:sel;
@@ -638,7 +618,6 @@
     ctx.restore();
   }
   window.addEventListener('resize',()=>{placeShapeMenu();sync()});
-  // Pushed surfaces (a board or a video) can move or resize without telling us.
   setInterval(()=>{
     if(root.hidden)return;const s=surface();
     if(s!==lastSurface){sync();return}
@@ -648,7 +627,6 @@
   // ---------- Public API ----------
   window.FTTAnnotate={
     PALETTE,SIZE_SETS,KINDS,cleanItem,drawItem,
-    // role: 'teacher' shows the pencil everywhere. Anything else: only while a reason is on.
     setRole(next){
       const was=role;role=next==='teacher'?'teacher':next==='student'?'student':null;
       if(was===role)return;
@@ -656,19 +634,15 @@
       if(!visible())return hideAll();
       sync();
     },
-    // name: 'sharing' | 'whiteboard'. Turning a reason on opens the toolbar.
     setReason(name,on){
       on=!!on;if(reasons.has(name)===on)return;
       if(on){
-        // Start with the surface's own tool: Hand on a page (the student keeps working), Pen on a whiteboard.
         reasons.add(name);mount();const s=stack[stack.length-1]||surface();st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';lastSurface=null;openBar(true);return}
       reasons.delete(name);
       if(!visible())return hideAll();
       if(!reasons.size&&autoOpened&&role==='teacher')mode='mini';
       sync();
     },
-    // A surface: {id, label, rect(), getItems(), setItems(list), live?(draft,point), idPrefix, renders?, drawsPoint?,
-    //   defaultTool?, tools?, colors?, sizes?(tool), maxItems?, maxPoints?, autoOpen?, delegate?}
     push(s){
       if(!s||stack.includes(s))return;stack.push(s);mount();
       if(s.autoOpen&&visible()){mode='open';autoOpened=true;st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:st.tool;lastSurface=null}
@@ -682,14 +656,11 @@
       sync();
     },
     refresh(){sync()},
-    // 'left' (default) or 'right': where the toolbar and pencil sit, for pages with their own tools on the left.
     setSide(side){root.dataset.side=side==='right'?'right':'left';bar.style.left='';bar.style.top='';bar.style.right='';sync()},
-    // Pick a tool from code (for example: a whiteboard starts with a black pen).
     select(tool,opts={}){if(opts.shape)st.shape=opts.shape;if(opts.color&&toolColors[tool])toolColors[tool]=opts.color;if(opts.color)st.color=opts.color;chooseTool(tool)},
     open(){openBar(false)},
     minimize,
     state:()=>({role,mode,tool:st.tool,reasons:[...reasons],surface:surface().id}),
-    // True for the toolbar, the pencil and the drawing layer (pages with an activity lock let these through).
     owns(node){return !root.hidden&&!!node&&root.contains(node)}
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
