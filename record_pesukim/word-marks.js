@@ -1,5 +1,9 @@
 /* Posuk Practice word marks (Issue #749).
-   The teacher taps Hebrew words on a recording card to mark what went wrong.
+   On a recording card the teacher taps a Hebrew word when it was read wrong,
+   and taps the small T under a word when its translation was wrong. Those two
+   switches are saved as one mark per word: readWrongTransOk, readOkTransWrong
+   or bothWrong (see markFor / flags below). The other ids are kept so grades
+   saved earlier still display.
    A word with no mark is correct. The ids here must match WORD_MARKS in
    backend/functions/posuk-review-core.cjs (the server rejects any other id). */
 (function(root){
@@ -28,10 +32,19 @@
     var m = BY_ID[id];
     return m ? 'color:' + m.color + ';background:' + m.bg + ';border-color:' + m.color + ';' : '';
   }
-  function legendHtml(){
-    return '<div class="wm-legend">' + MARKS.map(function(m){
-      return '<span class="wm-legend-item"><span class="wm-swatch" style="background:' + m.color + '"></span>' + esc(m.label) + '</span>';
-    }).join('') + '</div>';
+  // The two switches on a word (read wrong / translation wrong) -> the saved mark id.
+  function markFor(readWrong, transWrong){
+    if(readWrong && transWrong) return 'bothWrong';
+    if(readWrong) return 'readWrongTransOk';
+    if(transWrong) return 'readOkTransWrong';
+    return '';
+  }
+  // The reverse: a saved mark id -> which switches are on.
+  function flags(id){
+    return {
+      read: id === 'readWrongTransOk' || id === 'bothWrong' || id === 'incorrect',
+      trans: id === 'readOkTransWrong' || id === 'bothWrong'
+    };
   }
   // Saved marks ([{i, word, mark}]) as small coloured chips, for lists and reports.
   function chipsHtml(list){
@@ -43,7 +56,7 @@
     }).join('');
   }
 
-  var api = { MARKS: MARKS, byId: BY_ID, splitWords: splitWords, style: style, legendHtml: legendHtml, chipsHtml: chipsHtml, escapeHtml: esc };
+  var api = { MARKS: MARKS, byId: BY_ID, splitWords: splitWords, style: style, markFor: markFor, flags: flags, chipsHtml: chipsHtml, escapeHtml: esc };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PosukWordMarks = api;
 })(typeof window !== 'undefined' ? window : this);
