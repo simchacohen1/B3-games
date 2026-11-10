@@ -284,9 +284,14 @@ test('a permitted student can start sharing himself once the teacher enables scr
   // His own permission is checked first; the sharing service now in use answers "no request" and the
   // button still appears (the service refuses a turned-off student when he shares).
   expect(s.calls).toContain('permissions');
-  await share.click();
-  await expect.poll(() => s.page.evaluate(() => (window as any).__displayMediaCalls)).toBe(1);
-  await expect.poll(() => s.calls.includes('issue')).toBe(true);
+  // The click opens one dedicated sharing tab; that tab asks for the screen and holds the share,
+  // so changing pages in the activity tab can never end it.
+  const [tab] = await Promise.all([s.page.waitForEvent('popup'), share.click()]);
+  await tab.waitForLoadState();
+  expect(new URL(tab.url()).pathname).toBe('/class-pointer-prototype/student-share-window.html');
+  await expect.poll(() => tab.evaluate(() => (window as any).__displayMediaCalls), { timeout: 15000 }).toBe(1);
+  await expect.poll(() => s.calls.includes('issue'), { timeout: 15000 }).toBe(true);
+  expect(await s.page.evaluate(() => (window as any).__displayMediaCalls)).toBe(0);
   await s.context.close();
 });
 
@@ -294,9 +299,11 @@ test('a student the teacher turned off is refused by the sharing service and the
   const s = await studentActivity(browser, () => ({ status: 403, body: { ok: false, error: 'Your teacher has turned off your screen sharing.' } }));
   const share = s.page.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
   await expect(share).toBeVisible({ timeout: 15000 });
-  await share.click();
-  await expect(share).toBeHidden();
-  await expect(s.page.locator('#fttActivityScreenShare [role="status"]')).toHaveText(/turned off your screen sharing/);
+  const [tab] = await Promise.all([s.page.waitForEvent('popup'), share.click()]);
+  await tab.waitForLoadState();
+  // The sharing tab asks the service, which refuses him: its button disappears and it says why.
+  await expect(tab.locator('#fttActivityScreenShare [role="status"]')).toHaveText(/turned off your screen sharing/, { timeout: 15000 });
+  await expect(tab.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' })).toBeHidden();
   await s.context.close();
 });
 

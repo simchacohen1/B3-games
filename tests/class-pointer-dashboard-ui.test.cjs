@@ -20,7 +20,7 @@ test('compact dashboard keeps existing permission controls and teaching material
 test('activity screen-sharing uses the small button without a duplicate consent dialog',()=>{
   const activity=read('class-pointer-prototype/activity-share.js');
   assert.doesNotMatch(activity,/fttShareRequestOverlay|Open Sharing Window|Your teacher would like to see your screen/);
-  assert.match(activity,/btn\.addEventListener\('click',beginShare\)/);
+  assert.match(activity,/btn\.addEventListener\('click',shareClick\)/);
   assert.match(activity,/navigator\.mediaDevices\.getDisplayMedia/);
   assert.match(activity,/permission\?\.screenSharingDenied!==true/);
 });
@@ -33,8 +33,9 @@ test('persistent screen sharing asks for Entire Screen and contains no browser-t
   assert.doesNotMatch(boards,/Share a browser tab/);
   assert.doesNotMatch(boards,/startShare\('tab'\)/);
   assert.match(activity,/Please choose Entire Screen in the browser picker/);
-  assert.match(shareWindow,/Keep this window open while you visit Shorashim or another activity/);
-  assert.match(shareWindow,/Choose <strong>Entire Screen<\/strong>/);
+  assert.match(shareWindow,/You can visit any page in your other tab and the sharing keeps going/);
+  assert.match(activity,/Choose Entire Screen in the box that pops up/);
+  assert.match(activity,/You’re sharing your screen\. Go back to your other tab to keep working\./);
   assert.match(activity,/displaySurface:'monitor'/);
   assert.match(activity,/displaySurface&&displaySurface!=='monitor'/);
 });
