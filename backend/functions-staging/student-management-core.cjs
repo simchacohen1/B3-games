@@ -9,7 +9,9 @@ const BULK_ACTIONS={
  importPreview:imports.importPreview,importApply:imports.importApply,
  rollbackPreview:rollback.rollbackPreview,rollbackExecute:rollback.rollbackExecute,rollbackUndo:rollback.rollbackUndo,
  studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
- exportBackup:rollback.exportBackup,auditLog:rollback.auditLog
+ exportBackup:rollback.exportBackup,auditLog:rollback.auditLog,
+ // Issue #724: Owner Admin "Export Everything" (includes passcodes).
+ exportEverything:require('./student-export-core.cjs').exportEverything
 };
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
