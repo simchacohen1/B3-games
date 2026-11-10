@@ -3,11 +3,12 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-function loadMediaModule(){
+// `adminServices` supplies auth/database/storage fakes for tests that call the HTTP handler itself.
+function loadMediaModule(adminServices={}){
   const mod={exports:{}};
   const mockRequire=name=>{
-    if(name==='firebase-functions/v2/https')return {onRequest:()=>({})};
-    if(name==='firebase-admin')return {apps:[],initializeApp(){}};
+    if(name==='firebase-functions/v2/https')return {onRequest:(options,handler)=>handler};
+    if(name==='firebase-admin')return {apps:[],initializeApp(){},...adminServices};
     throw Error('Unexpected dependency in media test: '+name);
   };
   new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/private-media-url.js'),'utf8'))(mockRequire,mod,mod.exports);
@@ -77,4 +78,50 @@ test('a refused request reports which check failed, without changing the decisio
   assert.equal(await why(teacher,'somewhereElse/student_a/audio.webm'),'path-not-recognised');
   const student={uid:'s',b3StudentRole:'student',b3StudentId:'student_a',b3ClassId:'et'};
   assert.equal(await why(student,'posukPractice/student_b/audio.webm'),'student-is-not-the-owner');
+});
+
+test('privateMediaUrl logs one warning on a 403 naming the failed check, and never the email',async()=>{
+  const rows={
+    'b3Games/admins/teacher-a/active':false,
+    'b3Games/workspaces/b3-2026/teachers/teacher-a':{active:true,classIds:{et:true}},
+    'b3Games/workspaces/b3-2026/classes/et':{active:true,members:{student_a:{active:true}}},
+    'b3Games/workspaces/b3-2026/classes/wt':{active:true,members:{student_b:{active:true}}},
+    'b3Games/students/student_a/profile':{classId:'et'},
+    'b3Games/students/student_b/profile':{classId:'wt'}
+  };
+  let identity={uid:'teacher-a',email:'a@school.test',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+  const {privateMediaUrl}=loadMediaModule({
+    auth:()=>({verifyIdToken:async()=>identity}),
+    database:()=>database(rows),
+    storage:()=>({bucket:()=>({file:()=>({exists:async()=>[true],getSignedUrl:async()=>['https://signed.test/url']})})})
+  });
+  const call=async file=>{
+    const res={headers:{},set(k,v){this.headers[k]=v;},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};
+    await privateMediaUrl({method:'POST',headers:{authorization:'Bearer test-token'},body:{path:file}},res);
+    return res;
+  };
+  const warnings=[],realWarn=console.warn;
+  console.warn=(...args)=>warnings.push(args);
+  try{
+    // Allowed playback: signed URL, nothing logged.
+    const ok=await call('posukPractice/student_a/audio.webm');
+    assert.equal(ok.code,200);
+    assert.equal(warnings.length,0);
+
+    // Teacher of another class: 403 and exactly one diagnostic line.
+    const refused=await call('posukPractice/student_b/audio.webm');
+    assert.equal(refused.code,403);
+    assert.deepEqual(refused.body,{error:'You do not have access to this recording.'});
+    assert.equal(warnings.length,1);
+    assert.equal(warnings[0][0],'privateMediaUrl denied');
+    assert.deepEqual(JSON.parse(warnings[0][1]),{reason:'teacher-not-assigned-to-class',uid:'teacher-a',provider:'google.com',role:'staff',classId:'wt',path:'posukPractice/student_b/audio.webm'});
+    assert.ok(!warnings[0].join(' ').includes('a@school.test'));
+
+    // Refused student: role and reason are reported for that branch too.
+    identity={uid:'student-uid',b3StudentRole:'student',b3StudentId:'student_a',b3ClassId:'et',firebase:{sign_in_provider:'custom'}};
+    const student=await call('posukPractice/student_b/audio.webm');
+    assert.equal(student.code,403);
+    assert.equal(warnings.length,2);
+    assert.deepEqual(JSON.parse(warnings[1][1]),{reason:'student-is-not-the-owner',uid:'student-uid',provider:'custom',role:'student',classId:'',path:'posukPractice/student_b/audio.webm'});
+  }finally{console.warn=realWarn;}
 });
