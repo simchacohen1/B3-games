@@ -16,7 +16,7 @@
     if(!root||!root.ownerDocument)throw new TypeError("A dashboard container is required");
     const doc=root.ownerDocument;
     const entries=(items||[]).filter(x=>x&&x.card&&x.card.nodeType===1).map(x=>({
-      name:safeText(x.name),teacher:safeText(x.teacher),card:x.card,grade:gradeOf(x.name)
+      name:safeText(x.name),teacher:safeText(x.teacher),id:safeText(x.id||x.name),card:x.card,grade:gradeOf(x.name)
     }));
     const shell=doc.createElement("section");shell.className="principal-overview";
     shell.setAttribute("aria-label","Supervised classes overview");
@@ -35,15 +35,26 @@
     const byGrade=new Map();
     entries.forEach(entry=>{if(!byGrade.has(entry.grade))byGrade.set(entry.grade,[]);byGrade.get(entry.grade).push(entry);});
     const allDetails=[];
+    // Remember only UI expansion positions, not authorization or any student data.
+    const storage=opts.storage||(typeof sessionStorage==="undefined"?null:sessionStorage);
+    const key=opts.persistKey?"b3-principal-folds:"+opts.persistKey:null;
+    let saved=[];
+    try{if(storage&&key){const value=JSON.parse(storage.getItem(key)||"[]");if(Array.isArray(value))saved=value;}}catch(_){}
+    const expanded=new Set(saved);
+    function remember(){
+      if(!storage||!key)return;
+      try{storage.setItem(key,JSON.stringify(allDetails.filter(d=>d.open).map(d=>d.dataset.foldKey)));}catch(_){}
+    }
+
     [...byGrade].sort(([a],[b])=>a.localeCompare(b,undefined,{numeric:true})).forEach(([grade,list])=>{
-      const group=doc.createElement("details");group.className="principal-grade";
+      const group=doc.createElement("details");group.className="principal-grade";group.dataset.foldKey="grade:"+grade;group.open=expanded.has(group.dataset.foldKey);
       const title=doc.createElement("summary");title.textContent=grade+" · "+list.length+" "+(list.length===1?"class":"classes");group.append(title);
       const content=doc.createElement("div");content.className="principal-grade-classes";
       list.forEach(entry=>{
-        const detail=doc.createElement("details");detail.className="principal-class";
+        const detail=doc.createElement("details");detail.className="principal-class";detail.dataset.foldKey="class:"+entry.id;detail.open=expanded.has(detail.dataset.foldKey);
         const caption=doc.createElement("summary");caption.textContent=entry.name+(entry.teacher?" · "+entry.teacher:"");
         detail.append(caption,entry.card);content.append(detail);allDetails.push(detail);
-        detail.dataset.search=(entry.name+" "+entry.teacher).toLocaleLowerCase();
+        detail.dataset.search=(entry.name+" "+entry.teacher+" "+entry.grade).toLocaleLowerCase();
       });
       group.append(content);groups.append(group);allDetails.push(group);
     });
@@ -63,9 +74,10 @@
       summary.textContent=shown+" of "+entries.length+" supervised classes"+
         (opts.teacherCount!=null?" · "+Number(opts.teacherCount)+" supervised teachers":"");
     }
+    allDetails.forEach(d=>d.addEventListener("toggle",remember));
     search.addEventListener("input",applySearch);
-    expand.addEventListener("click",()=>allDetails.forEach(d=>{if(!d.hidden)d.open=true;}));
-    collapse.addEventListener("click",()=>allDetails.forEach(d=>{d.open=false;}));
+    expand.addEventListener("click",()=>{allDetails.forEach(d=>{if(!d.hidden)d.open=true;});remember();});
+    collapse.addEventListener("click",()=>{allDetails.forEach(d=>{d.open=false;});remember();});
     root.replaceChildren(shell);
     return {shell,search,expand,collapse,entries};
   }
