@@ -6,7 +6,7 @@ window.createClassHighlighter=function(options){
   function svg(tag,attrs={}){const element=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([key,value])=>element.setAttribute(key,String(value)));return element}
   function tool(){return $(options.teacher?'teacherTool':'studentTool').value}
   function drawing(){return C.highlightTools.includes(tool())}
-  function erasing(){return options.teacher&&tool()==='eraser'}
+  function erasing(){return tool()==='eraser'}
   function box(){const video=$('lesson'),rect=$('stage').getBoundingClientRect();return{rect,picture:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight),width:video.videoWidth,height:video.videoHeight}}
   function point(event){const b=box();if(!b.picture)return null;const p={x:(event.clientX-b.rect.left-b.picture.left)/b.picture.w,y:(event.clientY-b.rect.top-b.picture.top)/b.picture.h};return C.validPoint(p)?p:null}
   function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;if(!len)return Math.hypot(p.x-a.x,p.y-a.y);const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len));return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy))}
@@ -58,7 +58,7 @@ window.createClassHighlighter=function(options){
       event.preventDefault();event.stopPropagation();const text=window.prompt('Text for the lesson (Hebrew or English):','');if(!text?.trim())return;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
       const stroke={tool:'text',color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,{x:Math.min(1,p.x+0.2),y:Math.min(1,p.y+0.06)}],text};if(C.cleanStroke(stroke))options.submit(stroke);return;
     }
-    if(erasing()){event.preventDefault();hideOwner();const hit=[...strokes].reverse().find(s=>s.owner===options.owner()&&hits(s,p));if(hit)options.edit('erase',hit.id);return;}
+    if(erasing()){event.preventDefault();hideOwner();const hit=[...strokes].reverse().find(s=>(options.teacher||s.owner===options.owner())&&hits(s,p));if(hit)options.edit('erase',hit.id);return;}
     event.preventDefault();dragId=event.pointerId;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
     draft={tool:tool(),color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,p]};$('stage').setPointerCapture(dragId);render();
   });
