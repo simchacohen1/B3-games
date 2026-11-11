@@ -10,8 +10,8 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
   teacher_new:{active:true,classIds:{'new-room':true}},
   principal:{active:true,accountType:'principal',classIds:{et:true,'new-room':true}}
  },classes:{
-  et:{name:'ET',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true},members:{student_et:{active:true,name:'ET Student'}}},
-  wt:{name:'WT',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true},members:{student_wt:{active:true,name:'WT Student'}}},
+  et:{name:'ET',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true,homework:true,tag:true,davening:true,chavrusa:true,'name-picker':true,'class-pointer':true,'sync-to-nigri':true},members:{student_et:{active:true,name:'ET Student'}}},
+  wt:{name:'WT',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true,homework:true,tag:true,davening:true,chavrusa:true,'name-picker':true,'class-pointer':true,'sync-to-nigri':true},members:{student_wt:{active:true,name:'WT Student'}}},
   'new-room':{name:'New Room',active:true,toolGrants:{chazara:true},members:{student_new:{active:true,name:'New Student'}}}
  }}}}};
 const USER_STUB=`(()=>{
@@ -111,6 +111,10 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.deepEqual(results.teacher_et.classes,['ET']);
   assert.deepEqual(results.teacher_wt.classes,['WT']);
   assert.deepEqual(results.teacher_both.classes,['ET','WT']);
+  for(const [section,classId] of results.teacher_both.cards.map((card,index)=>[card,index===0?'et':'wt'])){
+   assert.ok(section.tiles.some(tile=>tile.id==='davening'&&new URL(tile.href,'http://localhost').pathname.includes('_'+classId+'/')), 'multi-class teacher gets the matching '+classId+' Davening route');
+   assert.ok(section.tiles.some(tile=>tile.id==='sync-to-nigri'), 'multi-class teacher gets the per-class Nigri tile when granted');
+  }
   assert.deepEqual(results.teacher_both.classJump.map(x=>x.label),['ET','WT']);
   assert.deepEqual(results.teacher_both.classJump.map(x=>x.target),['class-card-et','class-card-wt']);
   assert.equal(results.teacher_both.wtJumpWorked,true,'teacher can jump to assigned WT class');
@@ -125,7 +129,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,1,'Google popup and auth restoration share the in-flight teacher check');
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/admins/teacher_new').length,2,'pre-cache baseline performs two admin lookups without in-flight sharing');
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,2,'pre-cache baseline performs two teacher lookups without in-flight sharing');
-  const expectedTools=['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','student-rewards','daily-points','weekly-quiz','game-show','multiplayer-center'];
+  const expectedTools=['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','student-rewards','daily-points','weekly-quiz','game-show','multiplayer-center','homework','tag','davening','chavrusa','name-picker','class-pointer','sync-to-nigri'];
   for(const role of ['teacher_et','teacher_wt']){
    const section=results[role].cards[0],classId=role==='teacher_et'?'et':'wt';
    assert.deepEqual([...new Set(section.tiles.map(x=>x.id))].sort(),expectedTools.slice().sort(),role+' shows all granted homepage tools');
@@ -138,7 +142,14 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    }
    assert.ok(section.tiles.every(x=>x.href.includes('class='+classId)),role+' tool links target its assigned class');
    for(const tile of section.tiles){const pathname=decodeURIComponent(new URL(tile.href,'http://localhost').pathname).replace(/^\//,'');assert.ok(fs.existsSync(path.join(ROOT,pathname)),role+' destination exists: '+tile.title+' → '+pathname);}
-   for(const title of ['Manage Class','Student Report','Vocabulary Progress','Follow the Teacher'])assert.ok(section.teacherLinks.some(x=>x.title===title),role+' has teacher control '+title);
+   for(const title of ['Manage Class','Student Report','Vocabulary Progress','Follow the Teacher','Send Everyone to Share Screen'])assert.ok(section.teacherLinks.some(x=>x.title===title),role+' has teacher control '+title);
+   for(const link of section.teacherLinks){
+    const url=new URL(link.href,'http://localhost'),pathname=decodeURIComponent(url.pathname).replace(/^\\//,'');
+    assert.ok(fs.existsSync(path.join(ROOT,pathname)),role+' teacher action destination exists: '+link.title+' → '+pathname);
+    assert.equal(url.searchParams.get('class'),classId,role+' teacher action remains scoped to '+classId+': '+link.title);
+   }
+   const davening=section.tiles.find(x=>x.id==='davening');
+   assert.equal(new URL(davening.href,'http://localhost').pathname.slice(1),'davening_student_app_'+classId+'/index.html',role+' Davening route matches its class');
    assert.ok(!section.teacherLinks.some(x=>/Owner Admin|Administration/.test(x.title)),role+' has no owner control');
    for(const mode of ['desktop','mobile'])assert.equal(results[role].responsive[mode].overflow,false,role+' has no horizontal overflow at '+mode);
   }
