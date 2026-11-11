@@ -4,12 +4,12 @@ This inventory compares the Owner Admin class tool-grant catalog, the signed-in 
 
 ## Shared class tool catalog
 
-These 20 class grants are represented by `shared/home-tool-registry.js`. Owner Admin derives its per-class grant checkboxes from that metadata, while Teacher Login renders enabled entries for each active class assigned to the signed-in teacher. The Owner Admin catalog includes the compatible `sync-to-nigri` addition from PR #742. An owner enabling a grant changes only that selected class; a classroom teacher's class controls are enforced by `funTorahClassAccess` against the authenticated teacher's current assignment.
+These 20 class grants are represented by `shared/home-tool-registry.js`. Owner Admin derives its per-class grant checkboxes from that metadata, while Teacher Login renders enabled entries for each active class assigned to the signed-in teacher. The regular homepage's hardcoded Teacher Tools anchors now render from the same registry's `homepageTeacherTools` list. The Owner Admin catalog includes the compatible `sync-to-nigri` addition from PR #742. An owner enabling a grant changes only that selected class; a classroom teacher's class controls are enforced by `funTorahClassAccess` against the authenticated teacher's current assignment.
 
 | Tool / grant | Teacher Login | Owner/Admin | Notes |
 |---|---|---|---|
 | Sefer HaMitzvos | Available when granted | Per-class grant | Learning tool |
-| Halacha | Available when granted | Per-class grant | Lesson and student-work routes remain distinct |
+| Halacha | Available when granted | Per-class grant | Student-work and Teacher Lesson companion routes remain distinct |
 | Yiddish | Available when granted | Per-class grant | School/story gates continue to apply |
 | Posuk Practice | Available when granted | Per-class grant | Also controls the Chumash quiz and Mishnayos companion tiles |
 | Chumash חידון | Available with Posuk Practice | In same grant | Student quiz destination; same permission as the primary Posuk tool |
@@ -26,11 +26,11 @@ These 20 class grants are represented by `shared/home-tool-registry.js`. Owner A
 | Homework & Assignments | Available when granted | Per-class grant | Teacher assignment center |
 | Gallery | Available when granted | Per-class grant | Existing gallery review/access checks remain |
 | Tag Game | Available when granted | Per-class grant | Uses the class gallery destination |
-| Davening Player | Available when granted | Per-class grant | Existing ET/WT-specific student content is preserved |
+| Davening Player | Available only for matching ET or WT class | Per-class grant shown only for supported classes | Route selects `davening_student_app_et/index.html` or `_wt/index.html`; the previously referenced generic route does not exist |
 | Chavrusa of the Day | Available when granted | Per-class grant | Existing roster/class checks remain |
 | Name Picker | Available when granted | Per-class grant | Existing roster/class checks remain |
 | Class Pointer | Available when granted | Per-class grant | Includes PDF presentation, screen sharing, and whiteboard mode |
-| Sync to Nigri | Available only when granted and the school's Nigri gate allows it | Per-class grant | Retains the existing school/server gate from PR #742 |
+| Sync to Nigri | Available only when granted and the school's Nigri gate allows it | Per-class grant | Integrated from PR #742 without duplicating its tile; retains the existing school/server gate |
 
 ## Teacher-only actions from the regular homepage
 
@@ -69,4 +69,4 @@ The hardcoded Teacher Tools actions are now defined in the shared registry and r
 
 ## Regression coverage
 
-`tests/owner-teacher-tool-registry.test.cjs` asserts that Owner Admin, the regular homepage, and Teacher Login consume the shared registry; every class grant has a teacher destination and owner category; teacher actions are registry-driven and class-aware; and owner-only Class Dashboard stays out of the teacher action list. Existing ET/WT browser journeys cover class-specific rendering, destination links, class switching, and assigned-class permissions.
+`tests/owner-teacher-tool-registry.test.cjs` asserts that Owner Admin, the regular homepage, and Teacher Login consume the shared registry; all 20 class grants have teacher destinations and owner categories; the homepage hardcoded links are registry-driven; ET/WT Davening paths are correct; teacher actions carry class context; and owner-only Class Dashboard stays out of regular Teacher Login. Existing ET/WT browser journeys cover class-specific rendering, destination links, class switching, and assigned-class permissions.
