@@ -11,28 +11,42 @@
     {id:"challenge",icon:"🏆",title:"Challenge Playground",subtitle:"Quiz yourself or play a game",tools:["weekly-quiz","game-show","multiplayer-center"]}
   ];
   const tools={
-    "sefer-hamitzvos":{title:"Sefer HaMitzvos",href:"sefer-hamitzvos/index.html",studentHref:"sefer-hamitzvos/index.html",icon:"📖",group:"more-learning"},
-    halacha:{title:"Halacha",href:"halacha/teacher.html",icon:"📔",group:"more-learning"},
-    yiddish:{title:"Yiddish",href:"yiddish/teacher.html",icon:"assets/yiddish-icon-v2.png",group:"skills"},
-    "posuk-practice-scroll":{title:"Posuk Practice",href:"record_pesukim/teacher.html",studentHref:"record_pesukim/student.html",icon:"📜",group:"learn",companions:[{title:"Chumash חידון",href:"record_pesukim/student.html?mode=quiz",icon:"🧠"},{title:"Mishnayos Practice",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html",icon:"📖"},{title:"Mishnayos חידון",href:"record-mishnayos/student.html?mode=quiz",icon:"🧠"}]},
-    "rashi-letters":{title:"Rashi Letters",href:"rashi-letters/teacher.html",icon:"אב",group:"skills"},
-    gematria:{title:"Gematria",href:"gematria/teacher.html",icon:"🔢",group:"skills"},
-    shorashim:{title:"Shorashim",href:"shorashim/teacher.html",icon:"🌳",group:"roots"},
-    chazara:{title:"Chazara",href:"chazara/teacher.html",studentHref:"chazara/index.html",icon:"🔁",group:"learn"},
-    "game-show":{title:"Game Show",href:"game-show/teacher.html",icon:"🏆",group:"challenge"},
-    "student-rewards":{title:"Student Rewards",href:"student-rewards/teacher.html",icon:"🌟",group:"class"},
+    "sefer-hamitzvos":{title:"Sefer HaMitzvos",href:"sefer-hamitzvos/index.html",studentHref:"sefer-hamitzvos/index.html",icon:"📖",group:"more-learning",classGrant:"sefer-hamitzvos",grantGroup:"dual"},
+    halacha:{title:"Halacha",href:"halacha/teacher.html",icon:"📔",group:"more-learning",classGrant:"halacha",grantGroup:"dual"},
+    yiddish:{title:"Yiddish",href:"yiddish/teacher.html",icon:"assets/yiddish-icon-v2.png",group:"skills",classGrant:"yiddish",grantGroup:"dual"},
+    "posuk-practice-scroll":{title:"Posuk Practice",href:"record_pesukim/teacher.html",studentHref:"record_pesukim/student.html",icon:"📜",group:"learn",companions:[{title:"Chumash חידון",href:"record_pesukim/student.html?mode=quiz",icon:"🧠",classGrant:"posuk-practice-scroll",grantGroup:"dual"},{title:"Mishnayos Practice",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html",icon:"📖"},{title:"Mishnayos חידון",href:"record-mishnayos/student.html?mode=quiz",icon:"🧠"}]},
+    "rashi-letters":{title:"Rashi Letters",href:"rashi-letters/teacher.html",icon:"אב",group:"skills",classGrant:"rashi-letters",grantGroup:"dual"},
+    gematria:{title:"Gematria",href:"gematria/teacher.html",icon:"🔢",group:"skills",classGrant:"gematria",grantGroup:"dual"},
+    shorashim:{title:"Shorashim",href:"shorashim/teacher.html",icon:"🌳",group:"roots",classGrant:"shorashim",grantGroup:"dual"},
+    chazara:{title:"Chazara",href:"chazara/teacher.html",studentHref:"chazara/index.html",icon:"🔁",group:"learn",classGrant:"chazara",grantGroup:"dual"},
+    "game-show":{title:"Game Show",href:"game-show/teacher.html",icon:"🏆",group:"challenge",classGrant:"game-show",grantGroup:"dual"},
+    "student-rewards":{title:"Student Rewards",href:"student-rewards/teacher.html",icon:"🌟",group:"class",classGrant:"student-rewards",grantGroup:"dual"},
     "daily-points":{title:"Daily Points",href:"student-rewards/teacher.html?tab=Daily%20Points",icon:"✅",group:"class"},
-    "weekly-quiz":{title:"Weekly Quiz",href:"weekly-quiz/teacher.html",icon:"📝",group:"challenge"},
-    homework:{title:"Homework & Assignments",href:"assignment-center/teacher.html",icon:"📚"},
-    gallery:{title:"Gallery",href:"class-gallery/index.html",icon:"🖼️",group:"class"},
-    tag:{title:"Tag Game",href:"class-gallery/index.html",icon:"🏃",group:"class"},
-    davening:{title:"Davening Player",href:"davening_student_app/index.html",icon:"📖"},
-    "class-pointer":{title:"Class Pointer",href:"class-pointer-prototype/dashboard.html?teacher=1",icon:"👆"},
-    "multiplayer-center":{title:"Multiplayer Arcade",href:"multiplayer/index.html",icon:"🎮",group:"challenge"},
-    "name-picker":{title:"Name Picker",href:"name-picker/index.html",icon:"🎡"},
-    chavrusa:{title:"Chavrusa of the Day",href:"chavrusa/index.html",icon:"👥"},
+    "weekly-quiz":{title:"Weekly Quiz",href:"weekly-quiz/teacher.html",icon:"📝",group:"challenge",classGrant:"weekly-quiz",grantGroup:"dual"},
+    homework:{title:"Homework & Assignments",href:"assignment-center/teacher.html",icon:"📚",classGrant:"homework",grantGroup:"dual"},
+    gallery:{title:"Gallery",href:"class-gallery/index.html",icon:"🖼️",group:"class",classGrant:"gallery",grantGroup:"dual"},
+    tag:{title:"Tag Game",href:"class-gallery/index.html",icon:"🏃",group:"class",classGrant:"tag",grantGroup:"dual"},
+    davening:{title:"Davening Player",href:"davening_student_app/index.html",icon:"📖",classGrant:"davening",grantGroup:"teacher"},
+    "class-pointer":{title:"Class Pointer",href:"class-pointer-prototype/dashboard.html?teacher=1",icon:"👆",classGrant:"class-pointer",grantGroup:"unsorted"},
+    "multiplayer-center":{title:"Multiplayer Arcade",href:"multiplayer/index.html",icon:"🎮",group:"challenge",classGrant:"multiplayer-center",grantGroup:"dual"},
+    "name-picker":{title:"Name Picker",href:"name-picker/index.html",icon:"🎡",classGrant:"name-picker",grantGroup:"teacher"},
+    chavrusa:{title:"Chavrusa of the Day",href:"chavrusa/index.html",icon:"👥",classGrant:"chavrusa",grantGroup:"teacher"},
     "mishnayos-practice":{title:"Mishnayos Practice",href:"mishnayos/teacher.html",icon:"🕍",group:"more-learning"}
   };
+  tools["sync-to-nigri"]={title:"Sync to Nigri",href:"sync-to-nigri/index.html",icon:"🔄",classGrant:"sync-to-nigri",grantGroup:"teacher",schoolGate:"nigri"};
   tools["class-gallery"]=tools.gallery;
-  root.B3HomeToolRegistry=Object.freeze({tools:Object.freeze(tools),groups:Object.freeze(groups)});
+  const ownerToolGroups=[
+    {id:"dual",title:"Student activities",description:"Students use these. The teacher also gets a control or reports view."},
+    {id:"teacher",title:"Teacher-only tools",description:"Only the teacher sees these. Students never do."},
+    {id:"unsorted",title:"Not sorted yet",description:"Still deciding where these belong."}
+  ];
+  const teacherActions=[
+    {id:"act-as-student",title:"Sign in as a Student",icon:"👀",kind:"button",command:"act-as-student"},
+    {id:"student-report",title:"Student Report",icon:"📈",href:"student-report/index.html",classParam:true},
+    {id:"vocabulary-progress",title:"Vocabulary Progress",icon:"📚",href:"word-bank/teacher.html",classParam:true},
+    {id:"manage-class",title:"Manage Class",icon:"🎛️",href:"admin.html?tab=students",classParam:true,preview:true},
+    {id:"follow-teacher",title:"Follow the Teacher",icon:"👣",href:"follow-teacher/teacher.html",classParam:true,newTab:true,preview:false},
+    {id:"share-screen",title:"Send Everyone to Share Screen",icon:"🖥️",href:"class-pointer-prototype/classroom.html?dashboard=teacher&sendEveryoneShare=1",classParam:true,newTab:true,preview:false,classGrant:"class-pointer"}
+  ];
+  root.B3HomeToolRegistry=Object.freeze({tools:Object.freeze(tools),groups:Object.freeze(groups),ownerToolGroups:Object.freeze(ownerToolGroups),teacherActions:Object.freeze(teacherActions)});
 })(typeof window!=="undefined"?window:globalThis);
