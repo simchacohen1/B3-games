@@ -51,3 +51,30 @@ test('loader reaches normal Firebase pages and standalone teacher pages', () => 
     assert.match(read(p), /teacher-global-bootstrap\.js/, p);
   }
 });
+
+test('a button press is never silent: with no class chosen it asks which class (issue 769)', () => {
+  const s = read('teacher-global-controls.js');
+  // All three buttons, on tool pages and on the owner home bar, go through act().
+  assert.match(s, /lock\.addEventListener\('click', function\(\)\{ act\('access'\); \}\)/);
+  assert.match(s, /follow\.addEventListener\('click', function\(\)\{ act\('follow'\); \}\)/);
+  assert.match(s, /pointer\.addEventListener\('click', function\(\)\{ act\('pointer'\); \}\)/);
+  assert.match(s, /homeFollow\.addEventListener\('click',function\(\)\{act\('follow'\);\}\)/);
+  assert.match(s, /homePointer\.addEventListener\('click',function\(\)\{act\('pointer'\);\}\)/);
+  assert.match(s, /if \(!resolveClass\(\)\) \{ askClass\(which\); return; \}/);
+  assert.match(s, /Which class\?/);
+  // The Class Pointer button is shown to every signed-in teacher, not only once a class is chosen.
+  assert.match(s, /var ok = authorized && classes\.length > 0;/);
+  // The Yiddish app defines its own global open(), which replaces window.open there.
+  assert.doesNotMatch(s, /window\.open\(/);
+  assert.match(s, /link\.target = name;/);
+  // Still never picks between several classes by itself.
+  assert.match(s, /classes\.length === 1/);
+  assert.match(s, /selected = ids\.includes\(requested\) \? requested : '';/);
+});
+
+test('pages fetch the fixed toolbar, not a cached older copy', () => {
+  const version = /teacher-global-controls\.js\?v=20261110-buttons1/;
+  assert.match(read('gallery-share.js'), version);
+  assert.match(read('teacher-global-bootstrap.js'), version);
+  assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);
+});
