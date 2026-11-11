@@ -123,8 +123,8 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.deepEqual(results.teacher_signin.classes,['New Room']);
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/admins/teacher_new').length,1,'Google popup and auth restoration share the in-flight admin check');
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,1,'Google popup and auth restoration share the in-flight teacher check');
-  assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/admins/teacher_new').length,1,'pre-cache baseline performs one admin lookup for this sign-in lifecycle');
-  assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,1,'pre-cache baseline performs one teacher lookup for this sign-in lifecycle');
+  assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/admins/teacher_new').length,2,'pre-cache baseline performs two admin lookups without in-flight sharing');
+  assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,2,'pre-cache baseline performs two teacher lookups without in-flight sharing');
   const expectedTools=['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','student-rewards','daily-points','weekly-quiz','game-show','multiplayer-center'];
   for(const role of ['teacher_et','teacher_wt']){
    const section=results[role].cards[0],classId=role==='teacher_et'?'et':'wt';
