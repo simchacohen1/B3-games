@@ -51,7 +51,7 @@ test('Teacher View uses the shared full control panel and assignment-scoped clas
  const html=fs.readFileSync('admin.html','utf8');
  assert.match(html,/if\(access\.role!=="admin"\)[\s\S]*?const ids=\(access\.classIds\|\|\[\]\)/);
  assert.match(html,/panel\.style\.display="none";[\s\S]*?startOwnerControl\(\)/);
- assert.match(html,/auth\.authStateReady\)[\s\S]*?waitForTeacherAuth/);
+ assert.match(html,/auth\?\.authStateReady\)[\s\S]*?waitForTeacherAuth/);
  assert.doesNotMatch(html,/This class follows the B3 master schedule/);
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(scripts.length);new vm.Script(scripts.at(-1)[1],{filename:'admin.html'});
