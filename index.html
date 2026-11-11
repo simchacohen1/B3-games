@@ -399,6 +399,7 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
+<script src="shared/home-tool-registry.js?v=20261111-registry"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="test-login-link.js?v=20261107-testword"></script>
 <script src="student-tool-controls.js" defer></script>
@@ -746,6 +747,19 @@ document.addEventListener("DOMContentLoaded",function(){
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   window.__b3Ready = true;
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
+  const homeRegistry=window.B3HomeToolRegistry;
+  if(homeRegistry){
+    gameCards.forEach(card=>{
+      const id=card.dataset.gameId,meta=homeRegistry.tools[id];
+      if(meta&&!card.dataset.companionOf){card.dataset.registryGroup=meta.group||"";if(meta.studentHref)card.href=meta.studentHref;}
+      if(card.dataset.companionOf){const primary=homeRegistry.tools[card.dataset.companionOf],title=card.querySelector('.card-title')?.textContent?.trim();const item=primary?.companions?.find(c=>c.title===title);if(item)card.href=item.href;}
+    });
+    document.querySelectorAll('.game-group[data-game-group]').forEach(group=>{
+      const descriptor=homeRegistry.groups.find(g=>g.id===group.dataset.gameGroup);if(!descriptor)return;
+      const title=group.querySelector('.game-group-title'),subtitle=group.querySelector('.game-group-subtitle');
+      if(title)title.textContent=descriptor.title;if(subtitle)subtitle.textContent=descriptor.subtitle;
+    });
+  }
   // A companion tile (Mishnayos Practice) shares its main tool's switch and
   // class permission ("posuk-practice-scroll"). It is left out of the tool
   // lists and simply copies the main tile's open/closed/hidden state.
