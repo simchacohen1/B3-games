@@ -49,6 +49,7 @@ test('home page Sync to Nigri card is hidden by default with a class the card fi
   assert.equal(nigri.elementId,'nigriSyncCard');
   assert.equal(nigri.className,'nigri-hidden');
   assert.match(html, /registry\.homepageTeacherTools/);
+  assert.match(html, /renderTeacherHomepageTools\(\{role:"",classIds:\[\]\},true\)/,'the gated tile exists before the DOM-ready school check');
   assert.match(html, /\.teacher-tool-card\.nigri-hidden\{display:none!important\}/);
   assert.match(html, /B3SchoolScope\.checkNigri/);
   assert.match(html, /currentCard=document\.getElementById\("nigriSyncCard"\)/,'school authorization updates the current registry-rendered card');
