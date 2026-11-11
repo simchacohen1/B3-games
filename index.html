@@ -48,6 +48,7 @@
   .teacher-tools-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;max-width:900px;margin:auto}
   .teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:22px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
   .teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+  .teacher-tool-card.nigri-hidden{display:none!important}
   .teacher-tool-card .card-title{color:#92400e}
   .admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
   .admin-panel{position:fixed;top:58px;right:12px;width:min(440px,calc(100vw - 24px));background:white;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.22);padding:18px;text-align:left;z-index:9999;max-height:86vh;overflow-y:auto}
@@ -150,7 +151,7 @@
   .home-access-card iframe{flex:1;width:100%;border:0;background:#f1f5f9}
   @media(max-width:560px){.home-class-bar{top:58px;left:auto;right:10px;transform:none}body.has-home-class-bar>h1{padding-top:104px!important}.home-class-bar label{display:none}.home-access-modal{padding:0}.home-access-card{height:100%;border-radius:0}}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
-.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
+#classPick{display:none}.login-card.picking>:not(h2):not(#classPick){display:none}.login-card.picking #classPick{display:block}.class-pick-list{display:grid;gap:10px;margin:14px 0}.login-card .class-pick-list button{margin:0;font-size:19px}.login-card button.class-pick-back{background:#e2e8f0;color:#26364a}.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
 /* Keep the student launchers visible together on desktop screens. */
 @media(min-width:760px){
  body{padding-top:16px}
@@ -179,6 +180,9 @@
 .game-group-grid .yiddish-icon{width:clamp(36px,10vw,74px);height:clamp(36px,10vw,74px)}
 .game-group-grid .student-card-shell>.game-card{padding-right:clamp(3px,1vw,12px);padding-top:clamp(30px,6vw,24px)}
 .game-group-grid .card-lock{width:clamp(26px,5vw,42px);height:clamp(26px,5vw,42px);font-size:clamp(14px,2.8vw,24px);right:clamp(3px,.8vw,7px);top:clamp(3px,.8vw,7px)}
+/* Chumash Cheder has five tiles: each Practice tile sits next to its חידון tile, two per row, with Chazara across the bottom. */
+.game-group[data-game-group="learn"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-flow:row}
+.game-group[data-game-group="learn"] .game-group-grid>[data-game-id="chazara"],.game-group[data-game-group="learn"] .game-group-grid>:has(>[data-game-id="chazara"]){grid-column:1/-1}
 @media(min-width:760px){
  .game-group-grid .game-card{min-height:64px;padding:10px 8px;gap:clamp(6px,.9vw,10px);flex-direction:row}
  .game-group-grid .card-title{font-size:clamp(14px,1.6vw,18px);text-align:left}
@@ -396,12 +400,29 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
 <script src="backend/functions/student-tool-policy.js"></script>
+<script src="test-login-link.js?v=20261107-testword"></script>
 <script src="student-tool-controls.js" defer></script>
 <script defer src="assignment-center/home-link.js?v=20261027-staging"></script>
 <script src="follow-teacher/core.js?v=20261020-follow-pointer1" defer></script>
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
 <script src="guest-mode.js?v=20261011-guest" defer></script>
 <script src="site-settings.js?v=20261020-demo-student" defer></script>
+<script src="school-scope.js?v=20261107" defer></script>
+<script>
+// Sync to Nigri card: hidden unless the owner, or a teacher whose school has "Syncs to Nigri" on (school-scope.js).
+document.addEventListener("DOMContentLoaded",function(){
+  var api=window.B3SiteSettings,card=document.getElementById("nigriSyncCard");
+  if(!api||!card||!window.B3SchoolScope||!window.firebase)return;
+  var check=0;
+  api.onAuthStateChanged(function(user,authorized){
+    var mine=++check;card.classList.add("nigri-hidden");
+    if(!user||!authorized)return;
+    window.B3SchoolScope.checkNigri({db:window.firebase.database(),user:user,workspaceId:api.workspaceId}).then(function(r){
+      if(mine===check)card.classList.toggle("nigri-hidden",!r.allowed);
+    }).catch(function(){});
+  });
+});
+</script>
 <script src="approval-queue.js?v=20261021-approvals" defer></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
@@ -424,6 +445,7 @@ body > .subtitle::after {
     <label for="classPinInput">Passcode</label>
     <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <div id="classPick" role="group" aria-label="Choose your class"></div>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
@@ -440,6 +462,9 @@ body > .subtitle::after {
             <section class="game-group island-place island-main" data-game-group="learn">
         <div class="game-group-head"><span class="game-group-icon" aria-hidden="true"><svg viewBox="0 0 64 64" width="52" height="52" role="img" aria-label="Rebbe"><path d="M9 64c0-13 10-20 23-20s23 7 23 20z" fill="#1f2937"/><path d="M26 44l6 13 6-13z" fill="#fff"/><ellipse cx="32" cy="29" rx="11" ry="12" fill="#f3c79d"/><path d="M20.5 28c0 15 5 25 11.5 25s11.5-10 11.5-25c-2 6-6 9-11.5 9s-9.5-3-11.5-9z" fill="#4a3426"/><path d="M27 36.5c2-1.6 3.5-1.6 5-.6 1.5-1 3-1 5 .6-2 .8-3.5 1-5 .4-1.5.6-3 .4-5-.4z" fill="#4a3426"/><circle cx="28" cy="28" r="1.5" fill="#1f2937"/><circle cx="36" cy="28" r="1.5" fill="#1f2937"/><path d="M25.5 24.5q2.5-1.5 5 0M33.5 24.5q2.5-1.5 5 0" stroke="#4a3426" stroke-width="1.3" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="19" rx="18" ry="3.6" fill="#111827"/><path d="M21.5 19c0-8 3-12.5 10.5-12.5S42.5 11 42.5 19z" fill="#111827"/><path d="M21.8 15.5h20.4v3H21.8z" fill="#374151"/><path d="M32 7.5v4" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg></span><div><div class="game-group-title">Chumash Cheder</div><div class="game-group-subtitle">Learn your posuk, then review it</div></div></div>
         <div class="game-group-grid"><a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record_pesukim/student.html?mode=quiz"><span class="card-icon">🧠</span><span class="card-title">Chumash חידון</span></a>
+<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record-mishnayos/student.html"><span class="card-icon">📖</span><span class="card-title">Mishnayos Practice</span></a>
+<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record-mishnayos/student.html?mode=quiz"><span class="card-icon">🧠</span><span class="card-title">Mishnayos חידון</span></a>
 <a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a></div>
       </section>
             <section class="game-group island-place island-main island-roots" data-game-group="roots">
@@ -484,6 +509,7 @@ body > .subtitle::after {
       <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
       <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
+      <a class="teacher-tool-card" href="record-mishnayos/teacher.html" ><span class="card-icon">📖</span><span class="card-title">Mishnayos Practice — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="chazara/teacher.html" ><span class="card-icon">🔁</span><span class="card-title">Chazara — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="rashi-letters/teacher.html" ><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
@@ -496,7 +522,7 @@ body > .subtitle::after {
       <a class="teacher-tool-card" href="name-picker/index.html" ><span class="card-icon">🎡</span><span class="card-title">Name Picker</span></a>
       <a class="teacher-tool-card" href="class-dashboard/index.html" ><span class="card-icon">📊</span><span class="card-title">Class Dashboard</span></a>
       <a class="teacher-tool-card" href="student-report/index.html" ><span class="card-icon">📈</span><span class="card-title">Student Report — All Tools</span></a>
-      <a class="teacher-tool-card" href="sync-to-nigri/index.html" ><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
+      <a class="teacher-tool-card nigri-hidden" href="sync-to-nigri/index.html" id="nigriSyncCard"><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
       <a class="teacher-tool-card" href="davening_student_app_et/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — ET</span></a>
       <a class="teacher-tool-card" href="davening_student_app_wt/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — WT</span></a>
     </div>
@@ -626,6 +652,14 @@ document.addEventListener("DOMContentLoaded",function(){
   const pageParams=new URLSearchParams(window.location.search);
   const previewStudentId=String(pageParams.get("previewStudent")||"").trim();
   const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
+  // Quick sign-in link for a fictional test student (#ftt-test=..., issue #619).
+  // Take it out of the address bar at once so it is not left in history or shared.
+  let pendingTestLogin=null,testLinkAuthKnown=false;
+  try{
+    pendingTestLogin=isStudentPreview?null:(window.FTTTestLoginLink?.readHash(location.hash)||null);
+    if(/^#ftt-test=/.test(location.hash))history.replaceState(null,"",location.pathname+location.search);
+    if(pendingTestLogin)["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
+  }catch(e){pendingTestLogin=null;}
   // Keep the whole B3 classroom identity available to every mini-app.
   // ET/WT are still the student's within-class track, not this workspace ID.
   try{sessionStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
@@ -635,6 +669,19 @@ document.addEventListener("DOMContentLoaded",function(){
     window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
   }
   const db=window.firebase.database();
+  // Issue #667: the owner only needs the student ids here. A REST shallow read
+  // returns just the keys (a few KB) instead of every full student record (MB).
+  async function ownerStudentIds(){
+    try{
+      const user=firebase.auth().currentUser,base=String(firebase.app().options.databaseURL||"").replace(/\/+$/,"");
+      if(user&&base){
+        const res=await fetch(base+"/b3Games/students.json?shallow=true&auth="+encodeURIComponent(await user.getIdToken()));
+        if(res.ok)return Object.keys((await res.json())||{});
+      }
+    }catch(e){console.warn("Shallow student list failed; using full read.",e);}
+    const snap=await db.ref("b3Games/students").once("value");
+    return Object.keys(snap.val()||{});
+  }
   const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
   const classLabels={et:"ET",wt:"WT"};
 
@@ -699,7 +746,23 @@ document.addEventListener("DOMContentLoaded",function(){
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   window.__b3Ready = true;
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
-  const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
+  // A companion tile (Mishnayos Practice) shares its main tool's switch and
+  // class permission ("posuk-practice-scroll"). It is left out of the tool
+  // lists and simply copies the main tile's open/closed/hidden state.
+  const primaryGameCards=gameCards.filter(card=>!card.dataset.companionOf);
+  gameCards.filter(card=>card.dataset.companionOf).forEach(companion=>{
+    const primary=primaryGameCards.find(card=>card.dataset.gameId===companion.dataset.companionOf);
+    if(!primary)return;
+    const sync=()=>{
+      ["hidden","activity-closed"].forEach(cls=>companion.classList.toggle(cls,primary.classList.contains(cls)));
+      const badge=primary.querySelector(".activity-closed-badge");
+      companion.querySelector(".activity-closed-badge")?.remove();
+      if(badge)companion.appendChild(badge.cloneNode(true));
+    };
+    new MutationObserver(sync).observe(primary,{attributes:true,attributeFilter:["class"],childList:true});
+    sync();
+  });
+  const gameDefinitions=primaryGameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   gameCards.forEach(card=>card.addEventListener("click",event=>{
     if(card.classList.contains("activity-closed")){
       event.preventDefault();
@@ -756,8 +819,7 @@ document.addEventListener("DOMContentLoaded",function(){
     // The owner can still manage the complete B3 student directory.
     let studentIds=[];
     if(isOwner){
-      const studentsIndex=await db.ref("b3Games/students").once("value");
-      studentIds=Object.keys(studentsIndex.val()||{});
+      studentIds=await ownerStudentIds();
     }else{
       const ids=new Set();
       Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
@@ -887,8 +949,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let approvalCounts={};
   let approvalClassCounts={};
   let approvalClassNames={};
-  let approvalAttemptsCache=null,approvalAttemptsAt=0,approvalSweepAt=0;
-  const APPROVAL_POLL_MS=60000,APPROVAL_ATTEMPTS_MAX_AGE_MS=5*60000,APPROVAL_SWEEP_MIN_MS=5*60000;
+  let approvalSweepAt=0;
+  const APPROVAL_POLL_MS=60000,APPROVAL_SWEEP_MIN_MS=5*60000;
   const POINTS_API_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 
   const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
@@ -1016,27 +1078,49 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
   function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
-  async function loadApprovalCenter(autoOpen){
-    if(!isAuthorizedAdmin||approvalCenterLoading)return;
-    approvalCenterLoading=true;
-    renderApprovalCenter();
-    const reads=[
-      // The full Posuk attempts tree is large; reuse it for a few minutes.
-      ["attempts",(approvalAttemptsCache&&Date.now()-approvalAttemptsAt<APPROVAL_ATTEMPTS_MAX_AGE_MS)?Promise.resolve(approvalAttemptsCache):db.ref("posukPractice/attempts").once("value").then(function(snap){approvalAttemptsCache=snap;approvalAttemptsAt=Date.now();return snap;})],
-      ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
-      ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
-      ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
-      ["gallery",db.ref("classGallery/posts").once("value")],
-      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")],
-      ["rewardClasses",db.ref("studentRewards/classes").once("value")]
-    ];
-    const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
-    const data={};const failed=[];
-    settled.forEach(function(result,i){
-      const key=reads[i][0];
-      if(result.status==="fulfilled")data[key]=result.value.val()||{};
-      else failed.push(key);
+  // Approval sources are watched with live listeners instead of being
+  // re-downloaded with once() every minute: Realtime Database charges for data
+  // downloaded, and a listener downloads each tree once and then receives only
+  // the changes. (posukPractice/attempts alone is large.)
+  const APPROVAL_SOURCES=[
+    ["attempts","posukPractice/attempts"],
+    ["pointRequests","studentRewards/pointRequests"],
+    ["shorashimRecordings","posukPractice/shorashimLearning/recordingEvents"],
+    ["shorashimWords","posukPractice/shorashimLearning/catalog/shorashim"],
+    ["gallery","classGallery/posts"],
+    ["redemptions","studentRewards/redemptionsByStudent"],
+    ["rewardClasses","studentRewards/classes"]
+  ];
+  let approvalData={},approvalFailed={},approvalUnwatchers=[],approvalRecomputeTimer=null;
+  function watchApprovalSources(){
+    if(approvalUnwatchers.length)return;
+    approvalData={};approvalFailed={};
+    APPROVAL_SOURCES.forEach(function(source){
+      const key=source[0],ref=db.ref(source[1]);
+      const onValue=function(snap){approvalData[key]=snap.val()||{};delete approvalFailed[key];scheduleApprovalRecompute();};
+      const onError=function(err){console.warn("Approval source unavailable: "+key,err);delete approvalData[key];approvalFailed[key]=true;scheduleApprovalRecompute();};
+      ref.on("value",onValue,onError);
+      approvalUnwatchers.push(function(){ref.off("value",onValue);});
     });
+  }
+  function unwatchApprovalSources(){
+    approvalUnwatchers.forEach(function(off){off();});
+    approvalUnwatchers=[];approvalData={};approvalFailed={};
+    if(approvalRecomputeTimer){clearTimeout(approvalRecomputeTimer);approvalRecomputeTimer=null;}
+  }
+  // Many students writing at once must not trigger a recount per write.
+  function scheduleApprovalRecompute(){
+    if(approvalRecomputeTimer)return;
+    approvalRecomputeTimer=setTimeout(function(){approvalRecomputeTimer=null;loadApprovalCenter(false);},1000);
+  }
+  async function loadApprovalCenter(autoOpen){
+    if(!isAuthorizedAdmin)return;
+    watchApprovalSources();
+    // Show "checking" until every source has answered once (with data or an error).
+    approvalCenterLoading=APPROVAL_SOURCES.some(function(source){return approvalData[source[0]]===undefined&&!approvalFailed[source[0]];});
+    if(approvalCenterLoading){renderApprovalCenter();return;}
+    const data=approvalData;
+    const failed=Object.keys(approvalFailed);
     // Gallery posts live in one shared list but the gallery page shows one class at a time,
     // so link straight to the class that has the waiting projects (most pending first).
     const galleryPending=data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}):[];
@@ -1085,6 +1169,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("approvalCenterButton").classList.remove("hidden");
     if(approvalCenterTimer)clearInterval(approvalCenterTimer);
     // Keep the corner approval badge updated without auto-opening the center modal.
+    // The listeners keep the data current; this timer only recounts what is
+    // already in memory (no download), so the automatic Posuk point sweep
+    // still gets its regular chance to run.
     loadApprovalCenter(false);
     approvalCenterTimer=setInterval(function(){if(!document.hidden)loadApprovalCenter(false);},APPROVAL_POLL_MS);
   }
@@ -1094,7 +1181,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     closeApprovalCenter();
     approvalCounts={};
     approvalClassCounts={};
-    approvalAttemptsCache=null;approvalAttemptsAt=0;
+    unwatchApprovalSources();
     approvalCenterAutoShown=false;
   }
 
@@ -1151,6 +1238,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("lockedCard").classList.add("hidden");
     el("gamesArea").classList.add("hidden");
     el("teacherToolsSection").classList.add("hidden");
+  }
+  // Runs once, only after Firebase has said whether someone is already signed in.
+  function startTestLinkSignIn(){
+    if(!pendingTestLogin||!testLinkAuthKnown)return;
+    const login=pendingTestLogin;pendingTestLogin=null;
+    // Never swap a signed-in teacher's session for a test student.
+    if(isAuthorizedTeacher||currentUser?.email){setLoginMsg("This test student link must be opened in a private (incognito) window.");return;}
+    el("studentNameInput").value=login.name;el("classPinInput").value=login.passcode;
+    setTimeout(()=>studentSignIn({testLink:true}),0);
   }
 
   function studentHasOverride(gameId,studentId=myStudentId){
@@ -1509,7 +1605,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   // Student sign-in is checked on the server; passcodes never reach the browser.
   function studentAuthUrl(){
     const stagingProject=window.B3_STAGING_FIREBASE_CONFIG?.projectId;
-    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/i.test(location.hostname);
+    const stagingHost=['fun-torah-tools-staging.web.app','fun-torah-tools-staging.firebaseapp.com'].includes(location.hostname)||/^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/i.test(location.hostname);
     if(stagingProject==='fun-torah-tools-staging'||stagingHost)return `https://us-central1-${stagingProject||'fun-torah-tools-staging'}.cloudfunctions.net/funTorahStudentAuth`;
     return "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
   }
@@ -1553,7 +1649,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
     }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
+    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:"",choices:studentClassChoices.slice()};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
@@ -1660,13 +1756,39 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(key)try{localStorage.removeItem(key);}catch(e){}
   }
 
+  // A student in several classes picks one after the passcode is accepted.
+  // Resolves with the class id, or null when they press Back.
+  function chooseStudentClass(choices,name){
+    return new Promise(resolve=>{
+      const card=el("loginCard"),box=el("classPick"),heading=card.querySelector("h2");
+      const done=value=>{card.classList.remove("picking");heading.textContent="Student Sign In";box.replaceChildren();resolve(value);};
+      const help=document.createElement("p");help.textContent="Hi "+(name||"there")+"! Which class are you going to?";
+      const list=document.createElement("div");list.className="class-pick-list";
+      choices.slice().sort((a,b)=>String(a.name||a.id).localeCompare(String(b.name||b.id))).forEach(c=>{
+        const b=document.createElement("button");b.type="button";b.textContent=c.name||c.id;b.onclick=()=>done(c.id);list.appendChild(b);
+      });
+      const back=document.createElement("button");back.type="button";back.className="class-pick-back";back.textContent="← Back";back.onclick=()=>done(null);
+      heading.textContent="Choose your class";setLoginMsg("");
+      box.replaceChildren(help,list,back);card.classList.add("picking");
+      list.querySelector("button")?.focus();
+    });
+  }
+
   async function studentSignIn(){
     const btn=el("studentSignInBtn");
     if(btn.disabled)return;
+    // startTestLinkSignIn passes {testLink:true}; clicks pass an Event.
+    const testLink=arguments[0]?.testLink===true;
     btn.disabled=true;setLoginMsg("Checking…");
     try{
       const studentName=el("studentNameInput").value;
       const r=await checkStudentAccess(studentName,el("classPinInput").value);
+      if(testLink&&!r.ok)el("classPinInput").value="";
+      // Quick sign-in links are for test classes only, never real students.
+      if(testLink&&r.ok&&!window.FTTTestLoginLink?.onlyTestClasses(studentClassChoices,r.classId)){
+        el("classPinInput").value="";el("studentNameInput").value="";
+        setLoginMsg("This quick sign-in link only works for test students.");return;
+      }
       if(!r.ok){
         let message=r.reason;
         if(r.status===401){
@@ -1677,7 +1799,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       clearWrongPasscodeAttempts(studentName);
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
-      setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+      // One class: straight in. Several: the student chooses (quick test links skip this).
+      let entry=r;
+      const choices=Array.isArray(r.choices)?r.choices:[];
+      if(!testLink&&choices.length>1){
+        const picked=await chooseStudentClass(choices,r.name);
+        if(!picked){setLoginMsg("");return;}
+        if(picked!==r.classId)entry={...r,classId:picked,customToken:""};
+      }
+      setLoginMsg("Opening your games…");await enterStudent(entry);setLoginMsg("");
       // A student who opened a direct activity link (e.g. a teacher-assigned
       // Weekly Quiz) before signing in goes straight back to it.
       let returnTo="";try{returnTo=sessionStorage.getItem("b3StudentReturnTo")||"";sessionStorage.removeItem("b3StudentReturnTo");}catch(e){}
@@ -2232,7 +2362,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
   el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
-  el("approvalCenterRefresh")?.addEventListener("click",()=>{approvalAttemptsAt=0;loadApprovalCenter(false);});
+  el("approvalCenterRefresh")?.addEventListener("click",()=>{unwatchApprovalSources();loadApprovalCenter(false);});
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
@@ -2442,7 +2572,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // A verified teacher always wins over a guest preview.
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
+    testLinkAuthKnown=true;
     renderStudentAccess();renderAdminPanel();
+    startTestLinkSignIn();
     if(authorized){
       if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();
       Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);

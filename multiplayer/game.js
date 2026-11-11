@@ -20,7 +20,7 @@
   const el = id => document.getElementById(id);
   const title = el('gameTitle'), hint = el('gameHint'), message = el('message'), roomSection = el('room');
   const board = el('board'), actions = el('actions');
-  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', countdownTimer = null, countdownRetryTimer = null, countdownStarting = false, settlementRetryTimer = null, settlementInFlight = '', settledRoomCode = '', settlementRetries = 0;
+  let db = null, callable = null, classInfo = null, studentId = '', roomCode = '', room = null, privateHand = [], privateCard = null, ref = null, privateRef = null, listener = null, privateListener = null, pending = false, authReady = false, selectedChecker = null, selectedSet = [], askRank = null, selectedUno = null, mathDraft = '', countdownTimer = null, countdownRetryTimer = null, countdownStarting = false, awayTimer = null, settlementRetryTimer = null, settlementInFlight = '', settledRoomCode = '', settlementRetries = 0;
 
   function text(tag, className, value) {
     const node = document.createElement(tag);
@@ -69,6 +69,7 @@
       else { clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); countdownTimer = countdownRetryTimer = null; countdownStarting = false; el('countdown').hidden = true; }
       draw();
       if (room.state === 'finished') settleFinishedRoom();
+      else el('coinResult').hidden = true;
     }, () => notice('The game connection was interrupted. Refresh to reconnect.', true));
     if (['bingo', 'dominoes', 'go-fish', 'uno-style'].includes(gameKey)) {
       privateRef = db.ref(`b3Private/multiplayerGames/workspaces/${classInfo.workspaceId}/classes/${classInfo.classId}/rooms/${roomCode}/hands/${studentId}`);
@@ -80,7 +81,7 @@
       }, () => notice('Your private game information could not be loaded. Refresh to reconnect.', true));
     }
   }
-  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); clearTimeout(settlementRetryTimer); countdownTimer = countdownRetryTimer = settlementRetryTimer = null; ref = listener = privateRef = privateListener = null; }
+  function unlisten() { if (ref && listener) ref.off('value', listener); if (privateRef && privateListener) privateRef.off('value', privateListener); clearInterval(countdownTimer); clearTimeout(countdownRetryTimer); clearTimeout(settlementRetryTimer); clearTimeout(awayTimer); countdownTimer = countdownRetryTimer = settlementRetryTimer = awayTimer = null; ref = listener = privateRef = privateListener = null; }
   function clearSavedRejoin(code) {
     try {
       const key = 'fttMultiplayerRejoin:' + studentId, saved = JSON.parse(sessionStorage.getItem(key) || 'null');
@@ -90,6 +91,7 @@
   function statusText() {
     if (!room) return 'Connecting…';
     if (room.state === 'lobby') return room.host === studentId ? 'Waiting for classmates. You start the game when everyone is ready.' : 'Waiting for the host to start.';
+    if ((room.finished || room.state === 'finished') && room.forfeitBy?.length && room.winner === studentId) return 'Your classmate left, so you win this game.';
     if (room.finished || room.state === 'finished') return room.draw ? 'It’s a draw!' : (room.winner === studentId ? 'You won! Great game.' : ((room.players || []).find(p => p.studentId === room.winner)?.name || 'A classmate') + ' won this game.');
     if (gameKey === 'math-race') return 'Solve the question with your classmates.';
     if (gameKey === 'set') return 'Find a set of three cards.';
@@ -166,19 +168,42 @@
       actions.append(text('div', 'player-turn', statusText()));
       if (game?.maxPlayers === 2 && room.allowSpectators && room.winnerQueue?.length) actions.append(text('div', 'player-turn', room.winnerQueue.length + ' classmate(s) are waiting to play the winner.'));
       if (gameKey === 'bingo' && room.host === studentId) actions.append(button('Draw next number', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
-      if (gameKey === 'dominoes' && room.turn === studentId) actions.append(button('Draw a tile', () => call('move', { move: { type: 'draw' } }).catch(showError), 'btn', pending));
+      if (gameKey === 'dominoes' && room.turn === studentId) {
+        actions.append(button('Draw a tile', () => { selectedDom = null; call('move', { move: { type: 'draw' } }).catch(showError); }, 'btn uno-btn', pending));
+        const picked = selectedDom != null ? privateHand[selectedDom] : null;
+        if (picked) for (const end of ['left', 'right']) actions.append(button(end === 'left' ? '← Left end (' + room.ends[0] + ')' : 'Right end (' + room.ends[1] + ') →', () => { const index = selectedDom; selectedDom = null; call('move', { move: { type: 'play', index, end } }).catch(showError); }, 'uno-pick dm-end', pending || !domSides(picked)[end]));
+      }
       if (gameKey === 'uno-style' && room.turn === studentId) {
         const label = room.drawPending ? `Draw ${room.drawPending} cards` : 'Draw a card';
-        actions.append(button(label, () => call('move', { move: { type: room.drawPending ? 'draw-penalty' : 'draw' } }).catch(showError), 'btn', pending));
-        if (selectedUno != null) for (const color of ['red','yellow','green','blue']) actions.append(button(color, () => call('move', { move: { type: 'play', index: selectedUno, color } }).then(() => { selectedUno = null; }).catch(showError), 'quiet', pending));
+        actions.append(button(label, () => call('move', { move: { type: room.drawPending ? 'draw-penalty' : 'draw' } }).catch(showError), 'btn uno-btn', pending));
+        if (selectedUno != null) for (const color of ['red','yellow','green','blue']) actions.append(button(UNO_COLOR_NAMES[color], () => call('move', { move: { type: 'play', index: selectedUno, color } }).then(() => { selectedUno = null; }).catch(showError), 'uno-pick ' + color, pending));
       }
       if (gameKey === 'ludo' && room.turn === studentId) {
-        if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn', pending));
-        else actions.append(text('div', 'player-turn', 'You rolled ' + room.lastRoll + '. Choose a token.'));
+        if (room.lastRoll == null) actions.append(button('Roll die', () => call('move', { move: { type: 'roll' } }).catch(showError), 'btn uno-btn', pending));
+        else actions.append(text('div', 'player-turn', 'Tap a glowing token.'));
       }
+      addAwayControls();
       actions.append(button('Leave game', leaveRoom, 'quiet', pending));
       actions.append(button('Browse other games', leaveRoom, 'quiet'));
     }
+  }
+  // When a classmate leaves mid-game, wait a short grace period for them to come back,
+  // then let the players who stayed continue (or win, if nobody else is left).
+  function addAwayControls() {
+    clearTimeout(awayTimer); awayTimer = null;
+    const away = room?.awayPlayers || [];
+    if (!away.length || room.state !== 'playing') return;
+    const names = away.map(player => player.name).join(', ');
+    const readyAt = Math.max(...away.map(player => Number(player.leftAt) || 0)) + (Number(room.awayGraceMs) || 45000);
+    const waitMs = readyAt - Date.now();
+    const alone = activePlayerCount(room) <= 1;
+    if (waitMs > 0) {
+      actions.append(text('div', 'player-turn', `${names} left the game. Waiting ${Math.ceil(waitMs / 1000)} seconds for them to come back…`));
+      awayTimer = setTimeout(() => { awayTimer = null; draw(); }, Math.min(waitMs, 5000));
+      return;
+    }
+    actions.append(text('div', 'player-turn', `${names} left the game.`));
+    actions.append(button(alone ? 'End game — I win' : 'Continue without them', () => call('claim-forfeit').catch(showError), 'btn', pending));
   }
   function runCountdown(countdownAt) {
     if (countdownTimer) return;
@@ -202,12 +227,28 @@
     };
     tick(); countdownTimer = setInterval(tick, 100);
   }
+  function showCoinResult(coins) {
+    const box = el('coinResult');
+    if (!box || !coins) return;
+    box.hidden = false;
+    if (!coins.configured) { box.textContent = '🪙 Game coins are not turned on for your class yet. Ask your teacher to set them up.'; return; }
+    const earned = Math.max(0, Number(coins.earned) || 0), total = Math.max(0, Number(coins.totalCoins) || 0);
+    box.textContent = earned
+      ? `🪙 +${earned} game coin${earned === 1 ? '' : 's'}${coins.computerGame ? ' (computer game)' : ''}! You now have ${total}.`
+      : `🪙 No coins this round. You have ${total} game coin${total === 1 ? '' : 's'}.`;
+  }
+  function isActiveStudentPlayer() {
+    return classInfo?.role !== 'teacher' && (room?.players || []).some(player => player.studentId === studentId && player.role === 'student');
+  }
   function settleFinishedRoom() {
-    if (!room || room.state !== 'finished' || settledRoomCode === roomCode || settlementInFlight === roomCode) return;
+    if (!room || room.state !== 'finished' || settledRoomCode === roomCode + ':' + (room.round || 1) || settlementInFlight === roomCode) return;
+    // Only students who played can collect coins; teachers and spectators would just get an error.
+    if (!isActiveStudentPlayer()) return;
     settlementInFlight = roomCode;
-    call('settle').then(() => {
-      settledRoomCode = roomCode; settlementInFlight = ''; settlementRetries = 0;
+    call('settle').then(result => {
+      settledRoomCode = roomCode + ':' + (room?.round || 1); settlementInFlight = ''; settlementRetries = 0;
       clearTimeout(settlementRetryTimer); settlementRetryTimer = null;
+      showCoinResult(result.coins);
     }).catch(() => {
       settlementInFlight = '';
       settlementRetries += 1;
@@ -314,20 +355,7 @@
       const scores = (room.players || []).map(player => `${player.name}: ${player.score || 0}`).join(' · ');
       board.append(grid, text('div', 'player-turn', scores));
     } else if (gameKey === 'checkers') {
-      const grid = text('div', 'board strategy-board');
-      const ownTurn = room.turn === studentId && !room.finished;
-      for (let index = 0; index < 64; index += 1) {
-        const piece = room.board?.[index] || '', own = piece.startsWith(room.playersOrder?.[0] === studentId ? 'red' : 'yellow');
-        const label = piece ? (piece.endsWith('-king') ? '♛' : '●') : '';
-        const square = (Math.floor(index / 8) + index % 8) % 2 ? 'dark-square ' : 'light-square ';
-        const color = piece ? (piece.startsWith('red') ? 'piece-red' : 'piece-yellow') : '';
-        const selected = selectedChecker === index ? ' selected-square' : '';
-        grid.appendChild(cell(label, square + color + selected, () => {
-          if (own) { selectedChecker = index; draw(); return; }
-          if (selectedChecker != null) { const from = selectedChecker; selectedChecker = null; call('move', { move: { type: 'move', from, to: index } }).catch(showError); }
-        }, !ownTurn || (!own && selectedChecker == null)));
-      }
-      board.append(grid);
+      drawCheckersTable(board);
     } else if (gameKey === 'reversi') {
       const grid = text('div', 'board strategy-board');
       const ownTurn = room.turn === studentId && !room.finished;
@@ -362,72 +390,351 @@
       }
       board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} points`).join(' · ')));
     } else if (gameKey === 'set') {
-      const grid = text('div', 'board set-board');
-      (room.cards || []).forEach((card, index) => {
-        const shape = ['●','◆','■'][card.props[0]], color = ['🔴','🟣','🟢'][card.props[1]], fill = ['○','◍','●'][card.props[2]];
-        const label = Array(card.props[3] + 1).fill(shape + color + fill).join('  ');
-        const selected = selectedSet.includes(index);
-        grid.appendChild(cell(label, selected ? 'set-selected' : '', () => {
-          selectedSet = selected ? selectedSet.filter(item => item !== index) : selectedSet.length < 3 ? [...selectedSet, index] : [index];
-          if (selectedSet.length === 3) {
-            const indices = selectedSet.slice(); selectedSet = [];
-            call('move', { move: { type: 'claim', indices } }).catch(showError);
-          } else draw();
-        }, pending || !!room.finished));
-      });
-      board.append(grid, text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${player.score || 0} sets`).join(' · ')));
+      drawSetTable(board);
     } else if (gameKey === 'ludo') {
-      const list = text('div', 'ludo-list');
-      (room.players || []).forEach(player => {
-        const own = player.studentId === studentId;
-        const row = text('div', 'ludo-row'); row.appendChild(text('strong', '', player.name));
-        (room.tokens?.[player.studentId] || [-1,-1,-1,-1]).forEach((position, index) => {
-          const label = position < 0 ? 'Home' : position >= 51 ? `Home ${position - 50}/7` : `Track ${position + 1}`;
-          row.appendChild(button(`Token ${index + 1}: ${label}`, () => call('move', { move: { type: 'token', token: index } }).catch(showError), 'ludo-token', pending || !own || room.turn !== studentId || room.lastRoll == null || !!room.finished));
-        });
-        list.appendChild(row);
-      });
-      board.appendChild(list);
+      drawLudoTable(board);
     } else if (gameKey === 'dominoes') {
-      const ownTurn = room.turn === studentId && !room.finished;
-      board.append(text('div', 'game-result', 'Table'), text('div', 'domino-line', (room.layout || []).map(tile => `${tile.a} | ${tile.b}`).join('   ·   ')));
-      board.appendChild(text('div', 'player-turn', 'Tiles left to draw: ' + (room.boneyardCount || 0)));
-      const hand = text('div', 'card-hand');
-      privateHand.forEach((tile, index) => {
-        for (const end of ['left','right']) hand.appendChild(button(`${tile.a} | ${tile.b} ${end === 'left' ? '←' : '→'}`, () => call('move', { move: { type: 'play', index, end } }).catch(showError), 'playing-card', pending || !ownTurn));
-      });
-      board.appendChild(hand);
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.handCounts?.[player.studentId] || 0} tiles`).join(' · ')));
+      drawDominoTable(board);
     } else if (gameKey === 'go-fish') {
-      const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'], groups = new Map();
-      privateHand.forEach(card => groups.set(card.rank, (groups.get(card.rank) || 0) + 1));
-      board.append(text('div', 'game-result', 'Your cards'), text('div', 'player-turn', 'Books collected: ' + (room.bookCounts?.[studentId] || 0) + ' · Cards in the pond: ' + room.deckCount));
-      const hand = text('div', 'card-hand');
-      [...groups.entries()].forEach(([rank, count]) => hand.appendChild(button(`${ranks[rank]} (${count})`, () => { askRank = rank; drawBoard(); }, 'playing-card' + (askRank === rank ? ' selected-card' : ''), room.turn !== studentId || pending)));
-      board.appendChild(hand);
-      if (askRank != null && room.turn === studentId) {
-        board.appendChild(text('div', 'player-turn', 'Ask a classmate for ' + ranks[askRank]));
-        const targets = text('div', 'card-hand');
-        (room.players || []).filter(player => player.studentId !== studentId && (room.handCounts?.[player.studentId] || 0) > 0).forEach(player => targets.appendChild(button('Ask ' + player.name, () => call('move', { move: { type: 'ask', rank: askRank, target: player.studentId } }).then(() => { askRank = null; }).catch(showError), 'btn', pending)));
-        board.appendChild(targets);
-      }
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.bookCounts?.[player.studentId] || 0} books · ${room.handCounts?.[player.studentId] || 0} cards`).join(' · ')));
+      drawGoFishTable(board);
     } else if (gameKey === 'uno-style') {
-      const ownTurn = room.turn === studentId && !room.finished, top = room.topCard;
-      board.append(text('div', 'game-result', 'Current color: ' + (room.color || '—')), text('div', 'player-turn', 'Top card: ' + (top ? `${top.color || 'wild'} ${top.value}` : '—')));
-      if (room.drawPending) board.appendChild(text('div', 'player-turn', 'Draw ' + room.drawPending + ' cards before your turn.'));
-      const hand = text('div', 'card-hand');
-      privateHand.forEach((card, index) => hand.appendChild(button(`${card.color || 'Wild'} · ${card.value}`, () => {
-        if (!ownTurn) return;
-        if (card.kind === 'wild' || card.kind === 'wild4') { selectedUno = index; drawActions(); return; }
-        call('move', { move: { type: 'play', index } }).catch(showError);
-      }, 'playing-card card-' + (card.color || 'wild'), pending || !ownTurn || !!room.drawPending)));
-      board.appendChild(hand);
-      board.appendChild(text('div', 'player-turn', (room.players || []).map(player => `${player.name}: ${room.handCounts?.[player.studentId] || 0} cards`).join(' · ')));
+      drawUnoTable(board);
     }
+  }
+  const UNO_SYMBOLS = { skip: '⊘', reverse: '⇄', draw2: '+2', wild: '★', wild4: '+4' };
+  const UNO_COLOR_NAMES = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' };
+  function unoCardFace(card, extraClass) {
+    const symbol = UNO_SYMBOLS[card.kind] || String(card.value);
+    const isWild = card.kind === 'wild' || card.kind === 'wild4';
+    const node = text('div', 'ucard ' + (isWild ? 'wild' : (card.color || 'wild')) + (extraClass ? ' ' + extraClass : ''));
+    const face = text('div', 'face');
+    if (!isWild) face.appendChild(text('span', 'c1', symbol));
+    face.appendChild(text('div', 'oval'));
+    face.appendChild(text('div', 'big' + (symbol.length > 1 || UNO_SYMBOLS[card.kind] ? ' sym' : ''), symbol));
+    if (!isWild) face.appendChild(text('span', 'c2', symbol));
+    node.appendChild(face);
+    return node;
+  }
+  function unoCardName(card) {
+    const names = { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw two', wild: 'Wild', wild4: 'Wild draw four' };
+    return (card.color ? (UNO_COLOR_NAMES[card.color] || card.color) + ' ' : '') + (names[card.kind] || card.value);
+  }
+  function drawUnoTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished, top = room.topCard;
+    const bar = text('div', 'uno-bar');
+    bar.append(text('span', 'uno-room', 'Room ' + roomCode));
+    const ring = text('span', 'uno-color ' + (room.color || ''));
+    ring.dataset.color = room.color || ''; if (top) ring.dataset.top = String(top.value);
+    ring.append(text('b', ''), document.createTextNode('Color: ' + (UNO_COLOR_NAMES[room.color] || '—')));
+    bar.appendChild(ring);
+    const players = text('div', 'uno-players');
+    (room.players || []).forEach(player => {
+      const mine = player.studentId === studentId, turn = player.studentId === room.turn && !room.finished;
+      const badge = text('div', 'uno-p' + (turn ? ' turn' : ''));
+      const label = text('div', '', player.name + (mine ? ' (you)' : ''));
+      const count = room.handCounts?.[player.studentId] || 0;
+      label.appendChild(text('small', '', count + (count === 1 ? ' card' : ' cards') + (turn ? (mine ? ' · your turn!' : ' · playing') : '')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const mid = text('div', 'uno-mid');
+    const drawPile = text('div', 'pile'), back = text('div', 'ucard back'), backFace = text('div', 'face');
+    backFace.append(text('div', 'oval'), text('div', 'big', '★')); back.appendChild(backFace);
+    drawPile.append(back, text('div', 'lbl', 'Draw pile'));
+    const discard = text('div', 'pile');
+    discard.append(top ? unoCardFace(top, 'disc') : text('div', 'ucard back'), text('div', 'lbl', 'Top card'));
+    mid.append(drawPile, discard);
+    const msg = text('div', 'uno-msg', room.drawPending && ownTurn ? 'Draw ' + room.drawPending + ' cards before your turn.' : '');
+    if (ownTurn && !room.drawPending) msg.appendChild(text('small', '', 'Glowing cards can be played.'));
+    const hand = text('div', 'uno-hand');
+    privateHand.forEach((card, index) => {
+      const isWild = card.kind === 'wild' || card.kind === 'wild4';
+      const playable = ownTurn && !room.drawPending && (isWild || card.color === room.color || (top && card.value === top.value));
+      const node = button('', () => {
+        if (!ownTurn) return;
+        if (isWild) { selectedUno = index; drawActions(); draw(); return; }
+        call('move', { move: { type: 'play', index } }).catch(showError);
+      }, 'ucard-button', pending || !ownTurn || !!room.drawPending);
+      node.setAttribute('aria-label', unoCardName(card));
+      node.dataset.color = card.color || 'wild'; node.dataset.value = String(card.value);
+      const face = unoCardFace(card, (playable ? 'ok' : 'no') + (selectedUno === index ? ' picked' : ''));
+      face.setAttribute('aria-hidden', 'true');
+      node.appendChild(face);
+      hand.appendChild(node);
+    });
+    board.append(bar, players, mid, msg, hand);
+  }
+  const LUDO_COLORS = ['red', 'yellow', 'green', 'blue'], LUDO_NAMES = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' };
+  const LUDO_SAFE = [8, 21, 34, 47];
+  const LUDO_RING = (() => {
+    const ring = [], add = (c, r) => ring.push([c, r]);
+    for (let c = 1; c <= 5; c += 1) add(c, 6);
+    for (let r = 5; r >= 0; r -= 1) add(6, r);
+    add(7, 0); add(8, 0);
+    for (let r = 1; r <= 5; r += 1) add(8, r);
+    for (let c = 9; c <= 14; c += 1) add(c, 6);
+    add(14, 7); add(14, 8);
+    for (let c = 13; c >= 9; c -= 1) add(c, 8);
+    for (let r = 9; r <= 14; r += 1) add(8, r);
+    add(7, 14); add(6, 14);
+    for (let r = 13; r >= 9; r -= 1) add(6, r);
+    for (let c = 5; c >= 0; c -= 1) add(c, 8);
+    add(0, 7); add(0, 6);
+    return ring;
+  })();
+  const LUDO_LANE = { red: i => [1 + i, 7], yellow: i => [7, 1 + i], green: i => [13 - i, 7], blue: i => [7, 13 - i] };
+  function ludoPosition(color, index, position) {
+    return position < 51 ? LUDO_RING[(index * 13 + position) % 52] : LUDO_LANE[color](position - 51);
+  }
+  function ludoCanMove(position, roll) { return position < 0 ? roll === 6 : position + roll <= 57; }
+  function drawLudoTable(board) {
+    const ids = (room.playersOrder && room.playersOrder.length ? room.playersOrder : (room.players || []).map(player => player.studentId));
+    const colorOf = id => LUDO_COLORS[Math.max(0, ids.indexOf(id)) % 4];
+    const ownTurn = room.turn === studentId && !room.finished, rolled = room.lastRoll;
+    const nameOf = id => (room.players || []).find(player => player.studentId === id)?.name || 'Player';
+    const bar = text('div', 'ludo-players');
+    ids.forEach(id => {
+      const tokens = room.tokens?.[id] || [-1, -1, -1, -1], color = colorOf(id), turn = id === room.turn && !room.finished;
+      const done = tokens.filter(position => position === 57).length, yard = tokens.filter(position => position < 0).length;
+      const badge = text('div', 'lt-p ' + color + (turn ? ' turn' : ''));
+      const dot = text('i', ''), label = text('div', '', nameOf(id) + (id === studentId ? ' (you)' : ''));
+      label.appendChild(text('small', '', done + ' home · ' + yard + ' in the yard' + (turn ? (id === studentId ? ' · your turn!' : ' · playing') : '')));
+      badge.append(dot, label); bar.appendChild(badge);
+    });
+    const grid = text('div', 'lboard'), cellAt = {};
+    const place = (c, r, cls) => { const node = text('div', 'lc ' + (cls || '')); node.style.gridColumn = String(c + 1); node.style.gridRow = String(r + 1); grid.appendChild(node); cellAt[c + ',' + r] = node; return node; };
+    const slots = {};
+    [['red', 0, 0], ['yellow', 9, 0], ['blue', 0, 9], ['green', 9, 9]].forEach(([color, c, r]) => {
+      const yard = text('div', 'yard ' + color); yard.style.gridColumn = (c + 1) + ' / span 6'; yard.style.gridRow = (r + 1) + ' / span 6';
+      const pad = text('div', 'pad'); slots[color] = [];
+      for (let i = 0; i < 4; i += 1) { const slot = text('div', 'slot'); slots[color].push(slot); pad.appendChild(slot); }
+      yard.appendChild(pad); grid.appendChild(yard);
+    });
+    LUDO_RING.forEach(([c, r], i) => place(c, r, (i % 13 === 0 ? 'st-' + LUDO_COLORS[i / 13] : '') + (LUDO_SAFE.includes(i) ? ' safe' : '')));
+    LUDO_COLORS.forEach(color => { for (let i = 0; i < 6; i += 1) { const [c, r] = LUDO_LANE[color](i); place(c, r, 't-' + color); } });
+    const center = text('div', 'lcenter'); center.style.gridColumn = '7 / span 3'; center.style.gridRow = '7 / span 3'; grid.appendChild(center);
+    ids.forEach(id => {
+      const color = colorOf(id), index = ids.indexOf(id) % 4;
+      (room.tokens?.[id] || [-1, -1, -1, -1]).forEach((position, tokenIndex) => {
+        const mine = id === studentId, movable = mine && ownTurn && rolled != null && ludoCanMove(position, rolled);
+        const where = position < 0 ? 'in the yard' : position >= 57 ? 'home' : position >= 51 ? 'in the home lane' : 'on the track';
+        const pawn = button(String(tokenIndex + 1), () => { if (movable) call('move', { move: { type: 'token', token: tokenIndex } }).catch(showError); },
+          'pawn ' + color + (movable ? ' go' : ''), pending || !movable);
+        pawn.setAttribute('aria-label', nameOf(id) + ' token ' + (tokenIndex + 1) + ': ' + where);
+        pawn.dataset.token = String(tokenIndex);
+        if (position < 0) slots[color][tokenIndex].appendChild(pawn);
+        else if (position >= 57) { pawn.classList.add('finished'); center.appendChild(pawn); }
+        else { const [c, r] = ludoPosition(color, index, position); cellAt[c + ',' + r].appendChild(pawn); }
+      });
+    });
+    const roll = text('div', 'lt-roll');
+    if (rolled != null) {
+      const die = text('div', 'die'); die.setAttribute('aria-hidden', 'true');
+      const dots = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }[rolled] || [];
+      for (let i = 0; i < 9; i += 1) { const dot = text('b', ''); if (!dots.includes(i)) dot.style.visibility = 'hidden'; die.appendChild(dot); }
+      roll.append(die, text('div', 'lt-hint', (nameOf(room.turn) + ' rolled a ' + rolled)));
+    }
+    board.append(bar, grid, roll);
+  }
+  let selectedDom = null;
+  const DOM_PIPS = { 0: [], 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  function domHalf(value) {
+    const half = text('div', 'h'), pips = text('div', 'pips');
+    for (let i = 0; i < 9; i += 1) pips.appendChild(text('b', DOM_PIPS[value]?.includes(i) ? '' : 'off'));
+    half.appendChild(pips); return half;
+  }
+  function domTile(left, right, className) {
+    const node = text('div', 'dt ' + (className || '') + (left === right ? ' dbl' : ''));
+    node.append(domHalf(left), text('div', 'sep'), domHalf(right));
+    return node;
+  }
+  function domChain(layout) {
+    const lefts = [], rights = [];
+    let first = null;
+    layout.forEach((tile, index) => {
+      if (index === 0 && !tile.end) { first = [tile.a, tile.b]; return; }
+      if (tile.end === 'left') lefts.unshift(tile.flipped ? [tile.a, tile.b] : [tile.b, tile.a]);
+      else rights.push(tile.flipped ? [tile.b, tile.a] : [tile.a, tile.b]);
+    });
+    return [...lefts, ...(first ? [first] : []), ...rights];
+  }
+  function domSides(tile) {
+    const ends = room.ends || [];
+    return { left: ends.length === 2 && (tile.a === ends[0] || tile.b === ends[0]), right: ends.length === 2 && (tile.a === ends[1] || tile.b === ends[1]) };
+  }
+  function drawDominoTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    if (!ownTurn) selectedDom = null;
+    const players = text('div', 'dm-players');
+    (room.players || []).forEach(player => {
+      const turn = player.studentId === room.turn && !room.finished, mine = player.studentId === studentId;
+      const count = room.handCounts?.[player.studentId] || 0;
+      const badge = text('div', 'dm-p' + (turn ? ' turn' : ''));
+      const label = text('div', '', player.name + (mine ? ' (you)' : ''));
+      label.appendChild(text('small', '', count + (count === 1 ? ' tile' : ' tiles') + (turn ? (mine ? ' · your turn!' : ' · playing') : '')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label); players.appendChild(badge);
+    });
+    const felt = text('div', 'felt'), chain = text('div', 'dchain');
+    const tiles = domChain(room.layout || []);
+    tiles.forEach(([left, right], index) => {
+      const open = index === 0 || index === tiles.length - 1;
+      const node = domTile(left, right, open && tiles.length > 1 ? 'open' : '');
+      node.dataset.a = String(left); node.dataset.b = String(right);
+      chain.appendChild(node);
+    });
+    felt.appendChild(chain);
+    const pile = text('div', 'dpile');
+    pile.append(text('div', 'dback', '★'), text('div', '', 'Draw pile: ' + (room.boneyardCount || 0) + ' tiles'));
+    const hand = text('div', 'dhand');
+    privateHand.forEach((tile, index) => {
+      const sides = domSides(tile), playable = ownTurn && (sides.left || sides.right);
+      const node = button('', () => {
+        if (!playable) return;
+        if (sides.left && sides.right) { selectedDom = index; draw(); return; }
+        selectedDom = null;
+        call('move', { move: { type: 'play', index, end: sides.left ? 'left' : 'right' } }).catch(showError);
+      }, 'dtile-button', pending || !playable);
+      node.setAttribute('aria-label', 'Tile ' + tile.a + ' and ' + tile.b + (playable ? '' : ', cannot be played now'));
+      node.dataset.a = String(tile.a); node.dataset.b = String(tile.b);
+      node.appendChild(domTile(tile.a, tile.b, 'v ' + (playable ? 'go' : 'no') + (selectedDom === index ? ' picked' : '')));
+      hand.appendChild(node);
+    });
+    const hint = text('div', 'dm-hint', ownTurn ? (selectedDom != null ? 'Choose which end to play on.' : 'Glowing tiles can be played.') : '');
+    board.append(players, felt, pile, hand, hint);
+  }
+  const FISH_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const FISH_SUITS = [['o', '#ffba2c', '#d97a0f'], ['b', '#328ddd', '#2368ad'], ['g', '#3fc47e', '#1a7f4b'], ['p', '#a063d6', '#7434ad']];
+  function fishSvg(fill, stroke) {
+    const holder = text('span', 'fish');
+    holder.innerHTML = '<svg viewBox="0 0 70 50" aria-hidden="true"><path d="M12 25Q27 3 46 25Q27 47 12 25L2 14v22z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2"/><circle cx="38" cy="22" r="3" fill="#14263e"/><path d="M20 26q8 5 14 0" fill="none" stroke="' + stroke + '" stroke-width="2"/></svg>';
+    return holder;
+  }
+  function drawGoFishTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    const groups = new Map();
+    privateHand.forEach(card => { const group = groups.get(card.rank) || { count: 0, suit: card.suit || 0 }; group.count += 1; groups.set(card.rank, group); });
+    if (askRank != null && (!ownTurn || !groups.has(askRank))) askRank = null;
+    const players = text('div', 'gf-players');
+    (room.players || []).forEach(player => {
+      const mine = player.studentId === studentId, turn = player.studentId === room.turn && !room.finished;
+      const cards = room.handCounts?.[player.studentId] || 0, books = room.bookCounts?.[player.studentId] || 0;
+      const askable = !mine && ownTurn && askRank != null && cards > 0;
+      const label = text('div', '', (askable ? 'Ask ' : '') + player.name + (mine ? ' (you)' : ''));
+      label.appendChild(text('small', '', cards + (cards === 1 ? ' card' : ' cards') + ' · ' + books + (books === 1 ? ' book' : ' books')));
+      const badge = askable
+        ? button('', () => call('move', { move: { type: 'ask', rank: askRank, target: player.studentId } }).then(() => { askRank = null; }).catch(showError), 'gf-p ask', pending)
+        : text('div', 'gf-p' + (turn ? ' turn' : ''));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const pond = text('div', 'gf-pond');
+    const books = text('div', 'gf-books'); books.appendChild(text('span', '', 'Books collected: ' + (room.bookCounts?.[studentId] || 0)));
+    const water = text('div', 'water'); water.append(text('b', '', 'Pond'), text('b', '', (room.deckCount || 0) + ' cards'));
+    pond.append(books, water);
+    const hand = text('div', 'gf-hand');
+    [...groups.entries()].forEach(([rank, group]) => {
+      const [tone, fill, stroke] = FISH_SUITS[group.suit % 4];
+      const node = button('', () => { askRank = askRank === rank ? null : rank; draw(); }, 'gcard-button', !ownTurn || pending);
+      node.setAttribute('aria-label', FISH_RANKS[rank] + (group.count > 1 ? ', ' + group.count + ' cards' : ''));
+      node.dataset.rank = String(rank);
+      const card = text('div', 'fc ' + tone + (askRank === rank ? ' sel' : ownTurn ? ' can' : ''));
+      const face = text('div', 'face');
+      face.append(text('span', 'r', FISH_RANKS[rank]), fishSvg(fill, stroke), text('span', 'r2', FISH_RANKS[rank]));
+      card.appendChild(face);
+      if (group.count > 1) card.appendChild(text('span', 'n', '×' + group.count));
+      node.appendChild(card); hand.appendChild(node);
+    });
+    const hint = text('div', 'gf-hint', ownTurn ? (askRank != null ? 'Asking for ' + FISH_RANKS[askRank] + 's — tap a player.' : 'Pick a card to ask for.') : '');
+    board.append(players, pond, hand, hint);
+  }
+  function drawCheckersTable(board) {
+    const ownTurn = room.turn === studentId && !room.finished;
+    const redId = room.playersOrder?.[0];
+    const mySide = redId === studentId ? 'red' : 'yellow';
+    const pieces = room.board || Array(64).fill(null);
+    if (selectedChecker != null && (!ownTurn || !String(pieces[selectedChecker] || '').startsWith(mySide))) selectedChecker = null;
+    const counts = { red: 0, yellow: 0 };
+    pieces.forEach(piece => { if (piece) counts[String(piece).startsWith('red') ? 'red' : 'yellow'] += 1; });
+    const players = text('div', 'ck-players');
+    (room.players || []).forEach(player => {
+      const side = player.studentId === redId ? 'red' : 'yellow';
+      const badge = text('div', 'ck-p' + (player.studentId === room.turn && !room.finished ? ' turn' : ''));
+      const label = text('div', '', player.name + (player.studentId === studentId ? ' (you)' : ''));
+      label.appendChild(text('small', '', (side === 'red' ? 'Red' : 'Dark') + ' · ' + counts[side] + (counts[side] === 1 ? ' piece' : ' pieces')));
+      badge.append(text('i', side === 'red' ? 'r' : 'd'), label);
+      players.appendChild(badge);
+    });
+    const grid = text('div', 'ck-board');
+    for (let index = 0; index < 64; index += 1) {
+      const piece = pieces[index] || '';
+      const darkSquare = (Math.floor(index / 8) + index % 8) % 2 === 1;
+      const own = !!piece && piece.startsWith(mySide);
+      const target = ownTurn && selectedChecker != null && !piece && darkSquare;
+      const node = button('', () => {
+        if (own) { selectedChecker = selectedChecker === index ? null : index; draw(); return; }
+        if (selectedChecker != null) { const from = selectedChecker; selectedChecker = null; call('move', { move: { type: 'move', from, to: index } }).catch(showError); }
+      }, 'board-cell ck-sq ' + (darkSquare ? 'd' : 'l') + (target ? ' tgt' : ''), pending || !ownTurn || (!own && selectedChecker == null));
+      node.setAttribute('aria-label', piece ? (piece.startsWith('red') ? 'Red ' : 'Dark ') + (piece.endsWith('-king') ? 'king' : 'piece') + (selectedChecker === index ? ', selected' : '') : 'Empty square');
+      if (piece) {
+        const disc = text('span', 'pc ' + (piece.startsWith('red') ? 'r' : 'y') + (selectedChecker === index ? ' sel' : own && ownTurn ? ' go' : ''));
+        if (piece.endsWith('-king')) disc.appendChild(text('b', '', '♛'));
+        node.appendChild(disc);
+      }
+      grid.appendChild(node);
+    }
+    const hint = text('div', 'ck-hint', ownTurn ? (selectedChecker != null ? 'Tap a gold spot to move there.' : 'Tap one of your glowing pieces.') : '');
+    board.append(players, grid, hint);
+  }
+  const SET_COLORS = ['#e0334f', '#7b3fc9', '#1f9d5c'];
+  const SET_COLOR_NAMES = ['red', 'purple', 'green'], SET_SHAPE_NAMES = ['oval', 'diamond', 'squiggle'], SET_FILL_NAMES = ['empty', 'striped', 'solid'];
+  const SET_SHAPES = ['<ellipse cx="30" cy="11" rx="26" ry="9"/>', '<path d="M4 11 30 2l26 9-26 9z"/>', '<path d="M5 13C5 2 20 0 30 6s25 4 25-4v8c0 11-15 13-25 7S5 23 5 13z"/>'];
+  function setSymbol(props) {
+    const color = SET_COLORS[props[1]], fill = props[2] === 2 ? color : props[2] === 1 ? 'url(#setstripe' + props[1] + ')' : 'none';
+    return '<svg viewBox="0 0 60 22" aria-hidden="true"><defs><pattern id="setstripe' + props[1] + '" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1.6" fill="' + color + '"/></pattern></defs><g fill="' + fill + '" stroke="' + color + '" stroke-width="2.4">' + SET_SHAPES[props[0]] + '</g></svg>';
+  }
+  function drawSetTable(board) {
+    const players = text('div', 'st-players');
+    (room.players || []).forEach(player => {
+      const badge = text('div', 'st-p' + (player.studentId === studentId ? ' me' : ''));
+      const label = text('div', '', player.name + (player.studentId === studentId ? ' (you)' : ''));
+      const score = player.score || 0;
+      label.appendChild(text('small', '', score + (score === 1 ? ' set' : ' sets')));
+      badge.append(text('i', '', String(player.name || '?').slice(0, 2)), label);
+      players.appendChild(badge);
+    });
+    const grid = text('div', 'st-grid');
+    (room.cards || []).forEach((card, index) => {
+      const selected = selectedSet.includes(index);
+      const node = button('', () => {
+        selectedSet = selected ? selectedSet.filter(item => item !== index) : selectedSet.length < 3 ? [...selectedSet, index] : [index];
+        if (selectedSet.length === 3) {
+          const indices = selectedSet.slice(); selectedSet = [];
+          call('move', { move: { type: 'claim', indices } }).catch(showError);
+        } else draw();
+      }, 'board-cell st-card' + (selected ? ' set-selected sel' : ''), pending || !!room.finished);
+      const count = card.props[3] + 1;
+      node.dataset.props = card.props.join(',');
+      node.setAttribute('aria-label', count + ' ' + SET_COLOR_NAMES[card.props[1]] + ' ' + SET_FILL_NAMES[card.props[2]] + ' ' + SET_SHAPE_NAMES[card.props[0]] + (count > 1 ? 's' : '') + (selected ? ', selected' : ''));
+      node.innerHTML = setSymbol(card.props).repeat(count);
+      grid.appendChild(node);
+    });
+    const hint = text('div', 'st-hint', room.finished ? '' : selectedSet.length ? selectedSet.length + (selectedSet.length === 1 ? ' card' : ' cards') + ' picked — pick ' + (3 - selectedSet.length) + ' more.' : 'Pick three cards that make a set.');
+    board.append(players, grid, hint);
   }
   function draw() {
     if (!room) return;
+    el('room').classList.toggle('uno-mode', gameKey === 'uno-style');
+    el('room').classList.toggle('ludo-mode', gameKey === 'ludo');
+    el('room').classList.toggle('dominoes-mode', gameKey === 'dominoes');
+    el('room').classList.toggle('gofish-mode', gameKey === 'go-fish');
+    el('room').classList.toggle('checkers-mode', gameKey === 'checkers');
+    el('room').classList.toggle('c4-mode', gameKey === 'connect-four');
+    el('room').classList.toggle('ttt-mode', gameKey === 'tic-tac-toe');
+    el('room').classList.toggle('memory-mode', gameKey === 'memory-match');
+    el('room').classList.toggle('reversi-mode', gameKey === 'reversi');
+    el('room').classList.toggle('bingo-mode', gameKey === 'bingo');
+    el('room').classList.toggle('mathrace-mode', gameKey === 'math-race');
+    el('room').classList.toggle('set-mode', gameKey === 'set');
     el('roomState').textContent = statusText();
     drawPlayers(); drawBoard(); drawActions();
   }
@@ -437,7 +744,8 @@
     try {
       if (roomCode) {
         await call('leave');
-        if (room && room.host !== studentId && ['lobby', 'playing'].includes(room.state)) {
+        // The host now hands a game in progress to another player, so a host can rejoin it too.
+        if (room && (room.state === 'playing' || room.state === 'lobby' && room.host !== studentId)) {
           sessionStorage.setItem('fttMultiplayerRejoin:' + studentId, JSON.stringify({ gameKey, roomCode }));
         }
       }

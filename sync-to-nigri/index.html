@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script src="../teacher-tool-gate.js?v=20261028-gate" data-scope="b3"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<head><script src="../teacher-tool-gate.js?v=20261028-gate" data-scope="b3"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script><script src="../sync-to-nigri/nigri-school-gate.js?v=20261107"></script><script src="../sync-to-nigri/nigri-auth.js"></script><script src="../sync-to-nigri/nigri-connect.js?v=20261108"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sync to Nigri</title>
@@ -245,6 +245,7 @@
 <div class="wrap">
   <div id="modeChooser">
     <h1>Sync to Nigri</h1>
+    <div data-nigri-connect hidden></div>
     <div class="sub">What would you like to sync?</div>
     <div class="mode-choice-grid">
       <button class="mode-choice" type="button" onclick="openAttendance()">
@@ -344,6 +345,7 @@ const ROSTERS = {
     "Lapine Moshe",
     "Notik Kehos",
     "Oirechman Yisroel",
+    "Raichik Berel",
     "Raichman Moshe Tuvia",
     "Rosenfeld Avrohom",
     "Rozmarin Levi",
@@ -718,4 +720,3 @@ updateSyncButtonState();
 </script>
 </body>
 </html>
-

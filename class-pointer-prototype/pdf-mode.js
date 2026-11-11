@@ -56,14 +56,31 @@
     for(const picture of boardPictures)ctx.drawImage(picture.image,picture.x*W,picture.y*H,picture.w*W,picture.h*H);
     // Match the document ink's coordinate system, widths and opacity.
     const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes;
+    // Same as the live SVG ink: transparency is applied once per owner and tool group,
+    // so a person's overlapping highlights stay one flat layer in the video students see.
+    const penTools=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
+    const groups=new Map();
     for(const stroke of all){
       if(!stroke.points?.length)continue;
-      const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
-      ctx.globalAlpha=stroke.tool==='pen'?1:stroke.tool==='pencil'?0.94:stroke.tool==='crayon'?0.78:0.32;
-      ctx.strokeStyle=ctx.fillStyle=stroke.color;ctx.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);ctx.lineCap=ctx.lineJoin='round';
-      if(stroke.tool==='box'){ctx.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
-      const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
-      ctx.beginPath();pts.forEach((point,index)=>{ctx[index?'lineTo':'moveTo'](point.x*W,point.y*H)});ctx.stroke();
+      const kind=penTools.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight');
+      const key=(stroke.owner||'')+'|'+kind;
+      if(!groups.has(key))groups.set(key,{kind,list:[]});
+      groups.get(key).list.push(stroke);
+    }
+    const layer=document.createElement('canvas');layer.width=canvas.width;layer.height=canvas.height;
+    const lc=layer.getContext('2d');
+    for(const {kind,list} of groups.values()){
+      lc.setTransform(1,0,0,1,0,0);lc.clearRect(0,0,layer.width,layer.height);lc.setTransform(ctx.getTransform());
+      for(const stroke of list){
+        const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
+        lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);lc.lineCap=lc.lineJoin='round';
+        if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
+        const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
+        lc.beginPath();pts.forEach((point,index)=>{lc[index?'lineTo':'moveTo'](point.x*W,point.y*H)});lc.stroke();
+      }
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha=kind==='pen'?1:kind==='pencil'?0.94:kind==='crayon'?0.78:0.32;
+      ctx.drawImage(layer,0,0);ctx.restore();
     }
     ctx.globalAlpha=1;
   }
@@ -269,6 +286,32 @@
     }
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
+  // Hover or tap a mark on a whiteboard or document to see who made it.
+  const inkOwnerLabel=document.createElement('div');inkOwnerLabel.className='drawing-owner-label';inkOwnerLabel.hidden=true;inkOwnerLabel.setAttribute('aria-live','polite');stage.appendChild(inkOwnerLabel);
+  let inkLabelTimer=null;
+  function inkHits(stroke,p){
+    if(!stroke.points?.length)return false;const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
+    const t=Math.max(0.006,(stroke.size||0.016)*0.6);
+    if(stroke.tool==='box')return p.x>=Math.min(first.x,last.x)-t&&p.x<=Math.max(first.x,last.x)+t&&p.y>=Math.min(first.y,last.y)-t&&p.y<=Math.max(first.y,last.y)+t;
+    const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
+    const ty=t*W/Math.max(1,H);
+    for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[i+1]||a;const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;let k=len?((p.x-a.x)*dx+(p.y-a.y)*dy)/len:0;k=Math.max(0,Math.min(1,k));
+      const ex=(a.x+k*dx-p.x)/t,ey=(a.y+k*dy-p.y)/ty;if(ex*ex+ey*ey<=1)return true}
+    return false;
+  }
+  function hideInkOwner(){clearTimeout(inkLabelTimer);inkOwnerLabel.hidden=true}
+  function showInkOwner(event,linger){
+    if(draft){hideInkOwner();return}const p=normalized(event);if(!p){hideInkOwner();return}
+    const stroke=[...strokes].reverse().find(s=>inkHits(s,p));if(!stroke){hideInkOwner();return}
+    inkOwnerLabel.textContent=B.ownerName?.(stroke.owner)||(stroke.owner==='teacher'?'Teacher':'Student');
+    const r=stage.getBoundingClientRect();inkOwnerLabel.style.left=(event.clientX-r.left+12)+'px';inkOwnerLabel.style.top=(event.clientY-r.top+12)+'px';
+    inkOwnerLabel.hidden=false;clearTimeout(inkLabelTimer);if(linger)inkLabelTimer=setTimeout(hideInkOwner,1800);
+  }
+  if(isTeacher){
+    content.addEventListener('pointermove',event=>{if(event.pointerType!=='touch')showInkOwner(event,false)});
+    content.addEventListener('pointerleave',hideInkOwner);
+    content.addEventListener('click',event=>showInkOwner(event,true));
+  }
 
   // Embedded students see a video of the scrolled viewport, while PDF ink
   // uses fractions of the entire document. Translate only at that boundary.

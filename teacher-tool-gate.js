@@ -214,7 +214,9 @@
     var failTimer = setTimeout(function () {
       if (stage === "checking") show("Could not check your access", "Please reload the page. Teacher tools stay closed until access is confirmed.", [{ label: "Reload", onClick: function () { location.reload(); } }, homeButton()]);
     }, 20000);
-    ensureSiteSettings().then(function () {
+    // Shared so the Nigri school gate waits for this Firebase load instead of loading a second copy over it.
+    window.__b3TeacherGateReady = ensureSiteSettings();
+    window.__b3TeacherGateReady.then(function () {
       var api = window.B3SiteSettings;
       if (!api || !api.onAuthStateChanged) throw new Error("Access check unavailable");
       api.onAuthStateChanged(function (user, authorized, access) { clearTimeout(failTimer); onAuthDecision(user, authorized, access); });

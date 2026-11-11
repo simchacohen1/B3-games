@@ -113,7 +113,7 @@
       base.href = selected.href;
       documentCopy.head.prepend(base);
       const first = documentCopy.createElement("script");
-      first.src = new URL("teacher-preview-readonly.js?v=20261012-1", root).href;
+      first.src = new URL("teacher-preview-readonly.js?v=20261108-1", root).href;
       first.dataset.teacherPreviewGuard = "1";
       base.after(first);
       // Compat SDK methods need patching before the tool's own code runs.
@@ -176,7 +176,10 @@
         (toolId === "daily-points" && cls.toolGrants?.["student-rewards"] === true);
       if (!permitted) throw new Error("This tool is not enabled for the selected teacher's class.");
       window.__B3_PREVIEW_CONTEXT = Object.freeze({
-        verified:true,teacherName:teacher.name,classId,className:cls.name || classId
+        verified:true,teacherName:teacher.name,classId,className:cls.name || classId,
+        // Every class this teacher is assigned to, so tools with a class switcher
+        // show the same classes the real teacher would see. classId stays selected.
+        classIds:Object.freeze(teacher.classIds.slice())
       });
       document.getElementById("heading").textContent = teacher.name + " · " + (cls.name || classId) + " · " + currentTool[0];
       if (toolId === "manage-class") {

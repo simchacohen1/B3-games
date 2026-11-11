@@ -220,6 +220,18 @@
       "name": "Homework (Assignment Center) teacher",
       "gate": "gate",
       "scope": "teacher"
+    },
+    {
+      "path": "mishnayos/teacher.html",
+      "name": "Mishnayos Practice teacher",
+      "gate": "gate",
+      "scope": "teacher"
+    },
+    {
+      "path": "record-mishnayos/teacher.html",
+      "name": "Mishnayos Practice teacher dashboard",
+      "gate": "gate",
+      "scope": "teacher"
     }
   ],
   "deliberatelyNotListed": [

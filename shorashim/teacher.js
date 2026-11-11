@@ -73,8 +73,10 @@ const PEREK19_SHORASHIM=[[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two
   autoArt:true,
   hidden:false
 }));
-function perekOf(i){return Number(i?.perek)||18}
-function perekLabel(i){return perekOf(i)===19?'Perek י״ט':'Perek י״ח'}
+// Any perek (or none) and any list/category. See units.js; nothing is hardcoded.
+function perekOf(i){return window.B3ShorashimUnits.perekValue(i)}
+function perekLabel(i){return perekOf(i)===null?'No perek':window.B3ShorashimUnits.itemUnitLabel(i,state.settings.unitLabels)}
+function perekMatches(i,filter){return filter==='all'||(filter==='none'?perekOf(i)===null:String(perekOf(i))===String(filter))}
 function vocalizedCatalogKey(i){return String(i?.front||'').normalize('NFC')}
 function ensurePerekUnitsAnd19(){
   state.catalog=state.catalog||{};
@@ -492,10 +494,13 @@ async function loadAll(){
     $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
     loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
   }
-  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
+  // Stricter database rules may refuse the whole class student list. That must not
+  // stop the words, settings or the teacher's library from loading.
+  let studentListBlocked=false;
+  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value').catch(err=>{studentListBlocked=true;console.warn('Could not read the class student list',err);return null;}),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
-  state.students=c.val()||{};
+  state.students=(c&&c.val())||{};
   state.leaderboards=d.val()||{};
   // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
   // so a word deleted later stays deleted even after page reloads or file updates.
@@ -522,6 +527,7 @@ async function loadAll(){
   loadShorashimRecordings();
   bindFullScopeListener();
   const updates=[];
+  if(studentListBlocked)updates.push('student list not available');
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
@@ -530,6 +536,124 @@ async function loadAll(){
   applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
+/* ===== Perakim, lists and labels: all teacher-configurable ===== */
+function refreshPerekFilter(){
+  const sel=$('teacherPerekFilter');if(!sel)return;
+  const wanted=sel.value||'all',words=state.catalog.shorashim||[];
+  const perakim=[...new Set(words.map(perekOf).filter(n=>n!==null))].sort((a,b)=>a-b);
+  const opts=[['all','All Perakim'],...perakim.map(n=>[String(n),window.B3ShorashimUnits.unitLabel('perek:'+n,state.settings.unitLabels)])];
+  if(words.some(i=>perekOf(i)===null))opts.push(['none','No perek']);
+  sel.innerHTML=opts.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('');
+  sel.value=opts.some(([v])=>v===wanted)?wanted:'all';
+  const rename=$('teacherRenameUnit');if(rename)rename.classList.toggle('hidden',currentTrack!=='shorashim'||legacyScoped());
+}
+function renderBookletControl(){
+  const wrap=$('teacherBookletWrap'),box=$('teacherShowBooklet');if(!wrap||!box)return;
+  wrap.classList.toggle('hidden',currentTrack!=='shorashim'||legacyScoped());
+  box.checked=state.settings.showBooklet!==false;
+}
+async function renameUnitLabel(){
+  const U=window.B3ShorashimUnits,pf=$('teacherPerekFilter')?.value||'all',list=$('teacherListName')?.value||U.DEFAULT_LIST;
+  const key=/^\d+$/.test(pf)?'perek:'+pf:'list:'+list;
+  const current=U.unitLabel(key,state.settings.unitLabels),fallback=U.defaultUnitLabel(key);
+  const scope=key.startsWith('perek:')?`all Perek ${pf} words`:`words in “${list}” that have no perek`;
+  const answer=prompt(`Name students see for ${scope}.\nLeave blank to use “${fallback}”.`,current===fallback?'':current);
+  if(answer===null)return;
+  const label=answer.trim().slice(0,80);
+  state.settings.unitLabels={...(state.settings.unitLabels||{})};
+  if(label)state.settings.unitLabels[U.labelStorageKey(key)]=label;else delete state.settings.unitLabels[U.labelStorageKey(key)];
+  status('☁️ Saving…','syncing');
+  await db.ref(`${teacherSettingsPath()}/unitLabels/${U.labelStorageKey(key)}`).set(label||null);
+  status('☁️ Saved');renderCatalog();
+}
+async function setShowBooklet(show){
+  state.settings.showBooklet=!!show;
+  status('☁️ Saving…','syncing');
+  await db.ref(`${teacherSettingsPath()}/showBooklet`).set(!!show);
+  status('☁️ Saved');
+}
+
+/* ===== Each teacher's own library =====
+   Stored at shorashimLibraries/<teacher uid>, separate from every other teacher and
+   from the owner. A class only sees what its teacher copies into the class. */
+let teacherLibrary={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{}},teacherLibraryUid='';
+function libraryAvailable(){return CLASS_MODE&&CLASS_ID_VALID&&window.B3ShorashimUnits.validUid(teacherLibraryUid);}
+function libraryRef(){return db.ref(window.B3ShorashimUnits.libraryPath(teacherLibraryUid));}
+function renderLibraryStatus(note=''){
+  const box=$('teacherLibraryStatus');if(!box)return;
+  const U=window.B3ShorashimUnits,c=teacherLibrary.catalog,n=U.countWords(c);
+  const units=U.unitsFor(c.shorashim,teacherLibrary.settings.unitLabels).map(u=>`${u.label} (${u.count})`);
+  box.textContent=(n?`${n} word${n===1?'':'s'} in your library${units.length?': '+units.join(', '):''}.`:"Your library is empty. Save this class's words into it, or ask the owner to give you a list.")+(note?' '+note:'');
+}
+async function loadTeacherLibrary(){
+  const user=firebase.auth().currentUser;teacherLibraryUid=user?.uid||'';
+  const panel=$('teacherLibraryPanel');
+  if(!libraryAvailable()){if(panel)panel.classList.add('hidden');return;}
+  panel?.classList.remove('hidden');
+  try{
+    const v=(await libraryRef().once('value')).val()||{};
+    teacherLibrary={catalog:window.B3ShorashimUnits.withAllTracks(v.catalog),settings:v.settings||{}};
+    // One-time, copy-only migration: a teacher who already built words in this class
+    // gets them in their own library. Nothing in the class is moved or changed.
+    if(!window.B3ShorashimUnits.countWords(teacherLibrary.catalog)&&window.B3ShorashimUnits.countWords(state.catalog)){
+      const added=await saveClassToLibrary();
+      renderLibraryStatus(added?`(${added} word${added===1?' was':'s were'} copied from this class to start your library.)`:'');return;
+    }
+    renderLibraryStatus();
+  }catch(err){console.error('Could not load teacher library',err);if($('teacherLibraryStatus'))$('teacherLibraryStatus').textContent='Could not load your library. Please reload the page.';}
+}
+async function saveClassToLibrary(){
+  const U=window.B3ShorashimUnits;let added=0;
+  const result=await libraryRef().transaction(cur=>{
+    cur=cur||{};const merged=U.mergeCatalogById(cur.catalog,state.catalog);added=merged.added;
+    return {...cur,catalog:merged.catalog,settings:U.mergeSettings(cur.settings,{namedLists:state.settings.namedLists,unitLabels:state.settings.unitLabels}),updatedAt:Date.now()};
+  });
+  if(result.committed){const v=result.snapshot.val()||{};teacherLibrary={catalog:U.withAllTracks(v.catalog),settings:v.settings||{}};}
+  return added;
+}
+function openLibraryDialog(){
+  const U=window.B3ShorashimUnits,c=teacherLibrary.catalog,labels=teacherLibrary.settings.unitLabels;
+  if(!U.countWords(c))return alert('Your library is empty.');
+  const rows=U.unitsFor(c.shorashim,labels).map(u=>[`shorashim|${u.key}`,`🌳 ${u.label}`,u.count]);
+  if(c.prefix.length)rows.push(['prefix|*','Prefixes',c.prefix.length]);
+  if(c.suffix.length)rows.push(['suffix|*','Suffixes',c.suffix.length]);
+  $('teacherLibraryChoices').innerHTML=rows.map(([v,t,n])=>`<label style="display:block;margin:6px 0"><input type="checkbox" data-library-choice="${esc(v)}"> ${esc(t)} <span class="mini-note">(${n} word${n===1?'':'s'})</span></label>`).join('');
+  $('teacherLibraryDialog').showModal();
+}
+async function copyLibraryToClass(e){
+  e.preventDefault();
+  const U=window.B3ShorashimUnits;
+  const chosen=new Set([...$('teacherLibraryChoices').querySelectorAll('[data-library-choice]:checked')].map(x=>x.dataset.libraryChoice));
+  if(!chosen.size)return alert('Choose at least one list.');
+  const include=(item,track)=>chosen.has(track==='shorashim'?`shorashim|${U.unitKey(item)}`:`${track}|*`);
+  status('☁️ Adding words to this class…','syncing');
+  let added=0;
+  try{
+    const result=await db.ref(`${SPACE}/catalog`).transaction(cur=>{const m=U.mergeCatalogById(cur,teacherLibrary.catalog,include);added=m.added;return m.catalog;});
+    const nextSettings=U.mergeSettings(state.settings,{namedLists:teacherLibrary.settings.namedLists,unitLabels:teacherLibrary.settings.unitLabels});
+    await db.ref(teacherSettingsPath()).update({namedLists:nextSettings.namedLists||null,unitLabels:nextSettings.unitLabels||null});
+    state.settings={...state.settings,namedLists:nextSettings.namedLists,unitLabels:nextSettings.unitLabels};
+    if(result.committed)state.catalog=withAllTracks(result.snapshot.val()||state.catalog);
+    $('teacherLibraryDialog').close();renderAll();
+    status(`☁️ Saved • ${added} word${added===1?'':'s'} added to this class`);
+  }catch(err){
+    console.error('Could not copy library words to class',err);
+    status('⚠️ Could not add the words. Please try again.','error');
+    alert('Could not add the words to this class. Please try again.');
+  }
+}
+async function copyClassToLibrary(){
+  status('☁️ Saving to your library…','syncing');
+  try{
+    const n=await saveClassToLibrary();
+    renderLibraryStatus();
+    status(`☁️ Saved • ${n} new word${n===1?'':'s'} added to your library`);
+  }catch(err){
+    console.error('Could not save class words to library',err);
+    renderLibraryStatus('Could not save to your library. Please try again.');
+    status('⚠️ Could not save to your library','error');
+  }
+}
 function bindFullScopeListener(){
   if(legacyScoped()||fullScopeListenerBound)return;
   fullScopeListenerBound=true;
@@ -545,9 +669,10 @@ function bindFullScopeListener(){
   });
   const studentsRef=db.ref(`${SPACE}/students`);
   const applyStudent=snap=>{if(!visible()||!snap.key)return;state.students[snap.key]=snap.val()||{};renderAll();};
-  studentsRef.on('child_added',applyStudent);
-  studentsRef.on('child_changed',applyStudent);
-  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();});
+  const studentsRefused=err=>console.warn('Live student updates are not available',err);
+  studentsRef.on('child_added',applyStudent,studentsRefused);
+  studentsRef.on('child_changed',applyStudent,studentsRefused);
+  studentsRef.on('child_removed',snap=>{if(!visible()||!snap.key)return;delete state.students[snap.key];renderAll();},studentsRefused);
   state.leaderboards.match=state.leaderboards.match||{};
   const leaderboardsRef=db.ref(`${SPACE}/leaderboards/match`);
   const applyLeaderboard=snap=>{
@@ -584,10 +709,12 @@ async function toggleTeacherApproval(id){const item=(state.catalog[currentTrack]
 function renderCatalog(){
   currentTrack=$('teacherTrack').value;
   refreshNamedLists();
+  refreshPerekFilter();
+  renderBookletControl();
   const chosen=$('teacherListName')?.value||'Main List',
         perekFilter=$('teacherPerekFilter')?.value||'all',
         all=state.catalog[currentTrack]||[],
-        list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekFilter==='all'||perekOf(i)===Number(perekFilter));
+        list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,perekFilter));
   const perekWrap=$('teacherPerekWrap');if(perekWrap)perekWrap.classList.toggle('hidden',currentTrack!=='shorashim');
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
@@ -603,7 +730,7 @@ function renderCatalog(){
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
-      <div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
+      <div class="mini-actions"><label class="bulk-pick" title="Select for bulk delete"><input type="checkbox" data-a="pick" ${bulkSelected.has(String(i.id))?'checked':''} aria-label="Select ${esc(i.front)}"></label><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
       <div class="hebrew">${esc(i.front)}</div>
       <div>
         <b>${esc(i.english)}</b>
@@ -619,6 +746,9 @@ function renderCatalog(){
       </div>
     </div>`;
   }).join('')||'<p class="mini-note">This list is empty.\nAdd an item or use Bulk Add.</p>';
+  const visibleIds=new Set(list.map(i=>String(i.id)));
+  [...bulkSelected].forEach(id=>{if(!visibleIds.has(id))bulkSelected.delete(id)});
+  updateBulkBar(list);
 
   [...$('teacherCatalog').querySelectorAll('.catalog-teacher-row')].forEach(row=>{
     const id=row.dataset.id;
@@ -627,6 +757,7 @@ function renderCatalog(){
     row.querySelector('[data-a=edit]').onclick=()=>openEdit(id);
     row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);
     row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
+    row.querySelector('[data-a=pick]').onchange=e=>{if(e.target.checked)bulkSelected.add(String(id));else bulkSelected.delete(String(id));updateBulkBar(list);};
     const approve=row.querySelector('[data-a=approve]');
     if(approve)approve.onclick=()=>toggleTeacherApproval(id);
     const mergeDuplicate=row.querySelector('[data-a=merge-duplicate]');
@@ -735,10 +866,32 @@ async function removePictureChoice(id,artValue){
   await saveCatalog();
 }
 
-async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||pf==='all'||perekOf(i)===Number(pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
+async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekMatches(i,pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
+/* Bulk delete: tick words in the current list, then delete them all at once. */
+const bulkSelected=new Set();
+function updateBulkBar(list){
+  const bar=$('teacherBulkBar');if(!bar)return;
+  bar.classList.toggle('hidden',!list.length);
+  const n=bulkSelected.size,all=$('teacherSelectAll'),del=$('teacherDeleteSelected');
+  if(all){all.checked=list.length>0&&n===list.length;all.indeterminate=n>0&&n<list.length;all.onchange=()=>{bulkSelected.clear();if(all.checked)list.forEach(i=>bulkSelected.add(String(i.id)));renderCatalog();};}
+  const lbl=$('teacherSelectAllLabel');if(lbl)lbl.textContent=`Select all (${list.length})`;
+  if(del){del.disabled=!n;del.textContent=`🗑 Delete Selected (${n})`;del.onclick=deleteSelectedCatalogItems;}
+  const clr=$('teacherClearSelected');if(clr){clr.classList.toggle('hidden',!n);clr.onclick=()=>{bulkSelected.clear();renderCatalog();};}
+}
+async function deleteSelectedCatalogItems(){
+  const list=state.catalog[currentTrack]||[],picked=list.filter(x=>bulkSelected.has(String(x.id)));
+  if(!picked.length)return;
+  const preview=picked.slice(0,12).map(x=>`• ${x.front}${x.english?` — ${x.english}`:''}`).join('\n')+(picked.length>12?`\n…and ${picked.length-12} more`:'');
+  if(!confirm(`Permanently delete ${picked.length} word${picked.length===1?'':'s'}?\n\n${preview}\n\nThis removes them from Firebase. This cannot be undone.`))return;
+  const ids=new Set(picked.map(x=>String(x.id)));
+  state.catalog[currentTrack]=list.filter(x=>!ids.has(String(x.id)));
+  bulkSelected.clear();
+  renderCatalog();
+  await saveCatalog();
+}
 async function deleteCatalogItem(id){
   const list=state.catalog[currentTrack]||[],i=list.find(x=>x.id===id);
   if(!i)return;
@@ -753,7 +906,7 @@ function openEdit(id=null){
   $('tEditId').value=i?.id||'';
   $('tListName').value=i?listNameOf(i):($('teacherListName')?.value||'Main List');
   const selectedPerek=$('teacherPerekFilter')?.value;
-  $('tPerek').value=String(i?perekOf(i):(selectedPerek&&selectedPerek!=='all'?selectedPerek:19));
+  $('tPerek').value=i?String(perekOf(i)??''):(/^\d+$/.test(selectedPerek||'')?selectedPerek:'');
   $('tFront').value=i?.front||'';
   $('tEnglish').value=i?.english||'';
   $('tPasuk').value=i?.pasuk||'';
@@ -767,6 +920,8 @@ function openEdit(id=null){
 async function saveEdit(e){
   e.preventDefault();
   const l=state.catalog[currentTrack],id=$('tEditId').value;
+  const perekInput=window.B3ShorashimUnits.parsePerekInput($('tPerek').value);
+  if(currentTrack==='shorashim'&&!perekInput.ok){alert(`Perek must be a whole number from 1 to ${window.B3ShorashimUnits.MAX_PEREK}, or blank for no perek.`);return;}
   let i=id?l.find(x=>x.id===id):null;
   if(!i){
     i={id:`custom-${currentTrack}-${Date.now()}`,art:[],autoArt:currentTrack==='shorashim',hidden:false};
@@ -782,7 +937,7 @@ async function saveEdit(e){
   i.english=$('tEnglish').value.trim();
   i.pasuk=$('tPasuk').value.trim();
   if(currentTrack==='shorashim'){
-    i.perek=Number($('tPerek').value)||18;
+    if(perekInput.value===null)delete i.perek;else i.perek=perekInput.value;
     i.hebrew=$('tWord').value.trim();
     // Fill only missing artwork; editing a translation never replaces a teacher's existing choices.
     if(!sanitizeClassArt(i.art).length){
@@ -865,9 +1020,13 @@ $('teacherNewList').onclick=async()=>{
 };
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
-  const pf=$('teacherPerekFilter')?.value||'all';
-  $('bulkPerekLabel').textContent=currentTrack==='shorashim'?(pf==='18'?'Perek י״ח':'Perek י״ט'):'';
-  $('bulkPerekLabel').style.display=currentTrack==='shorashim'?'inline-block':'none';
+  // The perek must be chosen in the dialog every time (#571). It starts empty and is never
+  // taken from the filter, so words cannot silently land in the wrong perek.
+  $('bulkPerek').value='';
+  $('bulkNoPerek').checked=false;
+  $('bulkPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim');
+  $('bulkNoPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim'||!CLASS_MODE);
+  $('bulkPerekLabel').style.display='none';
   $('bulkItems').value='';
   $('teacherBulkDialog').showModal();
 };
@@ -876,7 +1035,9 @@ $('saveBulkItems').onclick=async e=>{
   const name=$('teacherListName').value||'Main List',
         lines=$('bulkItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),
         l=state.catalog[currentTrack],
-        added=[];
+        added=[],
+        bulkPerek=window.B3ShorashimUnits.bulkPerekChoice($('bulkPerek').value,{noPerekAllowed:CLASS_MODE,noPerekChecked:$('bulkNoPerek').checked});
+  if(currentTrack==='shorashim'&&!bulkPerek.ok){alert(bulkPerek.error);$('bulkPerek').focus();return;}
   for(const line of lines){
     const parts=line.split('|').map(x=>x.trim());
     if(parts.length<2||!parts[0]||!parts[1])continue;
@@ -892,8 +1053,7 @@ $('saveBulkItems').onclick=async e=>{
       hidden:false
     };
     if(isShoreshim){
-      const pf=$('teacherPerekFilter')?.value||'all';
-      item.perek=pf==='18'?18:19;
+      if(bulkPerek.value!==null)item.perek=bulkPerek.value;
       item.hebrew=parts[2]||parts[0];
       item.pasuk=parts[3]||'';
     }
@@ -913,13 +1073,19 @@ $('saveBulkItems').onclick=async e=>{
 $('toggleStudentSite').onclick=toggleStudentSite;
 $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(teacherSettingsPath()).set(state.settings)};
 $('teacherAddItem').onclick=()=>openEdit();
+$('teacherRenameUnit').onclick=renameUnitLabel;
+$('teacherShowBooklet').onchange=e=>setShowBooklet(e.target.checked);
+$('teacherLibraryFromClass').onclick=copyClassToLibrary;
+$('teacherLibraryToClass').onclick=openLibraryDialog;
+$('cancelLibraryCopy').onclick=()=>$('teacherLibraryDialog').close();
+$('saveLibraryCopy').onclick=copyLibraryToClass;
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
 $('tSaveItem').onclick=saveEdit;
 $('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
 bindTabs();
 let teacherAppOpened=false;
-function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
+function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll().catch(err=>{console.error('Could not load this class',err);status('⚠️ Could not load everything for this class. Please reload.','error');}).finally(()=>loadTeacherLibrary())}
 async function checkClassTeacher(user,access){
   if(!user||!access?.authorized){$('teacherGoogleSignIn').classList.remove('hidden');$('teacherGateMsg').textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return}
   activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
@@ -963,6 +1129,14 @@ if(CLASS_MODE){
       return;
     }
     const ids=access.classIds||[];
+    if(!CLASS_ID){
+      // Never start on a class quietly: ask, then reopen this page with that class.
+      $('teacherGoogleSignIn').classList.add('hidden');
+      $('teacherGateMsg').textContent='Choose your class.';
+      window.B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,window.B3_APP_CONTEXT?.workspaceId)
+        .catch(()=>{$('teacherGateMsg').textContent='Could not load your classes. Open Shorashim from Teacher Home.'});
+      return;
+    }
     activeTeacherAccess=access;isSiteAdmin=access.role==='admin';
     if(isSiteAdmin){
       document.querySelector('.topbar h1').textContent='Shorashim Learning Lab';

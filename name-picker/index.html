@@ -288,6 +288,7 @@
 <script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../class-confirm-gate.js"></script>
 <script src="../teacher-class-rosters.js?v=20261011"></script>
 
 </head>
@@ -508,8 +509,8 @@ async function loadState() {
   // The live roster is authoritative. Saved or restored names cannot replace it.
   state.rosters = Object.fromEntries(Object.entries(liveRosters).map(([key, names]) => [key, names.slice()]));
   if (!availableLists.includes(state.activeList) && state.activeList !== 'custom') state.activeList = availableLists[0];
-  const requested = (new URLSearchParams(location.search).get('class') || '').trim();
-  if (requested) state.activeList = rosterListKey(authorizedSession.selectedId);
+  // The class was confirmed by the teacher (or named in the link) before loading.
+  state.activeList = rosterListKey(authorizedSession.selectedId);
   if (state.activeList === 'custom' && !state.customNames.length) state.activeList = availableLists[0];
   if (!state.excludedByList || typeof state.excludedByList !== 'object') state.excludedByList = { east: [], west: [], custom: [] };
   [...availableLists, 'custom'].forEach(k => {

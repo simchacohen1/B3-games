@@ -9,11 +9,21 @@ const crypto = require('node:crypto');
 const policy = require('./homework-policy.cjs');
 const { resolveStudent } = require('./student-login-core.cjs');
 const { guarded } = require('./auth-attempts.cjs');
+const DM = require('./homework-messages.cjs');
+const hwItems = require('./homework-items-core.cjs');
 
 const WS = 'b3-2026';
 const OWNER_EMAIL = 'simcha5770@gmail.com';
 const key = s => typeof s === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(s);
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }); };
+// Assignment label shown to teachers: 'homework' (default) or 'classwork' (Class Assignment).
+const LABELS = ['homework', 'classwork'];
+const labelOf = def => (def && def.label === 'classwork' ? 'classwork' : 'homework');
+const cleanLabel = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (!LABELS.includes(value)) fail(400, 'Choose Homework or Class Assignment.');
+  return value;
+};
 const text = (s, n) => String(s == null ? '' : s).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f<>]/g, '').trim().slice(0, n);
 const base = classId => 'assignmentCenter/workspaces/' + WS + '/classes/' + classId;
 const OPEN = ['assigned', 'in_progress', 'returned'];
@@ -83,18 +93,42 @@ const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const targets = (def, members) => def.audience === 'all' ? Object.keys(members) : (def.audience || []).filter(s => has(members, s));
 const publicationState = def => def.publicationState || 'published'; // older definitions stay visible
 
+// Messages as one side sees them. "unread" = sent by the other side after this side last read the thread.
+function publicMessages(rec, viewer) {
+  const readAt = Number(rec?.readAt?.[viewer]) || 0;
+  return Array.isArray(rec?.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
+    text: message.text || '', voice: !!message.voice, createdAt: message.createdAt,
+    unread: message.role !== viewer && Number(message.createdAt) > readAt })) : [];
+}
 function present(def, rec, now) {
   return {
-    id: def.id, type: def.type, title: def.title, details: def.details, assignedAt: def.assignedAt ?? def.createdAt,
+    id: def.id, type: def.type, title: def.title, details: def.details, subject: def.subject || '', assignedAt: def.assignedAt ?? def.createdAt,
     dueAt: def.dueAt ?? null, targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
     targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
     status: rec.status, late: isLate(def, rec, now),
     draft: rec.draft || '', progress: rec.progress || 0, answer: rec.answer || '',
     submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-    updatedAt: rec.updatedAt || null,
-    messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
-      text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : []
+    updatedAt: rec.updatedAt || null, teacherId: def.createdBy || null,
+    items: hwItems.itemsOf(def), itemsDone: hwItems.doneMap(def, rec),
+    instructionVoice: !!def.instructionVoice,
+    messages: publicMessages(rec, 'student')
   };
+}
+// ---- recorded instructions (one voice message per assignment) -------------
+// The audio lives outside the definition so lists never carry it; it is read only through
+// instructionVoiceRead. Only the teacher who created the assignment can add, replace or remove it.
+const instructionVoicePath = (classId, aid) => base(classId) + '/instructionVoice/' + aid;
+const ownsAssignment = (def, actorId) => !!def.createdBy && def.createdBy === actorId;
+function instructionVoiceChange(body) {
+  if (body.voiceDataURL != null) return { set: cleanVoiceData(body.voiceDataURL) };
+  if (body.removeVoice === true) return { remove: true };
+  return null;
+}
+async function readInstructionVoice(store, classId, def) {
+  if (!def.instructionVoice) fail(404, 'This assignment has no recorded instructions.');
+  const voiceDataURL = await store.get(instructionVoicePath(classId, def.id));
+  if (!voiceDataURL) fail(404, 'The recorded instructions are no longer available.');
+  return { ok: true, voiceDataURL };
 }
 
 function cleanVoiceData(value) {
@@ -128,11 +162,72 @@ async function addMessage(store, path, message) {
     return { ...(cur || {}),
     messages: [...messages,
       { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: message.createdAt }],
+    readAt: { ...(cur?.readAt || {}), [message.role]: message.createdAt },
     ...(message.voiceData ? { voiceNotes: { ...(cur?.voiceNotes || {}), [message.id]: message.voiceData } } : {})
   };
   });
   if (limit) fail(429, message.voiceData ? 'This homework has reached its voice-note limit.' : 'This homework has reached its comment limit.');
   if (!tx || tx.committed === false) fail(409, 'The note could not be saved. Please try again.');
+}
+// ---- standalone messages (not tied to an assignment) -----------------------
+// One thread per student per class. It keeps the newest 30 messages and newest 6 voice notes
+// (older ones roll off, audio included), so it never fills up the way an assignment thread does.
+const GENERAL_MAX = 30, GENERAL_VOICE_MAX = 6, GENERAL_BURST = 10, GENERAL_BURST_MS = 10 * 60 * 1000;
+const generalPath = (classId, sid) => base(classId) + '/messages/' + sid;
+const isGeneral = body => body.assignmentId === undefined || body.assignmentId === null || body.assignmentId === '';
+async function addGeneralMessage(store, path, message) {
+  let busy = false;
+  const tx = await store.tx(path, cur => {
+    const recent = (Array.isArray(cur?.messages) ? cur.messages : []).filter(item =>
+      item.role === message.role && message.createdAt - Number(item.createdAt) < GENERAL_BURST_MS);
+    if (recent.length >= GENERAL_BURST) { busy = true; return undefined; }
+    let messages = [...(Array.isArray(cur?.messages) ? cur.messages : []),
+      { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: message.createdAt }];
+    while (messages.filter(item => item.voice).length > GENERAL_VOICE_MAX) {
+      const oldest = messages.findIndex(item => item.voice);
+      messages = messages.filter((item, i) => i !== oldest);
+    }
+    if (messages.length > GENERAL_MAX) messages = messages.slice(-GENERAL_MAX);
+    const voiceNotes = {};
+    for (const item of messages) {
+      if (!item.voice) continue;
+      const audio = item.id === message.id ? message.voiceData : cur?.voiceNotes?.[item.id];
+      if (audio) voiceNotes[item.id] = audio;
+    }
+    return { messages, readAt: { ...(cur?.readAt || {}), [message.role]: message.createdAt },
+      ...(Object.keys(voiceNotes).length ? { voiceNotes } : {}) };
+  });
+  if (busy) fail(429, 'That is a lot of messages in a few minutes. Please wait a little and try again.');
+  if (!tx || tx.committed === false) fail(409, 'The note could not be saved. Please try again.');
+}
+// comment / voiceRead / markRead on the standalone thread. Same size limits and checks as assignment notes.
+async function generalAction(store, path, body, role, now, newId) {
+  if (body.action === 'markRead') return markRead(store, path, role, now);
+  if (body.action === 'comment') {
+    const message = messageInput(body, role, now, newId);
+    await addGeneralMessage(store, path, message);
+    return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
+  }
+  if (body.action === 'voiceRead') return readVoice(store, path, body.messageId);
+  fail(400, 'Unknown action.');
+}
+async function readVoice(store, path, messageId) {
+  if (!key(messageId)) fail(404, 'That voice note is no longer available.');
+  const rec = await store.get(path + '/messages'), message = (Array.isArray(rec) ? rec : []).find(item => item.id === messageId && item.voice);
+  if (!message) fail(404, 'That voice note is no longer available.');
+  const voiceDataURL = await store.get(path + '/voiceNotes/' + message.id);
+  if (!voiceDataURL) fail(404, 'That voice note is no longer available.');
+  return { ok: true, voiceDataURL };
+}
+// Thread metadata only (never the audio), as one side sees it.
+async function generalThread(store, path, viewer) {
+  const [messages, readAt] = await Promise.all([store.get(path + '/messages'), store.get(path + '/readAt')]);
+  return publicMessages({ messages: Array.isArray(messages) ? messages : [], readAt }, viewer);
+}
+
+async function markRead(store, path, role, now) {
+  await store.tx(path, cur => cur ? { ...cur, readAt: { ...(cur.readAt || {}), [role]: now } } : undefined);
+  return { ok: true };
 }
 
 // ---- teacher actions -------------------------------------------------------
@@ -156,27 +251,35 @@ async function teacherDo(store, identity, body, now, newId) {
         if (late) counts.missing++;
         students[sid] = { name: members[sid].name, status: rec.status, late, answer: rec.answer || '',
           progress: rec.progress || 0, submittedAt: rec.submittedAt || null, feedback: rec.feedback || '', stars: rec.stars ?? null,
-          messages: Array.isArray(rec.messages) ? rec.messages.map(message => ({ id: message.id, role: message.role,
-            text: message.text || '', voice: !!message.voice, createdAt: message.createdAt })) : [] };
+          itemsDone: hwItems.doneMap(def, rec), messages: publicMessages(rec, 'teacher') };
       }
-      rows.push({ id: def.id, type: def.type, title: def.title, details: def.details,
+      rows.push({ id: def.id, type: def.type, label: labelOf(def), title: def.title, details: def.details, subject: def.subject || '',
         assignedAt: def.assignedAt ?? def.createdAt, dueAt: def.dueAt ?? null,
         targetAmount: def.targetAmount ?? def.targetMinutes ?? null,
         targetUnit: def.targetUnit || (def.targetMinutes ? 'minutes' : ''),
-        publicationState: publicationState(def), createdAt: def.createdAt, counts, students });
+        publicationState: publicationState(def), createdAt: def.createdAt, publishedAt: def.publishedAt ?? null,
+        items: hwItems.itemsOf(def), instructionVoice: !!def.instructionVoice, ownedByMe: ownsAssignment(def, actorId), counts, students });
     }
-    return { ok: true, students: members, assignments: rows };
+    const sids = Object.keys(members);
+    const threads = await Promise.all(sids.map(sid => generalThread(store, generalPath(classId, sid), 'teacher')));
+    const messages = {};
+    sids.forEach((sid, i) => { messages[sid] = threads[i]; });
+    // features tells the page this server supports recorded instructions (older servers leave it out).
+    return { ok: true, students: members, assignments: rows, messages, features: { instructionVoice: true } };
   }
 
   if (body.action === 'create') {
+    const items = hwItems.cleanItems(body.items, newId);
     let def;
-    try { def = policy.cleanDefinition({ type: body.type, title: body.title, details: body.details || '', dueAt: body.dueAt ?? null }); }
+    try { def = policy.cleanDefinition({ type: items ? items[0].type : body.type, title: body.title, details: body.details || '', dueAt: body.dueAt ?? null }); }
     catch (e) { fail(400, 'Check the type, title (up to 120 letters) and instructions.'); }
     const rawTarget = body.targetAmount == null || body.targetAmount === '' ? body.targetMinutes : body.targetAmount;
     const targetAmount = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit || (body.type === 'shorashim' ? 'minutes' : body.type === 'weeklyQuiz' ? 'questions' : ''));
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
+    const label = cleanLabel(body.label, 'homework');
+    const subject = text(body.subject, 60); // optional, e.g. Chumash, Mishnayos
     const assignedAt = body.assignedAt == null ? now : Number(body.assignedAt);
     if (!Number.isSafeInteger(assignedAt) || assignedAt < 0) fail(400, 'Choose a valid assigned date.');
     if (def.dueAt != null && def.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -186,22 +289,36 @@ async function teacherDo(store, identity, body, now, newId) {
       audience = [...new Set(body.studentIds)].filter(s => key(s) && has(members, s));
       if (!audience.length) fail(400, 'Choose students who are in this class.');
     }
+    const voice = body.voiceDataURL == null ? null : cleanVoiceData(body.voiceDataURL);
     const id = newId();
     if (!key(id)) fail(500, 'Could not create the assignment.');
-    const full = { id, ...def, assignedAt, targetAmount, targetUnit,
+    const full = { id, ...def, ...(items ? { items } : {}), label, subject, assignedAt, targetAmount, targetUnit,
       targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
       audience, publicationState: 'draft', createdAt: now, createdBy: actorId };
+    if (voice) {
+      // Audio first, so the definition never points at a recording that is not there.
+      await store.set(instructionVoicePath(classId, id), voice);
+      full.instructionVoice = { at: now, by: actorId };
+    }
     await store.set(base(classId) + '/definitions/' + id, full);
     return { ok: true, id };
   }
 
+  if (['comment', 'voiceRead', 'markRead'].includes(body.action) && isGeneral(body)) {
+    const sid = body.studentId;
+    if (!key(sid) || !has(members, sid)) fail(404, 'That student is not in this class.');
+    return generalAction(store, generalPath(classId, sid), body, 'teacher', now, newId);
+  }
   const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
   if (!def) fail(404, 'That assignment was not found.');
 
-  if (body.action === 'comment' || body.action === 'voiceRead') {
+  if (body.action === 'instructionVoiceRead') return readInstructionVoice(store, classId, def);
+
+  if (body.action === 'comment' || body.action === 'voiceRead' || body.action === 'markRead') {
     const sid = body.studentId;
     if (!key(sid) || !has(members, sid) || !targets(def, members).includes(sid)) fail(404, 'That student is not assigned this homework.');
     const path = recordPath(classId, sid, def.id);
+    if (body.action === 'markRead') return markRead(store, path, 'teacher', now);
     if (body.action === 'comment') {
       const message = messageInput(body, 'teacher', now, newId);
       await addMessage(store, path, message);
@@ -236,6 +353,21 @@ async function teacherDo(store, identity, body, now, newId) {
     return { ok: true };
   }
 
+  if (body.action === 'deletePermanently') {
+    // Explicit, teacher-confirmed removal of one homework from THIS class only (def came from this
+    // class's own definitions, and teacherAccess already proved the teacher belongs to the class).
+    // Removes the student records (answers, notes, voice recordings, feedback, stars) first and the
+    // assignment last, so a failed half-way run can simply be repeated.
+    if (body.confirm !== true) fail(400, 'Please confirm the delete.');
+    for (const sid of Object.keys(allRecords)) {
+      if (!key(sid)) continue;
+      if (allRecords[sid]?.assignments && has(allRecords[sid].assignments, def.id))
+        await store.set(recordPath(classId, sid, def.id), null);
+    }
+    await store.set(base(classId) + '/definitions/' + def.id, null);
+    return { ok: true };
+  }
+
   if (body.action === 'delete') {
     // Unpublishing does not undo publication: preserve every student's work and history.
     // The record check also covers legacy definitions without a publishedAt marker,
@@ -245,15 +377,23 @@ async function teacherDo(store, identity, body, now, newId) {
     if (publicationState(def) !== 'draft' || def.publishedAt != null || hasStudentRecord)
       fail(409, 'Archive homework that was published or has student work, so nothing is lost.');
     await store.set(base(classId) + '/definitions/' + def.id, null);
+    await store.set(instructionVoicePath(classId, def.id), null);
     return { ok: true };
   }
   if (body.action === 'edit') {
     if (publicationState(def) === 'archived') fail(409, 'Archived assignments are read only.');
+    // items: undefined keeps the current list, an empty list removes it (back to a plain assignment).
+    const items = body.items === undefined ? hwItems.itemsOf(def) : hwItems.cleanItems(body.items, newId) || [];
+    if ((body.voiceDataURL != null || body.removeVoice === true) && !ownsAssignment(def, actorId))
+      fail(403, 'Only the teacher who created this assignment can change its recorded instructions.');
+    const voiceChange = instructionVoiceChange(body);
     let next;
     try {
-      next = policy.cleanDefinition({ type: def.type, title: body.title ?? def.title, details: body.details ?? def.details,
+      next = policy.cleanDefinition({ type: items.length ? items[0].type : def.type, title: body.title ?? def.title, details: body.details ?? def.details,
         dueAt: body.dueAt === undefined ? def.dueAt : body.dueAt });
     } catch (e) { fail(400, 'Check the title, instructions and due date.'); }
+    const label = cleanLabel(body.label, labelOf(def));
+    const subject = body.subject === undefined ? def.subject || '' : text(body.subject, 60);
     const assignedAt = body.assignedAt === undefined ? def.assignedAt : Number(body.assignedAt);
     if (assignedAt != null && (!Number.isSafeInteger(assignedAt) || assignedAt < 0)) fail(400, 'Choose a valid assigned date.');
     if (next.dueAt != null && assignedAt != null && next.dueAt < assignedAt) fail(400, 'Due date must be on or after the assigned date.');
@@ -262,8 +402,18 @@ async function teacherDo(store, identity, body, now, newId) {
     if (targetAmount !== null && !(Number.isInteger(targetAmount) && targetAmount >= 1 && targetAmount <= 240)) fail(400, 'Target must be 1 to 240.');
     const targetUnit = String(body.targetUnit === undefined ? def.targetUnit || (def.targetMinutes ? 'minutes' : '') : body.targetUnit);
     if (targetAmount !== null && !['minutes', 'questions', 'rounds', 'items'].includes(targetUnit)) fail(400, 'Choose a supported target unit.');
-    await store.set(base(classId) + '/definitions/' + def.id, { ...def, ...next, assignedAt, targetAmount,
-      targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null, editedAt: now, editedBy: actorId });
+    let instructionVoice = def.instructionVoice || null;
+    if (voiceChange?.set) {
+      await store.set(instructionVoicePath(classId, def.id), voiceChange.set);
+      instructionVoice = { at: now, by: actorId };
+    }
+    const kept = { ...def };
+    delete kept.items;
+    await store.set(base(classId) + '/definitions/' + def.id, { ...kept, ...next, ...(items.length ? { items } : {}), label, subject, assignedAt, targetAmount,
+      targetUnit, targetMinutes: targetUnit === 'minutes' ? targetAmount : null,
+      instructionVoice: voiceChange?.remove ? null : instructionVoice, editedAt: now, editedBy: actorId });
+    // Remove the audio only after the definition stops pointing at it.
+    if (voiceChange?.remove) await store.set(instructionVoicePath(classId, def.id), null);
     return { ok: true };
   }
   if (body.action === 'approve' || body.action === 'return') {
@@ -290,8 +440,41 @@ async function teacherDo(store, identity, body, now, newId) {
   fail(400, 'Unknown action.');
 }
 
+// ---- one-on-one messages (#647) ----------------------------------------------
+// Teacher side: the inbox lists the students of every class this account may open.
+// A single conversation needs the class check and that the student is on its roster.
+async function teacherDm(store, identity, body, now, newId) {
+  if (body.action === 'dmInbox' || body.action === 'dmUnread') {
+    const { classes } = await authorizedClasses(store, identity);
+    if (body.action === 'dmUnread') return DM.teacherUnread(store, WS, identity.uid, classes.map(c => c.id));
+    return DM.teacherInbox(store, { ws: WS, uid: identity.uid, classes,
+      members: async classId => activeMembers(store, (await store.get('b3Games/workspaces/' + WS + '/classes/' + classId)) || {}) });
+  }
+  const classId = body.classId, sid = body.studentId;
+  const { cls, id: uid } = await teacherAccess(store, identity, classId);
+  const member = key(sid) ? cls.members?.[sid] : null;
+  const profile = member && member.active !== false ? await store.get('b3Games/students/' + sid + '/profile') : null;
+  if (!member || member.active === false || profile?.active === false) fail(404, 'That student is not in this class.');
+  const row = await store.get('b3Games/workspaces/' + WS + '/teachers/' + uid);
+  const onList = row && row.active !== false && row.classIds?.[classId] === true;
+  const kind = onList ? (row.accountType === 'principal' || row.role === 'principal' ? 'principal' : 'teacher') : 'admin';
+  const adult = { kind, name: DM.adultName(onList ? row : { displayName: identity.name, email: identity.email }, kind === 'principal' ? 'Principal' : 'Teacher') };
+  const defs = {};
+  if (body.action === 'dmSend' && key(body.assignmentId)) {
+    const def = await store.get(base(classId) + '/definitions/' + body.assignmentId);
+    if (def && publicationState(def) === 'published' && targets(def, { [sid]: true }).includes(sid)) defs[body.assignmentId] = def;
+  }
+  const t = { ws: WS, classId, sid, uid, viewer: 'teacher', adult, studentName: profile?.name || member.name || sid };
+  return DM.teacherThreadApi(store, t, body, now, newId, defs);
+}
+async function studentDm(store, body, now, ip, newId) {
+  const s = await studentContext(store, body, now, ip);
+  return DM.studentApi(store, { ws: WS, classId: s.classId, sid: s.sid, defs: s.defs, mine: s.mine }, body, now, newId);
+}
+
 // ---- student actions -------------------------------------------------------
-async function studentDo(store, body, now, ip, newId) {
+// Proves who the student is and loads their class's homework definitions.
+async function studentContext(store, body, now, ip) {
   const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
     () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   const sid = student.id, classId = student.classId;
@@ -307,6 +490,10 @@ async function studentDo(store, body, now, ip, newId) {
   const defs = (await store.get(base(classId) + '/definitions')) || {};
   const mine = def => (def.audience === 'all' || (Array.isArray(def.audience) && def.audience.includes(sid))) &&
     publicationState(def) === 'published' && (def.assignedAt == null || def.assignedAt <= now);
+  return { student, sid, classId, actor, ctx, scope, defs, mine };
+}
+async function studentDo(store, body, now, ip, newId) {
+  const { student, sid, classId, actor, ctx, scope, defs, mine } = await studentContext(store, body, now, ip);
 
   if (body.action === 'studentList') {
     const out = [];
@@ -319,16 +506,38 @@ async function studentDo(store, body, now, ip, newId) {
     const order = { returned: 0, assigned: 1, in_progress: 1, submitted: 2, approved: 3 };
     out.sort((a, b) => order[a.status] - order[b.status] || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity));
     return { ok: true, name: student.profile?.name || '', assignments: out,
-      openCount: out.filter(a => OPEN.includes(a.status)).length };
+      openCount: out.filter(a => OPEN.includes(a.status)).length,
+      general: { messages: await generalThread(store, generalPath(classId, sid), 'student') } };
   }
+  if (['comment', 'voiceRead', 'markRead'].includes(body.action) && isGeneral(body))
+    return generalAction(store, generalPath(classId, sid), body, 'student', now, newId);
 
   const def = key(body.assignmentId) && has(defs, body.assignmentId) && mine(defs[body.assignmentId]) ? defs[body.assignmentId] : null;
   if (!def || !mine(def)) fail(404, 'That assignment was not found.');
+  if (body.action === 'instructionVoiceRead') return readInstructionVoice(store, classId, def);
   const path = recordPath(classId, sid, def.id);
   if (body.action === 'comment') {
     const message = messageInput(body, 'student', now, newId);
     await addMessage(store, path, message);
     return { ok: true, message: { id: message.id, role: message.role, text: message.text, voice: message.voice, createdAt: now } };
+  }
+  if (body.action === 'markRead') return markRead(store, path, 'student', now);
+  if (body.action === 'itemDone') {
+    // Sent by the activity page (homework mode) when the student finishes one checklist item.
+    const item = hwItems.itemsOf(def).find(x => x.id === body.itemId);
+    if (!item) fail(404, 'That homework item was not found.');
+    let result = null;
+    const tx = await store.tx(path, cur => {
+      const rec = cur || newRecord(def, now);
+      const itemsDone = { ...(rec.itemsDone || {}) };
+      if (!itemsDone[item.id]) itemsDone[item.id] = now;
+      const next = { ...rec, itemsDone, updatedAt: now };
+      if (rec.status === 'assigned') next.status = 'in_progress';
+      result = next;
+      return next;
+    });
+    if (!tx || tx.committed === false || !result) fail(409, 'Could not save. Please try again.');
+    return { ok: true, itemsDone: hwItems.doneMap(def, result), allDone: hwItems.allDone(def, result) };
   }
   if (body.action === 'voiceRead') {
     const rec = await store.get(path), message = (rec?.messages || []).find(item => item.id === body.messageId && item.voice);
@@ -360,7 +569,8 @@ async function studentDo(store, body, now, ip, newId) {
   }
   if (body.action === 'submit') {
     const answer = text(body.answer, 2000), progress = minutes(body.progress);
-    if (!answer && !def.targetMinutes) fail(400, 'Write a short note about what you did.');
+    if (!answer && def.targetUnit !== 'minutes' && !def.targetMinutes &&
+        !hwItems.allDone(def, await store.get(path))) fail(400, 'Write a short note about what you did.');
     await store.tx(path, cur => {
       const rec = cur || newRecord(def, now);
       if (rec.status === 'submitted' && rec.answer === answer) return rec; // repeat tap: same result
@@ -384,13 +594,18 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return authorizedClasses(store, auth.identity);
   }
-  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'approve', 'return'].includes(a)) {
+  if (['teacherList', 'create', 'delete', 'edit', 'publish', 'unpublish', 'archive', 'deletePermanently', 'approve', 'return'].includes(a)) {
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
-  if (['comment', 'voiceRead'].includes(a) && auth && auth.identity)
+  if (DM.DM_ACTIONS.includes(a)) {
+    if (auth && auth.identity) return teacherDm(store, auth.identity, body, now, newId);
+    return studentDm(store, body, now, auth && auth.ip, newId);
+  }
+  if (['comment', 'voiceRead', 'markRead', 'instructionVoiceRead'].includes(a) && auth && auth.identity)
     return teacherDo(store, auth.identity, body, now, newId);
-  if (['studentList', 'save', 'submit', 'comment', 'voiceRead'].includes(a)) return studentDo(store, body, now, auth && auth.ip, newId);
+  if (['studentList', 'save', 'submit', 'itemDone', 'comment', 'voiceRead', 'markRead', 'instructionVoiceRead'].includes(a))
+    return studentDo(store, body, now, auth && auth.ip, newId);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };

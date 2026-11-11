@@ -13,6 +13,6 @@ test('owner-only items are not on the teacher home',()=>{
 test('a new class record has no tool grants',()=>{
  const owner=fs.readFileSync('owner-admin.html','utf8');
  const m=owner.match(/q\("addClass"\)\.onclick=[^\n]*/)[0];
- assert.match(m,/\.set\(\{name:name,active:true\}\)/);
+ assert.match(m,/\.set\(\{name:name,active:true(,schoolId:school)?\}\)/); // every class now belongs to a school
  assert.ok(!/toolGrants/.test(m));
 });

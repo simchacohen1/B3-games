@@ -548,7 +548,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
   <div id="dashboard" style="display:none;">
     <header>
       <h1>📖 Posuk Practice — Teacher</h1>
-      <p>Disputes, progress and recordings for your class</p>
+      <p>Grade recordings, see progress and recordings for your class</p>
       <label style="display:inline-flex;gap:8px;align-items:center;margin-top:6px;font-weight:700;">Sefer:
         <select id="teacherSeferSelect" style="padding:6px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"></select>
       </label>
@@ -571,6 +571,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 
       <div class="main-panel">
         <div class="tab-bar">
+          <button class="tab-btn" id="gradeTabBtn">🎙️ To Grade<span class="tab-count" id="gradeTabCount"></span></button>
           <button class="tab-btn active" id="overviewTabBtn">🏠 Overview<span class="tab-count" id="overviewDisputeCount"></span></button>
           <button class="tab-btn" id="studentTabBtn">👤 Student</button>
           <button class="tab-btn" id="rosterTabBtn">📋 Roster</button>
@@ -590,7 +591,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
-<script src="../firebase-config.js"></script>
+<script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 
 <script>
@@ -814,13 +815,21 @@ document.getElementById('enterBtn').textContent='Sign in with Google';
 document.getElementById('enterBtn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(error=>document.getElementById('gateMsg').textContent=error.message);
 B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
   teacherAccess=access||{authorized:false,role:'',classIds:[]};
+  if(authorized&&!requestedTeacherClass){
+    // Never start on a class (or all classes) quietly: ask, then reopen with it.
+    document.getElementById('gate').style.display='none';
+    document.getElementById('dashboard').style.display='none';
+    B3ClassGate.requireInUrl(path=>db.ref(path).once('value').then(s=>s.val()),access,teacherWorkspace)
+      .catch(error=>{document.getElementById('gate').style.display='block';document.getElementById('gateMsg').textContent=error.message});
+    return;
+  }
   const allowed=authorized&&(access.role==='admin'||!requestedTeacherClass||access.classIds.includes(requestedTeacherClass));
   document.getElementById('gate').style.display=allowed?'none':'block';
   document.getElementById('dashboard').style.display=allowed?'block':'none';
   if(allowed){
     allAttemptsCache=null;
     await loadStudents();
-    if(new URLSearchParams(location.search).get('review')!=='disputes') setTab('overview');
+    if(new URLSearchParams(location.search).get('review')!=='disputes') setTab('grade');
   }
 });
 
@@ -1102,7 +1111,7 @@ async function requestTeacherMilestoneAward(studentId, source, evidencePosukKey)
 }
 
 const TAB_BUTTONS = {
-  overview: 'overviewTabBtn', student: 'studentTabBtn', roster: 'rosterTabBtn', summary: 'summaryTabBtn',
+  grade: 'gradeTabBtn', overview: 'overviewTabBtn', student: 'studentTabBtn', roster: 'rosterTabBtn', summary: 'summaryTabBtn',
   reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', access: 'accessTabBtn'
 };
 Object.entries(TAB_BUTTONS).forEach(([tab, btnId]) => {
@@ -1136,7 +1145,10 @@ function markTab(tab){
 function setTab(tab){
   document.body.classList.toggle('reports-focused', tab === 'reports');
   markTab(tab);
-  if(tab === 'overview'){
+  if(tab === 'grade'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadGradeTab();
+  }else if(tab === 'overview'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadOverview();
   }else if(tab === 'summary'){
@@ -4286,6 +4298,128 @@ function renderClassPosukDetail(posukKey, bodyEl){
       }
     });
   }
+}
+</script>
+<style>
+  .grade-card{ background:#fff; border:2px solid #e6dcc4; border-radius:14px; padding:14px 16px; margin:0 0 14px; }
+  .grade-card h3{ margin:0 0 4px; font-size:1.05rem; }
+  .grade-meta{ color:var(--ink-soft); font-size:.85rem; margin-bottom:8px; }
+  .grade-hebrew{ direction:rtl; text-align:right; font-family:'Frank Ruhl Libre','David',serif; font-size:1.35rem; line-height:1.7; background:#fbf7ee; border-radius:10px; padding:8px 12px; margin:8px 0; }
+  .grade-form{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-top:10px; }
+  .grade-form label{ font-weight:700; display:inline-flex; gap:6px; align-items:center; }
+  .grade-form input[type=number]{ width:70px; padding:5px 8px; border-radius:8px; border:2px solid #cfc3a6; font-weight:700; }
+  .grade-form input[type=text]{ min-width:220px; flex:1; padding:6px 8px; border-radius:8px; border:2px solid #cfc3a6; }
+  .grade-choice{ display:inline-flex; gap:6px; }
+  .grade-choice button{ border:2px solid #cfc3a6; background:#fff; border-radius:999px; padding:6px 14px; font-weight:800; cursor:pointer; }
+  .grade-choice button.on.gold{ background:#fff3c4; border-color:#d4a514; }
+  .grade-choice button.on.retry{ background:#ffe4dc; border-color:#d47a5e; }
+  .grade-points{ font-weight:800; }
+  .grade-msg{ font-size:.85rem; margin-top:6px; min-height:1.1em; }
+  .graded-row{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:8px 0; border-bottom:1px solid #eee; font-size:.9rem; }
+</style>
+<script>
+/* ---------- To Grade (Issue #694) ----------
+   Students send ONE recording (reading + translation). The teacher listens
+   and grades it: gold standard (+10 points minus 1 per mistake, plus any
+   bonus; the posuk is locked for a month) or not gold (the student may try
+   again). Grades and points are saved by the server only. */
+const POSUK_GOLD_POINTS = 10;
+function gradeRefLabel(s){
+  const perek = Number(s.perek), a = Number(s.startPosuk), b = Number(s.endPosuk || a);
+  return (s.sefer ? s.sefer + ' · ' : '') + 'Perek ' + perek + ' · Posuk ' + a + (b > a ? '–' + b : '');
+}
+function gradePointsFor(gold, mistakes, bonus){
+  if(!gold) return 0;
+  return Math.max(0, POSUK_GOLD_POINTS - (Number(mistakes) || 0)) + (Number(bonus) || 0);
+}
+function gradeStatusText(s){
+  if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' pts' +
+    (Number(s.mistakes) ? ' · ' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') : '') +
+    (Number(s.bonus) ? ' · ' + s.bonus + ' bonus' : '');
+  if(s.status === 'retry') return '🔁 Not gold — student may retry' + (Number(s.mistakes) ? ' · ' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') : '');
+  return '⏳ Waiting';
+}
+async function loadGradeTab(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading recordings to grade…</div>';
+  let all;
+  try{ all = (await scopedStudentData('posukPractice/submissions')).val() || {}; }
+  catch(err){ console.error(err); mainEl.innerHTML = '<div class="empty-msg">Could not load recordings to grade.</div>'; return; }
+  const pending = [], graded = [];
+  Object.entries(all).forEach(([sid, subs]) => Object.values(subs || {}).forEach(s => {
+    if(!s || !s.id) return;
+    (s.status === 'pending' ? pending : graded).push({ sid, ...s });
+  }));
+  pending.sort((a, b) => (Number(a.submittedAt) || 0) - (Number(b.submittedAt) || 0));
+  graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
+  document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
+  let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
+    'Gold standard gives +10 points minus 1 per mistake (plus any bonus) and locks the posuk for a month. Not gold lets the student try again. The student already paid 5 points to send it.</p>';
+  if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
+  html += pending.map((s, i) => `<div class="grade-card" id="gradeCard_${i}">
+      <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
+      <div class="grade-meta">Sent ${escapeHtml(new Date(Number(s.submittedAt)).toLocaleString())}${s.durationMs ? ' · ' + formatDuration(Number(s.durationMs) / 1000) : ''}</div>
+      ${s.hebrewText ? '<div class="grade-hebrew">' + escapeHtml(s.hebrewText) + '</div>' : ''}
+      ${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}
+      <div class="grade-form">
+        <span class="grade-choice"><button type="button" class="gold" data-choice="gold">🏅 Gold standard</button><button type="button" class="retry" data-choice="retry">🔁 Not gold — try again</button></span>
+        <label>Mistakes <input type="number" min="0" max="100" step="1" value="0" data-field="mistakes"></label>
+        <label>Bonus points <input type="number" min="0" step="1" value="0" data-field="bonus"></label>
+        <input type="text" maxlength="500" placeholder="Note for the student (optional)" data-field="note">
+        <span class="grade-points" data-field="points"></span>
+        <button class="btn gold" type="button" data-save="1" disabled>Save grade</button>
+      </div>
+      <div class="grade-msg" data-field="msg"></div>
+    </div>`).join('');
+  if(graded.length){
+    html += '<h2 style="margin-top:22px;">✔️ Recently graded</h2>' + graded.slice(0, 30).map(s =>
+      `<div class="graded-row"><strong>${escapeHtml(studentsMap[s.sid] || s.sid)}</strong><span>${escapeHtml(gradeRefLabel(s))}</span><span>${escapeHtml(gradeStatusText(s))}</span><span style="color:var(--ink-soft)">${escapeHtml(new Date(Number(s.gradedAt)).toLocaleDateString())}${s.gradedBy ? ' · ' + escapeHtml(s.gradedBy) : ''}</span></div>`).join('');
+  }
+  mainEl.innerHTML = html;
+  pending.forEach((s, i) => wireGradeCard(document.getElementById('gradeCard_' + i), s));
+}
+function wireGradeCard(card, s){
+  if(!card) return;
+  let choice = '';
+  const field = n => card.querySelector('[data-field="' + n + '"]');
+  const saveBtn = card.querySelector('[data-save]');
+  const refresh = () => {
+    card.querySelectorAll('[data-choice]').forEach(b => b.classList.toggle('on', b.dataset.choice === choice));
+    const gold = choice === 'gold';
+    field('bonus').disabled = !gold;
+    if(!gold) field('bonus').value = '0';
+    const mistakes = Math.max(0, Math.floor(Number(field('mistakes').value) || 0));
+    const bonus = Math.max(0, Math.floor(Number(field('bonus').value) || 0));
+    field('points').textContent = choice ? ('= ' + gradePointsFor(gold, mistakes, bonus) + ' points') : '';
+    saveBtn.disabled = !choice;
+  };
+  card.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => { choice = b.dataset.choice; refresh(); });
+  field('mistakes').oninput = refresh; field('bonus').oninput = refresh;
+  refresh();
+  saveBtn.onclick = async () => {
+    const mistakes = Number(field('mistakes').value || 0), bonus = Number(field('bonus').value || 0);
+    if(!Number.isInteger(mistakes) || mistakes < 0 || mistakes > 100) return field('msg').textContent = 'Mistakes must be a whole number from 0 to 100.';
+    if(!Number.isInteger(bonus) || bonus < 0) return field('msg').textContent = 'Bonus must be a whole number of 0 or more.';
+    saveBtn.disabled = true; field('msg').textContent = 'Saving…';
+    try{
+      const user = firebase.auth().currentUser;
+      if(!user) throw new Error('Please sign in again.');
+      const idToken = await user.getIdToken();
+      const classId = /^[A-Za-z0-9_-]{1,100}$/.test(requestedTeacherClass) ? requestedTeacherClass : '';
+      const res = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
+        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
+        body: JSON.stringify({ action:'posuk-grade', classId, studentId:s.sid, submissionId:s.id, gold: choice === 'gold', mistakes, bonus, note: field('note').value.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if(!res.ok || !data.ok) throw new Error(data.error || ('The service returned ' + res.status));
+      field('msg').textContent = '✔️ Saved. ' + (data.points ? data.points + ' points' + (data.pointsPosted ? ' added.' : ' could not be added (no Student Rewards profile).') : 'No points.');
+      setTimeout(loadGradeTab, 900);
+    }catch(err){
+      console.error(err);
+      field('msg').textContent = '⚠️ ' + (err.message || 'Could not save the grade.');
+      saveBtn.disabled = false;
+    }
+  };
 }
 </script>
 <script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body>
