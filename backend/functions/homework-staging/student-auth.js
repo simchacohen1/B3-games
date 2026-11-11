@@ -47,7 +47,19 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:stagingOrigins(
   const result=await studentAuth(store,body,req.ip);
   if(result?.ok&&['login','choosePin'].includes(String(body.action||''))){
    const studentId=String(result.id||'');
-   const requestedClassId=String(body.classId||result.classId||'');
+   let requestedClassId=String(body.classId||'');
+   if(!requestedClassId&&/^[A-Za-z0-9_-]{1,100}$/.test(studentId)){
+    // A student can be in several classes. With no class named, start in one
+    // they are still active in, not simply the first membership found (which
+    // may be a class that was turned off or that they were blocked in).
+    const rows=await store.get('b3Games/students/'+studentId+'/memberships')||{};
+    const candidates=[String(result.classId||''),...Object.values(rows).filter(m=>m&&m.active!==false&&m.workspaceId==='b3-2026').map(m=>String(m.classId||''))].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
+    for(const id of new Set(candidates)){
+     const row=await store.get('b3Games/workspaces/b3-2026/classes/'+id);
+     if(row&&row.active!==false&&row.members?.[studentId]&&row.members[studentId].active!==false){requestedClassId=id;break;}
+    }
+    if(!requestedClassId)requestedClassId=String(result.classId||'');
+   }
    if(!/^[A-Za-z0-9_-]{1,100}$/.test(studentId)||!/^[A-Za-z0-9_-]{1,100}$/.test(requestedClassId))
     return res.status(403).json({error:'Choose an active class and sign in again.'});
    const [memberships,profile,cls]=await Promise.all([
