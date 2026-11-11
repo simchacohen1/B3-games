@@ -66,9 +66,12 @@ jobs:
               if (!previous || time > previousTime) latestByName.set(check.name, check);
             }
             const checks = [...latestByName.values()];
+            // navigation-policy (follow-teacher-tests.yml) is path-filtered and
+            // never runs on PR #779, whose files it does not cover; the same
+            // tests/follow-teacher*.test.cjs files run inside access-tests.
             const expected = [
               "test", "access-tests", "teacher-access", "critical-security",
-              "principal-access", "navigation-policy", "coloring",
+              "principal-access", "coloring",
               "real-browser-follow", "Synthetic learning tools and access boundaries"
             ];
             const missing = expected.filter(name => !latestByName.has(name));
