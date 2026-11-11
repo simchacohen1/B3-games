@@ -75,5 +75,5 @@
     {id:"davening-et",tool:"davening",classId:"et",title:"Davening Player — ET",icon:"📖",requiredClass:"et"},
     {id:"davening-wt",tool:"davening",classId:"wt",title:"Davening Player — WT",icon:"📖",requiredClass:"wt"}
   ];
-    root.B3HomeToolRegistry=Object.freeze({tools:Object.freeze(tools),groups:Object.freeze(groups),ownerToolGroups:Object.freeze(ownerToolGroups),teacherActions:Object.freeze(teacherActions)});
+    root.B3HomeToolRegistry=Object.freeze({tools:Object.freeze(tools),groups:Object.freeze(groups),ownerToolGroups:Object.freeze(ownerToolGroups),teacherActions:Object.freeze(teacherActions),homepageTeacherTools:Object.freeze(homepageTeacherTools)});
 })(typeof window!=="undefined"?window:globalThis);
