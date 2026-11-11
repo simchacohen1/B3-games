@@ -17,6 +17,9 @@
       const mine=this.strokes.filter(s=>s.owner===owner),pen=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool);
       if(this.strokes.length>=400||(pen?mine.filter(s=>['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(s.tool)).length>=150:(mine.filter(s=>s.tool!=='pen').length>=40||this.strokes.filter(s=>s.tool!=='pen').length>=240)))return false;this.strokes.push({...stroke,owner,id:'h'+(++this.sequence)});return true}
     edit(owner,action,id){if(action==='erase'){const i=this.strokes.findIndex(s=>s.owner===owner&&s.id===id);if(i>=0)this.strokes.splice(i,1);return}if(action==='clear'){this.strokes=this.strokes.filter(s=>s.owner!==owner);return}if(action==='undo'){const i=this.strokes.findLastIndex(s=>s.owner===owner);if(i>=0)this.strokes.splice(i,1)}}
+    // Authorization belongs to the teacher-side store, not a student's submitted owner field.
+    erase(actor,id){if(typeof id!=='string'||!id||typeof actor!=='string')return false;const i=this.strokes.findIndex(s=>s.id===id&&(actor==='teacher'||s.owner===actor));if(i<0)return false;this.strokes.splice(i,1);return true}
+    clearOwner(actor,owner){if(typeof owner!=='string'||(actor!=='teacher'&&actor!==owner))return false;const before=this.strokes.length;this.strokes=this.strokes.filter(s=>s.owner!==owner);return this.strokes.length!==before}
     reset(){this.strokes=[]}
   }
   function pointStyle(point){return{tool:tools.includes(point?.tool)?point.tool:'target',color:[...colors,...inkColors,'#ffcc00'].includes(point?.color)?point.color:null}}
