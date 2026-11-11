@@ -48,13 +48,15 @@ test('long text is wrapped and split into board text boxes instead of being cut 
 });
 test('pasted teacher text becomes bounded, validated text strokes with visible hit boxes',()=>{
   const made=Clip.textStrokes('Read\nthis lesson',width100,{aspect:16/9,sizes:[.028,.016,.008],color:'#1d4ed8'});
-  assert.equal(made.cut,false);assert.equal(made.strokes.length,1);
-  const stroke=made.strokes[0],clean=Core.cleanStroke(stroke);
-  assert.equal(stroke.tool,'text');assert.equal(stroke.color,'#1d4ed8');assert.equal(stroke.text,'Read\nthis lesson');
-  assert.ok(clean);assert.equal(clean.size,.028);assert.ok(stroke.points[1].x>stroke.points[0].x);assert.ok(stroke.points[1].y>stroke.points[0].y);
-  assert.ok(stroke.points.every(point=>point.x>=0&&point.x<=1&&point.y>=0&&point.y<=1));
-  const hebrew=Clip.textStrokes('שלום עולם',width100,{aspect:16/9,sizes:[.028,.016,.008]}).strokes[0];
-  assert.ok(Core.cleanStroke(hebrew));assert.ok(hebrew.points[1].x<hebrew.points[0].x,'RTL hit box extends left from the right-edge text anchor');
+  assert.equal(made.cut,false);assert.equal(made.strokes.length,2);
+  const [first,second]=made.strokes,clean=Core.cleanStroke(first);
+  assert.equal(first.tool,'text');assert.equal(first.color,'#1d4ed8');assert.equal(first.text,'Read');
+  assert.ok(clean);assert.equal(clean.size,.028);assert.ok(first.points[1].x>first.points[0].x);assert.ok(first.points[1].y>first.points[0].y);
+  assert.equal(second.text,'this lesson');assert.ok(second.points[0].y>first.points[0].y);
+  assert.ok(made.strokes.every(stroke=>Core.cleanStroke(stroke)&&stroke.points.every(point=>point.x>=0&&point.x<=1&&point.y>=0&&point.y<=1)));
+  const hebrew=Clip.textStrokes('שלום עולם\nשורה שניה',width100,{aspect:16/9,sizes:[.028,.016,.008]}).strokes;
+  assert.deepEqual(hebrew.map(item=>item.text),['שלום עולם','שורה שניה']);
+  assert.ok(hebrew.every(item=>Core.cleanStroke(item)&&item.points[1].x<item.points[0].x),'RTL hit boxes extend left from each line’s right-edge anchor');
   const tooTall=Clip.textStrokes(Array.from({length:250},()=> 'x').join('\n'),width100,{aspect:16/9,sizes:[.008]});
   assert.equal(tooTall.cut,true);assert.ok(tooTall.strokes.length>0);assert.ok(tooTall.strokes.every(item=>Core.cleanStroke(item)));
 });
@@ -255,7 +257,7 @@ test('the teacher whiteboard exposes paste, copy and the save / restore API',()=
   assert.match(pdfSource,/data-text-mark/);
   assert.match(pdfSource,/Edit whiteboard text/);
   assert.match(pdfSource,/replaceTextStroke\(stroke,text\)/);
-  assert.match(pdfSource,/marks\.splice\(index,1\);B\.submitStroke\(next\)/);
+  assert.match(pdfSource,/marks\.splice\(index,1\);next\.forEach\(item=>B\.submitStroke\(item\)\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
   assert.match(boardsSource,/window\.ClassPointerBoards=\{fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,/);
 });

@@ -103,12 +103,16 @@
   // include any scale used by the renderer, so the stored hit box follows the visible text.
   function textStrokes(text,width100,opts={}){
     const aspect=opts.aspect||16/9,layout=layoutText(text,width100,opts);
-    const strokes=layout.items.map(item=>{
-      const lines=item.text.split('\n'),width=width100(lines[0]||'')/100*item.size,height=lines.length*item.size*1.25*aspect;
-      const rtl=isRtl(item.text),edge=Math.max(.02,width);
-      return{tool:'text',color:opts.color||'#ffcc00',size:item.size,
-        points:[{x:item.x,y:item.y},{x:clamp(item.x+(rtl?-edge:edge),0,1),y:clamp(item.y+Math.max(.02,height),0,1)}],text:item.text};
-    });
+    const strokes=[];
+    for(const item of layout.items){
+      const lines=item.text.split('\n'),widths=lines.map(line=>Math.min(1,width100(line)/100*item.size)),wide=Math.max(0,...widths),rtl=isRtl(item.text);
+      lines.forEach((line,index)=>{
+        if(!line.trim())return;
+        const width=widths[index],x=rtl?item.x+wide-width:item.x,y=item.y+index*item.size*1.25*aspect,edge=Math.max(.02,width);
+        strokes.push({tool:'text',color:opts.color||'#ffcc00',size:item.size,
+          points:[{x:clamp(rtl?x+width:x,0,1),y:clamp(y,0,1)},{x:clamp(rtl?x:x+width,0,1),y:clamp(y+Math.max(.02,item.size*1.25*aspect),0,1)}],text:line});
+      });
+    }
     return{strokes,cut:layout.cut,size:layout.size};
   }
   function fitSize(width,height,maxSide){

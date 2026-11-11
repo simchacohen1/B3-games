@@ -217,6 +217,49 @@ test('teacher pastes editable text onto the shared whiteboard and can edit it', 
   await context.close();
 });
 
+test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline toolbar text', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  const content = (await page.locator('#pdfContent').boundingBox())!;
+  const shapes: Array<[string, string, string]> = [
+    ['line', 'line', 'line'], ['pen-arrow', 'g', 'arrow'], ['rectangle', 'rect', 'rect'], ['ellipse', 'ellipse', 'ellipse'], ['triangle', 'polygon', 'triangle'],
+  ];
+  for (let i = 0; i < shapes.length; i++) {
+    const [name, tag, variant] = shapes[i];
+    await page.locator('#fttAnnotate button[data-tool="shape"]').click();
+    await page.locator(`#fttAnnotate .fa-fly button[title="${variant === 'arrow' ? 'Arrow' : variant === 'rect' ? 'Rectangle' : variant === 'ellipse' ? 'Circle' : variant === 'triangle' ? 'Triangle' : 'Line'}"]`).click();
+    const x = content.x + 80 + i * 110, y = content.y + 100;
+    await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 65, y + 45, { steps: 4 }); await page.mouse.up();
+    const mark = page.locator(`#pdfInk [data-stroke-tool="${name}"]`);
+    await expect(mark).toHaveCount(1);
+    expect(await mark.evaluate((el: SVGElement) => el.tagName.toLowerCase())).toBe(tag);
+    if (name === 'pen-arrow') await expect(mark.locator(':scope > line, :scope > path')).toHaveCount(2);
+    expect(await page.evaluate((expected) => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === expected), name)).toBe(true);
+  }
+
+  await page.locator('#fttAnnotate button[data-tool="text"]').click();
+  await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
+  await expect(page.locator('#pdfTextEditDialog')).toBeVisible();
+  await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  const textMarks = page.locator('#pdfInk text[data-text-mark]');
+  await expect(textMarks).toHaveCount(2);
+  await expect(textMarks.nth(0)).toHaveText('שלום עולם');
+  await expect(textMarks.nth(0)).toHaveAttribute('direction', 'rtl');
+  await expect(textMarks.nth(1)).toHaveText('שורה שניה');
+
+  await page.getByRole('button', { name: '✏ Edit latest text' }).click();
+  await page.locator('#pdfTextEditInput').fill('תיקון ראשון\nתיקון שני');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(3);
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון ראשון');
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(2)).toHaveText('תיקון שני');
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
 test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and annotates it', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);

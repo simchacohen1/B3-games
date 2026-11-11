@@ -38,16 +38,30 @@
   textEditForm.append(textEditLabel,textEditInput,textEditSave,textEditCancel);textEditDialog.appendChild(textEditForm);stage.appendChild(textEditDialog);
   textEditForm.addEventListener('submit',event=>{
     event.preventDefault();textEditDialog.close();const stroke=textEditStroke;textEditStroke=null;if(!stroke)return;
-    replaceTextStroke(stroke,textEditInput.value);
+    if(stroke.id)replaceTextStroke(stroke,textEditInput.value);
+    else addTextStroke(stroke.points[0],textEditInput.value,stroke.size,stroke.color);
   });
   function openTextEditor(stroke){textEditStroke=stroke;textEditInput.value=stroke.text;textEditDialog.showModal();textEditInput.focus();textEditInput.select()}
+  function layoutTextStrokes(text,center,size,color){
+    const clip=window.ClassPointerClipboard;if(!clip)return{strokes:[],cut:false};
+    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
+    return clip.textStrokes(text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),center,sizes:[size],color});
+  }
+  function addTextStroke(point,text,size,color){
+    const made=layoutTextStrokes(text,point,size,color),valid=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean);
+    if(!valid.length){B.status('Enter some text to add it to the whiteboard.');return false}
+    valid.forEach(stroke=>B.submitStroke(stroke));
+    B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
+  }
   function replaceTextStroke(stroke,text){
-    const next=C.cleanStroke({...stroke,text}),marks=B.highlights?.();
-    if(!next){B.status('Enter some text to keep this text box.');return false}
+    const center={x:(stroke.points[0].x+stroke.points[1].x)/2,y:(stroke.points[0].y+stroke.points[1].y)/2};
+    const made=layoutTextStrokes(text,center,stroke.size,stroke.color),next=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean),marks=B.highlights?.();
+    if(!next.length){B.status('Enter some text to keep this text box.');return false}
     const index=Array.isArray(marks)?marks.findIndex(item=>item.id===stroke.id&&item.owner==='teacher'):-1;
     if(index<0){B.status('That whiteboard text is no longer available to edit.');return false}
     // Remove only this teacher mark, then submit the replacement to publish the complete mark list.
-    marks.splice(index,1);B.submitStroke(next);B.status('Whiteboard text updated.');return true;
+    marks.splice(index,1);next.forEach(item=>B.submitStroke(item));
+    B.status(made.cut?'The words were too long. Only the first part was kept.':'Whiteboard text updated.');return true;
   }
 
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
@@ -96,11 +110,20 @@
       lc.setTransform(1,0,0,1,0,0);lc.clearRect(0,0,layer.width,layer.height);lc.setTransform(ctx.getTransform());
       for(const stroke of list){
         const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
-        lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);lc.lineCap=lc.lineJoin='round';
+        const shapePen=['pen','line','pen-arrow','rectangle','ellipse','triangle'].includes(stroke.tool);
+        lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(shapePen?0.45:1);lc.lineCap=lc.lineJoin='round';
         if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
         if(stroke.tool==='text'){
           lc.font=`${Math.max(16,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
           (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(16,stroke.size*W*2.4)*1.25));continue;
+        }
+        const x1=first.x*W,y1=first.y*H,x2=last.x*W,y2=last.y*H,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1);
+        if(stroke.tool==='rectangle'){lc.strokeRect(x,y,sw,sh);continue}
+        if(stroke.tool==='ellipse'){lc.beginPath();lc.ellipse(x+sw/2,y+sh/2,sw/2,sh/2,0,0,Math.PI*2);lc.stroke();continue}
+        if(stroke.tool==='triangle'){lc.beginPath();lc.moveTo(x+sw/2,y);lc.lineTo(x+sw,y+sh);lc.lineTo(x,y+sh);lc.closePath();lc.stroke();continue}
+        if(stroke.tool==='pen-arrow'){
+          lc.beginPath();lc.moveTo(x1,y1);lc.lineTo(x2,y2);lc.stroke();const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(lc.lineWidth*4,10);
+          lc.beginPath();lc.moveTo(x2-radius*Math.cos(angle-.5),y2-radius*Math.sin(angle-.5));lc.lineTo(x2,y2);lc.lineTo(x2-radius*Math.cos(angle+.5),y2-radius*Math.sin(angle+.5));lc.stroke();continue;
         }
         const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
         lc.beginPath();pts.forEach((point,index)=>{lc[index?'lineTo':'moveTo'](point.x*W,point.y*H)});lc.stroke();
@@ -308,8 +331,21 @@
       (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
       return text;
     }
+    const x1=first.x*W,y1=first.y*H,x2=last.x*W,y2=last.y*H,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1);
+    const lineWidth=stroke.size*W*(['pen','line','pen-arrow','rectangle','ellipse','triangle'].includes(stroke.tool)?0.45:1);
+    const lineAttrs={fill:'none',stroke:color,'stroke-width':lineWidth,'stroke-linecap':'round','stroke-linejoin':'round'};
+    if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...lineAttrs});
+    if(stroke.tool==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...lineAttrs});
+    if(stroke.tool==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...lineAttrs});
+    if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...lineAttrs});
+    if(stroke.tool==='pen-arrow'){
+      const group=svg('g'),angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(lineWidth*4,10);
+      group.appendChild(svg('line',{x1,y1,x2,y2,...lineAttrs}));
+      group.appendChild(svg('path',{d:`M${x2-radius*Math.cos(angle-.5)} ${y2-radius*Math.sin(angle-.5)} L${x2} ${y2} L${x2-radius*Math.cos(angle+.5)} ${y2-radius*Math.sin(angle+.5)}`,...lineAttrs}));
+      return group;
+    }
     const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
-    return svg('path',{d:pts.map((p,i)=>(i?'L':'M')+(p.x*W).toFixed(1)+' '+(p.y*H).toFixed(1)).join(' '),fill:'none',stroke:color,'stroke-width':stroke.size*W*(stroke.tool==='pen'?0.45:1),'stroke-linecap':'round','stroke-linejoin':'round'});
+    return svg('path',{d:pts.map((p,i)=>(i?'L':'M')+(p.x*W).toFixed(1)+' '+(p.y*H).toFixed(1)).join(' '),...lineAttrs});
   }
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
@@ -318,7 +354,7 @@
       const kind=['pen','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=groups.get(key);
       if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
-      const mark=inkPath(stroke,stroke.color);if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
+      const mark=inkPath(stroke,stroke.color);mark.dataset.strokeTool=stroke.tool;if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
     }
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
@@ -385,6 +421,11 @@
       const textNode=[...ink.querySelectorAll('[data-text-mark]')].reverse().find(node=>{const rect=node.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom});
       const p=normalized(event),stroke=(textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId))||(p&&[...strokes].reverse().find(item=>item.tool==='text'&&item.owner==='teacher'&&inkHits(item,p)));
       if(stroke){event.preventDefault();event.stopPropagation();openTextEditor(stroke);return}
+      const tool=$(toolId).value;
+      if(tool==='text'&&!B.navigating()&&!notReady()&&B.live()&&B.writingAllowed()){
+        if(!p)return;event.preventDefault();event.stopPropagation();
+        openTextEditor({tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
+      }
     }
     const tool=$(toolId).value;
     if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed())return;
