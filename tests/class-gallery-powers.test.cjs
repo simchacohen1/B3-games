@@ -7,7 +7,8 @@ function server(mode='regular',classId='et'){
   data[classId==='et'?'b3Games/classGalleryPresenceSettings/tagEnabled':resource+'/settings/tagEnabled']=true;
   data[classId==='et'?'b3Games/classGalleryPresence':resource+'/presence']={[classId]:{student:{session:{playingTag:true,tagMode:mode,space:'hallway',updatedAt:Date.now()}}}};
   data['b3Games/workspaces/b3-2026/classes/'+classId]={active:true,members:{student:{active:true}}};
-  const read=p=>data[p],snap=v=>({val:()=>v,exists:()=>v!=null,child:p=>snap(p.split('/').reduce((a,k)=>a?.[k],v))});
+  // A child path resolves inside its nearest stored parent, as in the real database.
+  const read=p=>{if(p in data)return data[p];const parent=Object.keys(data).filter(k=>p.startsWith(k+'/')).sort((a,b)=>b.length-a.length)[0];return parent?p.slice(parent.length+1).split('/').reduce((a,k)=>a?.[k],data[parent]):undefined},snap=v=>({val:()=>v,exists:()=>v!=null,child:p=>snap(p.split('/').reduce((a,k)=>a?.[k],v))});
   const ref=p=>({get:async()=>snap(read(p)),child:k=>ref(p+'/'+k),set:async v=>{data[p]=v},update:async v=>{data[p]={...data[p],...v}},transaction:async fn=>{const v=fn(read(p));if(v===undefined)return {committed:false,snapshot:snap(read(p))};data[p]=v;return {committed:true,snapshot:snap(v)}}});
   const admin={apps:[{}],database:()=>({ref}),auth:()=>({verifyIdToken:async()=>({studentRewardsStudentId:'reward',studentRewardsRole:'student',b3StudentId:'student',b3ClassId:classId})})},exports={};
   vm.runInNewContext(fs.readFileSync('backend/functions/class-gallery-powers.js','utf8'),{exports,require:n=>n==='firebase-admin'?admin:{onRequest:(o,fn)=>fn},console,Date,Math});

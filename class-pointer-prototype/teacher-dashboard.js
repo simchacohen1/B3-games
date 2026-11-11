@@ -63,7 +63,8 @@ function init(){
   shareState.disabled=real.disabled;
   shareState.classList.toggle("cp-share-on",on&&!real.disabled);
   shareState.classList.toggle("cp-share-off",!on&&!real.disabled);
-  shareState.textContent=real.disabled?"Student sharing: waiting for class":on?"Student sharing: ON · click to turn off":"Student sharing: OFF · click to turn on";
+  shareState.textContent=real.disabled?"Student screen sharing: waiting for class":on?"Student screen sharing: ON · turn off":"Student screen sharing: off · turn on";
+  shareState.title=on?"Students can share their screens with you. Click to stop all student screen sharing.":"Students cannot share their screens right now. Click to let them (or open the Student screens tab).";
   shareState.setAttribute("aria-pressed",String(on));
  }
  shareState.addEventListener("click",()=>{const real=$("cpShareEnabled");if(real&&!real.disabled)real.click();setTimeout(syncShareState,0)});
@@ -78,6 +79,38 @@ function init(){
  const studentsBtn=iconButton('cp-topbar-btn cp-students-toggle','users','Students');studentsBtn.id='cpStudentsToggle';
  studentsBtn.setAttribute('aria-controls','cpStudentsDrawer');
  topbar.append(studentsBtn);
+ /* First-time guide: five short steps. Opens by itself the first time a teacher uses Class Pointer. */
+ const guideBtn=el('button','cp-topbar-btn cp-guide-btn','❓ Help');guideBtn.type='button';guideBtn.id='cpGuideBtn';
+ guideBtn.title='How Class Pointer works: a short guide';
+ topbar.append(guideBtn);
+ const guide=el('dialog','cp-guide');guide.id='cpGuide';guide.setAttribute('aria-labelledby','cpGuideTitle');
+ const guideHead=el('div','cp-guide-head');
+ const guideTitle=el('h2',null,'How Class Pointer works');guideTitle.id='cpGuideTitle';
+ const guideClose=el('button','cp-guide-x');guideClose.type='button';guideClose.setAttribute('aria-label','Close the guide');guideClose.append(icon('close'));
+ guideHead.append(guideTitle,guideClose);
+ const intro=el('p','cp-guide-intro','Students who are signed in to Fun Torah Tools connect by themselves. They do not need a link and do not need to leave the activity they are on.');
+ const steps=el('ol','cp-guide-steps');
+ for(const [head,text] of [
+  ['Show your lesson','In My screen, pick what to teach from: Share my screen, a PDF, a webpage or a whiteboard. Every student in this class sees it right away.'],
+  ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows their name.'],
+  ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. They click it and choose Entire Screen. Their screen appears here as a tile, and the list on top shows who has not shared yet.'],
+  ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. They see your marks on their own screen. 🧽 Clear takes them off.'],
+  ['When you are done','Click the red Stop sharing button to stop what students are watching. Student screen sharing: ON · turn off (top bar) stops all student screens. To end the class, close this page; students go back to what they were doing.']
+ ]){const li=el('li');li.append(el('strong',null,head),el('span',null,text));steps.append(li)}
+ const note=el('p','cp-guide-note','The browser always asks a student before their screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
+ const guideOk=el('button','cp-guide-ok','Got it');guideOk.type='button';
+ guide.append(guideHead,intro,steps,note,guideOk);
+ document.body.append(guide);
+ const GUIDE_KEY='classPointerGuideSeen';
+ function closeGuide(){try{guide.close()}catch{guide.removeAttribute('open')}try{localStorage.setItem(GUIDE_KEY,'1')}catch{}guideBtn.focus?.()}
+ function openGuide(){if(guide.open)return;try{guide.showModal()}catch{guide.setAttribute('open','')}guideOk.focus?.()}
+ guideBtn.addEventListener('click',openGuide);guideClose.addEventListener('click',closeGuide);guideOk.addEventListener('click',closeGuide);
+ guide.addEventListener('cancel',event=>{event.preventDefault();closeGuide()});
+ guide.addEventListener('click',event=>{if(event.target===guide)closeGuide()});
+ window.ClassPointerGuide={open:openGuide,close:closeGuide};
+ let seenGuide=true;try{seenGuide=localStorage.getItem(GUIDE_KEY)==='1'}catch{}
+ // Automated browser tests (navigator.webdriver) open it themselves, so it does not cover the page they test.
+ if(!seenGuide&&!navigator.webdriver)setTimeout(openGuide,400);
  const back=header?.querySelector('a[href]');
  if(back){back.classList.add('cp-topbar-back');topbar.append(back)}
  if(header){header.replaceChildren(topbar);header.classList.add('cp-header')}
@@ -105,14 +138,14 @@ function init(){
  const everyoneSelect=el('select');everyoneSelect.id='cpEveryoneLevel';
  for(const [v,t] of LEVEL_LONG){const o=el('option',null,t);o.value=v;everyoneSelect.append(o)}
  everyoneLabel.append(everyoneSelect);
- everyone.append(everyoneLabel,el('span','cp-everyone-help','Change one student below if needed.'));
+ everyone.append(everyoneLabel,el('span','cp-everyone-help','Nothing = watch only. Pointer, + Highlight and + Pen let students mark your lesson. Change one student below if needed.'));
  everyoneSelect.addEventListener('change',()=>{everyoneSelect.dataset.level=everyoneSelect.value;window.ClassPointerRoster?.setAll(everyoneSelect.value)});
  sidebar.append(everyone);
 
  /* One table: name, level on my screen, screen sharing, whiteboard. */
  const table=el('div','cp-student-table');table.setAttribute('role','group');table.setAttribute('aria-label','Student permissions');
  const tableHead=el('div','cp-student-head');
- tableHead.append(el('span',null,'Name'),el('span',null,'On my screen'));
+ tableHead.append(el('span',null,'Name'),el('span',null,'Can use on my lesson'));
  const tableBody=el('div','cp-student-body');
  table.append(tableHead,tableBody);
  sidebar.append(table);
@@ -133,7 +166,7 @@ function init(){
   b.addEventListener('click',()=>{Array.from(menu?.querySelectorAll('button')||[]).find(x=>x.textContent.includes(match))?.click()});
   send.append(b);
  }
- more.append(el('p','cp-more-help','Bring every signed-in student to screen sharing or to his own whiteboard.'),send);
+ more.append(el('p','cp-more-help','Bring every signed-in student to screen sharing or to their own whiteboard.'),send);
  const join=$('joinInstructions');if(join)more.append(join);
  const sharing=el('div','cp-student-sharing');
  sharing.append(el('strong',null,'Student sharing'));
@@ -213,7 +246,7 @@ function init(){
    const wasRemoved=!m&&!!row.id&&(R()?.removedIds?.()||[]).includes(row.id);
    if(wasRemoved){
     const back=el('button','cp-mini-btn','Allow back');back.type='button';back.setAttribute('aria-label','Allow '+row.name+' back into the class');
-    back.title='You removed '+row.name+'. Allow him to connect again.';
+    back.title='You removed '+row.name+'. Allow them to connect again.';
     back.addEventListener('click',()=>R()?.allowBack(row.id));const gone=el('span','cp-where','Removed');gone.style.cssText=WHERE;nameCell.append(gone,back);
    }
    if(m&&!m.admitted){
@@ -262,7 +295,7 @@ function init(){
  const live=el('span','cp-live-chip','Live');
  const tabControls=$('tabControls');
  const switchWrap=el('div','cp-switch-wrap');
- const switchBtn=el('button','cp-switch-btn','Switch');switchBtn.type='button';
+ const switchBtn=el('button','cp-switch-btn','Switch lesson');switchBtn.type='button';
  switchBtn.setAttribute('aria-haspopup','true');switchBtn.setAttribute('aria-expanded','false');switchBtn.setAttribute('aria-controls','cpSwitchMenu');
  const switchMenu=el('div','cp-switch-menu');switchMenu.id='cpSwitchMenu';switchMenu.hidden=true;
  switchMenu.append(el('small',null,'Switch to'));
@@ -346,7 +379,7 @@ function init(){
   link.addEventListener('click',()=>{if(!capture.disabled)capture.click()});
   foot.append(el('span','cp-source-sep','·'),link);tileButtons.push([link,capture]);
  }
- pickerCard.append(foot,el('p','cp-source-note','Students join with the invite link. You can switch anytime.'));
+ pickerCard.append(foot,el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
  stage?.append(pickerCard);
  for(const [b,original] of tileButtons){
   const sync=()=>{b.disabled=original.disabled};
@@ -354,6 +387,31 @@ function init(){
  }
  function syncLibrary(){library.hidden=!$('pointerPdfLibrary')}
  syncLibrary();setTimeout(syncLibrary,1500);
+
+ /* ---------- Reminder: whiteboard still on while nobody is using it ---------- */
+ const IDLE_MS=5*60*1000,AWAY_MS=30*1000;
+ const reminder=el('div','cp-board-reminder');reminder.hidden=true;reminder.setAttribute('role','alert');
+ const reminderStop=el('button','cp-reminder-stop','Stop whiteboard'),reminderKeep=el('button','cp-reminder-keep','Keep it on');
+ reminderStop.type='button';reminderKeep.type='button';
+ reminder.append(el('span',null,'The whiteboard is still on for your students. Close it when you are done.'),reminderStop,reminderKeep);
+ document.body.append(reminder);
+ const baseTitle=document.title;
+ let boardLive=false,idleTimer=null,hiddenAt=0;
+ function showReminder(){if(boardLive)reminder.hidden=false}
+ function resetIdle(){clearTimeout(idleTimer);idleTimer=boardLive?setTimeout(showReminder,IDLE_MS):null}
+ function syncReminder(live){
+  boardLive=live;
+  if(!live){reminder.hidden=true;clearTimeout(idleTimer);idleTimer=null;document.title=baseTitle;return}
+  if(!idleTimer)resetIdle();
+ }
+ reminderStop.addEventListener('click',()=>{reminder.hidden=true;stopBtn.click()});
+ reminderKeep.addEventListener('click',()=>{reminder.hidden=true;resetIdle()});
+ for(const type of ['pointerdown','pointermove','keydown','wheel'])stage?.addEventListener(type,()=>{if(boardLive&&reminder.hidden)resetIdle()},{passive:true});
+ document.addEventListener('visibilitychange',()=>{
+  if(!boardLive)return;
+  if(document.hidden){hiddenAt=Date.now();document.title='⚠ Whiteboard still on – '+baseTitle}
+  else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
+ });
 
  function syncLive(){
   const isLive=docOpen()||sharingScreen();
@@ -365,6 +423,8 @@ function init(){
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
   dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
+  dockStop.dataset.short='Stop\n'+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc==='Whiteboard'?'board':'page'):'screen');
+  syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
   syncLibrary();
  }

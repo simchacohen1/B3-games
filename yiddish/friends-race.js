@@ -72,6 +72,8 @@
     var box = $("yiFriendsBox"), d = getDb(), id = "", name = "";
     try { id = String(sessionStorage.getItem("b3Games_studentId") || "").trim(); name = sessionStorage.getItem("b3Games_studentName") || ""; } catch (e) {}
     if (student && student.name) name = student.name;
+    // Launching from the Multiplayer Center can run before the saved student sign-in has finished; wait for it.
+    for (var waited = 0; waited < 15000 && !(firebase.auth && firebase.auth().currentUser); waited += 100) await new Promise(function (resolve) { setTimeout(resolve, 100); });
     var actor;
     try { actor = await window.B3MultiplayerIdentity.resolve(d, firebase.auth().currentUser, new URLSearchParams(location.search).get("class") || "", id); }
     catch (e) { box.textContent = e.message || 'Sign in with an assigned class account to play.'; return; }

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<!-- Mishnayos Practice v1 — 2026-11-08 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="mishnayos-practice"></script>
+<title>Mishnayos Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --parchment:#F1E7CE;
+  --parchment-dark:#E4D4AC;
+  --ink:#3B2A1E;
+  --ink-soft:#6B5842;
+  --teal:#1A6E6E;
+  --teal-dark:#135555;
+  --gold:#C9A227;
+  --gold-light:#E4C662;
+  --tent-navy:#24344A;
+  --shadow:rgba(59,42,30,0.25);
+}
+*{box-sizing:border-box;}
+html,body{
+  margin:0;padding:0;
+  background:radial-gradient(circle at 20% 10%,#F6EEDA 0%,#E9DBB8 55%,#DCC998 100%);
+  font-family:'Quicksand',sans-serif;
+  color:var(--ink);
+  min-height:100vh;
+}
+.wrap{max-width:780px;margin:0 auto;padding:28px 18px 60px;}
+header.top{text-align:center;margin-bottom:22px;}
+header.top h1{
+  font-family:'Frank Ruhl Libre',serif;
+  font-weight:700;font-size:2rem;
+  color:var(--teal-dark);
+  margin:0 0 4px;letter-spacing:.5px;
+}
+header.top p{margin:0;color:var(--ink-soft);font-size:.95rem;}
+.picker-shell{
+  background:rgba(255,255,255,.85);
+  border:2px solid var(--gold);
+  border-radius:16px;
+  padding:20px 18px;
+  box-shadow:0 6px 18px var(--shadow);
+  margin-bottom:18px;
+}
+.picker-title{font-size:.8rem;font-weight:800;color:var(--ink-soft);text-align:center;margin-bottom:12px;}
+.picker-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;}
+select{
+  flex:1 1 160px;max-width:230px;min-width:140px;
+  font-family:'Quicksand',sans-serif;font-size:1rem;
+  padding:10px 12px;border-radius:10px;
+  border:2px solid var(--ink-soft);background:#fff;
+  direction:rtl;text-align:center;text-align-last:center;
+}
+.btn{
+  font-family:'Quicksand',sans-serif;font-weight:700;font-size:1rem;
+  border:none;border-radius:999px;padding:12px 26px;cursor:pointer;
+  color:#fff;background:var(--teal);box-shadow:0 4px 0 var(--teal-dark);
+  transition:transform .08s ease;display:block;margin:10px auto 0;
+}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--teal-dark);}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+.btn.small{padding:8px 16px;font-size:.85rem;}
+.btn.gold{background:var(--gold);box-shadow:0 4px 0 #97781a;color:var(--ink);}
+.btn.gold:active{box-shadow:0 1px 0 #97781a;}
+.mishna-card{
+  background:var(--parchment);
+  border:2px solid var(--gold-light);
+  border-radius:18px;
+  padding:24px 22px;
+  box-shadow:0 8px 24px var(--shadow);
+  margin-bottom:18px;
+}
+.mishna-label{font-size:.78rem;font-weight:800;color:var(--ink-soft);text-align:center;margin-bottom:14px;letter-spacing:.5px;text-transform:uppercase;}
+.mishna-text{
+  font-family:'Noto Serif Hebrew',serif;
+  font-size:1.5rem;line-height:1.9;
+  direction:rtl;text-align:right;
+  color:var(--ink);
+  background:rgba(255,255,255,.55);
+  border-radius:10px;
+  padding:14px 16px;
+}
+.mishna-nav{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap;}
+.mishna-nav .nav-label{font-size:.88rem;font-weight:700;color:var(--ink-soft);}
+.mode-toggle{display:inline-flex;gap:5px;padding:4px;border-radius:999px;background:rgba(31,46,61,.08);margin:12px auto;}
+.mode-choice{appearance:none;border:0;border-radius:999px;padding:9px 16px;background:transparent;color:var(--ink-soft);font-family:'Quicksand',sans-serif;font-weight:800;cursor:pointer;white-space:nowrap;}
+.mode-choice.active{background:var(--tent-navy);color:#fff;box-shadow:0 2px 6px rgba(31,46,61,.2);}
+.mode-row{display:flex;justify-content:center;margin-bottom:12px;}
+.type-box{width:100%;font-family:'Noto Serif Hebrew',serif;font-size:1.2rem;direction:rtl;text-align:right;padding:12px 14px;border-radius:12px;border:2px solid var(--gold);background:#fffdf5;min-height:80px;resize:vertical;}
+.feedback{margin-top:12px;padding:12px 16px;border-radius:12px;font-weight:700;text-align:center;font-size:1rem;display:none;}
+.feedback.ok{background:#dcfce7;color:#166534;border:1.5px solid #bbf7d0;display:block;}
+.feedback.close{background:#fef9c3;color:#854d0e;border:1.5px solid #fde68a;display:block;}
+.feedback.miss{background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;display:block;}
+.streak-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:16px 0 10px;}
+.streak-dot{width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.12);transition:background .3s;}
+.streak-dot.done{background:var(--teal);}
+.streak-dot.today{background:var(--gold);}
+.stats-row{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:10px 0;}
+.stat-box{background:rgba(255,255,255,.75);border:1px solid rgba(59,42,30,.12);border-radius:12px;padding:10px 18px;text-align:center;box-shadow:0 2px 8px rgba(59,42,30,.07);}
+.stat-num{font-size:1.6rem;font-weight:800;color:var(--teal-dark);}
+.stat-label{font-size:.75rem;font-weight:700;color:var(--ink-soft);}
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;}
+.modal-backdrop.show{display:flex;}
+.modal{background:var(--parchment);border:3px solid var(--gold);border-radius:22px;padding:30px 28px;max-width:400px;width:90%;box-shadow:0 12px 40px var(--shadow);text-align:center;}
+.modal h2{font-family:'Frank Ruhl Libre',serif;font-size:1.8rem;color:var(--teal-dark);margin:0 0 10px;}
+.modal p{color:var(--ink-soft);font-size:.95rem;margin:0 0 20px;}
+.hidden{display:none!important;}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>📖 Mishnayos Practice</h1>
+    <p>Learn and master a mishna at a time</p>
+  </header>
+  <div class="picker-shell" id="pickerShell">
+    <div class="picker-title">Choose what to practice</div>
+    <div class="picker-row">
+      <select id="sederSel" onchange="onSederChange()"></select>
+      <select id="masechSel" onchange="onMasechChange()"></select>
+    </div>
+    <div class="picker-row">
+      <select id="perekSel" onchange="onPerekChange()"></select>
+      <select id="mishnaSel"></select>
+    </div>
+    <button class="btn" onclick="startPractice()">Start Practice →</button>
+  </div>
+  <div class="mode-row hidden" id="modeRow">
+    <div class="mode-toggle">
+      <button class="mode-choice active" id="modeRead" onclick="setMode('read')">📖 Read</button>
+      <button class="mode-choice" id="modeType" onclick="setMode('type')">✍️ Type It</button>
+      <button class="mode-choice" id="modeBlank" onclick="setMode('blank')">🧠 Recall</button>
+    </div>
+  </div>
+  <div class="mishna-card hidden" id="mishnaCard">
+    <div class="mishna-label" id="mishnaLabel"></div>
+    <div class="mishna-text" id="mishnaText"></div>
+    <div id="typeArea" class="hidden" style="margin-top:14px;">
+      <textarea class="type-box" id="typeInput" placeholder="...כתוב את המשנה כאן" rows="4"></textarea>
+      <div style="text-align:center;margin-top:8px;"><button class="btn small" onclick="checkTyped()">Check ✓</button></div>
+      <div class="feedback" id="typeFeedback"></div>
+    </div>
+    <div id="blankArea" class="hidden" style="margin-top:14px;">
+      <div style="text-align:center;"><button class="btn small gold" onclick="revealMishna()">Reveal Mishna 👁</button></div>
+      <div class="feedback ok" id="recallFeedback" style="display:none;">Well done! Read it over carefully.</div>
+    </div>
+    <div class="mishna-nav">
+      <button class="btn small" onclick="prevMishna()">← Prev</button>
+      <span class="nav-label" id="navLabel"></span>
+      <button class="btn small" onclick="nextMishna()">Next →</button>
+    </div>
+  </div>
+  <div class="stats-row hidden" id="statsRow">
+    <div class="stat-box"><div class="stat-num" id="statDone">0</div><div class="stat-label">Reviewed Today</div></div>
+    <div class="stat-box"><div class="stat-num" id="statStreak">0</div><div class="stat-label">Day Streak 🔥</div></div>
+    <div class="stat-box"><div class="stat-num" id="statMastered">0</div><div class="stat-label">Mastered ⭐</div></div>
+  </div>
+  <div class="streak-bar hidden" id="streakBar"></div>
+</div>
+<div class="modal-backdrop" id="completionModal">
+  <div class="modal">
+    <h2>🌟 Yeyasher Koach!</h2>
+    <p>You practiced all the mishnayos in this perek.</p>
+    <button class="btn" onclick="closeModal()">Keep Going</button>
+  </div>
+</div>
+<script src="../back-nav.js" data-mode="inline" data-href="../index.html" data-label="← Fun Torah Tools"></script>
+<script>
+const SEDER_DATA={"זרעים":{"ברכות":[5,8,6,7,5,8,5,8,5],"פאה":[6,8,7,11,8,11,8,9],"דמאי":[4,5,6,8,11,12,8],"כלאים":[9,11,7,10,8,9,8,6,10],"שביעית":[8,10,10,10,9,6,7,11,9,9],"תרומות":[10,6,9,13,9,6,7,12,7,8,10],"מעשרות":[5,8,10,6,8],"מעשר שני":[3,13,13,12,15],"חלה":[9,8,10,11],"ערלה":[9,17,9],"ביכורים":[3,11,12,5]},"מועד":{"שבת":[11,7,6,2,4,10,4,7,7,5,6,5,7,4,3,8,8,3,6,5,5,6],"עירובין":[10,6,9,11,10,10,11,11,4,15],"פסחים":[7,8,8,10,10,6,13,8,11],"שקלים":[7,5,4,9,6,7,7,8],"יומא":[8,7,11,6,7,8,5,9],"סוכה":[11,9,15,10,8],"ביצה":[10,10,8,9,7],"ראש השנה":[4,8,8,9],"תענית":[7,10,9,8],"מגילה":[11,6,6,10],"מועד קטן":[9,5,9],"חגיגה":[8,7,8]},"נשים":{"יבמות":[4,10,10,13,13,6,6,6,6,9,7,6,13,9,10,7],"כתובות":[10,10,9,12,9,7,10,8,9,6,6,4,11],"נדרים":[4,5,11,8,6,10,9,7,8,8],"נזיר":[7,10,7,7,7,11,4,2,5],"סוטה":[9,6,8,3,5,4,8,7,15],"גיטין":[6,7,8,9,9,7,9,10,10],"קידושין":[10,10,13,14]},"נזיקין":{"בבא קמא":[4,6,11,9,7,6,7,7,12,10],"בבא מציעא":[8,11,12,12,11,8,11,9,13,6],"בבא בתרא":[6,14,10,9,11,8,8,8,10],"סנהדרין":[6,5,8,5,5,6,11,7,6,6,6],"מכות":[10,8,16],"שבועות":[7,5,11,13,5,7,8,6],"עדיות":[14,10,12,12,7,3,9,7],"עבודה זרה":[9,7,10,12,12],"אבות":[18,16,18,22,23,11],"הוריות":[5,7,8]},"קדשים":{"זבחים":[4,5,10,6,8,7,6,12,7,8,8,6,8],"מנחות":[4,5,7,5,9,7,4,7,9,9,9,5,11],"חולין":[7,10,10,7,5,7,6,6,8,4,2,5],"בכורות":[7,9,4,10,6,12,7,10],"ערכין":[4,6,5,4,6,5,5,7,8],"תמורה":[6,3,5,4,6,5,6],"כריתות":[10,6,10,3,8,9],"מעילה":[4,9,8,6,5,6],"תמיד":[4,5,9,3,6,3,4],"מידות":[9,6,8,7,4],"קינים":[4,5,6]},"טהרות":{"כלים":[9,8,8,4,11,4,6,11,8,8,9,8,8,8,6,8,17,9,9,10,3,10,5,17,9,9,9,10,9,8],"אהלות":[8,7,7,3,7,7,6,6,16,7,9,8,9,7,10,5,5,10],"נגעים":[6,5,8,11,5,8,5,10,3,10,12,7,12,13],"פרה":[4,5,11,4,9,5,12,12,9,8,9],"טהרות":[9,8,8,13,9,10,9,9,9,8],"מקואות":[8,10,8,5,6,11,7,5,8,8],"נדה":[7,7,7,7,9,14,5,4,11,8],"מכשירין":[6,11,8,10,11,8],"זבים":[6,4,3,7,12],"טבול יום":[4,8,6,7],"ידים":[5,4,5,8],"עוקצין":[6,10,12]}};
+function getSederList(){return Object.keys(SEDER_DATA);}
+function getMasechList(seder){return Object.keys(SEDER_DATA[seder]||{});}
+function getPerekCount(seder,masech){const v=SEDER_DATA[seder]?.[masech];return v?v.length:0;}
+function getMishnaCount(seder,masech,perek){const v=SEDER_DATA[seder]?.[masech];return v?v[perek-1]||0:0;}
+async function fetchMishna(masech,perek,mishna){
+  const heNameMap={"ברכות":"Berakhot","פאה":"Peah","דמאי":"Demai","כלאים":"Kilayim","שביעית":"Sheviit","תרומות":"Terumot","מעשרות":"Maasrot","מעשר שני":"Maaser Sheni","חלה":"Challah","ערלה":"Orlah","ביכורים":"Bikkurim","שבת":"Shabbat","עירובין":"Eruvin","פסחים":"Pesachim","שקלים":"Shekalim","יומא":"Yoma","סוכה":"Sukkah","ביצה":"Beitzah","ראש השנה":"Rosh Hashanah","תענית":"Taanit","מגילה":"Megillah","מועד קטן":"Moed Katan","חגיגה":"Chagigah","יבמות":"Yevamot","כתובות":"Ketubot","נדרים":"Nedarim","נזיר":"Nazir","סוטה":"Sotah","גיטין":"Gittin","קידושין":"Kiddushin","בבא קמא":"Bava Kamma","בבא מציעא":"Bava Metzia","בבא בתרא":"Bava Batra","סנהדרין":"Sanhedrin","מכות":"Makkot","שבועות":"Shevuot","עדיות":"Eduyot","עבודה זרה":"Avodah Zarah","אבות":"Pirkei Avot","הוריות":"Horayot","זבחים":"Zevachim","מנחות":"Menachot","חולין":"Chullin","בכורות":"Bekhorot","ערכין":"Arakhin","תמורה":"Temurah","כריתות":"Keritot","מעילה":"Meilah","תמיד":"Tamid","מידות":"Middot","קינים":"Kinnim","כלים":"Kelim","אהלות":"Oholot","נגעים":"Negaim","פרה":"Parah","טהרות":"Tohorot","מקואות":"Mikvaot","נדה":"Niddah","מכשירין":"Makhshirin","זבים":"Zavim","טבול יום":"Tevul Yom","ידים":"Yadayim","עוקצין":"Oktzin"};
+  const eng=heNameMap[masech]||masech;
+  const ref=`Mishnah_${eng}.${perek}.${mishna}`;
+  const url=`https://www.sefaria.org/api/texts/${ref}?lang=he&commentary=0`;
+  try{const r=await fetch(url);const d=await r.json();let txt=d.he;if(Array.isArray(txt))txt=txt[0]||'';return txt||null;}catch(e){return null;}
+}
+let currentSeder='',currentMasech='',currentPerek=1,currentMishna=1,totalMishnayos=1;
+let mode='read',sessionDone=0,dayStreak=0,totalMastered=0;
+(function(){
+  if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  loadSederOptions();
+})();
+function loadSederOptions(){const sel=document.getElementById('sederSel');getSederList().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});onSederChange();}
+function onSederChange(){currentSeder=document.getElementById('sederSel').value;const sel=document.getElementById('masechSel');sel.innerHTML='';getMasechList(currentSeder).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});onMasechChange();}
+function onMasechChange(){currentMasech=document.getElementById('masechSel').value;const count=getPerekCount(currentSeder,currentMasech);const sel=document.getElementById('perekSel');sel.innerHTML='';for(let i=1;i<=count;i++){const o=document.createElement('option');o.value=i;o.textContent='פרק '+toHebNum(i);sel.appendChild(o);}onPerekChange();}
+function onPerekChange(){currentPerek=parseInt(document.getElementById('perekSel').value)||1;totalMishnayos=getMishnaCount(currentSeder,currentMasech,currentPerek);const sel=document.getElementById('mishnaSel');sel.innerHTML='';for(let i=1;i<=totalMishnayos;i++){const o=document.createElement('option');o.value=i;o.textContent='משנה '+toHebNum(i);sel.appendChild(o);}}
+async function startPractice(){currentMishna=parseInt(document.getElementById('mishnaSel').value)||1;currentPerek=parseInt(document.getElementById('perekSel').value)||1;currentMasech=document.getElementById('masechSel').value;currentSeder=document.getElementById('sederSel').value;totalMishnayos=getMishnaCount(currentSeder,currentMasech,currentPerek);document.getElementById('pickerShell').classList.add('hidden');document.getElementById('modeRow').classList.remove('hidden');document.getElementById('mishnaCard').classList.remove('hidden');document.getElementById('statsRow').classList.remove('hidden');document.getElementById('streakBar').classList.remove('hidden');await loadCurrentMishna();updateStreakBar();}
+async function loadCurrentMishna(){const textEl=document.getElementById('mishnaText');document.getElementById('mishnaLabel').textContent=`${currentMasech} · פרק ${toHebNum(currentPerek)} · משנה ${toHebNum(currentMishna)}`;document.getElementById('navLabel').textContent=`${currentMishna} / ${totalMishnayos}`;textEl.textContent='...טוען';clearFeedback();if(mode==='blank'){textEl.style.filter='blur(6px)';textEl.style.userSelect='none';document.getElementById('recallFeedback').style.display='none';}else{textEl.style.filter='';textEl.style.userSelect='';}if(mode==='type')document.getElementById('typeInput').value='';const txt=await fetchMishna(currentMasech,currentPerek,currentMishna);textEl.textContent=txt||'(Text not available — please open your Mishna)';if(mode==='blank'){textEl.style.filter='blur(6px)';textEl.style.userSelect='none';}}
+function prevMishna(){if(currentMishna>1){currentMishna--;loadCurrentMishna();}}
+async function nextMishna(){if(currentMishna<totalMishnayos){currentMishna++;sessionDone++;document.getElementById('statDone').textContent=sessionDone;await loadCurrentMishna();}else{document.getElementById('completionModal').classList.add('show');}}
+function closeModal(){document.getElementById('completionModal').classList.remove('show');currentMishna=1;loadCurrentMishna();updateStreakBar();}
+function setMode(m){mode=m;['read','type','blank'].forEach(x=>{document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===m);});document.getElementById('typeArea').classList.toggle('hidden',m!=='type');document.getElementById('blankArea').classList.toggle('hidden',m!=='blank');const textEl=document.getElementById('mishnaText');if(m==='blank'){textEl.style.filter='blur(6px)';textEl.style.userSelect='none';document.getElementById('recallFeedback').style.display='none';}else{textEl.style.filter='';textEl.style.userSelect='';}if(m==='type')document.getElementById('typeInput').value='';clearFeedback();}
+function revealMishna(){const textEl=document.getElementById('mishnaText');textEl.style.filter='';textEl.style.userSelect='';document.getElementById('recallFeedback').style.display='block';}
+function clearFeedback(){const f=document.getElementById('typeFeedback');f.className='feedback';f.textContent='';document.getElementById('recallFeedback').style.display='none';}
+function normalize(s){return(s||'').replace(/[ְ-ׇ\s‌‍]/g,'').trim();}
+function checkTyped(){const typed=document.getElementById('typeInput').value;const actual=document.getElementById('mishnaText').textContent;const nt=normalize(typed),na=normalize(actual);const f=document.getElementById('typeFeedback');if(nt===na){f.className='feedback ok';f.textContent='✅ Perfect! Exactly right!';}else{const dist=levenshtein(nt,na);const ratio=1-dist/Math.max(nt.length,na.length,1);if(ratio>0.8){f.className='feedback close';f.textContent='👏 Very close! Check carefully.';}else{f.className='feedback miss';f.textContent='✏️ Keep practicing — look at the text again.';}}}
+function levenshtein(a,b){const m=a.length,n=b.length;const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);return dp[m][n];}
+function updateStreakBar(){const bar=document.getElementById('streakBar');bar.innerHTML='';for(let i=0;i<totalMishnayos;i++){const d=document.createElement('div');d.className='streak-dot'+(i<currentMishna-1?' done':i===currentMishna-1?' today':'');bar.appendChild(d);}}
+function toHebNum(n){const h=['','א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','יג','יד','טו','טז','יז','יח','יט','כ','כא','כב','כג','כד','כה','כו','כז','כח','כט','ל','לא','לב','לג','לד','לה','לו','לז','לח','לט','מ'];return h[n]||String(n);}
+</script>
+</body>
+</html>

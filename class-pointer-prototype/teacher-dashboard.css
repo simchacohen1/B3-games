@@ -1,7 +1,7 @@
 /* Simplified teacher workspace: top bar, picker in the empty stage, students drawer on the right.
    Presentation only; original controls keep their handlers. */
 .teacher-dashboard-source,.teacher-dashboard-menu-trigger{display:none!important}
-body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:360px;background:#eef1f6}
+body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:440px;background:#eef1f6}
 
 /* ---------- Top bar ---------- */
 body.cp-simple .app-header.cp-header{display:block;padding:0;margin:0 0 12px;border:0}
@@ -251,7 +251,7 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 
 .cp-share-state{min-height:44px;padding:0 16px;border-radius:10px;border:2px solid #6b7894;background:#2a3a5c;color:#fff;font-weight:800;font-size:15px;margin:0;cursor:pointer}
 .cp-share-state.cp-share-on{background:#16a34a;border-color:#bbf7d0}
-.cp-share-state.cp-share-off{background:#dc2626;border-color:#fecaca}
+.cp-share-state.cp-share-off{background:#334155;border-color:#94a3b8}
 .cp-share-state:disabled{opacity:.6;cursor:not-allowed}
 .cp-share-state[hidden]{display:none}
 
@@ -260,3 +260,43 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 #teacherDock .cp-dock-stop:hover:enabled{background:#b91c1c}
 #teacherDock .cp-dock-stop svg{stroke:currentColor}
 #teacherDock .cp-dock-stop[hidden]{display:none}
+
+/* One Stop button: the red one in the toolbar (also in full screen). The top-right copy and the PDF bar's Close button are hidden duplicates. */
+body.cp-simple.teacher-view .cp-live-wrap>.cp-stop-btn{display:none}
+body.cp-simple.teacher-view #pdfNav .pdf-close{display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .cp-dock-stop:not([hidden]){display:inline-flex!important}
+#teacherDock .cp-dock-stop{min-height:44px;padding-left:16px;padding-right:16px;font-size:15px}
+
+/* Reminder that the whiteboard is still on. Sits above full screen; never closes anything by itself. */
+.cp-board-reminder{position:fixed;z-index:10002;top:14px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;max-width:calc(100vw - 24px);padding:12px 16px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 12px 36px #0006;color:#7c2d12;font:700 16px system-ui}
+.cp-board-reminder[hidden]{display:none}
+.cp-board-reminder button{min-height:44px;padding:0 16px;border-radius:10px;font:800 15px system-ui;cursor:pointer;border:2px solid #b91c1c}
+.cp-board-reminder .cp-reminder-stop{background:#dc2626;color:#fff}
+.cp-board-reminder .cp-reminder-keep{background:#fff;color:#7c2d12;border-color:#c2410c}
+
+/* Students panel: show every boy's full name and where he is. Names wrap instead of being cut off;
+   "in Home" sits on its own line under the name; a long list scrolls inside the panel. */
+.cp-student-body{grid-template-columns:minmax(0,1fr) 96px 42px 42px}
+.cp-student-name{flex-wrap:wrap;row-gap:2px;align-items:center}
+.cp-student-name .cp-name-text{flex:1 1 0;min-width:8ch;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere;font-weight:600}
+.cp-student-name .cp-where{flex:1 0 100%!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;padding-left:15px}
+.cp-permissions-sidebar{overflow-y:auto}
+/* First-time guide (teacher-dashboard.js). */
+.cp-guide-btn{white-space:nowrap}
+dialog.cp-guide{width:min(620px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:22px 24px;border:0;border-radius:18px;background:#fff;color:#172033;box-shadow:0 24px 70px #0f172a66;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+dialog.cp-guide::backdrop{background:#0f172a99}
+.cp-guide-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cp-guide-head h2{margin:0;font-size:1.45rem;color:#17395b}
+.cp-guide-x{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer}
+.cp-guide-intro{margin:10px 0 14px;color:#475569}
+.cp-guide-steps{margin:0;padding:0;list-style:none;counter-reset:cpstep;display:grid;gap:10px}
+.cp-guide-steps li{counter-increment:cpstep;display:grid;grid-template-columns:34px 1fr;column-gap:12px;padding:10px 12px;border-radius:12px;background:#f1f5fb}
+.cp-guide-steps li::before{content:counter(cpstep);grid-row:span 2;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;font-weight:800}
+.cp-guide-steps strong{color:#0f2a4d}
+.cp-guide-steps span{color:#334155;font-size:15px}
+.cp-guide-note{margin:14px 0 16px;font-size:14px;color:#64748b}
+.cp-guide-ok{display:block;margin-left:auto;min-height:44px;padding:0 26px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:700 16px system-ui,sans-serif;cursor:pointer}
+.cp-guide-ok:focus-visible,.cp-guide-x:focus-visible{outline:3px solid #f5b800;outline-offset:2px}
+/* On Student screens / Student whiteboards the lesson drawing tools do nothing, so only Stop, View and Students stay. */
+body.cp-student-workspace #teacherDock>.tb-group:not(:has(#cpDockStop)),body.cp-viewing-student #teacherDock>.tb-group:not(:has(#cpDockStop)){display:none!important}
+body.cp-student-workspace #teacherDock>.tb-spacer{display:none}

@@ -35,7 +35,7 @@ const gameCategory: Record<string, { label: string; count: number }> = {
   'Gematria Race': { label: 'Torah & Jewish', count: 5 }, 'Weekly Quiz Race': { label: 'Torah & Jewish', count: 5 },
   'Rashi Letters Match': { label: 'Torah & Jewish', count: 5 }, 'Connect 4': { label: 'Board & Strategy', count: 5 },
   'Tic Tac Toe': { label: 'Board & Strategy', count: 5 }, Checkers: { label: 'Board & Strategy', count: 5 },
-  Reversi: { label: 'Board & Strategy', count: 5 }, Ludo: { label: 'Board & Strategy', count: 5 },
+  Othello: { label: 'Board & Strategy', count: 5 }, Ludo: { label: 'Board & Strategy', count: 5 },
   'Memory Match': { label: 'Cards & Matching', count: 5 }, Set: { label: 'Cards & Matching', count: 5 },
   Dominoes: { label: 'Cards & Matching', count: 5 }, 'Go Fish': { label: 'Cards & Matching', count: 5 },
   'Uno-style Cards': { label: 'Cards & Matching', count: 5 }, Bingo: { label: 'Quick Challenges', count: 2 },
@@ -79,7 +79,7 @@ test('all 17 full-size game apps stay visible in 3+2 category grids on desktop, 
 
     const categories = [
       { key: 'torah', label: 'Torah & Jewish', count: 5, games: ['Shorashim Race', 'Yiddish Race', 'Gematria Race', 'Weekly Quiz Race', 'Rashi Letters Match'] },
-      { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Reversi', 'Ludo'] },
+      { key: 'strategy', label: 'Board & Strategy', count: 5, games: ['Connect 4', 'Tic Tac Toe', 'Checkers', 'Othello', 'Ludo'] },
       { key: 'cards', label: 'Cards & Matching', count: 5, games: ['Memory Match', 'Set', 'Dominoes', 'Go Fish', 'Uno-style Cards'] },
       { key: 'challenges', label: 'Quick Challenges', count: 2, games: ['Bingo', 'Math Race'] },
     ];

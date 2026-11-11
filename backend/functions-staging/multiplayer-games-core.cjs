@@ -1,11 +1,11 @@
 'use strict';
 
 const GAMES = Object.freeze({
-  'connect-four': { name: 'Connect 4', minPlayers: 2, maxPlayers: 2 },
-  'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2 },
+  'connect-four': { name: 'Connect 4', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
+  'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
   'memory-match': { name: 'Memory Match', minPlayers: 2, maxPlayers: 4 },
   checkers: { name: 'Checkers', minPlayers: 2, maxPlayers: 2 },
-  reversi: { name: 'Reversi', minPlayers: 2, maxPlayers: 2 },
+  reversi: { name: 'Othello', minPlayers: 2, maxPlayers: 2 },
   bingo: { name: 'Bingo', minPlayers: 2, maxPlayers: 8 },
   'math-race': { name: 'Math Race', minPlayers: 2, maxPlayers: 8 },
   set: { name: 'Set', minPlayers: 2, maxPlayers: 6 },
@@ -19,6 +19,10 @@ const MEMORY_FACES = Object.freeze(['🍎', '⭐', '🐟', '🌈', '⚽', '🦁'
 
 function gameConfig(gameKey) {
   return GAMES[gameKey] || null;
+}
+
+function supportsComputerOpponent(gameKey) {
+  return GAMES[gameKey]?.computerOpponent === true;
 }
 
 function participantIds(players) {
@@ -48,7 +52,14 @@ function hydrateGameState(gameKey, input) {
   }
   if (gameKey === 'memory-match') { state.deck = asList(state.deck); state.matched = asList(state.matched); state.flipped = asList(state.flipped); state.scores ||= {}; }
   if (gameKey === 'reversi') state.passes ||= 0;
-  if (gameKey === 'bingo') { state.sequence = asList(state.sequence); state.called = asList(state.called); state.cards ||= {}; state.scores ||= {}; }
+  if (gameKey === 'bingo') {
+    state.sequence = asList(state.sequence); state.called = asList(state.called); state.cards ||= {}; state.scores ||= {};
+    for (const card of Object.values(state.cards)) {
+      if (!card || typeof card !== 'object') continue;
+      card.board = asList(card.board);
+      card.marked = asList(card.marked);
+    }
+  }
   if (gameKey === 'math-race') { state.questions = asList(state.questions); state.answers ||= {}; state.scores ||= {}; }
   if (gameKey === 'set') { state.deck = asList(state.deck); state.cards = asList(state.cards); state.scores ||= {}; }
   if (gameKey === 'ludo') { state.dice = asList(state.dice); state.tokens ||= {}; state.starts ||= {}; state.lastRoll ??= null; }
@@ -166,8 +177,44 @@ function applyMove(gameKey, state, playerId, move, players) {
   if (gameKey === 'connect-four') return moveConnectFour(state, playerId, move);
   if (gameKey === 'tic-tac-toe') return moveTicTacToe(state, playerId, move);
   if (gameKey === 'checkers') return moveCheckers(state, playerId, move);
-  if (gameKey === 'reversi') return moveReversi(state, playerId, move);
+  if (gameKey === 'reversi') return moveOthello(state, playerId, move);
   reject('This multiplayer game is not available yet.');
+}
+
+function computerMove(gameKey, state, computerId) {
+  if (gameKey === 'tic-tac-toe') {
+    const botMark = state.playersOrder[0] === computerId ? 'X' : 'O';
+    const humanMark = botMark === 'X' ? 'O' : 'X';
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    const winAt = mark => lines.find(line => line.filter(index => state.board[index] === mark).length === 2 && line.some(index => !state.board[index]))?.find(index => !state.board[index]);
+    const win = winAt(botMark); if (win !== undefined) return { type: 'place', index: win };
+    const block = winAt(humanMark); if (block !== undefined) return { type: 'place', index: block };
+    if (!state.board[4]) return { type: 'place', index: 4 };
+    const open = [0,2,6,8,1,3,5,7].find(index => !state.board[index]);
+    return open === undefined ? null : { type: 'place', index: open };
+  }
+  if (gameKey === 'connect-four') {
+    const openColumns = [3, 2, 4, 1, 5, 0, 6].filter(column => !state.board[column]);
+    if (!openColumns.length) return null;
+    const drop = (board, column, mark) => {
+      const row = [5, 4, 3, 2, 1, 0].find(y => !board[y * 7 + column]);
+      if (row === undefined) return null;
+      board[row * 7 + column] = mark;
+      return board;
+    };
+    const botMark = computerId === state.playersOrder[0] ? 'red' : 'yellow';
+    const otherMark = botMark === 'red' ? 'yellow' : 'red';
+    for (const column of openColumns) {
+      const board = drop(state.board.slice(), column, botMark);
+      if (lineWinner(board, 7, 6, 4) === botMark) return { type: 'drop', column };
+    }
+    for (const column of openColumns) {
+      const board = drop(state.board.slice(), column, otherMark);
+      if (lineWinner(board, 7, 6, 4) === otherMark) return { type: 'drop', column };
+    }
+    return { type: 'drop', column: openColumns[0] };
+  }
+  return null;
 }
 
 function moveTicTacToe(state, playerId, move) {
@@ -291,14 +338,14 @@ function reversiFlips(board, index, color) {
   }
   return flips;
 }
-function finishReversi(state) {
+function finishOthello(state) {
   const red = state.board.filter(value => value === 'red').length, yellow = state.board.filter(value => value === 'yellow').length;
   state.scores = { [state.playersOrder[0]]: red, [state.playersOrder[1]]: yellow };
   if (red === yellow) state.draw = true;
   else state.winner = state.playersOrder[red > yellow ? 0 : 1];
   state.finished = true;
 }
-function moveReversi(state, playerId, move) {
+function moveOthello(state, playerId, move) {
   const color = playerId === state.playersOrder[0] ? 'red' : 'yellow';
   if (move.type === 'pass') {
     if (state.board.some((value, index) => reversiFlips(state.board, index, color).length)) reject('You have a legal move; choose a square.');
@@ -313,7 +360,7 @@ function moveReversi(state, playerId, move) {
   const nextId = state.playersOrder.find(id => id !== playerId), nextColor = nextId === state.playersOrder[0] ? 'red' : 'yellow';
   const canPlay = state.board.some((value, index) => reversiFlips(state.board, index, nextColor).length);
   const canRepeat = state.board.some((value, index) => reversiFlips(state.board, index, color).length);
-  if (state.board.every(Boolean) || state.passes >= 2 || !canPlay && !canRepeat) finishReversi(state);
+  if (state.board.every(Boolean) || state.passes >= 2 || !canPlay && !canRepeat) finishOthello(state);
   else state.turn = canPlay ? nextId : playerId;
   return state;
 }
@@ -357,15 +404,19 @@ function moveMathRace(state, playerId, move, players) {
   state.answers[key][playerId] = move.answer === question.answer;
   if (move.answer === question.answer) state.scores[playerId] = (state.scores[playerId] || 0) + 1;
   state.moves += 1;
-  const active = participantIds(players);
-  if (active.every(id => state.answers[key][id] != null)) {
-    if (state.questionIndex === state.questions.length - 1) {
-      const high = Math.max(...Object.values(state.scores));
-      const winners = active.filter(id => state.scores[id] === high);
-      state.winner = winners.length === 1 ? winners[0] : null; state.draw = winners.length > 1; state.finished = true;
-    } else state.questionIndex += 1;
-  }
+  advanceMathRace(state, participantIds(players));
   return state;
+}
+// Move to the next question (or finish) once every active player has answered.
+function advanceMathRace(state, active) {
+  const answers = state.answers?.[String(state.questionIndex)] || {};
+  if (!active.length || !active.every(id => answers[id] != null)) return false;
+  if (state.questionIndex === state.questions.length - 1) {
+    const high = Math.max(...active.map(id => state.scores[id] || 0));
+    const winners = active.filter(id => (state.scores[id] || 0) === high);
+    state.winner = winners.length === 1 ? winners[0] : null; state.draw = winners.length > 1; state.finished = true;
+  } else state.questionIndex += 1;
+  return true;
 }
 function isSet(cards) {
   if (!Array.isArray(cards) || cards.length !== 3 || new Set(cards.map(card => card.id)).size !== 3) return false;
@@ -538,7 +589,7 @@ function moveUno(state, playerId, move, ids) {
   if ((card.kind === 'wild' || card.kind === 'wild4') && !['red','yellow','green','blue'].includes(move.color)) reject('Choose a color for your wild card.');
   hand.splice(move.index, 1); state.discard.push(card); state.moves += 1;
   if (!hand.length) { state.winner = playerId; state.finished = true; return state; }
-  if (card.kind === 'wild' || card.kind === 'wild4') state.color = move.color;
+  state.color = card.kind === 'wild' || card.kind === 'wild4' ? move.color : card.color;
   if (card.kind === 'draw2' || card.kind === 'wild4') { state.drawPending = card.kind === 'draw2' ? 2 : 4; advanceTurn(state, ids); }
   else if (card.kind === 'skip') advanceTurn(state, ids, 2);
   else if (card.kind === 'reverse') { state.direction *= -1; advanceTurn(state, ids, ids.length === 2 ? 2 : 1); }
@@ -577,9 +628,33 @@ function startGameState(gameKey, state, ids) {
   return state;
 }
 
+// A player who left (and did not come back) must not keep a game stuck:
+// pass their turn to the next active player, or move Math Race along.
+function skipAbsentPlayers(gameKey, state, players) {
+  if (!state || state.finished) return false;
+  const active = participantIds(players);
+  if (gameKey === 'math-race') return advanceMathRace(state, active);
+  if (!state.turn || active.includes(state.turn) || !active.length) return false;
+  const joined = Object.entries(players || {}).filter(([, player]) => player)
+    .sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0) || a[0].localeCompare(b[0])).map(([id]) => id);
+  const order = asList(state.playersOrder).filter(Boolean);
+  const seats = order.length ? order.concat(joined.filter(id => !order.includes(id))) : joined;
+  const step = gameKey === 'uno-style' && state.direction === -1 ? -1 : 1;
+  let index = seats.indexOf(state.turn);
+  for (let tries = 0; tries < seats.length; tries += 1) {
+    index = (index + step + seats.length) % seats.length;
+    if (active.includes(seats[index])) { state.turn = seats[index]; break; }
+  }
+  if (!active.includes(state.turn)) state.turn = active[0];
+  if (gameKey === 'ludo') state.lastRoll = null;
+  if (gameKey === 'memory-match') state.flipped = [];
+  if (gameKey === 'uno-style') state.drawPending = 0;
+  return true;
+}
+
 function publicView(gameKey, state, room, now = Date.now()) {
   const players = Object.entries(room.players || {}).filter(([, player]) => player && player.active !== false)
-    .map(([studentId, player]) => ({ studentId, name: String(player.name || 'Student'), score: state.scores?.[studentId] || 0 }));
+    .map(([studentId, player]) => ({ studentId, name: String(player.name || 'Student'), role: player.role === 'teacher' ? 'teacher' : 'student', score: state.scores?.[studentId] || 0 }));
   const view = {
     roomCode: room.roomCode, gameKey, gameName: GAMES[gameKey].name, host: room.host,
     hostName: room.hostName, state: room.state, createdAt: room.createdAt, updatedAt: now,
@@ -602,7 +677,6 @@ function publicView(gameKey, state, room, now = Date.now()) {
     if (gameKey === 'reversi') view.scores = Object.assign({}, state.scores || {});
   } else if (gameKey === 'bingo') {
     view.called = state.called.slice(); view.scores = Object.assign({}, state.scores);
-    view.cards = Object.fromEntries(Object.entries(state.cards).map(([id, card]) => [id, { board: card.board.slice(), marked: card.marked.slice() }]));
   } else if (gameKey === 'math-race') {
     const question = state.questions[state.questionIndex];
     view.question = question ? { prompt: question.prompt, index: state.questionIndex + 1, total: state.questions.length, answered: Object.keys(state.answers?.[String(state.questionIndex)] || {}).length } : null;
@@ -622,8 +696,12 @@ function publicView(gameKey, state, room, now = Date.now()) {
 }
 
 function privateView(gameKey, state, studentId) {
+  if (gameKey === 'bingo') {
+    const card = state.cards?.[studentId];
+    return card ? { card: { board: asList(card.board), marked: asList(card.marked) } } : {};
+  }
   if (gameKey === 'dominoes' || gameKey === 'go-fish' || gameKey === 'uno-style') return { hand: (state.hands?.[studentId] || []).map(card => ({ ...card })) };
   return {};
 }
 
-module.exports = { GAMES, gameConfig, participantIds, hydrateGameState, createGameState, startGameState, applyMove, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };
+module.exports = { GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, skipAbsentPlayers, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };

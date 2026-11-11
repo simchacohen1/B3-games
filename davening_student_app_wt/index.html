@@ -117,12 +117,12 @@ const tracks = [
   {name:'הרי אני / מה טובו', file:'audio/03_hareini_ma_tovu.mp3', page:'12'},
   {name:'אדון עולם', file:'audio/04_adon_olam.mp3', page:'13'},
   {name:'שיבנה בית המקדש', file:'audio/05_sheyibaneh.mp3', page:'26'},
-  {name:'ה׳ מלך', file:'audio/06_hashem_melech.mp3', page:'30'},
+  {name:'הִ מלך', file:'audio/06_hashem_melech.mp3', page:'30'},
   {name:'ברוך שאמר', file:'audio/07_baruch_sheamar.mp3', page:'30'},
   {name:'מזמור לתודה', file:'audio/08_mizmor_letodah.mp3', page:'31'},
   {name:'יהי כבוד', file:'audio/09_yehi_chevod.mp3', page:'31'},
   {name:'אשרי', file:'audio/10_ashrei.mp3', page:'33'},
-  {name:'הללויה / ברוך ה׳', file:'audio/11_halleluyah_baruch_hashem.mp3', page:'37'},
+  {name:'הללויה / ברוך הִ', file:'audio/11_halleluyah_baruch_hashem.mp3', page:'37'},
   {name:'ויושע', file:'audio/12_vayosha.mp3', page:'39'},
   {name:'אז ישיר', file:'audio/13_az_yashir.mp3', page:'39'},
   {name:'ישתבח', file:'audio/14_yishtabach.mp3', page:'41'},
@@ -133,7 +133,7 @@ const tracks = [
   {name:'ויציב', file:'audio/19_veyatziv.mp3', page:'48'},
   {name:'מי כמוך', file:'audio/20_mi_chemocha.mp3', page:'50'},
   {name:'שמונה עשרה — חורף', file:'audio/21_shemoneh_esrei_winter.mp3', page:'50'},
-  {name:'קוה אל ה׳', file:'audio/22_kavey.mp3', page:'81'},
+  {name:'קוה אל הִ', file:'audio/22_kavey.mp3', page:'81'},
   {name:'עלינו לשבח', file:'audio/23_aleinu.mp3', page:'84'},
   {name:'אל תירא', file:'audio/24_al_tira.mp3', page:'85'},
   {name:'קאפיטל של הרבי', file:'audio/25_rebbe_kapitel.mp3', page:'N/A'},
@@ -142,6 +142,7 @@ const tracks = [
 const audio=document.getElementById('audio'),title=document.getElementById('title'),playBtn=document.getElementById('playBtn'),seek=document.getElementById('seek'),status=document.getElementById('status'),speed=document.getElementById('speed'),autoNext=document.getElementById('autoNext');
 const INCLUDED_KEY='daveningIncludedTracks_WT';
 const AUTO_NEXT_KEY='daveningAutoNext_WT';
+const SPEED_PREFIX='wt_speed_track_';
 try{const savedAutoNext=localStorage.getItem(AUTO_NEXT_KEY);if(savedAutoNext!==null)autoNext.checked=savedAutoNext==='true'}catch(e){}
 autoNext.addEventListener('change',()=>{try{localStorage.setItem(AUTO_NEXT_KEY,String(autoNext.checked))}catch(e){}});
 let included=tracks.map(()=>true);
@@ -149,24 +150,26 @@ try{const saved=JSON.parse(localStorage.getItem(INCLUDED_KEY)||'null');if(Array.
 let index=0;
 function fmt(s){if(!Number.isFinite(s))return '0:00';s=Math.floor(Math.max(0,s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 function saveIncluded(){localStorage.setItem(INCLUDED_KEY,JSON.stringify(included))}
+function saveTrackSpeed(i){try{localStorage.setItem(SPEED_PREFIX+i,speed.value)}catch(e){}}
+function loadTrackSpeed(i){try{const s=localStorage.getItem(SPEED_PREFIX+i);return s!==null?s:'1'}catch(e){return '1'}}
+function applySpeedValue(val){const o=[...speed.options];const match=o.find(x=>x.value===val);speed.value=match?val:'1';audio.playbackRate=Number(speed.value)}
 function includedIndexes(){return tracks.map((_,i)=>i).filter(i=>included[i])}
 function firstIncludedIndex(){const a=includedIndexes();return a.length?a[0]:0}
 function nextIncludedIndex(from,dir=1){const a=includedIndexes();if(!a.length)return null;const p=a.indexOf(from);if(p===-1){if(dir>0)return a.find(i=>i>from)??a[0];const prev=[...a].reverse().find(i=>i<from);return prev??a[a.length-1]}const np=p+dir;return(np<0||np>=a.length)?null:a[np]}
 function renderGrid(){const g=document.getElementById('grid');g.innerHTML='';tracks.forEach((t,i)=>{const row=document.createElement('div');row.className='track-item';const cb=document.createElement('input');cb.type='checkbox';cb.checked=included[i];cb.setAttribute('aria-label',`Include ${t.name}`);cb.onchange=()=>{included[i]=cb.checked;saveIncluded();if(!included.some(Boolean)){audio.pause();playBtn.textContent='▶ Play';status.textContent='Select at least one part of davening'}else if(!included[index]){const r=nextIncludedIndex(index,1)??nextIncludedIndex(index,-1)??firstIncludedIndex();load(r,false)}renderGrid()};const b=document.createElement('button');b.className='track-btn'+(i===index?' active':'')+(included[i]?'':' excluded');b.textContent=t.name;b.onclick=()=>load(i,autoNext.checked&&included[i]);row.append(cb,b);g.appendChild(row)})}
-function load(i,play=false){if(i==null||i<0||i>=tracks.length)return;index=i;audio.pause();audio.src=tracks[index].file;audio.playbackRate=Number(speed.value);title.textContent=tracks[index].name;document.getElementById('pageNumber').textContent=tracks[index].page==='N/A'?'אין עמוד בסידור':`עמוד ${tracks[index].page}`;seek.value=0;document.getElementById('currentTime').textContent='0:00';document.getElementById('duration').textContent='0:00';playBtn.textContent='▶ Play';status.textContent=included[index]?'Ready':'This part is excluded';renderGrid();if(play&&included[index])audio.play().then(()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'}).catch(()=>status.textContent='Press Play to begin')}
+function load(i,play=false){if(i==null||i<0||i>=tracks.length)return;index=i;audio.pause();audio.src=tracks[index].file;applySpeedValue(loadTrackSpeed(index));title.textContent=tracks[index].name;document.getElementById('pageNumber').textContent=tracks[index].page==='N/A'?'אין עמוד בסידור':`עמוד ${tracks[index].page}`;seek.value=0;document.getElementById('currentTime').textContent='0:00';document.getElementById('duration').textContent='0:00';playBtn.textContent='▶ Play';status.textContent=included[index]?'Ready':'This part is excluded';renderGrid();if(play&&included[index])audio.play().then(()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'}).catch(()=>status.textContent='Press Play to begin')}
 function toggle(){if(!included.some(Boolean)){status.textContent='Select at least one part of davening';return}if(!included[index]){index=firstIncludedIndex();load(index,false)}if(audio.paused)audio.play().then(()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'}).catch(()=>status.textContent='Unable to start audio');else{audio.pause();playBtn.textContent='▶ Play';status.textContent='Paused'}}
 function goIncluded(dir){const target=nextIncludedIndex(index,dir);if(target==null){status.textContent=dir>0?'No later selected part':'No earlier selected part';return}load(target,autoNext.checked)}
 playBtn.onclick=toggle;document.getElementById('prevBtn').onclick=()=>goIncluded(-1);document.getElementById('nextBtn').onclick=()=>goIncluded(1);document.getElementById('restartBtn').onclick=()=>{if(!included[index])return;audio.currentTime=0;audio.play();playBtn.textContent='⏸ Pause';status.textContent='Playing'};document.getElementById('back10Btn').onclick=()=>audio.currentTime=Math.max(0,audio.currentTime-10);document.getElementById('forward10Btn').onclick=()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10);
 document.getElementById('selectAllBtn').onclick=()=>{included=tracks.map(()=>true);saveIncluded();renderGrid();status.textContent='All parts selected'};document.getElementById('clearAllBtn').onclick=()=>{included=tracks.map(()=>false);saveIncluded();audio.pause();playBtn.textContent='▶ Play';renderGrid();status.textContent='All parts deselected'};
-let speedFlashTimer=null;function flashSpeed(){const f=document.getElementById('speedFlash');f.textContent=Number(speed.value)+'×';f.classList.add('show');clearTimeout(speedFlashTimer);speedFlashTimer=setTimeout(()=>f.classList.remove('show'),800)}function applySpeed(showFlash=true){audio.playbackRate=Number(speed.value);if(showFlash)flashSpeed()}function changeSpeed(step){const o=[...speed.options];const c=Math.max(0,o.findIndex(x=>x.value===speed.value));const n=Math.max(0,Math.min(c+step,o.length-1));speed.value=o[n].value;applySpeed(true)}function resetSpeed(){speed.value='1';applySpeed(true)}speed.onchange=()=>applySpeed(true);speed.value='1.3';audio.playbackRate=1.3;
+let speedFlashTimer=null;function flashSpeed(){const f=document.getElementById('speedFlash');f.textContent=Number(speed.value)+'×';f.classList.add('show');clearTimeout(speedFlashTimer);speedFlashTimer=setTimeout(()=>f.classList.remove('show'),800)}function applySpeed(showFlash=true){audio.playbackRate=Number(speed.value);saveTrackSpeed(index);if(showFlash)flashSpeed()}function changeSpeed(step){const o=[...speed.options];const c=Math.max(0,o.findIndex(x=>x.value===speed.value));const n=Math.max(0,Math.min(c+step,o.length-1));speed.value=o[n].value;applySpeed(true)}function resetSpeed(){speed.value='1';applySpeed(true)}speed.onchange=()=>applySpeed(true);
 audio.ontimeupdate=()=>{document.getElementById('currentTime').textContent=fmt(audio.currentTime);if(audio.duration)seek.value=Math.round(audio.currentTime/audio.duration*1000)};audio.onloadedmetadata=()=>{document.getElementById('duration').textContent=fmt(audio.duration);audio.playbackRate=Number(speed.value)};audio.onplay=()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'};audio.onpause=()=>{if(!audio.ended){playBtn.textContent='▶ Play';if(audio.currentTime>0)status.textContent='Paused'}};audio.onerror=()=>{status.textContent='Audio file could not be loaded'};seek.oninput=()=>{if(audio.duration)audio.currentTime=Number(seek.value)/1000*audio.duration};audio.onended=()=>{playBtn.textContent='▶ Play';if(autoNext.checked){const t=nextIncludedIndex(index,1);if(t!=null)load(t,true);else status.textContent='Finished'}else status.textContent='Finished this section'};
 document.getElementById('startBtn').onclick=()=>{if(confirm('Start from the first selected recording?')){index=firstIncludedIndex();load(index,false)}};document.getElementById('fullscreenBtn').onclick=()=>{document.body.classList.toggle('presentation');if(document.body.classList.contains('presentation'))document.documentElement.requestFullscreen?.().catch(()=>{});else if(document.fullscreenElement)document.exitFullscreen?.()};
 document.addEventListener('keydown',e=>{if(['INPUT','SELECT'].includes(document.activeElement.tagName))return;if(e.key===' '){e.preventDefault();toggle()}else if(e.key==='ArrowRight'){e.preventDefault();goIncluded(1)}else if(e.key==='ArrowLeft'){e.preventDefault();goIncluded(-1)}else if(e.key==='+'||e.key==='='||e.code==='NumpadAdd'){e.preventDefault();changeSpeed(1)}else if(e.key==='-'||e.key==='_'||e.code==='NumpadSubtract'){e.preventDefault();changeSpeed(-1)}else if(e.key==='0'||e.code==='Numpad0'){e.preventDefault();resetSpeed()}});
 const volume=document.getElementById('volume'),volLabel=document.getElementById('volLabel');function applyVolume(){audio.volume=Number(volume.value)/100;volLabel.textContent=volume.value+'%';try{localStorage.setItem('daveningVolume_WT',volume.value)}catch(e){}}try{const sv=localStorage.getItem('daveningVolume_WT');if(sv!==null)volume.value=sv}catch(e){}volume.oninput=applyVolume;applyVolume();
 index=firstIncludedIndex();load(index,false);
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261021-icons-only1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 <script async src="../teacher-global-bootstrap.js?v=20261020"></script>
 </body>
 </html>
-

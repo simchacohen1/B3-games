@@ -193,7 +193,7 @@
       if (root.document && root.document.body && !root.document.querySelector('.b3-staging-notice')) {
         const notice = root.document.createElement('div');
         notice.className = 'b3-staging-notice';
-        notice.textContent = 'Staging test site · audio uploads, Posuk scoring, and Nigri syncing are disabled.';
+        notice.textContent = 'Staging test site · Posuk scoring and Nigri syncing are disabled.';
         root.document.body.prepend(notice);
       }
     };
@@ -204,3 +204,6 @@
     root.B3_STAGING_READY = true;
   }
 })(typeof window !== 'undefined' ? window : globalThis);
+
+// Opt-in local fixtures for no-cost staging E2E runs.
+if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') window.B3_STAGING_TEST_FIXTURES = true;
