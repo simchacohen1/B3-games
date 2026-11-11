@@ -56,3 +56,8 @@ test('Teacher View uses the shared full control panel and assignment-scoped clas
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(scripts.length);new vm.Script(scripts.at(-1)[1],{filename:'admin.html'});
 });
+test('embedded Admin password gate waits for the existing Firebase session check',()=>{
+ const home=fs.readFileSync('index.html','utf8');
+ assert.match(home,/html\.b3-home-auth-pending\s+#adminPasswordGate\s*\{display:none!important\}/);
+ assert.match(home,/const passwordUnlocked=isAuthorizedTeacher\|\|adminPasswordUnlocked\(\)/);
+});
