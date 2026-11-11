@@ -101,6 +101,11 @@ testEmulator('student writes stay within their own Posuk and Chazara records',as
 
 testEmulator('teachers can read assigned class records and cannot cross into another class',async()=>{
   const alpha=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const anonymous=env.unauthenticatedContext().database();
+  await fails(get(ref(anonymous,'b3Games')));
+  await fails(get(ref(anonymous,'b3Games/workspaces')));
+  await fails(get(ref(anonymous,'b3Games/workspaces/b3-2026/classes')));
+  await fails(get(ref(alpha,'b3Games/workspaces/b3-2026/classes')));
   await succeeds(get(ref(alpha,'posukPractice/attempts/synthetic_one')));
   await fails(get(ref(alpha,'posukPractice/attempts/synthetic_two')));
   const beta=db('teacher_beta',{email:'beta@example.test',email_verified:true});
@@ -266,7 +271,11 @@ testEmulator('teachers cannot write student profile or rewards balance',async()=
 testEmulator('Weekly Quiz teacher reads and student launch access stay class scoped',async()=>{
   const alphaTeacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
   const betaTeacher=db('teacher_beta',{email:'beta@example.test',email_verified:true});
+  const anonymous=env.unauthenticatedContext().database();
   const alphaStudent=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  await fails(get(ref(anonymous,'b3Quiz')));
+  await fails(get(ref(anonymous,'b3Quiz/classes')));
+  await fails(get(ref(alphaTeacher,'b3Quiz/classes')));
   await succeeds(get(ref(alphaTeacher,'b3Quiz/classes/alpha/quizzes')));
   await succeeds(get(ref(alphaTeacher,'b3Quiz/classes/alpha/launches')));
   await succeeds(get(ref(alphaTeacher,'b3Quiz/classes/alpha/responses')));

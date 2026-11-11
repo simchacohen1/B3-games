@@ -5,6 +5,7 @@
 //   2. Run this script. Exit code 0 = safe to deploy as the additive step. Anything else = STOP.
 // Any changed or removed existing rule, or an addition outside the approved list, is reported and fails the check.
 const fs = require('node:fs');
+const HARDENED_RULES = JSON.parse(fs.readFileSync('firebase-rules.hardened.json', 'utf8')).rules;
 
 // Paths (inside "rules") where a NEW node may appear that did not exist in the live rules.
 const ALLOWED_NEW = [
@@ -33,14 +34,66 @@ const ALLOWED_NEW = [
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
 // 2026-10-24: Posuk Practice recording links stop being public (student, active teacher, admin, owner).
 const APPROVED_CHANGES = [
+  // 2026-11-02: Chazara records are class-readable by assigned teachers and writable only by the matching student.
+  [['posukPractice', 'chazara', 'students'], { '$studentId': {
+    '.read': "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)",
+    '.write': 'auth != null && auth.token.b3StudentId == $studentId'
+  }}],
+  [['posukPractice', 'chazara', 'events'], { '$studentId': {
+    '.read': "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)",
+    '.write': 'auth != null && auth.token.b3StudentId == $studentId'
+  }}],
+  // 2026-11-02: Legacy Posuk Practice access records (which can contain passcodes) are private to their student and owner/admin.
+  [['posukPractice', 'allowedStudents', '$studentId', '.read'], "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  // 2026-11-02: Posuk Practice settings are authenticated; global controls are admin-only and class limits are assigned-class scoped.
+  [['posukPractice', 'settings', '.read'], 'auth != null'],
+  [['posukPractice', 'settings', 'practiceLimit', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['posukPractice', 'settings', 'classPracticeLimits'], { '$classId': { '.write': "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)" } }],
+  [['posukPractice', 'settings', 'accessLocked', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['posukPractice', 'settings', 'accessLockMessage', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['posukPractice', 'settings', 'appEnabled', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['posukPractice', 'settings', '$other', '.write'], false],
+  // 2026-11-02: Posuk Practice student records are readable only by the student, owner/admin, or assigned teacher; writes by that student only.
+  [['posukPractice', 'students', '$studentId', '.read'], "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)"],
+  [['posukPractice', 'students', '$studentId', '.write'], 'auth != null && auth.token.b3StudentId == $studentId'],
+  // 2026-11-02: Posuk Practice attempt writes are limited to the matching signed-in student.
+  [['posukPractice', 'attempts', '$studentId', '.write'], 'auth != null && auth.token.b3StudentId == $studentId'],
+  // 2026-11-02: Rashi Letters progress follows the student's primary class and own writes.
+  [['rashiLetters', 'settings', '.read'], 'auth != null'],
+  [['rashiLetters', 'settings', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['rashiLetters', 'progress', '$studentId', '.read'], "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)"],
+  [['rashiLetters', 'progress', '$studentId', '.write'], 'auth != null && auth.token.b3StudentId == $studentId'],
+  [['rashiLetters', 'matchRooms', '$room', '.read'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || auth.token.b3StudentRole == 'student' && auth.token.b3ClassId == data.child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + data.child('classId').val() + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + data.child('classId').val() + '/members/' + auth.token.b3StudentId + '/active').val() == true)"],
+  [['rashiLetters', 'matchRooms', '$room', '.write'], "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == newData.child('host').val() && auth.token.b3ClassId == newData.child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/members/' + auth.token.b3StudentId + '/active').val() == true && !data.exists() || auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == data.child('host').val() && auth.token.b3ClassId == data.child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/members/' + auth.token.b3StudentId + '/active').val() == true && !newData.exists()"],
+  [['rashiLetters', 'matchRooms', '$room', 'players'], { '$studentId': { '.write': "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == data.parent().parent().child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/members/' + $studentId + '/active').val() == true" } }],
+  [['rashiLetters', 'matchRooms', '$room', 'state'], { '.write': "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == data.parent().child('host').val() && auth.token.b3ClassId == data.parent().child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/members/' + auth.token.b3StudentId + '/active').val() == true" }],
+  [['rashiLetters', 'matchRooms', '$room', 'startedAt'], { '.write': "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == data.parent().child('host').val() && auth.token.b3ClassId == data.parent().child('classId').val() && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + auth.token.b3ClassId + '/members/' + auth.token.b3StudentId + '/active').val() == true" }],
+  // 2026-11-02: Legacy Game Show live state is authenticated; only owner/admin writes, active student reads remain.
+  [['tentTrailTrivia', '.read'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || auth.token.b3StudentRole == 'student')"],
+  [['tentTrailTrivia', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  // 2026-11-02: Game Show set and live state access becomes authenticated and class-scoped.
+  [['questionSets', '.read'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['questionSets', '.write'], "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"],
+  [['questionSets', '$setId'], { '.read': "auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/et').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/wt').val() == true)" }],
+  [['questionSets', 'classes'], { '$classId': {
+    set: {
+      '.read': "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
+      '.write': "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    },
+    live: {
+      '.read': "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/classes/' + $classId + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() == true && auth.token.b3ClassId == $classId || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
+      '.write': "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+    }
+  }}],
+  // 2026-11-01: active classroom teachers may read only a student's active primary class roster record.
+  [['b3Games', 'students', '$studentId', '.read'],
+    "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val() + '/active').val() != false && root.child('b3Games/workspaces/b3-2026/classes/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val() + '/members/' + $studentId + '/active').val() == true))"],
   [['posukPractice', 'attempts', '.read'],
     "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
   [['posukPractice', 'attempts', '$studentId', '.read'],
-    "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
-  // 2026-10-24: student records (b3Games/students) stop being public. The blanket b3Games read is
-  // replaced by explicit public reads on every other b3Games child, so those stay exactly as open.
-  [['b3Games', '$other'], { '.read': true }],
-  ...['admins', 'teachers', 'siteSettings', 'workspaces', 'classGalleryPresence', 'classGalleryTag', 'classGalleryPresenceSettings']
+    "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true && root.child('b3Games/workspaces/b3-2026/classes/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val() + '/active').val() != false && root.child('b3Games/workspaces/b3-2026/classes/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val() + '/members/' + $studentId + '/active').val() == true)"],
+  // Public settings/gallery paths remain public. Teacher/workspace directories are now class-scoped.
+  ...['siteSettings', 'classGalleryPresence', 'classGalleryTag', 'classGalleryPresenceSettings']
     .map(k => [['b3Games', k, '.read'], true]),
   [['b3Games', 'students', '.read'],
     "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
@@ -49,7 +102,28 @@ const APPROVED_CHANGES = [
 ];
 // Approved removals, each allowed only while its replacement is present in the candidate.
 const APPROVED_REMOVALS = [
-  [['b3Games', '.read'], candidate => candidate.b3Games?.$other?.['.read'] === true],
+  [['b3Games', '.read'], candidate => candidate.b3Games?.$other?.['.read'] === true
+    || !candidate.b3Games?.$other && JSON.stringify(candidate.b3Games?.workspaces) === JSON.stringify(HARDENED_RULES.b3Games?.workspaces)
+      && JSON.stringify(candidate.b3Games?.admins?.$uid) === JSON.stringify(HARDENED_RULES.b3Games?.admins?.$uid)
+      && JSON.stringify(candidate.b3Games?.teachers?.$uid) === JSON.stringify(HARDENED_RULES.b3Games?.teachers?.$uid)],
+  [['b3Games', '$other'], candidate => !candidate.b3Games?.$other && JSON.stringify(candidate.b3Games?.workspaces) === JSON.stringify(HARDENED_RULES.b3Games?.workspaces)],
+  [['b3Games', 'admins', '.read'], candidate => !!candidate.b3Games?.admins?.$uid && JSON.stringify(candidate.b3Games.admins.$uid) === JSON.stringify(HARDENED_RULES.b3Games?.admins?.$uid)],
+  [['b3Games', 'teachers', '.read'], candidate => !!candidate.b3Games?.teachers?.$uid && JSON.stringify(candidate.b3Games.teachers.$uid) === JSON.stringify(HARDENED_RULES.b3Games?.teachers?.$uid)],
+  [['b3Games', 'workspaces', '.read'], candidate => JSON.stringify(candidate.b3Games?.workspaces) === JSON.stringify(HARDENED_RULES.b3Games?.workspaces)],
+  [['b3Games', 'workspaces', '$workspaceId', '.write'], candidate => JSON.stringify(candidate.b3Games?.workspaces) === JSON.stringify(HARDENED_RULES.b3Games?.workspaces)],
+  [['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', '.write'], candidate => JSON.stringify(candidate.b3Games?.workspaces) === JSON.stringify(HARDENED_RULES.b3Games?.workspaces)],
+  [['posukPractice', 'chazara', '.read'], candidate => !!candidate.posukPractice?.chazara?.students],
+  [['posukPractice', 'chazara', '$section'], candidate => !!candidate.posukPractice?.chazara?.students && !!candidate.posukPractice?.chazara?.events],
+  [['posukPractice', 'shorashimLearning', '.read'], candidate => JSON.stringify(candidate.posukPractice?.shorashimLearning) === JSON.stringify(HARDENED_RULES.posukPractice?.shorashimLearning)],
+  [['posukPractice', 'shorashimLearning', '.write'], candidate => JSON.stringify(candidate.posukPractice?.shorashimLearning) === JSON.stringify(HARDENED_RULES.posukPractice?.shorashimLearning)],
+  [['posukPractice', 'shorashimLearning', '$section'], candidate => JSON.stringify(candidate.posukPractice?.shorashimLearning) === JSON.stringify(HARDENED_RULES.posukPractice?.shorashimLearning)],
+  [['b3Quiz', '.read'], candidate => JSON.stringify(candidate.b3Quiz) === JSON.stringify(HARDENED_RULES.b3Quiz)],
+  [['b3Quiz', '.write'], candidate => JSON.stringify(candidate.b3Quiz) === JSON.stringify(HARDENED_RULES.b3Quiz)],
+  [['posukPractice', 'allowedStudents', '.read'], candidate => !!candidate.posukPractice?.allowedStudents?.$studentId?.['.read']],
+  [['posukPractice', 'students', '.read'], candidate => !!candidate.posukPractice?.students?.$studentId?.['.read']],
+  [['rashiLetters', 'progress', '.read'], candidate => !!candidate.rashiLetters?.progress?.$studentId?.['.read']],
+  [['rashiLetters', 'matchRooms', '.read'], candidate => !!candidate.rashiLetters?.matchRooms?.$room?.['.read']],
+  [['rashiLetters', 'matchRooms', '$room', '.write'], candidate => !!candidate.rashiLetters?.matchRooms?.$room?.players && !!candidate.rashiLetters?.matchRooms?.$room?.state],
 ];
 
 function stripComments(text) { // the console allows // and /* */ comments; remove them outside strings
@@ -68,12 +142,22 @@ const parse = text => JSON.parse(stripComments(text));
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const allowedNew = p => ALLOWED_NEW.some(a => a.length === p.length && a.every((s, i) => s === p[i]));
 const samePath = (a, p) => a.length === p.length && a.every((s, i) => s === p[i]);
+function atPath(root, path) { return path.reduce((node, key) => node && node[key], root); }
+const approvedHardenedChange = (p, value) => (p[0] === 'posukPractice' && p[1] === 'shorashimLearning'
+  || p[0] === 'b3Quiz' || p[0] === 'b3Games' && ['admins','teachers','workspaces'].includes(p[1]))
+  && JSON.stringify(value) === JSON.stringify(atPath(HARDENED_RULES, p));
 const approvedChange = (p, value) => APPROVED_CHANGES.some(([a, v]) =>
-  samePath(a, p) && JSON.stringify(value) === JSON.stringify(v));
+  samePath(a, p) && JSON.stringify(value) === JSON.stringify(v)) || approvedHardenedChange(p, value);
 
 function compare(live, candidate) {
   const problems = [];
   const candidateRules = candidate.rules || candidate;
+  const isUnconditionalRead = value => value === true || typeof value === 'string' && value.trim() === 'true';
+  // The saved live baseline has this public parent read. Keep the candidate
+  // from silently restoring it when ordinary baseline comparison sees no diff.
+  if (isUnconditionalRead(candidateRules.b3Games?.['.read'])) {
+    problems.push('PUBLIC READ /b3Games/.read (parent grant bypasses class-scoped child rules)');
+  }
   const approvedRemoval = p => APPROVED_REMOVALS.some(([a, ok]) => samePath(a, p) && ok(candidateRules));
   const walk = (a, b, p) => {
     if (isObj(a) && isObj(b)) {
