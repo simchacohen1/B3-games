@@ -21,11 +21,12 @@ test("both homepages and Owner Admin consume the one shared tool registry", () =
 });
 
 test("all Owner Admin class-grant tools have a Teacher Login route and a grant group", () => {
-  const grants = Object.values(registry.tools).filter(tool => tool.classGrant);
+  const grants = [...new Map(Object.values(registry.tools).filter(tool => tool.classGrant).map(tool => [tool.classGrant, tool])).values()];
   const ids = new Set(grants.map(tool => tool.classGrant));
-  assert.equal(ids.size, grants.length, "each class grant appears once in the canonical catalog");
+  assert.equal(ids.size, grants.length, "class-gallery alias does not create a second grant entry");
   for (const tool of grants) {
-    assert.ok(tool.href, `${tool.title} must have a teacher destination`);
+    assert.ok(tool.href || (tool.supportedClasses && tool.supportedClasses.every(id => tool.classHrefs?.[id])),
+      `${tool.title} must have a teacher destination`);
     assert.ok(tool.grantGroup, `${tool.title} must have an Owner Admin category`);
   }
   for (const id of [
@@ -58,4 +59,22 @@ test("companion tiles retain the Posuk grant and private owner dashboard stays e
   ]);
   assert.ok(!registry.teacherActions.some(action => action.id === "class-dashboard"));
   assert.match(ownerHtml, /shared\/home-tool-registry\.js/);
+});
+
+test("regular homepage hardcoded teacher links are registry-driven and class-scoped", () => {
+  assert.match(indexHtml, /registry\.homepageTeacherTools/);
+  assert.doesNotMatch(indexHtml, /<a class="teacher-tool-card" href=/);
+  const itemIds = new Set(registry.homepageTeacherTools.map(item => item.id));
+  for (const id of [
+    "student-tool-access", "homework", "daily-points", "class-pointer", "follow-teacher",
+    "game-show", "posuk-practice", "mishnayos-practice", "shorashim", "chazara",
+    "rashi-letters", "gematria", "student-rewards", "weekly-quiz", "halacha-lesson",
+    "halacha-student-work", "chavrusa", "name-picker", "class-dashboard", "student-report",
+    "sync-to-nigri", "davening-et", "davening-wt"
+  ]) assert.ok(itemIds.has(id), `missing homepage teacher catalog entry: ${id}`);
+  const davening = registry.tools.davening;
+  assert.deepEqual(davening.supportedClasses, ["et", "wt"]);
+  assert.equal(davening.classHrefs.et, "davening_student_app_et/index.html");
+  assert.equal(davening.classHrefs.wt, "davening_student_app_wt/index.html");
+  assert.equal(registry.tools["class-dashboard"].ownerOnly, true);
 });
