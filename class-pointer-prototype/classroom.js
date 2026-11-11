@@ -50,7 +50,7 @@ function pointerPermission(){
   const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
   if(!mayPoint)cancelHover();if(!mayWrite)highlighter?.cancel()
   if(!isTeacher){
-    const tool=$('studentTool');if(tool){for(const option of tool.options){if(C.highlightTools.includes(option.value))option.disabled=!writingAllowed(option.value);else option.disabled=!mayPoint}if(tool.selectedOptions[0]?.disabled){const first=Array.from(tool.options).find(o=>!o.disabled);if(first){tool.value=first.value;tool.dispatchEvent(new Event('change',{bubbles:true}))}}}
+    const tool=$('studentTool');if(tool){for(const option of tool.options){if(option.value==='eraser')option.disabled=!mayWrite;else if(C.highlightTools.includes(option.value))option.disabled=!writingAllowed(option.value);else option.disabled=!mayPoint}if(tool.selectedOptions[0]?.disabled){const first=Array.from(tool.options).find(o=>!o.disabled);if(first){tool.value=first.value;tool.dispatchEvent(new Event('change',{bubbles:true}))}}}
     $('permissionText').textContent=!admitted?'Connecting to your class.':!mayPoint?'Watch the lesson. Your teacher has not enabled your pointer.':mayWrite?'Use the tools your teacher enabled.':'Pointer only. Your teacher has not enabled writing tools.';
   }
 }
@@ -249,7 +249,14 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
-    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
+    if(message.type==='edit-highlights'){
+      // Authorize on the verified connection, never on a client-supplied owner or role.
+      if(live()&&selected(member)&&(memberTools(member)?.highlight||memberTools(member)?.pen)){
+        if(message.action==='erase'){if(highlightStore.erase(member.id,message.id))publishHighlights()}
+        else if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
+      }
+      return;
+    }
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;queuePoint(member.id)}
     if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){
@@ -709,7 +716,7 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
-  edit(action,id){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action,id);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
+  edit(action,id){if(isTeacher){if(action==='all')highlightStore.reset();else if(action==='erase')highlightStore.erase('teacher',id);else if(action==='clear-owner')highlightStore.clearOwner('teacher',id);else highlightStore.edit('teacher',action,id);publishHighlights()}else if(['undo','clear','erase'].includes(action)&&live()&&(writingAllowed('highlight')||writingAllowed('pen')))send(teacherConnection,{type:'edit-highlights',action,...(action==='erase'?{id}:{})})}
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
