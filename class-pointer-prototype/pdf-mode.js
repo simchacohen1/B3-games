@@ -906,10 +906,10 @@
       if(payload.kind==='image'){await pastePicture(payload.blob);return}
       if(!B.live()||!B.writingAllowed()){B.status('You cannot add whiteboard text right now.');return}
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
-      const layout=clip.layoutText(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008]});
-      let added=0;for(const item of layout.items){const lines=item.text.split('\n'),width=ctx.measureText(lines[0]||'').width*2.4*item.size/100,height=lines.length*item.size*1.25*W/Math.max(1,H);const stroke=C.cleanStroke({tool:'text',color:B.ownColor(),size:item.size,points:[{x:item.x,y:item.y},{x:Math.min(1,item.x+Math.max(0.02,width)),y:Math.min(1,item.y+Math.max(0.02,height))}],text:item.text});if(stroke){B.submitStroke(stroke);added++}}
+      const made=clip.textStrokes(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008],color:B.ownColor()});
+      let added=0;for(const value of made.strokes){const stroke=C.cleanStroke(value);if(stroke){B.submitStroke(stroke);added++}}
       if(!added){B.status('No whiteboard text could be added.');return}
-      B.status((payload.cut||layout.cut)?clip.MSG.textCut:'Pasted editable text. Use “Edit latest text” to change it.');
+      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Pasted editable text. Use “Edit latest text” to change it.');
     },
     async copy(){
       const clip=window.ClassPointerClipboard;

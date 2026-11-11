@@ -99,6 +99,17 @@
     }
     return{items,cut,size};
   }
+  // Convert pasted words to validated-shape text strokes. `width100` must measure text at a 100px font and
+  // include any scale used by the renderer, so the stored hit box follows the visible text.
+  function textStrokes(text,width100,opts={}){
+    const aspect=opts.aspect||16/9,layout=layoutText(text,width100,opts);
+    const strokes=layout.items.map(item=>{
+      const lines=item.text.split('\n'),width=width100(lines[0]||'')/100*item.size,height=lines.length*item.size*1.25*aspect;
+      return{tool:'text',color:opts.color||'#ffcc00',size:item.size,
+        points:[{x:item.x,y:item.y},{x:clamp(item.x+Math.max(.02,width),0,1),y:clamp(item.y+Math.max(.02,height),0,1)}],text:item.text};
+    });
+    return{strokes,cut:layout.cut,size:layout.size};
+  }
   function fitSize(width,height,maxSide){
     const scale=Math.min(1,maxSide/Math.max(width,height,1));
     return{w:Math.max(1,Math.round(width*scale)),h:Math.max(1,Math.round(height*scale))};
@@ -131,7 +142,7 @@
     }
     return{pictures,strokes};
   }
-  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,fitSize,placeImage,cleanImageData,cleanLessonBoard};
+  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,fitSize,placeImage,cleanImageData,cleanLessonBoard};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}
   if(root.ClassPointerClipboard)return;
 

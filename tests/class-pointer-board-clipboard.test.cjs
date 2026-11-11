@@ -46,6 +46,16 @@ test('long text is wrapped and split into board text boxes instead of being cut 
   }
   assert.equal(Clip.layoutText('Hi',width100).items[0].size,.045); // short words stay big
 });
+test('pasted teacher text becomes bounded, validated text strokes with visible hit boxes',()=>{
+  const made=Clip.textStrokes('Read\nthis lesson',width100,{aspect:16/9,sizes:[.028,.016,.008],color:'#1d4ed8'});
+  assert.equal(made.cut,false);assert.equal(made.strokes.length,1);
+  const stroke=made.strokes[0],clean=Core.cleanStroke(stroke);
+  assert.equal(stroke.tool,'text');assert.equal(stroke.color,'#1d4ed8');assert.equal(stroke.text,'Read\nthis lesson');
+  assert.ok(clean);assert.equal(clean.size,.028);assert.ok(stroke.points[1].x>stroke.points[0].x);assert.ok(stroke.points[1].y>stroke.points[0].y);
+  assert.ok(stroke.points.every(point=>point.x>=0&&point.x<=1&&point.y>=0&&point.y<=1));
+  const tooTall=Clip.textStrokes(Array.from({length:250},()=> 'x').join('\n'),width100,{aspect:16/9,sizes:[.008]});
+  assert.equal(tooTall.cut,true);assert.ok(tooTall.strokes.length>0);assert.ok(tooTall.strokes.every(item=>Core.cleanStroke(item)));
+});
 test('text that cannot fit on one board is cut with a flag, and one very long word is broken',()=>{
   const laid=Clip.layoutText(Array.from({length:900},()=>'word').join(' '),width100);
   assert.equal(laid.cut,true);assert.equal(laid.size,.02);
@@ -239,9 +249,10 @@ test('the teacher whiteboard exposes paste, copy and the save / restore API',()=
   assert.match(pdfSource,/kind:'lesson-whiteboard'/);
   assert.match(pdfSource,/cleanLessonBoard\(saved,C\.cleanStroke\)/);
   assert.match(pdfSource,/register\(clipTarget\)/);
-  assert.match(pdfSource,/clip\.layoutText\(payload\.text/);
+  assert.match(pdfSource,/clip\.textStrokes\(payload\.text/);
   assert.match(pdfSource,/data-text-mark/);
   assert.match(pdfSource,/Edit whiteboard text/);
+  assert.match(pdfSource,/B\.edit\('erase',stroke\.id\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
   assert.match(boardsSource,/window\.ClassPointerBoards=\{fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,/);
 });
