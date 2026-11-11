@@ -78,3 +78,15 @@ test('pages fetch the fixed toolbar, not a cached older copy', () => {
   assert.match(read('teacher-global-bootstrap.js'), version);
   assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);
 });
+
+test('toolbar survives fullscreen transitions and page re-renders without rebinding handlers', () => {
+  const s = read('teacher-global-controls.js');
+  assert.match(s, /document\.fullscreenElement \|\| document\.body/);
+  assert.match(s, /document\.addEventListener\('fullscreenchange', ensureVisibleControls\)/);
+  assert.match(s, /window\.addEventListener\('pageshow', ensureVisibleControls\)/);
+  assert.match(s, /if \(bar\.parentElement !== surface\) surface\.appendChild\(bar\)/);
+  assert.match(s, /if \(modal\.parentElement !== surface\) surface\.appendChild\(modal\)/);
+  assert.match(s, /syncHomeButton\(lastAccess\)/);
+  assert.match(s, /z-index:2147483645/);
+  assert.match(s, /z-index:2147483646/);
+});
