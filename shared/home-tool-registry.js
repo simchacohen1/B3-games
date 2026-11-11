@@ -50,7 +50,8 @@
     {id:"share-screen",title:"Send Everyone to Share Screen",icon:"🖥️",href:"class-pointer-prototype/classroom.html?dashboard=teacher&sendEveryoneShare=1",classParam:true,newTab:true,preview:false,classGrant:"class-pointer"}
   ];
   const homepageTeacherTools=[
-    {id:"student-tool-access",action:"manage-class",title:"Student tool access",icon:"🎛️",classParam:true,elementId:""},
+    {id:"act-as-student",action:"act-as-student",title:"Sign in as a Student",icon:"👀"},
+    {id:"student-tool-access",action:"manage-class",title:"Student tool access",icon:"🎛️",classParam:true},
     {id:"homework",tool:"homework",title:"Homework & Assignments",icon:"📚",elementId:"homeworkCenterCard"},
     {id:"daily-points",tool:"daily-points",title:"Daily Points",icon:"✓"},
     {id:"class-pointer",tool:"class-pointer",title:"Classroom Pointer",icon:"👆",classParam:true},
@@ -64,7 +65,7 @@
     {id:"gematria",tool:"gematria",title:"Gematria — Teacher Dashboard",icon:"🔢"},
     {id:"student-rewards",tool:"student-rewards",title:"Student Rewards — Teacher",icon:"🏅"},
     {id:"weekly-quiz",tool:"weekly-quiz",title:"Weekly Quiz — Teacher",icon:"📝"},
-    {id:"halacha-lesson",companionOf:"halacha",companionTitle:"Halacha — Teacher Lesson",title:"Halacha — Teacher Lesson",icon:"📔"},
+    {id:"halacha-lesson",companionOf:"halacha",companionTitle:"Halacha — Teacher Lesson",title:"Halacha — Teacher Lesson",icon:"📔",classParam:true},
     {id:"halacha-student-work",tool:"halacha",title:"Halacha — Student Work",icon:"🗂️"},
     {id:"chavrusa",tool:"chavrusa",title:"Chavrusa of the Day",icon:"👥"},
     {id:"name-picker",tool:"name-picker",title:"Name Picker",icon:"🎡"},
