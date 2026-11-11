@@ -85,14 +85,23 @@
         open.onclick=async()=>{setStatus('Opening '+name.textContent+'…');open.disabled=true;try{
           const blob=await privateDownload(ref);
           const file=new File([blob],name.textContent+'.pdf',{type:'application/pdf'});
-          const opened=await window.ClassPointerPdf.openFile(file);if(!opened)throw Error('PDF could not be opened');activeId=meta.name;openedPage=Number.isFinite(page)&&page>0?page:1;
-          if(savedLayout&&savedLayout.spread)window.ClassPointerPdf.setLayout(savedLayout);
-          window.ClassPointerPdf.goToPage(openedPage-1);dialog.close();
+          const opened=await window.ClassPointerPdf.openFile(file);if(!opened)throw Error('PDF could not be opened');
+          // Keep the saved page in its own variable: changing the layout reports "page 1" back
+          // through onPageChanged, which must not replace the page we are about to resume on.
+          const resumePage=Number.isFinite(page)&&page>0?page:1;
+          if(savedLayout){
+            // The viewer keeps the layout of the PDF that was open before, so put this PDF's own layout back.
+            const now=window.ClassPointerPdf.getLayout();
+            if(savedLayout.spread?(!now.spread||now.rtl!==savedLayout.rtl||now.shift!==savedLayout.shift):now.spread)window.ClassPointerPdf.setLayout(savedLayout);
+          }
+          // Only start remembering once the saved layout is back, so opening never saves "page 1".
+          activeId=meta.name;openedPage=resumePage;
+          window.ClassPointerPdf.goToPage(resumePage-1);dialog.close();
         }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
         const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
         rename.onclick=async()=>{const next=prompt('New PDF name:',name.textContent);if(!next?.trim())return;try{await ref.updateMetadata({customMetadata:{...(meta.customMetadata||{}),displayName:next.trim().slice(0,100)}});await refresh()}catch(e){setStatus(errorText(e))}};
         const remove=document.createElement('button');remove.textContent='Delete';remove.type='button';
-        remove.onclick=async()=>{if(!confirm('Delete "'+name.textContent+'" from your private library?'))return;try{await ref.delete();if(activeId===meta.name)activeId=null;await refresh()}catch(e){setStatus(errorText(e))}};
+        remove.onclick=async()=>{if(!confirm('Delete "'+name.textContent+'" from your private library?'))return;try{await ref.delete();if(activeId===meta.name)activeId=null;if(pendingSave?.id===meta.name){clearTimeout(pageTimer);pendingSave=null}await refresh()}catch(e){setStatus(errorText(e))}};
         row.append(name,open,rename,remove);items.append(row);
       }
       setStatus(successMessage);
@@ -124,22 +133,29 @@
       activeId=id;await refresh('Saved privately.');
     }catch(e){setStatus(errorText(e));progressLabel.textContent='Upload not completed';}finally{save.disabled=false}
   };
-  let pageTimer;
+  let pageTimer,pendingSave=null;
   // Remember where the teacher is (page) and how it is laid out (one or two pages) for the next time.
   function scheduleSave(page){
     if(!activeId)return;
-    clearTimeout(pageTimer);const id=activeId;
-    pageTimer=setTimeout(async()=>{
-      if(activeId!==id)return;
+    clearTimeout(pageTimer);
+    pendingSave={id:activeId,page:page||openedPage||1,layout:JSON.stringify(window.ClassPointerPdf.getLayout())};
+    pageTimer=setTimeout(flushSave,2500);
+  }
+  // Write the waiting page now. Also called when the PDF is closed or another one is opened,
+  // so a page turned in the last couple of seconds is not forgotten.
+  function flushSave(){
+    clearTimeout(pageTimer);const saving=pendingSave;pendingSave=null;
+    if(!saving)return;
+    (async()=>{
       try{
-        const ref=(await teacherPrefix()).child(id);const m=await ref.getMetadata();
-        await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(page||openedPage||1),layout:JSON.stringify(window.ClassPointerPdf.getLayout())}});
+        const ref=(await teacherPrefix()).child(saving.id);const m=await ref.getMetadata();
+        await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(saving.page),layout:saving.layout}});
       }catch(_){}
-    },2500);
+    })();
   }
   window.PointerPdfLibrary={
-    onOpened(file){currentFile=file;activeId=null;clearTimeout(pageTimer)},
-    onClosed(){currentFile=null;activeId=null;clearTimeout(pageTimer)},
+    onOpened(file){flushSave();currentFile=file;activeId=null},
+    onClosed(){flushSave();currentFile=null;activeId=null},
     onPageChanged(page){openedPage=page;scheduleSave(page)},
     onLayoutChanged(){scheduleSave(window.ClassPointerPdf.currentPage()+1)}
   };
