@@ -1,0 +1,15 @@
+/* Principal-only progressive disclosure, scoped to the new overview component. */
+.principal-overview{max-width:1160px;margin:12px auto 30px;padding:16px;background:#fff;border:2px solid #dbeafe;border-radius:22px;box-shadow:0 8px 22px rgba(15,23,42,.08)}
+.principal-overview>h2{font:700 1.6rem 'Fredoka',sans-serif;color:#0f3b5f;margin:0 0 6px}
+.principal-overview-summary{font-weight:700;color:#475569;margin:0 0 16px}
+.principal-overview-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.principal-overview-controls input{flex:1 1 240px;min-width:0;border:2px solid #cbd5e1;border-radius:12px;padding:10px;font:inherit}
+.principal-overview-controls button{border:2px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:12px;padding:9px 14px;font:inherit;font-weight:800;cursor:pointer}
+.principal-grade,.principal-class{border:2px solid #e2e8f0;border-radius:14px;margin:9px 0;background:#f8fafc}
+.principal-grade>summary,.principal-class>summary{cursor:pointer;padding:14px 16px;font-weight:800;color:#0f3b5f}
+.principal-grade-classes{padding:0 12px 12px}
+.principal-class{background:white}
+.principal-class>.class-card{margin:0;padding:8px 14px 16px}
+.principal-overview [hidden]{display:none!important}
+.principal-overview :is(summary,input,button):focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+@media(max-width:600px){.principal-overview{padding:10px}.principal-grade-classes{padding:0 6px 6px}}
