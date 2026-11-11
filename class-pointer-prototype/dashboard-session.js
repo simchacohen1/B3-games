@@ -4,7 +4,7 @@
   const query=new URL(location.href).searchParams,C=window.ClassPointerDashboardCore;
   if(query.get('dashboard')!=='teacher')return;
   const classId=query.get('class'),ws=window.B3_APP_CONTEXT.workspaceId;
-  let activeRef=null,activePolicyRef=null,revision=0,ending=false,sessionWrites=Promise.resolve();
+  let activeRef=null,activePolicyRef=null,activeContext=null,sessionHeartbeat=null,revision=0,ending=false,sessionWrites=Promise.resolve();
   function permissionPath(room){return 'b3Private/classPointerSharePermissions/'+ws+'/'+classId+'/'+room}
   function permissionRows(policy){
     const clean=raw=>Object.fromEntries(Object.entries(raw||{}).filter(([id,v])=>C.validId(id)&&!['__proto__','constructor','prototype'].includes(id)&&v===true));
@@ -29,6 +29,17 @@
   // is still open here, set up the cleanup again and write the record back.
   let lastRow=null,lastPolicyRows=null,rowWatch=null;
   function stopRowWatch(){const stop=rowWatch;rowWatch=null;lastRow=null;lastPolicyRows=null;try{stop?.()}catch{}}
+  function stopSessionHeartbeat(){if(sessionHeartbeat!==null){clearInterval(sessionHeartbeat);sessionHeartbeat=null}}
+  function startSessionHeartbeat(ref,context){
+    stopSessionHeartbeat();
+    if(typeof setInterval!=='function')return;
+    sessionHeartbeat=setInterval(()=>{
+      if(ending||activeRef!==ref||activeContext!==context)return;
+      const user=firebase.auth?.().currentUser;
+      if(!user||user.uid!==context.user.uid)return;
+      writeSession(ref,()=>ref.child('lastSeenAt').set(firebase.database.ServerValue.TIMESTAMP)).catch(()=>{});
+    },60000);
+  }
   function watchRow(ref,policyRef,context){
     stopRowWatch();
     if(typeof ref.on!=='function')return;
@@ -160,13 +171,14 @@
     const context=await ready;
     if(!C.validRoom(room))throw Error('The classroom connection is not ready.');
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
-    const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;
+    const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;activeContext=context;
     const policyRef=context.db.ref(permissionPath(room));activePolicyRef=policyRef;
     await Promise.all([ref.onDisconnect().remove(),policyRef.onDisconnect().remove()]);
     if(current!==revision){await Promise.all([ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()]);return}
-    await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
+    await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,lastSeenAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
     if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()]);return}
     watchRow(ref,policyRef,context);
+    startSessionHeartbeat(ref,context);
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
@@ -225,13 +237,14 @@
     // or another attempt can still remove the previous classroom session.
     ending=true;
     try{
+      stopSessionHeartbeat();
       stopRowWatch();
       // Drain writes already sent; queued changes are invalidated by revision.
       // The final removal must happen after them so no child can resurrect a room.
       await sessionWrites.catch(()=>{});
       await Promise.all([ref.remove(),policyRef?.remove()]);
       await Promise.all([ref.onDisconnect().cancel(),policyRef?.onDisconnect().cancel()]);
-      if(activeRef===ref){activeRef=null;activePolicyRef=null}
+      if(activeRef===ref){activeRef=null;activePolicyRef=null;activeContext=null}
     }finally{ending=false}
   }};
 })();

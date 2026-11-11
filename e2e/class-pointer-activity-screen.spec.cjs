@@ -101,6 +101,7 @@ test('the sharing tab shares the screen by itself without an extra popup, and ca
     expect(await page.evaluate(()=>window.__verified.length)).toBe(cycle+1);
     await page.locator('#fttActivityScreenShare button').first().click();
     await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.closed===true)).toBe(true);
+    await page.evaluate(()=>window.ClassPointerActivityShares.studentStopped('arik'));
     await expect(page.locator('#activityScreenTray video')).toHaveCount(0);
     expect(await page.evaluate(()=>window.__streams.at(-1).stream.getVideoTracks()[0].readyState)).toBe('ended');
   }

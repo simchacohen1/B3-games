@@ -212,6 +212,8 @@ test('restart is gated on cleanup, never races with prior Firebase session remov
   assert.match(src,/button\.disabled=false;button\.textContent='↻ Start another class'/);
   assert.match(session,/policyRef\?\.remove\(\)/);
   assert.match(session,/policyRef\?\.onDisconnect\(\)\.cancel\(\)/);
+  assert.match(session,/lastSeenAt:firebase\.database\.ServerValue\.TIMESTAMP/);
+  assert.match(session,/setInterval\(\(\)=>\{[\s\S]*?ref\.child\('lastSeenAt'\)\.set/);
   assert.match(boards,/Do not send an asynchronous child update here/);
 });
 

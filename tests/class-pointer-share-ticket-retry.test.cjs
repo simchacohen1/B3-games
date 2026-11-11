@@ -114,6 +114,17 @@ test('tickets are invalid at and after their expiry time',async()=>{
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
 });
+test('an active long lesson stays authorized through its teacher heartbeat; an idle lesson expires',async()=>{
+  const f=fixture(),sessionPath='b3Games/workspaces/b3-2026/classes/et/classPointerSessions/'+f.room;
+  f.rows.set(sessionPath,{roomId:f.room,createdAt:Date.now()-5*60*60*1000,lastSeenAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'});
+  const issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(issue.statusCode,200,JSON.stringify(issue.body));
+  const verified=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
+  assert.equal(verified.statusCode,200,JSON.stringify(verified.body));
+  f.rows.set(sessionPath,{roomId:f.room,createdAt:Date.now()-5*60*60*1000,lastSeenAt:Date.now()-4*60*60*1000-1,studentScreenSharing:true,teacherUid:'teacher-et'});
+  const idle=await f.post({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(idle.statusCode,403);
+});
 // Sharing enabled with no teacher request: a student may share on his own, so his own permission must be answerable.
 test('permission check answers once sharing is enabled, without a teacher request',async()=>{
   const f=fixture(),key='b3Games/workspaces/b3-2026/classes/et/classPointerSessions/'+f.room;

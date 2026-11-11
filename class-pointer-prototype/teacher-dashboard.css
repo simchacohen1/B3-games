@@ -63,7 +63,7 @@ body.cp-simple #navigationHint{display:none}
 body.cp-simple #connectionStatus{font-size:13px;font-weight:500;color:var(--cp-muted);min-height:0;margin:0 0 6px}
 
 /* ---------- Tabs row: tabs left, live status right ---------- */
-.cp-tabs-row{position:relative;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+.cp-tabs-row{position:relative;z-index:2147483646;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
 body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-tabs-spacer{flex:1 1 auto}
 .cp-live-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}

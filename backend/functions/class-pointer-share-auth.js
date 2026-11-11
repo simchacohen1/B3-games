@@ -24,7 +24,8 @@ exports.classPointerShareAuth=onRequest({
   const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
-  if(!cls||cls.active===false||!session||session.roomId!==room||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Class Pointer is not active for this class.');
+  const now=Date.now(),sessionActivityAt=Number.isFinite(session?.lastSeenAt)?session.lastSeenAt:session?.createdAt;
+  if(!cls||cls.active===false||!session||session.roomId!==room||!Number.isFinite(sessionActivityAt)||now-sessionActivityAt>14400000||sessionActivityAt>now+60000)error(403,'Class Pointer is not active for this class.');
   if(!['et','wt'].includes(classId)&&cls.toolGrants?.['class-pointer']!==true)error(403,'Class Pointer is disabled for this class.');
   const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
   const failurePaths=id=>({s:'b3Private/classPointerJoinLimits/s_'+sha(id).slice(0,32),i:'b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32)});

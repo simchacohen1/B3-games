@@ -625,10 +625,11 @@
       if(active&&!autoTried&&!stream&&!busy&&!wait){autoTried=true;void beginShare()}
     }
     function current(rows){
-      return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
-        // A lesson this page is already following is not dropped just because it has run for a long time.
-        &&Number.isFinite(v.createdAt)&&(Date.now()-v.createdAt<14400000||key===latestSession?.roomId)&&Date.now()-v.createdAt>=-60000)
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
+      const now=Date.now();
+      return Object.entries(rows||{}).filter(([key,v])=>{const activeAt=Number.isFinite(v?.lastSeenAt)?v.lastSeenAt:v?.createdAt;return v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
+        // A teacher heartbeat keeps a live lesson discoverable; without one, old sessions expire.
+        &&Number.isFinite(activeAt)&&now-activeAt<14400000&&now-activeAt>=-60000})
+        .sort((a,b)=>(Number.isFinite(b[1].lastSeenAt)?b[1].lastSeenAt:b[1].createdAt)-(Number.isFinite(a[1].lastSeenAt)?a[1].lastSeenAt:a[1].createdAt))[0]?.[1]||null;
     }
     async function onSessions(snapshot){
       // Student switching must never reuse another boy's classroom invitation.

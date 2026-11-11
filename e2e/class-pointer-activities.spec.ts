@@ -37,6 +37,7 @@ async function openBoard(page: Page, teacher: boolean) {
       status: () => {}, fail: (message: any) => (window as any).__failures.push(message),
     };
   }, teacher);
+  await page.addScriptTag({ path: 'class-pointer-prototype/board-clipboard.js' });
   await page.addScriptTag({ path: 'class-pointer-prototype/student-boards.js' });
 }
 
@@ -153,14 +154,13 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
 
-    // Teacher pastes text from an ordinary clipboard outside text-entry fields.
+    // Text paste reads the clipboard and asks the teacher to confirm sending it to every board.
     await teacher.evaluate(() => {
-      const data = new DataTransfer();
-      data.setData('text/plain', 'בראשית');
-      const event = new Event('paste', { bubbles: true, cancelable: true });
-      Object.defineProperty(event, 'clipboardData', { value: data });
-      document.dispatchEvent(event);
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => 'בראשית' } });
     });
+    await teacher.getByRole('button', { name: '📋 Paste to All Boards' }).click();
+    await expect(teacher.getByRole('dialog', { name: 'Preview paste to all whiteboards' })).toBeVisible();
+    await teacher.getByRole('button', { name: '✓ Send to all boards' }).click();
     const sent = await deliver(teacher, students);
     expect(sent.filter((e: any) => e.message?.activity?.text === 'בראשית')).toHaveLength(2);
     await expect(ari.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
@@ -213,11 +213,9 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
       const c = document.createElement('canvas'); c.width = 80; c.height = 60;
       const ctx = c.getContext('2d')!; ctx.fillStyle = '#dc3030'; ctx.fillRect(0, 0, 80, 60);
       const image = await new Promise<Blob>((resolve) => c.toBlob(b => resolve(b!), 'image/png'));
-      const data = new DataTransfer();
-      data.items.add(new File([image], 'clipboard.png', { type: 'image/png' }));
-      const event = new Event('paste', { bubbles: true, cancelable: true });
-      Object.defineProperty(event, 'clipboardData', { value: data });
-      document.dispatchEvent(event);
+      const input = document.querySelector('.boards-activity-bar input[type="file"]') as HTMLInputElement;
+      const transfer = new DataTransfer(); transfer.items.add(new File([image], 'clipboard.png', { type: 'image/png' }));
+      input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await expect.poll(() => teacher.evaluate(() => (window as any).__out.filter((m: any) =>
       m.message?.activity?.kind === 'image').length)).toBeGreaterThanOrEqual(2);

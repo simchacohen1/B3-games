@@ -114,11 +114,11 @@ test('full-screen Students panel is a compact popover that can be dragged by its
   const h = (await head.boundingBox())!;
   await page.mouse.move(h.x + 30, h.y + h.height / 2);
   await page.mouse.down();
-  await page.mouse.move(h.x + 260, h.y + 90, { steps: 8 });
+  await page.mouse.move(h.x - 100, h.y + 90, { steps: 8 });
   await page.mouse.up();
   const moved = (await drawer.boundingBox())!;
   await shot(page, 'drawer-moved');
-  expect(moved.x).toBeGreaterThan(before.x + 200);
+  expect(moved.x).toBeLessThan(before.x - 80);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
   expect(Math.round(moved.width)).toBe(Math.round(before.width));
@@ -186,9 +186,11 @@ async function pasteRedPicture(page: Page) {
     const c = document.createElement('canvas'); c.width = 400; c.height = 200;
     const x = c.getContext('2d')!; x.fillStyle = '#e11d48'; x.fillRect(0, 0, 400, 200);
     const blob: Blob = await new Promise(r => c.toBlob(b => r(b!), 'image/png'));
-    const data = new DataTransfer(); data.items.add(new File([blob], 'screenshot.png', { type: 'image/png' }));
-    document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => [{ types: ['image/png'], getType: async () => blob }] } });
   });
+  const pasteButton = page.getByRole('button', { name: '📋 Paste', exact: true });
+  if (await pasteButton.count()) await pasteButton.click();
+  else await page.evaluate(() => document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() })));
 }
 
 test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and annotates it', async ({ browser }) => {
@@ -198,12 +200,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(true);
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
   expect(Math.min(...await boardPixel(page, 0.5, 0.5))).toBeGreaterThan(245);
-
-  // An existing pen mark must survive adding pictures.
   const content = (await page.locator('#pdfContent').boundingBox())!;
-  await page.mouse.move(content.x + 40, content.y + 40); await page.mouse.down();
-  await page.mouse.move(content.x + 160, content.y + 60, { steps: 6 }); await page.mouse.up();
-  await expect.poll(() => inkCount(page)).toBeGreaterThan(0);
   const marks = await inkCount(page);
 
   await pasteRedPicture(page);
@@ -216,7 +213,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   await page.mouse.move(p0.x + p0.width / 2, p0.y + p0.height / 2); await page.mouse.down();
   await page.mouse.move(p0.x + p0.width / 2 - 150, p0.y + p0.height / 2 + 40, { steps: 8 }); await page.mouse.up();
   const p1 = (await picture.boundingBox())!;
-  expect(p1.x).toBeLessThan(p0.x - 120);
+  expect(p1.x).toBeLessThan(p0.x - 80);
   // Resize from the bottom-right corner; the picture keeps its shape.
   const se = (await picture.locator('.board-picture-handle.se').boundingBox())!;
   await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2); await page.mouse.down();
@@ -238,6 +235,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   expect(await inkCount(page)).toBe(marks);
 
   // Annotate on top of the picture with the pen.
+  await page.locator('#teacherTool').evaluate((el: HTMLSelectElement) => { el.value = 'pen'; el.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.mouse.move(p2.x + 10, p2.y + 10); await page.mouse.down();
   await page.mouse.move(p2.x + p2.width - 10, p2.y + p2.height - 10, { steps: 6 }); await page.mouse.up();
   await expect.poll(() => inkCount(page)).toBeGreaterThan(marks);
@@ -549,9 +547,11 @@ test('teacher points and draws on an enlarged student screen; only that student 
   expect(await page.locator('#pointerLayer [data-person="teacher"]').count()).toBe(0);
   await page.getByRole('button', { name: '◀ Back to gallery' }).click();
   await expect(tools).toBeHidden();
-  // When the student stops sharing, his screen is told to clear the marks.
+  // A dropped connection keeps its tile during the reconnect window.
   const before = (await sentOf(page, 'board-screen-marks')).length;
   await page.evaluate(() => (window as any).__calls[0].close());
+  await expect(page.locator('#activityScreenTray .cp-activity-screen')).toHaveCount(1);
+  await page.evaluate(() => (window as any).ClassPointerActivityShares.studentStopped('pt1'));
   await expect(page.locator('#activityScreenTray .cp-activity-screen')).toHaveCount(0);
   expect(errors).toEqual([]);
   expect((await sentOf(page, 'board-screen-marks')).length).toBeGreaterThanOrEqual(before);

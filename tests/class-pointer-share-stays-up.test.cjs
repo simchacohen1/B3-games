@@ -485,6 +485,7 @@ test('a student\'s own page tells the teacher when he stops, and hears Stop view
   assert.match(share,/message\.type==='ended'\)\{stopPresence\(\);tell\(\{type:'lesson-ended',room\}\);lessonEnded\(room\)\}/);
   const boards=read('class-pointer-prototype/student-boards.js');
   assert.match(boards,/message\.from==='share-tab'\)\{window\.ClassPointerActivityShares\?\.studentStopped\?\.\(m\.studentId\);return\}/);
-  // A long lesson: the 4 hour limit does not drop a lesson this page is already following.
-  assert.match(share,/Date\.now\(\)-v\.createdAt<14400000\|\|key===latestSession\?\.roomId/);
+  // A long lesson remains discoverable through teacher heartbeats, but expires after four idle hours.
+  assert.match(share,/Number\.isFinite\(v\?\.lastSeenAt\)\?v\.lastSeenAt:v\?\.createdAt/);
+  assert.match(share,/now-activeAt<14400000/);
 });

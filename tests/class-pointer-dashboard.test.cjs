@@ -10,6 +10,8 @@ test('teacher access is limited to assigned active classes with the tool grant',
 test('room discovery rejects malformed and stale rooms, then chooses the newest valid lesson',()=>{
  const C=core(),now=Date.now(),other=room.replace('abc','def');
  assert.equal(C.latest({bad:{roomId:'bad',createdAt:now}}),null);assert.equal(C.latest({[room]:{roomId:room,createdAt:now-14400001}},now),null);
+ assert.equal(C.latest({[room]:{roomId:room,createdAt:now-18000000,lastSeenAt:now-500}},now).roomId,room,'a recent teacher heartbeat keeps a long lesson discoverable');
+ assert.equal(C.latest({[room]:{roomId:room,createdAt:now-18000000,lastSeenAt:now-14400001}},now),null,'a stale heartbeat does not keep a lesson alive');
  assert.equal(C.latest({[room]:{roomId:room,createdAt:now-200},[other]:{roomId:other,createdAt:now-100}},now).roomId,other);
 });
 test('automatic join only accepts a fresh handoff for this room and student class',()=>{
