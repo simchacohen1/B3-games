@@ -113,10 +113,10 @@ async function render(user,access){
  q("classes").innerHTML=snaps.map((s,i)=>{
  const id=ids[i],row=s.val()||{};
  if(!s.exists()||row.active===false)return "";
- const grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]);
+ const grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]&&(!REGISTRY.tools[x[0]].supportedClasses||REGISTRY.tools[x[0]].supportedClasses.includes(id)));
  if(["et","wt"].includes(id)&&siteSettings.games?.["multiplayer-center"]!==false&&siteSettings.classGames?.[id]?.["multiplayer-center"]!==false&&!enabled.some(x=>x[0]==="multiplayer-center"))enabled.push(["multiplayer-center",true]);
  if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);
- const cls=encodeURIComponent(id),link=tool=>previewActive?previewHref(tool,id):TOOLS[tool][1]+(TOOLS[tool][1].includes('?')?'&':'?')+'class='+cls;
+ const cls=encodeURIComponent(id),link=tool=>{const definition=REGISTRY.tools[tool],base=definition.classHrefs?.[id]||TOOLS[tool][1];return previewActive?previewHref(tool,id):base+(base.includes('?')?'&':'?')+'class='+cls;};
  const iconFor=tool=>{const value=REGISTRY.tools[tool]?.icon||ICONS[tool]||'';if(value.endsWith('.png'))return '<img class="yiddish-icon tool-icon" src="'+value+'" alt="">';return tool==='rashi-letters'?'<span class="card-icon tool-icon rashi-icon" lang="he" dir="rtl" aria-hidden="true">'+value+'</span>':'<span class="card-icon tool-icon" aria-hidden="true">'+value+'</span>';};
  const tileFor=(kind,[tool])=>'<a class="'+kind+'" data-game-id="'+tool+'" href="'+link(tool)+'" rel="noopener">'+iconFor(tool)+'<span class="card-title">'+esc(TOOLS[tool][0])+'</span></a>';
  const actionTile=(action)=>{
