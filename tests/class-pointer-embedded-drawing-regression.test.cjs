@@ -43,7 +43,8 @@ test('teacher enforces permission for embedded drawing events',()=>{
  assert.match(s,/member\.presence\?presence\.get\(member\.id\):members\.get\(member\.id\)/);
  assert.match(s,/message\.type==='highlight'&&live\(\)&&selected\(member\)/);
  assert.match(s,/message\.type==='point'&&live\(\)&&selected\(member\)/);
- assert.match(s,/message\.type==='edit-highlights'&&member\.admitted&&/);
+ assert.match(s,/message\.type==='edit-highlights'/);
+ assert.match(s,/live\(\)&&selected\(member\)&&\(memberTools\(member\)\?\.highlight\|\|memberTools\(member\)\?\.pen\)/);
 });
 test('Everyone and individual permission changes publish to all embedded student views',()=>{
  const s=read('classroom.js');
