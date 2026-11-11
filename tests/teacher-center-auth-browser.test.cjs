@@ -16,7 +16,7 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
  },classes:{
   et:{name:'ET',active:true,toolGrants:allClassGrants,members:{student_et:{active:true,name:'ET Student'}}},
   wt:{name:'WT',active:true,toolGrants:allClassGrants,members:{student_wt:{active:true,name:'WT Student'}}},
-  'new-room':{name:'New Room',active:true,toolGrants:allClassGrants,members:{student_new:{active:true,name:'New Student'}}}
+  'new-room':{name:'New Room',active:true,toolGrants:{chazara:true},members:{student_new:{active:true,name:'New Student'}}}
  }}}}};
 const USER_STUB=`(()=>{
  const T=${JSON.stringify(tree)},params=new URLSearchParams(location.search),role=params.get('synthetic')||'teacher_new';
