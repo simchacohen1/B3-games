@@ -3,7 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const {manageClassAccess}=require('../backend/functions/class-access-core.cjs');
+const {manageClassAccess,CLASS_TOOL_GRANTS}=require('../backend/functions/class-access-core.cjs');
 const settings=()=>({classAccess:{et:{mode:'auto',lockWindows:Object.fromEntries(['sun','mon','tue','wed','thu','fri','sat'].map(d=>[d,[]]))},wt:{mode:'locked',lockWindows:{}}},classGames:{et:{quiz:true},wt:{quiz:false}},classLockedGameOverride:{et:'',wt:'keep'},classLockedGameOverrideUntil:{et:{},wt:{keep:1}}});
 function store({assigned=['et'],admin=null}={}){
  const data={settings:settings(),writes:[],classes:{et:{active:true},wt:{active:true}},teacher:{active:true,classIds:Object.fromEntries(assigned.map(id=>[id,true]))},admin};
@@ -31,6 +31,22 @@ test('owner admin retains access across classes while platform writes remain cla
  const s=store({assigned:['et'],admin:{active:true}});
  await manageClassAccess(s,identity,{classId:'wt',action:'platform',mode:'locked'});
  assert.deepEqual(s.data.writes,[{'b3Games/workspaces/b3-2026/classes/wt/access/mode':'locked','b3Games/workspaces/b3-2026/classes/wt/siteEnabled':false}]);
+});
+test('teacher grant allowlist matches every classroom tool and excludes owner-only keys',async()=>{
+ const expected=["sefer-hamitzvos","halacha","yiddish","posuk-practice-scroll","rashi-letters","gematria","shorashim","chazara","game-show","student-rewards","weekly-quiz","multiplayer-center","homework","gallery","tag","davening","chavrusa","name-picker","class-pointer","sync-to-nigri"];
+ assert.deepEqual([...CLASS_TOOL_GRANTS].sort(),expected.slice().sort());
+ for(const toolId of CLASS_TOOL_GRANTS){
+  const s=store();await manageClassAccess(s,identity,{classId:'et',action:'grant',toolId,enabled:true});
+  assert.deepEqual(s.data.writes,[{["b3Games/workspaces/b3-2026/classes/et/toolGrants/"+toolId]:true}]);
+ }
+ for(const toolId of ['class-dashboard','owner-admin','school-settings','unknown-tool']){
+  const s=store();await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'grant',toolId,enabled:true}),{code:400});
+  assert.equal(s.data.writes.length,0,`refused grant ${toolId} must not write`);
+ }
+});
+test('teacher cannot change grants for an unassigned class',async()=>{
+ const s=store();await assert.rejects(manageClassAccess(s,identity,{classId:'wt',action:'grant',toolId:'posuk-practice-scroll',enabled:true}),{code:403});
+ assert.equal(s.data.writes.length,0);
 });
 test('assigned teacher tool writes target only that class',async()=>{
  const s=store();await manageClassAccess(s,identity,{classId:'et',action:'grant',toolId:'halacha',enabled:true});

@@ -1,6 +1,8 @@
 'use strict';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
+const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chavrusa','name-picker','class-pointer','sync-to-nigri']);
+const CLASS_TOOL_GRANT_SET=new Set(CLASS_TOOL_GRANTS);
 const DAYS=['sun','mon','tue','wed','thu','fri','sat'];
 const validWindows=value=>{
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
@@ -62,9 +64,9 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
   return {ok:true};
  }
  if(action==='grant'){
-  if(!validId(body.toolId)||typeof body.enabled!=='boolean')fail(400,'Invalid tool setting.');
+  if(!CLASS_TOOL_GRANT_SET.has(body.toolId)||typeof body.enabled!=='boolean')fail(400,'Invalid tool setting.');
   await store.update({[`${root}/toolGrants/${body.toolId}`]:body.enabled});return {ok:true};
  }
  fail(400,'Unknown class access action.');
 }
-module.exports={manageClassAccess};
+module.exports={manageClassAccess,CLASS_TOOL_GRANTS};
