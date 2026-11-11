@@ -31,17 +31,25 @@ test('non-owner teacher opens Shorashim without a second sign-in', async ({ page
   await ownerPage.goto(`${origin}/owner-admin.html`);
   await ownerPage.getByRole('button', { name: 'Sign in with Google' }).click();
   await expect(ownerPage.locator('#ownerArea')).toBeVisible();
+  // Every class and teacher belongs to a school (#631, #666).
+  await ownerPage.locator('#schoolName').fill('Fictional Pilot School');
+  await ownerPage.locator('#addSchool').click();
+  await expect(ownerPage.locator('#schools')).toContainText('Fictional Pilot School');
+  await ownerPage.locator('#schools').getByRole('button',{name:'Fictional Pilot School'}).click();
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
   await ownerPage.locator('#className').fill('Pilot Room Alpha');
   await ownerPage.locator('#addClass').click();
   await expect(ownerPage.locator('#classes')).toContainText('Pilot Room Alpha');
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Teachers'}).click();
   await ownerPage.locator('#teacherEmail').fill('teacher@example.test');
   await ownerPage.locator('#teacherName').fill('Fictional Teacher');
   await ownerPage.locator('#addTeacher').click();
   await expect(ownerPage.locator('#teachers')).toContainText('Fictional Teacher');
+  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
+  await ownerPage.locator('#classes').getByRole('button',{name:'Pilot Room Alpha'}).click();
   await ownerPage.locator('#teacherSelect').selectOption('teacher_example_test');
-  await ownerPage.locator('#classSelect').selectOption(CLASS_ID);
   await ownerPage.locator('#assign').click();
-  await expect(ownerPage.locator('#assignments')).toContainText('Pilot Room Alpha');
+  await expect(ownerPage.locator('#assignments')).toContainText('Fictional Teacher');
   await ownerContext.close();
   const tools = ['shorashim'];
   await env.withSecurityRulesDisabled(async c => {

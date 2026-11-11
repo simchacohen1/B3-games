@@ -193,6 +193,13 @@
   .posuk-tile.tile-high{ background: #C9E4A6; color: #33511E; }
   .posuk-tile.tile-mid{ background: var(--gold-light); color: var(--ink); }
   .posuk-tile.tile-low{ background: #EFC1C1; color: #7A2626; }
+  .hidden{ display:none !important; }
+  .review-group{ margin-bottom:14px; }
+  .review-group .perek-header{ cursor:default; }
+  .review-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; }
+  .review-tile{ width:auto !important; height:auto !important; min-height:64px; padding:8px; text-decoration:none; }
+  .review-tile .tile-num{ font-size:.9rem !important; font-family:'Quicksand',sans-serif !important; }
+  .review-tile .tile-score{ font-size:.72rem !important; line-height:1.3; }
 
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.9rem; margin-top:14px; }
   .hidden{ display:none !important; }
@@ -207,7 +214,7 @@
 
   <header class="top">
     <h1>📊 My Progress</h1>
-    <p>See how you're doing, posuk by posuk</p>
+    <p>Your recordings: gold standard, waiting for your teacher, and ones to try again</p>
   </header>
 
   <!-- Shown if no student is signed in on this browser -->
@@ -223,13 +230,16 @@
       <a href="student.html" class="btn small gold">← Back to Practice</a>
     </div>
 
-    <div class="tabs">
+    <!-- Issue #694: three groups from the teacher's grades. The old
+         per-skill AI score tabs are kept hidden (no longer used). -->
+    <div class="tabs hidden">
       <button class="tab-btn active" id="comprehensionTabBtn">🧠 Comprehension</button>
       <button class="tab-btn" id="readingTabBtn">🎙️ Reading</button>
       <button class="tab-btn" id="translateTabBtn">🌐 Translate</button>
     </div>
+    <div id="reviewGroups"></div>
 
-    <div id="perekList"></div>
+    <div id="perekList" class="hidden"></div>
     <div class="msg" id="statusMsg">Loading your progress…</div>
   </div>
 
@@ -238,6 +248,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -445,8 +456,62 @@ window.addEventListener('load', () => {
   }
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('studentNameLabel').textContent = studentName;
-  loadProgress();
+  loadReviewProgress();
 });
+
+/* ---------- Teacher-graded groups (Issue #694) ---------- */
+function reviewEscape(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function reviewDate(t){ return t ? new Date(Number(t)).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : ''; }
+function parseReviewKey(key){
+  const parts = String(key || '').split('_');
+  if(parts.length < 3) return null;
+  const posuk = Number(parts.pop()), perek = Number(parts.pop()), slug = parts.join('_');
+  if(!posuk || !perek) return null;
+  return { sefer: validSefer(PARSHA_TO_SEFER[slug]), perek, posuk };
+}
+// Waits for the Fun Torah Tools sign-in carried over from the practice page.
+function waitForStudentAuth(){
+  return new Promise(resolve => {
+    if(!firebase.auth) return resolve(null);
+    const stop = firebase.auth().onAuthStateChanged(user => { stop(); resolve(user); });
+    setTimeout(() => resolve(firebase.auth().currentUser), 6000);
+  });
+}
+async function loadReviewProgress(){
+  const statusMsg = document.getElementById('statusMsg');
+  const wrap = document.getElementById('reviewGroups');
+  try{
+    await waitForStudentAuth();
+    const snap = await db.ref('posukPractice/reviews/' + studentId).once('value');
+    const rows = Object.entries(snap.val() || {}).map(([key, r]) => ({ key, ...(r || {}), ref: parseReviewKey(key) })).filter(r => r.ref);
+    const order = (a, b) => SEFER_ORDER.indexOf(a.ref.sefer) - SEFER_ORDER.indexOf(b.ref.sefer) || a.ref.perek - b.ref.perek || a.ref.posuk - b.ref.posuk;
+    const groups = [
+      { id:'gold', title:'🏅 Gold standard', empty:'No gold standard pesukim yet — keep practicing!', rows: rows.filter(r => r.status === 'gold') },
+      { id:'pending', title:'⏳ Waiting for your teacher', empty:'Nothing waiting for your teacher.', rows: rows.filter(r => r.status === 'pending') },
+      { id:'retry', title:'🔁 Graded — not gold standard yet', empty:'Nothing to try again right now.', rows: rows.filter(r => r.status === 'retry') }
+    ];
+    const now = Date.now();
+    wrap.innerHTML = groups.map(g => {
+      g.rows.sort(order);
+      const tiles = g.rows.map(r => {
+        const ref = r.ref, href = 'student.html?sefer=' + encodeURIComponent(ref.sefer) + '&perek=' + ref.perek + '&posuk=' + ref.posuk;
+        let detail = '';
+        if(g.id === 'gold') detail = '+' + (Number(r.pointsAwarded) || 0) + ' pts' + (Number(r.bonus) ? ' · 🎉 ' + r.bonus + ' bonus' : '') +
+          (Number(r.lockedUntil) > now ? ' · 🔒 until ' + reviewDate(r.lockedUntil) : '');
+        else if(g.id === 'pending') detail = 'Sent ' + reviewDate(r.submittedAt);
+        else detail = (Number(r.mistakes) ? r.mistakes + ' mistake' + (Number(r.mistakes) === 1 ? '' : 's') + ' · ' : '') + 'Try again';
+        return '<a class="posuk-tile review-tile tile-' + (g.id === 'gold' ? 'high' : g.id === 'pending' ? 'mid' : 'low') + '" href="' + href + '">' +
+          '<span class="tile-num">' + reviewEscape(ref.sefer) + ' ' + ref.perek + ':' + ref.posuk + '</span><span class="tile-score">' + reviewEscape(detail) + '</span></a>';
+      }).join('');
+      return '<div class="perek-section expanded review-group"><div class="perek-header"><span>' + g.title + '</span><span class="summary">' + g.rows.length + '</span></div>' +
+        '<div class="perek-body">' + (tiles ? '<div class="review-grid">' + tiles + '</div>' : '<div class="msg">' + g.empty + '</div>') + '</div></div>';
+    }).join('');
+    statusMsg.textContent = rows.length ? '' : "You haven't sent any recordings to your teacher yet — go practice and come back!";
+  }catch(err){
+    console.error(err);
+    statusMsg.textContent = 'Could not load your progress — check your internet connection.';
+  }
+}
 
 document.getElementById('comprehensionTabBtn').onclick = () => switchTab('comprehension');
 document.getElementById('readingTabBtn').onclick = () => switchTab('reading');

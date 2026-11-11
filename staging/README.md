@@ -8,7 +8,8 @@ This directory contains the isolated staging build and provisioning workflow for
 - Firebase project: `fun-torah-tools-staging`
 - Realtime Database rules: `database.rules.json` (private by default; authenticated, role/class scoped access)
 - Cloud Functions codebase: `backend/functions-staging` (only the student auth, teacher claim, student management, Weekly Quiz, and reward functions required for the fictional test fixtures)
-- Audio/Storage uploads, Posuk scorer, and Nigri sync are disabled. No Firebase Storage bucket is provisioned.
+- Posuk scorer and Nigri sync are disabled.
+- Firebase Storage: the default bucket `fun-torah-tools-staging.firebasestorage.app` (US-CENTRAL1) exists so Posuk Practice recordings can be sent and graded (issue #694). Rules: `storage.rules`. The Chazara and Shorashim record buttons are still hidden on staging.
 - Do not run production deployment commands or merge PR #373 as part of staging work.
 
 The `firebase.staging.json` config names the staging Hosting site, staging database rules, and the minimal staging Functions codebase. Deploy only with `firebase --config firebase.staging.json deploy --project fun-torah-tools-staging` after confirming the active CLI project and reviewing the config.
@@ -39,4 +40,4 @@ Live coverage is in `e2e/staging-live.spec.ts`. It reads the ignored local crede
 
 ## Cost and safety notes
 
-Blaze billing is enabled on staging with an owner-configured $5 monthly budget alert. An alert is not a spending cap. The Functions source/artifact buckets are used by deployment; no Firebase Storage service/bucket is enabled. Keep functions limited to the staging codebase and avoid adding paid services without owner approval. The student custom-token function requires the staging runtime service account to have the narrow `iam.serviceAccountTokenCreator` permission needed for `signBlob`; verify runtime sign-in after IAM propagation. Scorer and Nigri integrations remain off until separately reviewed.
+Blaze billing is enabled on staging with an owner-configured $5 monthly budget alert. An alert is not a spending cap. The Functions source/artifact buckets are used by deployment. Firebase Storage is enabled with one default bucket, used for Posuk Practice test recordings (issue #694); it stores small test files only. Keep functions limited to the staging codebase and avoid adding paid services without owner approval. The student custom-token function requires the staging runtime service account to have the narrow `iam.serviceAccountTokenCreator` permission needed for `signBlob`; verify runtime sign-in after IAM propagation. Scorer and Nigri integrations remain off until separately reviewed.

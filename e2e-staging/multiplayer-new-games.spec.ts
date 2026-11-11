@@ -139,17 +139,13 @@ test.describe('Multiplayer Center new game staging journeys @multiplayer @auth',
       } else if (game.key === 'set') {
         const indexes = await host.evaluate(() => {
           const cells = Array.from(document.querySelectorAll('#board .board-cell'));
-          const p = cells.map(n => {
-            const tokens=(n.textContent||'').trim().split(/\s{2,}/);
-            const m=tokens[0]?.match(/^[●◆■](🔴|🟣|🟢)(○|◍|●)$/u);
-            return [tokens.length-1,['●','◆','■'].indexOf(Array.from(tokens[0]||'')[0]),['🔴','🟣','🟢'].indexOf(m?.[1]||''),['○','◍','●'].indexOf(m?.[2]||'')];
-          });
+          const p = cells.map(n => { const v=((n as HTMLElement).dataset.props||'').split(',').map(Number); return [v[3]||0, v[0], v[1], v[2]]; });
           const valid=(a:number,b:number,c:number)=>a===b&&b===c||a!==b&&a!==c&&b!==c;
           for(let a=0;a<p.length;a++)for(let b=a+1;b<p.length;b++)for(let c=b+1;c<p.length;c++)if([0,1,2,3].every(k=>valid(p[a][k],p[b][k],p[c][k])))return[a,b,c];
           return [];
         });
         expect(indexes).toHaveLength(3); for(const i of indexes)await hostCells.nth(i).click();
-        await expect(host.locator('#board')).toContainText(': 1 sets'); await expect(guest.locator('#board')).toContainText(': 1 sets');
+        await expect(host.locator('#board')).toContainText('1 set'); await expect(guest.locator('#board')).toContainText('1 set');
       } else if (game.key === 'ludo') {
         let movedPage: Page | null = null;
         const [hostId, guestId] = await Promise.all([host, guest].map(page => page.evaluate(() =>
