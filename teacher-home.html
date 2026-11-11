@@ -138,7 +138,7 @@ async function render(user,access){
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card" data-class-id="'+esc(id)+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card" data-class-id="'+encodeURIComponent(id)+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(principal&&window.B3PrincipalDashboard){
    // Group only the classes already resolved through this user's scoped access checks.
@@ -148,7 +148,7 @@ async function render(user,access){
      const items=cards.map(card=>({
        name:card.querySelector("h2")?.textContent||"",
        teacher:(card.querySelector(":scope > p.sub")?.textContent||"").replace(/^Teacher:\s*/,""),
-       id:card.dataset.classId||"",
+       id:decodeURIComponent(card.dataset.classId||""),
        card
      }));
      window.B3PrincipalDashboard.build(q("classes"),items,{teacherCount:supervised.length,persistKey:user?.uid||"principal"});
