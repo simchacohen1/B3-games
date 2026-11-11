@@ -23,7 +23,8 @@
     const heading=doc.createElement("h2");heading.textContent="School overview";shell.append(heading);
     const summary=doc.createElement("p");summary.className="principal-overview-summary";
     summary.textContent=entries.length+" supervised "+(entries.length===1?"class":"classes")+
-      (opts.teacherCount!=null?" · "+Number(opts.teacherCount)+" supervised teachers":"");
+      (opts.teacherCount!=null?" · "+Number(opts.teacherCount)+" supervised teachers":"")+
+      (opts.studentCount!=null?" · "+Number(opts.studentCount)+" students":"");
     shell.append(summary);
     const controls=doc.createElement("div");controls.className="principal-overview-controls";
     const search=doc.createElement("input");search.type="search";search.placeholder="Find a class or teacher";
@@ -72,7 +73,8 @@
         if(term&&matches)group.open=true;
       }
       summary.textContent=shown+" of "+entries.length+" supervised classes"+
-        (opts.teacherCount!=null?" · "+Number(opts.teacherCount)+" supervised teachers":"");
+        (opts.teacherCount!=null?" · "+Number(opts.teacherCount)+" supervised teachers":"")+
+      (opts.studentCount!=null?" · "+Number(opts.studentCount)+" students":"");
     }
     allDetails.forEach(d=>d.addEventListener("toggle",remember));
     search.addEventListener("input",applySearch);
