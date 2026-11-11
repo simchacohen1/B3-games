@@ -19,6 +19,7 @@
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
   let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
+  let textEditStroke=null;
 
   function el(tag,id,cls,text){const node=document.createElement(tag);if(id)node.id=id;if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
   function svg(tag,attrs){const node=document.createElementNS(ns,tag);for(const key in attrs)node.setAttribute(key,String(attrs[key]));return node}
@@ -29,6 +30,18 @@
   stage.insertBefore(scroller,$('highlightLayer'));
   const note=el('div','pdfNote');note.hidden=true;note.setAttribute('role','status');stage.appendChild(note);
   function showNote(text){note.textContent=text||'';note.hidden=!text}
+  const textEditDialog=el('dialog','pdfTextEditDialog'),textEditForm=el('form');textEditForm.method='dialog';
+  const textEditLabel=el('label',null,null,'Edit whiteboard text');textEditLabel.htmlFor='pdfTextEditInput';
+  const textEditInput=el('textarea','pdfTextEditInput');textEditInput.maxLength=240;textEditInput.rows=4;
+  const textEditSave=el('button',null,null,'Save text');textEditSave.type='submit';
+  const textEditCancel=el('button',null,null,'Cancel');textEditCancel.type='button';textEditCancel.addEventListener('click',()=>textEditDialog.close());
+  textEditForm.append(textEditLabel,textEditInput,textEditSave,textEditCancel);textEditDialog.appendChild(textEditForm);stage.appendChild(textEditDialog);
+  textEditForm.addEventListener('submit',event=>{
+    event.preventDefault();textEditDialog.close();const stroke=textEditStroke;textEditStroke=null;if(!stroke)return;
+    const next=C.cleanStroke({...stroke,text:textEditInput.value});if(!next){B.status('Enter some text to keep this text box.');return}
+    B.edit('erase',stroke.id);B.submitStroke(next);B.status('Whiteboard text updated.');
+  });
+  function openTextEditor(stroke){textEditStroke=stroke;textEditInput.value=stroke.text;textEditDialog.showModal();textEditInput.focus();textEditInput.select()}
 
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
   let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null,movePicturesBtn=null;
@@ -78,6 +91,10 @@
         const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
         lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);lc.lineCap=lc.lineJoin='round';
         if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
+        if(stroke.tool==='text'){
+          lc.font=`${Math.max(16,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
+          (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(16,stroke.size*W*2.4)*1.25));continue;
+        }
         const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
         lc.beginPath();pts.forEach((point,index)=>{lc[index?'lineTo':'moveTo'](point.x*W,point.y*H)});lc.stroke();
       }
@@ -150,6 +167,7 @@
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
     button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
+    button('✏ Edit latest text','Edit the most recently pasted teacher text mark.',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
     button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     movePicturesBtn=button('🖼 Move pictures','Move, resize or remove pictures pasted on the whiteboard',()=>editBoardPictures(),'pdf-btn pdf-board-pictures');movePicturesBtn.hidden=true;
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
@@ -278,6 +296,11 @@
   function inkPath(stroke,color){
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
+    if(stroke.tool==='text'){
+      const text=svg('text',{x:first.x*W,y:first.y*H,'font-size':Math.max(16,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
+      (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
+      return text;
+    }
     const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
     return svg('path',{d:pts.map((p,i)=>(i?'L':'M')+(p.x*W).toFixed(1)+' '+(p.y*H).toFixed(1)).join(' '),fill:'none',stroke:color,'stroke-width':stroke.size*W*(stroke.tool==='pen'?0.45:1),'stroke-linecap':'round','stroke-linejoin':'round'});
   }
@@ -285,10 +308,10 @@
     ink.replaceChildren();if(notReady())return;
     const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes,groups=new Map();
     for(const stroke of all){
-      const kind=['pencil','crayon','pen'].includes(stroke.tool)?stroke.tool:'highlight',key=stroke.owner+'|'+kind;
+      const kind=['pen','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=groups.get(key);
       if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
-      group.appendChild(inkPath(stroke,stroke.color));
+      const mark=inkPath(stroke,stroke.color);if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
     }
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
@@ -345,7 +368,17 @@
   }
   const toolId=isTeacher?'teacherTool':'studentTool',colorId=isTeacher?'teacherColor':'studentColor',sizeId=isTeacher?'teacherSize':'studentSize';
   function cancelDraft(){if(dragId!==null&&content.hasPointerCapture?.(dragId))content.releasePointerCapture(dragId);draft=null;dragId=null;drawInk()}
+  function editLatestText(){
+    const stroke=[...(B.highlights?.()||[])].reverse().find(item=>item.tool==='text'&&item.owner==='teacher');
+    if(!stroke){B.status('There is no teacher text to edit yet.');return}
+    openTextEditor(stroke);
+  }
   content.addEventListener('pointerdown',event=>{
+    if(isTeacher&&event.button===0){
+      const textNode=[...ink.querySelectorAll('[data-text-mark]')].reverse().find(node=>{const rect=node.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom});
+      const p=normalized(event),stroke=(textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId))||(p&&[...strokes].reverse().find(item=>item.tool==='text'&&item.owner==='teacher'&&inkHits(item,p)));
+      if(stroke){event.preventDefault();event.stopPropagation();openTextEditor(stroke);return}
+    }
     const tool=$(toolId).value;
     if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed())return;
     const p=normalized(event);if(!p)return;
@@ -865,17 +898,18 @@
     return true;
   }
   // ---------- Paste and Copy on the teacher whiteboard (board-clipboard.js) ----------
-  // Whatever is pasted becomes a picture on the board (words are turned into a picture of the words), so it can be
-  // moved and resized, and it reaches every student the same way the board itself does: joined students get the
-  // new board picture, and students on activity pages see it in the live lesson video.
+  // Pictures stay movable board images. Words remain text marks, so they can be edited and rendered accessibly.
   const clipTarget={priority:0,say:text=>B.status(text),
     active:()=>isBoardOpen()&&!window.ClassPointerBoards?.workspace?.(),
     async paste(payload){
       const clip=window.ClassPointerClipboard;
       if(payload.kind==='image'){await pastePicture(payload.blob);return}
-      const made=await clip.textImage(payload.text);
-      await pastePicture(made.blob);
-      if((payload.cut||made.cut)&&pictureEdits.length)B.status(clip.MSG.textCut+' Move it, then press ✓ Show to class.');
+      if(!B.live()||!B.writingAllowed()){B.status('You cannot add whiteboard text right now.');return}
+      const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
+      const layout=clip.layoutText(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008]});
+      let added=0;for(const item of layout.items){const lines=item.text.split('\n'),width=ctx.measureText(lines[0]||'').width*2.4*item.size/100,height=lines.length*item.size*1.25*W/Math.max(1,H);const stroke=C.cleanStroke({tool:'text',color:B.ownColor(),size:item.size,points:[{x:item.x,y:item.y},{x:Math.min(1,item.x+Math.max(0.02,width)),y:Math.min(1,item.y+Math.max(0.02,height))}],text:item.text});if(stroke){B.submitStroke(stroke);added++}}
+      if(!added){B.status('No whiteboard text could be added.');return}
+      B.status((payload.cut||layout.cut)?clip.MSG.textCut:'Pasted editable text. Use “Edit latest text” to change it.');
     },
     async copy(){
       const clip=window.ClassPointerClipboard;

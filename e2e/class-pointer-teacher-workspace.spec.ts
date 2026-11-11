@@ -192,6 +192,29 @@ async function pasteRedPicture(page: Page) {
   if (await pasteButton.count()) await pasteButton.click();
   else await page.evaluate(() => document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() })));
 }
+async function pasteWords(page: Page, text: string) {
+  await page.evaluate((value) => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => [{ types: ['text/plain'], getType: async () => new Blob([value], { type: 'text/plain' }) }] } });
+  }, text);
+  await page.getByRole('button', { name: '📋 Paste', exact: true }).click();
+}
+
+test('teacher pastes editable text onto the shared whiteboard and can edit it', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  await pasteWords(page, 'Read this lesson');
+  const mark = page.locator('#pdfInk text[data-text-mark]').filter({ hasText: 'Read this lesson' });
+  await expect(mark).toBeVisible();
+  await page.getByRole('button', { name: '✏ Edit latest text' }).click();
+  await page.locator('#pdfTextEditInput').fill('Updated lesson note');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toContainText('Updated lesson note');
+  expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === 'text' && s.text === 'Updated lesson note'))).toBe(true);
+  expect(errors).toEqual([]);
+  await context.close();
+});
 
 test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and annotates it', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
