@@ -7,7 +7,7 @@ const path=require('node:path');
 const base=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-library.js'),'utf8');
 
-function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false,promptName=null,uploadFails=false}={}){
+function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false,blobFails=false,promptName=null,uploadFails=false,savedLayout=null}={}){
   const elements={};
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
@@ -28,11 +28,11 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   showPdf.textContent='Show a PDF';presentMenu.closestElement=presentWrap;presentMenu.querySelectorAll=()=>[showPdf];
   dock.querySelector=q=>q==='#tbShareMenu'?presentMenu:null;
   presentWrap.querySelector=q=>q==='[data-menu="tbShareMenu"]'?presentToggle:null;
-  let listed=0,fetches=[],loaded=[],page=[],uploads=[];
+  let listed=0,fetches=[],loaded=[],page=[],uploads=[],updates=[],layouts=[],layout={spread:false,rtl:true,shift:false};
   const pdf={name:'Private worksheet.pdf',bucket:'test-bucket',fullPath:'pointerPdfLibrary/teacherA/abc.pdf',
     getDownloadURL(){throw Error('Public download token must never be requested')},
-    async getMetadata(){return {name:'abc.pdf',updated:'2026-10-15',customMetadata:{displayName:'Private worksheet',lastPage:'4'}}},
-    async updateMetadata(){return {}},
+    async getMetadata(){return {name:'abc.pdf',updated:'2026-10-15',customMetadata:{displayName:'Private worksheet',lastPage:'4',...(savedLayout?{layout:JSON.stringify(savedLayout)}:{})}}},
+    async updateMetadata(metadata){updates.push(metadata);return {}},
     async delete(){return {}}
   };
   const storage={ref(p){return {
@@ -47,14 +47,16 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   const auth={currentUser:{uid,async getIdToken(){return 'signed-in-ID-token'}}};
   const w={ClassPointerBridge:{isTeacher:teacher},ClassPointerDashboard:{ready:authorized?Promise.resolve({user:{uid}}):Promise.reject(Error('Teacher class access denied'))},
     firebase:{auth:()=>auth,storage:()=>storage},
-    ClassPointerPdf:{async openFile(file){loaded.push(file);return true},goToPage(i){page.push(i)},currentPage(){return 3},getLayout(){return {spread:false,rtl:true,shift:false}},setLayout(){}}};
+    ClassPointerPdf:{async openFile(file){loaded.push(file);return true},goToPage(i){page.push(i);w.PointerPdfLibrary.onPageChanged(i+1)},currentPage(){return 3},getLayout(){return {...layout}},
+      // Like the real viewer: a layout change keeps the place (page 1 on a fresh open) and reports it.
+      setLayout(next){layout={...layout,...next};layouts.push(next);w.PointerPdfLibrary.onPageChanged(1);w.PointerPdfLibrary.onLayoutChanged()}}};
   const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:id==='teacherDock'&&dockAvailable?dock:null,
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
     URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>promptName,confirm:()=>true,clearTimeout,setTimeout,
-    fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
+    fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>{if(blobFails)throw TypeError('Failed to fetch');return new Blob(['%PDF-1.7\n'])}}}};
   vm.runInNewContext(source,context);
-  return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},uploads,loaded,page};
+  return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},uploads,loaded,page,updates,layouts};
 }
 
 test('student page does not initialize the private library',()=>{
@@ -99,16 +101,63 @@ test('authorized teacher lists and reopens using Firebase ID token, never a publ
   assert.equal(h.loaded.length,1);
   assert.equal(h.page[0],3);
 });
-test('private-download network/CORS failures explain next step and leave saved file untouched',async()=>{
+test('PDF saved in two-page layout reopens on its saved page, not page 1',async()=>{
+  const h=harness({savedLayout:{spread:true,rtl:true,shift:true}});
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  await h.elements['#pointerLibraryItems'].children[0].children[1].onclick();
+  assert.equal(h.layouts.length,1,'saved two-page layout is put back');
+  assert.deepEqual(h.page,[3],'resumes on saved page 4');
+  h.w.PointerPdfLibrary.onClosed();
+  await new Promise(setImmediate);
+  assert.equal(h.updates.at(-1).customMetadata.lastPage,'4','opening must not save page 1 over the real page');
+});
+test('PDF saved in one-page layout drops a two-page layout left by the previous PDF',async()=>{
+  const h=harness({savedLayout:{spread:false,rtl:true,shift:false}});
+  h.w.ClassPointerPdf.setLayout({spread:true,shift:true});h.layouts.length=0;
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  await h.elements['#pointerLibraryItems'].children[0].children[1].onclick();
+  assert.equal(h.layouts.length,1);
+  assert.equal(h.w.ClassPointerPdf.getLayout().spread,false);
+  assert.deepEqual(h.page,[3]);
+  h.w.PointerPdfLibrary.onClosed();
+});
+test('closing the PDF right after turning a page still saves that page',async()=>{
+  const h=harness();
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  await h.elements['#pointerLibraryItems'].children[0].children[1].onclick();
+  h.w.PointerPdfLibrary.onPageChanged(9);
+  h.w.PointerPdfLibrary.onClosed();
+  await new Promise(setImmediate);
+  assert.equal(h.updates.length,1);
+  assert.equal(h.updates[0].customMetadata.lastPage,'9');
+  assert.equal(h.updates[0].customMetadata.displayName,'Private worksheet');
+});
+test('private-download request failures give a retryable network message and leave saved file untouched',async()=>{
   const h=harness({fetchFails:true});
   h.elements['.session-controls'].afterElement.onclick();
   await new Promise(setImmediate);
   const row=h.elements['#pointerLibraryItems'].children[0];
   await row.children[1].onclick();
-  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Cloud Storage bucket CORS setting/);
-  assert.match(h.elements['#pointerLibraryStatus'].textContent,/GET from https:\/\/funtorahtools.com/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Check your connection and try again/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/saved PDF has not been deleted/);
   assert.equal(h.elements['#pointerLibraryItems'].children.length,1);
   assert.equal(h.loaded.length,0);
+});
+
+test('interrupted PDF response body gives a safe retry message and preserves saved PDF and page metadata',async()=>{
+  const h=harness({blobFails:true});
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  const row=h.elements['#pointerLibraryItems'].children[0];
+  await row.children[1].onclick();
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/download was interrupted/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/saved PDF has not been deleted/);
+  assert.equal(h.elements['#pointerLibraryItems'].children.length,1);
+  assert.equal(h.loaded.length,0);
+  assert.equal(h.updates.length,0,'a failed download must not modify last-page metadata');
 });
 
 test('private PDF CORS example only allows known site origins and GET',()=>{

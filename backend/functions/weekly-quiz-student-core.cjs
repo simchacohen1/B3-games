@@ -1,5 +1,6 @@
 'use strict';
 
+const {readClassForStudent}=require('./student-practice-auth.cjs');
 const validKey=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const rootFor=classId=>['et','wt'].includes(classId)?'b3Quiz':`b3Quiz/classes/${classId}`;
@@ -42,7 +43,9 @@ async function authorizeStudent({decoded,get}){
   const [profile,memberships,cls]=await Promise.all([
     get(`b3Games/students/${studentId}/profile`),
     get(`b3Games/students/${studentId}/memberships`),
-    get(`b3Games/workspaces/b3-2026/classes/${classId}`)
+    // Active flag, tool grants and this student's row only: the quiz page calls
+    // this often, and the whole class record holds every member and gallery post.
+    readClassForStudent(get,classId,studentId)
   ]);
   const member=cls?.members?.[studentId],rows=memberships||{};
   const enrolled=Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId===classId)

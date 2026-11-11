@@ -111,8 +111,10 @@
     }
     function startWatch() {
       if (watch) return;
-      var ref = db.ref(path), cb = ref.on("value", function (s) { onAll(s.val() || {}); }, function (e) { console.warn("B3Race watch failed", e); });
-      watch = { ref: ref, cb: cb };
+      // Register before subscribing: cached data can call back right away, and onRoom may call startWatch again.
+      var ref = db.ref(path), mine = watch = { ref: ref, cb: null, last: null };
+      mine.cb = ref.on("value", function (s) { var all = s.val() || {}; mine.last = all; if (watch === mine) onAll(all); }, function (e) { console.warn("B3Race watch failed", e); });
+      if (watch !== mine) ref.off("value", mine.cb);
     }
     function stopWatch() { if (watch) { watch.ref.off("value", watch.cb); watch = null; } }
     function onAll(all) {
@@ -209,16 +211,33 @@
     function enter(code, isHost) {
       view++;
       saveRoomRoute(code, isHost);
-      var ref = db.ref(path + "/" + code), cb = ref.on("value", function (s) { if (room && room.code === code) onRoom(s.val() || null); }); room = { code: code, ref: ref, cb: cb, isHost: isHost, data: null, started: false, qi: 0, score: 0, finished: false, shown: null, waitStartedAt: now(), reminderTimer: null };
-      startWatch();
-      stopWatch();
+      var ref = db.ref(path + "/" + code), cb = ref.on("value", function (s) { if (room && room.code === code) onRoom(s.val() || null); }); room = { code: code, ref: ref, cb: cb, isHost: isHost, data: null, started: false, qi: 0, score: 0, finished: false, shown: null, waitStartedAt: now(), reminderTimer: null, conn: null };
+      // A host waiting alone keeps an eye on other open rooms so he can join a friend who is also waiting.
+      if (isHost) startWatch(); else stopWatch();
+      watchConnection(room);
     }
+    // After a short network drop, Firebase has already marked this player "left". Undo that
+    // when the connection comes back, and set up the disconnect marker again.
+    function watchConnection(r) {
+      var connRef = db.ref(".info/connected");
+      var cb = connRef.on("value", function (s) {
+        if (s.val() !== true || room !== r || r.finished || !r.data || !r.data.players || !r.data.players[me]) return;
+        var mine = r.ref.child("players/" + me);
+        if (r.data.players[me].left) mine.update({ left: false }).catch(function () {});
+        mine.onDisconnect().update({ left: true });
+      });
+      r.conn = { ref: connRef, cb: cb };
+    }
+    function otherActivePlayers(r) { return active(r.data).filter(function (x) { return x[0] !== me; }).length; }
     function leave() {
       stopWatch();
-      var r = room; if (!r) return; if (r.ref && r.cb) r.ref.off("value", r.cb); room = null;
+      var r = room; if (!r) return; if (r.ref && r.cb) r.ref.off("value", r.cb); if (r.conn) r.conn.ref.off("value", r.conn.cb); room = null;
       try {
         var st = r.data && r.data.state;
-        if (r.isHost && (st === "lobby" || st === "playing" || r.shown === "results")) { r.ref.onDisconnect().cancel(); r.ref.remove().catch(function () {}); var invite = centerRoomRef(r.code); if (invite) { invite.onDisconnect().cancel(); invite.remove().catch(function () {}); } }
+        // A host leaving a race in progress only steps out; classmates who are still racing keep their game.
+        var hostStepsOut = r.isHost && st === "playing" && !r.finished && otherActivePlayers(r) > 0;
+        if (hostStepsOut) { var hm = r.ref.child("players/" + me); hm.onDisconnect().cancel(); hm.update({ left: true }).catch(function () {}); }
+        else if (r.isHost && (st === "lobby" || st === "playing" || r.shown === "results")) { r.ref.onDisconnect().cancel(); r.ref.remove().catch(function () {}); var invite = centerRoomRef(r.code); if (invite) { invite.onDisconnect().cancel(); invite.remove().catch(function () {}); } }
         else if (!r.finished && r.data) { var m = r.ref.child("players/" + me); m.onDisconnect().cancel(); m.update({ left: true }).catch(function () {}); }
         clearRoomRoute();
       } catch (e) { console.error(e); }
@@ -238,13 +257,18 @@
       }
       r.data = data;
       publishCenterRoom(data, r.code);
-      if (data.state === "lobby") { renderLobby(data, all); return; }
+      if (data.state === "lobby" && r.isHost && active(data).length < 2) startWatch(); else stopWatch();
+      if (data.state === "lobby") { renderLobby(data, all || (watch && watch.last) || null); return; }
       if (r.shown === "results") return;
       if (data.state === "ended" || (r.finished && allDone(data))) { renderResults(data); return; }
       if (data.state === "playing" && !r.started) {
         if (!data.players || !data.players[me] || data.players[me].left) { room = null; start("That game already started."); return; }
         r.started = true;
         r.qi = Number(data.players[me].q) || 0; r.score = Number(data.players[me].score) || 0;
+        // The lobby deletes the room if the host disconnects. Once the race is on, a short
+        // drop on the host's device must not wipe out everyone's game, so cancel that here.
+        // (cancel() also clears this player's own marker, which is set again just below.)
+        if (r.isHost) r.ref.onDisconnect().cancel();
         r.ref.child("players/" + me).onDisconnect().update({ left: true });
         if (r.qi >= list(data.questions).length) renderWaiting(); else countdown(); return;
       }

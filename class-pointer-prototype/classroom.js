@@ -344,7 +344,7 @@ async function startClass(){
     if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     $('startClass').hidden=true;
     const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('dashboard','student');link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('dashboard','student');link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Pick what to teach from below. Signed-in students join by themselves.');roster();
     // An explicit Follow Teacher launch starts with the teacher's shared whiteboard.
     // This uses the existing classroom document viewer, not the student-board broadcast.
     if(new URL(location.href).searchParams.get('followTeacherWhiteboard')==='1')openFollowWhiteboard();
@@ -478,11 +478,11 @@ async function shareScreen(preferTab=false){
     screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
     setupTabControls(captureController,captured);captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
     await $('lesson').play();if(screen!==outgoing)return;document.dispatchEvent(new Event('class-pointer-capture-ready'));setActivityLesson(screen);publish();for(const member of members.values())if(member.admitted)callStudent(member);
-    status(preferTab?'Browser tab is sharing. Use Scroll tab and Tab A−/A+ when supported; hold Shift to navigate without marking.':viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
+    status(preferTab?'Browser tab is sharing. Use Scroll tab and Tab A−/A+ when supported; hold Shift to navigate without marking.':viewportController?.active?'Your screen is shared. Use 🔍 View to zoom in or show only part of it.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){
     if(peer!==currentPeer||(error.name==='AbortError'&&!screen)){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
     processor?.stop();if(viewportController===processor)viewportController=null;captured?.getTracks().forEach(track=>track.stop());stopSharing();
-    fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share teaching screen to try again.':'Could not share the screen. Please try again.');
+    fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share my screen to try again.':'Could not share the screen. Please try again.');
   }
 }
 function endClass(){
@@ -713,7 +713,10 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
-window.ClassPointerBridge={isTeacher,send,fail,
+window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
+  // What the lesson shows now: 'screen', 'pdf', 'webpage', 'whiteboard' or null (used by classroom-annotate.js).
+  lessonKind:()=>state.sharing?'screen':state.pdf===true?(state.documentKind||'pdf'):null,
+  ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   sendTeacher:message=>send(teacherConnection,message),started:()=>started,
   // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
   callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,presence:()=>presence,sharing:()=>state.sharing,stopSharing,

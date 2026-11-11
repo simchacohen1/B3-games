@@ -49,8 +49,12 @@ for (const role of ['admin', 'teacher']) {
       await expect(content.getByText('Test Student', { exact: true })).toBeHidden();
       await page.getByRole('button', { name: /Administration.*Teachers/ }).click();
       const administration = page.frameLocator('#administrationFrame');
-      await expect(administration.getByRole('heading', { name: 'Teachers', exact: true })).toBeVisible();
-      await expect(administration.getByRole('heading', { name: 'Classes', exact: true })).toBeVisible();
+      // Owner Admin is drill-down: it opens on the school list, and the
+      // Teachers and Classes sections stay hidden until a school is opened.
+      await expect(administration.getByRole('heading', { name: /Schools$/ })).toBeVisible();
+      await expect(administration.locator('#addSchool')).toBeVisible();
+      await expect(administration.locator('[data-view="teachers"]')).toBeHidden();
+      await expect(administration.locator('[data-view="classes"]')).toBeHidden();
       await expect(page.locator('#adminFrame')).toBeHidden();
       await page.getByRole('button', { name: /View as Teacher/ }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
