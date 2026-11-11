@@ -32,6 +32,8 @@ test('registry keeps owner-only controls out and retains class grant mapping for
  assert.match(index,/shared\/home-tool-registry\.js/);
  assert.match(index,/const homeRegistry=window\.B3HomeToolRegistry/);
  const homepageIds=new Set([...index.matchAll(/data-game-id="([^"]+)"/g)].map(m=>m[1]));
+ for(const id of homepageIds)assert.ok(registry.tools[id],`regular homepage tool ${id} must be represented by the shared registry`);
+ for(const [id,meta] of Object.entries(registry.tools))if(meta.group)assert.ok(registry.groups.some(g=>g.id===meta.group&&g.tools.includes(id)),`${id} group membership must exist in shared groups`);
  // Companions deliberately share the Posuk Practice grant, while the owner
  // home includes student-facing tools that have no separate teacher grant.
  for(const id of ['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','class-gallery','student-rewards','weekly-quiz','game-show','multiplayer-center'])assert.ok(registry.tools[id],id);
@@ -41,4 +43,5 @@ test('registry keeps owner-only controls out and retains class grant mapping for
  assert.ok(registry.groups.find(g=>g.id==='learn').icon.includes('aria-label="Rebbe"'),'Chumash Rebbe illustration remains SVG');
  assert.match(index,/data-companion-of="posuk-practice-scroll"/);
  assert.match(fs.readFileSync('home-island.css','utf8'),/@media\(max-width:750px\)/);
+ for(const name of ['home-island.css'])assert.ok(fs.existsSync(name),`${name} remains available for the shared responsive homepage layout`);
 });

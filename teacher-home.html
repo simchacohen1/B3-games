@@ -41,18 +41,23 @@
 .island-place[data-game-group]{grid-column:auto!important}
 .teacher-tools-container{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .teacher-tools-section{max-width:1130px}
+.class-jump{display:none;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin-top:10px}
+.class-jump button{border:2px solid #fcd34d;border-radius:999px;background:#fffbeb;color:#78350f;padding:7px 14px;font:inherit;font-weight:800;cursor:pointer}
+.class-jump button:hover,.class-jump button:focus-visible{background:#fef3c7;outline:3px solid #2563eb;outline-offset:2px}
+.teacher-home-page .game-group[data-game-group="learn"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-flow:row!important;grid-auto-columns:auto!important}
+.teacher-home-page .game-group[data-game-group="learn"] .game-group-grid>[data-game-id="chazara"]{grid-column:1/-1}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261020-demo-student"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
 <script src="shared/home-tool-registry.js?v=20261111-registry"></script>
-</head><body>
+</head><body class="teacher-home-page">
 <button id="signOut" class="signout-pill hidden">Sign out</button>
 <h1 id="homeTitle">Fun Torah Tools</h1>
 <div id="homeSubtitle" class="subtitle">Learning games and practice tools</div>
 <div id="gate" class="gate">Checking your teacher account…</div>
-<div id="app" class="hidden"><div class="teacher-bar"><strong id="who"></strong><div class="sub">Choose a class or open one of the tools enabled for it.</div><div id="principalSummary"></div></div><div id="classes" class="classes"></div></div>
+<div id="app" class="hidden"><div class="teacher-bar"><strong id="who"></strong><div class="sub">Choose a class or open one of the tools enabled for it.</div><div id="principalSummary"></div><nav id="classJump" class="class-jump" aria-label="Your assigned classes"></nav></div><div id="classes" class="classes"></div></div>
 <script>
 (function(){
 const api=window.B3SiteSettings,WS=api.workspaceId||"b3-2026";
@@ -125,8 +130,11 @@ async function render(user,access){
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card" id="class-card-'+encodeURIComponent(id)+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
+ const classCards=Array.from(q('classes').querySelectorAll('.class-card'));
+ q('classJump').innerHTML=classCards.length>1?classCards.map(card=>'<button type="button" data-class-target="'+card.id+'">'+esc(card.querySelector('h2')?.textContent||'Class')+'</button>').join(''):'';
+ q('classJump').style.display=classCards.length>1?'flex':'none';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');
@@ -137,6 +145,7 @@ async function render(user,access){
  }
 }
 q("classes").onclick=e=>{if(e.target.closest&&e.target.closest("[data-act-as-student]"))api.openActAsStudentPicker();};
+q('classJump').onclick=e=>{const button=e.target.closest&&e.target.closest('[data-class-target]');if(!button)return;document.getElementById(button.dataset.classTarget)?.scrollIntoView({behavior:'smooth',block:'start'});};
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
 let principalAccessRef=null,principalAccessHandler=null;
 function stopPrincipalAccessWatch(){
