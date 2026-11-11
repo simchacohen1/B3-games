@@ -8,6 +8,7 @@ const rewardsStore=require('./rewards-store.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
+const posukReviewCore=require('./posuk-review-core.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -121,10 +122,11 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
+    const act=String(req.body?.action||'');
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -137,6 +139,7 @@ async function authorizeChazaraAction(teacher,body){
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
+ if(action==='posuk-grade')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
    return;
@@ -962,6 +965,14 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
   return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
+// Posuk Practice teacher review: one recording, graded by hand (Issue #694).
+const posukReview=posukReviewCore.createPosukReview({
+  rtdb,SR_ROOT,
+  resolveRewardStudentId:id=>resolveRewardStudentId(id),
+  studentInfo:id=>studentInfo(id),
+  fileExists:async path=>{const [exists]=await admin.storage().bucket('b3-games.firebasestorage.app').file(path).exists();return exists;}
+});
+
 async function resolveRewardStudentId(posukStudentId){
   // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
   // the Admin SDK refuses unindexed orderByChild queries.
@@ -1494,8 +1505,22 @@ exports.studentRewardsAutoAward = onRequest(
           if(!result.ok) return res.status(409).json({error:result.error});
           return res.status(200).json(result);
         }
+        if(action==="posuk-submit"){
+          const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
+          if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+          const result=await posukReview.submit({studentId:practice.studentId,classId:practice.classId,
+            selectionKey:String(body.selectionKey||''),attemptId:String(body.attemptId||''),
+            hebrewText:String(body.hebrewText||''),sefer:String(body.sefer||'')});
+          return res.status(200).json(result);
+        }
         const teacher=await requireTeacher(req);
         if(!teacher.ok) return res.status(401).json({error:teacher.error});
+        if(action==="posuk-grade"){
+          const result=await posukReview.grade({teacherEmail:teacher.email,scope:teacher.scope,
+            studentId:String(body.studentId||''),submissionId:String(body.submissionId||''),
+            gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note});
+          return res.status(200).json(result);
+        }
         await authorizeChazaraAction(teacher,body);
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");

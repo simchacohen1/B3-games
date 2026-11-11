@@ -438,15 +438,19 @@ function moveMathRace(state, playerId, move, players) {
   state.answers[key][playerId] = move.answer === question.answer;
   if (move.answer === question.answer) state.scores[playerId] = (state.scores[playerId] || 0) + 1;
   state.moves += 1;
-  const active = participantIds(players);
-  if (active.every(id => state.answers[key][id] != null)) {
-    if (state.questionIndex === state.questions.length - 1) {
-      const high = Math.max(...Object.values(state.scores));
-      const winners = active.filter(id => state.scores[id] === high);
-      state.winner = winners.length === 1 ? winners[0] : null; state.draw = winners.length > 1; state.finished = true;
-    } else state.questionIndex += 1;
-  }
+  advanceMathRace(state, participantIds(players));
   return state;
+}
+// Move to the next question (or finish) once every active player has answered.
+function advanceMathRace(state, active) {
+  const answers = state.answers?.[String(state.questionIndex)] || {};
+  if (!active.length || !active.every(id => answers[id] != null)) return false;
+  if (state.questionIndex === state.questions.length - 1) {
+    const high = Math.max(...active.map(id => state.scores[id] || 0));
+    const winners = active.filter(id => (state.scores[id] || 0) === high);
+    state.winner = winners.length === 1 ? winners[0] : null; state.draw = winners.length > 1; state.finished = true;
+  } else state.questionIndex += 1;
+  return true;
 }
 function isSet(cards) {
   if (!Array.isArray(cards) || cards.length !== 3 || new Set(cards.map(card => card.id)).size !== 3) return false;
@@ -662,6 +666,30 @@ function startGameState(gameKey, state, ids, startAtMs) {
   return state;
 }
 
+// A player who left (and did not come back) must not keep a game stuck:
+// pass their turn to the next active player, or move Math Race along.
+function skipAbsentPlayers(gameKey, state, players) {
+  if (!state || state.finished) return false;
+  const active = participantIds(players);
+  if (gameKey === 'math-race') return advanceMathRace(state, active);
+  if (!state.turn || active.includes(state.turn) || !active.length) return false;
+  const joined = Object.entries(players || {}).filter(([, player]) => player)
+    .sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0) || a[0].localeCompare(b[0])).map(([id]) => id);
+  const order = asList(state.playersOrder).filter(Boolean);
+  const seats = order.length ? order.concat(joined.filter(id => !order.includes(id))) : joined;
+  const step = gameKey === 'uno-style' && state.direction === -1 ? -1 : 1;
+  let index = seats.indexOf(state.turn);
+  for (let tries = 0; tries < seats.length; tries += 1) {
+    index = (index + step + seats.length) % seats.length;
+    if (active.includes(seats[index])) { state.turn = seats[index]; break; }
+  }
+  if (!active.includes(state.turn)) state.turn = active[0];
+  if (gameKey === 'ludo') state.lastRoll = null;
+  if (gameKey === 'memory-match') state.flipped = [];
+  if (gameKey === 'uno-style') state.drawPending = 0;
+  return true;
+}
+
 function publicView(gameKey, state, room, now = Date.now()) {
   const players = Object.entries(room.players || {}).filter(([, player]) => player && player.active !== false)
     .map(([studentId, player]) => ({ studentId, name: String(player.name || 'Student'), role: player.role === 'teacher' ? 'teacher' : 'student', score: state.scores?.[studentId] || 0 }));
@@ -722,4 +750,4 @@ function privateView(gameKey, state, studentId) {
   return {};
 }
 
-module.exports = { chess, GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };
+module.exports = { chess, GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, skipAbsentPlayers, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };

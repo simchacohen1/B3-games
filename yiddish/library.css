@@ -69,6 +69,13 @@ body.lib #readStory{display:inline-block;margin-top:auto;align-self:flex-start;p
   background:var(--burgundy);color:#fff;font:900 1.02rem Nunito,Arial;text-decoration:none;box-shadow:0 4px 0 rgba(0,0,0,.28);border:0;transition:transform .1s}
 body.lib #readStory[hidden]{display:none}
 body.lib #readStory:hover{transform:translateY(-2px)}
+/* Story 2 sits under the Wine Merchant link, same pill in navy. */
+body.lib .story-links{margin-top:auto;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+body.lib .story-links #readStory{margin-top:0}
+body.lib #readStory2{display:inline-block;padding:13px 22px;border-radius:999px;background:#2f4f7a;color:#fff;font:900 1.02rem Nunito,Arial;border:0;
+  text-decoration:none;box-shadow:0 4px 0 rgba(0,0,0,.28);transition:transform .1s}
+body.lib #readStory2[hidden]{display:none}
+body.lib #readStory2:hover{transform:translateY(-2px)}
 
 /* ---------- New Arrivals display (#words) ---------- */
 body.lib .lib-display{background:linear-gradient(#6b3d21,#4e2b16);border-radius:10px;padding:16px 16px 0;
@@ -98,7 +105,8 @@ body.lib .lib-rooms{display:grid;grid-template-columns:1.35fr 1fr;gap:20px}
 body.lib .lib-rooms > *{min-width:0}
 body.lib .lib-room{border-radius:14px;overflow:hidden;background:var(--paper);display:flex;flex-direction:column;
   border:6px solid var(--wood-md);box-shadow:0 0 0 2px var(--wood-dk),0 12px 24px rgba(62,36,22,.25)}
-body.lib .lib-room:has(#readStory[hidden]){display:none}
+/* Hide Story Corner only when neither story link is showing. */
+body.lib .lib-room:has(#readStory[hidden]):not(:has(#readStory2:not([hidden]))){display:none}
 body.lib .lib-room svg{display:block;width:100%;height:auto}
 body.lib .lib-room-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px;flex:1;position:relative}
 body.lib .lib-step{display:inline-flex;align-items:center;gap:8px;font:900 .8rem Nunito,Arial;letter-spacing:.14em;text-transform:uppercase}

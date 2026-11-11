@@ -6,6 +6,10 @@
           "classes": {
             "$classId": {
               ".read": "((auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false && (root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/multiplayer-center').val() == true || (($classId == 'et' || $classId == 'wt') && root.child('b3Games/siteSettings/games/multiplayer-center').val() != false && root.child('b3Games/siteSettings/classGames/' + $classId + '/multiplayer-center').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/toolAccess/multiplayer-center').val() != false) || (auth != null && auth.uid != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && ((root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'teacher' && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'owner' && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/multiplayer-center').val() == true || (($classId == 'et' || $classId == 'wt') && root.child('b3Games/siteSettings/games/multiplayer-center').val() != false && root.child('b3Games/siteSettings/classGames/' + $classId + '/multiplayer-center').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/teacherIds/' + auth.uid).val() == true))",
+              "gamesLocked": {
+                ".write": "(auth != null && auth.uid != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && ((root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'teacher' && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'owner' && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/multiplayer-center').val() == true || (($classId == 'et' || $classId == 'wt') && root.child('b3Games/siteSettings/games/multiplayer-center').val() != false && root.child('b3Games/siteSettings/classGames/' + $classId + '/multiplayer-center').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/teacherIds/' + auth.uid).val() == true)",
+                ".validate": "newData.isBoolean()"
+              },
               "rooms": {
                 "$roomId": {
                   ".write": "((auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() != false && (root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/multiplayer-center').val() == true || (($classId == 'et' || $classId == 'wt') && root.child('b3Games/siteSettings/games/multiplayer-center').val() != false && root.child('b3Games/siteSettings/classGames/' + $classId + '/multiplayer-center').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/toolAccess/multiplayer-center').val() != false) || (auth != null && auth.uid != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && ((root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'teacher' && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/role').val() == 'owner' && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/multiplayer-center').val() == true || (($classId == 'et' || $classId == 'wt') && root.child('b3Games/siteSettings/games/multiplayer-center').val() != false && root.child('b3Games/siteSettings/classGames/' + $classId + '/multiplayer-center').val() != false)) && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/teacherIds/' + auth.uid).val() == true)) && ((!newData.exists() && (data.child('host').val() == auth.token.b3StudentId || data.child('host').val() == 'teacher_' + auth.uid)) || (newData.exists() && (newData.child('host').val() == auth.token.b3StudentId || newData.child('host').val() == 'teacher_' + auth.uid) && (!data.exists() || (data.child('host').val() == auth.token.b3StudentId || data.child('host').val() == 'teacher_' + auth.uid)))) && (!newData.exists() || (newData.child('gameKey').val() != 'connect-four' && newData.child('gameKey').val() != 'tic-tac-toe' && newData.child('gameKey').val() != 'memory-match' && newData.child('gameKey').val() != 'checkers' && newData.child('gameKey').val() != 'reversi' && newData.child('gameKey').val() != 'bingo' && newData.child('gameKey').val() != 'math-race' && newData.child('gameKey').val() != 'set' && newData.child('gameKey').val() != 'ludo' && newData.child('gameKey').val() != 'dominoes' && newData.child('gameKey').val() != 'go-fish' && newData.child('gameKey').val() != 'uno-style' && newData.child('gameKey').val() != 'chess' && newData.child('gameKey').val() != 'chess-5min')) && (!data.exists() || (data.child('gameKey').val() != 'connect-four' && data.child('gameKey').val() != 'tic-tac-toe' && data.child('gameKey').val() != 'memory-match' && data.child('gameKey').val() != 'checkers' && data.child('gameKey').val() != 'reversi' && data.child('gameKey').val() != 'bingo' && data.child('gameKey').val() != 'math-race' && data.child('gameKey').val() != 'set' && data.child('gameKey').val() != 'ludo' && data.child('gameKey').val() != 'dominoes' && data.child('gameKey').val() != 'go-fish' && data.child('gameKey').val() != 'uno-style' && data.child('gameKey').val() != 'chess' && data.child('gameKey').val() != 'chess-5min'))"
@@ -102,6 +106,10 @@
               },
               "posukPracticeLimit": {
                 ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+              },
+              "mishnayosPracticeLimit": {
+                ".read": "auth != null && (auth.token.b3ClassId == $classId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
+                ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
               }
             }
           }
@@ -118,6 +126,12 @@
       "classGalleryPresenceSettings": {
         ".read": true,
         ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)"
+      }
+    },
+    "shorashimLibraries": {
+      "$uid": {
+        ".read": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))",
+        ".write": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))"
       }
     },
     "tentTrailTrivia": {
@@ -140,6 +154,20 @@
         "$studentId": {
           ".read": "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))",
           ".write": true
+        }
+      },
+      "submissions": {
+        ".read": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)",
+        "$studentId": {
+          ".read": "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))",
+          ".write": false
+        }
+      },
+      "reviews": {
+        ".read": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)",
+        "$studentId": {
+          ".read": "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))",
+          ".write": false
         }
       },
       "settings": {
@@ -188,6 +216,56 @@
           "$studentId": {
             ".write": true
           }
+        }
+      },
+      "mishnayos": {
+        "students": {
+          "$studentId": {
+            ".read": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)",
+            ".write": "auth != null && auth.token.b3StudentId == $studentId",
+            ".validate": "!newData.exists() || newData.hasChildren(['name'])"
+          }
+        },
+        "attempts": {
+          "$studentId": {
+            ".read": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/students/' + $studentId + '/profile/classId').val() != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + root.child('b3Games/students/' + $studentId + '/profile/classId').val()).val() == true)",
+            ".write": "auth != null && auth.token.b3StudentId == $studentId"
+          }
+        },
+        "settings": {
+          ".read": "auth != null",
+          "practiceLimit": {
+            ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + auth.token.b3ClassId).val() == true)"
+          },
+          "classPracticeLimits": {
+            "$classId": {
+              ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+            }
+          },
+          "accessLocked": {
+            ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+          },
+          "accessLockMessage": {
+            ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+          },
+          "appEnabled": {
+            ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+          },
+          "$other": {
+            ".write": false
+          }
+        },
+        "translationChunks": {
+          ".read": "auth != null",
+          ".write": false
+        },
+        "generatedQuestions": {
+          ".read": "auth != null",
+          ".write": false
+        },
+        "answerKey": {
+          ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)",
+          ".write": false
         }
       }
     },

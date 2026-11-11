@@ -10,6 +10,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="posuk-practice-scroll"></script>
+<script>
+/* חידון (quiz) mode. The AI comprehension questions (tap the Hebrew words)
+   live in their own home tile, which opens this same page with ?mode=quiz.
+   Quiz mode shows only the Understand task; the normal practice page shows
+   only Read and Translate. Saved attempts, grading, teacher review and
+   Chazara scores are the same records either way. Old links that ask for
+   tab=comprehension (Chazara, My Progress) are sent to quiz mode. */
+(function(){
+  var p = new URLSearchParams(location.search);
+  if(p.get('mode') !== 'quiz' && p.get('tab') === 'comprehension'){
+    p.set('mode', 'quiz');
+    location.replace(location.pathname + '?' + p.toString() + location.hash);
+  }
+  // ?tool=test-me was the #694 draft name for this same mode; keep those links working.
+  window.B3_QUIZ_MODE = p.get('mode') === 'quiz' || p.get('tool') === 'test-me';
+  document.documentElement.classList.toggle('quiz-mode', window.B3_QUIZ_MODE);
+  if(window.B3_QUIZ_MODE){
+    document.title = 'Chumash חידון';
+    document.addEventListener('DOMContentLoaded', function(){
+      var h = document.querySelector('header.top h1'), d = document.querySelector('header.top p');
+      if(h) h.textContent = '🧠 Chumash חידון';
+      if(d) d.textContent = 'Answer questions about the posuk by tapping the Hebrew words.';
+    });
+  }
+})();
+</script>
+<style>
+  html.quiz-mode .task-tabs{ display:none; }
+  html.quiz-mode #comprehensionPanel .step-chip{ display:none; }
+  html:not(.quiz-mode) #tabComprehensionBtn{ display:none; }
+</style>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1196,6 +1227,30 @@
   }
 
 </style>
+<script>
+/* Two tools share this page (Issue #694):
+   - Posuk Practice (default): one recording of reading + translation, graded by the teacher.
+   - Chumash חידון (?mode=quiz, set up at the top of this page): the Understand questions
+     that used to be step 3 here. 'test-me' is this page's internal name for that mode. */
+window.POSUK_TOOL_MODE = window.B3_QUIZ_MODE ? 'test-me' : 'practice';
+document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
+</script>
+<style>
+  .tool-practice .task-tabs, .tool-practice #readingPanel, .tool-practice #translationPanel,
+  .tool-practice #comprehensionPanel, .tool-practice #rangeDisputeNote, .tool-practice .history{ display:none !important; }
+  .tool-test-me .task-tabs, .tool-test-me #readingPanel, .tool-test-me #translationPanel,
+  .tool-test-me #combinedPanel, .tool-test-me #bonusNotices,
+  .tool-test-me #comprehensionPanel .step-chip, .tool-test-me a[href="progress.html"]{ display:none !important; }
+  .combined-state{ margin:10px 0; padding:12px 14px; border-radius:14px; font-weight:700; line-height:1.4; }
+  .combined-state.pending{ background:#eef4ff; border:2px solid #9db8e8; color:#1f3d73; }
+  .combined-state.gold{ background:#fff7dc; border:2px solid var(--gold); color:#6b4a00; }
+  .combined-state.retry{ background:#fff0ec; border:2px solid #e8a797; color:#7a2a17; }
+  .combined-history{ margin-top:14px; }
+  .combined-history h4{ margin:0 0 6px; font-size:.95rem; }
+  .combined-history-row{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:8px 10px; border-radius:10px; background:#faf6ec; margin-bottom:6px; font-size:.86rem; }
+  .combined-history-row audio{ height:32px; max-width:100%; }
+  .bonus-notice{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:10px 0; padding:12px 14px; border-radius:14px; background:#fff7dc; border:2px solid var(--gold); font-weight:800; }
+</style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
 <script defer src="../gallery-share.js?v=20261022-pointer2"></script>
 </head>
@@ -1203,8 +1258,8 @@
 <div class="wrap">
 
   <header class="top">
-    <h1>📜 Posuk Practice Scroll</h1>
-    <p>Read the posuk. Explain what it means. See how you did!</p>
+    <h1 id="toolTitle">📜 Posuk Practice Scroll</h1>
+    <p id="toolSubtitle">Read the posuk and translate it in one recording. Your teacher will grade it!</p>
   </header>
 
   <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
@@ -1223,6 +1278,8 @@
         <button class="btn small" id="switchStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">Not you?</button>
       </div>
     </div>
+
+    <div id="bonusNotices"></div>
 
     <div class="selection-shell" id="selectionShell">
       <div class="mode-card">
@@ -1272,6 +1329,37 @@
         <button class="tab-btn active" id="tabReadingBtn">📖 Read Hebrew <span class="tab-check hidden" id="readingCheck">✅</span></button>
         <button class="tab-btn" id="tabTranslateBtn">🔤 Translate <span class="tab-check hidden" id="translateCheck">✅</span></button>
         <button class="tab-btn" id="tabComprehensionBtn">🧠 Understand <span class="tab-check hidden" id="comprehensionCheck">✅</span></button>
+      </div>
+
+      <!-- Posuk Practice (Issue #694): ONE recording covering reading and
+           translation. No computer grading — the teacher grades it. -->
+      <div class="task-card" id="combinedPanel">
+        <div class="task-title-row">
+          <h3>🎙️ Read &amp; Translate</h3>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-copy">
+            <strong>Read a few Hebrew words, then say what they mean in English. Keep going like that, a few words at a time, to the end.</strong>
+            <span>Tap the microphone once to start. It keeps recording the whole time. Tap ⏹️ when you finish, then send it to your teacher.</span>
+          </div>
+          <button class="listen-btn" id="combinedInstructionBtn" type="button">🔊 Listen</button>
+        </div>
+        <div id="combinedStateBox" class="combined-state hidden"></div>
+        <div class="record-stage" id="combinedRecordStage">
+          <div class="record-row">
+            <button class="seal-btn" id="combinedRecordBtn" title="Start recording" aria-label="Start or stop recording">🎙️</button>
+            <div class="mic-meter hidden" id="combinedMicMeter"><div class="mic-meter-bar" id="combinedMicMeterBar"></div></div>
+            <audio id="combinedAudioPlayback" controls class="hidden"></audio>
+            <button class="btn ghost-delete hidden" id="combinedDeleteBtn" title="Delete this recording">🗑️ Record again</button>
+          </div>
+          <div class="record-caption">🎙️ Tap to start • a few Hebrew words • their English • the next few words • tap ⏹️ at the end</div>
+          <span class="status-tag" id="combinedStatus">Not recorded yet</span>
+        </div>
+        <div style="text-align:center;margin-top:10px;">
+          <button class="btn gold hidden" id="combinedSubmitBtn" type="button">📤 Send to my teacher (costs 5 points)</button>
+        </div>
+        <div class="comp-status" id="combinedMsg"></div>
+        <div class="combined-history" id="combinedHistory"></div>
       </div>
 
       <!-- Hebrew reading task (computer-graded, same scorer as Kol Emes) -->
@@ -1779,6 +1867,7 @@ async function getGeneratedQuestionsForPart(part){
         posukText: part.text || '',
         posukTranslation: part.translation || '',
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
+        sefer: currentSefer,
         perekNum: currentPerekNum,
         posukNum: part.posukNum,
         questionLimit: 5
@@ -1962,7 +2051,7 @@ let comprehensionScore = null;     // 0-100, supplementary to the verdict tier a
 let comprehensionFeedback = "";
 
 /* ---------- Tabs (one task visible at a time) ---------- */
-let activeTab = 'reading'; // 'reading' | 'comprehension'
+let activeTab = window.POSUK_TOOL_MODE === 'test-me' ? 'comprehension' : 'reading'; // 'reading' | 'comprehension'
 
 /* ---------- Autosave tracking ----------
    Each task is graded and saved automatically the moment grading
@@ -2321,6 +2410,8 @@ function speakTextBrowserFallback(text){
 /* ---------- Student-friendly spoken directions ---------- */
 function studentDirection(task){
   const many = currentIsRange && currentPosukEndNum > currentPosukNum;
+  if(task === 'combined') return 'Tap the microphone once to start. Read a few Hebrew words out loud, then say what those words mean in English. Then read the next few Hebrew words and say what they mean. Keep going like that until the end of the ' +
+    (many ? 'selected pesukim' : 'posuk') + '. The recording keeps going the whole time, so you do not need to tap between pieces. When you finish, tap the stop button, then send it to your teacher.';
   if(task === 'reading') return many
     ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.'
     : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.';
@@ -2332,6 +2423,7 @@ function studentDirection(task){
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
 }
 
+document.getElementById('combinedInstructionBtn').onclick = () => speakText(studentDirection('combined'));
 document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
 document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
 document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));
@@ -2443,10 +2535,12 @@ function enterApp(){
     practiceScopeReady=true;ownClassSpace=false;classPracticeLimit=null;
     rebuildPerekOptionsForClassLimit();applyDeepLinkFromURL();return;
   }
-  db.ref('posukPractice/students/' + studentId).set({
+  // update(), not set(): keeps seenBonus (bonus-point notices already shown).
+  db.ref('posukPractice/students/' + studentId).update({
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
   });
+  if(window.POSUK_TOOL_MODE === 'practice') loadBonusNotices();
   // Nothing is selectable until we know which class's practice window applies.
   practiceScopeReady = false;
   rebuildPerekOptionsForClassLimit();
@@ -2525,7 +2619,7 @@ function applyDeepLinkFromURL(){
     // progress.html already includes the skill tab in its link. Honor it
     // only after the perek/posuk has finished loading so resetRecordingUI()
     // cannot put the student back on the default Reading tab afterward.
-    if(requestedTab) setActiveTab(requestedTab);
+    if(requestedTab && window.POSUK_TOOL_MODE === 'test-me') setActiveTab('comprehension');
   });
 }
 
@@ -2857,8 +2951,7 @@ perekSelect.onchange = async () => {
   resetScroll();
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
-  warmTranslationServices();
-  warmQuestionGradingService();
+  if(window.POSUK_TOOL_MODE === 'test-me') warmQuestionGradingService();
   fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
   fetchClassroomReferenceChapter(perekNum).catch(err => console.error('Classroom reference prefetch failed', err));
   fetchKehotChapterTranslation(perekNum).catch(err => console.error('Kehot comprehension reference prefetch failed', err));
@@ -2923,9 +3016,7 @@ async function loadSelectedPesukim(){
       return;
     }
   }
-  wakeScorer();
-  warmTranslationServices();
-  warmQuestionGradingService();
+  if(window.POSUK_TOOL_MODE === 'test-me') warmQuestionGradingService();
   document.getElementById('fetchMsg').textContent = rangeModeOn() ? 'Loading pesukim…' : 'Loading posuk…';
   try{
     const [pesukim, translations] = await Promise.all([
@@ -3391,7 +3482,8 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   collapseSelectionPicker();
   updateNavArrows();
   resetRecordingUI();
-  loadHistory();
+  if(window.POSUK_TOOL_MODE === 'practice') loadCombinedState();
+  else loadHistory();
 }
 
 /* ---------- Tab switching ----------
@@ -3399,6 +3491,10 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
    Switching tabs never loses anything already recorded — it's purely a
    visibility toggle. */
 function setActiveTab(tab){
+  // Chumash חידון (quiz mode) only has the Understand questions; Posuk Practice
+  // has only the combined recording panel (none of these three tabs).
+  if(window.POSUK_TOOL_MODE === 'test-me') tab = 'comprehension';
+  else if(tab === 'comprehension') tab = 'reading';
   activeTab = tab;
   document.getElementById('readingPanel').classList.toggle('hidden', tab !== 'reading');
   document.getElementById('translationPanel').classList.toggle('hidden', tab !== 'translate');
@@ -3406,6 +3502,7 @@ function setActiveTab(tab){
   document.getElementById('tabReadingBtn').classList.toggle('active', tab === 'reading');
   document.getElementById('tabTranslateBtn').classList.toggle('active', tab === 'translate');
   document.getElementById('tabComprehensionBtn').classList.toggle('active', tab === 'comprehension');
+  if(window.POSUK_TOOL_MODE === 'practice') return;
   if(tab === 'translate') renderCurrentChunk();
   hideNudge();
   loadHistory();
@@ -3431,7 +3528,8 @@ function hideNudge(){
 // translation -> comprehension) so the nudge always points to the next
 // natural step rather than jumping around.
 function nextUnfinishedTask(justSaved){
-  const order = ['hebrew', 'translation', 'comprehension'];
+  // Understand lives in its own חידון tile now, so never nudge toward it.
+  const order = window.B3_QUIZ_MODE ? [] : ['hebrew', 'translation'];
   for(const t of order){
     if(t !== justSaved && !attemptSaved[t]) return t;
   }
@@ -3724,6 +3822,9 @@ function resetComprehensionQuestionState(){
   questionTryCounts = {};
   comprehensionMode = 'questions';
   renderComprehensionQuestionUI();
+  // Understand questions live only in Chumash חידון now (#694); do not
+  // call the paid question generator from Posuk Practice.
+  if(window.POSUK_TOOL_MODE === 'practice') return;
 
   const msg = document.getElementById('comprehensionGradingMsg');
   if(msg) msg.textContent = 'Preparing questions from this pasuk…';
@@ -3893,11 +3994,10 @@ function resetRecordingUI(){
   hideNudge();
   setActiveTab(activeTab);
 
-  // Kick off (or reload from cache) the chunk breakdown for this posuk in
-  // the background, so it's likely ready by the time the student taps
-  // over to the Translate tab rather than making them wait once they get
-  // there.
-  loadOrGenerateTranslationChunks();
+  // The AI translation-piece breakdown belonged to the old Translate tab.
+  // Neither tool on this page uses it any more (Issue #694), so it is not
+  // generated (it called a paid AI service).
+  if(window.POSUK_TOOL_MODE === 'practice') resetCombinedRecording();
 }
 
 // Lets a student re-do a recording they don't like, before saving —
@@ -4208,6 +4308,11 @@ document.getElementById('comprehensionRetryBtn').onclick = () => {
    Sends the recording + the posuk's exact text to the scorer, which
    transcribes it and compares word-by-word. Shows a percentage plus a
    word-by-word breakdown, same as the standalone Kol Emes page. */
+// Section-break markers ({פ} open, {ס} closed) are layout, not words to read.
+function textForReadingScore(text){
+  return String(text || '').replace(/\{\s*[\u05e4\u05e1]\s*\}/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 async function scoreHebrewReading(){
   const gradingMsg = document.getElementById('hebrewGradingMsg');
   const resultEl = document.getElementById('hebrewResult');
@@ -4226,7 +4331,7 @@ async function scoreHebrewReading(){
   formData.append("name", studentName || "student");
   formData.append("perek", currentPerekNum || "");
   formData.append("posuk", currentPosukNum || "");
-  formData.append("posukText", currentPosukText);
+  formData.append("posukText", textForReadingScore(currentPosukText));
   formData.append("audio", currentAudio.hebrew, "recording." + currentAudioExt.hebrew);
 
   try{
@@ -4523,6 +4628,7 @@ async function gradeComprehensionAttempt(){
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
+    formData.append('sefer', currentSefer || '');
     formData.append('perekNum', String(currentPerekNum || ''));
     formData.append('posukNum', String(currentPosukNum || ''));
     formData.append('endPosukNum', String(currentPosukEndNum || currentPosukNum || ''));
@@ -5016,6 +5122,7 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
           posukText: part.text,
           posukTranslation: part.translation || '',
           classroomReferenceTranslation,
+          sefer: currentSefer,
           perekNum: currentPerekNum,
           posukNum: part.posukNum
         })
@@ -5561,6 +5668,7 @@ function gradeSingleTranslationSegment(idx, level){
       formData.append('audio', seg.blob, 'recording.' + seg.ext);
       formData.append('chunkHebrew', chunk.hebrew);
       formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+      formData.append('sefer', currentSefer || '');
       formData.append('perekNum', String(currentPerekNum || ''));
       formData.append('posukNum', String(chunk.posukNum || currentPosukNum || ''));
       try{
@@ -5875,6 +5983,7 @@ async function recordChunkFix(index, btnEl){
         formData.append('audio', blob, 'recording.' + ext);
         formData.append('chunkHebrew', chunk.hebrew);
         formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+        formData.append('sefer', currentSefer || '');
         formData.append('perekNum', String(currentPerekNum || ''));
         formData.append('posukNum', String(chunk.posukNum || currentPosukNum || ''));
         try{
@@ -6611,6 +6720,330 @@ async function deleteAttempt(attempt, btnEl){
     console.error(err);
   }
 }
+</script>
+<script>
+/* ---------- Posuk Practice: one recording, graded by the teacher (Issue #694) ----------
+   The student reads the Hebrew and translates it in ONE recording and sends
+   it to the teacher. Sending costs 5 points. Until the teacher grades it the
+   posuk cannot be sent again. Gold standard: +10 points minus 1 per mistake
+   (plus any teacher bonus) and the posuk is locked for a month. Not gold:
+   the student may try again. The server (studentRewardsAutoAward) enforces
+   all of this; the page only shows it. */
+const COMBINED_MAX_MS = 5 * 60 * 1000;
+const COMBINED_SUBMIT_COST = 5;
+let combinedBlob = null, combinedExt = 'webm', combinedMime = '', combinedDurationMs = 0;
+let combinedRecorder = null, combinedStream = null, combinedChunks = [], combinedStartedAt = 0, combinedMaxTimer = null;
+let combinedBusy = false, combinedLoadToken = 0, combinedUploaded = null, combinedLocked = false;
+
+function combinedEl(id){ return document.getElementById(id); }
+function combinedEscape(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function combinedDate(t){ return t ? new Date(Number(t)).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : ''; }
+// Same expansion as backend/functions/posuk-review-core.cjs.
+function combinedKeysFor(selectionKey){
+  const parts = String(selectionKey || '').split('_');
+  if(parts.length < 3) return [];
+  const last = parts.pop(), perek = parts.pop(), prefix = parts.join('_');
+  const m = /^(\d+)(?:-(\d+))?$/.exec(last);
+  if(!m) return [];
+  const out = [];
+  for(let n = Number(m[1]); n <= Number(m[2] || m[1]); n++) out.push(prefix + '_' + perek + '_' + n);
+  return out;
+}
+function combinedRefLabel(s){
+  if(!s) return '';
+  const perek = Number(s.perek), a = Number(s.startPosuk), b = Number(s.endPosuk || a);
+  return 'Perek ' + perek + ' · Posuk ' + a + (b > a ? '–' + b : '');
+}
+
+function stopCombinedStream(){
+  if(combinedMaxTimer){ clearTimeout(combinedMaxTimer); combinedMaxTimer = null; }
+  if(combinedStream){ combinedStream.getTracks().forEach(t => t.stop()); combinedStream = null; }
+  stopMicMeter('combined');
+}
+function resetCombinedRecording(){
+  if(combinedRecorder && combinedRecorder.state === 'recording'){
+    combinedRecorder.onstop = null;
+    try{ combinedRecorder.stop(); }catch(_e){}
+  }
+  combinedRecorder = null;
+  stopCombinedStream();
+  combinedBlob = null; combinedUploaded = null; combinedDurationMs = 0;
+  const btn = combinedEl('combinedRecordBtn');
+  btn.classList.remove('recording'); btn.textContent = '🎙️'; btn.disabled = combinedLocked;
+  const audio = combinedEl('combinedAudioPlayback');
+  audio.pause(); audio.removeAttribute('src'); audio.classList.add('hidden');
+  combinedEl('combinedDeleteBtn').classList.add('hidden');
+  combinedEl('combinedSubmitBtn').classList.add('hidden');
+  combinedEl('combinedStatus').textContent = 'Not recorded yet';
+}
+
+async function toggleCombinedRecording(){
+  if(combinedLocked || combinedBusy) return;
+  if(combinedRecorder && combinedRecorder.state === 'recording'){ try{ combinedRecorder.stop(); }catch(_e){} return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+    alert("This browser can't record audio. Please try a newer version of Chrome or Safari."); return;
+  }
+  const btn = combinedEl('combinedRecordBtn');
+  btn.disabled = true;
+  combinedEl('combinedStatus').textContent = 'Get ready…';
+  try{
+    combinedStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const opts = { audioBitsPerSecond:32000 };
+    const supported = ['audio/webm;codecs=opus','audio/mp4','audio/aac','audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t));
+    if(supported) opts.mimeType = supported;
+    const rec = new MediaRecorder(combinedStream, opts);
+    combinedRecorder = rec; combinedChunks = [];
+    rec.ondataavailable = e => { if(e.data && e.data.size) combinedChunks.push(e.data); };
+    rec.onstart = () => {
+      combinedStartedAt = Date.now();
+      startMicMeter(combinedStream, 'combined');
+      btn.disabled = false; btn.classList.add('recording'); btn.textContent = '⏹️';
+      combinedEl('combinedStatus').textContent = '🎙️ Recording… a few Hebrew words, then their English. Keep going. Tap ⏹️ at the end.';
+      combinedMaxTimer = setTimeout(() => { if(rec.state === 'recording'){ try{ rec.stop(); }catch(_e){} } }, COMBINED_MAX_MS);
+    };
+    rec.onstop = () => {
+      const mime = rec.mimeType || 'audio/webm';
+      const blob = new Blob(combinedChunks, { type: mime });
+      const elapsed = Date.now() - combinedStartedAt;
+      stopCombinedStream();
+      combinedRecorder = null;
+      btn.disabled = combinedLocked; btn.classList.remove('recording'); btn.textContent = '🎙️';
+      if(elapsed < 1500 || blob.size < RECORDING_MIN_BLOB_BYTES){
+        combinedEl('combinedStatus').textContent = 'That recording was too short — please try again.';
+        return;
+      }
+      combinedBlob = blob; combinedMime = mime; combinedExt = mimeTypeToExtension(mime); combinedDurationMs = elapsed; combinedUploaded = null;
+      const audio = combinedEl('combinedAudioPlayback');
+      audio.src = URL.createObjectURL(blob); audio.classList.remove('hidden');
+      combinedEl('combinedDeleteBtn').classList.remove('hidden');
+      combinedEl('combinedSubmitBtn').classList.remove('hidden');
+      combinedEl('combinedStatus').textContent = '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen, then send it to your teacher.';
+    };
+    rec.start();
+  }catch(err){
+    console.error(err);
+    stopCombinedStream(); combinedRecorder = null;
+    btn.disabled = false;
+    combinedEl('combinedStatus').textContent = 'Not recorded yet';
+    alert('Could not access the microphone. Please allow microphone permission.');
+  }
+}
+
+async function submitCombinedRecording(){
+  if(!combinedBlob || combinedBusy || combinedLocked || !currentPosukKey) return;
+  const msg = combinedEl('combinedMsg'), btn = combinedEl('combinedSubmitBtn');
+  if(teacherPreview){ msg.textContent = 'Preview only — nothing is sent to the teacher and no points change.'; return; }
+  if(!STUDENT_REWARDS_AUTO_AWARD_URL){ msg.textContent = 'Sending recordings to the teacher is not available on this site.'; return; }
+  if(!confirm('Send this recording to your teacher? It costs ' + COMBINED_SUBMIT_COST + ' points. You cannot record this posuk again until your teacher grades it.')) return;
+  combinedBusy = true; btn.disabled = true;
+  const key = currentPosukKey;
+  msg.textContent = '📤 Sending…';
+  try{
+    if(!combinedUploaded || combinedUploaded.key !== key){
+      const ref = db.ref('posukPractice/attempts/' + studentId + '/' + key).push();
+      const path = 'posukPractice/' + studentId + '/' + key + '_combined_' + ref.key + '.' + combinedExt;
+      await storage.ref(path).put(combinedBlob, { contentType: (combinedMime || 'audio/webm').split(';')[0] });
+      await ref.set({
+        timestamp: Date.now(), sefer: currentSefer, parsha: currentParshaName || null,
+        perek: currentPerekNum, posukStart: currentPosukNum, posukEnd: currentPosukEndNum || currentPosukNum,
+        isRange: currentIsRange, posukText: currentPosukText,
+        combinedAudioStoragePath: path, combinedAudioMimeType: combinedMime || null,
+        combinedDurationMs: combinedDurationMs || null, combinedSubmitted: false
+      });
+      combinedUploaded = { key, id: ref.key, ref };
+    }
+    const user = window.firebase && firebase.auth && firebase.auth().currentUser;
+    if(!user) throw new Error('Please sign in again.');
+    const idToken = await user.getIdToken();
+    const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
+      body: JSON.stringify({ action:'posuk-submit', selectionKey:key, attemptId:combinedUploaded.id, hebrewText:currentPosukText, sefer:currentSefer })
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || !data.ok) throw new Error(data.error || ('The service returned ' + response.status));
+    await combinedUploaded.ref.update({ combinedSubmitted:true, submittedAt:Date.now() }).catch(() => {});
+    resetCombinedRecording();
+    msg.textContent = '📤 Sent to your teacher!' + (data.pointsCharged ? ' ' + data.pointsCharged + ' points were taken.' : '');
+    if(key === currentPosukKey) await loadCombinedState(true);
+  }catch(err){
+    console.error('Posuk Practice submit failed', err);
+    msg.textContent = '⚠️ ' + (err.message || 'Could not send. Please try again.');
+    if(/waiting for your teacher|gold standard/i.test(err.message || '')) await loadCombinedState(true);
+  }finally{
+    combinedBusy = false; btn.disabled = false;
+  }
+}
+
+function setCombinedLocked(locked){
+  combinedLocked = !!locked;
+  combinedEl('combinedRecordStage').classList.toggle('hidden', combinedLocked);
+  combinedEl('combinedRecordBtn').disabled = combinedLocked;
+  if(combinedLocked){ combinedEl('combinedSubmitBtn').classList.add('hidden'); }
+}
+
+// Decides what the student may do on the current selection.
+function combinedSelectionState(reviews, keys, now){
+  const rows = keys.map(k => ({ key:k, row:reviews[k] || null }));
+  const pending = rows.find(r => r.row && r.row.status === 'pending');
+  if(pending) return { kind:'pending', row:pending.row };
+  const locked = rows.find(r => r.row && r.row.status === 'gold' && Number(r.row.lockedUntil) > now);
+  if(locked) return { kind:'gold', row:locked.row, key:locked.key, partial: keys.length > 1 };
+  return { kind:'open' };
+}
+
+function combinedStatusLabel(s){
+  if(s.status === 'pending') return '⏳ Waiting for your teacher';
+  if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' points' +
+    (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') +
+    (Number(s.bonus) ? ' · 🎉 ' + s.bonus + ' bonus' : '');
+  if(s.status === 'retry') return '🔁 Not gold standard yet' + (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') + ' — try again';
+  return '';
+}
+
+async function loadCombinedState(keepMessage){
+  const token = ++combinedLoadToken, key = currentPosukKey;
+  const box = combinedEl('combinedStateBox'), hist = combinedEl('combinedHistory');
+  if(!keepMessage) combinedEl('combinedMsg').textContent = '';
+  box.classList.add('hidden'); hist.innerHTML = '';
+  setCombinedLocked(false);
+  if(!key || teacherPreview) return;
+  let reviews = {}, subs = {};
+  try{
+    const [r, s] = await Promise.all([
+      db.ref('posukPractice/reviews/' + studentId).once('value'),
+      db.ref('posukPractice/submissions/' + studentId).once('value')
+    ]);
+    reviews = r.val() || {}; subs = s.val() || {};
+  }catch(err){
+    console.warn('Could not load Posuk Practice review status', err);
+    if(token === combinedLoadToken) combinedEl('combinedMsg').textContent = '⚠️ Could not check this posuk’s status. Check your internet and reload.';
+    return;
+  }
+  if(token !== combinedLoadToken || key !== currentPosukKey) return;
+  const keys = combinedKeysFor(key), now = Date.now();
+  const state = combinedSelectionState(reviews, keys, now);
+  const mine = Object.values(subs).filter(x => x && Array.isArray(x.posukKeys) && x.posukKeys.some(k => keys.includes(k)))
+    .sort((a, b) => (Number(b.submittedAt) || 0) - (Number(a.submittedAt) || 0));
+  if(state.kind === 'pending'){
+    box.className = 'combined-state pending';
+    box.textContent = '⏳ You sent this to your teacher on ' + combinedDate(state.row.submittedAt) + '. You can record it again after your teacher grades it.';
+    setCombinedLocked(true);
+  }else if(state.kind === 'gold'){
+    box.className = 'combined-state gold';
+    const which = state.partial ? ' (Posuk ' + state.key.split('_').pop() + ')' : '';
+    box.textContent = '🏅 Gold standard' + which + '! It is locked until ' + combinedDate(state.row.lockedUntil) + '. Pick a different posuk to practice.';
+    setCombinedLocked(true);
+  }else if(mine[0] && mine[0].status === 'retry' && mine[0].selectionKey === key){
+    box.className = 'combined-state retry';
+    box.textContent = '🔁 Your teacher graded your last try: not gold standard yet' +
+      (Number(mine[0].mistakes) ? ' (' + mine[0].mistakes + ' mistake' + (Number(mine[0].mistakes) === 1 ? '' : 's') + ')' : '') +
+      (mine[0].teacherNote ? ' — “' + mine[0].teacherNote + '”' : '') + '. Practice and try again!';
+  }else if(mine[0] && mine[0].status === 'gold'){
+    box.className = 'combined-state gold';
+    box.textContent = '🏅 You got gold standard on this on ' + combinedDate(mine[0].gradedAt) + '. You may practice it again.';
+  }else{
+    box.className = 'combined-state hidden';
+  }
+  if(box.className.indexOf('hidden') < 0) box.classList.remove('hidden');
+  if(mine.length){
+    hist.innerHTML = '<h4>📈 My recordings for this posuk</h4>' + mine.slice(0, 10).map(x =>
+      '<div class="combined-history-row" data-path="' + combinedEscape(x.audioStoragePath) + '">' +
+        '<span>' + combinedEscape(combinedDate(x.submittedAt)) + (x.selectionKey !== key ? ' · ' + combinedEscape(combinedRefLabel(x)) : '') + '</span>' +
+        '<strong>' + combinedEscape(combinedStatusLabel(x)) + '</strong>' +
+        (x.teacherNote && x.status !== 'pending' ? '<span>💬 ' + combinedEscape(x.teacherNote) + '</span>' : '') +
+        '<button class="btn small" type="button" data-listen="1">▶️ Listen</button>' +
+      '</div>').join('');
+    hist.querySelectorAll('[data-listen]').forEach(b => b.onclick = async () => {
+      const row = b.closest('.combined-history-row');
+      try{
+        const url = await storage.ref(row.dataset.path).getDownloadURL();
+        const a = document.createElement('audio'); a.controls = true; a.src = url;
+        b.replaceWith(a); a.play().catch(() => {});
+      }catch(err){ console.warn(err); b.textContent = 'Recording not available'; b.disabled = true; }
+    });
+  }
+}
+
+async function loadBonusNotices(){
+  if(teacherPreview || !studentId) return;
+  try{
+    const [s, seen] = await Promise.all([
+      db.ref('posukPractice/submissions/' + studentId).once('value'),
+      db.ref('posukPractice/students/' + studentId + '/seenBonus').once('value')
+    ]);
+    const seenIds = seen.val() || {};
+    const list = Object.values(s.val() || {}).filter(x => x && x.status === 'gold' && Number(x.bonus) > 0 && x.id && !seenIds[x.id])
+      .sort((a, b) => (Number(a.gradedAt) || 0) - (Number(b.gradedAt) || 0));
+    const wrap = combinedEl('bonusNotices');
+    wrap.innerHTML = list.map(x => '<div class="bonus-notice" data-id="' + combinedEscape(x.id) + '"><span>🎉 Your teacher gave you <b>' +
+      combinedEscape(x.bonus) + ' bonus points</b> for ' + combinedEscape(combinedRefLabel(x)) + '!</span><button class="btn small gold" type="button">OK</button></div>').join('');
+    wrap.querySelectorAll('.bonus-notice button').forEach(b => b.onclick = () => {
+      const row = b.closest('.bonus-notice');
+      db.ref('posukPractice/students/' + studentId + '/seenBonus/' + row.dataset.id).set(true).catch(err => console.warn(err));
+      row.remove();
+    });
+  }catch(err){ console.warn('Could not load bonus notices', err); }
+}
+
+combinedEl('combinedRecordBtn').onclick = toggleCombinedRecording;
+combinedEl('combinedDeleteBtn').onclick = () => { resetCombinedRecording(); combinedEl('combinedMsg').textContent = ''; };
+combinedEl('combinedSubmitBtn').onclick = submitCombinedRecording;
+</script>
+<script src="../assignment-center/homework-mode.js?v=20261108-hw649"></script>
+<script>
+/* Homework mode (#649). The homework link opens this page with ?hw=…&perek=…&posuk=…&endPosuk=…&hwSkills=…
+   The normal deep link above loads those pesukim; here we lock the page to them and tick the homework item
+   once every assigned posuk has a saved try for every assigned skill (since the homework was given).
+   Tries save to posukPractice/attempts exactly as in normal practice. */
+(function(){
+  const HM=window.HomeworkMode;if(!HM||!HM.active)return;
+  const p=HM.params,sefer=p.get('sefer')||'Bereishis',perek=Number(p.get('perek')),from=Number(p.get('posuk')),to=Number(p.get('endPosuk')||from);
+  const skills=(p.get('hwSkills')||'reading').split(',').filter(s=>['reading','translate','understand'].includes(s));
+  if(!perek||!from||!skills.length)return;
+  // Understand moved to Chumash חידון (#694): an Understand-only homework opens there.
+  if(window.POSUK_TOOL_MODE==='practice'&&skills.length===1&&skills[0]==='understand'){
+    const u=new URL(location.href);u.searchParams.set('mode','quiz');location.replace(u.href);return;
+  }
+  const names=window.POSUK_TOOL_MODE==='practice'
+    ?{reading:'Reading',translate:'Translate',understand:'Understand (in Chumash חידון)'}
+    :{reading:'Reading (in Posuk Practice)',translate:'Translate (in Posuk Practice)',understand:'Understand'};
+  const lock=document.createElement('style');
+  lock.textContent='html.b3-homework-mode #selectionShell,html.b3-homework-mode #changeSelectionBtn,html.b3-homework-mode #prevPosukBtn,html.b3-homework-mode #nextPosukBtn{display:none!important}';
+  document.head.append(lock);
+  const has=v=>v!==null&&v!==undefined&&v!=='';
+  const filled=v=>!!(v&&typeof v==='object'&&Object.keys(v).length);
+  const did={
+    // Since #694 one submitted recording covers both reading and translation.
+    reading:a=>a.combinedSubmitted===true||has(a.hebrewFinalScore)||has(a.hebrewScore),
+    translate:a=>a.combinedSubmitted===true||filled(a.translationChunkResults)||has(a.translationScore),
+    understand:a=>filled(a.questionResults)||has(a.comprehensionScore)||has(a.questionScore)
+  };
+  const total=to-from+1;
+  function check(all){
+    const covered={};skills.forEach(k=>covered[k]=new Set());
+    Object.values(all||{}).forEach(tries=>Object.values(tries||{}).forEach(a=>{
+      if(!a||typeof a!=='object'||(Number(a.timestamp)||0)<HM.since)return;
+      if((a.sefer||'Bereishis')!==sefer||Number(a.perek)!==perek)return;
+      const start=Number(a.posukStart),end=Number(a.posukEnd||a.posukStart);
+      skills.forEach(k=>{if(did[k](a))for(let v=Math.max(start,from);v<=Math.min(end,to);v++)covered[k].add(v)});
+    }));
+    const left=skills.filter(k=>covered[k].size<total);
+    if(!left.length){HM.complete();return}
+    HM.setStatus('To do: '+skills.map(k=>names[k]+' '+covered[k].size+'/'+total).join(' · '));
+  }
+  HM.setStatus('To do: '+skills.map(k=>names[k]).join(', ')+' for '+(total>1?'pesukim '+from+'–'+to:'posuk '+from));
+  // Wait for the student's sign-in, then watch their saved tries.
+  const started=Date.now();let watching=false;
+  const wait=setInterval(()=>{
+    if(!watching&&studentId&&studentId!=='teacher_preview'&&studentId!=='guest_preview'){
+      watching=true;
+      db.ref('posukPractice/attempts/'+studentId).on('value',s=>check(s.val()),err=>console.warn('Homework progress check failed',err));
+    }
+    if(Date.now()-started>120000)clearInterval(wait);
+    const msg=document.getElementById('fetchMsg');
+    if(msg&&/not opened/.test(msg.textContent))HM.setStatus('Your teacher has not opened these pesukim in Posuk Practice yet. Ask your teacher.');
+  },500);
+})();
 </script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
 </body>
