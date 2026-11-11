@@ -145,13 +145,22 @@ async function render(user,access){
    // Move the existing cards without cloning so links and tool control behavior are preserved.
    const cards=Array.from(q("classes").querySelectorAll(":scope > .class-card"));
    if(cards.length){
+     // Count unique active members from class snapshots already loaded for this principal.
+     const studentIds=new Set();
+     snaps.forEach(snapshot=>{
+       const row=snapshot.val()||{};
+       if(!snapshot.exists()||row.active===false)return;
+       Object.entries(row.members||{}).forEach(([id,member])=>{
+         if(member&&member.active!==false)studentIds.add(id);
+       });
+     });
      const items=cards.map(card=>({
        name:card.querySelector("h2")?.textContent||"",
        teacher:(card.querySelector(":scope > p.sub")?.textContent||"").replace(/^Teacher:\s*/,""),
        id:decodeURIComponent(card.dataset.classId||""),
        card
      }));
-     window.B3PrincipalDashboard.build(q("classes"),items,{teacherCount:supervised.length,persistKey:user?.uid||"principal"});
+     window.B3PrincipalDashboard.build(q("classes"),items,{teacherCount:supervised.length,studentCount:studentIds.size,persistKey:user?.uid||"principal"});
    }
  }
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
