@@ -103,6 +103,41 @@ test('highlights have separate owners and undo or clear never deletes another la
   store.edit('student:a','undo');assert.equal(store.strokes.length,2);
   store.edit('student:b','clear');assert.equal(store.strokes.length,1);assert.equal(store.strokes[0].owner,'student:a');
 });
+test('mark ownership protects overlapping strokes; teacher may erase any exact ID',()=>{
+  const store=new C.HighlightStore();
+  store.add('student:a',sampleStroke);store.add('student:b',sampleStroke);store.add('teacher',sampleStroke);
+  const [a,b,t]=store.strokes.map(x=>x.id);
+  assert.equal(store.erase('student:a',b),false);
+  assert.equal(store.erase('student:a',t),false);
+  assert.equal(store.erase('student:a',a),true);
+  assert.deepEqual(store.strokes.map(x=>x.id),[b,t]);
+  assert.equal(store.erase('teacher',b),true);
+  assert.equal(store.strokes[0].id,t);
+  assert.equal(store.erase('student:a','__proto__'),false);
+});
+test('students cannot clear peers; teacher can clear only selected students marks',()=>{
+  const store=new C.HighlightStore();
+  store.add('student:a',sampleStroke);store.add('student:b',sampleStroke);store.add('teacher',sampleStroke);
+  assert.equal(store.clearOwner('student:a','student:b'),false);
+  assert.equal(store.strokes.length,3);
+  assert.equal(store.clearOwner('teacher','student:a'),true);
+  assert.deepEqual(store.strokes.map(x=>x.owner),['student:b','teacher']);
+});
+test('network erase uses sender identity and refuses forged ownership and pointer-only roles',()=>{
+  const f=teacherFixture();
+  f.run("state.sharing=true;state.mode='selected';applyLevel(members.get('student:student-a'),'highlight')");
+  f.run("highlightStore.add('student:student-a',"+JSON.stringify(sampleStroke)+");highlightStore.add('teacher',"+JSON.stringify(sampleStroke)+")");
+  const ids=f.run('highlightStore.strokes.map(s=>s.id)');
+  f.connection.emit('data',{type:'edit-highlights',action:'erase',owner:'teacher',id:ids[1]});
+  assert.equal(f.run('highlightStore.strokes.length'),2);
+  f.run("applyLevel(members.get('student:student-a'),'point')");
+  f.connection.emit('data',{type:'edit-highlights',action:'erase',id:ids[0]});
+  assert.equal(f.run('highlightStore.strokes.length'),2);
+  f.run("applyLevel(members.get('student:student-a'),'highlight')");
+  f.connection.emit('data',{type:'edit-highlights',action:'erase',id:ids[0]});
+  assert.equal(f.run('highlightStore.strokes.length'),1);
+  assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
+});
 test('highlight messages enforce admission and permission and ignore forged ownership',()=>{
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
