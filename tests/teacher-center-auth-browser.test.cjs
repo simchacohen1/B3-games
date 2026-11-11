@@ -2,6 +2,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 let chromium;try{({chromium}=require('playwright'))}catch{({chromium}=require('@playwright/test'))}
 const ROOT=path.resolve(__dirname,'..');
+require('../shared/home-tool-registry.js');
+const registry=globalThis.B3HomeToolRegistry;
+const classGrantIds=[...new Set(Object.values(registry.tools).filter(tool=>tool.classGrant).map(tool=>tool.classGrant))];
+const allClassGrants=Object.fromEntries(classGrantIds.map(id=>[id,true]));
 const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
   owner:{active:true,classIds:{'*':true}},
   teacher_et:{active:true,classIds:{et:true}},
@@ -10,9 +14,9 @@ const tree={b3Games:{admins:{},workspaces:{'b3-2026':{teachers:{
   teacher_new:{active:true,classIds:{'new-room':true}},
   principal:{active:true,accountType:'principal',classIds:{et:true,'new-room':true}}
  },classes:{
-  et:{name:'ET',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true,homework:true,tag:true,davening:true,chavrusa:true,'name-picker':true,'class-pointer':true,'sync-to-nigri':true},members:{student_et:{active:true,name:'ET Student'}}},
-  wt:{name:'WT',active:true,toolGrants:{'posuk-practice-scroll':true,chazara:true,shorashim:true,'rashi-letters':true,yiddish:true,gematria:true,halacha:true,'sefer-hamitzvos':true,gallery:true,'student-rewards':true,'weekly-quiz':true,'game-show':true,'multiplayer-center':true,homework:true,tag:true,davening:true,chavrusa:true,'name-picker':true,'class-pointer':true,'sync-to-nigri':true},members:{student_wt:{active:true,name:'WT Student'}}},
-  'new-room':{name:'New Room',active:true,toolGrants:{chazara:true},members:{student_new:{active:true,name:'New Student'}}}
+  et:{name:'ET',active:true,toolGrants:allClassGrants,members:{student_et:{active:true,name:'ET Student'}}},
+  wt:{name:'WT',active:true,toolGrants:allClassGrants,members:{student_wt:{active:true,name:'WT Student'}}},
+  'new-room':{name:'New Room',active:true,toolGrants:allClassGrants,members:{student_new:{active:true,name:'New Student'}}}
  }}}}};
 const USER_STUB=`(()=>{
  const T=${JSON.stringify(tree)},params=new URLSearchParams(location.search),role=params.get('synthetic')||'teacher_new';
@@ -129,7 +133,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,1,'Google popup and auth restoration share the in-flight teacher check');
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/admins/teacher_new').length,2,'pre-cache baseline performs two admin lookups without in-flight sharing');
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,2,'pre-cache baseline performs two teacher lookups without in-flight sharing');
-  const expectedTools=['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','student-rewards','daily-points','weekly-quiz','game-show','multiplayer-center','homework','tag','davening','chavrusa','name-picker','class-pointer','sync-to-nigri'];
+  const expectedTools=[...classGrantIds,'daily-points'];
   for(const role of ['teacher_et','teacher_wt']){
    const section=results[role].cards[0],classId=role==='teacher_et'?'et':'wt';
    assert.deepEqual([...new Set(section.tiles.map(x=>x.id))].sort(),expectedTools.slice().sort(),role+' shows all granted homepage tools');
@@ -144,7 +148,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    for(const tile of section.tiles){const pathname=decodeURIComponent(new URL(tile.href,'http://localhost').pathname).replace(/^\//,'');assert.ok(fs.existsSync(path.join(ROOT,pathname)),role+' destination exists: '+tile.title+' → '+pathname);}
    for(const title of ['Manage Class','Student Report','Vocabulary Progress','Follow the Teacher','Send Everyone to Share Screen'])assert.ok(section.teacherLinks.some(x=>x.title===title),role+' has teacher control '+title);
    for(const link of section.teacherLinks){
-    const url=new URL(link.href,'http://localhost'),pathname=decodeURIComponent(url.pathname).replace(/^\\//,'');
+    const url=new URL(link.href,'http://localhost'),pathname=decodeURIComponent(url.pathname).replace(/^\//,'');
     assert.ok(fs.existsSync(path.join(ROOT,pathname)),role+' teacher action destination exists: '+link.title+' → '+pathname);
     assert.equal(url.searchParams.get('class'),classId,role+' teacher action remains scoped to '+classId+': '+link.title);
    }

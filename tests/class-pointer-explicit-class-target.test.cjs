@@ -70,10 +70,13 @@ test('Teacher Tools whiteboards action targets only chosen class',async()=>{
   assert.match(c.navigated,/sendEveryoneBoards=1/);
 });
 test('Teacher Tools and classroom wire whiteboard launch without automatic all-classes action',()=>{
-  const index=read('index.html'),classroom=read('class-pointer-prototype/classroom.js'),boards=read('class-pointer-prototype/student-boards.js');
-  // Teacher Tools now deliberately has one Pointer tile; the modes live in its chooser.
-  assert.match(index,/class-pointer-prototype\/dashboard\.html\?teacher=1/);
-  assert.match(index,/Classroom Pointer/);
+  const index=read('index.html'),registrySource=read('shared/home-tool-registry.js'),classroom=read('class-pointer-prototype/classroom.js'),boards=read('class-pointer-prototype/student-boards.js');
+  const context={window:{}};vm.runInNewContext(registrySource,context);
+  const registry=context.window.B3HomeToolRegistry,pointer=registry.tools['class-pointer'];
+  // The registry is the single source for the homepage tile and its chooser destination.
+  assert.equal(pointer.href,'class-pointer-prototype/dashboard.html?teacher=1');
+  assert.ok(registry.homepageTeacherTools.some(item=>item.tool==='class-pointer'&&item.title==='Classroom Pointer'));
+  assert.match(index,/registry\.homepageTeacherTools/);
   assert.doesNotMatch(index,/Send Class to Whiteboards/);
   assert.match(classroom,/classpointer:send-to-whiteboards/);
   assert.match(boards,/addEventListener\('classpointer:send-to-whiteboards'/);

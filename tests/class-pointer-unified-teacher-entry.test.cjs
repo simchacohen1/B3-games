@@ -43,11 +43,13 @@ function fixture(initial='boards'){
 }
 
 test('one homepage Pointer tile opens the class-and-mode chooser',()=>{
-  const index=read('index.html'),html=read('class-pointer-prototype/dashboard.html');
+  const index=read('index.html'),registrySource=read('shared/home-tool-registry.js'),html=read('class-pointer-prototype/dashboard.html');
+  const context={window:{}};vm.runInNewContext(registrySource,context);
+  const pointer=context.window.B3HomeToolRegistry.homepageTeacherTools.filter(item=>item.tool==='class-pointer');
   for(const mode of ['lesson','screens','boards'])assert.match(html,new RegExp('data-classroom-mode="'+mode+'"'));
-  assert.match(index,/<span class="card-title">Classroom Pointer<\/span>/);
-  assert.match(index,/class-pointer-prototype\/dashboard\.html\?teacher=1/);
-  assert.equal((index.match(/class="teacher-tool-card" href="class-pointer-prototype\/dashboard\.html\?teacher=1"/g)||[]).length,1);
+  assert.equal(pointer.length,1,'the shared registry defines one Classroom Pointer tile');
+  assert.equal(pointer[0].title,'Classroom Pointer');
+  assert.match(index,/registry\.homepageTeacherTools/);
   for(const removed of ['Send Class to Share Screen','Send Class to Whiteboards'])assert.ok(!index.includes(removed));
 });
 

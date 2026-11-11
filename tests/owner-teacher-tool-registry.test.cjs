@@ -54,6 +54,8 @@ test("hardcoded Teacher Tools actions are defined and rendered from the registry
 test("companion tiles retain the Posuk grant and private owner dashboard stays excluded", () => {
   const posuk = registry.tools["posuk-practice-scroll"];
   assert.equal(posuk.classGrant, "posuk-practice-scroll");
+  assert.equal(posuk.grantGroup, "dual");
+  assert.ok(posuk.companions.every(item => item.classGrant === "posuk-practice-scroll" && item.grantGroup === "dual"));
   assert.deepEqual(posuk.companions.map(item => item.title), [
     "Chumash חידון", "Mishnayos Practice", "Mishnayos חידון"
   ]);
@@ -70,7 +72,7 @@ test("regular homepage hardcoded teacher links are registry-driven and class-sco
     "game-show", "posuk-practice", "mishnayos-practice", "shorashim", "chazara",
     "rashi-letters", "gematria", "student-rewards", "weekly-quiz", "halacha-lesson",
     "halacha-student-work", "chavrusa", "name-picker", "class-dashboard", "student-report",
-    "sync-to-nigri", "davening-et", "davening-wt"
+    "sync-to-nigri", "davening-et", "davening-wt", "vocabulary-progress", "share-screen"
   ]) assert.ok(itemIds.has(id), `missing homepage teacher catalog entry: ${id}`);
   const davening = registry.tools.davening;
   assert.deepEqual(davening.supportedClasses, ["et", "wt"]);

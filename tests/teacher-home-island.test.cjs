@@ -25,7 +25,7 @@ test('teacher home reads its tool and group catalog from the shared registry',()
  assert.match(html,/TOOLS=Object\.fromEntries\(Object\.entries\(REGISTRY\.tools\)/);
  assert.match(html,/PLACES=REGISTRY\.groups\.map/);
  assert.ok(Object.keys(registry.tools).length>=20);
- for(const id of Object.keys(registry.tools))assert.ok(registry.tools[id].title&&registry.tools[id].href,id);
+ for(const id of Object.keys(registry.tools)){const tool=registry.tools[id];assert.ok(tool.title,id);assert.ok(tool.href||(tool.supportedClasses?.length&&tool.supportedClasses.every(classId=>tool.classHrefs?.[classId])),id);}
 });
 test('registry keeps owner-only controls out and retains class grant mapping for every homepage tool',()=>{
  const index=fs.readFileSync('index.html','utf8');

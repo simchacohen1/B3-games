@@ -2,6 +2,14 @@
 
 This inventory compares the Owner Admin class tool-grant catalog, the signed-in Teacher Tools links on `index.html`, and the class-scoped Teacher Login in `teacher-home.html` / `admin.html`.
 
+## Findings from the full audit
+
+- The shared registry now contains all 20 per-class Owner Admin grants, including Sync to Nigri from PR #742. It previously had Posuk Practice as a visible tile and as a Chumash quiz companion, but the primary tool lacked its own `classGrant` and grant category. As a result, the generated Owner Admin catalog could not offer the Posuk grant checkbox. Posuk Practice and all three #763 companion tiles now explicitly use the same class grant.
+- Vocabulary Progress and Share Screen were defined as Teacher Login actions but were absent from the regular homepage’s registry-rendered teacher tools list. Both now appear there; Share Screen remains class-pointer-grant-gated in Teacher Login.
+- The old generic Davening route did not exist. ET and WT now use their matching application paths, and the other class cannot see that tile.
+- Sync to Nigri continues to require its per-class grant and the existing Nigri school/server gate. The homepage now preserves that gate across registry re-renders.
+
+
 ## Shared class tool catalog
 
 These 20 class grants are represented by `shared/home-tool-registry.js`. Owner Admin derives its per-class grant checkboxes from that metadata, while Teacher Login renders enabled entries for each active class assigned to the signed-in teacher. The regular homepage's hardcoded Teacher Tools anchors now render from the same registry's `homepageTeacherTools` list. The Owner Admin catalog includes the compatible `sync-to-nigri` addition from PR #742. An owner enabling a grant changes only that selected class; a classroom teacher's class controls are enforced by `funTorahClassAccess` against the authenticated teacher's current assignment.
@@ -39,7 +47,8 @@ The hardcoded Teacher Tools actions are now defined in the shared registry and r
 | Action | Teacher Login | Access boundary |
 |---|---|---|
 | Student Report | Available per assigned class | Authenticated Teacher Center access and class chooser use assigned classes |
-| Vocabulary Progress | Available per assigned class | Carries the selected class context |
+| Vocabulary Progress | Available per assigned class and on the regular homepage | Carries the selected class context |
+| Classroom Pointer screen sharing | Available when Class Pointer is granted | Carries the selected class context; shares only that class |
 | Manage Class / Student tool access | Available | Opens Teacher Center roster and student tools for the selected assigned class |
 | Follow the Teacher | Available per assigned class | Carries class context; destination keeps its existing teacher/class gate |
 | Send Everyone to Share Screen | Available when Class Pointer is granted | Class Pointer grant required; opens the selected class |

@@ -412,14 +412,16 @@ body > .subtitle::after {
 <script>
 // Sync to Nigri card: hidden unless the owner, or a teacher whose school has "Syncs to Nigri" on (school-scope.js).
 document.addEventListener("DOMContentLoaded",function(){
-  var api=window.B3SiteSettings,card=document.getElementById("nigriSyncCard");
-  if(!api||!card||!window.B3SchoolScope||!window.firebase)return;
+  var api=window.B3SiteSettings;
+  if(!api||!window.B3SchoolScope||!window.firebase)return;
   var check=0;
   api.onAuthStateChanged(function(user,authorized){
-    var mine=++check;card.classList.add("nigri-hidden");
+    var mine=++check,card=document.getElementById("nigriSyncCard");
+    if(card)card.classList.add("nigri-hidden");
     if(!user||!authorized)return;
     window.B3SchoolScope.checkNigri({db:window.firebase.database(),user:user,workspaceId:api.workspaceId}).then(function(r){
-      if(mine===check)card.classList.toggle("nigri-hidden",!r.allowed);
+      var currentCard=document.getElementById("nigriSyncCard");
+      if(mine===check&&currentCard)currentCard.classList.toggle("nigri-hidden",!r.allowed);
     }).catch(function(){});
   });
 });
@@ -751,6 +753,9 @@ document.addEventListener("DOMContentLoaded",function(){
     }).filter(Boolean);
     container.replaceChildren(...(studentButton?[studentButton]:[]),...cards);
   }
+  // Render the registry-backed Sync tile before DOMContentLoaded attaches its
+  // school gate. The section stays hidden until access is known.
+  renderTeacherHomepageTools({role:"",classIds:[]},true);
   // Hook up student sign-in first. If any later setup code fails, the button
   // still responds instead of silently doing nothing.
   el("studentSignInBtn").addEventListener("click",studentSignIn);
