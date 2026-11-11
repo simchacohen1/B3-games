@@ -872,8 +872,24 @@ function studentSchool(id){const r=studentRecords[id];return r&&schoolData[r.sch
 function inClassOf(id,school){return Object.keys(rosterData[id]&&rosterData[id].classIds||{}).some(c=>classData[c]&&classData[c].schoolId===school)}
 function allStudentIds(){return [...new Set([...Object.keys(rosterData),...Object.keys(studentRecords)])].sort((a,b)=>studentName(a).localeCompare(studentName(b)))}
 function schoolStudentIds(){return allStudentIds().filter(id=>{const s=studentSchool(id);return s?s===nav.school:inClassOf(id,nav.school)})}
+// Preserve expanded group choices during navigation without storing student data.
+const studentOpenBySchool=new Map();
 function renderStudentSection(){
- q("studentList").innerHTML=schoolStudentIds().map(studentRow).join("")||'<small>No students in this school yet. Add them with Bulk Upload.</small>';
+ const ids=schoolStudentIds(),schoolClasses=schoolClassIds(),groups=new Map();
+ ids.forEach(id=>{
+   const membership=rosterData[id]&&rosterData[id].classIds||{};
+   // Show each student only once even if several classes are assigned.
+   const firstClass=schoolClasses.find(cid=>membership[cid]===true)||"";
+   if(!groups.has(firstClass))groups.set(firstClass,[]);
+   groups.get(firstClass).push(id);
+ });
+ const opened=studentOpenBySchool.get(nav.school)||new Set();
+ const sections=[...groups].sort(([a],[b])=>a&&b?byName(classData[a]?.name||a,classData[b]?.name||b):a?-1:1);
+ const controls=ids.length?'<div class="formrow" style="gap:8px"><span style="font-weight:800;margin-right:auto">'+ids.length+' students · '+sections.length+' groups</span><button type="button" data-student-fold="open">Expand all</button><button type="button" data-student-fold="close">Collapse all</button></div>':"";
+ q("studentList").innerHTML=controls+(ids.length?sections.map(([cid,members])=>{
+   const label=cid?(classData[cid]?.name||cid):"Not assigned to a class";
+   return '<details data-student-group="'+safe(cid||"unassigned")+'" data-group-name="'+safe(label.toLowerCase())+'"'+(opened.has(cid||"unassigned")?' open':'')+' style="border:2px solid #e2e8f0;border-radius:14px;margin:10px 0;background:#f8fafc"><summary style="cursor:pointer;padding:14px 16px;font-weight:800">'+safe(label)+' · '+members.length+' '+(members.length===1?'student':'students')+'</summary><div style="padding:0 12px 12px">'+members.map(studentRow).join("")+'</div></details>';
+ }).join(""):'<small>No students in this school yet. Add them with Bulk Upload.</small>');
  filterStudents();
  const plan=B3StudentScope.planImport(rosterData,studentRecords,classData,0),mine=plan.created.filter(id=>inClassOf(id,nav.school));
  q("studentImport").innerHTML=mine.length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+mine.length+' '+(mine.length===1?'student in this school&rsquo;s classes is':'students in this school&rsquo;s classes are')+' not set up yet.</b> Set them up from the classes they are in now? A student whose classes are all in this school gets this school; anyone also in another school&rsquo;s class you choose below. Nothing about their sign-in or classes changes.<div style="margin-top:10px"><button type="button" id="studentImportGo">Set up '+mine.length+' '+(mine.length===1?'student':'students')+'</button></div></div>':"";
@@ -884,8 +900,35 @@ function renderOrphanStudents(){
  const ids=allStudentIds().filter(id=>!studentSchool(id)&&!Object.keys(rosterData[id]&&rosterData[id].classIds||{}).length);
  q("studentOrphans").innerHTML=ids.length&&Object.keys(schoolData).length?'<div class="listlabel">Students with no school and no class</div>'+ids.map(studentRow).join(""):"";
 }
-function filterStudents(){const t=q("studentSearch").value.trim().toLowerCase();q("studentList").querySelectorAll("[data-student-row]").forEach(r=>{r.hidden=!!t&&!r.dataset.name.includes(t)})}
+function filterStudents(){
+ const t=q("studentSearch").value.trim().toLowerCase();
+ q("studentList").querySelectorAll("details[data-student-group]").forEach(group=>{
+   const matchClass=!!t&&group.dataset.groupName.includes(t);
+   let shown=0;
+   group.querySelectorAll("[data-student-row]").forEach(row=>{
+     row.hidden=!!t&&!matchClass&&!row.dataset.name.includes(t);
+     if(!row.hidden)shown++;
+   });
+   group.hidden=shown===0;
+   if(t&&shown)group.open=true;
+ });
+}
 q("studentSearch").addEventListener("input",filterStudents);
+// Existing student input changes still bubble to the original #studentList listener.
+q("studentList").addEventListener("click",event=>{
+ const control=event.target.closest("[data-student-fold]");
+ if(!control)return;
+ const open=control.dataset.studentFold==="open";
+ q("studentList").querySelectorAll("details[data-student-group]:not([hidden])").forEach(group=>{group.open=open;});
+});
+q("studentList").addEventListener("toggle",event=>{
+ const group=event.target;
+ if(!group.matches("details[data-student-group]")||q("studentSearch").value.trim())return;
+ const opened=studentOpenBySchool.get(nav.school)||new Set();
+ if(group.open)opened.add(group.dataset.studentGroup);
+ else opened.delete(group.dataset.studentGroup);
+ studentOpenBySchool.set(nav.school,opened);
+},true);
 // Re-reads records first so the import never overwrites a record saved meanwhile. Writes only the new path, and only for students in the open school's classes.
 async function importStudents(){
  const school=nav.school,records=await B3StudentScope.loadRecords(db,WS),classes=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
