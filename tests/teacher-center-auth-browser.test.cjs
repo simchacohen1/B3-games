@@ -123,6 +123,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.deepEqual(results.teacher_both.classJump.map(x=>x.target),['class-card-et','class-card-wt']);
   assert.equal(results.teacher_both.wtJumpWorked,true,'teacher can jump to assigned WT class');
   assert.equal(results.teacher_both.etJumpWorked,true,'teacher can return to assigned ET class');
+  assert.deepEqual(results.teacher_both.classes,['ET','WT'],'multi-class teacher receives exactly both assigned classes');
   assert.deepEqual(results.teacher_new.classes,['New Room']);
   assert.deepEqual(results.teacher_return.classes,['New Room']);
   assert.deepEqual(results.principal.classes,['ET','New Room']);
@@ -134,8 +135,9 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/admins/teacher_new').length,2,'pre-cache baseline performs two admin lookups without in-flight sharing');
   assert.equal(results.teacher_signin.baselineReads.filter(p=>p==='b3Games/workspaces/b3-2026/teachers/teacher_new').length,2,'pre-cache baseline performs two teacher lookups without in-flight sharing');
   const expectedTools=[...classGrantIds,'daily-points'];
-  for(const role of ['teacher_et','teacher_wt']){
-   const section=results[role].cards[0],classId=role==='teacher_et'?'et':'wt';
+  for(const [role,classId] of [['teacher_et','et'],['teacher_wt','wt'],['teacher_both','et'],['teacher_both','wt']]){
+   const section=results[role].cards.find(card=>card.name===classId.toUpperCase());
+   assert.ok(section,role+' has the authorized '+classId.toUpperCase()+' class card');
    assert.deepEqual([...new Set(section.tiles.map(x=>x.id))].sort(),expectedTools.slice().sort(),role+' shows all granted homepage tools');
    const companionPaths={'Chumash חידון':'record_pesukim/student.html','Mishnayos Practice':'record-mishnayos/teacher.html','Mishnayos חידון':'record-mishnayos/student.html'};
    for(const [title,path] of Object.entries(companionPaths)){
