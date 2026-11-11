@@ -37,7 +37,10 @@ test('registry keeps owner-only controls out and retains class grant mapping for
  // Companions deliberately share the Posuk Practice grant, while the owner
  // home includes student-facing tools that have no separate teacher grant.
  for(const id of ['posuk-practice-scroll','chazara','shorashim','rashi-letters','yiddish','gematria','halacha','sefer-hamitzvos','gallery','class-gallery','student-rewards','weekly-quiz','game-show','multiplayer-center'])assert.ok(registry.tools[id],id);
- for(const id of ['owner-admin','sync-to-nigri','comment-log'])assert.ok(!registry.tools[id],id);
+ for(const id of ['owner-admin','comment-log'])assert.ok(!registry.tools[id],id);
+ const nigri=registry.tools['sync-to-nigri'];
+ assert.equal(nigri.classGrant,'sync-to-nigri');
+ assert.equal(nigri.schoolGate,'nigri');
  assert.ok(homepageIds.has('posuk-practice-scroll'));
  assert.deepEqual(Array.from(registry.tools['posuk-practice-scroll'].companions,c=>c.title),['Chumash חידון','Mishnayos Practice','Mishnayos חידון']);
  const mishnayos=registry.tools['posuk-practice-scroll'].companions.find(c=>c.title==='Mishnayos Practice');
