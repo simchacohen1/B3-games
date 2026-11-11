@@ -159,6 +159,11 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    assert.ok(!section.teacherLinks.some(x=>/Owner Admin|Administration/.test(x.title)),role+' has no owner control');
    for(const mode of ['desktop','mobile'])assert.equal(results[role].responsive[mode].overflow,false,role+' has no horizontal overflow at '+mode);
   }
+  const restrictedClass=results.teacher_new.cards[0];
+  assert.deepEqual([...new Set(restrictedClass.tiles.map(tile=>tile.id))],['chazara'],'a class with only Chazara grant receives only that tool');
+  assert.ok(!restrictedClass.tiles.some(tile=>tile.id==='class-pointer'),'ungranted Class Pointer stays out of the tile list');
+  assert.ok(!restrictedClass.teacherLinks.some(link=>link.title==='Send Everyone to Share Screen'),'ungranted Class Pointer cannot expose screen-sharing controls');
+  assert.ok(!restrictedClass.teacherLinks.some(link=>link.title==='Class Dashboard'),'owner-only dashboard is not exposed to teachers');
   for(const role of Object.keys(results)){
    assert.equal(results[role].appVisible,true,role+' renders only after authorized callback');
    assert.equal(results[role].signInVisible,false,role+' does not fall back to sign-in after authorization');
