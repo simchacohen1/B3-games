@@ -54,14 +54,19 @@
     try{
       response=await fetch(url,{headers:{Authorization:'Firebase '+token},cache:'no-store'});
     }catch(error){
-      // An interrupted fetch can have multiple causes, but a missing bucket CORS
-      // GET origin is common for authenticated Firebase Storage browser downloads.
-      throw Error('Could not download this PDF securely. Check the Cloud Storage bucket CORS setting: allow GET from https://funtorahtools.com. Your saved PDF has not been deleted.');
+      throw Error('Could not reach this saved PDF. Check your connection and try again. Your saved PDF has not been deleted.');
     }
     if(!response.ok)throw Error('Private PDF download failed (HTTP '+response.status+'). Check your Firebase Storage permissions. Your saved PDF has not been deleted.');
     const length=Number(response.headers.get('content-length')||'0');
     if(length>MAX_PDF_BYTES)throw Error('This saved PDF is larger than the 500 MB library limit.');
-    const blob=await response.blob();
+    let blob;
+    try{
+      // fetch() can resolve after headers arrive, then reject while consuming a
+      // dropped/aborted response body. Keep that browser TypeError out of status.
+      blob=await response.blob();
+    }catch(error){
+      throw Error('The PDF download was interrupted. Your saved PDF has not been deleted; please try again.');
+    }
     if(blob.size>MAX_PDF_BYTES)throw Error('This PDF is too large to open from the library (500 MB maximum).');
     return blob;
   }
