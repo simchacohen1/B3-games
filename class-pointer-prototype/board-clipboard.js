@@ -105,8 +105,9 @@
     const aspect=opts.aspect||16/9,layout=layoutText(text,width100,opts);
     const strokes=layout.items.map(item=>{
       const lines=item.text.split('\n'),width=width100(lines[0]||'')/100*item.size,height=lines.length*item.size*1.25*aspect;
+      const rtl=isRtl(item.text),edge=Math.max(.02,width);
       return{tool:'text',color:opts.color||'#ffcc00',size:item.size,
-        points:[{x:item.x,y:item.y},{x:clamp(item.x+Math.max(.02,width),0,1),y:clamp(item.y+Math.max(.02,height),0,1)}],text:item.text};
+        points:[{x:item.x,y:item.y},{x:clamp(item.x+(rtl?-edge:edge),0,1),y:clamp(item.y+Math.max(.02,height),0,1)}],text:item.text};
     });
     return{strokes,cut:layout.cut,size:layout.size};
   }

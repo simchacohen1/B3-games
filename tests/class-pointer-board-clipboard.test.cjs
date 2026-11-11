@@ -53,6 +53,8 @@ test('pasted teacher text becomes bounded, validated text strokes with visible h
   assert.equal(stroke.tool,'text');assert.equal(stroke.color,'#1d4ed8');assert.equal(stroke.text,'Read\nthis lesson');
   assert.ok(clean);assert.equal(clean.size,.028);assert.ok(stroke.points[1].x>stroke.points[0].x);assert.ok(stroke.points[1].y>stroke.points[0].y);
   assert.ok(stroke.points.every(point=>point.x>=0&&point.x<=1&&point.y>=0&&point.y<=1));
+  const hebrew=Clip.textStrokes('שלום עולם',width100,{aspect:16/9,sizes:[.028,.016,.008]}).strokes[0];
+  assert.ok(Core.cleanStroke(hebrew));assert.ok(hebrew.points[1].x<hebrew.points[0].x,'RTL hit box extends left from the right-edge text anchor');
   const tooTall=Clip.textStrokes(Array.from({length:250},()=> 'x').join('\n'),width100,{aspect:16/9,sizes:[.008]});
   assert.equal(tooTall.cut,true);assert.ok(tooTall.strokes.length>0);assert.ok(tooTall.strokes.every(item=>Core.cleanStroke(item)));
 });
