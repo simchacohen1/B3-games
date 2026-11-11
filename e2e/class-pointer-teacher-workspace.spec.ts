@@ -210,7 +210,8 @@ test('teacher pastes editable text onto the shared whiteboard and can edit it', 
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('Updated lesson note');
   await page.getByRole('button', { name: 'Save text' }).click();
-  await expect(page.locator('#pdfInk text[data-text-mark]')).toContainText('Updated lesson note');
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(1);
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveText('Updated lesson note');
   expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === 'text' && s.text === 'Updated lesson note'))).toBe(true);
   expect(errors).toEqual([]);
   await context.close();

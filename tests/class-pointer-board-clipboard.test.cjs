@@ -254,7 +254,8 @@ test('the teacher whiteboard exposes paste, copy and the save / restore API',()=
   assert.match(pdfSource,/clip\.textStrokes\(payload\.text/);
   assert.match(pdfSource,/data-text-mark/);
   assert.match(pdfSource,/Edit whiteboard text/);
-  assert.match(pdfSource,/B\.edit\('erase',stroke\.id\)/);
+  assert.match(pdfSource,/replaceTextStroke\(stroke,text\)/);
+  assert.match(pdfSource,/marks\.splice\(index,1\);B\.submitStroke\(next\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
   assert.match(boardsSource,/window\.ClassPointerBoards=\{fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,/);
 });

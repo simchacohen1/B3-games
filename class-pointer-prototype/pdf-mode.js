@@ -38,10 +38,17 @@
   textEditForm.append(textEditLabel,textEditInput,textEditSave,textEditCancel);textEditDialog.appendChild(textEditForm);stage.appendChild(textEditDialog);
   textEditForm.addEventListener('submit',event=>{
     event.preventDefault();textEditDialog.close();const stroke=textEditStroke;textEditStroke=null;if(!stroke)return;
-    const next=C.cleanStroke({...stroke,text:textEditInput.value});if(!next){B.status('Enter some text to keep this text box.');return}
-    B.edit('erase',stroke.id);B.submitStroke(next);B.status('Whiteboard text updated.');
+    replaceTextStroke(stroke,textEditInput.value);
   });
   function openTextEditor(stroke){textEditStroke=stroke;textEditInput.value=stroke.text;textEditDialog.showModal();textEditInput.focus();textEditInput.select()}
+  function replaceTextStroke(stroke,text){
+    const next=C.cleanStroke({...stroke,text}),marks=B.highlights?.();
+    if(!next){B.status('Enter some text to keep this text box.');return false}
+    const index=Array.isArray(marks)?marks.findIndex(item=>item.id===stroke.id&&item.owner==='teacher'):-1;
+    if(index<0){B.status('That whiteboard text is no longer available to edit.');return false}
+    // Remove only this teacher mark, then submit the replacement to publish the complete mark list.
+    marks.splice(index,1);B.submitStroke(next);B.status('Whiteboard text updated.');return true;
+  }
 
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
   let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null,movePicturesBtn=null;
