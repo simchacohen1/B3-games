@@ -113,7 +113,7 @@ async function render(user,access){
  q("classes").innerHTML=snaps.map((s,i)=>{
  const id=ids[i],row=s.val()||{};
  if(!s.exists()||row.active===false)return "";
- const grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]&&(!REGISTRY.tools[x[0]].supportedClasses||REGISTRY.tools[x[0]].supportedClasses.includes(id)));
+ const grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]&&!REGISTRY.tools[x[0]].ownerOnly&&(!REGISTRY.tools[x[0]].supportedClasses||REGISTRY.tools[x[0]].supportedClasses.includes(id)));
  if(["et","wt"].includes(id)&&siteSettings.games?.["multiplayer-center"]!==false&&siteSettings.classGames?.[id]?.["multiplayer-center"]!==false&&!enabled.some(x=>x[0]==="multiplayer-center"))enabled.push(["multiplayer-center",true]);
  if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);
  const cls=encodeURIComponent(id),link=tool=>{const definition=REGISTRY.tools[tool],base=definition.classHrefs?.[id]||TOOLS[tool][1];return previewActive?previewHref(tool,id):base+(base.includes('?')?'&':'?')+'class='+cls;};

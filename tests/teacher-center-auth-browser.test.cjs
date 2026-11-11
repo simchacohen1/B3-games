@@ -139,6 +139,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    const section=results[role].cards.find(card=>card.name===classId.toUpperCase());
    assert.ok(section,role+' has the authorized '+classId.toUpperCase()+' class card');
    assert.deepEqual([...new Set(section.tiles.map(x=>x.id))].sort(),expectedTools.slice().sort(),role+' shows all granted homepage tools');
+   assert.ok(!section.tiles.some(x=>x.title==='Class Dashboard'),role+' never renders a stale owner-only tool grant');
    const companionPaths={'Chumash חידון':'record_pesukim/student.html','Mishnayos Practice':'record-mishnayos/teacher.html','Mishnayos חידון':'record-mishnayos/student.html'};
    for(const [title,path] of Object.entries(companionPaths)){
     const tile=section.tiles.find(x=>x.title===title);assert.ok(tile,role+' companion '+title);
