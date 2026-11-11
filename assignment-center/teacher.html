@@ -520,7 +520,7 @@ function renderReports(){var d=state.data,box=$('list');if(!d)return;box.replace
   var titles={published:'Published assignments',draft:'Draft assignments',archived:'Archived assignments'};
   var statuses=['published','draft','archived'];
   var totals={published:0,draft:0,archived:0},pending={published:0,draft:0,archived:0};
-  ordered.forEach(function(a){var p=pubOf(a);totals[p]=(totals[p]||0)+1;pending[p]=(pending[p]||0)+assignmentCounts(a).waiting});
+  ordered.forEach(function(a){var p=pubOf(a);if(!statuses.includes(p))p='published';totals[p]=(totals[p]||0)+1;pending[p]=(pending[p]||0)+assignmentCounts(a).waiting});
   var controls=el('div',null,'review-group-actions'),expand=el('button','Expand all','sec'),collapse=el('button','Collapse all','sec');
   expand.type=collapse.type='button';
   expand.onclick=function(){grouped.forEach(function(g,k){g.open=true;state.openAssignmentGroups[k]=true})};
@@ -533,7 +533,7 @@ function renderReports(){var d=state.data,box=$('list');if(!d)return;box.replace
     fold.append(sum);box.append(fold);grouped.set(p,fold);
     fold.addEventListener('toggle',function(){if(fold.open)state.openAssignmentGroups[p]=true;else delete state.openAssignmentGroups[p]});
   });
-  ordered.forEach(function(a){var p=pubOf(a),row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
+  ordered.forEach(function(a){var p=pubOf(a);if(!statuses.includes(p))p='published';var row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
     var top=el('div',null,'row-top'),name=el('span',null,'row-name');name.append(document.createTextNode(a.title+' '),labelBadge(a));if(a.subject)name.append(el('span',a.subject,'badge'));if(p==='draft')name.append(el('span','Draft · students can’t see it','badge state'));if(p==='archived')name.append(el('span','Archived','badge state'));top.append(name,el('span',dateLine(a),'row-dates'));row.append(top);
     if(p!=='draft')row.append(countLine(assignmentCounts(a)));var fresh=newNotesIn(a);if(fresh)name.append(el('span','💬 '+fresh+' new','badge new-msg'));
     row.onclick=function(){openAssignment(a.id)};grouped.get(p).append(row)})}
