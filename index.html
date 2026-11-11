@@ -741,7 +741,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const companion=item.companionOf&&registry.tools[item.companionOf]?.companions?.find(c=>c.title===item.companionTitle);
       let href=action?.href||companion?.teacherHref||companion?.href||tool?.classHrefs?.[item.classId]||tool?.href||"";
       if(!href)return null;
-      if(item.classParam&&selectedClass)href+=(href.includes("?")?"&":"?")+"class="+encodeURIComponent(selectedClass);
+      if((item.classParam||action?.classParam)&&selectedClass)href+=(href.includes("?")?"&":"?")+"class="+encodeURIComponent(selectedClass);
       const card=document.createElement("a");card.className="teacher-tool-card"+(item.className?" "+item.className:"");
       card.href=href;if(item.elementId)card.id=item.elementId;
       if(item.newTab||action?.newTab){card.target="_blank";card.rel="noopener";}
