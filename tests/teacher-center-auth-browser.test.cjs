@@ -129,7 +129,13 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   for(const role of ['teacher_et','teacher_wt']){
    const section=results[role].cards[0],classId=role==='teacher_et'?'et':'wt';
    assert.deepEqual([...new Set(section.tiles.map(x=>x.id))].sort(),expectedTools.slice().sort(),role+' shows all granted homepage tools');
-   for(const title of ['Chumash חידון','Mishnayos Practice','Mishnayos חידון'])assert.ok(section.tiles.some(x=>x.title===title),role+' companion '+title);
+   const companionPaths={'Chumash חידון':'record_pesukim/student.html','Mishnayos Practice':'record-mishnayos/teacher.html','Mishnayos חידון':'record-mishnayos/student.html'};
+   for(const [title,path] of Object.entries(companionPaths)){
+    const tile=section.tiles.find(x=>x.title===title);assert.ok(tile,role+' companion '+title);
+    const url=new URL(tile.href,'http://localhost');
+    assert.equal(url.pathname.slice(1),path,role+' companion route '+title);
+    assert.equal(url.searchParams.get('class'),classId,role+' companion is scoped to '+classId);
+   }
    assert.ok(section.tiles.every(x=>x.href.includes('class='+classId)),role+' tool links target its assigned class');
    for(const tile of section.tiles){const pathname=decodeURIComponent(new URL(tile.href,'http://localhost').pathname).replace(/^\//,'');assert.ok(fs.existsSync(path.join(ROOT,pathname)),role+' destination exists: '+tile.title+' → '+pathname);}
    for(const title of ['Manage Class','Student Report','Vocabulary Progress','Follow the Teacher'])assert.ok(section.teacherLinks.some(x=>x.title===title),role+' has teacher control '+title);

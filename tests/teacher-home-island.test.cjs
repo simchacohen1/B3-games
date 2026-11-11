@@ -40,6 +40,9 @@ test('registry keeps owner-only controls out and retains class grant mapping for
  for(const id of ['owner-admin','sync-to-nigri','comment-log'])assert.ok(!registry.tools[id],id);
  assert.ok(homepageIds.has('posuk-practice-scroll'));
  assert.deepEqual(Array.from(registry.tools['posuk-practice-scroll'].companions,c=>c.title),['Chumash חידון','Mishnayos Practice','Mishnayos חידון']);
+ const mishnayos=registry.tools['posuk-practice-scroll'].companions.find(c=>c.title==='Mishnayos Practice');
+ assert.equal(mishnayos.href,'record-mishnayos/student.html','regular homepage keeps the student practice page');
+ assert.equal(mishnayos.teacherHref,'record-mishnayos/teacher.html','Teacher View uses the teacher dashboard');
  assert.ok(registry.groups.find(g=>g.id==='learn').icon.includes('aria-label="Rebbe"'),'Chumash Rebbe illustration remains SVG');
  assert.match(index,/data-companion-of="posuk-practice-scroll"/);
  assert.match(fs.readFileSync('home-island.css','utf8'),/@media\(max-width:750px\)/);

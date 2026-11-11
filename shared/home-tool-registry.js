@@ -14,7 +14,7 @@
     "sefer-hamitzvos":{title:"Sefer HaMitzvos",href:"sefer-hamitzvos/index.html",studentHref:"sefer-hamitzvos/index.html",icon:"📖",group:"more-learning"},
     halacha:{title:"Halacha",href:"halacha/teacher.html",icon:"📔",group:"more-learning"},
     yiddish:{title:"Yiddish",href:"yiddish/teacher.html",icon:"assets/yiddish-icon-v2.png",group:"skills"},
-    "posuk-practice-scroll":{title:"Posuk Practice",href:"record_pesukim/teacher.html",studentHref:"record_pesukim/student.html",icon:"📜",group:"learn",companions:[{title:"Chumash חידון",href:"record_pesukim/student.html?mode=quiz",icon:"🧠"},{title:"Mishnayos Practice",href:"record-mishnayos/student.html",icon:"📖"},{title:"Mishnayos חידון",href:"record-mishnayos/student.html?mode=quiz",icon:"🧠"}]},
+    "posuk-practice-scroll":{title:"Posuk Practice",href:"record_pesukim/teacher.html",studentHref:"record_pesukim/student.html",icon:"📜",group:"learn",companions:[{title:"Chumash חידון",href:"record_pesukim/student.html?mode=quiz",icon:"🧠"},{title:"Mishnayos Practice",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html",icon:"📖"},{title:"Mishnayos חידון",href:"record-mishnayos/student.html?mode=quiz",icon:"🧠"}]},
     "rashi-letters":{title:"Rashi Letters",href:"rashi-letters/teacher.html",icon:"אב",group:"skills"},
     gematria:{title:"Gematria",href:"gematria/teacher.html",icon:"🔢",group:"skills"},
     shorashim:{title:"Shorashim",href:"shorashim/teacher.html",icon:"🌳",group:"roots"},
