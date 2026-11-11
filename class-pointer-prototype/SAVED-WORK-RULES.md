@@ -10,8 +10,8 @@ but every save, list and open answers "Saving is not turned on yet. Ask your tea
 |---|---|---|---|
 | Realtime Database | `firebase-rules.json` (the file `firebase.json` and `firebase.pointer-additive.json` deploy) | yes | **No.** Block to add is below. When the owner approves it, the new write expression must also be recorded in `security/reviewed-permission-expressions.json` and `scripts/rules-additive-check.cjs`, which is the owner's review step |
 | Realtime Database, hardened candidate | not live (`firebase-rules.hardened.json`, `staging/database.rules.json`; open PRs #766 and others edit them) | yes | No. Block to add is below |
-| Storage | Published by hand in the Firebase console. `firebase.json` has no `storage` entry on purpose. The closest copy is `security/pointer-pdf-library-merged-storage.rules` (what the owner was given to paste for the PDF Library) | not reliably | **No.** Block to add is below |
-| Storage, hardened candidate | not live (`storage-rules.hardened.rules`, used only by `firebase.security-deploy.json` and the emulator tests) | yes | No. Note: this file has **no** `pointerPdfLibrary` rule, so publishing it as it stands would turn off the teacher PDF Library |
+| Storage | Published by hand in the Firebase console. `firebase.json` has no `storage` entry on purpose. `security/pointer-pdf-library-merged-storage.rules` is a candidate copy containing the PDF Library rules plus these saved-work blocks | not reliably | **Candidate changed only; not published.** |
+| Storage, hardened candidate | not live (`storage-rules.hardened.rules`, used by the Storage emulator tests) | yes | Saved-work blocks are added and emulator-tested. This file still has **no** `pointerPdfLibrary` rule, so publishing it as-is would turn off the teacher PDF Library |
 
 ## Data layout
 
@@ -27,9 +27,11 @@ File ids are random (`crypto.randomUUID`) and match `[A-Za-z0-9_-]{1,64}`. No st
 
 **Teachers cannot see students' files.** The owner asked for files "private to that student", so there is no teacher read rule and no teacher list. (Anyone with Firebase console access to the project can still see stored files, as with all other data.)
 
-## Storage rules to add
+## Storage rules (candidate implementation, NOT published)
 
-Paste inside `match /b/{bucket}/o { ... }`, beside the existing blocks. Nothing existing changes.
+The two saved-work blocks below are now present in `storage-rules.hardened.rules` and `security/pointer-pdf-library-merged-storage.rules`. The former is loaded directly by `firebase.security-test.json` for synthetic emulator checks; the latter preserves the teacher PDF Library block for review as a console-paste candidate. Neither file is selected by `firebase.json`, and no live Firebase Storage rules were changed.
+
+Keep the rules here as the review reference. Before publication, compare with a fresh backup of the actual console rules and merge these blocks without replacing unrelated live permissions.
 
 ```
     // Class Pointer saved work (issue #770).
@@ -106,7 +108,7 @@ Under `b3Games/workspaces/$workspaceId/classes/$classId`:
 - Depth is held to two levels by the `parentId` rule. The 60-folder limit and control-character cleaning are done by the page.
 - Deleting a folder only removes folder rows. Student files are never touched; they show under "Other".
 
-**For the hardened database rules** (when that file is next edited): add the same node with the hardened `classPointerSessions` `.write`, plus a read for the class:
+**Database folders are still proposal-only.** No Realtime Database rule file has this node yet. The live `firebase-rules.json` addition must be coordinated with the active rules work on PRs #686/#628 and #738. For the hardened database rules, add the same node with the hardened `classPointerSessions` `.write`, plus a read for the class:
 
 ```json
 ".read": "<the hardened classPointerSessions .read expression: owner, admin, teacher of this class, or a signed-in student whose b3ClassId is this class>"

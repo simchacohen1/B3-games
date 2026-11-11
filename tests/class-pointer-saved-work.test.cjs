@@ -224,10 +224,16 @@ test('proposed Storage rules keep student files private to that student in that 
   assert.match(rules,/request\.resource\.size <= 10 \* 1024 \* 1024/);
 });
 
-test('Storage rules files in the repo are untouched: the live Storage rules are published by hand',()=>{
+test('saved-work Storage rules are present in review candidates, not selected by Firebase deploy config',()=>{
   for(const file of ['storage-rules.hardened.rules','security/pointer-pdf-library-merged-storage.rules']){
     const text=fs.readFileSync(path.join(base,file),'utf8');
-    assert.ok(!text.includes('studentFiles')&&!text.includes('pointerWhiteboards'),file);
+    assert.match(text,/match \/studentFiles\/\{classId\}\/\{studentId\}\/\{fileId\}/,file);
+    assert.match(text,/match \/pointerWhiteboards\/\{teacherUid\}\/\{fileId\}/,file);
+    assert.match(text,/request\.auth\.token\.b3StudentId == studentId/,file);
+    assert.match(text,/request\.auth\.token\.b3ClassId == classId/,file);
+    assert.match(text,/request\.auth\.uid == teacherUid/,file);
+    assert.match(text,/request\.resource\.size <= 25 \* 1024 \* 1024/,file);
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(base,'firebase.json'),'utf8')).storage,undefined);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(base,'firebase.security-test.json'),'utf8')).storage.rules,'storage-rules.hardened.rules');
 });
