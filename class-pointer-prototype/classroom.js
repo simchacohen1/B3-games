@@ -712,7 +712,7 @@ function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(co
 function submitStroke(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else if(writingAllowed(stroke.tool))send(teacherConnection,{type:'highlight',stroke})}
 function live(){return state.sharing||state.pdf===true}
 if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
-  teacher:isTeacher,allowed:()=>!navigating&&writingAllowed($(isTeacher?'teacherTool':'studentTool').value),sharing:()=>state.sharing&&!state.pdf,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
+  teacher:isTeacher,allowed:()=>!navigating&&($(isTeacher?'teacherTool':'studentTool').value==='eraser'?(writingAllowed('highlight')||writingAllowed('pen')):writingAllowed($(isTeacher?'teacherTool':'studentTool').value)),sharing:()=>state.sharing&&!state.pdf,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
