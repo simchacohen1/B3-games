@@ -12,7 +12,7 @@
   ];
   const tools={
     "sefer-hamitzvos":{title:"Sefer HaMitzvos",href:"sefer-hamitzvos/index.html",studentHref:"sefer-hamitzvos/index.html",icon:"📖",group:"more-learning",classGrant:"sefer-hamitzvos",grantGroup:"dual"},
-    halacha:{title:"Halacha",href:"halacha/teacher.html",icon:"📔",group:"more-learning",classGrant:"halacha",grantGroup:"dual"},
+    halacha:{title:"Halacha",href:"halacha/teacher.html",icon:"📔",group:"more-learning",companions:[{title:"Halacha — Teacher Lesson",href:"halacha/index.html?teacher=1",icon:"📖"}],classGrant:"halacha",grantGroup:"dual"},
     yiddish:{title:"Yiddish",href:"yiddish/teacher.html",icon:"assets/yiddish-icon-v2.png",group:"skills",classGrant:"yiddish",grantGroup:"dual"},
     "posuk-practice-scroll":{title:"Posuk Practice",href:"record_pesukim/teacher.html",studentHref:"record_pesukim/student.html",icon:"📜",group:"learn",companions:[{title:"Chumash חידון",href:"record_pesukim/student.html?mode=quiz",icon:"🧠",classGrant:"posuk-practice-scroll",grantGroup:"dual"},{title:"Mishnayos Practice",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html",icon:"📖"},{title:"Mishnayos חידון",href:"record-mishnayos/student.html?mode=quiz",icon:"🧠"}]},
     "rashi-letters":{title:"Rashi Letters",href:"rashi-letters/teacher.html",icon:"אב",group:"skills",classGrant:"rashi-letters",grantGroup:"dual"},
@@ -26,7 +26,7 @@
     homework:{title:"Homework & Assignments",href:"assignment-center/teacher.html",icon:"📚",classGrant:"homework",grantGroup:"dual"},
     gallery:{title:"Gallery",href:"class-gallery/index.html",icon:"🖼️",group:"class",classGrant:"gallery",grantGroup:"dual"},
     tag:{title:"Tag Game",href:"class-gallery/index.html",icon:"🏃",group:"class",classGrant:"tag",grantGroup:"dual"},
-    davening:{title:"Davening Player",href:"davening_student_app/index.html",icon:"📖",classGrant:"davening",grantGroup:"teacher"},
+    davening:{title:"Davening Player",href:"",classHrefs:{et:"davening_student_app_et/index.html",wt:"davening_student_app_wt/index.html"},supportedClasses:["et","wt"],icon:"📖",classGrant:"davening",grantGroup:"teacher"},
     "class-pointer":{title:"Class Pointer",href:"class-pointer-prototype/dashboard.html?teacher=1",icon:"👆",classGrant:"class-pointer",grantGroup:"unsorted"},
     "multiplayer-center":{title:"Multiplayer Arcade",href:"multiplayer/index.html",icon:"🎮",group:"challenge",classGrant:"multiplayer-center",grantGroup:"dual"},
     "name-picker":{title:"Name Picker",href:"name-picker/index.html",icon:"🎡",classGrant:"name-picker",grantGroup:"teacher"},
