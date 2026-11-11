@@ -15,7 +15,7 @@
   var homeFollow = null, homePointer = null, modal = null, modalTitle = null, modalClassSelect = null;
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
-  var lastFollowClass = '';
+  var lastFollowClass = '', lastAccess = null;
   // A button pressed before any class is chosen waits here ('access', 'follow'
   // or 'pointer') while the panel asks "Which class?" (issue 769).
   var pending = '', chooser = null, popoutBtn = null;
@@ -200,7 +200,7 @@
     if (bar) return;
     var style = el('style');
     style.textContent = [
-      '#fttTeacherQuickBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:0;padding:5px 6px 5px 14px;border-radius:999px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
+      '#fttTeacherQuickBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483645;display:flex;align-items:center;gap:6px;background:#fff;border:0;padding:5px 6px 5px 14px;border-radius:999px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
       '#fttTeacherQuickBar[hidden],#fttTeacherQuickModal[hidden]{display:none!important}',
       '#fttTeacherQuickBar label{font-size:13px;font-weight:800}',
       '#fttTeacherQuickBar select{max-width:170px;min-width:130px;border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;color:#1e293b;background:#fff;font:700 14px Arial}',
@@ -211,7 +211,7 @@
       '#fttTeacherQuickBar button[hidden],.ftt-home-follow[hidden]{display:none!important}',
       '#fttTeacherQuickBar button[aria-current=page],.ftt-home-follow[aria-current=page]{cursor:default}',
       '.ftt-home-follow{font-size:18px!important;padding:5px 9px!important;border-radius:999px!important}',
-      '#fttTeacherQuickModal{position:fixed;inset:0;z-index:100500;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:12px;font-family:Arial,sans-serif}',
+      '#fttTeacherQuickModal{position:fixed;inset:0;z-index:2147483646;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:12px;font-family:Arial,sans-serif}',
       '#fttTeacherQuickModal .ftt-quick-card{background:#fff;color:#1e293b;border-radius:18px;width:min(980px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 65px #0005}',
       '#fttTeacherQuickModal .ftt-quick-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #cbd5e1;font-weight:900}',
       '#fttTeacherQuickModal .ftt-quick-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}',
@@ -323,6 +323,31 @@
     }
     syncPointerButtons();
   }
+  // Fullscreen changes the browser's top layer: body-level fixed controls are
+  // invisible/unhittable until moved inside the fullscreen element. Activity
+  // pages also replace body children or re-render the owner home bar.
+  // Reattach the ORIGINAL nodes so their click listeners survive navigation.
+  function ensureVisibleControls() {
+    if (!authorized || !bar || !modal || !document.body) return;
+    var surface = document.fullscreenElement || document.body;
+    if (modal.parentElement !== surface) surface.appendChild(modal);
+    if (bar.parentElement !== surface) surface.appendChild(bar);
+    if (lastAccess) {
+      var homeBar = document.getElementById('homeClassBar');
+      if (homeBar && lastAccess.role === 'admin' &&
+          (!homeFollow || !homeBar.contains(homeFollow) ||
+           !homePointer || !homeBar.contains(homePointer))) {
+        syncHomeButton(lastAccess);
+      } else if (!homeBar && bar.hidden) {
+        syncHomeButton(lastAccess);
+      }
+    }
+  }
+  document.addEventListener('fullscreenchange', ensureVisibleControls);
+  window.addEventListener('pageshow', ensureVisibleControls);
+  // A low-frequency safety check avoids observing every DOM mutation produced
+  // by busy learning games and keeps event handlers on their original nodes.
+  setInterval(ensureVisibleControls, 1000);
   // Shared drawing toolbar: a teacher always has the pencil button (class-pointer-prototype/annotation-toolbar.js).
   var annotateLoading = null;
   function teacherAnnotate(on) {
@@ -338,7 +363,7 @@
   }
   function reset() {
     teacherAnnotate(false);
-    authorized = false; identity++; classes = []; selected = '';
+    authorized = false; lastAccess = null; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
     if (homePointer) {homePointer.remove();homePointer=null;}
@@ -380,10 +405,12 @@
       // pre-selected; otherwise the bar shows "Choose a class\u2026".
       selected = ids.includes(requested) ? requested : '';
       authorized=true;
+      lastAccess=access;
       teacherAnnotate(true);
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
+      ensureVisibleControls();
     } catch(e) {
       if (serial===identity) reset();
       console.warn('Teacher quick controls unavailable:',e);
