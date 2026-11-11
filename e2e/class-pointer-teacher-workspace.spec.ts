@@ -238,6 +238,15 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
     if (name === 'pen-arrow') await expect(mark.locator(':scope > line, :scope > path')).toHaveCount(2);
     expect(await page.evaluate((expected) => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === expected), name)).toBe(true);
   }
+  const presentationInk = await page.evaluate(async () => {
+    const blob = await (window as any).ClassPointerPdf.exportPng(), bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d')!; ctx.drawImage(bitmap, 0, 0); bitmap.close();
+    const rgba=ctx.getImageData(0,0,canvas.width,canvas.height).data;let nonWhite=0;
+    for(let i=0;i<rgba.length;i+=4)if(rgba[i]<240||rgba[i+1]<240||rgba[i+2]<240)nonWhite++;
+    return {width:canvas.width,height:canvas.height,nonWhite};
+  });
+  expect(presentationInk.nonWhite, JSON.stringify(presentationInk)).toBeGreaterThan(100);
 
   await page.locator('#fttAnnotate button[data-tool="text"]').click();
   await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
