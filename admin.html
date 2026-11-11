@@ -141,39 +141,36 @@ function makeSection(d,id){
 function moveRange(start,count,target){let n=start;for(let i=0;i<count&&n;i++){const next=n.nextElementSibling;target.appendChild(n);n=next}}
 function isOwnerNow(){try{return (frame.contentWindow?.B3SiteSettings?.getCurrentAccess?.()||{}).role==="admin"}catch(e){return false}}
 let teacherAccessClass="";
+let teacherAuthWait=null;
 function taEsc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
+function waitForTeacherAuth(w){
+ if(teacherAuthWait)return teacherAuthWait;
+ teacherAuthWait=new Promise(resolve=>{
+   let off=()=>{},done=false,timer=0;
+   const finish=value=>{if(done)return;done=true;clearTimeout(timer);off();teacherAuthWait=null;resolve(value)};
+   timer=setTimeout(()=>finish(w.B3SiteSettings.getCurrentAccess?.()||{}),12000);
+   off=w.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>finish(access||{authorized}));
+ });
+ return teacherAuthWait;
+}
 async function renderTeacherAccess(msg){
   const panel=document.getElementById("teacherAccessPanel");
   const w=frame.contentWindow,db=w?.firebase?.database?.(),access=w?.B3SiteSettings?.getCurrentAccess?.()||{},ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
   if(!db||!w?.B3SiteSettings){panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Loading teacher sign-in…</div></div>';setTimeout(()=>{if(currentTab==="access"&&!isOwnerNow())renderTeacherAccess()},900);return}
   if(!access.authorized){
+    const auth=w.firebase.auth();
+    if(auth.authStateReady)await auth.authStateReady();
+    if(auth.currentUser)await waitForTeacherAuth(w);
+    const refreshed=w.B3SiteSettings.getCurrentAccess?.()||{};
+    if(refreshed.authorized){showTab(currentTab);return}
+    if(auth.currentUser){panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Class access unavailable</h2><p class="ta-hint">This signed-in account is not assigned to an active class.</p><p role="status" id="taSignInStatus"></p></div></div>';return}
     panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Teacher &amp; administrator sign in</h2><p>Sign in with your authorized Google account to open your classes.</p><button type="button" id="taSignIn">Sign in with Google</button><p role="status" id="taSignInStatus"></p></div></div>';
     document.getElementById('taSignIn').onclick=async()=>{try{await w.B3SiteSettings.signInWithGoogle();applyRoleView();showTab(currentTab);}catch(error){document.getElementById('taSignInStatus').textContent=error.message||'Could not sign in. Please try again.';}};
     return;
   }
-  const ids=(access.classIds||[]).filter(Boolean);
-  if(!ids.length){panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>No class yet</h2><p class="ta-hint">No class is assigned to your account yet.</p></div></div>';return}
-  if(!teacherAccessClass||!ids.includes(teacherAccessClass))teacherAccessClass=ids.includes(requestedClassId)?requestedClassId:ids[0];
-  const base="b3Games/workspaces/"+ws+"/classes/";
-  const snaps=await Promise.all(ids.map(id=>db.ref(base+id).once("value")));
-  const recs={};ids.forEach((id,i)=>recs[id]=snaps[i].val()||{});
-  const rec=recs[teacherAccessClass],name=rec.name||teacherAccessClass;
-  const legacy=teacherAccessClass==="et"||teacherAccessClass==="wt";
-  const locked=rec.siteEnabled===false||(rec.access&&rec.access.mode==="locked");
-  const picker=ids.length>1?'<select id="taPick">'+ids.map(id=>'<option value="'+taEsc(id)+'"'+(id===teacherAccessClass?" selected":"")+'>'+taEsc(recs[id].name||id)+'</option>').join("")+'</select>':"";
-  panel.innerHTML='<div class="ta-wrap">'+picker+'<div class="ta-card"><h2>'+taEsc(name)+'</h2><p class="ta-hint">'+(legacy?"This class follows the B3 master schedule, so it can't be locked here.":"When your class is locked, your students can't open any activity. Unlock it when you want them to play.")+'</p><div class="ta-pill '+(locked?"ta-locked":"ta-open")+'">'+(locked?"🔒 LOCKED":"✅ OPEN")+'</div>'+(legacy?"":'<div class="ta-btns"><button class="ta-lock" id="taLock" '+(locked?"disabled":"")+'>🔒 Lock my class now</button><button class="ta-unlock" id="taUnlock" '+(locked?"":"disabled")+'>✅ Unlock my class</button></div>')+'<div class="ta-msg" id="taMsg">'+taEsc(msg||"")+'</div></div></div>';
-  const pick=document.getElementById("taPick");if(pick)pick.onchange=()=>{teacherAccessClass=pick.value;renderTeacherAccess()};
-  const save=async lockIt=>{
-    const msgEl=document.getElementById("taMsg");msgEl.textContent="Saving…";
-    try{
-      const u={};u[base+teacherAccessClass+"/access/mode"]=lockIt?"locked":"open";
-      if(!lockIt&&rec.siteEnabled===false)u[base+teacherAccessClass+"/siteEnabled"]=true;
-      await db.ref().update(u);
-      renderTeacherAccess(lockIt?"Class locked ✓":"Class unlocked ✓");
-    }catch(err){console.error(err);msgEl.textContent="Could not save. Please try again."}
-  };
-  const lb=document.getElementById("taLock"),ub=document.getElementById("taUnlock");
-  if(lb)lb.onclick=()=>save(true);if(ub)ub.onclick=()=>save(false);
+  panel.style.display="none";
+  document.getElementById("ownerControlPanel").style.display="block";
+  startOwnerControl();
 }
 // ---- Owner Control page -------------------------------------------------
 // One class at a time: status, Automatic / Open now / Lock now, and every
@@ -181,7 +178,7 @@ async function renderTeacherAccess(msg){
 // class is locked.
 let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
 let cpRecords={},cpClassesUnsub=false;
-let cpClass=(embedMode&&requestedClassId)?requestedClassId:(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
+let cpClass=requestedClassId||(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
 function cpClassTabs(){
  return CP_CLASSES.map(c=>'<button type="button" data-cp-class="'+cpEsc(c.id)+'" class="'+(c.id===cpClass?'on':'')+'"><span class="cp-dot"></span>'+cpEsc(c.name)+'</button>').join('');
@@ -194,9 +191,22 @@ function cpBindClassTabs(panel){
  });
 }
 function cpWatchClasses(){
- const w=frame.contentWindow,db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
+ const w=frame.contentWindow,db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
  if(!db||cpClassesUnsub)return;
  cpClassesUnsub=true;
+ if(access.role!=="admin"){
+   const ids=(access.classIds||[]).filter(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
+   if(!ids.length){CP_CLASSES=[];cpRecords={};return}
+   let loaded=0;
+   ids.forEach(id=>db.ref("b3Games/workspaces/"+ws+"/classes/"+id).on("value",snapshot=>{
+     const row=snapshot.val();if(row)cpRecords[id]=row;else delete cpRecords[id];loaded++;
+     if(loaded<ids.length)return;
+     CP_CLASSES=ids.filter(key=>cpRecords[key]?.active!==false&&cpRecords[key]).map(key=>({id:key,name:String(cpRecords[key].name||key)}));
+     if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
+     if(currentTab==="access"&&!isOwnerNow())renderOwnerControl();
+   },e=>{console.error("Could not load assigned class",id,e)}));
+   return;
+ }
  db.ref("b3Games/workspaces/"+ws+"/classes").on("value",snapshot=>{
    cpRecords=snapshot.val()||{};
    const all=Object.entries(cpRecords).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
@@ -289,7 +299,7 @@ function renderOwnerControl(){
 }
 // New classes use their own access and tool grants, never B3's shared ET/WT settings.
 function renderOwnerPlatformClass(panel){
- const id=cpClass,row=cpRecords[id],w=frame.contentWindow;
+ const id=cpClass,row=cpRecords[id],w=frame.contentWindow,teacherMode=w?.B3SiteSettings?.getCurrentAccess?.().role==="teacher";
  if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
  const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",isOpen=row.siteEnabled!==false&&mode!=="locked"&&cpSettings?.siteEnabled!==false;
  const tools=cpGames().map(t=>({id:t.id==="class-gallery"?"gallery":t.id,name:t.name}));
@@ -300,7 +310,7 @@ function renderOwnerPlatformClass(panel){
    return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
-  +(cpSettings?.siteEnabled===false?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
+  +(cpSettings?.siteEnabled===false&&!teacherMode?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
   +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
   +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
@@ -310,12 +320,9 @@ function renderOwnerPlatformClass(panel){
  cpBindClassTabs(panel);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
  panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
-   if(b.dataset.cpNewMode==="open"){
-     const updates={};
-     updates[base+"/access/mode"]="open";
-     updates[base+"/siteEnabled"]=true;
-     return db.ref().update(updates);
-   }
+   const mode=b.dataset.cpNewMode;
+   if(teacherMode)return cpApi().manageClassAccessAction(id,"platform",{mode});
+   if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true});
    return db.ref(base+"/access/mode").set("locked");
  },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
  const emergency=document.getElementById("cpEmergencyOffNew");
@@ -327,11 +334,15 @@ function renderOwnerPlatformClass(panel){
    const on=b.dataset.cpGrantAll==="1";
    if(!confirm((on?"Enable":"Disable")+" ALL tools for "+name+"?"))return;
    const updates={};distinct.forEach(t=>{updates[base+"/toolGrants/"+t.id]=on;});
-   cpSave(()=>db.ref().update(updates),"All tools "+(on?"enabled":"disabled")+" for "+name+" ✓");
+   cpSave(()=>teacherMode
+     ?Promise.all(distinct.map(t=>cpApi().manageClassAccessAction(id,"grant",{toolId:t.id,enabled:on})))
+     :db.ref().update(updates),"All tools "+(on?"enabled":"disabled")+" for "+name+" ✓");
  });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
    const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
-   cpSave(()=>db.ref(base+"/toolGrants/"+tool).set(!on),
+   cpSave(()=>teacherMode
+     ?cpApi().manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on})
+     :db.ref(base+"/toolGrants/"+tool).set(!on),
      tool+(on?" disabled":" enabled")+" for "+name+" ✓");
  });
 }
@@ -417,7 +428,7 @@ function showTab(tab){
   const teacherPanel=document.getElementById("teacherAccessPanel"),isTeacherAccess=tab==="access"&&!owner;
   teacherPanel.style.display=isTeacherAccess?"block":"none";
   if(isTeacherAccess)renderTeacherAccess();
-  const ownerPanel=document.getElementById("ownerControlPanel"),isOwnerControl=tab==="access"&&owner;
+  const ownerPanel=document.getElementById("ownerControlPanel"),isOwnerControl=tab==="access"&&(owner||Boolean(frame.contentWindow?.B3SiteSettings?.getCurrentAccess?.().authorized));
   ownerPanel.style.display=isOwnerControl?"block":"none";
   if(isOwnerControl)startOwnerControl();
   d.querySelectorAll(".admin-dashboard-section").forEach(s=>s.style.display=s.id==="admin-section-"+tab?"block":"none");

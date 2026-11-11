@@ -762,6 +762,26 @@
       .then(function () { return normalized; });
   }
 
+  function saveTeacherClassAccess(classId, payload) {
+    if (typeof classId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(classId)) return Promise.reject(new Error("Choose an assigned class."));
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) return Promise.reject(new Error("Google sign-in required."));
+    return user.getIdToken().then(function (token) {
+      return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahClassAccess", {
+        method:"POST", headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({classId:classId,actorMode:"teacher"},payload))
+      });
+    }).then(async function (response) {
+      const result = await response.json().catch(function(){ return {}; });
+      if (!response.ok) throw new Error(result.error || "Could not save class access.");
+      return result;
+    });
+  }
+  function manageClassAccessAction(classId, action, fields) {
+    return saveTeacherClassAccess(classId,Object.assign({action:action},fields||{}));
+  }
+
   function updateSiteEnabled(enabled) {
     return readOnce().then(function (settings) {
       settings.siteEnabled = Boolean(enabled);
@@ -778,6 +798,7 @@
 
   function updateClassGameEnabled(classId, gameId, enabled) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"game",gameId:gameId,enabled:Boolean(enabled)});
     return readOnce().then(function (settings) {
       settings.classGames = settings.classGames || { et: {}, wt: {} };
       settings.classGames[classId] = settings.classGames[classId] || {};
@@ -910,6 +931,9 @@
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     gameId = String(gameId || "").trim();
     if (!gameId) return Promise.reject(new Error("Activity is required."));
+    if (currentAccess.role === "teacher") {
+      return readOnce().then(function(settings){ return saveTeacherClassAccess(classId,{action:"star",gameId:gameId,keepOpen:Boolean(keepOpen),expiresAt:keepOpen?lockedGameExpiryFor(settings,classId):0}); });
+    }
     return readOnce().then(function (settings) {
       const list = activeLockedGameList(settings, classId).filter(function (id) { return id !== gameId; });
       if (keepOpen) list.push(gameId);
@@ -930,6 +954,7 @@
   function updateClassMode(classId, mode) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     if (!["auto", "open", "locked"].includes(mode)) return Promise.reject(new Error("Unknown access mode."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"mode",mode:mode});
     return readOnce().then(function (settings) {
       settings.classAccess[classId].mode = mode;
       return save(settings);
@@ -938,6 +963,7 @@
 
   function updateClassLockWindows(classId, lockWindows) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"lockWindows",lockWindows:lockWindows});
     return readOnce().then(function (settings) {
       const fallback = settings.classAccess[classId].lockWindows;
       const normalized = {};
@@ -1481,6 +1507,7 @@
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
+    manageClassAccessAction: manageClassAccessAction,
     updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
