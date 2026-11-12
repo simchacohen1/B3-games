@@ -22,11 +22,14 @@ test('Multiplayer Center is teacher-managed as a student activity',()=>{
  assert.equal(policy.allowed(cls,'one','multiplayer-center'),false);
  assert.equal(policy.allowed(cls,'two','multiplayer-center'),true);
 });
-test('owner admin activity list keeps existing tools and adds Multiplayer Center',()=>{
+test('owner admin activity catalog is derived from the shared registry',()=>{
  const source=fs.readFileSync('owner-admin.html','utf8');
- const catalog=source.match(/const PLATFORM_TOOLS=\[([\s\S]*?)\n\];/);
- assert.ok(catalog,'owner admin activity catalog is present');
- for(const id of ['weekly-quiz','multiplayer-center','gallery','tag'])assert.match(catalog[1],new RegExp('\\["'+id+'"'));
+ const context={};vm.runInNewContext(fs.readFileSync('shared/home-tool-registry.js','utf8'),context);
+ const registry=context.B3HomeToolRegistry;
+ assert.match(source,/Object\.values\(REGISTRY\.tools\)/);
+ assert.doesNotMatch(source,/const PLATFORM_TOOLS\s*=\s*\[/);
+ const grants=new Set(Object.values(registry.tools).filter(tool=>tool.classGrant).map(tool=>tool.classGrant));
+ for(const id of ['weekly-quiz','multiplayer-center','gallery','tag','posuk-practice-scroll','sync-to-nigri'])assert.ok(grants.has(id),`missing owner/teacher shared grant: ${id}`);
 });
 test('teacher controls show granted student activities with current per-student selections',()=>{
  const window={B3StudentTools:policy};vm.runInNewContext(fs.readFileSync('student-tool-controls.js','utf8'),{window});

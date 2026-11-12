@@ -174,8 +174,12 @@ test('staging guard accepts only the staging host/project and provides local act
 test('preview Firebase config and bootstrap stay isolated from production', () => {
   const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
-  assert.match(homeSource, /id="homeworkCenterCard" href="assignment-center\/teacher\.html"[^>]*>[\s\S]*?Homework &amp; Assignments/,
-    'the main Teacher Tools panel links directly to the Homework Center');
+  const registryContext={window:{}};vm.runInNewContext(fs.readFileSync(__dirname + '/../shared/home-tool-registry.js','utf8'),registryContext);
+  const registry=registryContext.window.B3HomeToolRegistry;
+  const homework=registry.homepageTeacherTools.find(item=>item.elementId==='homeworkCenterCard');
+  assert.ok(homework&&homework.tool==='homework','the main Teacher Tools panel renders its Homework Center card from the shared registry');
+  assert.equal(registry.tools.homework.href,'assignment-center/teacher.html');
+  assert.match(homeSource,/registry\.homepageTeacherTools/);
   assert.match(homeSource, /homework-406-preview\|pr-597-homework-notes/,
     'the signed-in student auth route recognizes only the staging Homework preview host');
   assert.match(homeSource, /return "https:\/\/us-central1-b3-games\.cloudfunctions\.net\/funTorahStudentAuth"/,

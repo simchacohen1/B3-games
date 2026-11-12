@@ -119,10 +119,15 @@ test('homepage, activity gate and teacher interfaces include Follow Teacher',()=
   const teacherHome=fs.readFileSync(path.join(ROOT,'teacher-home.html'),'utf8');
   const teacher=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.js'),'utf8');
   const html=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.html'),'utf8');
+  const registryContext={window:{}};vm.runInNewContext(fs.readFileSync(path.join(ROOT,'shared/home-tool-registry.js'),'utf8'),registryContext);
+  const registry=registryContext.window.B3HomeToolRegistry;
   assert.match(homepage,/FTTFollowStudent\?\.start/);
-  assert.match(homepage,/Follow the Teacher/);
+  assert.ok(registry.homepageTeacherTools.some(item=>item.action==='follow-teacher'),'regular homepage exposes registry-backed Follow Teacher');
+  assert.ok(registry.teacherActions.some(action=>action.id==='follow-teacher'&&action.classParam),'action carries selected class context');
+  assert.match(homepage,/registry\.homepageTeacherTools/);
   assert.match(gate,/startFollowTeacherListener\(studentClassId, studentId\)/);
-  assert.match(teacherHome,/follow-teacher\/teacher\.html\?class=/);
+  assert.match(teacherHome,/REGISTRY\.teacherActions\.map\(actionTile\)/);
+  assert.match(teacherHome,/action\.href\+\(action\.classParam\?/);
   assert.match(teacher,/access\/followTeacher/);
   assert.match(teacher,/teacher\.user\.uid/);
   assert.match(teacher,/C\.propose/);

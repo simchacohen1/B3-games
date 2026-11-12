@@ -1,0 +1,82 @@
+# Owner/Admin and Teacher Login tool comparison
+
+This inventory compares the Owner Admin class tool-grant catalog, the signed-in Teacher Tools links on `index.html`, and the class-scoped Teacher Login in `teacher-home.html` / `admin.html`.
+
+## Findings from the full audit
+
+- The shared registry now contains all 20 per-class Owner Admin grants, including Sync to Nigri from PR #742. It previously had Posuk Practice as a visible tile and as a Chumash quiz companion, but the primary tool lacked its own `classGrant` and grant category. As a result, the generated Owner Admin catalog could not offer the Posuk grant checkbox. Posuk Practice and all three #763 companion tiles now explicitly use the same class grant.
+- Vocabulary Progress and Share Screen were defined as Teacher Login actions but were absent from the regular homepage’s registry-rendered teacher tools list. Both now appear there; Share Screen remains class-pointer-grant-gated in Teacher Login.
+- The old generic Davening route did not exist. ET and WT now use their matching application paths, and the other class cannot see that tile.
+- The class-access backend requires an active teacher assignment for each class and now accepts tool-grant writes only for the 20 classroom grant IDs. Unknown IDs and the owner-only Class Dashboard grant are rejected before writing.
+- Sync to Nigri continues to require its per-class grant and the existing Nigri school/server gate. The homepage now preserves that gate across registry re-renders.
+
+
+## Shared class tool catalog
+
+These 20 class grants are represented by `shared/home-tool-registry.js`. Owner Admin derives its per-class grant checkboxes from that metadata, while Teacher Login renders enabled entries for each active class assigned to the signed-in teacher. The regular homepage's hardcoded Teacher Tools anchors now render from the same registry's `homepageTeacherTools` list. The Owner Admin catalog includes the compatible `sync-to-nigri` addition from PR #742. An owner enabling a grant changes only that selected class; a classroom teacher's class controls are enforced by `funTorahClassAccess` against the authenticated teacher's current assignment.
+
+| Tool / grant | Teacher Login | Owner/Admin | Notes |
+|---|---|---|---|
+| Sefer HaMitzvos | Available when granted | Per-class grant | Learning tool |
+| Halacha | Available when granted | Per-class grant | Student-work and Teacher Lesson companion routes remain distinct |
+| Yiddish | Available when granted | Per-class grant | School/story gates continue to apply |
+| Posuk Practice | Available when granted | Per-class grant | Also controls the Chumash quiz and Mishnayos companion tiles |
+| Chumash חידון | Available with Posuk Practice | In same grant | Student quiz destination; same permission as the primary Posuk tool |
+| Mishnayos Practice | Available with Posuk Practice | In same grant | Teacher practice dashboard destination |
+| Mishnayos חידון | Available with Posuk Practice | In same grant | Student quiz destination |
+| Rashi Letters | Available when granted | Per-class grant | Learning tool |
+| Gematria | Available when granted | Per-class grant | Learning tool |
+| Shorashim | Available when granted | Per-class grant | Teacher dashboard |
+| Chazara | Available when granted | Per-class grant | Teacher dashboard |
+| Game Show | Available when granted | Per-class grant | Host controls remain teacher-side |
+| Student Rewards | Available when granted | Per-class grant | Includes the Daily Points teacher view |
+| Weekly Quiz | Available when granted | Per-class grant | Teacher and student routes remain distinct |
+| Multiplayer Arcade | Available when granted | Per-class grant | Existing access rules remain in effect |
+| Homework & Assignments | Available when granted | Per-class grant | Teacher assignment center |
+| Gallery | Available when granted | Per-class grant | Existing gallery review/access checks remain |
+| Tag Game | Available when granted | Per-class grant | Uses the class gallery destination |
+| Davening Player | Available only for matching ET or WT class | Per-class grant shown only for supported classes | Route selects `davening_student_app_et/index.html` or `_wt/index.html`; the previously referenced generic route does not exist |
+| Chavrusa of the Day | Available when granted | Per-class grant | Existing roster/class checks remain |
+| Name Picker | Available when granted | Per-class grant | Existing roster/class checks remain |
+| Class Pointer | Available when granted | Per-class grant | Includes PDF presentation, screen sharing, and whiteboard mode |
+| Sync to Nigri | Available only when granted and the school's Nigri gate allows it | Per-class grant | Integrated from PR #742 without duplicating its tile; retains the existing school/server gate |
+
+## Teacher-only actions from the regular homepage
+
+The hardcoded Teacher Tools actions are now defined in the shared registry and rendered from that metadata in Teacher Login.
+
+| Action | Teacher Login | Access boundary |
+|---|---|---|
+| Student Report | Available per assigned class | Authenticated Teacher Center access and class chooser use assigned classes |
+| Vocabulary Progress | Available per assigned class and on the regular homepage | Carries the selected class context |
+| Classroom Pointer screen sharing | Available when Class Pointer is granted | Carries the selected class context; shares only that class |
+| Manage Class / Student tool access | Available | Opens Teacher Center roster and student tools for the selected assigned class |
+| Follow the Teacher | Available per assigned class | Carries class context; destination keeps its existing teacher/class gate |
+| Send Everyone to Share Screen | Available when Class Pointer is granted | Class Pointer grant required; opens the selected class |
+| Sign in as a Student | Available as a teacher action | Existing student-mode behavior; does not grant owner/admin access |
+
+## Owner/Admin controls available in Teacher Login
+
+- **Class Access:** open or lock a selected assigned class; manage supported class schedules, game availability, starred-game exceptions, and tool grants through the authenticated class-access endpoint.
+- **Students:** see and manage the assigned class roster, passcodes, and each student's available tools through the scoped Student tab.
+- **Student progress and reports:** Student Report and Vocabulary Progress are class-context actions. The report page's class selection is constrained by the signed-in teacher's current class assignments.
+- **Activities:** teachers can manage availability for their selected class. The platform-wide Active/Inactive catalog remains owner-only.
+- **PDF and whiteboard teaching:** available inside Class Pointer; these are not separate class grants.
+
+## Intentionally restricted or excluded
+
+| Owner/Admin capability | Teacher Login treatment | Reason |
+|---|---|---|
+| Create or move schools; school-wide sync configuration | Excluded | Platform-wide administration |
+| Add/remove teachers or principals; assign staff or supervision | Excluded | Changes account roles and class membership |
+| Create classes or move a class between schools | Excluded | Owner/school administration |
+| School-wide student roster moves, bulk upload, import undo, bulk delete, exports, and audit log | Excluded | Cross-class or school-wide identity/data administration; teachers use the scoped roster instead |
+| Emergency lock and platform-wide site/activity controls | Excluded | Affects every class; teachers retain per-class controls |
+| Copy the owner's private Shorashim catalog, Posuk window, or Yiddish story into another class | Excluded | Distributes owner-owned resources; teachers manage their class resources inside their own tools |
+| Private Class Dashboard with imported family/location details | Excluded | Its current data source is owner-private and is not class-scoped |
+| Nigri grade selection and school connection settings | Excluded | School-level integration settings; the granted Sync to Nigri page still applies its existing school/server authorization |
+| Owner preview of another teacher; owner Teacher View switch | Excluded from regular teachers | Owner-only preview/navigation controls |
+
+## Regression coverage
+
+`tests/owner-teacher-tool-registry.test.cjs` asserts that Owner Admin, the regular homepage, and Teacher Login consume the shared registry; all 20 class grants have teacher destinations and owner categories; the homepage hardcoded links are registry-driven; ET/WT Davening paths are correct; teacher actions carry class context; and owner-only Class Dashboard stays out of regular Teacher Login. Existing ET/WT browser journeys cover class-specific rendering, destination links, class switching, and assigned-class permissions. The backend grant allowlist and class-scope denials are covered by `tests/class-access-core.test.cjs` and emulator/browser regression checks.

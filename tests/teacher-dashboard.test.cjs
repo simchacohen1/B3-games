@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function dashboard(rows,search=''){
  const nodes={},reads=[],listeners={};
- const node=id=>nodes[id]||(nodes[id]={classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:'',replaceChildren(){this.innerHTML=''}});
+ const node=id=>nodes[id]||(nodes[id]={id,style:{},classList:{values:new Set(),add(...v){v.forEach(x=>this.values.add(x))},remove(...v){v.forEach(x=>this.values.delete(x))}},parentElement:{appendChild(){}},innerHTML:'',textContent:'',replaceChildren(){this.innerHTML=''},querySelectorAll(){return []}});
  const api={workspaceId:'b3-2026',onAuthStateChanged:cb=>api.callback=cb};
  const document={getElementById:node,createElement:()=>({set textContent(v){this.innerHTML=String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}})};
  const db={ref:p=>({
@@ -9,8 +9,9 @@ function dashboard(rows,search=''){
   on:(event,listener)=>{listeners[p]=listener;listener({val:()=>rows[p]||null})},
   off:(event,listener)=>{if(listeners[p]===listener)delete listeners[p]}
  })};
- const html=fs.readFileSync('teacher-home.html','utf8'),code=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?)<\/script>/)[1];
- vm.runInNewContext(code,{URLSearchParams,window:{B3SiteSettings:api,B3_FIREBASE_CONFIG:{},B3PrincipalScope:require('../principal-scope.js'),addEventListener(){}},firebase:{apps:[{}],database:()=>db},document,location:{search,replace(){}},console});
+ const html=fs.readFileSync('teacher-home.html','utf8'),code=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?)<\/script>/)[1],registryContext={window:{}};
+ vm.runInNewContext(fs.readFileSync('shared/home-tool-registry.js','utf8'),registryContext);
+ vm.runInNewContext(code,{URLSearchParams,window:{...registryContext.window,B3SiteSettings:api,B3_FIREBASE_CONFIG:{},B3PrincipalScope:require('../principal-scope.js'),addEventListener(){}},firebase:{apps:[{}],database:()=>db},document,location:{search,replace(){}},console});
  return {nodes,reads,listeners,run:access=>api.callback({email:'teacher@test',uid:'principal-1'},true,access)};
 }
 test('regular teacher receives icon cards with selected-class links',async()=>{const x=dashboard({'b3Games/workspaces/b3-2026/classes/mine':{name:'Mine',active:true,toolGrants:{chazara:true,yiddish:true,'weekly-quiz':false}}});await x.run({authorized:true,role:'teacher',classIds:['mine']});const cards=x.nodes.classes.innerHTML;assert.match(cards,/tool-icon/);assert.match(cards,/🔁/);assert.match(cards,/yiddish-icon-v2.png/);assert.match(cards,/chazara\/teacher.html\?class=mine/);assert.ok(!cards.includes('weekly-quiz/teacher'));assert.deepEqual(x.reads,['b3Games/workspaces/b3-2026/classes/mine'])});

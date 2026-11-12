@@ -399,6 +399,7 @@ body > .subtitle::after {
 <script src="vendor/firebase/12.15.0/firebase-auth-compat.js" defer></script>
 <script src="vendor/firebase/12.15.0/firebase-database-compat.js" defer></script>
 <script src="firebase-config.js?v=20261001-teacherauth" defer></script>
+<script src="shared/home-tool-registry.js?v=20261111-registry"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="test-login-link.js?v=20261107-testword"></script>
 <script src="student-tool-controls.js" defer></script>
@@ -411,14 +412,16 @@ body > .subtitle::after {
 <script>
 // Sync to Nigri card: hidden unless the owner, or a teacher whose school has "Syncs to Nigri" on (school-scope.js).
 document.addEventListener("DOMContentLoaded",function(){
-  var api=window.B3SiteSettings,card=document.getElementById("nigriSyncCard");
-  if(!api||!card||!window.B3SchoolScope||!window.firebase)return;
+  var api=window.B3SiteSettings;
+  if(!api||!window.B3SchoolScope||!window.firebase)return;
   var check=0;
   api.onAuthStateChanged(function(user,authorized){
-    var mine=++check;card.classList.add("nigri-hidden");
+    var mine=++check,card=document.getElementById("nigriSyncCard");
+    if(card)card.classList.add("nigri-hidden");
     if(!user||!authorized)return;
     window.B3SchoolScope.checkNigri({db:window.firebase.database(),user:user,workspaceId:api.workspaceId}).then(function(r){
-      if(mine===check)card.classList.toggle("nigri-hidden",!r.allowed);
+      var currentCard=document.getElementById("nigriSyncCard");
+      if(mine===check&&currentCard)currentCard.classList.toggle("nigri-hidden",!r.allowed);
     }).catch(function(){});
   });
 });
@@ -501,31 +504,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <h2>👨‍🏫 Teacher Tools</h2>
     <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
     <div class="teacher-tools-container">
-      <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
-      <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
-      <a class="teacher-tool-card" id="homeworkCenterCard" href="assignment-center/teacher.html"><span class="card-icon">📚</span><span class="card-title">Homework &amp; Assignments</span></a>
-      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
-      <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
-      <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
-      <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
-      <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="record-mishnayos/teacher.html" ><span class="card-icon">📖</span><span class="card-title">Mishnayos Practice — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="chazara/teacher.html" ><span class="card-icon">🔁</span><span class="card-title">Chazara — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="rashi-letters/teacher.html" ><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="gematria/teacher.html" ><span class="card-icon">🔢</span><span class="card-title">Gematria — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">🏅</span><span class="card-title">Student Rewards — Teacher</span></a>
-      <a class="teacher-tool-card" href="weekly-quiz/teacher.html" ><span class="card-icon">📝</span><span class="card-title">Weekly Quiz — Teacher</span></a>
-      <a class="teacher-tool-card" href="halacha/index.html?teacher=1&v=20261007-teacher-sync" ><span class="card-icon">📔</span><span class="card-title">Halacha — Teacher Lesson</span></a>
-      <a class="teacher-tool-card" href="halacha/teacher.html" ><span class="card-icon">🗂️</span><span class="card-title">Halacha — Student Work</span></a>
-      <a class="teacher-tool-card" href="chavrusa/index.html" ><span class="card-icon">👥</span><span class="card-title">Chavrusa of the Day</span></a>
-      <a class="teacher-tool-card" href="name-picker/index.html" ><span class="card-icon">🎡</span><span class="card-title">Name Picker</span></a>
-      <a class="teacher-tool-card" href="class-dashboard/index.html" ><span class="card-icon">📊</span><span class="card-title">Class Dashboard</span></a>
-      <a class="teacher-tool-card" href="student-report/index.html" ><span class="card-icon">📈</span><span class="card-title">Student Report — All Tools</span></a>
-      <a class="teacher-tool-card nigri-hidden" href="sync-to-nigri/index.html" id="nigriSyncCard"><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
-      <a class="teacher-tool-card" href="davening_student_app_et/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — ET</span></a>
-      <a class="teacher-tool-card" href="davening_student_app_wt/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — WT</span></a>
-    </div>
+      <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button></div>
   </div>
 
   <div id="versionModal" class="version-modal hidden" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle">
@@ -739,6 +718,44 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   const el=id=>document.getElementById(id);
+  function renderTeacherHomepageTools(access,guestMode){
+    const registry=window.B3HomeToolRegistry,container=document.querySelector("#teacherToolsSection .teacher-tools-container");
+    if(!registry||!container)return;
+    const ids=Array.isArray(access?.classIds)?access.classIds:[];
+    const requested=el("homeClassSelect")?.value;
+    const selectedClass=ids.includes(requested)?requested:(ids[0]||"");
+    const studentAction=registry.teacherActions.find(action=>action.id==="act-as-student");
+    const studentButton=el("actAsStudentCard");
+    if(studentButton&&studentAction){
+      const icon=document.createElement("span");icon.className="card-icon";icon.textContent=studentAction.icon;
+      const label=document.createElement("span");label.className="card-title";label.style.color="#166534";label.textContent=studentAction.title;
+      studentButton.replaceChildren(icon,label);
+    }
+    const cards=(registry.homepageTeacherTools||[]).filter(item=>{
+      const tool=item.tool&&registry.tools[item.tool];
+      if((item.ownerOnly||tool?.ownerOnly)&&access?.role!=="admin")return false;
+      if(item.requiredClass&&!guestMode&&access?.role!=="admin"&&!ids.includes(item.requiredClass))return false;
+      return true;
+    }).map(item=>{
+      if(item.action==="act-as-student")return null;
+      const action=item.action&&registry.teacherActions.find(a=>a.id===item.action);
+      const tool=item.tool&&registry.tools[item.tool];
+      const companion=item.companionOf&&registry.tools[item.companionOf]?.companions?.find(c=>c.title===item.companionTitle);
+      let href=action?.href||companion?.teacherHref||companion?.href||tool?.classHrefs?.[item.classId]||tool?.href||"";
+      if(!href)return null;
+      if((item.classParam||action?.classParam)&&selectedClass)href+=(href.includes("?")?"&":"?")+"class="+encodeURIComponent(selectedClass);
+      const card=document.createElement("a");card.className="teacher-tool-card"+(item.className?" "+item.className:"");
+      card.href=href;if(item.elementId)card.id=item.elementId;
+      if(item.newTab||action?.newTab){card.target="_blank";card.rel="noopener";}
+      const icon=document.createElement("span");icon.className="card-icon";icon.textContent=item.icon||action?.icon||tool?.icon||"";
+      const label=document.createElement("span");label.className="card-title";label.textContent=item.title||action?.title||companion?.title||tool?.title||"";
+      card.append(icon,label);return card;
+    }).filter(Boolean);
+    container.replaceChildren(...(studentButton?[studentButton]:[]),...cards);
+  }
+  // Render the registry-backed Sync tile before DOMContentLoaded attaches its
+  // school gate. The section stays hidden until access is known.
+  renderTeacherHomepageTools({role:"",classIds:[]},true);
   // Hook up student sign-in first. If any later setup code fails, the button
   // still responds instead of silently doing nothing.
   el("studentSignInBtn").addEventListener("click",studentSignIn);
@@ -746,6 +763,19 @@ document.addEventListener("DOMContentLoaded",function(){
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   window.__b3Ready = true;
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
+  const homeRegistry=window.B3HomeToolRegistry;
+  if(homeRegistry){
+    gameCards.forEach(card=>{
+      const id=card.dataset.gameId,meta=homeRegistry.tools[id];
+      if(meta&&!card.dataset.companionOf){card.dataset.registryGroup=meta.group||"";if(meta.studentHref)card.href=meta.studentHref;}
+      if(card.dataset.companionOf){const primary=homeRegistry.tools[card.dataset.companionOf],title=card.querySelector('.card-title')?.textContent?.trim();const item=primary?.companions?.find(c=>c.title===title);if(item)card.href=item.href;}
+    });
+    document.querySelectorAll('.game-group[data-game-group]').forEach(group=>{
+      const descriptor=homeRegistry.groups.find(g=>g.id===group.dataset.gameGroup);if(!descriptor)return;
+      const title=group.querySelector('.game-group-title'),subtitle=group.querySelector('.game-group-subtitle');
+      if(title)title.textContent=descriptor.title;if(subtitle)subtitle.textContent=descriptor.subtitle;
+    });
+  }
   // A companion tile (Mishnayos Practice) shares its main tool's switch and
   // class permission ("posuk-practice-scroll"). It is left out of the tool
   // lists and simply copies the main tile's open/closed/hidden state.
@@ -1429,6 +1459,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     "name-picker/index.html":"Teachers spin a wheel to pick a student fairly."
   };
   function renderGuest(){
+    renderTeacherHomepageTools({role:"",classIds:[]},true);
     el("classPointerStudentLink").classList.add("hidden");
     el("loginCard").classList.add("hidden");
     el("lockedCard").classList.add("hidden");
@@ -1502,6 +1533,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedTeacher){
+      renderTeacherHomepageTools(currentAccess,false);
       el("loginCard").classList.add("hidden");
       el("studentBar").classList.remove("hidden");
       el("studentNameLabel").textContent=currentUser?.displayName||currentUser?.email||"Teacher";

@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
 const GATED_PAGES = [
@@ -43,9 +44,15 @@ test('Weekly Quiz "Send to Nigri" starts hidden and appears only when the check 
 
 test('home page Sync to Nigri card is hidden by default with a class the card filter cannot undo', () => {
   const html = read('index.html');
-  assert.match(html, /<a class="teacher-tool-card nigri-hidden" href="sync-to-nigri\/index\.html" id="nigriSyncCard">/);
+  const registryContext={window:{}};vm.runInNewContext(read('shared/home-tool-registry.js'),registryContext);
+  const nigri=registryContext.window.B3HomeToolRegistry.homepageTeacherTools.find(item=>item.tool==='sync-to-nigri');
+  assert.equal(nigri.elementId,'nigriSyncCard');
+  assert.equal(nigri.className,'nigri-hidden');
+  assert.match(html, /registry\.homepageTeacherTools/);
+  assert.match(html, /renderTeacherHomepageTools\(\{role:"",classIds:\[\]\},true\)/,'the gated tile exists before the DOM-ready school check');
   assert.match(html, /\.teacher-tool-card\.nigri-hidden\{display:none!important\}/);
   assert.match(html, /B3SchoolScope\.checkNigri/);
+  assert.match(html, /currentCard=document\.getElementById\("nigriSyncCard"\)/,'school authorization updates the current registry-rendered card');
 });
 
 test('gate fails closed: page content is hidden until the check passes', () => {

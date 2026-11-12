@@ -13,7 +13,7 @@ permissions:
   contents: read
 jobs:
   access-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
           JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx2g'
         run: npx firebase emulators:exec --project demo-ftt-security --config firebase.security-test.json --only database,storage "node --test tests/security-rules-emulator.test.cjs && node --test tests/multiplayer-owner-rules-emulator.test.cjs && node --test tests/storage-rules-emulator.test.cjs"
       - name: Install Playwright Chromium for browser regression tests
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Run class, teacher role, and backend regression tests
         # These two legacy files use Playwright Test and target the hosted site;
         # the Playwright workflow owns browser execution. Keep Node's runner on
