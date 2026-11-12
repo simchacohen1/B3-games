@@ -2776,3 +2776,5 @@ exports.generateMishnahQuestions = mishnayosPractice.generateMishnahQuestions;
 exports.gradeMishnahQuestionAnswer = mishnayosPractice.gradeMishnahQuestionAnswer;
 exports.gradeMishnahExplanation = mishnayosPractice.gradeMishnahExplanation;
 exports.mishnayosAnswerKey = mishnayosPractice.mishnayosAnswerKey;
+
+exports.daveningChazzan = require("./davening-chazzan").daveningChazzan;
