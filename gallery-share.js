@@ -13,7 +13,7 @@
   const params = new URLSearchParams(location.search);
   if (['previewStudentId','teacherPreview','teacher_preview'].some(key => params.has(key))) return;
 
-  let ready = false, checking = false, busy = false, image = null, dialog = null, nextReadyCheck = 0;
+  let ready = false, checking = false, busy = false, image = null, captureIdentity = null, dialog = null, nextReadyCheck = 0;
   const source = (() => {
     const p = location.pathname.toLowerCase();
     if (p.includes('sefer-hamitzvos')) return 'sefer-hamitzvos';
@@ -116,7 +116,8 @@
   async function capture() {
     const button = document.getElementById('fttGalleryShareButton');
     if (busy || !button) return;
-    if (!credentials()) {
+    const signedInAtCapture = credentials();
+    if (!signedInAtCapture) {
       alert('Please sign in as a student from the Fun Torah Tools home page first.');
       return;
     }
@@ -146,6 +147,8 @@
       image = canvas.toDataURL('image/jpeg', .72);
       if (image.length > 1150000) image = canvas.toDataURL('image/jpeg', .45);
       if (image.length > 1150000) throw Error('This picture is too large. Try making your browser window smaller.');
+      // A later Switch Student must not submit the previous boy's screenshot as someone else's work.
+      captureIdentity = {studentId:signedInAtCapture.studentId, classId:signedInAtCapture.classId};
       const box = ensureDialog();
       box.querySelector('img').src = image;
       box.querySelector('input').value = (document.title || 'My Learning').slice(0,70);
@@ -156,6 +159,7 @@
       box.showModal();
     } catch (error) {
       image = null;
+      captureIdentity = null;
       alert(error.message || 'Could not capture this page. Please try again.');
     } finally {
       busy = false;
@@ -166,6 +170,10 @@
     if (busy || !image || !dialog) return;
     const cred = credentials();
     if (!cred) { setStatus('Please sign in again from the home page.',true); return; }
+    if (!captureIdentity || cred.studentId !== captureIdentity.studentId || cred.classId !== captureIdentity.classId) {
+      setStatus('Student sign-in changed. Close this picture and take a new one before sending.', true);
+      return;
+    }
     const title = dialog.querySelector('input').value.trim();
     if (!title) { setStatus('Please enter a title.',true); return; }
     busy = true;
@@ -182,6 +190,7 @@
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.ok) throw Error(result.error || 'Could not send your picture.');
       image = null;
+      captureIdentity = null;
       setStatus('✓ Sent! Your Rebbi will review this picture before it appears in the gallery.');
       close.textContent = 'Done';
     } catch (error) {
