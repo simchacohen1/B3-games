@@ -24,3 +24,19 @@ test("production class-access deployment is manual, owner-only, and target-bound
   assert.doesNotMatch(workflow, /firebase deploy --only functions(?:\s|$)/);
   assert.doesNotMatch(workflow, /FIREBASE_TOKEN|firebase login|secrets\.FIREBASE/);
 });
+
+test("deployment guard requires every branch-protection check and only checks that run on PR #779", () => {
+  const expected = workflow.match(/const expected = \[([\s\S]*?)\];/);
+  assert.ok(expected, "guard keeps an explicit expected-check list");
+  const names = [...expected[1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
+  for (const required of ["test", "access-tests", "critical-security", "coloring"]) {
+    assert.ok(names.includes(required), `guard must require branch-protection check: ${required}`);
+  }
+  for (const extra of ["teacher-access", "principal-access", "real-browser-follow",
+    "Synthetic learning tools and access boundaries"]) {
+    assert.ok(names.includes(extra), `guard must keep access check: ${extra}`);
+  }
+  // follow-teacher-tests.yml is path-filtered and does not run on PR #779.
+  assert.ok(!names.includes("navigation-policy"));
+  assert.match(workflow, /missing\.length \|\| failed\.length/);
+});

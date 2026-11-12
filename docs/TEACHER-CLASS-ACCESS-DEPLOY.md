@@ -16,7 +16,7 @@
 `.github/workflows/deploy-class-access.yml` is manual only. The workflow:
 1. Runs only when `simchacohen1` dispatches it from `main`.
 2. Accepts only the current, open, non-draft head SHA of PR #779.
-3. Requires all expected PR check contexts and the latest result for every check run to be green.
+3. Requires all expected PR check contexts and the latest result for every check run to be green. The expected list is the four branch-protection checks plus the teacher, principal, Follow Teacher browser and synthetic access checks. `navigation-policy` is not listed because its workflow is path-filtered and does not run on #779; its test files run inside `access-tests`.
 4. Runs the focused class authorization and sign-in tests from that exact commit.
 5. Authenticates through GitHub OIDC / Google Workload Identity Federation. It stores no service-account key or Firebase token.
 6. Deploys only `functions:funTorahClassAccess` to `b3-games`.
@@ -67,7 +67,7 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER@$PROJECT_ID.iam.gs
   --role="roles/iam.workloadIdentityUser"
 ```
 
-The deploy identity gets Cloud Functions Developer and Service Account User on the existing runtime identity. It does not receive Owner, Firebase Admin, database access, or a JSON key. If CI reports a missing permission, stop and review the exact permission before adding anything; do not broaden the role to Owner.
+The deploy identity gets Cloud Functions Developer and Service Account User on the existing runtime identity. It does not receive Owner, Firebase Admin, database access, or a JSON key. Known gap found before first use: Cloud Functions Developer lacks `run.services.setIamPolicy`, which the Firebase CLI needs to make a newly created HTTP function publicly invocable. The owner must grant that single permission (custom role) or `roles/run.admin` to the deployer before the first deployment. If CI reports a missing permission, stop and review the exact permission before adding anything; do not broaden the role to Owner.
 
 Wait for WIF/IAM propagation before dispatch. The workflow uses these exact identifiers:
 
