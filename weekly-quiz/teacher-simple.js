@@ -87,7 +87,9 @@
   const finish = actions.querySelector('[onclick="stopLaunch()"]');
   const link = actions.querySelector('[onclick="copyStudentLink()"]');
   start.textContent = 'Start class quiz'; finish.textContent = 'Finish quiz';
-  link.textContent = 'Copy student link';
+  // Share the exact live test, not the generic student practice homepage.
+  link.textContent = 'Copy direct link to this test';
+  link.setAttribute('onclick', 'copyLaunchLink(activeLaunchId)');
   disclosure('Score & session options', topCard, [$('scoreReleaseBtn')]);
   const empty = document.createElement('div');
   empty.className = 'live-empty';
