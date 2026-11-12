@@ -229,7 +229,7 @@ test('daily quota is shared across all legacy and Vayeira readings, including re
   const fourth=await b.submit('kid1',p[1].id);
   assert.equal(fourth.code,429);
   assert.equal(fourth.body.dailyLimit,3);
-  assert.equal(b.db.getAt('rashiLetters/dailySubmissions/kid1/'+new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).replace(/\//g,'-'))?.count,3);
+  assert.equal(b.db.getAt('rashiLetters/dailySubmissions/kid1/'+(()=>{const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(x=>[x.type,x.value]));return parts.year+'-'+parts.month+'-'+parts.day;})())?.count,3);
   assert.equal(Object.keys(b.files).length,3,'blocked upload must never be saved');
   const first=pendingRequests(b).find(([,r])=>r.sectionId==='zayin')[0];
   await b.teacher('teacherEt','rashi-reject',{classId:'et',requestId:first});
