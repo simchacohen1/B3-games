@@ -63,6 +63,7 @@
     function sample(rms, at) {
       if (!running || finished) return null;
       if (!Number.isFinite(rms) || !Number.isFinite(at)) return null;
+      if (at < lastTime) return null; // Do not rewind the clock on stale samples.
       const level = clamp(rms, 0, 1);
       const elapsed = clamp(at - lastTime, 0, MAX_SAMPLE_GAP_MS);
       lastTime = at;
