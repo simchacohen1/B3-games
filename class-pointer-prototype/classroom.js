@@ -696,6 +696,11 @@ $('spotlight').addEventListener('change',()=>{state.spotlight=$('spotlight').che
 $('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.points.teacher;publish()});
 $('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
+// Site-wide release may be requested from any teacher site tab.
+// Ending the classroom also revokes approved student sharing and closes connections.
+document.addEventListener('ftt:release-teacher-control',()=>{
+  if(isTeacher&&started&&!closingClass)void endClass();
+});
 $('sendEveryoneShare')?.addEventListener('click',requestEveryoneToShare);
  $('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',captureBrowserTab);$('stopScreen').addEventListener('click',stopSharing);
 if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
