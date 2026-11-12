@@ -57,6 +57,13 @@
   const ready=new Promise((resolve,reject)=>{
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       try{
+        // A copied teacher URL must never serve as a student entry point.
+        // Only redirect after the existing authentication callback has identified
+        // a signed-in non-teacher. A missing/slow auth check must fail closed.
+        if(user && access?.role !== 'teacher' && access?.role !== 'admin'){
+          location.replace('../index.html');
+          throw Error('Student accounts must open Class Pointer from their student dashboard.');
+        }
         if(!user||!authorized||!C.validId(classId))throw Error('Open Class Pointer from Teacher Tools and sign in with your teacher account.');
         const db=firebase.database(),ref=db.ref('b3Games/workspaces/'+ws+'/classes/'+classId),row=(await ref.once('value')).val();
         if(!C.permitted(access,classId,row))throw Error('Class Pointer is not enabled for this teacher and class.');
