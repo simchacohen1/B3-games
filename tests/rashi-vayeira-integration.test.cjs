@@ -52,6 +52,8 @@ test('student tile, passage browser and teacher scoring are wired',()=>{
   assert.match(mic,/dailyFull\(\)/);
   assert.match(teacher,/class="rashi-grade"/);
   assert.match(teacher,/class="rashi-feedback"/);
+  assert.match(teacher,/approveLegacyAllBtn/);
+  assert.match(teacher,/pendingLegacyIds=rows\.filter\(r=>!String\(r\.sectionId/);
   assert.match(backend,/rashiCore\.readingWords\(sectionId,req\.query\.words\)/);
   assert.match(backend,/rashiReserveDaily\(studentId,dailyDate\)/);
   assert.match(backend,/rashiReleaseDaily\(studentId,dailyDate\)/);
