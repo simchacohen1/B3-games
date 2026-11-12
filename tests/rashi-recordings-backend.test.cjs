@@ -198,3 +198,49 @@ test('core rules: sections, words and claim',()=>{
   assert.equal(core.claim({status:'rejected',attempt:1,attemptId:'a'},{x:1}).write.attempt,2);
   assert.equal(require('../backend/functions/student-practice-auth.cjs').toolForSource('rashi-recording'),'rashi-letters');
 });
+
+test('Vayeira passage uses full canonical Hebrew and allows only its assigned teacher to grade',async()=>{
+  const passage=require('../backend/functions/vayeira-rashi.json').passages[0];
+  const b=makeBackend(seed());
+  const send=await b.submit('kid1',passage.id,{query:{words:'not real Hebrew'}});
+  assert.equal(send.code,200,JSON.stringify(send.body));
+  const record=b.db.getAt('rashiLetters/recordings/kid1/'+passage.id);
+  assert.deepEqual(record.words,[passage.text]);
+  const et=await b.teacher('teacherEt','rashi-list-pending',{classId:'et'});
+  assert.equal(et.body.requests[0].sectionId,passage.id);
+  assert.deepEqual(et.body.requests[0].words,[passage.text]);
+  const id=pendingRequests(b)[0][0];
+  assert.equal((await b.teacher('teacherWt','rashi-approve',{classId:'wt',requestId:id,grade:95})).code,403);
+  assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id})).code,400,'numeric grade required');
+  assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:'',feedback:'Good'})).code,400);
+  const yes=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:95,feedback:'Well read!'});
+  assert.equal(yes.code,200,JSON.stringify(yes.body));
+  assert.equal(balance(b,'rs1'),12);
+  const state=(await b.status('kid1')).body.sections[passage.id];
+  assert.equal(state.status,'approved');assert.equal(state.grade,95);assert.equal(state.feedback,'Well read!');
+  assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:95})).body.alreadyHandled,true);
+  assert.equal(balance(b,'rs1'),12);
+});
+test('daily quota is shared across all legacy and Vayeira readings, including rejected attempts',async()=>{
+  const b=makeBackend(seed()),p=require('../backend/functions/vayeira-rashi.json').passages;
+  for(const id of ['zayin','bet',p[0].id]){
+    const r=await b.submit('kid1',id);assert.equal(r.code,200,JSON.stringify(r.body));
+  }
+  const fourth=await b.submit('kid1',p[1].id);
+  assert.equal(fourth.code,429);
+  assert.equal(fourth.body.dailyLimit,3);
+  assert.equal(b.db.getAt('rashiLetters/dailySubmissions/kid1/'+new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).replace(/\//g,'-'))?.count,3);
+  assert.equal(Object.keys(b.files).length,3,'blocked upload must never be saved');
+  const first=pendingRequests(b).find(([,r])=>r.sectionId==='zayin')[0];
+  await b.teacher('teacherEt','rashi-reject',{classId:'et',requestId:first});
+  assert.equal((await b.submit('kid1','zayin')).code,429,'teacher rejection does not refund daily quota');
+  assert.equal((await b.submit('kid2',p[0].id)).code,200,'different student gets an independent allowance');
+});
+test('four simultaneous Rashi section submissions accept at most three',async()=>{
+  const b=makeBackend(seed());
+  const out=await Promise.all(['zayin','bet','tsadi','alef'].map(id=>b.submit('kid1',id)));
+  assert.equal(out.filter(r=>r.code===200).length,3);
+  assert.equal(out.filter(r=>r.code===429).length,1);
+  assert.equal(Object.keys(b.files).length,3);
+  assert.equal(pendingRequests(b).length,3);
+});
