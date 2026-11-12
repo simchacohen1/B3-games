@@ -30,7 +30,10 @@
   const pickMime=()=>MIMES.find(m=>root.MediaRecorder&&root.MediaRecorder.isTypeSupported&&root.MediaRecorder.isTypeSupported(m))||'';
 
   let cfg={isPreview:()=>false,onBack:()=>{},hideOthers:()=>{}};
-  let statusMap=null,statusAt=0,statusPromise=null;
+  let statusMap=null,statusAt=0,statusPromise=null,dailyCount=0,dailyLimit=3,dailyDate='';
+  const todayNY=()=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const dailyFull=()=>dailyCount>=dailyLimit;
+  let vayeiraCatalogPromise=null;
   let ui=null;                       // screen elements
   let session=null;                  // the section currently on screen
 
@@ -43,6 +46,7 @@
   async function loadStatus(force){
     if(STAGING())return {};
     if(cfg.isPreview())return {};
+    if(dailyDate&&dailyDate!==todayNY()){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
     if(!force&&statusMap&&Date.now()-statusAt<STATUS_CACHE_MS)return statusMap;
     if(statusPromise)return statusPromise;
     statusPromise=(async()=>{
@@ -50,7 +54,7 @@
         const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+await idToken()},body:JSON.stringify({action:'rashi-student-status'})});
         const data=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(data.error||'Could not check your recordings.');
-        statusMap=data.sections||{};statusAt=Date.now();
+        statusMap=data.sections||{};dailyCount=Number(data.dailyCount)||0;dailyLimit=Number(data.dailyLimit)||3;dailyDate=todayNY();statusAt=Date.now();
       }catch(err){console.warn('Rashi recording status unavailable',err);if(!statusMap)statusMap={};statusAt=0;}
       finally{statusPromise=null;}
       return statusMap;
@@ -61,7 +65,8 @@
 
   async function sendRecording(sectionId,words,blob,durationMs){
     if(STAGING())throw new Error('Recording rewards are disabled on staging.');
-    const qs='rashi=submit&section='+encodeURIComponent(sectionId)+'&durationMs='+Math.round(durationMs)+'&words='+encodeURIComponent((words||[]).join('|'));
+    const sentWords=sectionId.startsWith('vayeira-')?'':(words||[]).join('|');
+    const qs='rashi=submit&section='+encodeURIComponent(sectionId)+'&durationMs='+Math.round(durationMs)+'&words='+encodeURIComponent(sentWords);
     const res=await fetch(API_URL+'?'+qs,{method:'POST',headers:{'Content-Type':(blob.type||'audio/webm').split(';')[0],'Authorization':'Bearer '+await idToken()},body:blob});
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||'Could not send the recording.');
@@ -79,17 +84,19 @@
     +'.rr-msg{min-height:1.4em;font-weight:700;margin:6px 0}.rr-err{color:#a12b2b}.rr-note{color:#536180;font-size:14px;font-weight:700}'
     +'.rr-pulse{animation:rrpulse 1s infinite}@keyframes rrpulse{50%{opacity:.55}}'
     +'.rr-chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800}'
-    +'.rr-menu-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#fff;border:2px solid #e1dcfb;border-radius:14px;padding:8px 12px;margin:8px 0}';
+    +'.rr-menu-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#fff;border:2px solid #e1dcfb;border-radius:14px;padding:8px 12px;margin:8px 0}'
+    +'.rr-passage{font-family:"Mekorot Rashi",serif;font-size:30px;line-height:1.85;display:block;width:100%;white-space:pre-wrap;text-align:right;padding:16px 20px;background:white;border-radius:18px;border:2px solid #c9bff5}'
+    +'.rr-vayeira-title{font-size:24px;font-weight:800;margin:10px 0}.rr-vayeira-select{font-size:18px;min-height:44px;padding:8px;border-radius:9px}';
   function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function ensureScreen(){
     if(ui)return ui;
     const style=document.createElement('style');style.textContent=CSS;document.head.appendChild(style);
     const card=el('div','card');card.id='recordScreen';card.style.display='none';
-    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),words:el('div','rr-words'),banner:el('div','rr-banner'),
+    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),words:el('div','rr-words'),banner:el('div','rr-banner'),
       timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
       note:el('p','rr-note','Worth '+POINTS+' points after your teacher listens and approves.'),footer:el('div','rr-row')};
     ui.words.setAttribute('dir','rtl');ui.words.setAttribute('lang','he');ui.msg.setAttribute('role','status');ui.msg.setAttribute('aria-live','polite');
-    card.append(ui.title,ui.sub,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
+    card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
     const anchor=document.getElementById('closedScreen');
     (anchor&&anchor.parentNode?anchor.parentNode:document.body).insertBefore(card,anchor||null);
     return ui;
@@ -104,13 +111,20 @@
     const u=ensureScreen(),s=session;if(!s)return;
     const status=statusOf(s.id),b=bannerFor(status);
     u.sub.textContent=s.label||'';
-    u.words.replaceChildren(...s.words.map(w=>el('span','rr-word',w)));
+    u.title.textContent=s.id.startsWith('vayeira-')?'🎤 Read This Rashi!':'🎤 Read Your Words!';
+    u.quota.textContent='Readings today: '+dailyCount+' / '+dailyLimit;
+    u.words.replaceChildren(...s.words.map(w=>el('span',s.id.startsWith('vayeira-')?'rr-passage':'rr-word',w)));
     u.banner.className='rr-banner '+b.cls;u.banner.textContent=b.icon+' '+b.text;
+    const result=statusMap?.[s.id];
+    if(result&&result.grade!=null&&status==='approved')u.banner.textContent+=' · Grade: '+result.grade+'/100';
+    if(result?.feedback)u.banner.textContent+=' · Teacher feedback: '+result.feedback;
     u.controls.replaceChildren();u.footer.replaceChildren();
     u.timer.classList.toggle('hidden',s.state!=='recording');
     u.note.classList.toggle('hidden',status==='approved');
     if(cfg.isPreview()){
       u.controls.append(el('p','rr-note','Preview only — students record here. Nothing is saved.'));
+    }else if(dailyFull()){
+      u.controls.append(el('p','rr-note','You completed your 3 Rashi readings for today. Come back tomorrow!'));
     }else if(!canRecord(status)){
       // pending or approved: nothing more to do for this section
     }else if(s.state==='recording'){
@@ -129,7 +143,7 @@
   function setMsg(text,isErr){const u=ensureScreen();u.msg.textContent=text||'';u.msg.className='rr-msg'+(isErr?' rr-err':'');}
 
   async function startRecording(){
-    const s=session;if(!s||s.state==='recording')return;
+    const s=session;if(!s||s.state==='recording'||dailyFull())return;
     setMsg('');
     if(!(root.navigator&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||!root.MediaRecorder){setMsg('This device cannot record. Ask your teacher for help.',true);return;}
     try{
@@ -170,12 +184,17 @@
     s.sending=true;setMsg('Sending your recording…');render();
     try{
       const out=await sendRecording(s.id,s.words,s.blob,s.durationMs);
-      statusMap=statusMap||{};statusMap[s.id]={status:out.status||'pending'};statusAt=Date.now();
+      statusMap=statusMap||{};statusMap[s.id]={status:out.status||'pending'};
+      if(out.dailyCount!=null)dailyCount=Number(out.dailyCount);
+      else if(!out.alreadySubmitted)dailyCount=Math.min(dailyLimit,dailyCount+1);
+      dailyDate=todayNY();statusAt=Date.now();
       s.blob=null;dropAudio();s.playing=false;
       setMsg(out.alreadySubmitted?'This reading was already sent.':'Sent! Now your teacher will listen.');
     }catch(err){
       // keep the recording so he can simply press Submit again
-      setMsg((err&&err.message?err.message:'Could not send.')+' Your recording is still saved here — tap Submit to try again.',true);
+      const limitHit=err&&/3 Rashi readings/.test(err.message||'');
+      if(limitHit){dailyCount=dailyLimit;dailyDate=todayNY();}
+      setMsg((err&&err.message?err.message:'Could not send.')+(limitHit?'':' Your recording is still saved here — tap Submit to try again.'),true);
     }finally{s.sending=false;if(session===s)render();}
   }
   function leave(next){
@@ -200,7 +219,7 @@
   async function offer(section,onDone){
     if(cfg.isPreview()||(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest())){onDone&&onDone();return;}
     await loadStatus(false);
-    if(!canRecord(statusOf(section.id))){onDone&&onDone();return;}
+    if(dailyFull()||!canRecord(statusOf(section.id))){onDone&&onDone();return;}
     return open(section,onDone);
   }
   // "Reading with Mic" page: every section is a choice, each with its status.
@@ -216,14 +235,56 @@
     const list=el('div'),rows=sections.map(sec=>{
       const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record','',()=>open(sec,()=>openHub(sections),()=>openHub(sections)));
       row.append(name,chip,go);list.append(row);return {sec,chip,go};});
-    hub.append(list,button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
+    hub.append(list,el('p','rr-note','Readings today: '+dailyCount+' / '+dailyLimit),button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
     const map=cfg.isPreview()?{}:await loadStatus(false);
-    rows.forEach(r=>{const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);
+    rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);
       r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
       if(st==='pending'||st==='approved')r.go.textContent='View';});
   }
+  
+  // A standalone passage browser. Each source Rashi has its own record ID and status.
+  async function openVayeiraHub(){
+    if(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest()){
+      root.B3Guest.unlock?.('Sign in to unlock','Sign in to record your Rashi reading.');return;
+    }
+    ensureScreen();
+    if(session&&hasUnsent()&&!root.confirm('Your recording has not been sent yet. Leave without sending it?'))return;
+    if(session)leave();
+    cfg.hideOthers();
+    if(!hub){hub=el('div','card');hub.id='recordHub';hub.style.textAlign='center';ui.card.parentNode.insertBefore(hub,ui.card);}
+    hub.style.display='block';
+    hub.replaceChildren(el('h2','rr-vayeira-title','📖 Parshas Vayeira — Rashi Readings'),el('p','rr-sub','Pick a perek and a Rashi, then record yourself reading it.'));
+    const msg=el('p','rr-note','Loading passages…');hub.append(msg);
+    try{
+      if(!vayeiraCatalogPromise)vayeiraCatalogPromise=fetch('data/vayeira-rashi.json').then(r=>{if(!r.ok)throw Error('Could not load Rashis.');return r.json();}).catch(e=>{vayeiraCatalogPromise=null;throw e;});
+      const data=await vayeiraCatalogPromise;
+      if(!hub||hub.style.display==='none')return;
+      const map=cfg.isPreview()?{}:await loadStatus(false);
+      const sections=data.passages||[];
+      msg.remove();
+      const quota=el('p','rr-note','Readings today: '+dailyCount+' / '+dailyLimit),select=el('select','rr-vayeira-select');
+      select.setAttribute('aria-label','Choose perek');
+      [...new Set(sections.map(p=>p.perek))].forEach(p=>{const op=el('option',null,'Perek '+p);op.value=String(p);select.append(op);});
+      const list=el('div');
+      function show(){
+        list.replaceChildren();
+        sections.filter(p=>String(p.perek)===select.value).forEach(p=>{
+          const status=map[p.id]?.status||'none',row=el('div','rr-menu-row');
+          const details=el('div'),name=el('strong',null,'Perek '+p.perek+', Pasuk '+p.pasuk),preview=el('div','rr-note',p.text.slice(0,110)+(p.text.length>110?'…':''));
+          preview.setAttribute('dir','rtl');preview.setAttribute('lang','he');details.append(name,preview);
+          const go=button(status==='pending'?'⏳ Waiting':status==='approved'?'✅ View':'🎤 Record Reading','',()=>open({id:p.id,label:'Parshas Vayeira · '+p.perek+':'+p.pasuk,words:[p.text]},()=>openVayeiraHub(),()=>openVayeiraHub()));
+          if(dailyFull()&&status!=='pending'&&status!=='approved')go.disabled=true;
+          row.append(details,go);list.append(row);
+        });
+      }
+      select.onchange=show;
+      hub.append(quota,select,list,button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
+      show();
+    }catch(err){msg.textContent=err.message||'Could not load the Rashi passages.';}
+  }
+
   function hideHub(){if(hub)hub.style.display='none';}
   function init(options){cfg=Object.assign(cfg,options||{});}
-  function reset(){statusMap=null;statusAt=0;}
-  return {init,open,offer,openHub,hideHub,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
+  function reset(){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
+  return {init,open,offer,openHub,openVayeiraHub,hideHub,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
 });
