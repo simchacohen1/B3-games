@@ -128,9 +128,26 @@
     return readLocal(ctx);
   }
   function teacherRequest(action, body = {}, ctx = context()) { return request(action, body, ctx, true); }
+  // Matching sets must never be a single obvious Hebrew/English pair. Pad the
+  // lesson's own words with other real words (never a duplicate Hebrew spelling or
+  // an identical English meaning, which would make two answers correct).
+  const MIN_MATCH = 4, MAX_MATCH = 6; // MAX_MATCH is advisory; a lesson's own words are never dropped
+  const sameKey = value => clean(value).normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('he');
+  function matchSet(words, pool, min = MIN_MATCH, max = MAX_MATCH) {
+    const out = [], heSeen = new Set(), enSeen = new Set();
+    const add = word => {
+      const he = sameKey(word && word.hebrew), en = sameKey(word && word.english);
+      if (!he || !en || heSeen.has(he) || enSeen.has(en)) return false;
+      heSeen.add(he); enSeen.add(en); out.push(word); return true;
+    };
+    (Array.isArray(words) ? words : []).forEach(add);
+    const extras = (Array.isArray(pool) ? pool : []).slice().sort(() => Math.random() - 0.5);
+    for (const word of extras) { if (out.length >= min) break; add(word); }
+    return out;
+  }
   function list(source = 'all', ctx = context()) {
     return Object.values(readLocal(ctx).words).filter(word => source === 'all' || (word.sources || [word.source]).includes(source))
       .sort((a, b) => a.hebrew.localeCompare(b.hebrew, 'he'));
   }
-  root.FTTWordBank = { context, collect, list, recordAnswer, read: readLocal, sync, request, teacherRequest, mergeBank, storageKey, authFor };
+  root.FTTWordBank = { context, collect, list, recordAnswer, read: readLocal, sync, request, teacherRequest, mergeBank, storageKey, authFor, matchSet, MIN_MATCH };
 })(typeof window === 'object' ? window : globalThis);

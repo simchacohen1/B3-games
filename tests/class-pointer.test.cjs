@@ -39,7 +39,7 @@ test('normalized coordinates align across wide and portrait video and preview re
 });
 test('student names have a bounded display length and exclude control characters',()=>{
   assert.equal(C.cleanName('  Mayer\n\u0000 '),'Mayer');assert.equal(C.cleanName({name:'Mayer'}),'');
-  assert.equal(C.cleanName('M'.repeat(100)).length,32);
+  assert.equal(C.cleanName('M'.repeat(100)).length,60);
 });
 test('teacher rejects network pointer messages until admission and permission',()=>{
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});

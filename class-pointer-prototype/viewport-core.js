@@ -37,5 +37,21 @@
     const selectionH=selectionW/aspect,left=sx>0?start.x:start.x-selectionW,top=sy>0?start.y:start.y-selectionH;
     return cleanRegion({x:left/width,y:top/height,w:selectionW/width,h:selectionH/height});
   }
-  return{clamp,outputSize,cleanRegion,zoomRegion,panRegion,selectionFromDrag};
+  // Zoom to a new level while keeping the lesson point under `anchor` (0..1 across the current view) where it is.
+  function zoomAt(base,view,zoom,anchor){
+    base=cleanRegion(base)||{x:0,y:0,w:1,h:1};view=cleanRegion(view)||base;
+    const z=clamp(Number(zoom)||1,1,6),w=base.w/z,h=base.h/z;
+    const fx=clamp(Number.isFinite(anchor?.x)?anchor.x:0.5,0,1),fy=clamp(Number.isFinite(anchor?.y)?anchor.y:0.5,0,1);
+    const ax=view.x+fx*view.w,ay=view.y+fy*view.h;
+    return{zoom:z,view:{x:clamp(ax-fx*w,base.x,base.x+base.w-w),y:clamp(ay-fy*h,base.y,base.y+base.h-h),w,h}};
+  }
+  // Zoom so a dragged box (0..1 across the current view) fills the picture.
+  function zoomToBox(base,view,zoom,box){
+    base=cleanRegion(base)||{x:0,y:0,w:1,h:1};view=cleanRegion(view)||base;
+    if(!box||![box.x,box.y,box.w,box.h].every(Number.isFinite)||box.w<=0||box.h<=0)return null;
+    const next=clamp((Number(zoom)||1)/Math.max(box.w,box.h),1,6);
+    const center={x:view.x+(box.x+box.w/2)*view.w,y:view.y+(box.y+box.h/2)*view.h};
+    return{zoom:next,view:zoomRegion(base,next,center)};
+  }
+  return{clamp,outputSize,cleanRegion,zoomRegion,panRegion,selectionFromDrag,zoomAt,zoomToBox};
 });

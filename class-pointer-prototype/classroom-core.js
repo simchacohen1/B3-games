@@ -20,7 +20,7 @@
     reset(){this.strokes=[]}
   }
   function pointStyle(point){return{tool:tools.includes(point?.tool)?point.tool:'target',color:[...colors,...inkColors,'#ffcc00'].includes(point?.color)?point.color:null}}
-  function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,32):''}
+  function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,60):''}
   function validPoint(value){return !!value&&Number.isFinite(value.x)&&Number.isFinite(value.y)&&value.x>=0&&value.x<=1&&value.y>=0&&value.y<=1}
   function canPoint(mode,student){return !!student?.admitted&&(mode==='everyone'||(mode==='selected'&&student.allowed===true))}
   function canWrite(mode,student){return canPoint(mode,student)&&student?.writeAllowed===true}
