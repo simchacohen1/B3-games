@@ -1552,9 +1552,21 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json({ok:true,requests});
         }
         if(action==="rashi-approve"||action==="rashi-reject"){
-          await rashiAuthorizeRequest(teacher,body.requestId);
+          const request=await rashiAuthorizeRequest(teacher,body.requestId);
+          const isPassage=!!rashiCore.sectionText(request.sectionId);
+          const grade=Number(body.grade),feedback=String(body.feedback||'').trim();
+          if(isPassage&&action==="rashi-approve"&&(!Number.isInteger(grade)||grade<0||grade>100||body.grade==null))
+            return res.status(400).json({error:'Choose a reading grade from 0 to 100.'});
+          if(feedback.length>500)return res.status(400).json({error:'Feedback must be 500 characters or shorter.'});
           const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
           if(!result.ok)return res.status(409).json({error:result.error});
+          // Add grade/feedback only to the matching submitted attempt after authorization.
+          if(!result.alreadyHandled&&isPassage){
+            await rashiRecordRef(request.practiceStudentId,request.sectionId).transaction(cur=>{
+              if(!cur||cur.requestId!==body.requestId)return;
+              return {...cur,...(action==="rashi-approve"?{grade}:{grade:null}),feedback,gradedBy:teacher.email,gradedAt:Date.now()};
+            });
+          }
           return res.status(200).json(result);
         }
         if(action==="list-chazara-pending"){
