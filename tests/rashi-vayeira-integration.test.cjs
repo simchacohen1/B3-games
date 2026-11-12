@@ -30,7 +30,7 @@ test('server recognizes the 36 Rashis and all legacy reading IDs, rejects arbitr
 test('legacy words still sanitise; Vayeira text is never truncated to twelve words',()=>{
   assert.deepEqual(core.readingWords('alef',['אָב','בֵּן']),['אָב','בֵּן']);
   const longest=catalog.passages.reduce((a,b)=>a.text.length>b.text.length?a:b);
-  assert.ok(longest.text.length>180);
+  assert.ok(longest.text.trim().split(/\s+/).length>12,'longest Rashi passage must exceed the legacy 12-word limit');
   assert.equal(core.readingWords(longest.id,[])[0],longest.text);
 });
 test('each Vayeira reading maintains a distinct pending/approved/rejected attempt',()=>{
