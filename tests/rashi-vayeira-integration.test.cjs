@@ -82,3 +82,26 @@ test('staging keeps the same canonical passages and explicitly rejects productio
   const client=read('rashi-letters/recordings.js');
   assert.match(client,/if\(STAGING\(\)\)throw new Error\('Recording rewards are disabled on staging\.'\)/);
 });
+
+
+test('all 36 Vayeira passages have readable whole-word Hebrew and correct Rashi example 18:8',()=>{
+  const all=require('../rashi-letters/data/vayeira-rashi.json').passages;
+  assert.equal(all.length,36);
+  assert.equal(new Set(all.map(p=>p.id)).size,36);
+  assert.deepEqual(all,require('../backend/functions/vayeira-rashi.json').passages);
+  assert.deepEqual(all,require('../backend/functions-staging/vayeira-rashi.json').passages);
+  for(const p of all){
+    const t=p.text;
+    assert.equal(t,t.trim(),p.id+' must be trimmed');
+    assert.ok(!/[ \t]{2,}/.test(t),p.id+' repeated spaces');
+    assert.ok(!/[\u0591-\u05bd\u05bf-\u05c7](?:\\s|$)/u.test(t),p.id+' dangling niqqud');
+    assert.ok(!/[\u0591-\u05bd\u05bf-\u05c7](?=[\u05d0-\u05ea])\s/.test(t),p.id+' misplaced niqqud');
+    assert.ok(!/\b(?:g)\b/i.test(t),p.id+' stray extracted letter');
+    assert.ok(/[:]/.test(t),p.id+' dibbur hamaschil separator');
+    assert.ok(t.length>20,p.id+' suspiciously truncated Rashi');
+  }
+  const passage=all.find(p=>p.id==='vayeira-18-8');
+  assert.equal(passage.text,'וַיֹּאכֵלוּ: נִרְאוּ כְּמוֹ שֶׁאָכְלוּ, מִכָּאן שֶׁלֹּא יְשַׁנֶּה אָדָם מִן הַמִּנְהָג.');
+  assert.ok(all.find(p=>p.id==='vayeira-22-14').text.endsWith("לְעַמּוֹ'."));
+  assert.ok(all.find(p=>p.id==='vayeira-19-24').text.includes('"וַה\'"'));
+});
