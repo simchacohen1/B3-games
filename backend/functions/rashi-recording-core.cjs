@@ -40,6 +40,6 @@ function publicStatus(record,requestStatus){
   if(!record)return {status:'none'};
   let status=String(record.status||'pending');
   if(status==='pending'&&['approved','rejected'].includes(requestStatus))status=requestStatus;
-  return {status,attempt:Number(record.attempt)||1,submittedAt:record.createdAt||null,reviewedAt:record.reviewedAt||null,points:status==='approved'?RASHI_POINTS:0};
+  return {status,attempt:Number(record.attempt)||1,submittedAt:record.createdAt||null,reviewedAt:record.reviewedAt||null,points:status==='approved'?RASHI_POINTS:0,grade:record.grade??null,feedback:record.feedback||''};
 }
 module.exports={RASHI_SOURCE,RASHI_POINTS,MIN_BYTES,MAX_BYTES,MIN_DURATION_MS,MAX_WORDS,SECTIONS,PASSAGES,isSection,sectionLabel,sectionText,readingWords,cleanWords,claim,requestIdFor,publicStatus};
