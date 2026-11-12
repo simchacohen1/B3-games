@@ -115,6 +115,9 @@
     u.quota.textContent='Readings today: '+dailyCount+' / '+dailyLimit;
     u.words.replaceChildren(...s.words.map(w=>el('span',s.id.startsWith('vayeira-')?'rr-passage':'rr-word',w)));
     u.banner.className='rr-banner '+b.cls;u.banner.textContent=b.icon+' '+b.text;
+    const result=statusMap?.[s.id];
+    if(result&&result.grade!=null&&status==='approved')u.banner.textContent+=' · Grade: '+result.grade+'/100';
+    if(result?.feedback)u.banner.textContent+=' · Teacher feedback: '+result.feedback;
     u.controls.replaceChildren();u.footer.replaceChildren();
     u.timer.classList.toggle('hidden',s.state!=='recording');
     u.note.classList.toggle('hidden',status==='approved');
