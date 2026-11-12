@@ -47,8 +47,8 @@
     let intervalActiveMs = 0;
     let nextFeedbackAt = feedbackEveryMs;
     let feedbackCount = 0;
+    let activeIntervals = 0;
     let sampleCount = 0;
-    let peak = 0;
 
     function start(at) {
       if (finished) throw new Error('This session has ended. Create a new meter.');
@@ -68,7 +68,6 @@
       const elapsed = clamp(at - lastTime, 0, MAX_SAMPLE_GAP_MS);
       lastTime = at;
       sampleCount++;
-      peak = Math.max(peak, level);
       // Early levels calibrate the ambient threshold; they do not count as speech.
       if (calibrationElapsed < calibrationMs) {
         calibrationElapsed += elapsed;
@@ -90,6 +89,7 @@
         const fraction = intervalMeasuredMs ? intervalActiveMs / intervalMeasuredMs : 0;
         const message = feedbackFor(fraction);
         feedbackCount++;
+        if (intervalActiveMs >= 1000) activeIntervals++;
         intervalMeasuredMs = 0;
         intervalActiveMs = 0;
         nextFeedbackAt += feedbackEveryMs;
@@ -106,6 +106,7 @@
         soundActivityPercent: Math.round(fraction * 100),
         calibrationSeconds: round(calibrationElapsed / 1000),
         feedbackCount,
+        activeIntervals,
         samples: sampleCount,
         // Signal amplitude is intentionally NOT part of a score.
         hasMeasuredActivity: measuredMs > 0
@@ -137,6 +138,10 @@
         studentName: String(report && report.studentName || 'Student'),
         hasData: measured > 0,
         measuredMinutes: round(measured / 60),
+        microphoneMinutes: round((measured + (Number.isFinite(data?.calibrationSeconds)
+          ? clamp(data.calibrationSeconds, 0, 10) : 0)) / 60),
+        observedIntervals: Number.isInteger(data?.feedbackCount) ? data.feedbackCount : 0,
+        activeIntervals: Number.isInteger(data?.activeIntervals) ? data.activeIntervals : 0,
         soundActivityPercent: measured > 0 ? Math.round(active / measured * 100) : null,
         // This is an observational summary, not a teacher points suggestion.
         status: measured > 0 ? 'Microphone activity measured' : 'No microphone data'
