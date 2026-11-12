@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FTT Question Modes — Draft Studio</title>
+<style>
+:root{font-family:system-ui,Arial;color:#17324d;background:#f3f6fa}*{box-sizing:border-box}main{max-width:960px;margin:25px auto;padding:0 16px}section{background:white;border:1px solid #dce5ef;border-radius:16px;padding:20px;margin:14px 0}h1{font-size:25px}h2{font-size:19px}label{display:block;font-weight:650;margin:12px 0 5px}textarea,input,select{width:100%;padding:10px;font:inherit;border:1px solid #bbcadb;border-radius:8px;background:white}textarea{min-height:90px}button{font:inherit;border:0;border-radius:9px;padding:10px 14px;cursor:pointer;background:#2162a4;color:white;margin:5px 6px 5px 0}button.secondary{background:#e8eff7;color:#153957}button:disabled{opacity:.45}p,.note{line-height:1.5;color:#51667a}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.error{color:#a5222d}.good{color:#126638}#preview{padding:12px;background:#f5f8fd;border-radius:10px;white-space:pre-wrap;overflow:auto}small{color:#5b6d81}code{white-space:pre-wrap}#status{font-weight:650}
+</style></head><body><main><h1>Question Modes — Draft Studio</h1>
+<p>This is a development-only authoring preview for Issue #185, not the live Weekly Quiz generator. Nothing is sent to Firebase or assigned to students. Save drafts as JSON locally; production sessions currently accept only old multiple-choice submissions.</p>
+<section><div class="grid"><div><label for="mode">Question mode</label><select id="mode"></select></div><div><label for="question">Question / instruction</label><input id="question" dir="auto" placeholder="e.g. Select all the verbs"></div></div><div id="fields"></div><button id="validate">Validate &amp; preview</button><button id="add">Add valid question to draft</button><div id="status" role="status" aria-live="polite"></div></section>
+<section><h2>Draft quiz <span id="count">0 questions</span></h2><div id="draft"></div><button id="export" class="secondary">Download JSON draft</button><button id="import" class="secondary">Import JSON draft</button><input id="upload" type="file" accept="application/json,.json" hidden><button id="clear" class="secondary">Clear draft</button></section>
+<section><h2>Structured preview</h2><pre id="preview"></pre><small>For teacher review. Student controls and server scoring must be implemented before release.</small></section>
+</main><script src="./question-modes-v2.js"></script><script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const titles={single_select:'Multiple Choice',multi_select:'Checkboxes',true_false:'True / False',free_text:'Free Text',essay:'Essay / Long Text',sorter:'Sorter',categorizer:'Categorizer',multi_categorizer:'Categorizer (multiple categories)',highlight_text:'Highlight Text',hot_spot:'Hot Spot',fill_gaps:'Fill-in-the-Gap'};
+let questions=[];
+function field(id,label,help='',multiline=true){return '<label for="'+id+'">'+label+'</label>'+(multiline?'<textarea id="'+id+'" dir="auto"></textarea>':'<input id="'+id+'" dir="auto">')+(help?'<small>'+help+'</small>':'');}
+function options(){
+ const t=$('mode').value; let html='';
+ switch(t){
+ case 'single_select':case 'multi_select':html+=field('choices','Choices (one per line)');html+=field('correct','Correct choice numbers (1-based)',t==='multi_select'?'Separate several numbers with commas':'One number',false);break;
+ case 'true_false':html+='<label for="correct">Correct answer</label><select id="correct"><option value="true">True</option><option value="false">False</option></select>';break;
+ case 'free_text':html+=field('answers','Accepted answers (one per line)');break;
+ case 'essay':html+=field('rubric','Teacher grading rubric');break;
+ case 'sorter':html+=field('items','Items in correct order (one per line)','They will be shuffled in student view');break;
+ case 'categorizer':case 'multi_categorizer':html+=field('categories','Categories (one per line)')+field('items','Items and correct categories','Each line: item | category. For multiple categories: item | category 1, category 2');break;
+ case 'highlight_text':html+=field('passage','Text to display')+field('regions','Correct text ranges','Each line: start,end (zero-based UTF-16 character offsets; end exclusive). Select spans carefully for Hebrew.');break;
+ case 'hot_spot':html+=field('imageUrl','HTTPS image URL','A secure teacher-approved image URL; production upload is not yet implemented',false)+field('regions','Correct picture regions','Each line: x,y,width,height as normalized fractions from 0 to 1');break;
+ case 'fill_gaps':html+=field('template','Sentence with blanks','Use {{gap1}}, {{gap2}} as placeholders')+field('gaps','Blank keys and answers','Each line: gap1 | answer 1, answer 2; optional dropdown choices after another | separated by commas');break;
+ }
+ $('fields').innerHTML=html;
+}
+const lines=id=>(($(id)?.value)||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+const pieces=line=>line.split('|').map(x=>x.trim());
+function build(){
+ const mode=$('mode').value, q={schemaVersion:2,mode,q:$('question').value.trim()};
+ switch(mode){
+ case 'single_select':q.choices=lines('choices');q.correctIndex=Number($('correct').value)-1;break;
+ case 'multi_select':q.choices=lines('choices');q.correctIndices=$('correct').value.split(',').map(s=>Number(s.trim())-1);break;
+ case 'true_false':q.correct=$('correct').value==='true';break;
+ case 'free_text':q.answers=lines('answers');break;
+ case 'essay':q.rubric=$('rubric').value.trim();break;
+ case 'sorter':q.items=lines('items');q.correctOrder=q.items.slice();break;
+ case 'categorizer':case 'multi_categorizer':
+   q.categories=lines('categories');q.key={};q.items=[];
+   lines('items').forEach(line=>{let [item,cat]=pieces(line);q.items.push(item);q.key[item]=mode==='categorizer'?cat:(cat||'').split(',').map(s=>s.trim());});break;
+ case 'highlight_text':q.passage=$('passage').value;q.spans=lines('regions').map(l=>{const [start,end]=l.split(',').map(Number);return{start,end};});break;
+ case 'hot_spot':q.imageUrl=$('imageUrl').value.trim();q.regions=lines('regions').map(l=>{let [x,y,width,height]=l.split(',').map(Number);return{shape:'rect',x,y,width,height};});break;
+ case 'fill_gaps':q.template=$('template').value;q.gaps=lines('gaps').map(l=>{const [id,answers,opts]=pieces(l);const o={id,answers:(answers||'').split(',').map(x=>x.trim())};if(opts)o.options=opts.split(',').map(x=>x.trim());return o;});break;
+ }
+ return q;
+}
+function validate(){
+ const q=build(),errors=FTTQuizModes.validate(q);
+ $('preview').textContent=JSON.stringify(q,null,2);
+ $('status').textContent=errors.length?errors.join('; '):'Question is valid for the draft schema.';
+ $('status').className=errors.length?'error':'good';
+ return errors.length?null:q;
+}
+function repaint(){
+ $('count').textContent=questions.length+' question'+(questions.length===1?'':'s');
+ $('draft').replaceChildren();
+ questions.forEach((q,i)=>{
+ const row=document.createElement('div');row.style.padding='10px 0';row.style.borderBottom='1px solid #e1e8ee';
+ const title=document.createElement('span');title.textContent=(i+1)+'. '+q.q+' — '+titles[q.mode];
+ const btn=document.createElement('button');btn.className='secondary';btn.textContent='Remove';btn.onclick=()=>{questions.splice(i,1);repaint();};
+ row.append(title,btn);$('draft').append(row);
+ });
+}
+$('mode').innerHTML=FTTQuizModes.MODES.map(t=>'<option value="'+t+'">'+titles[t]+'</option>').join('');
+$('mode').onchange=options;options();
+$('validate').onclick=validate;
+$('add').onclick=()=>{const q=validate();if(!q)return;questions.push(q);repaint();};
+$('clear').onclick=()=>{if(confirm('Clear this unsaved draft?')){questions=[];repaint();}};
+$('export').onclick=()=>{
+ if(!questions.length)return;
+ const blob=new Blob([JSON.stringify({schemaVersion:2,questions},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='ftt-quiz-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);
+};
+$('import').onclick=()=>$('upload').click();
+$('upload').onchange=async()=>{
+ const file=$('upload').files[0];if(!file)return;
+ try{if(file.size>1024*1024)throw new Error('File exceeds 1 MB');
+ const data=JSON.parse(await file.text());if(!Array.isArray(data.questions)||data.questions.length>100)throw new Error('Invalid draft');
+ const errors=data.questions.flatMap((q,i)=>FTTQuizModes.validate(q).map(e=>'Question '+(i+1)+': '+e));
+ if(errors.length)throw new Error(errors.slice(0,5).join('; '));
+ questions=data.questions.map(FTTQuizModes.migrate);repaint();$('status').textContent='Draft imported locally.';$('status').className='good';
+ }catch(e){$('status').textContent=e.message;$('status').className='error';}
+ $('upload').value='';
+};
+})();
+</script></body></html>
