@@ -3,6 +3,9 @@
 // studentRewardsAutoAward function and its tests: which sections exist, how
 // many points they are worth, and how a submission may replace an earlier one.
 const RASHI_SOURCE='rashi-recording';
+const VAYEIRA=require('./vayeira-rashi.json');
+const PASSAGES=Object.freeze(Object.fromEntries(VAYEIRA.passages.map(p=>[p.id,Object.freeze(p)])));
+
 const RASHI_POINTS=2;
 const MIN_BYTES=1000;
 const MAX_BYTES=9*1024*1024;
@@ -13,8 +16,10 @@ const SECTIONS=Object.freeze({
   tsadisofit:'Mission 5 (ץ) words',memsofit:'Mission 6 (ם) words',shin:'Mission 7 (שׁ / שׂ) words',samech:'Mission 8 (ס) words',
   finalreview:'Final review words',words2:'2-letter words',words3:'3-letter words',words4:'4-letter words'
 });
-const isSection=id=>typeof id==='string'&&Object.prototype.hasOwnProperty.call(SECTIONS,id);
-const sectionLabel=id=>SECTIONS[id]||String(id||'');
+const isSection=id=>typeof id==='string'&&(Object.prototype.hasOwnProperty.call(SECTIONS,id)||Object.prototype.hasOwnProperty.call(PASSAGES,id));
+const sectionLabel=id=>SECTIONS[id]||(PASSAGES[id]?`Vayeira ${PASSAGES[id].perek}:${PASSAGES[id].pasuk}`:String(id||''));
+const sectionText=id=>PASSAGES[id]?.text||null;
+const readingWords=(id,untrusted)=>PASSAGES[id]?[PASSAGES[id].text]:cleanWords(untrusted);
 // Words are shown to the teacher only; keep Hebrew letters, points and spaces.
 function cleanWords(value){
   const list=Array.isArray(value)?value:String(value||'').split('|');
@@ -37,4 +42,4 @@ function publicStatus(record,requestStatus){
   if(status==='pending'&&['approved','rejected'].includes(requestStatus))status=requestStatus;
   return {status,attempt:Number(record.attempt)||1,submittedAt:record.createdAt||null,reviewedAt:record.reviewedAt||null,points:status==='approved'?RASHI_POINTS:0};
 }
-module.exports={RASHI_SOURCE,RASHI_POINTS,MIN_BYTES,MAX_BYTES,MIN_DURATION_MS,MAX_WORDS,SECTIONS,isSection,sectionLabel,cleanWords,claim,requestIdFor,publicStatus};
+module.exports={RASHI_SOURCE,RASHI_POINTS,MIN_BYTES,MAX_BYTES,MIN_DURATION_MS,MAX_WORDS,SECTIONS,PASSAGES,isSection,sectionLabel,sectionText,readingWords,cleanWords,claim,requestIdFor,publicStatus};
