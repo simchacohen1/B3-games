@@ -195,6 +195,12 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
 
 /* Look-alike letters */
+.vayeira-feature-btn{width:100%;min-height:100px;display:flex;align-items:center;justify-content:center;gap:18px;padding:16px 22px;border:3px solid var(--gold);border-radius:16px;background:linear-gradient(135deg,#e8f7f2,#fff8df);color:var(--rimon-dark);cursor:pointer;box-shadow:0 4px 0 rgba(59,42,30,.12)}
+.vayeira-feature-btn:hover{background:linear-gradient(135deg,#daf4eb,#fff0c6)}
+.vayeira-feature-btn:focus-visible{outline:3px solid var(--rimon);outline-offset:3px}
+.vayeira-feature-btn>span:first-child{font-size:2.5rem;line-height:1}
+.vayeira-rashi-title{font-family:'Mekorot Rashi',serif;font-size:3.2rem;font-weight:700;line-height:1.2;white-space:nowrap}
+@media(max-width:420px){.vayeira-feature-btn{min-height:85px}.vayeira-rashi-title{font-size:2.6rem}}
 .letter-pick-btn.mic-tile{grid-column:1/-1;background:linear-gradient(135deg,#ffe3e3,#fff1d6)!important;border:3px solid #d93b3b;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px}
 .letter-pick-btn.mic-tile span{font-size:40px}.letter-pick-btn.mic-tile small{font-size:17px;font-weight:800;color:#8a1f1f}
 .letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
@@ -298,6 +304,11 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   </div>
 
   <div class="card" id="modeGate" style="display:none;">
+    <div class="mode-gate-section">
+      <button class="vayeira-feature-btn" id="vayeiraReadingBtn" type="button" aria-label="Parshas Vayeira Rashi readings">
+        <span aria-hidden="true">📖</span><span lang="he" dir="rtl" class="vayeira-rashi-title">רש״י</span>
+      </button>
+    </div>
     <div class="mode-gate-section">
       <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
@@ -832,11 +843,8 @@ function renderLetterGrid(){
     mic.setAttribute('aria-label','Reading with Mic: record yourself reading Rashi words');
     mic.onclick=()=>window.RashiRecordings.openHub(allRecSections());
     grid.appendChild(mic);
-    const vayeira=document.createElement('button');
-    vayeira.className='letter-pick-btn vayeira-reading-tile';
-    vayeira.textContent='📖 Parshas Vayeira — Rashi Readings';
-    vayeira.onclick=()=>window.RashiRecordings.openVayeiraHub();
-    grid.appendChild(vayeira);
+    const vayeira=document.getElementById('vayeiraReadingBtn');
+    if(vayeira) vayeira.onclick=()=>window.RashiRecordings.openVayeiraHub();
   }
 }
 
