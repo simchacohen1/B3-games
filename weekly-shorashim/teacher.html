@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weekly Shorashim — Teacher</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}
+header{background:#0f766e;color:#fff;padding:16px 22px}header h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#ccfbf1;font-size:13px}
+header .stg{font-size:11px;font-weight:bold;background:#fff7ed;color:#dc6b19;border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle}
+main{max-width:1200px;margin:auto;padding:20px}
+.status{padding:12px;background:#fff;border-radius:12px;margin-bottom:15px;font-weight:bold}
+.classTabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.classTabs button{border:2px solid #c9d8e6;background:#fff;color:#134e4a;border-radius:10px;padding:8px 14px;font-weight:bold;cursor:pointer}
+.classTabs button.on{background:#0f766e;color:#fff;border-color:#0f766e}
+.panel{background:#fff;border-radius:14px;box-shadow:0 3px 10px #0001;padding:16px;margin-bottom:14px}
+.panel h2{margin:0 0 10px;font-size:17px;color:#134e4a}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.setting label{display:block;font-size:12px;font-weight:bold;color:#64748b;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
+.setting select,.setting input[type=number]{font-size:16px;padding:8px 10px;border:2px solid #c9d8e6;border-radius:9px;background:#fff;min-width:90px}
+.setting .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.setting .hold{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:bold;text-transform:none;letter-spacing:0;color:#203040;margin:8px 0 0}
+.btn{border:0;border-radius:9px;padding:9px 14px;background:#0f766e;color:#fff;font-weight:bold;cursor:pointer;font-size:14px}
+.btn:disabled{opacity:.5;cursor:default}
+.muted{color:#64748b;font-size:13px}
+.saved{color:#1f7a45;font-size:13px;font-weight:bold;min-height:18px;margin-top:6px}
+.saved.err{color:#b42318}
+.weeks{display:flex;flex-wrap:wrap;gap:6px}
+.weeks button{width:36px;height:36px;border-radius:10px;border:2px solid #e2e8f0;background:#fff;color:#475569;font-weight:bold;cursor:pointer;font-size:12px}
+.weeks button.cur{border-color:#5eead4;background:#f0fdf9;color:#0f766e}
+.weeks button.on{background:#0f766e;color:#fff;border-color:#0f766e}
+.tableWrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid #e5edf4;font-size:14px;white-space:nowrap}
+th{background:#f6f9fc;color:#475569;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+td.score b{font-size:15px;color:#134e4a}
+td.none,tr.none td{color:#94a3b8}
+.he{font-family:David,"Times New Roman",serif;font-size:19px;direction:rtl;unicode-bidi:isolate}
+.missed{display:flex;flex-wrap:wrap;gap:8px}
+.missed .w{border:1.5px solid #fecaca;background:#fef2f2;border-radius:10px;padding:6px 10px;font-size:13px}
+.missed .w b{color:#b42318}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap}
+.hidden{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script><script src="../site-settings.js?v=20261020-demo-student"></script>
+</head>
+<body>
+<header><h1>ש Weekly Shorashim — Teacher <span class="stg">STAGING</span></h1><p>Each student's best score in every game for a week, the words the class misses most, and the class's grade and week.</p></header>
+<main>
+ <div id="status" class="status">Checking teacher access…</div>
+ <div id="classTabs" class="classTabs"></div>
+
+ <div id="body" class="hidden">
+  <div class="panel">
+   <h2>Class settings</h2>
+   <div class="settings">
+    <div class="setting">
+     <label for="grade">Word list grade</label>
+     <div class="row"><select id="grade"></select><button type="button" class="btn" id="saveGrade">Save grade</button></div>
+     <p class="muted">Grades build on each other: B3 sees the B2 and B3 words. A class with nothing saved is B3.</p>
+     <div class="saved" id="gradeSaved"></div>
+    </div>
+    <div class="setting">
+     <label for="week">Current week</label>
+     <div class="row"><input type="number" id="week" min="1" max="30" step="1"><button type="button" class="btn" id="saveWeek">Set week</button></div>
+     <label class="hold"><input type="checkbox" id="held"> Hold on this week (do not move up on Sunday)</label>
+     <p class="muted" id="weekInfo"></p>
+     <div class="saved" id="weekSaved"></div>
+    </div>
+   </div>
+  </div>
+
+  <div class="panel">
+   <div class="toolbar"><h2 style="margin:0">Scores for week <span id="reportWeekLabel"></span></h2><span><span class="muted" id="updated"></span> <button type="button" class="btn" id="refresh">↻ Refresh</button></span></div>
+   <div class="weeks" id="weeks"></div>
+  </div>
+
+  <div class="panel">
+   <h2>Words missed most this week</h2>
+   <div class="missed" id="missed"></div>
+  </div>
+
+  <div class="panel tableWrap">
+   <table><thead><tr id="headRow"></tr></thead><tbody id="rows"></tbody></table>
+   <p class="muted">Each box shows the best score and how many times the student played. Scores are counted differently in each game: Chumash Racer and Lava Traveler are points, Matching is a speed score (up to 1000), Flashcards is the number of "Got it" cards, Practice Quiz is a percent.</p>
+  </div>
+ </div>
+</main>
+<script src="data.js?v=20261111-1"></script>
+<script src="logic.js?v=20261111-1"></script>
+<script src="teacher.js?v=20261111-1"></script>
+<script src="../back-nav.js" data-mode="inline" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body></html>

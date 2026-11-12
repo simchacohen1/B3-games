@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weekly Shorashim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Frank+Ruhl+Libre:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=20261111-1">
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script>
+</head>
+<body>
+<div class="ws-page" id="wsPage">
+  <div class="ws-topbar">
+    <a href="../index.html">← Fun Torah Tools</a>
+    <div><span class="ws-who" id="wsWho"></span><span class="ws-staging">STAGING</span></div>
+  </div>
+  <div class="ws-notice" id="wsNotice">Loading Weekly Shorashim…</div>
+
+  <div class="ws-card hidden" id="wsCard">
+    <div class="ws-card-head">
+      <div class="ws-icon">ש</div>
+      <div>
+        <div><h1 class="ws-card-title ws-he">שורשים</h1><span class="ws-badge ws-badge-teal">Shoroshim</span><span class="ws-badge ws-chip" id="wsGradeBadge"></span></div>
+        <p class="ws-desc" id="wsDesc">Weekly vocabulary practice</p>
+      </div>
+    </div>
+    <div class="ws-panel">
+      <div class="ws-rule"></div>
+      <div class="ws-modes">
+        <button type="button" class="ws-mode on" id="wsModeSingle">📅 This Week</button>
+        <button type="button" class="ws-mode" id="wsModeCumulative">📚 All Weeks So Far</button>
+      </div>
+      <p class="ws-label">Select Week</p>
+      <div class="ws-weeks" id="wsWeeks"></div>
+      <div class="ws-grade-box">
+        <div class="ws-grade-head"><span class="ws-chip" id="wsGradeChip"></span><span id="wsGradeTitle"></span></div>
+        <div class="ws-count-row"><span class="ws-count" id="wsCount"></span><span id="wsRange"></span></div>
+        <div class="ws-words" id="wsWords"></div>
+        <div class="ws-quizlet" id="wsQuizlet"></div>
+        <p class="ws-label" id="wsGamesLabel">Choose a game</p>
+        <div class="ws-games" id="wsGames"></div>
+        <p class="ws-muted" id="wsSaveNote"></p>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="wsGame" class="hidden"></div>
+
+<script src="data.js?v=20261111-1"></script>
+<script src="logic.js?v=20261111-1"></script>
+<script src="games.js?v=20261111-1"></script>
+<script src="app.js?v=20261111-1"></script>
+</body>
+</html>
