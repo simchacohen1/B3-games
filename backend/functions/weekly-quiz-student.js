@@ -15,8 +15,12 @@ exports.weeklyQuizStudent=onRequest({
   if(Buffer.byteLength(JSON.stringify(req.body||{}))>4000)return res.status(413).json({error:'Request too large.'});
   const bearer=String(req.headers.authorization||'');
   if(!bearer.startsWith('Bearer '))return res.status(401).json({error:'Student sign-in required.'});
+  // An expired, revoked, disabled or malformed token is a sign-in problem (401),
+  // not a server failure (500) that the quiz page would keep retrying.
+  let decoded;
+  try{decoded=await admin.auth().verifyIdToken(bearer.slice(7),true);}
+  catch(error){return res.status(401).json({error:'Student sign-in required.'});}
   try{
-    const decoded=await admin.auth().verifyIdToken(bearer.slice(7),true);
     const db=admin.database();
     const result=await weeklyQuizStudentAction({
       decoded,
