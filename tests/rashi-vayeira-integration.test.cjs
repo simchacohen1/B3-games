@@ -66,3 +66,19 @@ test('student receives grades only with status, without mutating the original re
   assert.equal(core.publicStatus(row,'approved').feedback,'Very good!');
   assert.equal(row.status,'approved');
 });
+
+
+test('staging keeps the same canonical passages and explicitly rejects production Firebase',()=>{
+  assert.deepEqual(require('../backend/functions-staging/vayeira-rashi.json'),catalog);
+  const stagingCore=require('../backend/functions-staging/rashi-recording-core.cjs');
+  assert.equal(stagingCore.isSection(catalog.passages[0].id),true);
+  assert.deepEqual(stagingCore.readingWords(catalog.passages[0].id,'client input'),[catalog.passages[0].text]);
+  const staging=read('backend/functions-staging/student-rewards-auto-award.js');
+  assert.match(staging,/assertNoProductionFirebaseTarget\(admin\.apps\[0\]\)/);
+  assert.match(staging,/const rashiBucket=\(\)=>admin\.storage\(\)\.bucket\(\)/);
+  assert.doesNotMatch(staging,/const RASHI_BUCKET='b3-games/);
+  assert.match(staging,/rashiReserveDaily\(studentId,dailyDate\)/);
+  assert.match(staging,/rashiCore\.readingWords\(sectionId,req\.query\.words\)/);
+  const client=read('rashi-letters/recordings.js');
+  assert.match(client,/if\(STAGING\(\)\)throw new Error\('Recording rewards are disabled on staging\.'\)/);
+});
