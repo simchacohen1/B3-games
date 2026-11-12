@@ -234,11 +234,18 @@ async function rashiStudentSubmit(req,res){
   // 3. Claim the one slot for this student+section (only if nothing is
   //    pending/approved). A double-click loses here and its upload is removed.
   let claimed=null,blockedBy=null;
-  const tx=await rashiRecordRef(studentId,sectionId).transaction(cur=>{
-    const r=rashiCore.claim(cur,seed);
-    if(r.block){blockedBy=r.block;return;}
-    claimed=r.write;return r.write;
-  });
+  let tx;
+  try{
+    tx=await rashiRecordRef(studentId,sectionId).transaction(cur=>{
+      const r=rashiCore.claim(cur,seed);
+      if(r.block){blockedBy=r.block;return;}
+      claimed=r.write;return r.write;
+    });
+  }catch(err){
+    await file.delete().catch(()=>{});
+    await rashiReleaseDaily(studentId,dailyDate).catch(()=>{});
+    throw err;
+  }
   if(!tx.committed||!claimed||tx.snapshot.val()?.attemptId!==attemptId){
     await file.delete().catch(()=>{});
     await rashiReleaseDaily(studentId,dailyDate);
