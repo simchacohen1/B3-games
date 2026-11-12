@@ -94,8 +94,7 @@ test('all 36 Vayeira passages have readable whole-word Hebrew and correct Rashi 
     const t=p.text;
     assert.equal(t,t.trim(),p.id+' must be trimmed');
     assert.ok(!/[ \t]{2,}/.test(t),p.id+' repeated spaces');
-    assert.ok(!/[\u0591-\u05bd\u05bf-\u05c7](?:\\s|$)/u.test(t),p.id+' dangling niqqud');
-    assert.ok(!/[\u0591-\u05bd\u05bf-\u05c7](?=[\u05d0-\u05ea])\s/.test(t),p.id+' misplaced niqqud');
+    assert.ok(!/(?:^|[\\s.,:;!?])[\u0591-\u05bd\u05bf-\u05c7]/u.test(t),p.id+' standalone niqqud');
     assert.ok(!/\b(?:g)\b/i.test(t),p.id+' stray extracted letter');
     assert.ok(/[:]/.test(t),p.id+' dibbur hamaschil separator');
     assert.ok(t.length>20,p.id+' suspiciously truncated Rashi');
