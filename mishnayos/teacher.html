@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- Mishnayos Practice Teacher View v1 — 2026-11-08 -->
 <html lang="en">
-<head>
+<head><script src="../teacher-tool-gate.js?v=20261028-gate" data-scope="teacher"></script>
 <meta charset="UTF-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -86,7 +86,7 @@ function toHebNum(n){const h=['','א','ב','ג','ד','ה','ו','ז','ח','ט','�
 const api=window.B3SiteSettings,WS=api.workspaceId||'b3-2026';
 const params=new URLSearchParams(location.search),classId=params.get('class')||'';
 let db,currentAssignments=[],students=[];
-(function(){if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);db=firebase.database();loadSederOptions();api.onAuthStateChanged((user,authorized,access)=>{if(!access?.authorized){location.replace('../teacher-home.html');return;}document.getElementById('signOut').classList.remove('hidden');document.getElementById('signOut').onclick=()=>api.signOut().then(()=>location.reload());loadAssignments();loadStudentProgress();});})();
+(function(){if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);db=firebase.database();loadSederOptions();api.onAuthStateChanged((user,authorized,access)=>{if(!access?.authorized){return;} /* the Teacher Tools gate shows the lock card */document.getElementById('signOut').classList.remove('hidden');document.getElementById('signOut').onclick=()=>api.signOut().then(()=>location.reload());loadAssignments();loadStudentProgress();});})();
 function loadSederOptions(){const sel=document.getElementById('sederSel');getSederList().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});onSederChange();}
 function onSederChange(){const seder=document.getElementById('sederSel').value;const sel=document.getElementById('masechSel');sel.innerHTML='';getMasechList(seder).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});onMasechChange();}
 function onMasechChange(){const seder=document.getElementById('sederSel').value,masech=document.getElementById('masechSel').value;const count=getPerekCount(seder,masech);const sel=document.getElementById('perekSel');sel.innerHTML='';for(let i=1;i<=count;i++){const o=document.createElement('option');o.value=i;o.textContent='פרק '+toHebNum(i);sel.appendChild(o);}onPerekChange();}

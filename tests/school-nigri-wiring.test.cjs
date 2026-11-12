@@ -18,8 +18,8 @@ test('every standalone Nigri page loads the school gate before its own scripts r
     const gate = html.search(/<script src="[^"]*sync-to-nigri\/nigri-school-gate\.js[^"]*"( data-owner-only="1")?><\/script>/);
     assert.ok(gate > 0, page + ' is missing the school gate');
     assert.ok(!/nigri-school-gate\.js[^"]*" data-mode="panel"/.test(html), page + ' must use full-page mode');
-    const firstOther = html.slice(0, gate).match(/<script(?![^>]*guest-mode\.js)[^>]*>/);
-    assert.equal(firstOther, null, page + ': only guest-mode.js may run before the gate');
+    const firstOther = html.slice(0, gate).match(/<script(?![^>]*(?:guest-mode|teacher-tool-gate)\.js)[^>]*>/);
+    assert.equal(firstOther, null, page + ': only guest-mode.js and the Teacher Tools gate may run before the school gate');
   }
 });
 

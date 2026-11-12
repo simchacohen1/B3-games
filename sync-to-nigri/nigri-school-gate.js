@@ -68,6 +68,8 @@
     if (document.readyState === 'loading') await new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true }));
     // Pages using teacher-global-bootstrap.js load Firebase themselves a moment later;
     // wait for that instead of loading a second copy at the same time.
+    // The Teacher Tools gate loads Firebase itself; wait for it so a second copy is not loaded over the first.
+    if (window.__b3TeacherGateReady) { try { await window.__b3TeacherGateReady; } catch (e) { /* fall through to the checks below */ } }
     const loaded = () => !!(window.firebase && window.firebase.initializeApp && window.firebase.auth && window.firebase.database);
     if (document.querySelector('script[src*="teacher-global-bootstrap.js"]')) {
       for (let i = 0; i < 50 && !(loaded() && window.B3_FIREBASE_CONFIG); i++) await new Promise(r => setTimeout(r, 100));
