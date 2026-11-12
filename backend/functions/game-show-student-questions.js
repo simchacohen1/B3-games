@@ -45,7 +45,7 @@ exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://sim
     const identity=await admin.auth().verifyIdToken(token,true),sid=String(identity.b3StudentId||''),classId=String(identity.b3ClassId||''),name=String(identity.b3StudentName||'').replace(/[.#$\[\]]/g,'_').slice(0,80);
     if(identity.b3StudentRole!=='student'||!sid||!classId||!name)return res.status(403).json({error:'Student sign-in required.'});
     const rtdb=admin.database(),base=`b3Games/workspaces/b3-2026/classes/${classId}`,cls=await rtdb.ref(base).get(),membership=await rtdb.ref(`${base}/members/${sid}`).get();
-    if(!cls.exists()||cls.child('active').val()!==true||!membership.exists()||membership.child('active').val()!==true||cls.child('toolGrants/game-show').val()!==true)return res.status(403).json({error:'Active Game Show class membership required.'});
+    if(!isActiveStudentAccess(identity,cls,membership))return res.status(403).json({error:'Active Game Show class membership required.'});
     if(req.body?.action!=='buzz')return res.status(400).json({error:'Unknown Game Show action.'});
     const game=rtdb.ref(`questionSets/classes/${classId}/live`),now=Date.now();let accepted=false;
     const result=await game.transaction(current=>{
