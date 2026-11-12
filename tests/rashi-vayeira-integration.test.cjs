@@ -30,7 +30,7 @@ test('server recognizes the 36 Rashis and all legacy reading IDs, rejects arbitr
 test('legacy words still sanitise; Vayeira text is never truncated to twelve words',()=>{
   assert.deepEqual(core.readingWords('alef',['אָב','בֵּן']),['אָב','בֵּן']);
   const longest=catalog.passages.reduce((a,b)=>a.text.length>b.text.length?a:b);
-  assert.ok(longest.text.length>180);
+  assert.ok(longest.text.trim().split(/\s+/).length>12,'longest Rashi passage must exceed the legacy 12-word limit');
   assert.equal(core.readingWords(longest.id,[])[0],longest.text);
 });
 test('each Vayeira reading maintains a distinct pending/approved/rejected attempt',()=>{
@@ -81,4 +81,26 @@ test('staging keeps the same canonical passages and explicitly rejects productio
   assert.match(staging,/rashiCore\.readingWords\(sectionId,req\.query\.words\)/);
   const client=read('rashi-letters/recordings.js');
   assert.match(client,/if\(STAGING\(\)\)throw new Error\('Recording rewards are disabled on staging\.'\)/);
+});
+
+
+test('all 36 Vayeira passages have readable whole-word Hebrew and correct Rashi example 18:8',()=>{
+  const all=require('../rashi-letters/data/vayeira-rashi.json').passages;
+  assert.equal(all.length,36);
+  assert.equal(new Set(all.map(p=>p.id)).size,36);
+  assert.deepEqual(all,require('../backend/functions/vayeira-rashi.json').passages);
+  assert.deepEqual(all,require('../backend/functions-staging/vayeira-rashi.json').passages);
+  for(const p of all){
+    const t=p.text;
+    assert.equal(t,t.trim(),p.id+' must be trimmed');
+    assert.ok(!/[ \t]{2,}/.test(t),p.id+' repeated spaces');
+    assert.ok(!/(?:^|[\\s.,:;!?])[\u0591-\u05bd\u05bf-\u05c7]/u.test(t),p.id+' standalone niqqud');
+    assert.ok(!/\b(?:g)\b/i.test(t),p.id+' stray extracted letter');
+    assert.ok(/[:]/.test(t),p.id+' dibbur hamaschil separator');
+    assert.ok(t.length>20,p.id+' suspiciously truncated Rashi');
+  }
+  const passage=all.find(p=>p.id==='vayeira-18-8');
+  assert.equal(passage.text,'וַיֹּאכֵלוּ: נִרְאוּ כְּמוֹ שֶׁאָכְלוּ, מִכָּאן שֶׁלֹּא יְשַׁנֶּה אָדָם מִן הַמִּנְהָג.');
+  assert.ok(all.find(p=>p.id==='vayeira-22-14').text.endsWith("לְעַמּוֹ'."));
+  assert.ok(all.find(p=>p.id==='vayeira-19-24').text.includes('"וַה\'"'));
 });
