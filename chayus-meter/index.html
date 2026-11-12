@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chayus Meter — Student Preview</title>
+<style>
+:root{--ink:#15315b;--sub:#516686;--blue:#315efb;--sea:#00aa91;--gold:#ffcc53;--bg:#eaf4fc;--line:#d6e3f1}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 12%,#d8fae9 0,transparent 36%),linear-gradient(160deg,#eaf4ff,#f9fbff);font-family:system-ui,Arial,sans-serif;color:var(--ink);min-height:100vh}
+.wrap{max-width:860px;padding:25px 16px 45px;margin:auto}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+mark{font-weight:900;color:#7a4d00;background:#ffecb9;border-radius:99px;padding:7px 12px;font-size:.86rem}h1{font-size:clamp(2.3rem,8vw,3.8rem);margin:20px 0 2px;line-height:1.06}h2{margin:0 0 12px}.sub{color:var(--sub);font-size:1.04rem;line-height:1.55}
+.panel{background:#fff;border:1px solid var(--line);box-shadow:0 18px 55px #123d6f17;border-radius:28px;padding:clamp(18px,5vw,36px);margin-top:22px}
+.meter-area{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}
+.circle{position:relative;width:min(100%,240px);aspect-ratio:1;border-radius:50%;margin:auto;background:conic-gradient(var(--sea) var(--fill,0%),#e8f0fb 0);display:grid;place-items:center;transition:background .15s}
+.circle::before{content:"";position:absolute;inset:15px;border-radius:50%;background:#fff}
+.circle-inner{position:relative;z-index:1;text-align:center;font-size:2.6rem;font-weight:900}.circle-inner small{display:block;font-size:.87rem;color:var(--sub);font-weight:700}
+.feedback{font-size:clamp(1.28rem,3vw,1.8rem);font-weight:900;line-height:1.35;min-height:100px}.status{color:var(--sub);font-weight:700;margin:12px 0}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}button{border:0;border-radius:14px;padding:13px 22px;font-size:1rem;font-weight:850;cursor:pointer;background:#eaf0ff;color:var(--ink)}
+button.primary{background:var(--blue);color:#fff}button.danger{background:#fff0ee;color:#952c23}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible{outline:3px solid #eeac17;outline-offset:3px}
+.note{border-left:4px solid var(--gold);padding:10px 16px;background:#fff9e9;border-radius:0 12px 12px 0;color:#544322;line-height:1.45}
+.stats{display:flex;gap:14px;flex-wrap:wrap}.stat{background:#eff7ff;border-radius:15px;padding:13px 16px;flex:1;min-width:140px}.stat strong{display:block;font-size:1.8rem}.muted{font-size:.91rem;color:var(--sub)}.hidden{display:none}
+@media(max-width:620px){.meter-area{grid-template-columns:1fr}.circle{width:195px}.feedback{text-align:center;min-height:0}}
+</style>
+<script src="core.js" defer></script>
+<script src="student.js" defer></script>
+</head>
+<body>
+<main class="wrap">
+  <div class="top"><strong>Fun Torah Tools · Davening</strong><mark>Preview only — not connected to teacher</mark></div>
+  <h1>✨ My Chayus Meter</h1>
+  <p class="sub">Daven with chayus! If you choose to turn on your microphone, this little meter can notice sound activity and give an encouraging message every few minutes.</p>
+  <div class="panel">
+    <div class="meter-area">
+      <div class="circle" id="circle" role="img" aria-label="Live microphone sound activity"><div class="circle-inner">🎵<small>Sound activity</small></div></div>
+      <div>
+        <div id="feedback" class="feedback" aria-live="polite">Ready when you are!</div>
+        <p class="status" id="status" role="status">Microphone is off.</p>
+        <p class="muted">The meter responds to sound, not to how well you say the words. You never need to shout.</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="start" class="primary">🎤 Turn on microphone</button>
+      <button id="pause" disabled>Pause microphone</button>
+      <button id="finish" class="danger" disabled>Finish davening</button>
+    </div>
+    <p class="muted" id="permissionNote">Your browser will ask your permission. Microphone sound is analyzed only on this device. No audio or transcripts are recorded, uploaded, or saved.</p>
+  </div>
+  <div class="panel hidden" id="summary">
+    <h2>🌟 Your session summary</h2>
+    <div class="stats">
+      <div class="stat"><strong id="measured">0</strong>minutes measured</div>
+      <div class="stat"><strong id="activity">—</strong>sound activity</div>
+      <div class="stat"><strong id="messages">0</strong>encouraging messages</div>
+    </div>
+    <p class="note">This is a development preview. Your summary has <strong>not</strong> been sent to your teacher. Only a teacher can decide points. Background sounds, music, and microphone differences can affect these measurements.</p>
+  </div>
+  <p class="note" style="margin-top:20px"><strong>Important:</strong> This standalone preview is not the full class feature yet. Students should not use these measurements for official grades or rewards. The future teacher report will use verified, class-scoped sessions.</p>
+</main>
+</body>
+</html>
