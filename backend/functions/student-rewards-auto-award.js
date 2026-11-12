@@ -1555,7 +1555,7 @@ exports.studentRewardsAutoAward = onRequest(
           const request=await rashiAuthorizeRequest(teacher,body.requestId);
           const isPassage=!!rashiCore.sectionText(request.sectionId);
           const grade=Number(body.grade),feedback=String(body.feedback||'').trim();
-          if(isPassage&&action==="rashi-approve"&&(!Number.isInteger(grade)||grade<0||grade>100||body.grade==null))
+          if(isPassage&&action==="rashi-approve"&&(!Number.isInteger(grade)||grade<0||grade>100||body.grade==null||String(body.grade).trim()===''))
             return res.status(400).json({error:'Choose a reading grade from 0 to 100.'});
           if(feedback.length>500)return res.status(400).json({error:'Feedback must be 500 characters or shorter.'});
           const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
