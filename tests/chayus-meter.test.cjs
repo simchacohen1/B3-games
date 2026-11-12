@@ -104,3 +104,26 @@ test('overlong or bad reports are bounded by a maximum of two hours', () => {
   assert.equal(row.measuredMinutes, 120);
   assert.equal(row.soundActivityPercent, 100);
 });
+
+test('consistency counts activity across measured intervals, excluding paused time', () => {
+  const m = createMeter({ calibrationMs: 0 });
+  m.start(0);
+  for (let at = 500; at <= 150000; at += 500) m.sample(0.2, at);
+  m.pause();
+  m.start(200000);
+  for (let at = 200500; at <= 350000; at += 500) m.sample(0, at);
+  const data = m.finish();
+  assert.equal(data.feedbackCount, 2);
+  assert.equal(data.activeIntervals, 1);
+  assert.equal(data.soundActivityPercent, 50);
+});
+
+test('server allowlists bounded aggregate metrics only', () => {
+  const { validateMetrics } = require('../backend/functions/chayus-report-core.cjs');
+  const metrics = { measuredSeconds: 300, activeSeconds: 150, calibrationSeconds: 3,
+    feedbackCount: 2, activeIntervals: 1 };
+  assert.deepEqual(validateMetrics({ ...metrics, studentId: 'spoof', audio: [0.2] }, 303), metrics);
+  assert.throws(() => validateMetrics(metrics, 200), /Invalid/);
+  assert.throws(() => validateMetrics({ ...metrics, activeIntervals: 3 }, 303), /Invalid/);
+  assert.throws(() => validateMetrics({ ...metrics, activeSeconds: 301 }, 303), /Invalid/);
+});
