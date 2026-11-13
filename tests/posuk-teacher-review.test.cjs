@@ -131,6 +131,96 @@ test('a grade is saved once; bonus only with gold; teacher must have the student
   assert.equal(s.balance(), 5);
 });
 
+test('word marks: saved with the grade as [{i, word, mark}]; nothing tapped = none (Issue #749)', async () => {
+  const s = setup({ balance: 0 });
+  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1', hebrewText: '  וַיֹּאמֶר  לָהֶם יַעֲקֹב אַחַי ' });
+  const bad = m => s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true, wordMarks: m });
+  await assert.rejects(bad({ 4: 'incorrect' }), /does not match the posuk/);
+  await assert.rejects(bad({ 0: 'made-up' }), /Unknown word mark/);
+  await assert.rejects(bad({ '-1': 'incorrect' }), /does not match the posuk/);
+  await assert.rejects(bad(['incorrect']), /not valid/);
+  assert.equal(s.db.root.posukPractice.submissions[SID].a1.status, 'pending');
+  const g = await s.review.grade({ teacherEmail: 't@x', scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true, mistakes: 2,
+    wordMarks: { 3: 'skipped', 1: 'readOkTransWrong' } });
+  assert.equal(g.points, 8);
+  assert.deepEqual(s.db.root.posukPractice.submissions[SID].a1.wordMarks,
+    [{ i: 1, word: 'לָהֶם', mark: 'readOkTransWrong' }, { i: 3, word: 'אַחַי', mark: 'skipped' }]);
+
+  const none = setup({ balance: 0 });
+  await none.review.submit({ studentId: SID, selectionKey: none.key, attemptId: 'a1', hebrewText: 'וַיֹּאמֶר לָהֶם' });
+  const all = await none.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true, mistakes: 0, wordMarks: {} });
+  assert.equal(all.points, 10);
+  assert.equal(none.db.root.posukPractice.submissions[SID].a1.status, 'gold');
+  assert.equal(none.db.root.posukPractice.submissions[SID].a1.wordMarks ?? null, null);
+});
+
+test('word marks: the page and the server agree on the mark ids, staging copy included', () => {
+  const page = require('../record_pesukim/word-marks.js');
+  assert.deepEqual(page.MARKS.map(m => m.id), [...core.WORD_MARKS]);
+  assert.equal(page.MARKS[0].id, 'incorrect');
+  assert.equal(new Set(page.MARKS.map(m => m.color)).size, page.MARKS.length);
+  assert.deepEqual(page.splitWords('  א  ב\tג '), ['א', 'ב', 'ג']);
+  assert.equal(fs.readFileSync('backend/functions-staging/posuk-review-core.cjs', 'utf8'), fs.readFileSync('backend/functions/posuk-review-core.cjs', 'utf8'));
+  for(const f of ['backend/functions/student-rewards-auto-award.js', 'backend/functions-staging/student-rewards-auto-award.js'])
+    assert.match(fs.readFileSync(f, 'utf8'), /wordMarks:body\.wordMarks/);
+  const teacher = fs.readFileSync('record_pesukim/teacher.html', 'utf8');
+  assert.match(teacher, /word-marks\.js/);
+  assert.match(teacher, /wordMarks: marks/);
+  assert.match(teacher, /let choice = 'gold'/);
+});
+
+test('word marks: tapping a word means read wrong, tapping its T means translation wrong', () => {
+  const page = require('../record_pesukim/word-marks.js');
+  assert.equal(page.markFor(false, false), '');
+  assert.equal(page.markFor(true, false), 'readWrongTransOk');
+  assert.equal(page.markFor(false, true), 'readOkTransWrong');
+  assert.equal(page.markFor(true, true), 'bothWrong');
+  // Every mark the page can produce is one the server accepts, and it round-trips.
+  for(const [read, trans] of [[true, false], [false, true], [true, true]]){
+    const id = page.markFor(read, trans);
+    assert.ok(core.WORD_MARKS.includes(id));
+    assert.deepEqual(page.flags(id), { read, trans });
+  }
+  assert.deepEqual(page.flags(''), { read: false, trans: false });
+  const teacher = fs.readFileSync('record_pesukim/teacher.html', 'utf8');
+  assert.match(teacher, /class="grade-word" data-word=/);
+  assert.match(teacher, /class="grade-t" data-trans=/);
+  assert.ok(teacher.includes('PosukWordMarks.markFor(readWrong.has(n), transWrong.has(n))'));
+  // The marking-mode dropdown is gone.
+  assert.doesNotMatch(teacher, /data-field="mode"|Marking mode|legendHtml/);
+});
+
+test('word marks: the student sees the whole posuk in order with the marked words flagged', () => {
+  const page = require('../record_pesukim/word-marks.js');
+  const hebrew = 'וַיֹּאמֶר לָהֶם יַעֲקֹב אַחַי מֵאַיִן אַתֶּם';
+  const words = page.splitWords(hebrew);
+  const marks = core.cleanWordMarks({ 1: 'readWrongTransOk', 3: 'readOkTransWrong', 4: 'bothWrong' }, hebrew);
+  const html = page.feedbackHtml(hebrew, marks);
+  // Right to left, every word present once, in posuk order, nikud untouched.
+  assert.match(html, /class="wm-fb-posuk" dir="rtl" lang="he"/);
+  let at = -1;
+  for(const w of words){ const next = html.indexOf('>' + w, at + 1); assert.ok(next > at, w + ' is in order'); at = next; }
+  assert.equal((html.match(/class="wm-fb-word/g) || []).length, words.length);
+  // Reading and translation are told apart; a word can have both.
+  assert.match(html, new RegExp('wm-fb-read"[^>]*>' + words[1]));
+  assert.match(html, new RegExp('wm-fb-trans"[^>]*>' + words[3]));
+  assert.match(html, new RegExp('wm-fb-both"[^>]*>' + words[4]));
+  assert.match(html, /2 words read wrong · 2 words translated wrong/);
+  assert.doesNotMatch(html, new RegExp('wm-fb-(read|trans|both)"[^>]*>' + words[0]));
+  // Nothing marked, or a grade saved before word marks existed: nothing extra shown.
+  assert.equal(page.feedbackHtml(hebrew, null), '');
+  assert.equal(page.feedbackHtml(hebrew, undefined), '');
+  assert.equal(page.feedbackHtml(hebrew, []), '');
+  // Marks that do not line up with the saved Hebrew fall back to chips, never a wrong highlight.
+  const off = page.feedbackHtml('אחד שתים', [{ i: 5, word: 'שלש', mark: 'bothWrong' }]);
+  assert.match(off, /wm-chip/); assert.doesNotMatch(off, /wm-fb-posuk/);
+  // Text is escaped.
+  assert.doesNotMatch(page.feedbackHtml('<b>x</b> y', [{ i: 0, word: '<b>x</b>', mark: 'incorrect' }]), /<b>x/);
+  const student = fs.readFileSync('record_pesukim/student.html', 'utf8');
+  assert.match(student, /<script src="word-marks\.js\?v=/);
+  assert.match(student, /PosukWordMarks\.feedbackHtml\(x\.hebrewText, x\.wordMarks\)/);
+});
+
 test('rules: students and the browser can never write submissions or reviews', () => {
   for(const file of ['firebase-rules.json', 'firebase-rules.hardened.json', 'staging/database.rules.json']){
     const pp = JSON.parse(fs.readFileSync(file, 'utf8')).rules.posukPractice;

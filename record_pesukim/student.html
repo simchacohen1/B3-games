@@ -1249,6 +1249,19 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
   .combined-history h4{ margin:0 0 6px; font-size:.95rem; }
   .combined-history-row{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:8px 10px; border-radius:10px; background:#faf6ec; margin-bottom:6px; font-size:.86rem; }
   .combined-history-row audio{ height:32px; max-width:100%; }
+  /* Words the teacher marked on a graded recording (#749). */
+  .wm-fb{ flex:1 1 100%; background:#fff; border:1px solid #e6dcc4; border-radius:10px; padding:8px 10px; }
+  .wm-fb-title{ font-weight:700; font-size:.84rem; margin-bottom:4px; }
+  .wm-fb-posuk{ direction:rtl; text-align:right; font-family:'Frank Ruhl Libre','David',serif; font-size:clamp(1.5rem, 4.6vw, 2rem); line-height:1.5; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:flex-start; }
+  .wm-fb-word{ display:inline-flex; flex-direction:column; align-items:center; padding:0 6px; border:2px solid transparent; border-radius:8px; }
+  .wm-fb-tag{ font-family:system-ui,sans-serif; font-size:.62rem; font-weight:800; line-height:1.2; padding-bottom:3px; white-space:nowrap; }
+  .wm-fb-read{ background:#fde3e0; border-color:#c62828; color:#8f1d1d; }
+  .wm-fb-trans{ background:#dfeafc; border-color:#1557b0; color:#123f80; }
+  .wm-fb-both{ background:#f0dff7; border-color:#7b1fa2; color:#5a1578; }
+  .wm-fb-other{ background:#e3e6ea; border-color:#4a5560; color:#333c45; }
+  .wm-chips{ display:flex; flex-wrap:wrap; gap:6px; width:100%; }
+  .wm-chip{ display:inline-flex; align-items:baseline; gap:6px; border:1px solid; border-radius:999px; padding:1px 10px; font-size:.78rem; font-weight:700; }
+  .wm-chip-word{ font-family:'Frank Ruhl Libre','David',serif; font-size:1.15rem; }
   .bonus-notice{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:10px 0; padding:12px 14px; border-radius:14px; background:#fff7dc; border:2px solid var(--gold); font-weight:800; }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
@@ -1536,6 +1549,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
 <script src="../firebase-config.js?v=20261029-staging-config"></script>
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="word-marks.js?v=20261113-studentfb"></script>
 
 <script>
 /* =========================================================
@@ -6952,6 +6966,7 @@ async function loadCombinedState(keepMessage){
         '<strong>' + combinedEscape(combinedStatusLabel(x)) + '</strong>' +
         (x.teacherNote && x.status !== 'pending' ? '<span>💬 ' + combinedEscape(x.teacherNote) + '</span>' : '') +
         '<button class="btn small" type="button" data-listen="1">▶️ Listen</button>' +
+        (x.status !== 'pending' && window.PosukWordMarks ? PosukWordMarks.feedbackHtml(x.hebrewText, x.wordMarks) : '') +
       '</div>').join('');
     hist.querySelectorAll('[data-listen]').forEach(b => b.onclick = async () => {
       const row = b.closest('.combined-history-row');

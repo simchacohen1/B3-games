@@ -21,6 +21,10 @@ const MAX_RANGE = 40;
 const MAX_MISTAKES = 100;
 const MAX_BONUS = 100000;
 const SOURCES = Object.freeze({ submit: 'posuk-submit', gold: 'posuk-gold' });
+// Per-word marks the teacher taps on the posuk (Issue #749). A word with no
+// mark is correct. Must match record_pesukim/word-marks.js.
+const WORD_MARKS = Object.freeze(['incorrect', 'readOkTransWrong', 'readWrongTransOk', 'bothWrong', 'skipped', 'review']);
+const MAX_WORD_MARKS = 400;
 
 const validKey = v => typeof v === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(v);
 const validSelectionKey = v => typeof v === 'string' && /^[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*_\d{1,3}_\d{1,3}(?:-\d{1,3})?$/.test(v) && v.length <= 120;
@@ -48,6 +52,28 @@ function pointsForGrade({ gold, mistakes, bonus }){
 function intInRange(v, min, max){
   const n = Number(v);
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}
+
+const splitWords = text => String(text || '').trim().split(/\s+/).filter(Boolean);
+
+// Checks the teacher's { wordIndex: markId } against the Hebrew text saved
+// with the submission and returns [{ i, word, mark }] in posuk order, or
+// null when nothing is marked. The word itself is copied in so the student
+// page and reports never have to re-split the text.
+function cleanWordMarks(raw, hebrewText){
+  if(raw === undefined || raw === null) return null;
+  if(typeof raw !== 'object' || Array.isArray(raw)) fail('Word marks are not valid.');
+  const entries = Object.entries(raw);
+  if(entries.length > MAX_WORD_MARKS) fail('Too many word marks.');
+  const words = splitWords(hebrewText);
+  const out = [];
+  for(const [k, mark] of entries){
+    if(!/^\d{1,4}$/.test(k) || Number(k) >= words.length) fail('A word mark does not match the posuk.');
+    if(!WORD_MARKS.includes(mark)) fail('Unknown word mark.');
+    out.push({ i: Number(k), word: words[Number(k)].slice(0, 80), mark });
+  }
+  out.sort((a, b) => a.i - b.i);
+  return out.length ? out : null;
 }
 
 // Is this posuk blocked from a new submission right now?
@@ -147,7 +173,7 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     return { ok: true, submission: { ...submission, submitCharged: !!charge.ok }, pointsCharged: charge.ok ? SUBMIT_COST : 0, balanceAfter: charge.balanceAfter ?? null };
   }
 
-  async function grade({ teacherEmail, scope, studentId, submissionId, gold, mistakes, bonus, note }){
+  async function grade({ teacherEmail, scope, studentId, submissionId, gold, mistakes, bonus, note, wordMarks }){
     if(!validKey(studentId) || !validKey(submissionId)) fail('Missing submission.');
     if(scope && !scope.students?.[studentId]) fail('This student does not belong to your selected class.', 403);
     const isGold = gold === true;
@@ -163,11 +189,13 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     if(!before) fail('Submission not found.', 404);
     if(scope && scope.selected && before.classId && !(scope.students[studentId].classIds || [scope.students[studentId].classId]).includes(before.classId))
       fail('This submission belongs to another class.', 403);
+    const marks = cleanWordMarks(wordMarks, before.hebrewText);
 
     const result = {
       status: isGold ? 'gold' : 'retry', mistakes: m, bonus: b, pointsAwarded: points,
       gradedAt: t, gradedBy: String(teacherEmail || '').slice(0, 200), lockedUntil: isGold ? t + LOCK_MS : null,
-      teacherNote: String(note || '').slice(0, 500) || null
+      teacherNote: String(note || '').slice(0, 500) || null,
+      wordMarks: marks
     };
     const tx = await ref.transaction(cur => {
       if(cur === null) return null;
@@ -211,5 +239,5 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
   return { submit, grade, postPoints };
 }
 
-module.exports = { createPosukReview, posukKeysForSelection, pointsForGrade, blockedReason, validSelectionKey,
+module.exports = { createPosukReview, posukKeysForSelection, pointsForGrade, blockedReason, validSelectionKey, cleanWordMarks, WORD_MARKS,
   SUBMIT_COST, GOLD_POINTS, LOCK_MS, SOURCES };
