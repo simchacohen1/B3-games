@@ -131,7 +131,7 @@
   }
   function endpoint() {
     const project = window.B3_FIREBASE_CONFIG?.projectId;
-    if (!['b3-games', 'fun-torah-tools-staging'].includes(project)
+    if (!/^(?:b3-games|fun-torah-tools-staging)$/.test(project || '')
       || (location.hostname.includes('staging') && project !== 'fun-torah-tools-staging')) {
       throw new Error('The Chayus session service is unavailable.');
     }

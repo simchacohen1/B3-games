@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const { authorize } = require('./davening-session-auth.cjs');
 const { act } = require('./davening-session-service.cjs');
 const { rewardsTeacher } = require('./rewards-teacher-core.cjs');
+const deployment = require('./davening-deployment.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -13,8 +14,7 @@ const catalog = Array.from({ length: 26 }, (_, index) => `part-${index + 1}`);
 
 exports.daveningChazzan = onRequest({
   region: 'us-central1',
-  cors: ['https://funtorahtools.com', 'https://www.funtorahtools.com',
-    'https://simchacohen1.github.io', 'https://fun-torah-tools-staging.web.app'],
+  cors: [...deployment.cors],
   maxInstances: 10
 }, async (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -34,7 +34,7 @@ exports.daveningChazzan = onRequest({
   try {
     const db = admin.database();
     const get = async path => (await db.ref(path).get()).val();
-    const actor = await authorize(get, identity, body.classId);
+    const actor = await authorize(get, identity, body.classId, deployment);
     const getRoster = async classId => {
       if (actor.role !== 'teacher' || classId !== actor.classId) {
         throw Object.assign(new Error('Teacher access to this class is required.'), { status: 403 });
@@ -58,7 +58,7 @@ exports.daveningChazzan = onRequest({
     };
     const awardPoint = ({ classId, studentId, assignmentKey }) => rewardsTeacher(rewardStore, identity, {
       action: 'awardDaveningPart', classId: `b3_${classId}`, studentId, assignmentKey
-    }, Date.now(), { verifiedDaveningPart: true });
+    }, Date.now(), { verifiedDaveningPart: true, stagingPasswordTeacher: deployment.stagingPasswordTeachers === true });
     return res.json({ session: await act({ db, actor, catalog, body, getRoster, awardPoint }) });
   } catch (error) {
     if (!error.status) console.error('Davening session request failed', error);

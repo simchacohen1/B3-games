@@ -4,13 +4,13 @@ const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const { authorize } = require('./davening-session-auth.cjs');
 const { act } = require('./chayus-session-service.cjs');
+const deployment = require('./davening-deployment.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
 exports.daveningChayus = onRequest({
   region: 'us-central1',
-  cors: ['https://funtorahtools.com', 'https://www.funtorahtools.com',
-    'https://simchacohen1.github.io', 'https://fun-torah-tools-staging.web.app'],
+  cors: [...deployment.cors],
   maxInstances: 10
 }, async (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -24,7 +24,7 @@ exports.daveningChayus = onRequest({
     const identity = await admin.auth().verifyIdToken(token, true);
     const db = admin.database();
     const get = async path => (await db.ref(path).get()).val();
-    const actor = await authorize(get, identity, req.body?.classId);
+    const actor = await authorize(get, identity, req.body?.classId, deployment);
     const getRoster = async classId => {
       if (actor.role !== 'teacher' || classId !== actor.classId) {
         throw Object.assign(new Error('Teacher access to this class is required.'), { status: 403 });

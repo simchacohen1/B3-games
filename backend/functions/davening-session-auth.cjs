@@ -1,13 +1,18 @@
 'use strict';
 
 const { validKey, readClassForStudent } = require('./student-practice-auth.cjs');
+const defaultDeployment = require('./davening-deployment.cjs');
 
 function deny() {
   throw Object.assign(new Error('Active Davening class access is required.'), { status: 403 });
 }
 
-async function authorize(get, identity, classId) {
-  if (!['et', 'wt'].includes(classId) || !validKey(identity?.uid)) deny();
+// `page` is the Davening page asking ('et' or 'wt'). The deployment settings
+// name the one class record that page may use; nothing else is reachable.
+async function authorize(get, identity, page, deployment = defaultDeployment) {
+  const classId = typeof page === 'string' && Object.hasOwn(deployment.classMap, page)
+    ? deployment.classMap[page] : null;
+  if (!validKey(classId) || !validKey(identity?.uid)) deny();
   const workspace = 'b3Games/workspaces/b3-2026';
   if (identity.b3StudentRole === 'student') {
     const studentId = identity.b3StudentId;
@@ -28,7 +33,11 @@ async function authorize(get, identity, classId) {
     return { role: 'student', classId, studentId, name: String(profile.name || member.name || 'Student').slice(0, 100) };
   }
 
-  if (identity.email_verified !== true || identity.firebase?.sign_in_provider !== 'google.com') deny();
+  const provider = identity.firebase?.sign_in_provider;
+  // Fictional staging teachers sign in with a password; only the staging build allows them.
+  const stagingTeacher = deployment.stagingPasswordTeachers === true
+    && identity.b3StagingAccount === true && provider === 'password';
+  if (identity.email_verified !== true || (provider !== 'google.com' && !stagingTeacher)) deny();
   const [cls, admin, teacher] = await Promise.all([
     get(`${workspace}/classes/${classId}`),
     get(`b3Games/admins/${identity.uid}`),

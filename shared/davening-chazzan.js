@@ -18,11 +18,14 @@
   panel.append(style, heading, status, controls);
   document.querySelector('main').before(panel);
   let session, token, busy = false, applying = false, roster = [], rosterLoading = false, rosterLoaded = false;
+  // A teacher playback change made while another request is in flight is sent
+  // right after it, so the class never stays on a stale play/pause/speed.
+  let playbackQueued = false;
   const pending = new Map();
 
   async function request(action, fields = {}, { renderResponse = true } = {}) {
     const project = window.B3_FIREBASE_CONFIG?.projectId;
-    if (!['b3-games', 'fun-torah-tools-staging'].includes(project)
+    if (!/^(?:b3-games|fun-torah-tools-staging)$/.test(project || '')
       || (location.hostname.includes('staging') && project !== 'fun-torah-tools-staging')) {
       throw new Error('Davening Firebase configuration is unavailable.');
     }
@@ -57,6 +60,7 @@
         status.textContent = error.message;
       } finally {
         busy = false;
+        if (playbackQueued) sendPlayback();
       }
     };
     controls.append(element);
@@ -183,7 +187,7 @@
     applying = true;
     const track = Number(playback.part.split('-')[1]) - 1;
     if (student && track !== index) load(track, false);
-    if (audio.playbackRate !== playback.speed) {
+    if (audio.playbackRate !== playback.speed && !(teacher && playbackQueued)) {
       speed.value = String(playback.speed);
       audio.playbackRate = playback.speed;
     }
@@ -204,21 +208,29 @@
     if (student && session?.playback?.playing) audio.play().catch(() => {});
   });
   for (const event of ['play', 'pause', 'seeked', 'ratechange', 'loadedmetadata', 'ended']) {
-    audio.addEventListener(event, async () => {
-      if (student || applying || busy || session?.phase !== 'active') return;
+    audio.addEventListener(event, () => {
+      if (!teacher || applying || session?.phase !== 'active') return;
       if (event === 'ratechange' && audio.playbackRate === session.playback?.speed) return;
-      busy = true;
-      try {
-        await request('playback', {
-          partId: `part-${index + 1}`, position: audio.currentTime || 0,
-          speed: audio.playbackRate, playing: !audio.paused && !audio.ended
-        });
-      } catch (error) {
-        status.textContent = error.message;
-      } finally {
-        busy = false;
-      }
+      sendPlayback();
     });
+  }
+
+  async function sendPlayback() {
+    if (!teacher || session?.phase !== 'active') { playbackQueued = false; return; }
+    if (busy) { playbackQueued = true; return; }
+    busy = true;
+    playbackQueued = false;
+    try {
+      await request('playback', {
+        partId: `part-${index + 1}`, position: audio.currentTime || 0,
+        speed: audio.playbackRate, playing: !audio.paused && !audio.ended
+      });
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      busy = false;
+      if (playbackQueued) sendPlayback();
+    }
   }
 
   async function refresh() {
@@ -226,7 +238,7 @@
     busy = true;
     try { await request('read'); }
     catch (error) { status.textContent = error.message; }
-    finally { busy = false; }
+    finally { busy = false; if (playbackQueued) sendPlayback(); }
   }
 
   try {
@@ -242,7 +254,6 @@
       const claims = (await user.getIdTokenResult(true)).claims || {};
       student = claims.b3StudentRole === 'student';
       teacher = !student;
-      studentId = student ? claims.b3StudentId : null;
       if (student) {
         document.body.classList.add('davening-student-mode');
         document.querySelectorAll('.controls,.secondary,.list,.header-actions,.kbd').forEach(node => { node.hidden = true; });

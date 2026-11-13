@@ -16,8 +16,10 @@ const initials=n=>String(n||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2)
 const categoryKey=n=>String(n||'category').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'category';
 const pick=(obj,ids)=>Object.fromEntries(ids.filter(id=>obj&&obj[id]!==undefined).map(id=>[id,obj[id]]));
 
-async function teacherAccess(store,identity){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+async function teacherAccess(store,identity,context={}){
+ // Fictional staging teachers sign in with a password; only the staging-only Davening build sets this flag.
+ const stagingTeacher=context.stagingPasswordTeacher===true&&identity?.b3StagingAccount===true&&identity.firebase?.sign_in_provider==='password';
+ if(!identity?.uid||identity.email_verified!==true||(identity.firebase?.sign_in_provider!=='google.com'&&!stagingTeacher))fail(403,'Verified Google teacher sign-in required.');
  const email=String(identity.email||'').toLowerCase();
  const admin=await store.get('b3Games/admins/'+identity.uid);
  const owner=email===ADMIN_EMAIL||Boolean(admin&&admin.active!==false);
@@ -220,7 +222,7 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
 
 async function rewardsTeacher(store,identity,body,nowMs=Date.now(),context={}){
  const now=new Date(nowMs).toISOString();
- const access=await teacherAccess(store,identity);
+ const access=await teacherAccess(store,identity,context);
  const scope=await scopeFor(store,access);
  const action=String(body?.action||''),email=access.email;
  if(action==='load')return {ok:true,root:await loadRoot(store,scope)};

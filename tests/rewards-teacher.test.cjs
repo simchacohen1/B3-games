@@ -51,6 +51,12 @@ test('a verified Chazzan assignment awards exactly one point with a stable trans
  assert.equal(d.tree.studentRewards.students['b3_'+require('node:crypto').createHash('sha256').update('moshe').digest('hex').slice(0,28)].rewardBalance,1);
  assert.equal(Object.values(d.tree.studentRewards.pointAdjustments).filter(x=>x.source==='davening').length,1);
  await assert.rejects(rewardsTeacher(d,OTHER,award,Date.now(),{verifiedDaveningPart:true}),{code:403});
+ // A password sign-in is refused unless the staging-only build both sets its flag and the account carries the staging marker.
+ const PW={...T,firebase:{sign_in_provider:'password'}};
+ await assert.rejects(rewardsTeacher(d,PW,award,Date.now(),{verifiedDaveningPart:true}),{code:403});
+ await assert.rejects(rewardsTeacher(d,{...PW,b3StagingAccount:true},award,Date.now(),{verifiedDaveningPart:true}),{code:403});
+ await assert.rejects(rewardsTeacher(d,PW,award,Date.now(),{verifiedDaveningPart:true,stagingPasswordTeacher:true}),{code:403});
+ assert.equal((await rewardsTeacher(d,{...PW,b3StagingAccount:true},award,Date.now(),{verifiedDaveningPart:true,stagingPasswordTeacher:true})).duplicate,true);
 });
 test('a teacher approves activity points only for their own students, once',async()=>{const d=seed();const {root}=await call(d,T,{action:'load'});
  const moshe=Object.values(root.students).find(s=>s.b3StudentId==='moshe').id;d.tree.studentRewards.pointRequests.r1.rewardStudentId=moshe;
