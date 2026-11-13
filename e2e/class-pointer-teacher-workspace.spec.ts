@@ -215,11 +215,27 @@ async function pasteWords(page: Page, text: string) {
   await page.getByRole('button', { name: '📋 Paste', exact: true }).click();
 }
 // The teacher's own controls on this page: the "Shapes ▾" menu in the tool bar above the lesson.
+// Works with the Shapes menu on the teacher tool bar, and with the single drawing toolbar (#821) once that is merged.
+const NEW_TOOLBAR_SHAPE: Record<string, string> = { line: 'Line', 'pen-arrow': 'Arrow', rectangle: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle' };
 async function choosePenShape(page: Page, label: string, tool: string) {
-  await page.locator('#teacherDock').getByRole('button', { name: 'Shapes ▾' }).click();
-  await page.locator('#tbPenShapes').getByRole('button', { name: label, exact: true }).click();
-  await expect(page.locator('#tbPenShapes')).toBeHidden();
+  const menu = page.locator('#teacherDock').getByRole('button', { name: 'Shapes ▾' });
+  if (await menu.count()) {
+    await menu.click();
+    await page.locator('#tbPenShapes').getByRole('button', { name: label, exact: true }).click();
+    await expect(page.locator('#tbPenShapes')).toBeHidden();
+  } else if (tool === 'text') {
+    await page.locator('#fttAnnotate button[data-tool="text"]').click();
+  } else {
+    await page.locator('#fttAnnotate button[data-tool="shape"]').click();
+    await page.locator(`#fttAnnotate .fa-fly button[title="${NEW_TOOLBAR_SHAPE[tool]}"]`).click();
+  }
   await expect(page.locator('#teacherTool')).toHaveValue(tool);
+}
+// The lesson can move sideways a moment after a whiteboard opens (the drawing toolbar takes its place), so measure it once it is still.
+async function settledContentBox(page: Page) {
+  let last = '';
+  await expect.poll(async () => { const now = JSON.stringify(await page.locator('#pdfContent').boundingBox()), still = now === last; last = now; return still; }, { intervals: [250] }).toBe(true);
+  return (await page.locator('#pdfContent').boundingBox())!;
 }
 
 test('teacher pastes editable text onto the shared whiteboard and can edit it', async ({ browser }) => {
@@ -245,12 +261,12 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   const page = await context.newPage(); const errors = await openTeacher(page);
   await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
-  const content = (await page.locator('#pdfContent').boundingBox())!;
   // A newly opened whiteboard opens the drawing toolbar on the Pen by itself within half a second, and a shape
   // chosen before that is put back to Pen. Wait for the toolbar, as a teacher would see it, before choosing a shape.
   await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toBeVisible();
   await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Pen');
   await expect(page.locator('#teacherTool')).toHaveValue('pen');
+  const content = await settledContentBox(page);
   const shapes: Array<[string, string, string]> = [['line', 'line', '━ Straight line'], ['pen-arrow', 'g', '➜ Pen arrow'], ['rectangle', 'rect', '▭ Rectangle'], ['ellipse', 'ellipse', '◯ Circle / oval'], ['triangle', 'polygon', '△ Triangle']];
   for (let i = 0; i < shapes.length; i++) {
     const [name, tag, label] = shapes[i];
