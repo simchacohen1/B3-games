@@ -12,6 +12,12 @@
   const DEFAULT_FEEDBACK_MS = 150000;
   const DEFAULT_CALIBRATION_MS = 3000;
   const MAX_SAMPLE_GAP_MS = 600;
+  // The on-screen meter follows how steadily a voice is heard over roughly the
+  // last quarter minute. It is fed a yes/no "voice heard" signal, never volume.
+  const STEADINESS_WINDOW_MS = 12000;
+  // Sustained very high input only triggers a "no need to be loud" reminder.
+  const LOUD_LEVEL = 0.35;
+  const LOUD_HINT_AFTER_MS = 2000;
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
   const round = (n, places = 1) => Number(n.toFixed(places));
 
@@ -40,6 +46,7 @@
     let finished = false;
     let lastTime = null;
     let noiseFloor = 0.012;
+    let calibrationFloor = Infinity;
     let calibrationElapsed = 0;
     let measuredMs = 0;
     let activeMs = 0;
@@ -52,6 +59,9 @@
     let pauseCount = 0;
     let pausedMs = 0;
     let pauseStartedAt = null;
+    let lastActive = false;
+    let steadiness = 0;
+    let loudMs = 0;
 
     function start(at) {
       if (finished) throw new Error('This session has ended. Create a new meter.');
@@ -69,6 +79,8 @@
         pauseStartedAt = Number.isFinite(at) ? at : null;
       }
       running = false;
+      lastActive = false;
+      loudMs = 0;
       lastTime = null; // Never count inactive or background-tab gaps.
     }
     function sample(rms, at) {
@@ -82,14 +94,25 @@
       // Early levels calibrate the ambient threshold; they do not count as speech.
       if (calibrationElapsed < calibrationMs) {
         calibrationElapsed += elapsed;
-        // Adapt conservatively: initial speaking must not drive threshold very high.
-        noiseFloor = Math.min(0.055, 0.9 * noiseFloor + 0.1 * level);
+        // Keep the quietest moment heard. A boy who is already davening when he
+        // turns the meter on must not teach it that his voice is room noise.
+        calibrationFloor = Math.min(calibrationFloor, level);
+        noiseFloor = clamp(calibrationFloor, 0.005, 0.055);
         return null;
       }
       // Count sound activity, never relative loudness. Shouting earns no bonus.
       const threshold = clamp(noiseFloor * 2.1 + 0.012, 0.028, 0.14);
       const isActive = level >= threshold;
-      if (!isActive) noiseFloor = clamp(0.985 * noiseFloor + 0.015 * level, 0.005, 0.06);
+      // Room noise estimate: drops quickly in the short gaps between words and
+      // rises only very slowly, so steady davening is not mistaken for noise
+      // while a constant hum (a fan, a heater) is gradually tuned out.
+      noiseFloor = clamp(level < noiseFloor
+        ? 0.7 * noiseFloor + 0.3 * level
+        : noiseFloor + (level - noiseFloor) * 0.0015, 0.005, 0.06);
+      // Display-only state. A quiet voice and a loud voice move it identically.
+      lastActive = isActive;
+      steadiness += ((isActive ? 1 : 0) - steadiness) * (1 - Math.exp(-elapsed / STEADINESS_WINDOW_MS));
+      loudMs = level >= LOUD_LEVEL ? Math.min(2 * LOUD_HINT_AFTER_MS, loudMs + elapsed) : Math.max(0, loudMs - elapsed / 2);
       measuredMs += elapsed;
       intervalMeasuredMs += elapsed;
       if (isActive) {
@@ -127,6 +150,16 @@
         hasMeasuredActivity: measuredMs > 0
       };
     }
+    // What the student's own screen may show right now. Nothing here is sent
+    // anywhere, and none of it depends on how loud the voice is.
+    function live() {
+      return {
+        calibrating: running && calibrationElapsed < calibrationMs,
+        voiceHeard: running && lastActive,
+        steadiness: round(clamp(steadiness, 0, 1), 3),
+        gentleVolumeHint: running && loudMs >= LOUD_HINT_AFTER_MS
+      };
+    }
     function restore(data) {
       if (running || finished || measuredMs || !data || typeof data !== 'object') return false;
       const safe = (key, max) => Number.isFinite(data[key]) ? clamp(data[key], 0, max) : 0;
@@ -142,10 +175,12 @@
     }
     function finish() {
       if (running) { running = false; lastTime = null; }
+      lastActive = false;
+      loudMs = 0;
       finished = true;
       return snapshot();
     }
-    return { start, pause, sample, snapshot, restore, finish };
+    return { start, pause, sample, snapshot, live, restore, finish };
   }
 
   /*
@@ -170,12 +205,6 @@
           ? clamp(data.calibrationSeconds, 0, 10) : 0)) / 60),
         observedIntervals: Number.isInteger(data?.feedbackCount) ? data.feedbackCount : 0,
         activeIntervals: Number.isInteger(data?.activeIntervals) ? data.activeIntervals : 0,
-        consistencyPercent: Number.isInteger(data?.feedbackCount) && data.feedbackCount > 0
-          ? Math.round(clamp(Number(data.activeIntervals) / data.feedbackCount, 0, 1) * 100) : null,
-        pauseCount: Number.isInteger(data?.pauseCount) ? data.pauseCount : 0,
-        pausedMinutes: Number.isFinite(data?.pausedSeconds) ? round(data.pausedSeconds / 60) : 0,
-        lastSavedAt: Number.isFinite(report?.lastSavedAt) ? report.lastSavedAt : null,
-        missingAtEnd: report?.missingAtEnd === true,
         consistencyPercent: Number.isInteger(data?.feedbackCount) && data.feedbackCount > 0
           ? Math.round(clamp(Number(data.activeIntervals) / data.feedbackCount, 0, 1) * 100) : null,
         pauseCount: Number.isInteger(data?.pauseCount) ? data.pauseCount : 0,

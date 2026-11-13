@@ -131,3 +131,59 @@ test('server allowlists bounded aggregate metrics only', () => {
   assert.throws(() => validateMetrics({ ...metrics, activeIntervals: 3 }, 303), /Invalid/);
   assert.throws(() => validateMetrics({ ...metrics, activeSeconds: 301 }, 303), /Invalid/);
 });
+
+test('the on-screen meter follows steadiness and is identical for quiet and loud voices', () => {
+  function run(level) {
+    const m = createMeter({ calibrationMs: 0 });
+    m.start(0);
+    const seen = [];
+    for (let t = 200; t <= 20000; t += 200) { m.sample(level, t); seen.push(m.live().steadiness); }
+    return { seen, live: m.live() };
+  }
+  const comfortable = run(0.08);
+  const shouting = run(0.9);
+  assert.deepEqual(comfortable.seen, shouting.seen);
+  assert.equal(comfortable.live.voiceHeard, true);
+  assert.ok(comfortable.live.steadiness > 0.75 && comfortable.live.steadiness <= 1);
+  // Loudness never appears in what the screen is given, only a gentle reminder flag.
+  assert.deepEqual(Object.keys(comfortable.live).sort(), ['calibrating', 'gentleVolumeHint', 'steadiness', 'voiceHeard']);
+  assert.equal(comfortable.live.gentleVolumeHint, false);
+  assert.equal(shouting.live.gentleVolumeHint, true);
+});
+
+test('the meter builds gradually, fades in silence, and rests while paused', () => {
+  const m = createMeter({ calibrationMs: 1000 });
+  m.start(0);
+  for (let t = 200; t <= 800; t += 200) m.sample(0.008, t);
+  assert.equal(m.live().calibrating, true);
+  m.sample(0.008, 1000);
+  m.sample(0.1, 1200);
+  assert.equal(m.live().calibrating, false);
+  const early = m.live().steadiness;
+  for (let t = 1400; t <= 13000; t += 200) m.sample(0.1, t);
+  const built = m.live().steadiness;
+  assert.ok(early < 0.05 && built > 0.6);
+  for (let t = 13200; t <= 25000; t += 200) m.sample(0, t);
+  assert.ok(m.live().steadiness < built / 2);
+  assert.equal(m.live().voiceHeard, false);
+  m.pause(25000);
+  assert.deepEqual({ ...m.live(), steadiness: 0 }, { calibrating: false, voiceHeard: false, steadiness: 0, gentleVolumeHint: false });
+});
+
+test('a boy already davening when he turns the meter on is still heard', () => {
+  const m = createMeter();
+  m.start(0);
+  // Speech-like input from the first moment: words at a comfortable level with short gaps.
+  for (let t = 200; t <= 63000; t += 200) m.sample((t / 200) % 5 === 0 ? 0.006 : 0.06, t);
+  const data = m.finish();
+  assert.equal(data.measuredSeconds, 60);
+  assert.ok(data.soundActivityPercent >= 75, `heard only ${data.soundActivityPercent}%`);
+});
+
+test('a constant hum is tuned out instead of counting as davening forever', () => {
+  const m = createMeter({ calibrationMs: 0 });
+  m.start(0);
+  for (let t = 200; t <= 300000; t += 200) m.sample(0.05, t);
+  assert.equal(m.live().voiceHeard, false);
+  assert.ok(m.finish().soundActivityPercent < 50);
+});
