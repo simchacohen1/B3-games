@@ -60,3 +60,102 @@ test('Shorashim legacy teacher reads follow the student profile class and active
   }
   assert.ok(shorashim.leaderboards.match.$pairCount.$studentId['.read']);
 });
+// Owner Admin, the owner's class pickers and teacher preview list whole collections.
+// A rule on one record does not allow listing its parent, so the owner needs these.
+test('owner and active admins can list the collections Owner Admin needs; nobody else can',()=>{
+  const OWNER_OR_ADMIN="auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)";
+  const ws=rules.b3Games.workspaces.$workspaceId;
+  assert.equal(rules.b3Games.students['.read'],OWNER_OR_ADMIN);
+  for(const list of ['classes','teachers','schools','students','contentGrants','meta','siteSettings'])assert.equal(ws[list]['.read'],OWNER_OR_ADMIN,list+' list');
+  for(const list of ['schools','students','contentGrants','meta','siteSettings'])assert.equal(ws[list]['.write'],OWNER_OR_ADMIN,list+' write');
+  // Listing must not open writes that were owner-only, or the whole workspace.
+  assert.equal(ws['.read'],undefined);assert.equal(ws['.write'],undefined);
+  assert.equal(ws.classes['.write'],undefined);assert.equal(ws.teachers['.write'],undefined);assert.equal(rules.b3Games.students['.write'],undefined);
+  assert.doesNotMatch(ws.teachers.$uid['.write'],/admins/,'only the owner writes teacher records');
+});
+test('a teacher can read one school record (name and Nigri flag) but cannot list or change schools',()=>{
+  const schools=rules.b3Games.workspaces.$workspaceId.schools;
+  assert.match(schools.$schoolId['.read'],/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true/);
+  assert.doesNotMatch(schools['.read'],/teachers\//);
+  assert.equal(schools.$schoolId['.write'],undefined);
+});
+test('staging rules are the hardened rules with only the owner email swapped',()=>{
+  const staging=fs.readFileSync('staging/database.rules.json','utf8').replaceAll('owner@funtorahtools-staging.test','simcha5770@gmail.com');
+  assert.deepEqual(JSON.parse(staging).rules,rules);
+});
+// The hardened file had fallen behind the live rules: strict rules added to
+// firebase-rules.json since October were never copied across.
+const liveRules=JSON.parse(fs.readFileSync('firebase-rules.json','utf8')).rules;
+function permissions(node,path='',out={}){
+  for(const [key,value] of Object.entries(node||{})){
+    if(key==='.read'||key==='.write')out[path+' '+key]=value;
+    else if(value&&typeof value==='object')permissions(value,path+'/'+key,out);
+  }
+  return out;
+}
+test('Weekly Quiz and Multiplayer: every strict live rule is also in the hardened file, unchanged',()=>{
+  for(const root of ['b3Quiz','multiplayerCenter']){
+    const live=permissions(liveRules[root]),hard=permissions(rules[root]);
+    for(const [path,expression] of Object.entries(live)){
+      assert.notEqual(expression,true,root+path+' is not public on live');
+      if(root==='multiplayerCenter')assert.equal(hard[path],expression,root+path);
+      else assert.ok(path in hard,root+path+' exists in the hardened file');
+    }
+  }
+  assert.deepEqual(rules.multiplayerCenter,liveRules.multiplayerCenter);
+  // The live-launch pointers a student's Weekly Quiz page listens to.
+  const settings=rules.b3Quiz.settings;
+  assert.match(settings.activeLaunchByClass.$targetClass['.read'],/auth\.token\.b3ClassId == \$targetClass/);
+  assert.match(settings.studentActiveLaunch.$studentId['.read'],/auth\.token\.b3StudentId == \$studentId/);
+  assert.match(settings.studentAssignments.$studentId['.read'],/auth\.token\.b3StudentId == \$studentId/);
+});
+test('a student can load and save only their own Halacha scrapbook and Gematria stars',()=>{
+  const student=rules.b3Games.students.$studentId;
+  assert.equal(student.halacha['.write'],'auth != null && auth.token.b3StudentId == $studentId');
+  assert.equal(student.halacha['.read'],student.profile['.read'],'same readers as the student profile');
+  assert.equal(student['.read'],undefined);assert.equal(student['.write'],undefined);
+  const own='auth != null && auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId';
+  const progress=rules.b3Games.workspaces.$workspaceId.classes.$classId.resources.gematria.progress;
+  assert.equal(progress.$studentId['.read'],own);assert.equal(progress.$studentId['.write'],own);
+  assert.equal(progress['.read'],undefined,'a student cannot list classmates');
+});
+test('the owner can list Posuk Practice work for the approval queue',()=>{
+  for(const list of ['attempts','submissions','reviews'])assert.doesNotMatch(rules.posukPractice[list]['.read'],/b3StudentId|teachers\//,list);
+});
+// Owner decision (2026-11-10): students may see classmates in their own class.
+// The older ET and WT classes share one gallery, tag game and Shorashim leaderboard, so they count as one group.
+test('classmates: a student reads the roster, live classmates, tag game and leaderboard of their own class only',()=>{
+  const cls=rules.b3Games.workspaces.$workspaceId.classes.$classId,gallery=cls.resources.gallery;
+  const same='auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId';
+  for(const expression of [cls.members['.read'],gallery.presence['.read'],gallery.settings['.read'],gallery.tag['.read'],gallery.tag['.write']])assert.equal(expression,same);
+  assert.match(gallery.presence.$presenceClass.$studentKey['.write'],/auth\.token\.b3StudentId == \$studentKey && auth\.token\.b3ClassId == \$classId/);
+  assert.equal(cls.members['.write'],undefined);assert.equal(gallery.settings['.write'],undefined);
+  const legacy=[rules.b3Games.classGalleryPresence['.read'],rules.b3Games.classGalleryTag.$mode['.read'],rules.posukPractice.shorashimLearning.leaderboards.match.$pairCount['.read']];
+  for(const expression of legacy){
+    assert.match(expression,/^auth != null && \(auth\.token\.b3ClassId == 'et' \|\| auth\.token\.b3ClassId == 'wt' \|\| /);
+    assert.doesNotMatch(expression,/b3StudentId != null|auth != null\)?$/);
+  }
+  const tagWrite=rules.b3Games.classGalleryTag.$mode['.write'];
+  assert.match(tagWrite,/\(\$mode == 'all' \|\| \$mode == 'manhunt'\)/,'students change only the two game states');
+  assert.match(rules.b3Games.classGalleryPresence.all.$viewerKey['.write'],/\$viewerKey == 'teacher_' \+ auth\.uid/);
+});
+test('class teachers: Game Show question library and Shorashim class lists follow the class assignment',()=>{
+  const classTeacher=/teachers\/' \+ auth\.uid \+ '\/active'\)\.val\(\) == true && root\.child\('b3Games\/workspaces\/b3-2026\/teachers\/' \+ auth\.uid \+ '\/classIds\/' \+ \$classId\)\.val\(\) == true/;
+  const show=rules.questionSets.classes.$classId;
+  for(const key of ['library','activeLibraryId'])for(const permission of ['.read','.write']){
+    assert.equal(show[key][permission],show.set[permission],key+permission+' matches the class question set');
+    assert.match(show[key][permission],classTeacher);
+  }
+  const shorashim=rules.posukPractice.shorashimLearning.classes.$classId;
+  for(const list of ['students','recordingEvents']){
+    assert.match(shorashim[list]['.read'],classTeacher,list);
+    assert.doesNotMatch(shorashim[list]['.read'],/b3StudentId|b3ClassId/,'students cannot list classmates\' work');
+    assert.equal(shorashim[list]['.write'],undefined);
+  }
+});
+test('owner-only lists for the legacy Shorashim dashboard and the special-access roster',()=>{
+  const ownerOrAdmin="auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)";
+  assert.equal(rules.posukPractice.shorashimLearning.students['.read'],ownerOrAdmin);
+  assert.equal(rules.posukPractice.shorashimLearning.leaderboards['.read'],ownerOrAdmin);
+  assert.equal(rules.posukPractice.allowedStudents['.read'],ownerOrAdmin);
+});
