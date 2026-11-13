@@ -58,6 +58,15 @@ test('a verified Chazzan assignment awards exactly one point with a stable trans
  await assert.rejects(rewardsTeacher(d,PW,award,Date.now(),{verifiedDaveningPart:true,stagingPasswordTeacher:true}),{code:403});
  assert.equal((await rewardsTeacher(d,{...PW,b3StagingAccount:true},award,Date.now(),{verifiedDaveningPart:true,stagingPasswordTeacher:true})).duplicate,true);
 });
+test('a Chazzan point is recorded when the database first runs the transaction with an empty cache',async()=>{const d=seed();
+ // The real database calls the update with null first, then with the saved account.
+ const nullFirst={...d,tx:async(p,f)=>{const first=f(null);if(first===undefined)return {committed:false,snapshot:{val:()=>null}};return d.tx(p,f)}};
+ const award={action:'awardDaveningPart',classId:'b3_sc',studentId:'moshe',assignmentKey:'session_2_part-3'};
+ const first=await rewardsTeacher(nullFirst,T,award,Date.now(),{verifiedDaveningPart:true});
+ assert.equal(first.applied,1);assert.equal(first.balance,1);
+ const again=await rewardsTeacher(nullFirst,T,award,Date.now(),{verifiedDaveningPart:true});
+ assert.equal(again.applied,0);assert.equal(again.balance,1);
+});
 test('a teacher approves activity points only for their own students, once',async()=>{const d=seed();const {root}=await call(d,T,{action:'load'});
  const moshe=Object.values(root.students).find(s=>s.b3StudentId==='moshe').id;d.tree.studentRewards.pointRequests.r1.rewardStudentId=moshe;
  const ok=await call(d,T,{action:'approve',requestId:'r1'});assert.equal(ok.status,'approved');assert.equal(d.tree.studentRewards.students[moshe].rewardBalance,5);

@@ -43,12 +43,19 @@
     return result;
   }
 
+  // A press that lands during the background refresh waits for it instead of being lost.
+  async function whenFree() {
+    while (busy) await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
   function button(label, action, fields = {}) {
     const element = document.createElement('button');
     element.textContent = label;
     element.className = 'btn';
     element.onclick = async () => {
-      if (busy) return;
+      if (element.disabled) return;
+      element.disabled = true;
+      await whenFree();
       const key = JSON.stringify([session?.id, action, fields]);
       const requestId = pending.get(key) || crypto.randomUUID();
       pending.set(key, requestId);
@@ -60,6 +67,7 @@
         status.textContent = error.message;
       } finally {
         busy = false;
+        element.disabled = false;
         if (playbackQueued) sendPlayback();
       }
     };
@@ -100,9 +108,10 @@
         wheel.textContent = '🎡 Spin for my part!';
         wheel.setAttribute('aria-label', 'Spin the wheel to receive a Davening section');
         wheel.onclick = async () => {
-          if (busy) return;
-          busy = true;
+          if (wheel.disabled) return;
           wheel.disabled = true;
+          await whenFree();
+          busy = true;
           wheel.classList.add('spinning');
           try {
             const before = new Set(Object.keys(session.parts || {}).filter(id => session.parts[id].mine));
@@ -163,16 +172,21 @@
         const assign = document.createElement('button'); assign.type = 'button'; assign.textContent = 'Save'; assign.className = 'btn'; assign.style.cssText = 'padding:4px 8px;margin-left:5px';
         assign.onclick = () => request('assign', { partId: `part-${i + 1}`, studentId: select.value || null }).catch(error => { status.textContent = error.message; });
         row.append(assign);
+      }
+      // The award stays available after the teacher finishes the session.
+      if (teacher && session) {
         if (part?.started && part.studentId && (part.completed || session.phase === 'ended')) {
           const reward = document.createElement('button'); reward.type = 'button'; reward.className = 'btn';
           reward.style.cssText = 'padding:4px 8px;margin-left:5px;background:#fff5cf';
           reward.textContent = part.awarded ? '✓ 1 point awarded' : '⭐ Award 1 Rewards point';
           reward.disabled = Boolean(part.awarded);
           reward.onclick = async () => {
-            if (busy || part.awarded) return;
+            if (reward.disabled) return;
+            reward.disabled = true;
+            await whenFree();
             busy = true;
             try { await request('award', { partId: `part-${i + 1}`, requestId: crypto.randomUUID() }); }
-            catch (error) { status.textContent = error.message; }
+            catch (error) { status.textContent = error.message; reward.disabled = false; }
             finally { busy = false; }
           };
           row.append(reward);

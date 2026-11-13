@@ -272,7 +272,10 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now(),context={}){
   const studentPath=SR+'/students/'+rewardStudentId;
   let outcome;
   const result=await store.tx(studentPath,cur=>{
-   if(!cur||cur.active===false)fail(403,'This student Rewards account is not active.');
+   outcome=undefined;
+   // The database may first run this with an empty local cache; returning null lets it retry with the saved account.
+   if(cur===null)return null;
+   if(cur.active===false)fail(403,'This student Rewards account is not active.');
    const previous=cur.daveningAwardKeys?.[markerKey];
    if(previous){outcome={...previous,duplicate:true};return cur;}
    const balanceAfter=Math.max(0,Number(cur.rewardBalance||0)+1);

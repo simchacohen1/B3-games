@@ -112,3 +112,43 @@ test('ended Chazzan sessions are removed after 30 days when read', async () => {
   assert.equal(value, null);
   assert.equal(state.has('daveningSessions/et'), false);
 });
+
+test('awards and clean-up work when the database first runs a transaction with an empty cache', async () => {
+  // The real Realtime Database calls the update function with null first, then
+  // again with the saved value. An update that gives up on null never commits.
+  const state = new Map();
+  const db = { ref: path => ({
+    get: async () => ({ val: () => structuredClone(state.get(path) ?? null) }),
+    transaction: async update => {
+      const saved = structuredClone(state.get(path) ?? null);
+      let next = update(null);
+      if (next !== undefined && saved !== null) next = update(saved);
+      if (next !== undefined) {
+        if (next === null) state.delete(path); else state.set(path, structuredClone(next));
+      }
+      return { committed: next !== undefined, snapshot: { val: () => structuredClone(next === undefined ? saved : next) } };
+    }
+  }) };
+  const awards = [];
+  let failNext = false;
+  const awardPoint = async value => { if (failNext) { failNext = false; throw Object.assign(new Error('Rewards is busy.'), { status: 503 }); } awards.push(value); };
+  const call = body => act({ db, actor: { classId: 'et', role: 'teacher' }, body,
+    catalog: ['ashrei'], getRoster: async () => [{ id: 'boy-a', name: 'Ari Example' }], awardPoint });
+  const opened = await call({ action: 'open', requestId: 'open' });
+  await call({ action: 'assign', sessionId: opened.id, partId: 'ashrei', studentId: 'boy-a' });
+  await call({ action: 'playback', sessionId: opened.id, partId: 'ashrei', speed: 1, position: 0, playing: false });
+  await call({ action: 'finish', sessionId: opened.id });
+  const award = { action: 'award', sessionId: opened.id, partId: 'ashrei', requestId: 'award-a' };
+  // A failed Rewards write releases the claim, so the teacher can try again.
+  failNext = true;
+  await assert.rejects(call(award), /Rewards is busy/);
+  assert.equal(state.get('daveningSessions/et').parts.ashrei.awardPending, undefined);
+  assert.equal((await call(award)).parts.ashrei.awarded, true);
+  await call({ ...award, requestId: 'award-b' });
+  assert.equal(awards.length, 1);
+  await assert.rejects(call({ ...award, sessionId: 'another-session' }), /changed/);
+  // An ended session past its 30 days is removed on the next read.
+  state.set('daveningSessions/et', { ...state.get('daveningSessions/et'), endedAt: Date.now() - 31 * 24 * 60 * 60 * 1000 });
+  assert.equal(await call({ action: 'read' }), null);
+  assert.equal(state.has('daveningSessions/et'), false);
+});

@@ -40,8 +40,8 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
   if (action === 'read') {
     const current = (await ref.get()).val();
     if (current?.endedAt && Date.now() - current.endedAt > 30 * 24 * 60 * 60 * 1000) {
-      await ref.transaction(session => session?.id === current.id && session.endedAt === current.endedAt ? null : undefined,
-        undefined, false);
+      await ref.transaction(session => session === null
+        || (session.id === current.id && session.endedAt === current.endedAt) ? null : undefined, undefined, false);
       return null;
     }
     return publicSession(current, actor);
@@ -74,6 +74,8 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
     let claimError;
     const claim = await ref.transaction(session => {
       claimError = undefined;
+      // RTDB may first run the callback with an empty local cache; returning null lets it retry with the server's data.
+      if (session === null) return null;
       try {
         if (!session || session.id !== sessionId) fail(409, 'This session has changed.');
         const part = session.parts?.[partId];
@@ -94,7 +96,8 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
     try { await awardPoint({ classId: actor.classId, studentId: part.studentId, assignmentKey }); }
     catch (error) {
       await ref.transaction(session => {
-        if (!session || session.id !== sessionId) return undefined;
+        if (session === null) return null;
+        if (session.id !== sessionId) return undefined;
         const assigned = session.parts?.[partId];
         if (!assigned?.awardPending || assigned.studentId !== part.studentId || assigned.awarded) return undefined;
         const { awardPending, ...rest } = assigned;
@@ -105,8 +108,9 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
     let rejection;
     const result = await ref.transaction(session => {
       rejection = undefined;
+      if (session === null) return null;
       try {
-        if (!session || session.id !== sessionId) fail(409, 'This session has changed.');
+        if (session.id !== sessionId) fail(409, 'This session has changed.');
         const assigned = session.parts?.[partId];
         if (!assigned?.studentId || assigned.studentId !== part.studentId) fail(409, 'The assignment changed before the point was saved.');
         if (assigned.awarded) return session;
