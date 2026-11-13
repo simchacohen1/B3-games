@@ -7,7 +7,7 @@ const path=require('node:path');
 const base=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-library.js'),'utf8');
 
-function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false,promptName=null,uploadFails=false,savedLayout=null}={}){
+function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false,blobFails=false,promptName=null,uploadFails=false,savedLayout=null}={}){
   const elements={};
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
@@ -54,7 +54,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
     URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>promptName,confirm:()=>true,clearTimeout,setTimeout,
-    fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
+    fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>{if(blobFails)throw TypeError('Failed to fetch');return new Blob(['%PDF-1.7\n'])}}}};
   vm.runInNewContext(source,context);
   return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},uploads,loaded,page,updates,layouts};
 }
@@ -135,16 +135,29 @@ test('closing the PDF right after turning a page still saves that page',async()=
   assert.equal(h.updates[0].customMetadata.lastPage,'9');
   assert.equal(h.updates[0].customMetadata.displayName,'Private worksheet');
 });
-test('private-download network/CORS failures explain next step and leave saved file untouched',async()=>{
+test('private-download request failures give a retryable network message and leave saved file untouched',async()=>{
   const h=harness({fetchFails:true});
   h.elements['.session-controls'].afterElement.onclick();
   await new Promise(setImmediate);
   const row=h.elements['#pointerLibraryItems'].children[0];
   await row.children[1].onclick();
-  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Cloud Storage bucket CORS setting/);
-  assert.match(h.elements['#pointerLibraryStatus'].textContent,/GET from https:\/\/funtorahtools.com/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Check your connection and try again/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/saved PDF has not been deleted/);
   assert.equal(h.elements['#pointerLibraryItems'].children.length,1);
   assert.equal(h.loaded.length,0);
+});
+
+test('interrupted PDF response body gives a safe retry message and preserves saved PDF and page metadata',async()=>{
+  const h=harness({blobFails:true});
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  const row=h.elements['#pointerLibraryItems'].children[0];
+  await row.children[1].onclick();
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/download was interrupted/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/saved PDF has not been deleted/);
+  assert.equal(h.elements['#pointerLibraryItems'].children.length,1);
+  assert.equal(h.loaded.length,0);
+  assert.equal(h.updates.length,0,'a failed download must not modify last-page metadata');
 });
 
 test('private PDF CORS example only allows known site origins and GET',()=>{

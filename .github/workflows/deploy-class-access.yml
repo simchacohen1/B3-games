@@ -1,0 +1,145 @@
+name: Deploy teacher class-access function
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact green head commit of PR #779
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: firebase-production-fun-torah-class-access
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.actor == 'simchacohen1' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Validate owner request and exact green PR #779 head
+        id: validate
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        with:
+          script: |
+            const sha = (process.env.SOURCE_SHA || "").trim();
+            if (!/^[0-9a-f]{40}$/i.test(sha)) {
+              core.setFailed("source_sha must be a full 40-character commit SHA.");
+              return;
+            }
+            if (context.actor !== "simchacohen1" || context.ref !== "refs/heads/main") {
+              core.setFailed("Only simchacohen1 may dispatch this workflow from main.");
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: 779
+            });
+            if (pr.state !== "open" || pr.draft || pr.base.ref !== "main" ||
+                pr.head.repo.full_name !== "simchacohen1/B3-games" || pr.head.sha !== sha) {
+              core.setFailed("The source SHA must be the current open, non-draft PR #779 head targeting main.");
+              return;
+            }
+
+            const { data } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+              per_page: 100
+            });
+            const latestByName = new Map();
+            for (const check of data.check_runs) {
+              const previous = latestByName.get(check.name);
+              const time = check.started_at || check.created_at;
+              const previousTime = previous && (previous.started_at || previous.created_at);
+              if (!previous || time > previousTime) latestByName.set(check.name, check);
+            }
+            const checks = [...latestByName.values()];
+            // navigation-policy (follow-teacher-tests.yml) is path-filtered and
+            // never runs on PR #779, whose files it does not cover; the same
+            // tests/follow-teacher*.test.cjs files run inside access-tests.
+            const expected = [
+              "test", "access-tests", "teacher-access", "critical-security",
+              "principal-access", "coloring",
+              "real-browser-follow", "Synthetic learning tools and access boundaries"
+            ];
+            const missing = expected.filter(name => !latestByName.has(name));
+            const failed = checks.filter(check => check.status !== "completed" || check.conclusion !== "success");
+            if (missing.length || failed.length) {
+              const details = [
+                missing.length ? `missing required checks: ${missing.join(", ")}` : "",
+                failed.length ? `not green: ${failed.map(check => `${check.name}=${check.conclusion || check.status}`).join(", ")}` : ""
+              ].filter(Boolean).join("; ");
+              core.setFailed(`PR #779 checks are not ready: ${details}`);
+              return;
+            }
+            core.setOutput("sha", sha);
+            core.info(`Verified PR #779 head ${sha} and ${checks.length} green check contexts.`);
+
+      - name: Check out the validated PR #779 commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.validate.outputs.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Test class access authorization and teacher sign-in regressions
+        run: node --test tests/class-access-core.test.cjs tests/teacher-signin-entry.test.cjs
+
+      - name: Validate the function source
+        run: |
+          node --check backend/functions/class-access.js
+          node --check backend/functions/index.js
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix backend/functions --ignore-scripts
+
+      - name: Authenticate with GitHub OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: b3-games
+          workload_identity_provider: projects/568530046190/locations/global/workloadIdentityPools/github-actions-prod/providers/teacher-class-access
+          service_account: github-functions-deployer@b3-games.iam.gserviceaccount.com
+          create_credentials_file: true
+          cleanup_credentials: true
+
+      - name: Deploy only funTorahClassAccess to the verified project
+        run: npx --no-install firebase deploy --only functions:funTorahClassAccess --project=b3-games --non-interactive
+
+      - name: Verify the deployed HTTP handler rejects unauthenticated writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://us-central1-b3-games.cloudfunctions.net/funTorahClassAccess"
+          post_code="$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+            --request POST --header 'Content-Type: application/json' --data '{}' "$endpoint")"
+          if [[ "$post_code" != "401" ]] || ! grep -q "Google sign-in required" response.json; then
+            echo "Expected unauthenticated POST to return 401; got $post_code."
+            cat response.json
+            exit 1
+          fi
+          get_code="$(curl --silent --show-error --output response.json --write-out '%{http_code}' "$endpoint")"
+          if [[ "$get_code" != "405" ]]; then
+            echo "Expected GET to return 405; got $get_code."
+            cat response.json
+            exit 1
+          fi
+          echo "Deployed function returned 401 without an ID token and 405 for GET."
