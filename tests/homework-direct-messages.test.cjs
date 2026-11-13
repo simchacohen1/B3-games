@@ -18,7 +18,8 @@ function makeStore() {
     teachers: {
       t1: { active: true, displayName: 'Rabbi Alef', classIds: { et: true } },
       t2: { active: true, displayName: 'rabbi.bet@example.org', classIds: { wt: true } },
-      p1: { active: true, accountType: 'principal', displayName: 'Principal Gimmel', classIds: { et: true, wt: true } },
+      p1: { active: true, accountType: 'principal', displayName: 'Principal Gimmel', classIds: { et: true, wt: true },
+        supervisedTeachers: { invite_t1: { name: 'Rabbi Alef', classIds: { et: true } }, invite_t2: { name: 'Rabbi Bet', classIds: { wt: true } } } },
       gone: { active: false, displayName: 'Old Teacher', classIds: { et: true } }
     }
   } }, students: {
@@ -228,5 +229,22 @@ for (const [name, api] of Object.entries(cores)) {
     for (const action of ['dmThread', 'dmSend', 'dmRead'])
       await assert.rejects(api(store, t1, { action, classId: 'wt', studentId: 's3', text: 'hi' }, 3, ids), { code: 403 }, action);
     assert.equal((await api(store, t2, { action: 'dmUnread' }, 4)).unread, 1);
+  });
+
+  test(`${name}: a principal given a class of their own is the teacher of that class`, async () => {
+    const store = makeStore();
+    const ws = store.data.b3Games.workspaces['b3-2026'];
+    ws.classes.pc = { name: 'Principal Class', toolGrants: { homework: true }, members: { s4: { active: true } } };
+    ws.teachers.p1.classIds.pc = true; // not through a supervised teacher
+    store.data.b3Games.students.s4 = { profile: { name: 'Avi Four' }, memberships: { m: { workspaceId: 'b3-2026', classId: 'pc' } } };
+    store.data.b3Private.passcodes.s4 = { passcode: '4444' };
+    const four = student('s4', 'Avi Four', '4444', 'pc');
+    const inbox = await api(store, {}, { action: 'dmInbox', ...four }, 1);
+    assert.deepEqual(inbox.groups[0].contacts.map(c => [c.id, c.kind, !!c.readOnly]), [['p1', 'principal', false]]);
+    assert.ok(!('supervisor' in inbox.groups[0].contacts[0]));
+    await api(store, {}, { action: 'dmSend', ...four, teacherId: 'p1', text: 'Good morning' }, 2, ids);
+    assert.equal((await api(store, p1, { action: 'dmThread', classId: 'pc', studentId: 's4' }, 3)).messages.length, 1);
+    // The same principal is still not a contact for a student of a class they only supervise.
+    assert.deepEqual((await api(store, {}, { action: 'dmInbox', ...student() }, 4)).groups[0].contacts.map(c => c.id), ['t1']);
   });
 }

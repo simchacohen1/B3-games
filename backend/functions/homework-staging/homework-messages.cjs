@@ -48,7 +48,11 @@ async function classAdults(store, ws, classId) {
   for (const [uid, row] of Object.entries(rows)) {
     if (!key(uid) || !row || row.active === false || row.classIds?.[classId] !== true) continue;
     const kind = isPrincipal(row) ? 'principal' : 'teacher';
-    out[uid] = { id: uid, kind, name: adultName(row, kind === 'principal' ? 'Principal' : 'Teacher') };
+    // `supervisor`: a principal who has this class only through a teacher they supervise. A
+    // principal given a class of their own (not through a teacher) is that class's teacher.
+    const supervisor = kind === 'principal' &&
+      Object.values(row.supervisedTeachers || {}).some(t => t && t.classIds?.[classId] === true);
+    out[uid] = { id: uid, kind, name: adultName(row, kind === 'principal' ? 'Principal' : 'Teacher'), ...(supervisor ? { supervisor } : {}) };
   }
   return out;
 }
@@ -159,10 +163,10 @@ async function studentContacts(store, s) {
   const [adults, rows] = await Promise.all([classAdults(store, s.ws, s.classId),
     store.get(root(s.ws) + '/dmSummary/students/' + s.classId + '/' + s.sid)]);
   const contacts = {};
-  for (const [uid, adult] of Object.entries(adults)) {
+  for (const [uid, { supervisor, ...adult }] of Object.entries(adults)) {
     // The teachers of the student's class: the only people a student can write to first.
-    if (adult.kind !== 'principal') { contacts[uid] = adult; continue; }
-    // A principal supervises the class but does not teach it. The student sees the principal
+    if (!supervisor) { contacts[uid] = adult; continue; }
+    // This principal supervises the class but does not teach it. The student sees the principal
     // only once the principal has written to them, and can then answer. Messages a student
     // sent to the principal before this rule stay readable, with no new sending.
     const row = rows?.[uid];
