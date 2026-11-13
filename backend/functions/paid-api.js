@@ -30,6 +30,15 @@ function stable(value) {
 function paidHandler(name, category, handler) {
   return async (req, res) => {
     res.set('Cache-Control', 'no-store');
+    // Set CORS headers on every response, including preflight OPTIONS.
+    const origin = req.get('Origin');
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Vary', 'Origin');
+    }
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-B3-Student-Id, X-B3-Student-Pin');
+    res.set('Access-Control-Max-Age', '3600');
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' });
     const db = admin.database();
