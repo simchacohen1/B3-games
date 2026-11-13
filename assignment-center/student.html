@@ -207,7 +207,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 <script src="../firebase-config.js"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="homework-common.js?v=2fb22d3c"></script>
-<script src="messages-ui.js?v=0e812531"></script>
+<script src="messages-ui.js?v=baee5970"></script>
 <script src="homework-items.js?v=8588ed0e"></script>
 <script>
 (function(){'use strict';
@@ -272,7 +272,7 @@ function buildFilterBar(list){
   section('Show',[chip('Not done','done','notdone'),chip('Done','done','done')]);
   if(filtering()){var clear=el('button','✕ Clear filters','filter-chip');clear.type='button';clear.onclick=function(){activeFilters={subject:null,time:null,done:null};render(lastData)};filterBar.append(clear)}
 }
-// Messages tab (#647): one-on-one chats with my teachers and the principal.
+// Messages tab (#647): one-on-one chats with my teachers (the principal only after writing first).
 var Msgs=window.HomeworkMessages.create({role:'student',call:call,
   who:function(c){return {teacherId:c.id}},
   onUnread:function(n){drawUnread(n)},
