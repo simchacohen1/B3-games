@@ -1,5 +1,7 @@
 'use strict';
 
+const chess = require('./chess-core.cjs');
+
 const GAMES = Object.freeze({
   'connect-four': { name: 'Connect 4', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
   'tic-tac-toe': { name: 'Tic Tac Toe', minPlayers: 2, maxPlayers: 2, computerOpponent: true },
@@ -13,6 +15,8 @@ const GAMES = Object.freeze({
   dominoes: { name: 'Dominoes', minPlayers: 2, maxPlayers: 4 },
   'go-fish': { name: 'Go Fish', minPlayers: 2, maxPlayers: 6 },
   'uno-style': { name: 'Uno-style Cards', minPlayers: 2, maxPlayers: 6 },
+  chess: { name: 'Chess', minPlayers: 2, maxPlayers: 2, chess: true, timeLimitMs: 0 },
+  'chess-5min': { name: 'Chess (5 minutes)', minPlayers: 2, maxPlayers: 2, chess: true, timeLimitMs: 300000 },
 });
 
 const MEMORY_FACES = Object.freeze(['🍎', '⭐', '🐟', '🌈', '⚽', '🦁', '🚀', '🌻']);
@@ -50,6 +54,13 @@ function hydrateGameState(gameKey, input) {
     const board = asList(state.board);
     state.board = Array.from({ length: size }, (_, index) => board[index] || '');
   }
+  if (GAMES[gameKey]?.chess) {
+    const board = asList(state.board);
+    state.board = Array.from({ length: 64 }, (_, index) => board[index] || '');
+    state.captured = { w: asList(state.captured?.w), b: asList(state.captured?.b) };
+    state.castling = state.castling || '-'; state.ep = Number.isInteger(state.ep) ? state.ep : -1; state.halfmove ||= 0;
+    state.lastMove = state.lastMove || { from: -1, to: -1 };
+  }
   if (gameKey === 'memory-match') { state.deck = asList(state.deck); state.matched = asList(state.matched); state.flipped = asList(state.flipped); state.scores ||= {}; }
   if (gameKey === 'reversi') state.passes ||= 0;
   if (gameKey === 'bingo') {
@@ -86,6 +97,7 @@ function seededShuffle(values, seed) {
 function createGameState(gameKey, players, options = {}) {
   const ids = participantIds(players);
   if (!GAMES[gameKey]) throw new Error('Unknown multiplayer game.');
+  if (GAMES[gameKey].chess) return { ...chess.newChessFields(), playersOrder: ids.slice(), turn: ids[0] || '', winner: null, draw: false, finished: false, moves: 0, timeLimitMs: GAMES[gameKey].timeLimitMs, endsAt: 0 };
   if (gameKey === 'connect-four') return { board: Array(42).fill(''), playersOrder: ids.slice(), otherPlayer: ids[1] || '', turn: ids[0] || '', winner: null, draw: false, finished: false, moves: 0 };
   if (gameKey === 'tic-tac-toe') return { board: Array(9).fill(''), playersOrder: ids.slice(), otherPlayer: ids[1] || '', turn: ids[0] || '', winner: null, draw: false, finished: false, moves: 0 };
   if (gameKey === 'memory-match') {
@@ -158,12 +170,13 @@ function lineWinner(board, width, height, count) {
 
 function reject(message) { throw new Error(message); }
 
-function applyMove(gameKey, state, playerId, move, players) {
+function applyMove(gameKey, state, playerId, move, players, context = {}) {
   if (!GAMES[gameKey]) reject('Unknown multiplayer game.');
   if (!state || state.finished) reject('This game has finished.');
   if (!players?.[playerId] || players[playerId].active === false) reject('Join this room before playing.');
   if (!move || typeof move !== 'object' || Array.isArray(move)) reject('Invalid move.');
   const ids = participantIds(players);
+  if (GAMES[gameKey].chess) return moveChess(state, playerId, move, context);
   if (gameKey === 'memory-match') return moveMemory(state, playerId, move, ids);
   if (gameKey === 'bingo') return moveBingo(state, playerId, move, players);
   if (gameKey === 'math-race') return moveMathRace(state, playerId, move, players);
@@ -179,6 +192,27 @@ function applyMove(gameKey, state, playerId, move, players) {
   if (gameKey === 'checkers') return moveCheckers(state, playerId, move);
   if (gameKey === 'reversi') return moveOthello(state, playerId, move);
   reject('This multiplayer game is not available yet.');
+}
+
+function moveChess(state, playerId, move, context) {
+  const nowMs = Number(context.now) || Date.now();
+  const colorName = id => id === state.playersOrder[0] ? 'w' : 'b';
+  const finishWith = () => {
+    if (state.winnerColor) state.winner = state.playersOrder[state.winnerColor === 'w' ? 0 : 1];
+    delete state.winnerColor;
+    return state;
+  };
+  // A timed game ends when the clock runs out, whoever sends the next message.
+  if (state.timeLimitMs > 0 && state.endsAt > 0 && nowMs >= state.endsAt) {
+    chess.finishOnTime(state);
+    return finishWith();
+  }
+  if (move.type === 'timeout') reject('There is still time left on the clock.');
+  if (state.turn !== playerId) reject('Wait for your turn.');
+  if (move.type !== 'move') reject('Choose a piece and a legal square.');
+  chess.playChessMove(state, colorName(playerId), move, reject);
+  if (!state.finished) state.turn = state.playersOrder.find(id => id !== playerId);
+  return finishWith();
 }
 
 function computerMove(gameKey, state, computerId) {
@@ -603,12 +637,16 @@ function hasBingo(marked) {
   return [0,1,2,3,4].every(index => set.has(index * 6)) || [0,1,2,3,4].every(index => set.has(index * 4 + 4));
 }
 
-function startGameState(gameKey, state, ids) {
+function startGameState(gameKey, state, ids, startAtMs) {
   const config = GAMES[gameKey];
   if (!config) reject('Unknown multiplayer game.');
   if (ids.length < config.minPlayers) reject('Wait for another player to join.');
   if (ids.length > config.maxPlayers) reject('This room is full.');
   state.turn = ids[0];
+  if (config.chess) {
+    state.playersOrder = ids.slice();
+    state.endsAt = config.timeLimitMs > 0 ? (Number(startAtMs) || Date.now()) + config.timeLimitMs : 0;
+  }
   if (gameKey === 'tic-tac-toe' || gameKey === 'connect-four') {
     state.playersOrder = ids.slice();
     state.otherPlayer = ids[1];
@@ -661,7 +699,15 @@ function publicView(gameKey, state, room, now = Date.now()) {
     players, playerCount: players.length, turn: state.turn, finished: !!state.finished,
     winner: state.winner || null, draw: !!state.draw, moves: state.moves || 0,
   };
-  if (gameKey === 'connect-four' || gameKey === 'tic-tac-toe') {
+  if (GAMES[gameKey].chess) {
+    const captured = { w: asList(state.captured?.w), b: asList(state.captured?.b) };
+    view.board = state.board.slice(); view.playersOrder = state.playersOrder.slice();
+    view.check = !!state.check; view.endReason = state.endReason || ''; view.lastMove = state.lastMove || { from: -1, to: -1 };
+    view.captured = captured; view.timeLimitMs = state.timeLimitMs || 0; view.endsAt = state.endsAt || 0;
+    view.points = Object.fromEntries(state.playersOrder.map((id, index) => [id, chess.points(state, index === 0 ? 'w' : 'b')]));
+    view.scores = Object.assign({}, view.points);
+    view.legal = state.finished ? {} : chess.legalMap(state, state.turn === state.playersOrder[0] ? 'w' : 'b');
+  } else if (gameKey === 'connect-four' || gameKey === 'tic-tac-toe') {
     view.board = state.board.slice();
     if (gameKey === 'connect-four') view.playersOrder = state.playersOrder.slice();
     if (gameKey === 'tic-tac-toe') view.playersOrder = state.playersOrder.slice();
@@ -704,4 +750,4 @@ function privateView(gameKey, state, studentId) {
   return {};
 }
 
-module.exports = { GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, skipAbsentPlayers, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };
+module.exports = { chess, GAMES, gameConfig, supportsComputerOpponent, participantIds, hydrateGameState, createGameState, startGameState, applyMove, computerMove, skipAbsentPlayers, publicView, privateView, lineWinner, checkersMoves, reversiFlips, hasBingo, makeBingoCard, isSet, hasSet };

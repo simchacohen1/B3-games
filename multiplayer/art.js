@@ -18,7 +18,9 @@
     ludo: '<rect x="11" y="11" width="74" height="74" rx="13" fill="#f5f7fb" stroke="#334155" stroke-width="4"/><path d="M16 16h25v25H16z" fill="#e94853"/><path d="M55 16h25v25H55z" fill="#f3c93a"/><path d="M16 55h25v25H16z" fill="#3f75d5"/><path d="M55 55h25v25H55z" fill="#39a866"/><path d="M41 16h14v25H41zM41 55h14v25H41zM16 41h25v14H16zM55 41h25v14H55z" fill="#fff" stroke="#ccd3df" stroke-width="2"/><path d="m41 41 7 7 7-7v14l-7-7-7 7z" fill="#9ca3af"/>',
     dominoes: '<rect x="23" y="9" width="50" height="78" rx="10" fill="#fffdf6" stroke="#315a78" stroke-width="5" transform="rotate(12 48 48)"/><path d="M27 48h42" stroke="#315a78" stroke-width="4"/><g fill="#24364a"><circle cx="39" cy="30" r="4"/><circle cx="59" cy="30" r="4"/><circle cx="49" cy="58" r="4"/><circle cx="39" cy="73" r="4"/><circle cx="59" cy="73" r="4"/></g>',
     "go-fish": '<path d="M10 26h54a9 9 0 0 1 9 9v34a9 9 0 0 1-9 9H37L20 90V78h-1a9 9 0 0 1-9-9z" fill="#fff" stroke="#2198b7" stroke-width="4"/><path d="M22 52c13-17 27-17 40 0-13 17-27 17-40 0zm40 0 13-10v20z" fill="#38b8d1" stroke="#137b9a" stroke-width="3"/><circle cx="34" cy="49" r="3" fill="#17384a"/><path d="M12 20h42" stroke="#a4e5f0" stroke-width="4" stroke-linecap="round"/>',
-    "uno-style": '<rect x="20" y="13" width="49" height="72" rx="11" fill="#2772c9" stroke="#fff" stroke-width="4" transform="rotate(13 44 49)"/><rect x="15" y="10" width="49" height="72" rx="11" fill="#ef3c47" stroke="#fff" stroke-width="4" transform="rotate(-10 39 46)"/><ellipse cx="39" cy="47" rx="17" ry="26" fill="#fff" transform="rotate(-10 39 47)"/><text x="39" y="56" text-anchor="middle" font-size="26" font-weight="1000" font-style="italic" fill="#e6323e" font-family="system-ui,sans-serif">7</text><rect x="15" y="10" width="49" height="72" rx="11" fill="none" stroke="#f5cd28" stroke-width="4" transform="rotate(-10 39 46)"/>'
+    "uno-style": '<rect x="20" y="13" width="49" height="72" rx="11" fill="#2772c9" stroke="#fff" stroke-width="4" transform="rotate(13 44 49)"/><rect x="15" y="10" width="49" height="72" rx="11" fill="#ef3c47" stroke="#fff" stroke-width="4" transform="rotate(-10 39 46)"/><ellipse cx="39" cy="47" rx="17" ry="26" fill="#fff" transform="rotate(-10 39 47)"/><text x="39" y="56" text-anchor="middle" font-size="26" font-weight="1000" font-style="italic" fill="#e6323e" font-family="system-ui,sans-serif">7</text><rect x="15" y="10" width="49" height="72" rx="11" fill="none" stroke="#f5cd28" stroke-width="4" transform="rotate(-10 39 46)"/>',
+    chess: '<rect x="9" y="9" width="78" height="78" rx="11" fill="#e9eefb" stroke="#fff" stroke-width="4"/>',
+    "chess-5min": '<rect x="9" y="9" width="78" height="78" rx="11" fill="#e9eefb" stroke="#fff" stroke-width="4"/>',
   };
   // High-contrast, original card artwork based on each game's recognizable playing pieces.
   // Keep the internal game keys intact to preserve saved rooms and rules.
@@ -41,6 +43,31 @@
     "dominoes": "<defs><filter id=\"d-sh\" x=\"-40%\" y=\"-40%\" width=\"180%\" height=\"180%\"><feDropShadow dx=\"0\" dy=\"3\" stdDeviation=\"2\" flood-opacity=\".38\"/></filter><linearGradient id=\"d-iv\" x2=\"1\" y2=\"1\"><stop stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#e6e2d5\"/></linearGradient></defs><g filter=\"url(#d-sh)\"><g transform=\"rotate(-22 32 40)\"><rect x=\"11\" y=\"10\" width=\"37\" height=\"68\" rx=\"7\" fill=\"url(#d-iv)\" stroke=\"#ccbfa8\" stroke-width=\"2\"/><path d=\"M13 44h33\" stroke=\"#4a4a4a\" stroke-width=\"2\"/><circle cx=\"30\" cy=\"26\" r=\"4\" fill=\"#202635\"/><circle cx=\"21\" cy=\"57\" r=\"4\" fill=\"#202635\"/><circle cx=\"39\" cy=\"57\" r=\"4\" fill=\"#202635\"/></g><g transform=\"rotate(20 65 46)\"><rect x=\"47\" y=\"12\" width=\"37\" height=\"68\" rx=\"7\" fill=\"url(#d-iv)\" stroke=\"#ccbfa8\" stroke-width=\"2\"/><path d=\"M49 46h33\" stroke=\"#4a4a4a\" stroke-width=\"2\"/><circle cx=\"56\" cy=\"26\" r=\"4\" fill=\"#202635\"/><circle cx=\"75\" cy=\"26\" r=\"4\" fill=\"#202635\"/><circle cx=\"65\" cy=\"35\" r=\"4\" fill=\"#202635\"/><circle cx=\"56\" cy=\"58\" r=\"4\" fill=\"#202635\"/><circle cx=\"75\" cy=\"58\" r=\"4\" fill=\"#202635\"/></g></g>",
     "go-fish": "<defs><filter id=\"f-sh\" x=\"-40%\" y=\"-40%\" width=\"180%\" height=\"180%\"><feDropShadow dx=\"0\" dy=\"3\" stdDeviation=\"2\" flood-opacity=\".42\"/></filter></defs><g filter=\"url(#f-sh)\"><g transform=\"rotate(-19 33 47)\"><rect x=\"10\" y=\"13\" width=\"44\" height=\"70\" rx=\"7\" fill=\"#fff\"/><rect x=\"13\" y=\"16\" width=\"38\" height=\"64\" rx=\"5\" fill=\"#dffaff\"/><text x=\"19\" y=\"30\" font-size=\"14\" font-family=\"system-ui,sans-serif\" font-weight=\"900\" fill=\"#c36b05\">8</text><path d=\"M21 51Q32 32 43 51Q32 69 21 51l-7-8v16z\" fill=\"#ffba2c\" stroke=\"#d97a0f\" stroke-width=\"1.5\"/><circle cx=\"38\" cy=\"47\" r=\"2.5\" fill=\"#14263e\"/></g><g transform=\"rotate(15 68 48)\"><rect x=\"47\" y=\"13\" width=\"43\" height=\"70\" rx=\"7\" fill=\"#fff\"/><rect x=\"50\" y=\"16\" width=\"37\" height=\"64\" rx=\"5\" fill=\"#d7efff\"/><text x=\"56\" y=\"30\" font-size=\"14\" font-family=\"system-ui,sans-serif\" font-weight=\"900\" fill=\"#195ba7\">3</text><path d=\"M54 54Q64 35 80 50Q65 68 54 54l-6-8v14z\" fill=\"#328ddd\" stroke=\"#2368ad\" stroke-width=\"1.5\"/><circle cx=\"74\" cy=\"48\" r=\"2.5\" fill=\"#15233a\"/><path d=\"M56 72q7-5 14 0t14 0\" fill=\"none\" stroke=\"#48b9df\" stroke-width=\"2\"/></g></g>"
   };
+  // Chess pieces drawn as plain shapes. The king wears a rounded crown with a ball on top (no cross),
+  // so it cannot be mistaken for the queen, whose crown has five separate balls.
+  var CHESS_BASE = '<path d="M10 39.500h25V36c0-1.500-1-2.500-2.500-2.500h-20C11 33.500 10 34.500 10 36z"/>';
+  var CHESS_SHAPES = {
+    P: '<circle cx="22.500" cy="13" r="5.500"/><path d="M16.500 33.500c0-8 3.500-10.500 6-13.500 2.500 3 6 5.500 6 13.500z"/>',
+    R: '<path d="M12 10h4.500v3.500h4V10h4.500v3.500h4V10H33v9l-3 3v11.500H15V22l-3-3z"/>',
+    N: '<path d="M14 33.500c-1-9 3-14 8-17l-3-3.500 2-3.500 3.500 2c7 1.500 11 8 11 15 0 3-.5 5-.5 7z"/><circle cx="23" cy="15.500" r="1.300" class="cp-dot"/>',
+    B: '<ellipse cx="22.500" cy="11.500" rx="4.500" ry="5.500"/><path d="M17 33.500c0-8 1.500-10.500 5.500-13.500 4 3 5.500 5.500 5.500 13.500z"/><path d="M21 13.500l3-4" class="cp-line"/>',
+    Q: '<path d="M11 15l4.500 11 3-12 4 11 4-11 3 12L34 15l-2 18.500H13z"/><circle cx="11" cy="12.500" r="2.300"/><circle cx="17" cy="9.500" r="2.300"/><circle cx="22.500" cy="8.500" r="2.300"/><circle cx="28" cy="9.500" r="2.300"/><circle cx="34" cy="12.500" r="2.300"/>',
+    K: '<path d="M12 27c-1.500-8.500 3.500-14.500 10.500-14.500S35 18.500 33 27z"/><circle cx="22.500" cy="8.800" r="3.600"/><path d="M11 34l2-7h19l2 7z"/><path d="M17 26c0-7 2.500-11 5.500-13.500M28 26c0-7-2.500-11-5.500-13.500M14.500 24.500h16" class="cp-line"/>'
+  };
+  function chessPieceMarkup(type, color) {
+    var fill = color === 'w' ? '#ffffff' : '#38476a', stroke = color === 'w' ? '#6f86bd' : '#0b1330', ink = stroke;
+    return '<g fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.700" stroke-linejoin="round" stroke-linecap="round" style="--ink:' + ink + '">' + CHESS_SHAPES[type].replace(/class="cp-dot"/g, 'fill="' + ink + '" stroke="none"').replace(/class="cp-line"/g, 'fill="none" stroke="' + ink + '" stroke-width="1.500"') + CHESS_BASE + '</g>';
+  }
+  function chessPiece(type, color) {
+    var parsed = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45">' + chessPieceMarkup(type, color) + '</svg>', 'image/svg+xml');
+    var svg = document.importNode(parsed.documentElement, true);
+    svg.setAttribute('class', 'chess-piece'); svg.setAttribute('aria-hidden', 'true');
+    return svg;
+  }
+  var CHESS_TILE = '<defs><pattern id="ch-sq" width="38" height="38" patternUnits="userSpaceOnUse"><rect width="38" height="38" fill="#e9eefb"/><rect width="19" height="19" fill="#5b7fc7"/><rect x="19" y="19" width="19" height="19" fill="#5b7fc7"/></pattern><filter id="ch-sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="3" stdDeviation="2.500" flood-color="#0b1330" flood-opacity=".55"/></filter></defs><rect x="9" y="9" width="78" height="78" rx="11" fill="url(#ch-sq)" stroke="#fff" stroke-width="4"/><g transform="translate(15 6) scale(1.8)" filter="url(#ch-sh)">' + chessPieceMarkup('K', 'w') + '</g>';
+  var CHESS_CLOCK = '<g transform="translate(70 70)"><circle r="15" fill="#ffd23f" stroke="#fff" stroke-width="3.500"/><circle r="10.500" fill="#fff8d6"/><path d="M0-7v7l5 3" fill="none" stroke="#7a4b00" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round"/></g>';
+  CARD_ART.chess = CHESS_TILE;
+  CARD_ART["chess-5min"] = CHESS_TILE + CHESS_CLOCK;
   function gameIllustration(game) {
     var markup = CARD_ART[game.key] || GAME_ART[game.key];
     if (!markup) return (function () { var s = document.createElement("span"); s.className = "game-art-symbol"; s.textContent = game.icon; return s; })();
@@ -50,5 +77,5 @@
     svg.setAttribute("aria-hidden", "true");
     return svg;
   }
-  window.FTT_GAME_ART = { illustration: gameIllustration };
+  window.FTT_GAME_ART = { illustration: gameIllustration, chessPiece: chessPiece };
 })();

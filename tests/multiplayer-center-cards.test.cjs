@@ -16,9 +16,9 @@ const games = capture(/var GAMES = (\[[\s\S]*?\]);/, 'game catalog');
 const categories = capture(/var GAME_CATEGORIES = (\{[\s\S]*?\n  \});/, 'game categories');
 const artwork = capture(/var GAME_ART = (\{[\s\S]*?\n  \});/, 'game artwork');
 
-test('all 17 multiplayer cards have a distinct illustration, category, and playable route', () => {
-  assert.equal(games.length, 17);
-  assert.equal(new Set(games.map(game => game.key)).size, 17);
+test('all 19 multiplayer cards have a distinct illustration, category, and playable route', () => {
+  assert.equal(games.length, 19);
+  assert.equal(new Set(games.map(game => game.key)).size, 19);
   for (const game of games) {
     assert.ok(game.name && game.description && game.url, `${game.key} has its child-friendly card copy and route`);
     assert.ok(categories[game.key], `${game.key} belongs to a visible category`);
