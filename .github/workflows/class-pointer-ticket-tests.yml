@@ -13,6 +13,9 @@ on:
       - 'firebase-rules.json'
       - 'tests/class-pointer-*.test.cjs'
       - 'tests/class-pointer-session-rules-emulator.cjs'
+      - 'tests/class-pointer-teacher-reconnect-emulator.cjs'
+      - 'class-pointer-prototype/dashboard-session.js'
+      - 'firebase-rules.hardened.json'
       - 'e2e/class-pointer-activity-screen.spec.cjs'
   workflow_dispatch:
 # Newer runs on the same PR/branch cancel superseded ones (including main,
@@ -36,7 +39,7 @@ jobs:
       - name: Install pinned Firebase emulator CLI
         run: npm install --global firebase-tools@15.26.0
       - name: Verify class-scoped database authorization in the emulator
-        run: firebase emulators:exec --only database --project demo-class-pointer "node --test tests/class-pointer-session-rules-emulator.cjs"
+        run: firebase emulators:exec --only database --project demo-class-pointer "node --test tests/class-pointer-session-rules-emulator.cjs tests/class-pointer-teacher-reconnect-emulator.cjs"
       - name: Install Chromium for simulated media test
         run: npx playwright install --with-deps chromium
       - name: Run authorization and simulated connection tests

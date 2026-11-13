@@ -11,7 +11,7 @@ function sessionFixture(){
     key:path.split('/').pop(),
     child:key=>ref(path+'/'+key),
     once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),
-    onDisconnect:()=>({remove:async()=>{},cancel:async()=>{}}),
+    onDisconnect:()=>({remove:async()=>{},set:async()=>{},cancel:async()=>{}}),
     set:async value=>writes.push(['set',path,value]),
     update:async value=>writes.push(['update',path,value]),
     remove:async()=>{}
