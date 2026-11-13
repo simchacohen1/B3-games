@@ -69,6 +69,8 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER@$PROJECT_ID.iam.gs
 
 The deploy identity gets Cloud Functions Developer and Service Account User on the existing runtime identity. It does not receive Owner, Firebase Admin, database access, or a JSON key. Known gap found before first use: Cloud Functions Developer lacks `run.services.setIamPolicy`, which the Firebase CLI needs to make a newly created HTTP function publicly invocable. The owner must grant that single permission (custom role) or `roles/run.admin` to the deployer before the first deployment. If CI reports a missing permission, stop and review the exact permission before adding anything; do not broaden the role to Owner.
 
+The deploy identity has no Secret Manager access and must not get any. Firebase CLI resolves every secret param (`defineSecret`) declared anywhere in the loaded functions codebase, even with `--only functions:funTorahClassAccess`, so deploying from `index.js` failed on `secretmanager.secrets.get` for `PARENT_DASHBOARD_SYNC_SECRET` (run 43372745863, attempts 4 and 5). The workflow therefore writes `backend/functions/class-access-deploy-entry.js`, which exports only `funTorahClassAccess`, points `package.json` `main` at it for that run, and fails if any other module of the codebase is loaded. Do not fix a secret error here by granting the deployer a Secret Manager role.
+
 Wait for WIF/IAM propagation before dispatch. The workflow uses these exact identifiers:
 
 - Provider: `projects/568530046190/locations/global/workloadIdentityPools/github-actions-prod/providers/teacher-class-access`
