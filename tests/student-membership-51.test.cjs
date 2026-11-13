@@ -205,7 +205,7 @@ function payload(text,store,decisions){
  const names=Object.values(store.tree.b3Games.workspaces[W].classes).map(c=>c.name);
  const plan=R.plan(R.parse(text),names);
  assert.deepEqual(plan.errors,[],'file is valid');
- return {batchId:R.batchIdFor(text),classes:plan.classes,staff:[],students:plan.students.map(s=>({...s,decision:decisions?.[s.name]}))};
+ return {batchId:R.batchIdFor(text),classes:plan.classesToCreate.concat(plan.existingClassesInFile),staff:[],students:plan.students.map(s=>({...s,decision:decisions?.[s.name]}))};
 }
 async function runImport(store,text,decisions){
  const body=payload(text,store,decisions);
