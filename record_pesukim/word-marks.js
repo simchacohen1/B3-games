@@ -56,7 +56,42 @@
     }).join('');
   }
 
-  var api = { MARKS: MARKS, byId: BY_ID, splitWords: splitWords, style: style, markFor: markFor, flags: flags, chipsHtml: chipsHtml, escapeHtml: esc };
+  // The whole posuk for the student, right to left, with the words the teacher
+  // marked shown in colour: red = read wrong, blue = translation wrong, purple =
+  // both. A small tag under each marked word says which, so colour is not the
+  // only signal. Returns '' when nothing was marked. If the saved Hebrew does
+  // not line up with the marks (an older record), it falls back to the chips.
+  function feedbackHtml(hebrewText, list){
+    if(!Array.isArray(list)) return '';
+    var marks = list.filter(function(x){ return x && BY_ID[x.mark]; });
+    if(!marks.length) return '';
+    var words = splitWords(hebrewText), byIndex = {};
+    var lined = words.length && marks.every(function(x){
+      byIndex[x.i] = x;
+      return Number.isInteger(x.i) && x.i >= 0 && x.i < words.length && words[x.i] === x.word;
+    });
+    if(!lined) return '<div class="wm-chips">' + chipsHtml(marks) + '</div>';
+    var reads = 0, trans = 0, other = 0;
+    var body = words.map(function(w, n){
+      var x = byIndex[n];
+      if(!x) return '<span class="wm-fb-word">' + esc(w) + '</span>';
+      var f = flags(x.mark), kind, tag;
+      if(f.read && f.trans){ kind = 'both'; tag = 'Read + translation'; reads++; trans++; }
+      else if(f.read){ kind = 'read'; tag = 'Read wrong'; reads++; }
+      else if(f.trans){ kind = 'trans'; tag = 'Translation'; trans++; }
+      else { kind = 'other'; tag = BY_ID[x.mark].short; other++; }
+      return '<span class="wm-fb-word wm-fb-' + kind + '" title="' + esc(BY_ID[x.mark].label) + '">' + esc(w) +
+        '<span class="wm-fb-tag" dir="ltr">' + esc(tag) + '</span></span>';
+    }).join(' ');
+    var parts = [];
+    if(reads) parts.push(reads + ' word' + (reads === 1 ? '' : 's') + ' read wrong');
+    if(trans) parts.push(trans + ' word' + (trans === 1 ? '' : 's') + ' translated wrong');
+    if(other) parts.push(other + ' other mark' + (other === 1 ? '' : 's'));
+    return '<div class="wm-fb"><div class="wm-fb-title">Words your teacher marked: ' + esc(parts.join(' · ')) + '</div>' +
+      '<div class="wm-fb-posuk" dir="rtl" lang="he">' + body + '</div></div>';
+  }
+
+  var api = { MARKS: MARKS, feedbackHtml: feedbackHtml, byId: BY_ID, splitWords: splitWords, style: style, markFor: markFor, flags: flags, chipsHtml: chipsHtml, escapeHtml: esc };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PosukWordMarks = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -190,6 +190,37 @@ test('word marks: tapping a word means read wrong, tapping its T means translati
   assert.doesNotMatch(teacher, /data-field="mode"|Marking mode|legendHtml/);
 });
 
+test('word marks: the student sees the whole posuk in order with the marked words flagged', () => {
+  const page = require('../record_pesukim/word-marks.js');
+  const hebrew = 'וַיֹּאמֶר לָהֶם יַעֲקֹב אַחַי מֵאַיִן אַתֶּם';
+  const words = page.splitWords(hebrew);
+  const marks = core.cleanWordMarks({ 1: 'readWrongTransOk', 3: 'readOkTransWrong', 4: 'bothWrong' }, hebrew);
+  const html = page.feedbackHtml(hebrew, marks);
+  // Right to left, every word present once, in posuk order, nikud untouched.
+  assert.match(html, /class="wm-fb-posuk" dir="rtl" lang="he"/);
+  let at = -1;
+  for(const w of words){ const next = html.indexOf('>' + w, at + 1); assert.ok(next > at, w + ' is in order'); at = next; }
+  assert.equal((html.match(/class="wm-fb-word/g) || []).length, words.length);
+  // Reading and translation are told apart; a word can have both.
+  assert.match(html, new RegExp('wm-fb-read"[^>]*>' + words[1]));
+  assert.match(html, new RegExp('wm-fb-trans"[^>]*>' + words[3]));
+  assert.match(html, new RegExp('wm-fb-both"[^>]*>' + words[4]));
+  assert.match(html, /2 words read wrong · 2 words translated wrong/);
+  assert.doesNotMatch(html, new RegExp('wm-fb-(read|trans|both)"[^>]*>' + words[0]));
+  // Nothing marked, or a grade saved before word marks existed: nothing extra shown.
+  assert.equal(page.feedbackHtml(hebrew, null), '');
+  assert.equal(page.feedbackHtml(hebrew, undefined), '');
+  assert.equal(page.feedbackHtml(hebrew, []), '');
+  // Marks that do not line up with the saved Hebrew fall back to chips, never a wrong highlight.
+  const off = page.feedbackHtml('אחד שתים', [{ i: 5, word: 'שלש', mark: 'bothWrong' }]);
+  assert.match(off, /wm-chip/); assert.doesNotMatch(off, /wm-fb-posuk/);
+  // Text is escaped.
+  assert.doesNotMatch(page.feedbackHtml('<b>x</b> y', [{ i: 0, word: '<b>x</b>', mark: 'incorrect' }]), /<b>x/);
+  const student = fs.readFileSync('record_pesukim/student.html', 'utf8');
+  assert.match(student, /<script src="word-marks\.js\?v=/);
+  assert.match(student, /PosukWordMarks\.feedbackHtml\(x\.hebrewText, x\.wordMarks\)/);
+});
+
 test('rules: students and the browser can never write submissions or reviews', () => {
   for(const file of ['firebase-rules.json', 'firebase-rules.hardened.json', 'staging/database.rules.json']){
     const pp = JSON.parse(fs.readFileSync(file, 'utf8')).rules.posukPractice;
