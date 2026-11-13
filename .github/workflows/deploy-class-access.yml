@@ -112,6 +112,33 @@ jobs:
       - name: Install Cloud Functions dependencies
         run: npm ci --prefix backend/functions --ignore-scripts
 
+      # Firebase CLI resolves every secret param declared anywhere in the
+      # functions codebase before it applies --only, so loading index.js makes
+      # this deploy read unrelated secrets (PARENT_DASHBOARD_SYNC_SECRET and
+      # others) that the deploy identity must not be able to see. Deploy from an
+      # entry file that exports this one function, so no other module is loaded.
+      - name: Limit the deployed source to funTorahClassAccess
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '"use strict";' \
+            'exports.funTorahClassAccess = require("./class-access").funTorahClassAccess;' \
+            > backend/functions/class-access-deploy-entry.js
+          npm pkg set main=class-access-deploy-entry.js --prefix backend/functions
+          node -e '
+            const entry = require("./backend/functions/class-access-deploy-entry.js");
+            const names = Object.keys(entry);
+            if (names.length !== 1 || names[0] !== "funTorahClassAccess") {
+              throw new Error("Deploy entry must export only funTorahClassAccess; got: " + names.join(", "));
+            }
+            const path = require("path");
+            const source = path.resolve("backend/functions");
+            const loaded = Object.keys(require.cache).filter(file => path.dirname(file) === source).map(file => path.basename(file));
+            const allowed = ["class-access-deploy-entry.js", "class-access.js", "class-access-core.cjs"];
+            const extra = loaded.filter(name => !allowed.includes(name));
+            if (extra.length) throw new Error("Deploy entry loaded unrelated modules: " + extra.join(", "));
+          '
+
       - name: Authenticate with GitHub OIDC
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:

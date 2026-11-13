@@ -40,3 +40,17 @@ test("deployment guard requires every branch-protection check and only checks th
   assert.ok(!names.includes("navigation-policy"));
   assert.match(workflow, /missing\.length \|\| failed\.length/);
 });
+
+test("deployment loads only the class-access function, so no unrelated secret is read", () => {
+  // Firebase CLI resolves every defineSecret param in the loaded codebase, even with --only.
+  const limit = workflow.indexOf("Limit the deployed source to funTorahClassAccess");
+  const auth = workflow.indexOf("Authenticate with GitHub OIDC");
+  const deploy = workflow.indexOf("firebase deploy --only functions:funTorahClassAccess");
+  assert.ok(limit > 0 && limit < auth && auth < deploy, "the entry file is written before authentication and deployment");
+  assert.match(workflow, /exports\.funTorahClassAccess = require\("\.\/class-access"\)\.funTorahClassAccess;/);
+  assert.match(workflow, /npm pkg set main=class-access-deploy-entry\.js --prefix backend\/functions/);
+  assert.match(workflow, /Deploy entry must export only funTorahClassAccess/);
+  // The workflow itself must never be given a secret value or a secret-reading step.
+  assert.doesNotMatch(workflow, /secrets\.[A-Z_]+/);
+  assert.doesNotMatch(workflow, /^\s+(?:run:.*|- .*)(?:PARENT_DASHBOARD|functions:secrets|gcloud secrets)/m);
+});
