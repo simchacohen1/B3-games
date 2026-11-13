@@ -189,8 +189,12 @@ async function pasteWords(page: Page, text: string) {
   }, text);
   await page.getByRole('button', { name: '📋 Paste', exact: true }).click();
 }
-async function chooseTeacherTool(page: Page, tool: string) {
-  await page.locator('#teacherTool').evaluate((el: HTMLSelectElement, value) => { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); }, tool);
+// The teacher's own controls on this page: the "Shapes ▾" menu in the tool bar above the lesson.
+async function choosePenShape(page: Page, label: string, tool: string) {
+  await page.locator('#teacherDock').getByRole('button', { name: 'Shapes ▾' }).click();
+  await page.locator('#tbPenShapes').getByRole('button', { name: label, exact: true }).click();
+  await expect(page.locator('#tbPenShapes')).toBeHidden();
+  await expect(page.locator('#teacherTool')).toHaveValue(tool);
 }
 
 test('teacher pastes editable text onto the shared whiteboard and can edit it', async ({ browser }) => {
@@ -217,11 +221,15 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
   const content = (await page.locator('#pdfContent').boundingBox())!;
-  const shapes: Array<[string, string]> = [['line', 'line'], ['pen-arrow', 'g'], ['rectangle', 'rect'], ['ellipse', 'ellipse'], ['triangle', 'polygon']];
+  // A newly opened whiteboard opens the drawing toolbar on the Pen by itself within half a second, and a shape
+  // chosen before that is put back to Pen. Wait for the toolbar, as a teacher would see it, before choosing a shape.
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toBeVisible();
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Pen');
+  await expect(page.locator('#teacherTool')).toHaveValue('pen');
+  const shapes: Array<[string, string, string]> = [['line', 'line', '━ Straight line'], ['pen-arrow', 'g', '➜ Pen arrow'], ['rectangle', 'rect', '▭ Rectangle'], ['ellipse', 'ellipse', '◯ Circle / oval'], ['triangle', 'polygon', '△ Triangle']];
   for (let i = 0; i < shapes.length; i++) {
-    const [name, tag] = shapes[i];
-    // The lesson's own tool menu: the same value the toolbar sets when a shape is chosen there.
-    await chooseTeacherTool(page, name);
+    const [name, tag, label] = shapes[i];
+    await choosePenShape(page, label, name);
     const x = content.x + 80 + i * 110, y = content.y + 100;
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 65, y + 45, { steps: 4 }); await page.mouse.up();
     const mark = page.locator(`#pdfInk [data-stroke-tool="${name}"]`);
@@ -241,7 +249,7 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   });
   expect(copied.nonWhite, JSON.stringify(copied)).toBeGreaterThan(100);
 
-  await chooseTeacherTool(page, 'text');
+  await choosePenShape(page, 'T Text box', 'text');
   await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
   await expect(page.locator('#pdfTextEditDialog')).toBeVisible();
   await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
