@@ -69,8 +69,9 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    const currentSettings=fs.readFileSync(path.join(ROOT,'site-settings.js'),'utf8');
    const baseSettings=currentSettings
     .replace(/  \/\/ Popup completion and Firebase's auth-state callback can request the same\n  \/\/ authorization check at the same time\. Share only in-flight work for this\n  \/\/ UID; once it settles, the next auth event performs fresh permission reads\.\n  const accessChecksInFlight = new Map\(\);\n\n/, '')
-    .replace('function readUserAccessFromFirebase(user)', 'function readUserAccess(user)')
-    .replace(/  function readUserAccess\(user\) \{\n    const uid = user && String\(user\.uid \|\| ""\);[\s\S]*?\n  \}\n\n  function isAuthorizedUser/, '  function isAuthorizedUser');
+     .replace(/  function readUserAccess\(user\) \{\r?\n    const uid = user && String\(user\.uid \|\| ""\);[\s\S]*?\r?\n  \}\r?\n\r?\n  function isAuthorizedUser/, '  function readUserAccess(user) {\r\n    return readUserAccessFromFirebase(user);\r\n  }\r\n\r\n  function isAuthorizedUser');
+    assert.match(baseSettings, /function readUserAccess\(user\) \{\s*return readUserAccessFromFirebase\(user\);/,
+      'the comparison build must bypass only in-flight request sharing');
    const currentRuns=[],baseRuns=[];
    for(let i=0;i<3;i++){currentRuns.push(await signInRun(browser,port,currentSettings));baseRuns.push(await signInRun(browser,port,baseSettings));}
    const median=rows=>rows.map(x=>x.elapsedMs).sort((a,b)=>a-b)[Math.floor(rows.length/2)];

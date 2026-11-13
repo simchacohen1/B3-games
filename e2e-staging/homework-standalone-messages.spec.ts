@@ -21,10 +21,18 @@ async function recordVoiceNote(page: Page, box: ReturnType<Page['locator']>, sec
   await box.getByRole('button', { name: '🎙 Record voice note' }).click();
   await expect(panel).toBeVisible();
   await expect(panel.locator('.rec-dot')).toBeVisible();
-  await expect(panel.locator('.rec-time')).toHaveText(/^00:00 · 00:15 left$/);
-  await page.waitForTimeout(seconds * 1000 + 300);
-  // The timer runs: elapsed has moved on from 00:00 and the time left has dropped below 15 seconds.
-  await expect(panel.locator('.rec-time')).toHaveText(/^00:0[1-9] · 00:(0\d|1[0-4]) left$/);
+  const timer = panel.locator('.rec-time');
+  const start = await timer.textContent();
+  const match = start?.match(/^00:(\d{2}) · 00:(\d{2}) left$/);
+  expect(match, 'recording timer should show elapsed and remaining seconds').toBeTruthy();
+  const startElapsed = Number(match![1]);
+  const startRemaining = Number(match![2]);
+  expect(startElapsed + startRemaining, 'elapsed plus remaining time stays at the 15-second cap').toBe(15);
+  // Recording startup can take several seconds; wait for an actual timer tick instead of assuming 00:00.
+  await expect.poll(async () => {
+    const current = (await timer.textContent())?.match(/^00:(\d{2}) · 00:(\d{2}) left$/);
+    return !!current && Number(current[1]) > startElapsed && Number(current[2]) < startRemaining;
+  }).toBe(true);
   await expect(box.getByRole('button', { name: '■ Stop & send' })).toBeVisible();
   await box.getByRole('button', { name: '■ Stop & send' }).click();
   await expect(box.locator('.conversation-feedback')).toHaveText('Voice note sent.', { timeout: 20000 });
