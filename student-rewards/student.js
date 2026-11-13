@@ -164,6 +164,10 @@ async function trySharedB3Login(){
 async function load(){
   if(!state.studentId)return;
   const empty={val:()=>null};
+  // Firebase cost (#51): six of the paths read once below are listened to by subscribe() straight
+  // afterwards. Holding them open first makes each one download instead of two.
+  const noSync=()=>{};
+  for(const ref of [db.ref(`${ROOT}/students/${state.studentId}`),own('redemptionsByStudent'),own('classRewardContributionsByStudent'),own('refundRequests'),db.ref(`${ROOT}/rewards`),db.ref(`${ROOT}/settings/rewardStoreEnabled`)])ref.on('value',noSync,noSync);
   const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory,classRewardStatus,contributionsSnap,refundsSnap]=await Promise.all([
     db.ref(`${ROOT}/students/${state.studentId}`).once('value'),
     own('dailyRatings').once('value'),
