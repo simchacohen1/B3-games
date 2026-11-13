@@ -49,6 +49,59 @@ async function openGame(page: Page, gameName: string) {
   await page.getByRole('button', { name: `Start Game: ${gameName}`, exact: true }).click();
 }
 
+test('signing in from the Arcade returns the student with the correct name @auth @multiplayer', async ({ browser }) => {
+  test.skip(!credentials || !classAccounts.length, NOT_CONFIGURED);
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const watch = await watchPage(page);
+  try {
+    await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(page);
+    await page.getByRole('link', { name: 'Go to sign in' }).click();
+    await expect(page).toHaveURL(/index\.html(?:\?.*)?$/);
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('b3StudentReturnTo'))).toBe('multiplayer/index.html');
+    await page.locator('#studentNameInput').fill(classAccounts[0].name);
+    await page.locator('#classPinInput').fill(classAccounts[0].passcode);
+    await page.locator('#studentSignInBtn').click();
+    await expect(page).toHaveURL(/multiplayer\/index\.html$/, { timeout: 45000 });
+    await expectStagingIsolation(page);
+    await expect(page.locator('#accountStatus')).toContainText(classAccounts[0].name, { timeout: 30000 });
+    await expect(page.locator('.category-group')).toHaveCount(4);
+    expect(watch.productionRequests).toEqual([]);
+    expect(watch.pageErrors).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
+test('signed-in staging student launches Tic Tac Toe and makes a move against the computer @auth @multiplayer', async ({ browser }) => {
+  test.skip(!credentials || !classAccounts.length, NOT_CONFIGURED);
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const watch = await watchPage(page);
+  try {
+    await signInStudent(page, classAccounts[0]);
+    await page.goto(SITE + '/multiplayer/index.html', { waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(page);
+    await expect(page.locator('#accountStatus')).toContainText(classAccounts[0].name, { timeout: 30000 });
+    await openGame(page, 'Tic Tac Toe');
+    await expect(page).toHaveURL(/multiplayer\/game\.html\?game=tic-tac-toe/);
+    await expect(page.locator('#message')).toContainText('Looking for a classmate');
+    await page.getByRole('button', { name: 'Play the computer now' }).click();
+    await expect(page.locator('#room')).toBeVisible({ timeout: 30000 });
+    const emptySquares = page.locator('#board button[aria-label="Empty square"]');
+    await expect(emptySquares).toHaveCount(9);
+    await emptySquares.first().click();
+    await expect(emptySquares).toHaveCount(7, { timeout: 15000 });
+    await page.getByRole('button', { name: 'Leave game' }).click();
+    await expect(page).toHaveURL(/multiplayer\/index\.html/);
+    expect(watch.productionRequests).toEqual([]);
+    expect(watch.pageErrors).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 async function answerOneQuestion(page: Page, game: typeof gameJourneys[number]) {
   const box = page.locator(game.guestBox);
   await expect(box).toContainText(game.status, { timeout: 30000 });

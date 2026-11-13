@@ -45,9 +45,20 @@ test.describe('staging student journeys @auth', () => {
   }
 
   test('home dashboard shows the signed-in student @signin', async () => {
+    await page.evaluate(() => {
+      const studentId = sessionStorage.getItem('b3Games_studentId') || sessionStorage.getItem('posukPractice_studentId') || '';
+      for (const tool of ['chazara', 'class-gallery', 'shorashim']) {
+        localStorage.setItem(`b3Games_lastVisit_${studentId}_${tool}`, String(Date.now()));
+      }
+      // Keep the fictional Posuk greeting eligible for this deterministic check.
+      localStorage.removeItem(`b3Games_lastVisit_${studentId}_posuk-practice-scroll`);
+    });
     await openTool('/');
     await expect(page.locator('#studentBar')).toBeVisible({ timeout: 45000 });
     await expect(page.locator('#studentBar')).toContainText(student.name);
+    const posukTile = page.locator('.game-card[data-game-id="posuk-practice-scroll"]');
+    await expect(posukTile.locator('.student-nudge')).toBeVisible({ timeout: 15000 });
+    await expect(posukTile.locator('.student-nudge')).toContainText(student.name.split(/\s+/)[0]);
   });
 
   test('Weekly Quiz shows the assigned fictional quiz', async () => {
