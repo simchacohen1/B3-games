@@ -89,3 +89,48 @@ test('the existing Sync to Nigri page is untouched by this screen', () => {
   const index = fs.readFileSync(dir + 'index.html', 'utf8');
   assert.doesNotMatch(index, /my-login|nigri-login/);
 });
+
+// ---- Step 3: grade + course matching display, and the Owner Admin grade setting ----
+test('courses: asks the server for one class, URL-encoded, and returns grade and courses', async () => {
+  const e = env([{ status: 200, body: { grade: 'B3 ET', courses: [{ slot: 'davening', label: 'Davening', courseId: 28734, available: true, reason: null }] } }]);
+  const r = await C.courses(e, 'TEST-ALEF/../x');
+  assert.equal(e.calls[0].url, 'https://staging-sync.example.test/nigri-courses?class=TEST-ALEF%2F..%2Fx');
+  assert.equal(e.calls[0].opt.method, 'GET');
+  assert.deepEqual([r.ok, r.grade, r.courses.length], [true, 'B3 ET', 1]);
+});
+
+test('courses: refusals read plainly (not his class, no grade, not turned on)', async () => {
+  for (const [status, body, expect] of [[403, { error: 'That is not one of your classes.' }, /not one of your classes/],
+    [400, { error: 'The owner has not set which Nigri grade this class belongs to.' }, /owner has not set/], [404, {}, /not turned on/]]) {
+    const r = await C.courses(env([{ status, body }]), 'x');
+    assert.equal(r.ok, false); assert.match(r.message, expect);
+  }
+});
+
+test('courseLine: ready, or why it is not, without IDs', () => {
+  assert.equal(C.courseLine({ label: 'Davening', available: true }), 'Davening \u2014 ready');
+  assert.equal(C.courseLine({ label: 'Friday Class 1', available: false, reason: 'Your Nigri login cannot see this class.', courseId: 28910 }),
+    'Friday Class 1 \u2014 not available: Your Nigri login cannot see this class.');
+  assert.ok(!C.courseLine({ label: 'x', available: true, courseId: 28734 }).includes('28734'));
+});
+
+test('login page lists classes from his own teacher record and never names shared rooms', () => {
+  assert.match(html, /id="classPick"/); assert.match(html, /firebase-database-compat\.js/);
+  assert.match(screen, /teachers\/' \+ u\.uid \+ '\/classIds/);
+  for (const src of [html, screen, clientSrc]) assert.doesNotMatch(src, /Conference Room|Rally Room/i);
+});
+
+test('Owner Admin: Nigri grade dropdown saves classes/<id>/nigriGrade, only B3 ET / B3 WT / not set', () => {
+  const admin = fs.readFileSync(__dirname + '/../owner-admin.html', 'utf8');
+  assert.match(admin, /id="nigriGrade"/);
+  assert.match(admin, /classes\/"\+classId\+"\/nigriGrade"\)\.set\(v\|\|null\)/);
+  const opts = [...admin.matchAll(/<option value="(B3 [EW]T)"/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(opts)].sort(), ['B3 ET', 'B3 WT']);
+  const scripts = [...admin.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+  new vm.Script(scripts);
+});
+
+test('course list refreshes after Save and after Remove', () => {
+  assert.match(screen, /busy\(false\); if \(r\.ok\) showCourses\(\);\s*\/\/ which classes/);
+  assert.match(screen, /Removed\.'; busy\(false\); if \(r\.ok\) showCourses\(\);/);
+});
