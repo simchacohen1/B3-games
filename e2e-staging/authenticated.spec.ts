@@ -330,10 +330,14 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
     await expect(studentCard).toContainText('Handed in');
     await studentPage.getByRole('tab', { name: /Handed In/ }).click();
     studentCard = await openCard('#section-handed');
-    await studentCard.getByRole('button', { name: /Message your teacher|Read messages/ }).click();
-    await studentCard.locator('.home-conversation textarea').fill('Could you check my answer?');
-    await studentCard.getByRole('button', { name: 'Send message' }).click();
-    await expect(studentCard).toContainText('Could you check my answer?');
+    await studentCard.getByRole('button', { name: /Message my teacher about this/ }).click();
+    const messagesTab = studentPage.locator('#list [role="tabpanel"][data-tab="messages"]');
+    await expect(messagesTab.locator('.dm-head strong')).toBeVisible();
+    await expect(messagesTab.locator('.dm-head small')).toHaveText('Teacher');
+    await expect(messagesTab.locator('.dm-chip')).toContainText(title);
+    await messagesTab.getByRole('textbox', { name: 'Type a message' }).fill('Could you check my answer?');
+    await messagesTab.getByRole('button', { name: 'Send message' }).click();
+    await expect(messagesTab.locator('.dm-thread')).toContainText('Could you check my answer?');
 
     const studentVoice = await studentPage.evaluate(async assignmentId => {
       const audio = 'data:audio/webm;base64,GkXfowcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
@@ -365,13 +369,31 @@ test('fictional teacher publishes homework for a fictional student @auth @homewo
 
     await teacherPage.reload({ waitUntil: 'domcontentloaded' });
     await expectStagingIsolation(teacherPage);
+    await teacherPage.locator('#openMessages').click();
+    const teacherMessages = teacherPage.locator('#dmBox');
+    const studentContact = teacherMessages.locator('.dm-contact').filter({ hasText: student.name });
+    await expect(studentContact).toHaveCount(1);
+    await studentContact.click();
+    await expect(teacherMessages.locator('.dm-head strong')).toHaveText(student.name);
+    await expect(teacherMessages.locator('.dm-thread')).toContainText('Could you check my answer?');
+    await teacherMessages.getByRole('textbox', { name: 'Type a message' }).fill('I will review this homework now.');
+    await teacherMessages.getByRole('button', { name: 'Send message' }).click();
+    await expect(teacherMessages.locator('.dm-thread')).toContainText('I will review this homework now.');
+    const assignedTeacherName = (await messagesTab.locator('.dm-head strong').textContent())?.trim() || '';
+    expect(assignedTeacherName).not.toBe('');
+    await studentPage.reload({ waitUntil: 'domcontentloaded' });
+    await expectStagingIsolation(studentPage);
+    await studentPage.getByRole('tab', { name: /Messages/ }).click();
+    const reloadedMessages = studentPage.locator('#list [role="tabpanel"][data-tab="messages"]');
+    await reloadedMessages.locator('.dm-contact').filter({ hasText: assignedTeacherName }).click();
+    await expect(reloadedMessages.locator('.dm-thread')).toContainText('I will review this homework now.');
+    await teacherPage.locator('#screenMessages .backHome').click();
     await teacherPage.getByRole('button', { name: /Check Assignments/ }).click();
     teacherCard = teacherPage.locator('#reviewList .card').filter({ hasText: title });
     await expect(teacherCard).toContainText(student.name);
     // Review entries are collapsed <details>; open the entry before checking
     // the conversation controls or attempting to reply.
     await teacherCard.locator('summary').click();
-    await expect(teacherCard).toContainText('Could you check my answer?');
     await expect(teacherCard.getByRole('button', { name: /Play voice note/ })).toBeVisible();
     await teacherCard.locator('.home-conversation textarea').fill('Yes—please add one more example.');
     await teacherCard.getByRole('button', { name: 'Send message' }).click();
