@@ -1258,7 +1258,6 @@
 
   <header class="top">
     <h1>📖 Mishnayos Practice</h1>
-    <p>Read the Mishnah. Translate it. Show you understand it!</p>
   </header>
 
   <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
@@ -1334,13 +1333,6 @@
           <h3>📖 Read the Hebrew</h3>
           <span class="step-chip">STEP 1</span>
         </div>
-        <div class="instruction-card">
-          <div class="instruction-copy">
-            <strong>Read the selected Hebrew out loud.</strong>
-            <span>Tap the microphone, wait for the Hebrew to become clear, then read. Stay quiet when you finish.</span>
-          </div>
-          <button class="listen-btn" id="readingInstructionBtn" type="button">🔊 Listen</button>
-        </div>
         <div class="record-stage">
           <div class="record-row">
             <button class="seal-btn" id="hebrewRecordBtn" title="Start reading" aria-label="Start or stop reading">🎙️</button>
@@ -1362,14 +1354,6 @@
           <h3>🔤 Translate</h3>
           <span class="step-chip">STEP 2</span>
         </div>
-        <div class="instruction-card">
-          <div class="instruction-copy">
-            <strong>Tap a Hebrew piece, wait for it to turn clear, then say its English meaning.</strong>
-            <span>When you finish speaking, stay quiet for a moment. It will stop and save by itself.</span>
-          </div>
-          <button class="listen-btn" id="translationInstructionBtn" type="button">🔊 Listen</button>
-        </div>
-
         <div class="chunk-level-row">
           <button class="btn small gold" id="chunkSmallerBtn">➖ Smaller</button>
           <span class="chunk-level-label" id="chunkLevelLabel"></span>
@@ -2383,8 +2367,6 @@ function studentDirection(task){
     : 'Tell what this part of the Mishnah says, in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
 }
 
-document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
-document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
 document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));
 
 const historyToggleBtn = document.getElementById('historyToggleBtn');
