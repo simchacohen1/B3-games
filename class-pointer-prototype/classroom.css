@@ -33,27 +33,7 @@ body.lesson-expanded{overflow:hidden}
 .share-area-shade{position:absolute;inset:0;background:transparent;pointer-events:none}
 .share-area-selection{position:absolute;border:3px solid #ffcc00;box-shadow:0 0 0 9999px #07152966,0 0 0 1px #fff6;border-radius:6px;pointer-events:none}
 
-/* Full-screen teaching controls stay inside the fullscreen stage so the teacher never has to exit to change tools. */
-.fullscreen-teacher-toolbar{position:absolute;top:10px;left:10px;right:92px;z-index:6;background:#101827e8;color:white;border:1px solid #ffffff38;border-radius:12px;box-shadow:0 8px 28px #0007;backdrop-filter:blur(10px);padding:8px;pointer-events:auto}
-.fullscreen-toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 6px}
-.fullscreen-toolbar-top strong{font-size:13px;letter-spacing:.02em}
-.fullscreen-toolbar-collapse{padding:5px 9px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
-.fullscreen-toolbar-body{display:flex;flex-wrap:wrap;align-items:end;gap:6px}
-.fullscreen-toolbar-control{display:flex;align-items:center;gap:4px;margin:0;color:#e8eef8;font-size:11px}
-.fullscreen-toolbar-control>span{white-space:nowrap}
-.fullscreen-toolbar-control select,.fullscreen-toolbar-control button{min-height:32px;padding:5px 8px;border-radius:7px;font-size:12px;background:#f8fafc;color:#172033;border-color:#cbd5e1}
-.fullscreen-toolbar-control select{max-width:135px}
-.fullscreen-toolbar-control input[type=checkbox]{width:16px;height:16px;margin:0}
-.fullscreen-toolbar-control button.active{background:#2557d6;color:white;border-color:#7ba2ff}
-.fullscreen-toolbar-control button.danger{background:#8f2630;color:white;border-color:#d7646e}
-.fullscreen-zoom-readout{align-self:center;min-width:40px;text-align:center;font-size:12px;font-weight:700;color:#dbeafe}
-.fullscreen-teacher-toolbar.collapsed{right:auto;min-width:190px}
-.fullscreen-teacher-toolbar.collapsed .fullscreen-toolbar-top{padding-bottom:0}
 #stage:fullscreen .share-area-dialog,#stage.lesson-fullscreen .share-area-dialog{z-index:20}
-@media(max-width:850px){
-  .fullscreen-teacher-toolbar{right:74px;max-height:42vh;overflow:auto}
-  .fullscreen-toolbar-control select,.fullscreen-toolbar-control button{font-size:11px;padding:4px 6px}
-}
 
 .drawing-owner-label{position:absolute;z-index:5;pointer-events:none;background:#172033ee;color:white;border:1px solid #ffffff55;border-radius:6px;padding:4px 7px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px #0005;transform:translateY(-100%)}
 
@@ -103,93 +83,13 @@ footer{padding-top:8px;border-top:1px solid #e9edf5;color:#738098}
 #highlightLayer [data-tool="crayon"]{opacity:.78!important;stroke-dasharray:8 4}
 @media(max-width:720px){main{margin:10px;padding:16px;border-radius:18px}.tool-card{padding:15px}.tool-controls{align-items:stretch}.field{width:100%}.field select{width:100%}.roster-row{gap:8px}}
 
-/* Student tools remain inside the shared lesson, including native fullscreen. */
-.student-floating-toolbar{right:auto;width:max-content;max-width:calc(100% - 24px);max-height:calc(100% - 24px);overflow:auto;background:#fffffff2;color:#23334e;border:2px solid #b9cbff;box-shadow:0 6px 24px #17203340}
-.student-floating-toolbar .fullscreen-toolbar-top{cursor:move;touch-action:none;color:#234ea8}
-.student-floating-toolbar .fullscreen-toolbar-control{color:#45536c}
-.student-floating-toolbar .fullscreen-toolbar-body{gap:8px}
-.student-floating-toolbar .fullscreen-toolbar-collapse{background:#e8efff!important;color:#234ea8!important}
-.student-floating-toolbar.collapsed{min-width:0}
-.student-floating-toolbar .fullscreen-toolbar-control select{max-width:125px}
-
-/* Student roster inside the full-screen teacher toolbar. */
-.fullscreen-toolbar-top{flex-wrap:wrap}
-.fullscreen-roster-toggle{margin-left:auto;padding:5px 10px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
-.fullscreen-roster-toggle.active{background:#2557d6!important}
-.fullscreen-roster-toggle.alert{background:#d97706!important;border-color:#fcd34d!important;animation:rosterPulse 1.2s ease-in-out infinite}
-@keyframes rosterPulse{50%{box-shadow:0 0 0 4px #fbbf2466}}
-.fullscreen-roster-panel{margin-top:8px;background:#f8fafc;color:#172033;border-radius:10px;padding:8px 12px;max-height:45vh;overflow:auto}
-.fullscreen-roster-panel>strong{display:block;font-size:12px;color:#34445f;margin-bottom:2px}
-.fullscreen-roster-panel #roster{margin-top:0;font-size:13px}
-.fullscreen-roster-panel .roster-row{padding:6px 0;gap:8px}
-.fullscreen-roster-panel .roster-row span{min-width:120px}
-.fullscreen-roster-panel .roster-row button{padding:5px 9px;font-size:12px}
-.fullscreen-roster-panel .roster-row label{padding:4px 8px;font-size:12px}
-
-/* Teacher dock: one compact toolbar directly above the lesson; floats inside the lesson in full screen. */
+/* Teacher page: the drawing toolbar (annotation-toolbar.js) is the only toolbar. The teacher leaves full screen from its More menu or with Escape. */
 .session-controls{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
 .session-controls button.quiet{background:#fff;color:#56637a;font-weight:650}
 body.teacher-view .lesson-actions{display:none}
 body.teacher-view #pointerStatus{display:none}
 body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
-.teacher-dock{position:sticky;top:8px;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;padding:6px;background:#ffffffee;border:1px solid #dbe3f2;border-radius:16px;box-shadow:0 6px 20px #23355a1a;backdrop-filter:blur(8px)}
-.teacher-dock button,.teacher-dock select{box-shadow:none}
-.tb-group{display:flex;align-items:center;gap:3px;padding:2px;background:#f3f6fc;border-radius:12px}
-.tb-spacer{flex:1}
-.tb-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 11px;border:0;border-radius:10px;background:transparent;color:#2a3a57;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
-.tb-btn:hover:enabled{background:#e4ecfb}
-.tb-btn[aria-pressed="true"]{background:#3268e8;color:#fff;box-shadow:0 2px 6px #3268e855}
-.tb-btn[aria-pressed="true"]:hover{background:#2758ce}
-.tb-ico{font-size:17px;line-height:1}
-.tb-caret{padding:6px 7px;margin-left:-4px;font-size:12px}
-.tb-swatches button{width:26px;height:26px;min-height:0;padding:0;margin:0 1px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px #c9d3e4;cursor:pointer}
-.tb-swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px #23334e;transform:scale(1.08)}
-.tb-sizes button{display:grid;place-items:center;width:32px;height:34px;min-height:0;padding:0;border:0;border-radius:9px;background:transparent;cursor:pointer}
-.tb-sizes i{display:block;width:var(--d);height:var(--d);border-radius:50%;background:#2a3a57}
-.tb-sizes button[aria-pressed="true"]{background:#dfe8fb}
-.tb-sizes.dim{opacity:.45}
-.tb-toggle{gap:4px;cursor:pointer;user-select:none}
-.tb-toggle input{position:absolute;opacity:0;pointer-events:none}
-.tb-toggle:has(input:checked){background:#ffe58a;color:#4a3b00}
-.tb-toggle:has(input:focus-visible){outline:2px solid #3268e8}
-.tb-menu-wrap{position:relative;display:inline-flex}
-.tb-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;display:grid;gap:2px;min-width:190px;padding:6px;background:#fff;border:1px solid #dbe3f2;border-radius:14px;box-shadow:0 14px 40px #1a284633;color:#23334e}
-.tb-menu-right{left:auto;right:0}
-.tb-menu>button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;border-radius:9px;background:transparent;text-align:left;font-size:14px;font-weight:650;cursor:pointer}
-.tb-menu>button:hover:enabled{background:#eef3fd}
-.tb-menu>button.active{background:#e3ebfd;color:#234ea8}
-.tb-menu>button span{width:20px;text-align:center}
-.tb-menu>button.danger{color:#b4232f}
-.tb-menu>button.danger:hover:enabled{background:#fdecee}
-.tb-menu small{padding:8px 11px 2px;color:#7a869b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-.tb-view-menu{min-width:260px}
-.tb-view-menu .share-view-controls{margin:0;padding:4px;background:none;border:0;display:flex;flex-wrap:wrap;gap:6px}
-.tb-view-menu .share-view-controls button{padding:8px 10px;font-size:13px}
-.tb-students{width:min(420px,88vw);max-height:min(60vh,520px);overflow:auto;padding:12px}
-.tb-students .field{margin-bottom:6px}
-.tb-students .field select{width:100%}
-.tb-students #roster{margin-top:6px;font-size:14px;color:#56637a}
-.tb-students .roster-row{padding:8px 0;gap:8px}
-.tb-students .roster-row span{min-width:110px}
-.tb-students .roster-row button{padding:6px 10px;font-size:13px}
-.tb-students .roster-row label{padding:5px 8px;font-size:12px}
-#tbStudentsBtn.alert{background:#f59e0b;color:#fff;animation:rosterPulse 1.2s ease-in-out infinite}
-.tb-collapse{display:none}
-.teacher-dock.floating{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 20px);margin:0;background:#ffffffeb;z-index:8}
-.teacher-dock.floating .tb-collapse{display:inline-flex}
-.teacher-dock.floating.collapsed>*:not(.tb-group:last-child),.teacher-dock.floating.collapsed .tb-group:last-child>*:not(.tb-collapse):not(#tbFullscreen){display:none}
-.teacher-dock.floating.collapsed .tb-collapse::after{content:' Tools'}
-.teacher-dock.floating.collapsed .tb-collapse{font-size:0}
-.teacher-dock.floating.collapsed .tb-collapse::after{font-size:14px;content:'🛠 Tools'}
 #stage{margin-top:10px}
-@media(max-width:900px){.tb-text{display:none}.tb-btn{padding:6px 9px}}
-@media(max-width:560px){.teacher-dock{gap:4px}.tb-swatches button{width:22px;height:22px}}
-.tb-swatches button:hover:enabled{background:var(--c)}
-.tb-sizes button:hover:enabled{background:#e4ecfb}
-
-body.student-dock-view .student-tool-card,body.student-dock-view .lesson-actions{display:none}
-body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
-.teacher-dock.floating.collapsed .tb-group:last-child [id$="tbFullscreen"]{display:inline-flex}
 
 .tab-controls{display:inline-flex;flex-wrap:wrap;gap:8px}
 .tab-controls[hidden]{display:none}
@@ -239,68 +139,8 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 #stage.mouse-navigation #pdfContent:active{cursor:grabbing}
 #navigationHint{margin:8px 0;font-size:14px}
 
-/* Fullscreen teacher tools: narrow, movable side rail instead of a top banner. */
-#stage .teacher-dock.floating{
-  top:12px;left:12px;right:auto;bottom:auto;transform:none;
-  width:fit-content;max-width:190px;max-height:calc(100% - 24px);
-  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
-  overflow:visible;
-}
-#stage .teacher-dock.floating>.tb-group{justify-content:center;flex-wrap:wrap}
-#stage .teacher-dock.floating>.tb-spacer{display:none}
-#stage .teacher-dock.floating .tb-menu{top:0;left:calc(100% + 6px);right:auto;max-height:75vh;overflow:auto}
-#stage .teacher-dock.floating.collapsed{width:auto;max-width:190px}
-#stage .teacher-dock.floating.collapsed>.tb-move-handle{display:inline-flex}
-#stage .teacher-dock.floating.collapsed .tb-group:last-child{display:flex}
-#stage .teacher-dock.floating.collapsed .tb-menu{display:none}
-
-
-/* Compact full-screen side tab: one toolbar, no duplicate top controls. */
-#stage .teacher-dock.floating.collapsed {
-  top:12px;
-  left:0;
-  right:auto;
-  width:44px;
-  max-width:44px;
-  padding:5px;
-  border-radius:0 12px 12px 0;
-  gap:0;
-}
-#stage .teacher-dock.floating.collapsed > .tb-move-handle,
-#stage .teacher-dock.floating.collapsed > .tb-group {display:none!important}
-#stage .teacher-dock.floating.collapsed > .tb-group:last-child {display:flex!important}
-#stage .teacher-dock.floating.collapsed > .tb-group:last-child > * {display:none!important}
-#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .tb-collapse {
-  display:inline-flex!important;
-  width:34px;
-  min-width:34px;
-  min-height:38px;
-  justify-content:center;
-  padding:4px;
-}
-#stage .teacher-dock.floating.collapsed .tb-collapse::after {content:'☰'!important;font-size:22px}
-#stage .teacher-dock.floating.collapsed .tb-collapse {font-size:0}
-#stage .teacher-dock.floating.collapsed .tb-menu {display:none!important}
-#stage:has(.teacher-dock.floating) > #fullscreenTeacherToolbar {display:none!important}
-
-/* One tool-permission preset shared by every selected pupil. */
-.tb-students .permission-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:12px;background:#edf5ff;color:#142942}
-.tb-students .permission-tools strong{flex-basis:100%;font-size:14px}
-.tb-students .permission-tools label{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #bed1ec;border-radius:8px;background:#fff;font-weight:700;cursor:pointer}
-.tb-students .permission-tools input{width:17px;height:17px;accent-color:#2361b2}
-.tb-students .pointer-bulk-actions{display:flex;gap:8px;margin:10px 0}
-.tb-students .pointer-bulk-actions button{flex:1;padding:9px 12px;font-weight:750;border-radius:8px}
-.tb-students .roster-row label{margin-left:auto;display:flex;align-items:center;gap:6px}
-.tb-students .roster-row label input{width:18px;height:18px}
-
 /* 2026-10-13: Edge-friendly maximized teaching, without browser Fullscreen API. */
 body.lesson-expanded #stage.lesson-fullscreen{position:fixed;inset:0;width:100%;height:100dvh;z-index:10000;border-radius:0}
-.tb-students{max-width:min(94vw,560px)!important;max-height:min(75dvh,650px)!important;min-width:min(330px,94vw);overflow:auto!important;resize:both;overscroll-behavior:contain}
-.tb-students #roster{max-height:55dvh;overflow-y:auto}
-.tb-roster-handle{cursor:grab;touch-action:none;background:#e8efff;color:#173c77;padding:9px 12px;border-radius:9px;font-weight:750;user-select:none}
-.tb-roster-handle:active{cursor:grabbing}
-.teacher-dock .tb-menu-wrap{position:relative}
-@media(max-width:700px){.tb-students{max-height:70dvh!important;width:min(94vw,420px)}}
 
 /* Clean teaching workspace: no extra vertical space consumed by secondary controls. */
 body.teacher-view main{max-width:none;margin:0 auto;padding:10px 16px 18px;border-radius:0}
@@ -321,7 +161,6 @@ body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
 /* Keep the restart control visible when the classroom has ended; the compact
    teacher workspace otherwise hides its original action buttons. */
 body.teacher-view .session-controls>#startClass:not([hidden]){display:inline-flex!important;align-items:center;background:#1d4ed8;color:white}
-
 
 /* Teacher sharing is enabled or disabled; room lifecycle is automatic. */
 body.teacher-view #endClass{display:none!important}

@@ -76,9 +76,26 @@ function init(){
  invite.title='Copy the student join link';
  const inviteText=invite.querySelector('span');
  topbar.append(invite);
- const studentsBtn=iconButton('cp-topbar-btn cp-students-toggle','users','Students');studentsBtn.id='cpStudentsToggle';
+ /* Students: the one place to choose who can point, highlight or draw. Big and yellow so it cannot be missed. */
+ const studentsBtn=el('button','cp-topbar-btn cp-students-toggle');studentsBtn.type='button';studentsBtn.id='cpStudentsToggle';
+ const studentsText=el('span','cp-students-text');
+ studentsText.append(el('strong',null,'Students'),el('small',null,'who can point & draw'));
+ studentsBtn.append(icon('users',26),studentsText);
+ studentsBtn.setAttribute('aria-label','Students: choose who can point and draw');
+ studentsBtn.title='Choose which students can point, highlight or draw on your lesson';
  studentsBtn.setAttribute('aria-controls','cpStudentsDrawer');
- topbar.append(studentsBtn);
+ /* A small tip points at the button the first time a lesson is live. It goes away for good on first use. */
+ const studentsWrap=el('span','cp-students-wrap');
+ const studentsHint=el('div','cp-students-hint');studentsHint.id='cpStudentsHint';studentsHint.hidden=true;studentsHint.setAttribute('role','status');
+ const hintClose=el('button','cp-students-hint-x','✕');hintClose.type='button';hintClose.setAttribute('aria-label','Close this tip');
+ studentsHint.append(el('span',null,'Let students point or draw: click here'),hintClose);
+ studentsWrap.append(studentsBtn,studentsHint);
+ topbar.append(studentsWrap);
+ const HINT_KEY='classPointerStudentsHintSeen';
+ let hintSeen=false;try{hintSeen=localStorage.getItem(HINT_KEY)==='1'}catch{}
+ function dismissHint(){studentsHint.hidden=true;if(hintSeen)return;hintSeen=true;try{localStorage.setItem(HINT_KEY,'1')}catch{}}
+ function syncHint(){studentsHint.hidden=hintSeen||!document.body.classList.contains('cp-is-live')||!document.body.classList.contains('cp-drawer-closed')}
+ hintClose.addEventListener('click',event=>{event.stopPropagation();dismissHint()});
  /* First-time guide: five short steps. Opens by itself the first time a teacher uses Class Pointer. */
  const guideBtn=el('button','cp-topbar-btn cp-guide-btn','❓ Help');guideBtn.type='button';guideBtn.id='cpGuideBtn';
  guideBtn.title='How Class Pointer works: a short guide';
@@ -91,11 +108,11 @@ function init(){
  const intro=el('p','cp-guide-intro','Students who are signed in to Fun Torah Tools connect by themselves. They do not need a link and do not need to leave the activity they are on.');
  const steps=el('ol','cp-guide-steps');
  for(const [head,text] of [
-  ['Show your lesson','In My screen, pick what to teach from: Share my screen, a PDF, a webpage or a whiteboard. Every student in this class sees it right away.'],
-  ['Let students point or draw on it','Click Students. For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows their name.'],
+  ['Show your lesson','In My screen, pick what to teach from: Share my screen, a PDF, a webpage or a whiteboard. Every student in this class sees it right away. Your pointer and drawing tools are in the white toolbar on the left. ➖ Hide shrinks it to a pencil button.'],
+  ['Let students point or draw on it','Click the big yellow Students button (top bar, or on the white toolbar in full screen). For Everyone, or for one student, choose Nothing, Pointer, + Highlight or + Pen. Each student’s pointer shows their name.'],
   ['See your students’ screens','Click Student screens. Each student gets a blue Share My Screen button. They click it and choose Entire Screen. Their screen appears here as a tile, and the list on top shows who has not shared yet.'],
   ['Point or draw on a student’s screen','Click a student’s screen to open it large. Choose 👆 Point or ✏️ Pen. They see your marks on their own screen. 🧽 Clear takes them off.'],
-  ['When you are done','Click the red Stop sharing button to stop what students are watching. Student screen sharing: ON · turn off (top bar) stops all student screens. To end the class, close this page; students go back to what they were doing.']
+  ['When you are done','Click the red Stop button (above the lesson, or on the white toolbar in full screen) to stop what students are watching. Student screen sharing: ON · turn off (top bar) stops all student screens. To end the class, close this page; students go back to what they were doing.']
  ]){const li=el('li');li.append(el('strong',null,head),el('span',null,text));steps.append(li)}
  const note=el('p','cp-guide-note','The browser always asks a student before their screen is shared. Nothing is recorded. Keep Zoom open for voices and cameras.');
  const guideOk=el('button','cp-guide-ok','Got it');guideOk.type='button';
@@ -152,7 +169,6 @@ function init(){
 
  /* Original permissions menu stays in the drawer (hidden by CSS) so full screen keeps working. */
  const menu=$('tbStudentsMenu');
- const menuHome=menu?.parentElement;
  if(menu){menu.hidden=false;menu.classList.add('teacher-dashboard-roster');sidebar.append(menu)}
  const menuSlot=document.createComment('student-permissions-home');if(menu)menu.after(menuSlot);
  const retry=$('startClass');if(retry)sidebar.append(retry);
@@ -184,7 +200,7 @@ function init(){
   setTimeout(()=>window.dispatchEvent(new Event('resize')),60);
  }
  setDrawer(false);
- studentsBtn.addEventListener('click',()=>setDrawer(document.body.classList.contains('cp-drawer-closed')));
+ studentsBtn.addEventListener('click',()=>{dismissHint();setDrawer(document.body.classList.contains('cp-drawer-closed'))});
  closeDrawer.addEventListener('click',()=>setDrawer(false));
 
  /* Drawer starts below the top bar, so the bar keeps its full width. */
@@ -289,7 +305,7 @@ function init(){
  /* ---------- Tabs row: tabs on the left, live status on the right ---------- */
  const tabs=document.querySelector('.cp-workspace-tabs');
  const tabsRow=el('div','cp-tabs-row');
- if(tabs){tabs.before(tabsRow);tabsRow.append(tabs)}else{const dock=$('teacherDock');(dock||panel).before(tabsRow)}
+ if(tabs){tabs.before(tabsRow);tabsRow.append(tabs)}else($('stage')||panel).before(tabsRow)
  tabsRow.append(el('span','cp-tabs-spacer'));
  const liveWrap=el('div','cp-live-wrap');
  const live=el('span','cp-live-chip','Live');
@@ -305,23 +321,18 @@ function init(){
   if(short[id]){node.dataset.longLabel=node.textContent;node.replaceChildren(icon(short[id][0]),el('span',null,short[id][1]))}
   switchMenu.append(node);
  }
- const stopBtn=iconButton('cp-stop-btn','stop','Stop presenting');
+ /* The one red Stop button, above the lesson. In full screen this row is hidden; the drawing toolbar shows its own red Stop that clicks this one. */
+ const stopBtn=iconButton('cp-stop-btn','stop','Stop presenting');stopBtn.id='cpStopBtn';
+ stopBtn.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
  switchWrap.append(switchBtn,switchMenu);
  const fullBtn=$('fullScreenLesson');
  if(fullBtn){fullBtn.replaceChildren(icon('full'));fullBtn.setAttribute('aria-label','Full screen');fullBtn.title='Full screen';fullBtn.classList.add('cp-icon-btn')}
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
  liveWrap.append(switchWrap,stopBtn);
- /* Full screen: the tabs row is hidden, so the floating toolbar gets its own red Stop button. */
- const dockStop=iconButton('tb-btn cp-dock-stop','stop','Stop');dockStop.id='cpDockStop';dockStop.hidden=true;
- dockStop.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
- dockStop.addEventListener('click',()=>stopBtn.click());
- {const fsBtn=$('tbFullscreen');if(fsBtn)fsBtn.before(dockStop);else $('teacherDock')?.append(dockStop)}
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
- document.getElementById('tbStudentsBtn')?.closest('.tb-menu-wrap')?.classList.add('teacher-dashboard-menu-trigger');
- document.getElementById('teacherDock')?.querySelector('[data-menu="tbShareMenu"]')?.closest('.tb-menu-wrap')?.classList.add('teacher-dashboard-share-trigger');
  const emptyActions=document.querySelector('.lesson-actions');if(emptyActions&&!emptyActions.children.length)emptyActions.hidden=true;
 
  function openSwitch(open){
@@ -421,9 +432,7 @@ function init(){
   liveWrap.hidden=!isLive;
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
-  const stopLabel=stopBtn.querySelector('span')?.textContent||'Stop';
-  dockStop.hidden=!isLive;dockStop.querySelector('span').textContent=stopLabel;
-  dockStop.dataset.short='Stop\n'+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc==='Whiteboard'?'board':'page'):'screen');
+  syncHint();
   syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
   syncLibrary();
@@ -434,42 +443,33 @@ function init(){
  new MutationObserver(syncLive).observe(panel,{attributes:true,attributeFilter:['hidden']});
  syncLive();
 
- /* ---------- Toolbar: Box moves into the Shapes menu ---------- */
- const shapesMenu=$('tbPenShapes');
- if(shapesMenu&&!shapesMenu.querySelector('[data-draw="box"]')){
-  const box=el('button',null,'▧ Highlight box');box.type='button';box.dataset.draw='box';
-  shapesMenu.prepend(box);
- }
-
- /* ---------- Full screen: the same Students panel opens over the lesson from the 👥 button ---------- */
+ /* ---------- Full screen: the same Students panel opens over the lesson from the toolbar's Students button ---------- */
  const panelHome=document.createComment('students-panel-home');sidebar.before(panelHome);
  for(const type of ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'])sidebar.addEventListener(type,e=>{if(sidebar.classList.contains('cp-drawer-overlay'))e.stopPropagation()});
  sidebar.addEventListener('pointerenter',()=>{if(sidebar.classList.contains('cp-drawer-overlay'))stage?.dispatchEvent(new PointerEvent('pointerleave'))});
- const studentsDockBtn=$('tbStudentsBtn');
  let wasExpanded=false;
  function isExpanded(){return !!stage&&(stage.classList.contains('lesson-fullscreen')||document.fullscreenElement===stage)}
  function setOverlay(open){
   sidebar.classList.toggle('cp-overlay-open',open);
-  studentsDockBtn?.setAttribute('aria-expanded',String(open));
-  studentsDockBtn?.classList.toggle('cp-dock-active',open);
   if(open)queueRender();
  }
  function syncExpanded(){
   const expanded=isExpanded();
   if(expanded===wasExpanded)return;
   wasExpanded=expanded;
-  menuHome?.classList.toggle('teacher-dashboard-menu-trigger',!expanded);
   if(expanded){stage.append(sidebar);sidebar.classList.add('cp-drawer-overlay');sidebar.dataset.stageUi='true';setOverlay(false)}
   else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;for(const prop of ['left','right','top','bottom','width','height'])sidebar.style.removeProperty(prop);panelHome.after(sidebar)}
  }
  if(stage)new MutationObserver(syncExpanded).observe(stage,{attributes:true,attributeFilter:['class']});
  document.addEventListener('fullscreenchange',syncExpanded);
- studentsDockBtn?.addEventListener('click',e=>{
-  if(!isExpanded())return;
-  e.preventDefault();e.stopImmediatePropagation();
-  if(menu)menu.hidden=true;
-  setOverlay(!sidebar.classList.contains('cp-overlay-open'));
- },true);
+ /* The drawing toolbar's Students button (classroom-annotate.js) opens the same panel: the drawer beside the
+    lesson, or the panel over the lesson in full screen. */
+ const studentsOpen=()=>isExpanded()?sidebar.classList.contains('cp-overlay-open'):!document.body.classList.contains('cp-drawer-closed');
+ window.ClassPointerStudentsPanel={
+  toggle(){dismissHint();if(isExpanded())setOverlay(!studentsOpen());else setDrawer(!studentsOpen())},
+  isOpen:studentsOpen,
+  waiting:()=>(R()?.list()||[]).filter(m=>!m.admitted).length
+ };
  closeDrawer.addEventListener('click',e=>{if(sidebar.classList.contains('cp-drawer-overlay')){e.stopImmediatePropagation();setOverlay(false)}},true);
 
  // Drag the full-screen Students panel by its header without altering any student permissions.
@@ -492,40 +492,19 @@ function init(){
  });
  for(const type of ['pointerup','pointercancel'])drawerHead.addEventListener(type,()=>{drawerDrag=null});
 
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open')){setOverlay(false);studentsDockBtn?.focus()}});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open'))setOverlay(false)});
 
- // Click anywhere outside the Students panel (or press Escape) to close it.
+ // Click anywhere outside the Students panel (or press Escape) to close it. The two Students buttons open and close it themselves.
  document.addEventListener('pointerdown',e=>{
   const path=e.composedPath();
-  if(path.includes(sidebar)||path.includes(studentsBtn)||(studentsDockBtn&&path.includes(studentsDockBtn)))return;
+  if(path.includes(sidebar)||path.includes(studentsBtn)||path.some(node=>node?.dataset?.action==='students'))return;
   if(!document.body.classList.contains('cp-drawer-closed'))setDrawer(false);
   if(sidebar.classList.contains('cp-overlay-open'))setOverlay(false);
  },true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.body.classList.contains('cp-drawer-closed'))setDrawer(false)});
 
- // Present menu rows get a stable name so full screen can show a clear icon beside each choice.
- const presentSources={'Show my screen to students':'shareScreen','Capture a tab, window or screen':'openBrowserTab','Show a PDF':'openPdf','Show a web page':'openWebpage','Show a whiteboard':'openWhiteboard','Stop presenting':'stopScreen'};
- document.querySelectorAll('#tbShareMenu>button').forEach(button=>{const id=presentSources[button.textContent.trim()];if(id&&!button.dataset.source)button.dataset.source=id});
-
- /* ---------- Left rail: its pop-up menus open beside the rail instead of being cut off inside it ---------- */
- const dockEl=$('teacherDock');
- function placeRailMenus(){
-  if(!dockEl)return;
-  const rail=dockEl.classList.contains('dock-left')&&dockEl.classList.contains('floating');
-  for(const m of dockEl.querySelectorAll('.tb-menu')){
-   const props=['position','left','top','right','max-height','overflow','margin-left'];
-   if(!rail||m.hidden){if(m.dataset.cpRail){for(const k of props)m.style.removeProperty(k);delete m.dataset.cpRail}continue}
-   const trigger=dockEl.querySelector('[data-menu="'+m.id+'"]');if(!trigger)continue;
-   const d=dockEl.getBoundingClientRect(),t=trigger.getBoundingClientRect(),set=(k,v)=>m.style.setProperty(k,v,'important');
-   m.dataset.cpRail='1';set('position','fixed');set('right','auto');set('margin-left','0');set('left',Math.round(d.right+6)+'px');
-   set('max-height',(window.innerHeight-16)+'px');set('overflow','auto');
-   const h=m.getBoundingClientRect().height;
-   set('top',Math.round(Math.max(8,Math.min(t.top,window.innerHeight-h-8)))+'px');
-  }
- }
  // Gallery: an obvious way back from one student's enlarged screen or board (sharing continues).
  for(const b of document.querySelectorAll('#boardsView .boards-bar button'))if(b.textContent.trim()==='◀ All students'){b.textContent='◀ Back to gallery';b.title='Back to all students (sharing continues)'}
- if(dockEl)new MutationObserver(placeRailMenus).observe(dockEl,{subtree:true,attributes:true,attributeFilter:['hidden','class']});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

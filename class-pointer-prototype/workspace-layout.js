@@ -4,8 +4,8 @@
 (function(){
   function init(){
     const panel=document.getElementById('teacherPanel');
-    const dock=document.getElementById('teacherDock');
-    if(!panel||!dock)return;
+    const stage=document.getElementById('stage');
+    if(!panel||!stage)return;
     const tabs=document.createElement('nav');
     tabs.className='cp-workspace-tabs';
     tabs.setAttribute('aria-label','Classroom sections');
@@ -25,7 +25,7 @@
       tabs.appendChild(b);buttons.set(id,b);
     }
     const hint=document.getElementById('navigationHint');
-    if(hint)hint.before(tabs);else dock.before(tabs);
+    (hint||stage).before(tabs);
     function activate(id){
       const launch=document.getElementById('studentBoards');
       if((id==='screens'||id==='whiteboards')&&(!launch||launch.disabled))return;
@@ -33,23 +33,10 @@
       // toggles. Hiding a workspace must preserve screen capture and board data.
       const navigate=window.ClassPointerBoards?.navigateWorkspace;
       if(!navigate||navigate(id)!==true)return;
+      // classroom-annotate.js listens for this: back on My screen the drawing toolbar starts on the Pointer.
       document.dispatchEvent(new CustomEvent('class-pointer-workspace',{detail:id}));
       for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
-      if(id==='teach')document.querySelector('.tb-mode[data-mode="point"]')?.click();
     }
-    // Primary tabs replace the extra quick-launch buttons, not their underlying functions.
-    // Keep their original DOM nodes for existing code and observers.
-    function organize(){
-      const quick=document.getElementById('tbStudentScreensQuick');
-      if(quick)quick.hidden=true;
-      const menu=document.getElementById('tbStudentsMenu');
-      if(menu){
-        menu.setAttribute('aria-label','Student permissions');
-        const handle=menu.querySelector('.tb-roster-handle');
-        if(handle&&handle.textContent!=='Student permissions')handle.textContent='Student permissions';
-      }
-    }
-    organize();
     // Keep the tabs truthful when the gallery is opened or closed some other way
     // (Student sharing button, Students menu, closing the gallery).
     function syncTabs(){
@@ -60,7 +47,6 @@
     }
     document.addEventListener('classpointer:sharing-state',syncTabs);
     document.addEventListener('class-pointer-workspace',()=>setTimeout(syncTabs,0));
-    new MutationObserver(organize).observe(dock,{childList:true,subtree:false});
     const observer=new MutationObserver(()=>{tabs.hidden=panel.hidden});
     observer.observe(panel,{attributes:true,attributeFilter:['hidden']});
     tabs.hidden=panel.hidden;
