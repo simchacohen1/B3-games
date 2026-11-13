@@ -35,21 +35,25 @@ test('student Pointer entry returns to the student dashboard without opening a s
     assert.equal(f.request,undefined,'no Pointer-only authentication flow');
   }
 });
-test('teacher publishes and removes only its own random room and registers disconnect cleanup first',async()=>{
+test('teacher publishes and removes only its own random room; a dropped connection marks the lesson offline and never deletes it (#801)',async()=>{
  const writes=[],C=core(),classId='one';let auth;
- const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),onDisconnect:()=>({remove:async()=>writes.push(['disconnect',path]),cancel:async()=>writes.push(['cancel',path])}),set:async value=>writes.push(['set',path,value]),update:async value=>writes.push(['update',path,value]),remove:async()=>writes.push(['remove',path])});
+ const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),onDisconnect:()=>({remove:async()=>writes.push(['disconnect-remove',path]),set:async value=>writes.push(['disconnect-set',path,value]),cancel:async()=>writes.push(['cancel',path])}),set:async value=>writes.push(['set',path,value]),update:async value=>writes.push(['update',path,value]),remove:async()=>writes.push(['remove',path])});
  const database=()=>({ref});database.ServerValue={TIMESTAMP:{'.sv':'timestamp'}};
  const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
  await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.requestScreenSharing();await context.window.ClassPointerDashboard.end();
  const sessionPath='b3Games/workspaces/b3-2026/classes/one/classPointerSessions/'+room;
  const policyPath='b3Private/classPointerSharePermissions/b3-2026/one/'+room;
- assert.deepEqual(writes.filter(([op])=>op==='disconnect').map(([,path])=>path),[sessionPath,policyPath]);
+ // #801: nothing is deleted when the teacher's connection drops; only an offline time is stamped, and it is armed before the lesson is written.
+ assert.deepEqual(writes.filter(([op])=>op==='disconnect-remove'),[]);
+ const armed=writes.filter(([op])=>op==='disconnect-set');
+ assert.ok(armed.length>=1&&armed.every(([,path,value])=>path===sessionPath+'/teacherOfflineAt'&&value===database.ServerValue.TIMESTAMP));
+ assert.ok(writes.findIndex(([op])=>op==='disconnect-set')<writes.findIndex(([op,path])=>op==='set'&&path===sessionPath));
  assert.equal(writes.find(([op,path])=>op==='set'&&path===sessionPath)[2].teacherUid,'test-teacher');
  const request=writes.find(([op,path])=>op==='update'&&path===sessionPath)[2];
  assert.equal(request.studentScreenSharing,true);assert.equal(request.shareRequest.at,database.ServerValue.TIMESTAMP);
  assert.deepEqual(writes.filter(([op])=>op==='remove').map(([,path])=>path),[sessionPath,policyPath]);
- assert.deepEqual(writes.filter(([op])=>op==='cancel').map(([,path])=>path),[sessionPath,policyPath]);
+ assert.deepEqual(writes.filter(([op])=>op==='cancel').map(([,path])=>path),[sessionPath+'/teacherOfflineAt']);
 });
 
 test('student Pointer cannot unexpectedly reopen during global or class locks',async()=>{
