@@ -20,7 +20,7 @@ for (const role of ['admin', 'teacher']) {
           const access={authorized:true,role:${JSON.stringify(role)},classIds:${JSON.stringify(role === 'admin' ? ['*'] : ['mine'])}};
           const settings={siteEnabled:true,games:{},classGames:{},classAccess:{et:{mode:'open',lockWindows:{}},wt:{mode:'open',lockWindows:{}}}};
           window.B3SiteSettings={workspaceId:'b3-2026',getCurrentAccess:()=>access,subscribe:cb=>cb(settings),normalizeSettings:s=>s,describeClassAccess:()=>({open:true}),isClassOpen:()=>true,activeLockedGameList:()=>[]};
-          window.firebase={auth:()=>({currentUser:{uid:'test',email:'test@example.test'}}),database:()=>({ref:()=>({once:async()=>({val:()=>({name:'My Class',active:true})})})})};
+          window.firebase={auth:()=>({currentUser:{uid:'test',email:'test@example.test'}}),database:()=>({ref:()=>({once:async()=>({val:()=>({name:'My Class',active:true})}),on:(event,callback)=>{callback({val:()=>({name:'My Class',active:true})});return ()=>{}},off:()=>{}})})};
           document.getElementById('adminControls').classList.remove('hidden');
           document.getElementById('classMemberList').textContent='Test Student';
           document.getElementById('studentToolChoices').textContent='Individual student tool choices';

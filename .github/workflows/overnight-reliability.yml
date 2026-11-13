@@ -26,7 +26,7 @@ concurrency:
 jobs:
   synthetic-browser-readiness:
     name: Synthetic learning tools and access boundaries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         run: |
           npm ci
           npm ci --prefix backend/functions --ignore-scripts
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Verify database and storage rules in local emulators
         env:
           B3_RUN_RTDB_EMULATOR_TESTS: '1'
