@@ -48,6 +48,28 @@ async function classAdults(store, ws, classId) {
     const kind = isPrincipal(row) ? 'principal' : 'teacher';
     out[uid] = { id: uid, kind, name: adultName(row, kind === 'principal' ? 'Principal' : 'Teacher') };
   }
+  // A teacher record always wins over the invitation-based entry below.
+  return { ...(await teachingAdmins(store, ws, classId)), ...out };
+}
+
+// The owner can also teach a class (#730). The owner's teacher record is the owner record
+// and carries no classes, so the owner's classes are read from the owner's own teacher
+// invitation, the same one Owner Admin writes for any teacher. Only an active administrator
+// whose own, active, ordinary teacher invitation lists this class is added, as "Teacher".
+// The admins list and the invitations can be written by the owner only.
+const lower = s => String(s == null ? '' : s).trim().toLowerCase();
+const inviteKey = email => lower(email).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+async function teachingAdmins(store, ws, classId) {
+  const admins = (await store.get('b3Games/admins')) || {};
+  const out = {};
+  for (const [uid, admin] of Object.entries(admins)) {
+    const email = lower(admin?.email), id = inviteKey(email);
+    if (!key(uid) || !admin || admin.active === false || !email || !key(id)) continue;
+    const invite = await store.get('b3Games/workspaces/' + ws + '/teacherInvites/' + id);
+    if (!invite || invite.active === false || isPrincipal(invite) || lower(invite.email) !== email ||
+        invite.classIds?.[classId] !== true) continue;
+    out[uid] = { id: uid, kind: 'teacher', name: adultName({ displayName: invite.name, email }, 'Teacher') };
+  }
   return out;
 }
 
