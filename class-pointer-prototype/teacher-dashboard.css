@@ -1,6 +1,6 @@
 /* Simplified teacher workspace: top bar, picker in the empty stage, students drawer on the right.
    Presentation only; original controls keep their handlers. */
-.teacher-dashboard-source,.teacher-dashboard-menu-trigger{display:none!important}
+.teacher-dashboard-source{display:none!important}
 body.cp-simple{--cp-navy:#17233b;--cp-blue:#2563eb;--cp-line:#dce2ec;--cp-muted:#4a5672;--cp-drawer:440px;background:#eef1f6}
 
 /* ---------- Top bar ---------- */
@@ -16,9 +16,41 @@ body.cp-simple .app-header.cp-header{display:block;padding:0;margin:0 0 12px;bor
 .cp-joined.cp-joined-alert{color:#fde68a;font-weight:700}
 .cp-topbar-btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #3b4d74;background:transparent;color:#fff;font-weight:600;font-size:15px;margin:0}
 .cp-topbar-btn:hover:not(:disabled){background:#22314f}
-.cp-students-toggle{background:#f5b800;border-color:#f5b800;color:var(--cp-navy)}
-.cp-students-toggle:hover:not(:disabled){background:#ffc928}
-body.cp-drawer-closed .cp-students-toggle{background:var(--cp-blue);border-color:var(--cp-blue);color:#fff}
+/* Students (who can point & draw): the biggest, brightest button in the bar, so no teacher misses it.
+   Nothing else in the bar is yellow with dark text. The drawing toolbar's Students button uses the same yellow. */
+.cp-students-wrap{position:relative;display:inline-flex}
+.cp-students-toggle{min-height:54px;padding:4px 14px 4px 12px;gap:10px;border-radius:14px;background:#ffd60a;border:3px solid #fff;color:#17233b;box-shadow:0 2px 0 #0006;text-align:left;cursor:pointer}
+.cp-students-toggle:hover:not(:disabled){background:#ffe45c}
+.cp-students-toggle:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
+.cp-students-toggle svg{flex:none}
+.cp-students-text{display:flex;flex-direction:column;line-height:1.15}
+.cp-students-text strong{font-size:18px;font-weight:800}
+.cp-students-text small{font-size:12.5px;font-weight:700}
+.cp-students-toggle[aria-expanded=true]{background:#fff3b0;box-shadow:inset 0 0 0 3px #17233b}
+/* While a lesson is live and the panel is closed: a soft ring that slowly pulses. */
+@keyframes cpStudentsPulse{0%{box-shadow:0 2px 0 #0006,0 0 0 0 #ffd60acc}70%{box-shadow:0 2px 0 #0006,0 0 0 12px #ffd60a00}100%{box-shadow:0 2px 0 #0006,0 0 0 0 #ffd60a00}}
+body.cp-is-live.cp-drawer-closed .cp-students-toggle{animation:cpStudentsPulse 2.4s ease-out infinite}
+@media (prefers-reduced-motion:reduce){body.cp-is-live.cp-drawer-closed .cp-students-toggle{animation:none;box-shadow:0 2px 0 #0006,0 0 0 4px #ffd60a66}}
+/* One-time tip under the button. */
+.cp-students-hint{position:absolute;z-index:60;top:calc(100% + 12px);right:0;display:flex;align-items:center;gap:8px;width:max-content;max-width:min(300px,80vw);padding:10px 8px 10px 14px;border-radius:12px;background:#ffd60a;color:#17233b;font:800 15px/1.3 system-ui,sans-serif;box-shadow:0 10px 28px #0f172a59}
+.cp-students-hint::before{content:"";position:absolute;bottom:100%;right:34px;border:9px solid transparent;border-bottom-color:#ffd60a}
+.cp-students-hint[hidden]{display:none}
+/* Narrow windows wrap the button to the left edge: open the tip rightwards so it stays on screen. */
+@media (max-width:900px){.cp-students-hint{right:auto;left:0}.cp-students-hint::before{right:auto;left:34px}}
+.cp-students-hint-x{flex:none;width:30px;height:30px;min-height:0;padding:0;margin:0;border:0;border-radius:8px;background:#17233b1f;color:#17233b;font-size:14px;font-weight:800;cursor:pointer}
+.cp-students-hint-x:hover{background:#17233b33}
+/* The drawing toolbar gets its own strip on the left (classroom-annotate.js sets the width), so it never covers
+   the lesson, the tabs or the top bar. The whole page moves over (in full screen: the whole lesson); nothing
+   inside the lesson is shifted, so pointers and drawings stay in place. */
+body.teacher-view.cp-tool-gutter main{padding-left:var(--cp-tool-gutter)!important}
+/* The top bar keeps its full width. The toolbar starts right under it (at the top of the screen in full screen)
+   and is never taller than the space below, so it does not cover the top bar either. */
+body.teacher-view.cp-tool-gutter .app-header.cp-header{margin-left:calc(16px - var(--cp-tool-gutter))}
+body.teacher-view #fttAnnotate .fa-bar{top:calc(var(--cp-drawer-top,70px) + 8px);transform:none;max-height:calc(100vh - var(--cp-drawer-top,70px) - 20px)}
+body.teacher-view.lesson-expanded #fttAnnotate .fa-bar{top:12px;max-height:calc(100vh - 24px)}
+body.teacher-view.cp-tool-gutter.lesson-expanded #stage.lesson-fullscreen{left:var(--cp-tool-gutter)!important;width:calc(100% - var(--cp-tool-gutter))!important}
+body.teacher-view.lesson-expanded #stage.lesson-fullscreen{margin:0!important}
+body.teacher-view.lesson-expanded::before{content:"";position:fixed;inset:0;z-index:9999;background:#17233b}
 .cp-topbar-back{color:#c9d6f2;font-size:14px}
 .cp-topbar-back:hover{color:#fff}
 
@@ -31,7 +63,9 @@ body.cp-simple #navigationHint{display:none}
 body.cp-simple #connectionStatus{font-size:13px;font-weight:500;color:var(--cp-muted);min-height:0;margin:0 0 6px}
 
 /* ---------- Tabs row: tabs left, live status right ---------- */
-.cp-tabs-row{position:relative;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+.cp-tabs-row{position:relative;z-index:2147483646;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+/* Full screen: this row goes behind the lesson (the drawing toolbar has Stop, Lesson and Exit full screen), so it never covers the lesson. */
+body.lesson-expanded .cp-tabs-row{z-index:40}
 body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-tabs-spacer{flex:1 1 auto}
 .cp-live-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -56,9 +90,6 @@ body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-live-wrap button:focus-visible{outline:3px solid var(--cp-blue);outline-offset:2px}
 .cp-topbar-btn,.cp-topbar-logo{display:inline-flex;align-items:center;gap:8px}
 
-/* Drawing tools appear only once something is live (full screen and student boards keep them). */
-body.cp-simple.teacher-view:not(.cp-is-live):not(.boards-on) #teacherDock:not(.floating){display:none!important}
-
 /* ---------- Source picker in the empty stage ---------- */
 #stage .cp-source-picker{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;background:#fff;cursor:default;overflow:auto}
 #stage .cp-source-picker h2{margin:0;font-size:26px;color:var(--cp-navy);text-align:center}
@@ -78,17 +109,6 @@ body.cp-simple.teacher-view:not(.cp-is-live):not(.boards-on) #teacherDock:not(.f
 /* Helper bubble now lives in the Students drawer; floating Gallery button moves off the stage corner. */
 body.cp-simple #activityScreenHelp,body.cp-simple #stage>a[href="../index.html"]{display:none!important}
 body.cp-simple.teacher-view #fttGalleryShareButton{right:auto;left:18px}
-
-/* ---------- Toolbar: fewer choices in the normal view (full screen keeps everything) ---------- */
-body.cp-simple #teacherDock:not(.floating) .tb-move-handle,
-body.cp-simple #teacherDock:not(.floating) #tbDockLeft,
-body.cp-simple #teacherDock:not(.floating) .tb-sizes{display:none!important}
-body.cp-simple #teacherDock .tb-mode[data-mode=box]{display:none!important}
-body.cp-simple #teacherDock .tb-swatches [data-color="#7ce4dc"],
-body.cp-simple #teacherDock .tb-swatches [data-color="#dca0ff"],
-body.cp-simple #teacherDock .tb-swatches [data-color="#ffa65c"],
-body.cp-simple #teacherDock .tb-swatches [data-color="#1d4ed8"]{display:none!important}
-body.teacher-view #teacherDock:not(.floating) #tbFullscreen,body.teacher-view #teacherDock:not(.floating) .teacher-dashboard-share-trigger{display:none}
 
 /* ---------- Students drawer ---------- */
 .cp-permissions-sidebar{background:#fff;border:1px solid var(--cp-line);border-radius:16px;padding:16px;box-sizing:border-box}
@@ -111,10 +131,6 @@ body.cp-drawer-closed .cp-permissions-sidebar{display:none}
 .cp-permissions-sidebar summary{cursor:pointer;font-weight:600;font-size:14px}
 .cp-student-sharing{border-top:1px solid var(--cp-line);margin-top:14px;padding-top:12px}
 .cp-student-sharing p{font-size:13px;color:var(--cp-muted)}
-body.teacher-view .cp-permissions-sidebar #tbStudentsMenu{width:100%!important;min-width:0!important;max-height:none!important;overflow:visible!important}
-body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools{display:flex;flex-wrap:wrap;white-space:normal}
-body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools label{font-size:14px;padding:6px 8px;min-width:0}
-body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .pointer-bulk-actions{display:flex;flex-wrap:wrap;gap:6px}
 
 /* Original permissions menu is kept for full screen only. */
 .cp-permissions-sidebar #tbStudentsMenu{display:none!important}
@@ -155,8 +171,6 @@ body.teacher-view.cp-compact-workspace:not(.cp-drawer-closed) .app-header.cp-hea
 body.teacher-view #teacherPanel{margin:0}
 body.teacher-view.cp-compact-workspace #stage:not(.lesson-fullscreen):not(:fullscreen){flex:1 1 0;min-height:180px;height:auto;aspect-ratio:auto}
 body.teacher-view.cp-compact-workspace .lesson-actions:empty{display:none}
-body.teacher-view #teacherDock:not(.floating){font-size:13px;gap:4px;padding:6px}
-body.teacher-view #teacherDock .tb-btn{padding:8px;font-size:13px}
 body.cp-simple footer{display:none}
 }
 @media(max-width:999px){
@@ -168,19 +182,9 @@ body.cp-simple.teacher-view .cp-workspace-tab{white-space:normal;font-size:13px;
 body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min-height:620px}
 }
 
-/* Full-screen left rail: text-only buttons become icons so nothing spills out of the rail. */
-#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"],
-#stage .teacher-dock.floating.dock-left #pointerPdfLibrary{font-size:0!important;width:44px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
-#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{content:"\1F5A5";font-size:17px}
-#stage .teacher-dock.floating.dock-left #pointerPdfLibrary::before{content:"\1F4DA";font-size:17px}
-#stage.tb-docked-left > #placeholder{left:56px!important;width:calc(100% - 56px)!important;box-sizing:border-box}
-
-/* Full screen: Students panel as an overlay inside the lesson, opened from the 👥 rail button. */
+/* Full screen: Students panel as an overlay inside the lesson, opened from the Students button on the drawing toolbar. */
 #stage .cp-permissions-sidebar.cp-drawer-overlay{display:none!important;position:absolute!important;top:12px!important;bottom:12px!important;right:12px!important;left:auto!important;width:min(360px,calc(100% - 80px));margin:0!important;overflow:auto;z-index:40;box-shadow:0 12px 36px #0006;cursor:default}
-#stage.tb-docked-left .cp-permissions-sidebar.cp-drawer-overlay{left:66px!important;right:auto!important}
 #stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open{display:block!important}
-#stage .teacher-dock .cp-dock-active{background:var(--cp-blue,#2563eb)!important;color:#fff!important}
-#stage .teacher-dock.floating.dock-left{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 
 /* Classroom Pointer cleanup: the Students drawer owns participant controls.
    Keep the actual live screen/whiteboard tiles visible, not a duplicate toolbar. */
@@ -206,33 +210,6 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 #stage .cp-permissions-sidebar.cp-drawer-overlay select{min-height:38px}
 #stage .cp-permissions-sidebar.cp-drawer-overlay .cp-level{font-size:15px;min-height:42px}
 
-/* ---------- Full screen: larger, clearer Present controls ----------
-   Present is the teacher's main action, so in full screen it is a solid blue
-   button with a readable label, and its menu uses big rows with icons. */
-#stage .teacher-dock.floating .teacher-dashboard-share-trigger,
-#stage .teacher-dock.floating .tb-menu-wrap:has(>[data-menu="tbShareMenu"]){width:100%;justify-content:center}
-#stage .teacher-dock.floating [data-menu="tbShareMenu"]{min-height:46px;width:100%;padding:8px 14px;border:0;border-radius:12px;background:#1d4ed8;color:#fff;font-size:16px!important;font-weight:800;justify-content:center;box-shadow:0 3px 10px #1d4ed855}
-#stage .teacher-dock.floating [data-menu="tbShareMenu"]:hover,
-#stage .teacher-dock.floating [data-menu="tbShareMenu"][aria-expanded="true"]{background:#1e40af;color:#fff}
-#stage .teacher-dock.floating [data-menu="tbShareMenu"]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
-#stage .teacher-dock.floating #tbShareMenu{min-width:320px;padding:12px;gap:6px;border-radius:16px}
-#stage .teacher-dock.floating #tbShareMenu>strong{font-size:17px;padding:2px 6px 6px;color:#12305f}
-#stage .teacher-dock.floating #tbShareMenu>button{min-height:52px;padding:10px 14px;font-size:17px;font-weight:700;border:1px solid #dbe3f2;background:#f8fafc;border-radius:12px;gap:12px}
-#stage .teacher-dock.floating #tbShareMenu>button:hover:enabled{background:#e8effd;border-color:#93b4f5}
-#stage .teacher-dock.floating #tbShareMenu>button:disabled{opacity:.45}
-#stage .teacher-dock.floating #tbShareMenu>button[data-source]::before{font-size:22px;width:28px;text-align:center;flex:none}
-#tbShareMenu>button[data-source="shareScreen"]::before{content:"\1F5A5"}
-#tbShareMenu>button[data-source="openBrowserTab"]::before{content:"\1F4F7"}
-#tbShareMenu>button[data-source="openPdf"]::before{content:"\1F4C4"}
-#tbShareMenu>button[data-source="openWebpage"]::before{content:"\1F310"}
-#tbShareMenu>button[data-source="openWhiteboard"]::before{content:"\1F4DD"}
-#tbShareMenu>button[data-source="stopScreen"]::before{content:"\23F9"}
-#stage .teacher-dock.floating #tbShareMenu>button[data-source="stopScreen"]:enabled{color:#b4232f}
-/* Left rail: keep Present large enough to find, with its label under the icon. */
-#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]{width:48px!important;height:56px!important;min-height:0;padding:2px 0!important;flex-direction:column;gap:1px;background:#1d4ed8!important;color:#fff!important;border-radius:10px}
-#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{font-size:22px!important;line-height:1}
-#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::after{content:"Present";font-size:11px;font-weight:800;line-height:1.1}
-
 /* Teacher whiteboard: pasted pictures waiting to be placed (move / resize). */
 #pdfContent .board-picture-edit{position:absolute;z-index:3;box-sizing:border-box;outline:3px dashed #2563eb;outline-offset:2px;cursor:move;touch-action:none;background:#fff;box-shadow:0 8px 26px #0f172a40}
 #pdfContent .board-picture-edit.selected{outline-style:solid}
@@ -255,17 +232,8 @@ body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!
 .cp-share-state:disabled{opacity:.6;cursor:not-allowed}
 .cp-share-state[hidden]{display:none}
 
-/* Fullscreen toolbar: red Stop button for the live PDF / whiteboard / webpage / shared screen */
-#teacherDock .cp-dock-stop{background:#dc2626;color:#fff;font-weight:700;border:1px solid #b91c1c;justify-content:center}
-#teacherDock .cp-dock-stop:hover:enabled{background:#b91c1c}
-#teacherDock .cp-dock-stop svg{stroke:currentColor}
-#teacherDock .cp-dock-stop[hidden]{display:none}
-
-/* One Stop button: the red one in the toolbar (also in full screen). The top-right copy and the PDF bar's Close button are hidden duplicates. */
-body.cp-simple.teacher-view .cp-live-wrap>.cp-stop-btn{display:none}
+/* One Stop button: the red one above the lesson (in full screen, the red Stop on the drawing toolbar clicks it). The PDF bar's Close button is a hidden duplicate. */
 body.cp-simple.teacher-view #pdfNav .pdf-close{display:none!important}
-#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .cp-dock-stop:not([hidden]){display:inline-flex!important}
-#teacherDock .cp-dock-stop{min-height:44px;padding-left:16px;padding-right:16px;font-size:15px}
 
 /* Reminder that the whiteboard is still on. Sits above full screen; never closes anything by itself. */
 .cp-board-reminder{position:fixed;z-index:10002;top:14px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;max-width:calc(100vw - 24px);padding:12px 16px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;box-shadow:0 12px 36px #0006;color:#7c2d12;font:700 16px system-ui}
@@ -297,6 +265,3 @@ dialog.cp-guide::backdrop{background:#0f172a99}
 .cp-guide-note{margin:14px 0 16px;font-size:14px;color:#64748b}
 .cp-guide-ok{display:block;margin-left:auto;min-height:44px;padding:0 26px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:700 16px system-ui,sans-serif;cursor:pointer}
 .cp-guide-ok:focus-visible,.cp-guide-x:focus-visible{outline:3px solid #f5b800;outline-offset:2px}
-/* On Student screens / Student whiteboards the lesson drawing tools do nothing, so only Stop, View and Students stay. */
-body.cp-student-workspace #teacherDock>.tb-group:not(:has(#cpDockStop)),body.cp-viewing-student #teacherDock>.tb-group:not(:has(#cpDockStop)){display:none!important}
-body.cp-student-workspace #teacherDock>.tb-spacer{display:none}

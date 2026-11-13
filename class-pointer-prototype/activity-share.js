@@ -83,6 +83,9 @@
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-annotate1',root).href);
+    // Save and My files for the student's own whiteboard.
+    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261113-savedwork1',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261113-savedwork1',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>My Files | Fun Torah Tools</title>
+<style>
+body{margin:0;background:#eef3fb;color:#172d49;font:16px system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:#234ea8;color:#fff}
+header h1{margin:0;font-size:26px}
+header a{color:#fff;font-weight:700}
+main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-radius:16px;box-shadow:0 4px 18px #1720331f}
+#viewer{position:fixed;inset:0;display:flex;flex-direction:column;background:#dfe6f1}
+#viewer[hidden],#addPdf[hidden]{display:none}
+#viewerBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;background:#fff;box-shadow:0 2px 8px #1720331a}
+#viewerName{flex:1;min-width:120px;overflow-wrap:anywhere}
+#viewerPage{flex:1;overflow:auto;padding:12px;text-align:center}
+#viewerPage canvas{background:#fff;box-shadow:0 2px 12px #17203340}
+.ftt-picture{display:block;max-width:100%;margin:12px auto;border:1px solid #c9d4e4;border-radius:10px}
+</style>
+<script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-storage-compat.js"></script>
+<script defer src="../firebase-config.js"></script>
+<script defer src="vendor/pdf.min.js?v=3.11.174"></script>
+<script defer src="saved-work-core.js?v=20261113-savedwork1"></script>
+<script defer src="saved-work.js?v=20261113-savedwork1"></script>
+<script defer src="my-files.js?v=20261113-savedwork1"></script>
+</head>
+<body class="ftt-saved">
+<header><h1>📂 My files</h1><a href="../index.html">Back to Fun Torah Tools</a></header>
+<main>
+<p class="ftt-saved-note">Your saved whiteboards and PDFs. Only you can see them.</p>
+<div class="ftt-saved-actions"><button id="addPdf" type="button" class="main" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden></div>
+<p id="filesStatus" class="ftt-saved-status" role="status">Loading…</p>
+<div id="filesList"></div>
+</main>
+<section id="viewer" aria-label="PDF" hidden>
+<div id="viewerBar" role="toolbar" aria-label="PDF controls">
+<button id="viewerBack" type="button">← My files</button>
+<strong id="viewerName"></strong>
+<button id="viewerPrevious" type="button">◀ Previous</button>
+<span id="viewerCount" aria-live="polite"></span>
+<button id="viewerNext" type="button">Next ▶</button>
+<button id="viewerZoomOut" type="button" aria-label="Make smaller">－</button>
+<span id="viewerZoom"></span>
+<button id="viewerZoomIn" type="button" aria-label="Make bigger">＋</button>
+</div>
+<div id="viewerPage"></div>
+</section>
+</body>
+</html>

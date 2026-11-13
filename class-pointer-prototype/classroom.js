@@ -725,7 +725,9 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
-  resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()}};
+  resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
+  // Teacher only: put the marks of a saved whiteboard back for everyone (pdf-mode.js importWhiteboard).
+  restoreMarks(list){if(!isTeacher)return;state.points={};highlightStore.restore(list);publishHighlights();publish()}};
 function setNavigation(on){
   if(navigating===on)return;
   navigating=on;cancelHover();hideOwnPointer();highlighter?.cancel();

@@ -3,7 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {initializeTestEnvironment}=require('@firebase/rules-unit-testing');
-const {ref,uploadBytes,getBytes,deleteObject}=require('firebase/storage');
+const {ref,uploadBytes,getBytes,deleteObject,listAll}=require('firebase/storage');
 
 const projectId='demo-b3-security';
 const enabled=process.env.B3_RUN_STORAGE_EMULATOR_TESTS==='1';
@@ -38,4 +38,44 @@ testStorage('Gallery media is writable and readable only by the owning student i
   await rejected(getBytes(ref(beta,path)));
   await rejected(uploadBytes(ref(one,'classGallery/beta/synthetic_one/post_1/audio.webm'),new Blob(['no']),{contentType:'audio/webm'}));
   await deleteObject(ref(one,path));
+});
+
+testStorage('saved student files are private to the matching student and class and enforce file types and sizes',async()=>{
+  const one=storage('one',{b3StudentRole:'student',b3StudentId:'synthetic_one',b3ClassId:'alpha'});
+  const sameClassPeer=storage('peer',{b3StudentRole:'student',b3StudentId:'synthetic_peer',b3ClassId:'alpha'});
+  const otherClass=storage('other',{b3StudentRole:'student',b3StudentId:'synthetic_one',b3ClassId:'beta'});
+  const teacher=storage('teacher_alpha',{});
+  const anonymous=env.unauthenticatedContext().storage();
+  const own=ref(one,'studentFiles/alpha/synthetic_one/board_1.json');
+  await uploadBytes(own,new Blob(['{"version":1}']),{contentType:'application/json'});
+  assert.ok((await getBytes(own)).byteLength>0);
+  for(const outsider of [sameClassPeer,otherClass,teacher,anonymous]){
+    await rejected(getBytes(ref(outsider,'studentFiles/alpha/synthetic_one/board_1.json')));
+    await rejected(listAll(ref(outsider,'studentFiles/alpha/synthetic_one')));
+  }
+  await rejected(uploadBytes(ref(sameClassPeer,'studentFiles/alpha/synthetic_one/forged.json'),new Blob(['{}']),{contentType:'application/json'}));
+  for(const outsider of [sameClassPeer,otherClass,teacher,anonymous]){
+    await rejected(uploadBytes(ref(outsider,'studentFiles/alpha/synthetic_one/board_1.json'),new Blob(['{}']),{contentType:'application/json'}));
+    await rejected(deleteObject(ref(outsider,'studentFiles/alpha/synthetic_one/board_1.json')));
+  }
+  assert.ok((await getBytes(own)).byteLength>0);
+  await rejected(uploadBytes(ref(one,'studentFiles/alpha/synthetic_one/not-an-image.png'),new Blob(['not an image']),{contentType:'application/json'}));
+  await rejected(uploadBytes(ref(one,'studentFiles/alpha/synthetic_one/too-large.json'),new Blob([new Uint8Array(3*1024*1024+1)]),{contentType:'application/json'}));
+  await deleteObject(own);
+});
+
+testStorage('saved teacher whiteboards are private to their Firebase UID and reject student identities',async()=>{
+  const teacherA=storage('teacher_a',{});
+  const teacherB=storage('teacher_b',{});
+  const studentWithSameUid=storage('teacher_a',{b3StudentRole:'student',b3StudentId:'teacher_a',b3ClassId:'alpha'});
+  const anonymous=env.unauthenticatedContext().storage();
+  const own=ref(teacherA,'pointerWhiteboards/teacher_a/lesson_1.json');
+  await uploadBytes(own,new Blob(['{"kind":"whiteboard"}']),{contentType:'application/json'});
+  assert.ok((await getBytes(own)).byteLength>0);
+  for(const outsider of [teacherB,studentWithSameUid,anonymous]){
+    await rejected(getBytes(ref(outsider,'pointerWhiteboards/teacher_a/lesson_1.json')));
+    await rejected(listAll(ref(outsider,'pointerWhiteboards/teacher_a')));
+  }
+  await rejected(uploadBytes(ref(teacherA,'pointerWhiteboards/teacher_a/not-an-image.png'),new Blob(['no']),{contentType:'application/json'}));
+  await deleteObject(own);
 });
