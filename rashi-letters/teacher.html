@@ -333,7 +333,7 @@ async function loadTeacher(user, access){
       access = { ...access, classIds: Object.keys(row.classIds || {}).filter(id => id !== '*' && row.classIds[id] === true) };
     }
     const chosenClass = await B3ClassGate.requireInUrl(async p => (await db.ref(p).once('value')).val(), access);
-    teacherScope = await window.FunTorahTeacherScope.roster(async p => (await db.ref(p).once('value')).val(), access, chosenClass, 'rashi-letters');
+    teacherScope = await window.FunTorahTeacherScope.roster(async p => (await db.ref(p).once('value')).val(), access, chosenClass, 'rashi-letters', {partialMemberships:true});
     document.getElementById('scopeLabel').textContent = Object.values(teacherScope.classes).map(c => c.name).join(' + ');
     document.getElementById('lockLabel').style.display = isOwner ? '' : 'none';
     gate.style.display = 'none'; app.style.display = '';

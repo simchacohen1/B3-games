@@ -224,12 +224,13 @@ function sumQuiz(hist){
 
 /* ---------- Loading ---------- */
 async function classIdsFor(acc,u){
- const all=obj(await get('b3Games/workspaces/'+WS+'/classes'));
- let ids;
- if(acc.role==='admin')ids=Object.keys(all);
+ // The owner lists every class; a teacher reads only their own (see readClassesFor).
+ let ids,all={};
+ if(acc.role==='admin'){all=obj(await window.B3SiteSettings.readClassesFor(acc).catch(()=>({})));ids=Object.keys(all);}
  else{
   ids=(acc.classIds||[]).filter(Boolean);
   if(!ids.length&&u){const row=obj(await get('b3Games/workspaces/'+WS+'/teachers/'+u.uid));ids=Object.keys(obj(row.classIds)).filter(id=>id!=='*'&&row.classIds[id]===true)}
+  all=obj(await window.B3SiteSettings.readClassesFor({authorized:true,role:'teacher',classIds:ids}));
  }
  return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members)}));
 }

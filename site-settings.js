@@ -1240,6 +1240,25 @@
       .sort(function (a, b) { return a.className.localeCompare(b.className); });
   }
 
+  // The class records this account may open: every class for the owner (one list
+  // read), or only a teacher's own classes, read one by one. Teacher pages must not
+  // list every class: it downloads other teachers' rosters, and stricter database
+  // rules allow a teacher their own classes only. A class that cannot be read is left out.
+  function readClassesFor(access) {
+    const services = ensureFirebase();
+    if (!services || !services.db || !access || access.authorized === false) return Promise.resolve({});
+    const root = WORKSPACE_ROOT_KEY + "/classes";
+    if (access.role === "admin") return services.db.ref(root).once("value").then(function (snap) { return snap.val() || {}; });
+    const ids = Array.from(new Set((access.classIds || []).filter(function (id) { return typeof id === "string" && ACTING_ID.test(id); })));
+    return Promise.all(ids.map(function (id) {
+      return services.db.ref(root + "/" + id).once("value").then(function (snap) { return [id, snap.val()]; }, function () { return [id, null]; });
+    })).then(function (rows) {
+      const classes = {};
+      rows.forEach(function (row) { if (row[1]) classes[row[0]] = row[1]; });
+      return classes;
+    });
+  }
+
   // Only same-site tool pages may be used as the landing page after sign-in.
   const NEXT_PATH = /^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/;
   async function startActingAsStudent(classId, studentId, studentTab, nextPath) {
@@ -1476,6 +1495,7 @@
     defaultSettings: cloneDefaultSettings(),
     normalizeSettings: normalizeSettings,
     readOnce: readOnce,
+    readClassesFor: readClassesFor,
     subscribe: subscribe,
     save: save,
     updateSiteEnabled: updateSiteEnabled,

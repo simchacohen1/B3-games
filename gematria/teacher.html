@@ -62,7 +62,7 @@ function pctCell(o){const p=pct(o);if(p===null)return '<span class="pct n">—</
 function tricky(m){return Object.entries(m||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([h])=>h).join(" ")}
 function ago(t){if(!t)return"";const d=(Date.now()-t)/1000;if(d<90)return"just now";if(d<3600)return Math.round(d/60)+" min ago";if(d<86400)return Math.round(d/3600)+" hr ago";return new Date(t).toLocaleDateString()}
 async function classList(access){
- const snap=await db.ref("b3Games/workspaces/"+ws+"/classes").once("value");const all=snap.val()||{};
+ const all=await window.B3SiteSettings.readClassesFor(access); // owner: every class; teacher: own classes only
  const allowed=access?.role==="admin"?null:new Set(access?.classIds||[]);
  return Object.entries(all).filter(([id,r])=>r&&r.active!==false&&(!allowed||allowed.has(id))).map(([id,r])=>({id,name:String(r.name||id.toUpperCase()),members:r.members||{}}));
 }
