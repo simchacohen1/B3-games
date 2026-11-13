@@ -61,10 +61,11 @@ const TOOLS={
 
 "sefer-hamitzvos":["Sefer HaMitzvos","sefer-hamitzvos/index.html"],"halacha":["Halacha","halacha/teacher.html"],"yiddish":["Yiddish","yiddish/teacher.html"],"posuk-practice-scroll":["Posuk Practice","record_pesukim/teacher.html"],"rashi-letters":["Rashi Letters","rashi-letters/teacher.html"],"gematria":["Gematria","gematria/teacher.html"],"shorashim":["Shorashim","shorashim/teacher.html"],"chazara":["Chazara","chazara/teacher.html"],"game-show":["Game Show","game-show/teacher.html"],"student-rewards":["Student Rewards","student-rewards/teacher.html"],"daily-points":["Daily Points","student-rewards/teacher.html?tab=Daily%20Points"],"weekly-quiz":["Weekly Quiz","weekly-quiz/teacher.html"],"homework":["Homework & Assignments","assignment-center/teacher.html"],"gallery":["Gallery","class-gallery/index.html"],"tag":["Tag Game","class-gallery/index.html"],
 "davening":["Davening Player","davening_student_app/index.html"],"class-pointer":["Class Pointer","class-pointer-prototype/dashboard.html?teacher=1"],"multiplayer-center":["Multiplayer Arcade","multiplayer/index.html"],"name-picker":["Name Picker","name-picker/index.html"],"chavrusa":["Chavrusa of the Day","chavrusa/index.html"],
-"mishnayos-practice":["Mishnayos Practice","mishnayos/teacher.html"]
+"mishnayos-practice":["Mishnayos Practice","mishnayos/teacher.html"],
+"kriah-assessment":["Kriah Assessment","kriah-assessment/index.html"]
 };
 const STUDENT_TOOLS={'sefer-hamitzvos':'sefer-hamitzvos/index.html',yiddish:'yiddish/index.html','posuk-practice-scroll':'record_pesukim/student.html','rashi-letters':'rashi-letters/student.html',gematria:'gematria/index.html',shorashim:'shorashim/index.html',chazara:'chazara/index.html','game-show':'game-show/player.html','student-rewards':'student-rewards/student.html','daily-points':'student-rewards/student.html','weekly-quiz':'weekly-quiz/index.html',halacha:'halacha/index.html?teacher=1','mishnayos-practice':'mishnayos/student.html'};
-const ICONS={'sefer-hamitzvos':'📖','halacha':'📔','yiddish':'<img src="assets/yiddish-icon-v2.png" alt="">','posuk-practice-scroll':'📜','rashi-letters':'אב','gematria':'🔢','shorashim':'🌳','chazara':'🔁','game-show':'🏆','student-rewards':'🌟','daily-points':'✅','weekly-quiz':'📝','homework':'📚','multiplayer-center':'🎮','gallery':'🖼️','class-gallery':'🖼️','tag':'🏃','davening':'📖','chumash-quiz':'❓','work-timer':'⏱️','class-slides':'🖥️','class-pointer':'👆','name-picker':'🎡','chavrusa':'👥','mishnayos-practice':'🕍'};
+const ICONS={'sefer-hamitzvos':'📖','halacha':'📔','yiddish':'<img src="assets/yiddish-icon-v2.png" alt="">','posuk-practice-scroll':'📜','rashi-letters':'אב','gematria':'🔢','shorashim':'🌳','chazara':'🔁','game-show':'🏆','student-rewards':'🌟','daily-points':'✅','weekly-quiz':'📝','homework':'📚','multiplayer-center':'🎮','gallery':'🖼️','class-gallery':'🖼️','tag':'🏃','davening':'📖','chumash-quiz':'❓','work-timer':'⏱️','class-slides':'🖥️','class-pointer':'👆','name-picker':'🎡','chavrusa':'👥','mishnayos-practice':'🕍','kriah-assessment':'אָ'};
 TOOLS['class-gallery']=TOOLS.gallery;
 const PLACES=[
 ["learn",'<svg viewBox="0 0 64 64" width="52" height="52" role="img" aria-label="Rebbe"><path d="M9 64c0-13 10-20 23-20s23 7 23 20z" fill="#1f2937"/><path d="M26 44l6 13 6-13z" fill="#fff"/><ellipse cx="32" cy="29" rx="11" ry="12" fill="#f3c79d"/><path d="M20.5 28c0 15 5 25 11.5 25s11.5-10 11.5-25c-2 6-6 9-11.5 9s-9.5-3-11.5-9z" fill="#4a3426"/><path d="M27 36.5c2-1.6 3.5-1.6 5-.6 1.5-1 3-1 5 .6-2 .8-3.5 1-5 .4-1.5.6-3 .4-5-.4z" fill="#4a3426"/><circle cx="28" cy="28" r="1.5" fill="#1f2937"/><circle cx="36" cy="28" r="1.5" fill="#1f2937"/><path d="M25.5 24.5q2.5-1.5 5 0M33.5 24.5q2.5-1.5 5 0" stroke="#4a3426" stroke-width="1.3" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="19" rx="18" ry="3.6" fill="#111827"/><path d="M21.5 19c0-8 3-12.5 10.5-12.5S42.5 11 42.5 19z" fill="#111827"/><path d="M21.8 15.5h20.4v3H21.8z" fill="#374151"/><path d="M32 7.5v4" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg>',"Chumash Cheder","Learn your posuk, then review it",["posuk-practice-scroll","chazara"]," island-main"],
@@ -99,7 +100,7 @@ async function render(user,access){
      previewActive=true;user={email:teacher.name};access={authorized:true,role:'teacher',classIds:teacher.classIds};
    }catch(error){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent=error.message;return;}
  }
- if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press “Exit student view” at the bottom to return to your teacher account.";return}
+ if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press \u201cExit student view\u201d at the bottom to return to your teacher account.";return}
  if(!access?.authorized){showTeacherSignIn(user?'This Google account is not assigned as a Fun Torah Tools teacher. Choose your authorized account.':'');return}
  if(access.role==="admin"){
    if(previewParams.get('manageStudentTools')!=='1'){location.replace("index.html");return}
@@ -123,7 +124,7 @@ async function render(user,access){
  if(["et","wt"].includes(id)&&siteSettings.games?.["multiplayer-center"]!==false&&siteSettings.classGames?.[id]?.["multiplayer-center"]!==false&&!enabled.some(x=>x[0]==="multiplayer-center"))enabled.push(["multiplayer-center",true]);
  if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);
  const cls=encodeURIComponent(id),link=tool=>previewActive?previewHref(tool,id):TOOLS[tool][1]+(TOOLS[tool][1].includes('?')?'&':'?')+'class='+cls;
- const iconFor=tool=>{const icon=ICONS[tool]||'';if(icon.startsWith('<img'))return icon.replace('<img ','<img class="yiddish-icon tool-icon" ');return tool==='rashi-letters'?'<span class="card-icon tool-icon rashi-icon" lang="he" dir="rtl" aria-hidden="true">'+icon+'</span>':'<span class="card-icon tool-icon" aria-hidden="true">'+icon+'</span>';};
+ const iconFor=tool=>{const icon=ICONS[tool]||'';if(icon.startsWith('<img'))return icon.replace('<img ','<img class="yiddish-icon tool-icon" ');return tool==='rashi-letters'||tool==='kriah-assessment'?'<span class="card-icon tool-icon rashi-icon" lang="he" dir="rtl" aria-hidden="true">'+icon+'</span>':'<span class="card-icon tool-icon" aria-hidden="true">'+icon+'</span>';};
  const tileFor=(kind,[tool])=>'<a class="'+kind+'" data-game-id="'+tool+'" href="'+link(tool)+'" rel="noopener">'+iconFor(tool)+'<span class="card-title">'+esc(TOOLS[tool][0])+'</span></a>';
  const actionTile=(icon,label,href,extra)=>'<a class="teacher-tool-card" href="'+href+'"'+(extra||'')+'><span class="card-icon" aria-hidden="true">'+icon+'</span><span class="card-title">'+label+'</span></a>';
  const placed=new Set(),places=PLACES.map(([key,icon,title,sub,toolIds,extra])=>{const mine=enabled.filter(x=>toolIds.includes(x[0]));mine.forEach(x=>placed.add(x[0]));return mine.length?'<section class="game-group island-place'+extra+'" data-game-group="'+key+'"><div class="game-group-head"><span class="game-group-icon" aria-hidden="true">'+icon+'</span><div><div class="game-group-title">'+title+'</div><div class="game-group-subtitle">'+sub+'</div></div></div><div class="game-group-grid">'+mine.map(x=>tileFor('game-card',x)).join("")+'</div></section>':"";}).join("");
@@ -134,16 +135,17 @@ async function render(user,access){
   +actionTile('🎛️','Manage Class',previewActive?previewHref('manage-class',id):'admin.html?tab=students&class='+cls)
   +(previewActive?'':actionTile('👣','Follow the Teacher','follow-teacher/teacher.html?class='+cls,' target="_blank" rel="noopener"'))
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
-  +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
- const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+  +(grants['kriah-assessment']===true?actionTile('אָ','Kriah Assessment','kriah-assessment/index.html?class='+cls,' lang="he" dir="rtl"'):'')
+  +teacherOnly.filter(x=>x[0]!=='kriah-assessment').map(x=>tileFor('teacher-tool-card',x)).join("");
+ const teacherBox='<div class="teacher-tools-section"><h3>\ud83d\udc68\u200d\ud83c\udfeb Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
+ return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+' </section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;
    const welcome=q('who').parentElement;
-   welcome.querySelector('.sub').textContent='Explore the teacher’s assigned classes and tools in read-only view. You remain signed in as the owner.';
+   welcome.querySelector('.sub').textContent='Explore the teacher\u2019s assigned classes and tools in read-only view. You remain signed in as the owner.';
    if(!q('exitTeacherPreview')){const exit=document.createElement('a');exit.id='exitTeacherPreview';exit.href='admin.html?v=20261008-teacher-preview';exit.className='sign';exit.textContent='Exit teacher view';exit.style.cssText='display:inline-block;margin-top:14px;color:#fff';welcome.append(exit);}
  }
 }
@@ -180,4 +182,4 @@ api.onAuthStateChanged((user,authorized,access)=>{
  return done;
 });
 })();
-</script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="← Fun Torah Tools"></script></body></html>
+</script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="\u2190 Fun Torah Tools"></script></body></html>
