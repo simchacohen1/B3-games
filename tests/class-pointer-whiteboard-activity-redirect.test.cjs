@@ -17,7 +17,11 @@ test('whiteboards open over the student learning activity',()=>{
 test('screen requests do not add a dialog over whiteboard or activity',()=>{
   const activity=read('activity-share.js');
   for(const old of ['fttShareRequestOverlay','routeTeacherRequest','Open Sharing Window'])assert.ok(!activity.includes(old));
-  assert.ok(activity.includes("holder.style.display=active?'flex':'none'"));
+  assert.ok(activity.includes("holder.style.display=active&&!lessonActive?'flex':'none'"));
+  // Hidden while the teacher shares; refreshed whenever the teacher starts, stops or the class ends.
+  assert.ok((activity.match(/lessonActive=true;refreshSessionState()/g)||[]).length===1);
+  assert.ok(activity.includes("reopen.style.display='none';refreshSessionState()"));
+  assert.ok(activity.includes("lessonId='';refreshSessionState();"));
   assert.ok(activity.includes("btn.addEventListener('click',beginShare)"));
 });
 
