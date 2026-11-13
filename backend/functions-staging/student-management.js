@@ -8,7 +8,7 @@ exports.funTorahManageStudents=onRequest({region:'us-central1',cors:corsForProdu
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  // Owner bulk import/rollback requests carry a whole roster (Issue #706).
- const bulk=['importPreview','importApply','rollbackPreview','rollbackExecute','rollbackUndo','bulkPreview','bulkDelete','exportBackup'].includes(req.body?.action);
+ const bulk=['importPreview','importApply','rollbackPreview','rollbackExecute','rollbackUndo','bulkPreview','bulkDelete','exportBackup','classSplitEnroll'].includes(req.body?.action);
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>(bulk?600000:3000))return res.status(413).json({error:'Request too large.'});
  try{
   const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
