@@ -2,16 +2,38 @@
 const {randomUUID,randomBytes,createHash}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const tools=require('./student-tool-policy.js');
-const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
+const {loadStudentProfiles}=require('./student-directory.cjs');
+const duplicates=require('./student-duplicates-core.cjs');
+const fail=(code,message,extra)=>{throw Object.assign(new Error(message),{code},extra)};
 const imports=require('./student-import-core.cjs');
 const rollback=require('./student-rollback-core.cjs');
 const BULK_ACTIONS={
  importPreview:imports.importPreview,importApply:imports.importApply,
  rollbackPreview:rollback.rollbackPreview,rollbackExecute:rollback.rollbackExecute,rollbackUndo:rollback.rollbackUndo,
  studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
- exportBackup:rollback.exportBackup,auditLog:rollback.auditLog
+ exportBackup:rollback.exportBackup,auditLog:rollback.auditLog,
+ // Read-only report of possible duplicate students and class names. Never writes.
+ duplicateReport:duplicates.duplicateReport
 };
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
+const nameKey=duplicates.nameKey;
+// Passcodes for many students at once. Reads run side by side in small groups:
+// one after another, a whole-school list took longer than the page waits.
+async function passcodesFor(store,ids){
+ const out={},list=[...new Set(ids)].filter(key);
+ for(let i=0;i<list.length;i+=40){
+  const part=list.slice(i,i+40),rows=await Promise.all(part.map(id=>readPasscode(store.get,id,{allowLegacyDefault:true})));
+  part.forEach((id,n)=>{out[id]=rows[n].passcode;});
+ }
+ return out;
+}
+// Active, non-demo students whose name matches (ignoring case, spaces and
+// punctuation). Used only to refuse accidental duplicates; nothing is merged.
+async function sameNameStudents(store,name,exceptId){
+ const k=nameKey(name);if(!k)return [];
+ const {profiles}=await loadStudentProfiles(store.get,store.keys);
+ return Object.entries(profiles||{}).filter(([id,p])=>key(id)&&id!==exceptId&&p&&p.active!==false&&!p.demo&&nameKey(p.name||id)===k).map(([id])=>id);
+}
 // Owner-only: copy every passcode into private storage, and optionally erase
 // the old public copies (profiles, class members, legacy allowedStudents).
 async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
@@ -105,18 +127,16 @@ async function manageStudents(store,identity,body,now=Date.now()){
  }
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
-  const passcodes={};for(const id of new Set([...Object.keys(students||{}),...Object.keys(legacy||{})].filter(key)))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
-  return {ok:true,passcodes};
+  return {ok:true,passcodes:await passcodesFor(store,[...Object.keys(students||{}),...Object.keys(legacy||{})])};
  }
  if(!key(classId))fail(400,'Choose a class.');
  const teacher=owner?null:await store.get(root+'/teachers/'+identity.uid);
  if(!owner&&(!teacher||teacher.active===false||teacher.classIds?.[classId]!==true))fail(403,'This class is not assigned to your teacher account.');
  const cls=await store.get(root+'/classes/'+classId);
- if(!cls||cls.active===false)fail(403,'This class is inactive.');
- if(body.action==='list'){
-  const passcodes={};for(const id of Object.keys(cls.members||{}).filter(key))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
-  return {ok:true,passcodes};
- }
+ // The owner may still LOOK at the list of a class that is turned off (the
+ // page keeps ET and WT visible); every change still needs an active class.
+ if(!cls||(cls.active===false&&!(owner&&body.action==='list')))fail(403,'This class is inactive.');
+ if(body.action==='list')return {ok:true,passcodes:await passcodesFor(store,Object.keys(cls.members||{}))};
  // Each teacher's own demo student: a real student account (profile, private
  // passcode, class membership) so every tool saves progress exactly as it
  // does for children. The ID is derived from the teacher's UID, so it is the
@@ -158,6 +178,16 @@ async function manageStudents(store,identity,body,now=Date.now()){
  if(body.action==='create'){
   const name=String(body.name||'').trim(),passcode=String(body.passcode||'').trim();
   if(!name||name.length>100||!passcode||passcode.length>100)fail(400,'Enter a student name and individual passcode.');
+  // Duplicate check before any new account is made. Nothing is merged or
+  // changed here; the request is refused and the person decides.
+  const same=await sameNameStudents(store,name);
+  const here=same.filter(sid=>cls.members?.[sid]);
+  if(here.length)fail(409,'A student named "'+name+'" is already in this class'+(here.some(sid=>cls.members[sid].active===false)?' (currently blocked)':'')+'. No new student was created.',{duplicate:'in-class'});
+  if(same.length){
+   const codes=await passcodesFor(store,same);
+   if(same.some(sid=>codes[sid]&&codes[sid]===passcode))fail(409,'A student with this name and passcode already exists. If this is the same boy, use "Add an existing student" (or ask the administrator to add him to this class). If it is a different boy, give him a different passcode.',{duplicate:'same-passcode'});
+   if(body.confirmNew!==true)fail(409,'A student named "'+name+'" already exists in another class. If this is the same boy, use "Add an existing student" (or ask the administrator to add him to this class) so he keeps one account.',{duplicate:'same-name'});
+  }
   profile={id,name,active:true,createdAt:now,createdBy:identity.uid,passcodeUpdatedAt:now};
   updates[profilePath]=profile;
   updates[PRIVATE+id]={passcode,updatedAt:now};
@@ -174,6 +204,12 @@ async function manageStudents(store,identity,body,now=Date.now()){
   }
  }else if(body.action==='passcode'){
   const passcode=String(body.passcode||'').trim();if(!passcode||passcode.length>100)fail(400,'Enter an individual passcode.');
+  // Two students with the same name and passcode cannot sign in at all.
+  const same=await sameNameStudents(store,profile.name||id,id);
+  if(same.length){
+   const codes=await passcodesFor(store,same);
+   if(same.some(sid=>codes[sid]&&codes[sid]===passcode))fail(409,'Another student with the same name already uses this passcode. Choose a different passcode.',{duplicate:'same-passcode'});
+  }
   Object.assign(updates,passcodeWrites(id,passcode,now));
   // Remove redundant copies from this class; the central profile is authoritative.
   updates[memberPath+'/passcode']=null;

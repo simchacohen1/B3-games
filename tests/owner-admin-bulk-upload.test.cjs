@@ -9,6 +9,7 @@ const vm=require('node:vm');
 const {manageStudents}=require('../backend/functions/student-management-core.cjs');
 const {studentAuth}=require('../backend/functions/student-auth-core.cjs');
 const R=require('../bulk-roster.js');
+const {legacyCreate}=require('./helpers/legacy-create.cjs');
 
 const html=fs.readFileSync('owner-admin.html','utf8');
 const block=html.slice(html.indexOf('// ---- Bulk upload '),html.indexOf('// ---- End bulk upload '));
@@ -111,7 +112,7 @@ test('Undo CSV Import: tick both import runs, review, one confirmation; earlier 
  const before=JSON.stringify(h.tree.b3Games.students.old_moshe);
  // Two runs of the OLD importer (one account per class row), hours apart.
  const t1=Date.parse('2026-11-09T02:18:37Z'),t2=Date.parse('2026-11-09T17:49:11Z');
- for(let i=0;i<12;i++)await manageStudents(h.store,OWNER,{action:'create',classId:i%2?'b2_et_morning':'b2_et_afternoon',name:i<2?'Moshe Fict':'Run One '+(i>>1),passcode:String(400000+(i>>1))},t1+i*100);
+ for(let i=0;i<12;i++)await legacyCreate(h.store,OWNER,{classId:i%2?'b2_et_morning':'b2_et_afternoon',name:i<2?'Moshe Fict':'Run One '+(i>>1),passcode:String(400000+(i>>1))},t1+i*100);
  for(let i=0;i<11;i++)await manageStudents(h.store,OWNER,{action:'create',classId:'b2_et_afternoon',name:'Run Two '+i,passcode:String(500000+i)},t2+i*100);
  // One imported child already did some work: must be kept.
  const worked=named(h,'Run Two 3')[0].profile.id;

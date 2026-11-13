@@ -113,3 +113,11 @@ trees, so they are covered by the same check.
 against `backend/functions-staging` with `STUDENT_FUNCTIONS_DIR`),
 `tests/owner-admin-bulk-upload.test.cjs` (the real page block driving the real
 server code in memory).
+
+## Duplicate safety added for Issue #51 (Student Management & Class Membership)
+
+- **Same name and same passcode = the same student.** When exactly one existing account has the row's name and passcode, the import reuses it and only adds the missing classes. This makes an edited copy of an earlier file safe to import again. Same name with a different passcode, or more than one matching account, still stops for the owner to decide.
+- **Adding one student by hand** (Class management) now checks first: a name already in that class is refused; a name that exists in another class needs a deliberate confirmation; a second account with the same name and passcode is always refused.
+- **Changing a passcode** is refused if another student with the same name already uses it.
+- **Find possible duplicates** (Owner Admin, Students, Bulk Management) lists same-name accounts, same-name classes and class-list entries without an account. It is read-only: nothing is deleted, merged or renamed, and no passcode is shown.
+- **Blocked / Enabled** in Class management applies to the chosen class only, for the owner as well as for teachers. A student in both ET and WT can be blocked in one and stay enabled in the other.
