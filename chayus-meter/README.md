@@ -1,6 +1,6 @@
-# Chayus Meter — isolated prototype (#802)
+# Chayus Meter (#802)
 
-**Status: not connected to live davening, student login, teacher data, or rewards. Do not merge/deploy this as a finished feature.**
+**Status: integrated on the ET/WT Davening pages on the combined draft branch (PR #800). Not on staging or production.** `index.html`, `student.js` and `teacher-preview.html` are the original standalone preview.
 
 This feature is **separate** from “I Want to Be Chazzan” (#799, PR #800). Any boy who opts in may get private, periodic encouragement during teacher-led davening; Chazzan assignment and speed control have no bearing on it.
 
@@ -35,4 +35,15 @@ Build a **server-verified** per-class, per-track (ET/WT) davening session:
 5. Teacher sees each class's summary, with **No data** for nonparticipants or denied/absent microphones, and controls for manual point awarding via the existing Student Rewards flow. **Never credit, recommend, or deduct points automatically.** Do not allow a teacher in another class to read these reports. Keep ET/WT class data separate and decide a short retention/clearout policy.
 6. Test with isolated **fictional** teacher/boys in database/auth emulators, including cross-class denial, duplicate/replay reports, teacher end, simultaneous submissions, reconnection, mic denied, silent tab, ET/WT mix-up and Rewards idempotency if the award tool is integrated. Then verify signed-in browser flow on staging before considering a release.
 
-**Not yet implemented:** Student Login route, teacher-authorized start/end, secure session transport, ET/WT in-player UI, actual teacher report delivery, Firebase security rules, authenticated emulator/browser tests, rewards manual-action UI wiring. No production merge or deployment authorized by the development request.
+## Student meter (what the boy sees)
+
+The panel in `player.js` shows a flame inside a ring. Both are driven by `meter.live()` in `core.js`, which exposes only: `calibrating`, `voiceHeard` (yes/no), `steadiness` (how consistently a voice was heard over roughly the last quarter minute) and `gentleVolumeHint`. Loudness is not an input, so a quiet voice and a shout draw the same picture; sustained very loud input only shows "No need to be loud." Students never see a score or percentage. Animations stop under `prefers-reduced-motion`.
+
+Room noise: calibration keeps the quietest moment heard, and the noise estimate falls quickly in the gaps between words and rises very slowly, so a boy who is already davening when he opts in is still heard, while a constant hum is gradually tuned out.
+
+## Tests
+
+- `node --test tests/chayus-meter.test.cjs tests/chayus-session-service.test.cjs`
+- `npx playwright test e2e/chayus-meter-davening.spec.cjs --project=chromium` runs the real ET page with fictional accounts, a generated audio source and the real session services on an in-memory store: opt-in, granted/denied/missing microphone, pause, resume, off, the 2.5-minute encouragement, the teacher summary, Chazzan running alongside, no automatic points, and that only the seven summary numbers leave the device.
+
+**Still not verified:** a real microphone on real school computers, and the signed-in flow on staging (the Davening endpoints and the fictional class `davening` grant are not on staging yet). No production merge or deployment is authorized.
