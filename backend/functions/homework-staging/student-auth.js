@@ -4,8 +4,9 @@ const admin=require('firebase-admin');
 const {studentAuth}=require('./student-auth-core.cjs');
 const crypto=require('node:crypto');
 const studentTools=require('./student-tool-policy.js');
+const {stagingOrigins}=require('./staging-cors.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://fun-torah-tools-staging.web.app', /^https:\/\/fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/],maxInstances:10},async(req,res)=>{
+exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:stagingOrigins(),maxInstances:10},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  if(Buffer.byteLength(JSON.stringify(req.body||{}))>2000)return res.status(413).json({error:'Request too large.'});

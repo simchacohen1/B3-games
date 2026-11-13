@@ -5,13 +5,14 @@ const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const crypto=require('node:crypto');
 const {readPasscode,key,equal}=require('./student-passcodes.cjs');
+const {corsForProductionOrigins}=require('./staging-cors.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const validRoom=s=>typeof s==='string'&&/^class-pointer-[a-f0-9-]{36}$/.test(s);
 const validId=s=>key(s);
 const error=(code,message)=>{throw Object.assign(new Error(message),{code})};
 exports.classPointerShareAuth=onRequest({
  region:'us-central1',
- cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],
+ cors:corsForProductionOrigins(['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io']),
  maxInstances:10
 },async(req,res)=>{
  res.set('Cache-Control','no-store');

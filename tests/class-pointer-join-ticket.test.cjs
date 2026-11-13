@@ -52,6 +52,7 @@ function fixture() {
     if (name === 'firebase-functions/v2/https') return { onRequest: (_o, fn) => { handler = fn; return fn; } };
     if (name === 'firebase-admin') return admin;
     if (name === 'node:crypto') return require('node:crypto');
+    if (name === './staging-cors.cjs') return { corsForProductionOrigins: origins => origins };
     if (name === './student-passcodes.cjs') return {
       // like the real one: the shared default 5770 is only returned when the caller allows it
       readPasscode: async (_get, id, opts) => ({ passcode: passcodes[id] || (id === 'legacy' && opts && opts.allowLegacyDefault ? '5770' : '') }),
