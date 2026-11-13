@@ -160,7 +160,10 @@ async function renderTeacherAccess(msg){
   if(!access.authorized){
     const auth=typeof w.firebase?.auth==="function"?w.firebase.auth():null;
     if(auth?.authStateReady)await auth.authStateReady();
-    if(auth?.currentUser)await waitForTeacherAuth(w);
+    // Always wait for the shared sign-in check. In a new tab the teacher's
+    // remembered Google login is restored a moment after the page loads, so
+    // "no user yet" does not mean signed out (#823).
+    await waitForTeacherAuth(w);
     const refreshed=w.B3SiteSettings.getCurrentAccess?.()||{};
     if(refreshed.authorized){showTab(currentTab);return}
     if(auth?.currentUser){panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Class access unavailable</h2><p class="ta-hint">This signed-in account is not assigned to an active class.</p><p role="status" id="taSignInStatus"></p></div></div>';return}

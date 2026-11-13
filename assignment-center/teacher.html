@@ -414,7 +414,13 @@ var HI=window.HomeworkItems,itemsBox=HI.builder($('itemsBuilder'),{onChange:func
 function itemsProblem(){return itemsBox.isEditing()?'Finish the item you are adding first: press Add to homework, or Cancel.':''}
 
 $('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){say($('signinMsg'),e.message)})};
-$('signout').onclick=function(){auth.signOut()};
+// Sign out must also clear the teacher login remembered for new tabs (#823).
+function signOutTeacherEverywhere(){
+  var saved=null;
+  try{saved=firebase.app('FTTRememberedTeacher')}catch(_){try{saved=firebase.initializeApp(firebase.app().options,'FTTRememberedTeacher')}catch(e){}}
+  return Promise.resolve(saved?saved.auth().signOut():null).catch(function(){}).then(function(){return auth.signOut()});
+}
+$('signout').onclick=function(){signOutTeacherEverywhere()};
 auth.onAuthStateChanged(async function(u){
   if(!u){$('signin').style.display='';$('app').style.display='none';$('signout').style.display='none';$('who').textContent='';return}
   $('signin').style.display='none';$('signout').style.display='';$('who').textContent=u.email||'';

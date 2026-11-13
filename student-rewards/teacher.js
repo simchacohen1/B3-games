@@ -947,7 +947,13 @@ function bindPage(){
 function shiftDate(n){const d=new Date(`${state.date}T12:00:00`);d.setDate(d.getDate()+n);state.date=d.toISOString().slice(0,10);prepareDraft();render()}
 $("#prevDate").onclick=()=>shiftDate(-1);$("#nextDate").onclick=()=>shiftDate(1);$("#topDate").onchange=e=>{state.date=e.target.value;prepareDraft();render()};
 $("#googleBtn").onclick=async()=>{try{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});await auth.signInWithPopup(p)}catch(err){$("#loginError").textContent=err.message||String(err)}};
-$("#signOutBtn").onclick=()=>auth.signOut();
+// Sign out must also clear the teacher login remembered for new tabs (#823).
+function signOutTeacherEverywhere(){
+  let saved=null;
+  try{saved=firebase.app("FTTRememberedTeacher")}catch(_){try{saved=firebase.initializeApp(firebase.app().options,"FTTRememberedTeacher")}catch(e){}}
+  return Promise.resolve(saved?saved.auth().signOut():null).catch(()=>{}).then(()=>auth.signOut());
+}
+$("#signOutBtn").onclick=()=>signOutTeacherEverywhere();
 auth.onAuthStateChanged(async user=>{
   if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
   state.teacherMode=!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase();
