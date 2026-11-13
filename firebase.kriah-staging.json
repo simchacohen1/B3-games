@@ -1,7 +1,7 @@
 {
   "functions": [{ "source": "backend/kriah-staging", "codebase": "kriah-staging" }],
   "hosting": {
-    "site": "fun-torah-tools-staging",
+    "site": "fun-torah-tools-kriah-staging",
     "public": ".kriah-preview",
     "ignore": ["**/.*", "**/node_modules/**"],
     "headers": [{ "source": "**", "headers": [{ "key": "Cache-Control", "value": "no-store" }, { "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }],
