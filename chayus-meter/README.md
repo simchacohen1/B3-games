@@ -13,7 +13,11 @@ This feature is **separate** from “I Want to Be Chazzan” (#799, PR #800). An
 
 Microphone volume **cannot measure kavana, words read, correct pronunciation, or enthusiasm reliably**; speakers playing davening, peers, room sounds, device mic gain and echo cancellation can all change activity estimates. These aggregates are *not grades*. Missing/denied mic is “No data,” **not zero participation**. Raising voice volume is **never rewarded** by the metric. It is particularly important not to shame quiet boys.
 
-## Required class integration before staging release
+## Integrated class flow
+
+The ET and WT players load the meter and its class-scoped `daveningChayus` HTTPS endpoint. Only the verified student receives their own saved aggregate on refresh; a teacher assigned to that class starts/ends the separate Chayus session and reads the teacher report. Raw audio and sample buffers stay on the student's device. The server retains only the latest aggregate report for each student in that class session; an ended session is deleted on its next read after 30 days or replaced when the teacher starts another session. Chayus points remain entirely teacher-controlled through existing Rewards controls.
+
+## Security and verification notes
 
 Existing claims to coordinate before touching shared files:
 

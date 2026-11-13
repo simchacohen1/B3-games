@@ -38,13 +38,36 @@ function spin(session, { studentId, name, requestId, entropy }) {
 function setPlayback(session, playback) {
   if (session.phase === 'ended') reject('This session has ended.');
   if (!session.parts[playback.part]) reject('Choose a davening part.');
-  const part = session.parts[playback.part];
+  const parts = { ...session.parts };
+  if (session.playback?.part && session.playback.part !== playback.part) {
+    parts[session.playback.part] = { ...parts[session.playback.part], completed: true };
+  }
+  const part = parts[playback.part];
   return {
     ...session,
     phase: 'active',
     playback,
-    parts: { ...session.parts, [playback.part]: { ...part, started: true } }
+    parts: { ...parts, [playback.part]: { ...part, started: true, completed: false } }
   };
+}
+
+function setRegistration(session, open) {
+  if (session.phase === 'active' || session.phase === 'ended') reject('Registration is closed.');
+  if (typeof open !== 'boolean') reject('Choose whether registration is open.');
+  return { ...session, phase: open ? 'signup' : 'ready' };
+}
+
+function assignPart(session, { partId, studentId, name }) {
+  const current = session.parts[partId];
+  if (!current) reject('Choose a davening part.');
+  if (!session.phase || session.phase === 'ended') reject('This session has ended.');
+  if (current.awardPending) reject('A Rewards point is being recorded for this assignment.');
+  if (!studentId) return { ...session, parts: { ...session.parts,
+    [partId]: { changes: 0, studentId: null, name: null, started: false, completed: false } } };
+  const elsewhere = Object.entries(session.parts).filter(([id, part]) => id !== partId && part.studentId === studentId).length;
+  if (elsewhere >= 2) reject('This student already has two parts.');
+  return { ...session, parts: { ...session.parts,
+    [partId]: { changes: 0, studentId, name, started: false, completed: false } } };
 }
 
 function setChazzanSpeed(session, { studentId, partId, speed, requestId }) {
@@ -74,4 +97,4 @@ function spinEntropy() {
   return randomInt(2 ** 32) / 2 ** 32;
 }
 
-module.exports = { newSession, spin, setPlayback, setChazzanSpeed, spinEntropy };
+module.exports = { newSession, spin, setPlayback, setChazzanSpeed, setRegistration, assignPart, spinEntropy };

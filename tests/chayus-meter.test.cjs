@@ -23,6 +23,7 @@ test('only consented active sampling counts and paused time is excluded', () => 
   assert.equal(result.measuredSeconds, 0.4);
   assert.equal(result.activeSeconds, 0.4);
   assert.equal(result.soundActivityPercent, 100);
+  assert.equal(result.pauseCount, 1);
   assert.equal(result.status, 'ended');
   assert.throws(() => m.start(90000), /ended/);
 });
@@ -96,6 +97,8 @@ test('teacher rows distinguish unavailable data and never compute point awards',
   assert.equal(rows[0].measuredMinutes, 2);
   assert.equal(rows[1].soundActivityPercent, null);
   assert.equal(rows[1].status, 'No microphone data');
+  assert.equal(rows[0].consistencyPercent, null);
+  assert.equal(rows[1].consistencyPercent, null);
   assert.ok(rows.every(row => !('points' in row) && !('recommendedPoints' in row)));
 });
 
@@ -122,7 +125,8 @@ test('server allowlists bounded aggregate metrics only', () => {
   const { validateMetrics } = require('../backend/functions/chayus-report-core.cjs');
   const metrics = { measuredSeconds: 300, activeSeconds: 150, calibrationSeconds: 3,
     feedbackCount: 2, activeIntervals: 1 };
-  assert.deepEqual(validateMetrics({ ...metrics, studentId: 'spoof', audio: [0.2] }, 303), metrics);
+  assert.deepEqual(validateMetrics({ ...metrics, studentId: 'spoof', audio: [0.2] }, 303),
+    { ...metrics, pauseCount: 0, pausedSeconds: 0 });
   assert.throws(() => validateMetrics(metrics, 200), /Invalid/);
   assert.throws(() => validateMetrics({ ...metrics, activeIntervals: 3 }, 303), /Invalid/);
   assert.throws(() => validateMetrics({ ...metrics, activeSeconds: 301 }, 303), /Invalid/);

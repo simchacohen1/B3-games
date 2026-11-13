@@ -12,7 +12,8 @@ function invalid() {
 function validateMetrics(input, elapsedSeconds) {
   if (!input || !Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) invalid();
   const limit = Math.min(MAX_SESSION_SECONDS, elapsedSeconds + 1);
-  const { measuredSeconds, activeSeconds, calibrationSeconds, feedbackCount, activeIntervals } = input;
+  const { measuredSeconds, activeSeconds, calibrationSeconds, feedbackCount, activeIntervals,
+    pauseCount = 0, pausedSeconds = 0 } = input;
   if (![measuredSeconds, activeSeconds, calibrationSeconds].every(
     value => Number.isFinite(value) && value >= 0
   )) invalid();
@@ -22,7 +23,10 @@ function validateMetrics(input, elapsedSeconds) {
     || feedbackCount > Math.floor(measuredSeconds / INTERVAL_SECONDS)
     || !Number.isInteger(activeIntervals) || activeIntervals < 0
     || activeIntervals > feedbackCount) invalid();
-  return { measuredSeconds, activeSeconds, calibrationSeconds, feedbackCount, activeIntervals };
+  if (!Number.isInteger(pauseCount) || pauseCount < 0 || pauseCount > 100
+    || !Number.isFinite(pausedSeconds) || pausedSeconds < 0 || pausedSeconds > MAX_SESSION_SECONDS) invalid();
+  return { measuredSeconds, activeSeconds, calibrationSeconds, feedbackCount, activeIntervals,
+    pauseCount, pausedSeconds };
 }
 
 module.exports = { validateMetrics };

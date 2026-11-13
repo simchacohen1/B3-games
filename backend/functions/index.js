@@ -2778,3 +2778,4 @@ exports.gradeMishnahExplanation = mishnayosPractice.gradeMishnahExplanation;
 exports.mishnayosAnswerKey = mishnayosPractice.mishnayosAnswerKey;
 
 exports.daveningChazzan = require("./davening-chazzan").daveningChazzan;
+exports.daveningChayus = require("./chayus-meter").daveningChayus;

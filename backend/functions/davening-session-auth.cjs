@@ -24,7 +24,7 @@ async function authorize(get, identity, classId) {
       ? rows.some(row => row?.active !== false && row?.workspaceId === 'b3-2026' && row?.classId === classId)
       : profile?.classId === classId;
     if (!profile || profile.active === false || !enrolled || !member || member.active === false
-      || cls.active === false) deny();
+      || cls.active === false || cls.toolGrants?.davening !== true) deny();
     return { role: 'student', classId, studentId, name: String(profile.name || member.name || 'Student').slice(0, 100) };
   }
 

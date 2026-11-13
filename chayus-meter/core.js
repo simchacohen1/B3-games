@@ -49,14 +49,25 @@
     let feedbackCount = 0;
     let activeIntervals = 0;
     let sampleCount = 0;
+    let pauseCount = 0;
+    let pausedMs = 0;
+    let pauseStartedAt = null;
 
     function start(at) {
       if (finished) throw new Error('This session has ended. Create a new meter.');
       if (!Number.isFinite(at)) throw new TypeError('A monotonic timestamp is required');
       running = true;
+      if (pauseStartedAt !== null) {
+        pausedMs += Math.max(0, at - pauseStartedAt);
+        pauseStartedAt = null;
+      }
       lastTime = at;
     }
-    function pause() {
+    function pause(at) {
+      if (running) {
+        pauseCount++;
+        pauseStartedAt = Number.isFinite(at) ? at : null;
+      }
       running = false;
       lastTime = null; // Never count inactive or background-tab gaps.
     }
@@ -99,6 +110,8 @@
     }
     function snapshot() {
       const fraction = measuredMs ? activeMs / measuredMs : 0;
+      const visiblePausedMs = pausedMs + (pauseStartedAt !== null && !running
+        ? Math.max(0, performance.now() - pauseStartedAt) : 0);
       return {
         status: finished ? 'ended' : running ? 'active' : 'paused',
         measuredSeconds: round(measuredMs / 1000),
@@ -107,17 +120,32 @@
         calibrationSeconds: round(calibrationElapsed / 1000),
         feedbackCount,
         activeIntervals,
+        pauseCount,
+        pausedSeconds: round(visiblePausedMs / 1000),
         samples: sampleCount,
         // Signal amplitude is intentionally NOT part of a score.
         hasMeasuredActivity: measuredMs > 0
       };
     }
+    function restore(data) {
+      if (running || finished || measuredMs || !data || typeof data !== 'object') return false;
+      const safe = (key, max) => Number.isFinite(data[key]) ? clamp(data[key], 0, max) : 0;
+      measuredMs = safe('measuredSeconds', 7200) * 1000;
+      activeMs = Math.min(measuredMs, safe('activeSeconds', 7200) * 1000);
+      calibrationElapsed = Math.min(calibrationMs, safe('calibrationSeconds', 4) * 1000);
+      feedbackCount = Number.isInteger(data.feedbackCount) ? clamp(data.feedbackCount, 0, 48) : 0;
+      activeIntervals = Number.isInteger(data.activeIntervals) ? clamp(data.activeIntervals, 0, feedbackCount) : 0;
+      pauseCount = Number.isInteger(data.pauseCount) ? clamp(data.pauseCount, 0, 100) : 0;
+      pausedMs = safe('pausedSeconds', 7200) * 1000;
+      nextFeedbackAt = (feedbackCount + 1) * feedbackEveryMs;
+      return true;
+    }
     function finish() {
-      pause();
+      if (running) { running = false; lastTime = null; }
       finished = true;
       return snapshot();
     }
-    return { start, pause, sample, snapshot, finish };
+    return { start, pause, sample, snapshot, restore, finish };
   }
 
   /*
@@ -142,6 +170,18 @@
           ? clamp(data.calibrationSeconds, 0, 10) : 0)) / 60),
         observedIntervals: Number.isInteger(data?.feedbackCount) ? data.feedbackCount : 0,
         activeIntervals: Number.isInteger(data?.activeIntervals) ? data.activeIntervals : 0,
+        consistencyPercent: Number.isInteger(data?.feedbackCount) && data.feedbackCount > 0
+          ? Math.round(clamp(Number(data.activeIntervals) / data.feedbackCount, 0, 1) * 100) : null,
+        pauseCount: Number.isInteger(data?.pauseCount) ? data.pauseCount : 0,
+        pausedMinutes: Number.isFinite(data?.pausedSeconds) ? round(data.pausedSeconds / 60) : 0,
+        lastSavedAt: Number.isFinite(report?.lastSavedAt) ? report.lastSavedAt : null,
+        missingAtEnd: report?.missingAtEnd === true,
+        consistencyPercent: Number.isInteger(data?.feedbackCount) && data.feedbackCount > 0
+          ? Math.round(clamp(Number(data.activeIntervals) / data.feedbackCount, 0, 1) * 100) : null,
+        pauseCount: Number.isInteger(data?.pauseCount) ? data.pauseCount : 0,
+        pausedMinutes: Number.isFinite(data?.pausedSeconds) ? round(data.pausedSeconds / 60) : 0,
+        lastSavedAt: Number.isFinite(report?.lastSavedAt) ? report.lastSavedAt : null,
+        missingAtEnd: report?.missingAtEnd === true,
         soundActivityPercent: measured > 0 ? Math.round(active / measured * 100) : null,
         // This is an observational summary, not a teacher points suggestion.
         status: measured > 0 ? 'Microphone activity measured' : 'No microphone data'
