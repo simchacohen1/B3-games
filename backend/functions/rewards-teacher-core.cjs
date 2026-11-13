@@ -16,8 +16,10 @@ const initials=n=>String(n||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2)
 const categoryKey=n=>String(n||'category').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'category';
 const pick=(obj,ids)=>Object.fromEntries(ids.filter(id=>obj&&obj[id]!==undefined).map(id=>[id,obj[id]]));
 
-async function teacherAccess(store,identity){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+async function teacherAccess(store,identity,context={}){
+ // Fictional staging teachers sign in with a password; only the staging-only Davening build sets this flag.
+ const stagingTeacher=context.stagingPasswordTeacher===true&&identity?.b3StagingAccount===true&&identity.firebase?.sign_in_provider==='password';
+ if(!identity?.uid||identity.email_verified!==true||(identity.firebase?.sign_in_provider!=='google.com'&&!stagingTeacher))fail(403,'Verified Google teacher sign-in required.');
  const email=String(identity.email||'').toLowerCase();
  const admin=await store.get('b3Games/admins/'+identity.uid);
  const owner=email===ADMIN_EMAIL||Boolean(admin&&admin.active!==false);
@@ -72,8 +74,10 @@ async function loadRoot(store,scope){
  const {rewardClassIds,enrollments,studentIds}=scope;
  const [classes,students,categories,rewards,catalog,settings,requests,adjustments,rounds]=await Promise.all(
   ['classes','students','categories','rewards','classRewardCatalog','settings','pointRequests','pointAdjustments','classRewardRounds'].map(p=>store.get(SR+'/'+p)));
- const ids=new Set(studentIds),root={
-  classes:pick(classes||{},rewardClassIds),enrollments,students:pick(students||{},studentIds),
+ const ids=new Set(studentIds),safeStudents=pick(students||{},studentIds);
+ for(const student of Object.values(safeStudents))if(student)delete student.daveningAwardKeys;
+ const root={
+  classes:pick(classes||{},rewardClassIds),enrollments,students:safeStudents,
   categories:categories||{},
   // Each teacher class has its own store: only that class's items.
   rewards:Object.fromEntries(Object.entries(rewards||{}).filter(([,r])=>rewardClassIds.includes(r?.ownerClassId))),
@@ -216,9 +220,9 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
  return {ok:true,status};
 }
 
-async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
+async function rewardsTeacher(store,identity,body,nowMs=Date.now(),context={}){
  const now=new Date(nowMs).toISOString();
- const access=await teacherAccess(store,identity);
+ const access=await teacherAccess(store,identity,context);
  const scope=await scopeFor(store,access);
  const action=String(body?.action||''),email=access.email;
  if(action==='load')return {ok:true,root:await loadRoot(store,scope)};
@@ -254,6 +258,40 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   const id='adj_'+nowMs+'_'+sha(sid+nowMs+Math.random()).slice(0,8);
   await store.update({[SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now}});
   return {ok:true,applied,balance};
+ }
+ if(action==='awardDaveningPart'){
+  if(context.verifiedDaveningPart!==true)fail(403,'A verified Davening assignment is required.');
+  const classId=String(body.classId||''),b3StudentId=String(body.studentId||''),assignmentKey=String(body.assignmentKey||'');
+  requireClass(scope,classId);
+  if(!key(b3StudentId)||!key(assignmentKey))fail(400,'Invalid Davening assignment.');
+  const students=await store.get(SR+'/students')||{};
+  const rewardStudentId=scope.studentIds.find(id=>scope.enrollments[classId]?.[id]===true
+   && students[id]?.active!==false&&students[id]?.b3StudentId===b3StudentId);
+  if(!rewardStudentId)fail(403,'This Chazzan is not enrolled in your Rewards class.');
+  const markerKey=sha(classId+'|'+assignmentKey),id='davn_'+markerKey.slice(0,40);
+  const studentPath=SR+'/students/'+rewardStudentId;
+  let outcome;
+  const result=await store.tx(studentPath,cur=>{
+   outcome=undefined;
+   // The database may first run this with an empty local cache; returning null lets it retry with the saved account.
+   if(cur===null)return null;
+   if(cur.active===false)fail(403,'This student Rewards account is not active.');
+   const previous=cur.daveningAwardKeys?.[markerKey];
+   if(previous){outcome={...previous,duplicate:true};return cur;}
+   const balanceAfter=Math.max(0,Number(cur.rewardBalance||0)+1);
+   const marker={id,classId,amount:1,balanceAfter,teacherEmail:email,createdAt:now};
+   outcome={...marker,duplicate:false};
+   return {...cur,rewardBalance:balanceAfter,daveningAwardKeys:{...(cur.daveningAwardKeys||{}),[markerKey]:marker}};
+  });
+  if(!result?.committed||!outcome)fail(409,'The Chazzan point could not be recorded.');
+  const adjustmentPath=SR+'/pointAdjustments/'+id;
+  const existing=await store.get(adjustmentPath);
+  if(existing&&existing.sourceKey!==markerKey)fail(409,'This Rewards transaction key is already in use.');
+  if(!existing)await store.update({[adjustmentPath]:{
+   id,studentId:rewardStudentId,classId,amount:1,action:'teacher',reason:'Davening Chazzan part',
+   teacherEmail:outcome.teacherEmail,createdAt:outcome.createdAt,source:'davening',sourceKey:markerKey
+  }});
+  return {ok:true,applied:outcome.duplicate?0:1,balance:outcome.balanceAfter,duplicate:outcome.duplicate};
  }
  if(action==='comment'){
   const classId=String(body.classId||''),sid=String(body.studentId||'');requireStudent(scope,classId,sid);
