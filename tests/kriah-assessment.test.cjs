@@ -220,3 +220,59 @@ test('teacher audioRead refuses shortened private storage objects, without delet
   await denied(send(f, 'teacherA', 'audioRead', { id }), 409);
   assert.equal((await send(f, 'teacherA', 'get', { id })).record.audio.size, Buffer.from(webm, 'base64').length);
 });
+
+// --- Playback length and Alef-Beis adventure presentation (#624 follow-up) ---
+function fakePlayer() {
+  const listeners = {}, player = { duration: NaN, readyState: 0, seeks: [],
+    addEventListener(name, fn) { (listeners[name] ||= new Set()).add(fn); },
+    removeEventListener(name, fn) { listeners[name]?.delete(fn); },
+    emit(name) { [...(listeners[name] || [])].forEach(fn => fn()); },
+    listening() { return Object.values(listeners).reduce((n, s) => n + s.size, 0); } };
+  Object.defineProperty(player, 'currentTime', { get() { return player.seeks.at(-1) ?? 0; }, set(v) { player.seeks.push(v); } });
+  return player;
+}
+test('playback length waits for the end-seek instead of trusting a part-way length', async () => {
+  const player = fakePlayer(), pending = Recorder.resolveDuration(player, { setTimer: () => 1, clearTimer() {} });
+  player.duration = Infinity; player.emit('loadedmetadata');
+  assert.equal(player.seeks[0], 1e101);
+  // A browser may report the first second before it has scanned the file.
+  player.duration = 1; player.emit('durationchange');
+  assert.equal(player.seeks.length, 1, 'must not stop at the part-way one-second length');
+  player.duration = 34.7; player.emit('durationchange'); player.emit('seeked');
+  assert.equal(await pending, 34.7);
+  assert.equal(player.seeks.at(-1), 0); assert.equal(player.listening(), 0);
+});
+test('playback length: already known, and unknown after the time limit', async () => {
+  const known = fakePlayer(); known.duration = 12; known.readyState = 1;
+  assert.equal(await Recorder.resolveDuration(known, { setTimer: () => 1, clearTimer() {} }), 12);
+  assert.equal(known.seeks.length, 0);
+  let expire; const stuck = fakePlayer(), pending = Recorder.resolveDuration(stuck, { setTimer: fn => { expire = fn; return 1; }, clearTimer() {} });
+  stuck.duration = Infinity; stuck.emit('loadedmetadata'); expire();
+  assert.equal(await pending, null); assert.equal(stuck.seeks.at(-1), 0);
+});
+test('decoded recording gives its real length and an exact-length WAV copy', async () => {
+  const samples = new Float32Array(8000).fill(0.5), buffer = { duration: 1, length: 8000, sampleRate: 8000, numberOfChannels: 1, getChannelData: () => samples };
+  class Decoder { async decodeAudioData() { return buffer; } async close() {} }
+  const info = await Recorder.inspect(new Blob(['fictional']), { Decoder });
+  assert.equal(info.duration, 1);
+  const bytes = Buffer.from(await info.toWav().arrayBuffer());
+  assert.equal(bytes.length, 44 + 16000); assert.equal(bytes.toString('latin1', 0, 4), 'RIFF'); assert.equal(bytes.toString('latin1', 8, 12), 'WAVE');
+  assert.equal(bytes.readUInt32LE(24), 8000); assert.equal(bytes.readUInt32LE(40), 16000); assert.equal(bytes.readInt16LE(44), Math.trunc(0.5 * 0x7fff));
+  class Broken { async decodeAudioData() { throw new Error('unsupported'); } async close() {} }
+  assert.equal(await Recorder.inspect(new Blob(['fictional']), { Decoder: Broken }), null);
+  assert.equal(await Recorder.inspect(new Blob([]), { Decoder }), null);
+});
+test('Alef-Beis trail and reading tiles are in reading order (Alef first)', () => {
+  const Magic = require('../kriah-assessment/magic.js');
+  assert.equal(Magic.LETTERS.map(l => l.letter).join(''), 'אבגדהוזחטיכלמנסעפצקרשת');
+  assert.deepEqual(Magic.LETTERS.slice(0, 3).map(l => l.name), ['Alef', 'Beis', 'Gimmel']);
+  assert.equal(Magic.FINALS.map(l => l.letter).join(''), 'ךםןףץ');
+  const words = Magic.passageModel('בָּ גִ שָׁלוֹם', Core);
+  assert.deepEqual(words.map(w => w.length), [1, 1, 4]);
+  assert.deepEqual(words.flat().map(t => t.index), [0, 1, 2, 3, 4, 5]);
+  assert.equal(words[0][0].text.normalize('NFC'), 'בָּ'.normalize('NFC'));
+  assert.ok(Magic.CHEERS.includes(Magic.cheer(0)) && Magic.CHEERS.includes(Magic.cheer(0.999)));
+  // The page markup must keep Hebrew containers right-to-left.
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '../kriah-assessment/index.html'), 'utf8');
+  assert.match(html, /id="trailLetters"[^>]*dir="rtl"/); assert.match(html, /class="letter-garden" dir="rtl"/);
+});

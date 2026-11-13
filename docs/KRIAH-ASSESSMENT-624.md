@@ -229,3 +229,77 @@ unverified because its browser-runtime download repeatedly timed out/was slow.
 The local-fictional CI microphone/recovery/markup/report journey passes. Real
 Safari/iPad remains a separate check. These limitations do not prevent reviewing
 the isolated staging deployment, and do not grant production release approval.
+
+## Follow-up 2026-11-13: playback length, staging accounts, Alef-Beis adventure
+
+### "Recordings load as only about 1 second"
+
+Checked against the fictional data on staging (read-only):
+
+- The private bucket holds four originals. Two are **318-byte, 1-second synthetic
+  clips** uploaded by `scripts/kriah-stage-api-verify.cjs`; one of them belongs to
+  the only *Reviewed* assessment, so it is the first recording a teacher opens.
+  It plays for one second because one second is all that was ever recorded.
+- The two real browser recordings (124,878 B / 32.7 s and 134,376 B / 35.3 s)
+  decode to 32.2 s and 34.8 s and play to the end in Edge and Chrome through the
+  page's own player code. A local fake-microphone run of 8 s and 50 s also
+  saved, uploaded and played back at full length. No stored recording is cut.
+- Nothing was deleted. The synthetic clips are still there.
+
+What changed so this cannot mislead or fail quietly again:
+
+- `recorder.js` `resolveDuration()` replaces the old length helper. The old one
+  accepted the **first** finite length the player reported and then cancelled
+  its own end-seek; a browser that reports a part-way length first (the first
+  one-second chunk) would have been frozen at about one second. The new helper
+  waits for the end-seek to finish, has a time limit, and cleans up.
+- `recorder.js` `inspect()` fully decodes the recording for its real length. If
+  the player cannot show that full length, playback switches to a plain WAV
+  copy (`wav()`), so the whole recording is heard and can be seeked. The stored
+  original is never modified.
+- The teacher sees "Recording length: m:ss · the student recorded for m:ss".
+  A clip under 3 seconds is labelled as recorded that short, not cut off.
+- A student whose take is under 2 seconds is told so before sending.
+
+Not verified: Safari / iPad playback (no device available here).
+
+### Staging accounts: what the center needs
+
+The server (`backend/kriah-staging/service.cjs`) accepts an account only when
+all of the following hold. Missing any one gives a 403.
+
+| Who | Needs |
+|---|---|
+| Student sign-in token | custom claims `b3StudentRole: "student"`, `b3StudentId`, `b3ClassId` |
+| Class row `…/classes/{classId}` | id starts `kriah-test-`, `active`, `kriahSynthetic`, `toolGrants["kriah-assessment"]`, `members[studentId].active` |
+| Student record | `profile.active` **and** `profile.kriahSynthetic`; an active membership for that class in workspace `b3-2026` |
+| Teacher | email/password account on `@funtorahtools-staging.test`, email verified; teacher row `active`, `kriahSynthetic`, `classIds[classId]`. No custom claims. |
+
+Because of the `kriah-test-` rule, the ordinary staging students (TEST-ALEF,
+TEST-BEIS…) cannot open the center even though their homepage sign-in carries
+the three claims. Sign in on the Kriah page itself with a Kriah test account.
+
+`scripts/kriah-stage-accounts.cjs` checks all of this (read-only by default)
+and repairs it with `--apply`: it adds missing claims and Kriah rows, and
+creates one demo teacher and one demo student whose generated passwords go to a
+private file outside the repository. It never resets a password, never deletes,
+and only writes Kriah fixture records.
+
+State found on 2026-11-13 (check mode):
+
+- `student.kriah.et` — complete.
+- `student.kriah.wt` — has the claims, but its profile has lost
+  `kriahSynthetic`, so the server rejects it.
+- `student.kriah.et2` — created by hand with **no claims** and no class rows.
+- The passwords of the original four fixture accounts were kept only in a
+  temporary Cloud Shell file and are not available locally.
+
+### Alef-Beis adventure design
+
+`magic.css` / `magic.js` (presentation only) add the night-sky hero, the
+Alef-Beis Trail of 22 letters plus the five final letters, student "reading
+quest" cards, tappable letter tiles for the passage, a large microphone
+button, step chips and a short star burst after sending. Every Hebrew container
+is `dir="rtl"`: Alef is first on the right, Beis to its left. The old hero
+tiles were laid out left-to-right (Alef on the left); that is fixed and covered
+by a test. Teacher grading tools are unchanged apart from the theme.
