@@ -125,7 +125,20 @@ test('the large viewer picks up a screen that starts while it is already open, a
   await wait(()=>!!f.tile,'live student gets a tile');
   f.tile.click();
   await wait(()=>f.video.srcObject===f.shared,'open viewer did not pick up the new screen');
+  // The connection drops by itself (network): the large viewer stays open on the last picture, because the
+  // student's computer quietly calls again.
   call.emit('close');
+  await new Promise(resolve=>setTimeout(resolve,60));
+  assert.notEqual(f.tile?.removed,true,'a dropped connection does not throw the teacher back to the gallery');
+  assert.equal(f.video.srcObject,f.shared,'the large viewer keeps the last picture while the student reconnects');
+  assert.equal(f.focusPane.hidden,false);
+  // The student's computer calls again: same tile, same large view.
+  await f.startSharing();
+  await new Promise(resolve=>setTimeout(resolve,60));
+  assert.equal(f.focusPane.hidden,false,'the large view survives the new call');
+  assert.equal(f.video.srcObject,f.shared);
+  // The student stops on purpose (his own page reports it): the tile goes away at once.
+  f.window.ClassPointerActivityShares.studentStopped('arik');
   await wait(()=>f.tile?.removed===true&&f.video.srcObject===null,'stopped share removes its gallery tile');
 });
 
