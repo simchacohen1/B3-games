@@ -58,7 +58,7 @@ try:
         student = page()
         student.locator('#actor').select_option('studentA')
         expect(student.locator('#studentLabel')).to_be_hidden()
-        student.get_by_role('button', name='Open assessment', exact=True).click()
+        student.get_by_role('button', name='Start reading', exact=True).click()
         student.locator('#assessment input[type=checkbox]').check()
         student.get_by_role('button', name='Record reading', exact=True).click()
         expect(student.locator('#recordTimer')).to_contain_text('Recording')
@@ -68,7 +68,7 @@ try:
         # Page interruption: recover original Blob from IndexedDB.
         student.reload()
         student.locator('#actor').select_option('studentA')
-        student.get_by_role('button', name='Open assessment', exact=True).click()
+        student.get_by_role('button', name='Start reading', exact=True).click()
         expect(student.locator('#recordTimer')).to_contain_text('Recovered an unsent recording')
         student.locator('#assessment input[type=checkbox]').check()
         failed = [False]
@@ -142,7 +142,7 @@ try:
         teacher.screenshot(path=str(OUT / 'mobile-report.png'), full_page=True)
         teacher.pdf(path=str(OUT / 'fictional-report.pdf'), print_background=True)
         student.get_by_role('button', name='Refresh', exact=True).click()
-        student.get_by_role('button', name='Open assessment', exact=True).click()
+        student.get_by_role('button', name='Open my reading', exact=True).click()
         expect(student.locator('#assessment')).to_contain_text('Listen again to this kamatz.')
         student.get_by_role('button', name='Progress reports', exact=True).click()
         expect(student.locator('#reportBody')).to_contain_text('needs-practice')

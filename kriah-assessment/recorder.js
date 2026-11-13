@@ -67,6 +67,65 @@
       }
       return { checked: false };
     }
+    // Decode the whole recording and report its real audio length. Returns null
+    // when this browser cannot decode the format (that alone is not an error).
+    // toWav() gives a plain PCM copy for playback only; the stored original is
+    // never changed.
+    static async inspect(blob, { Decoder = root.AudioContext || root.webkitAudioContext } = {}) {
+      if (!Decoder || !blob?.size) return null;
+      let decoder;
+      try {
+        decoder = new Decoder();
+        const audio = await decoder.decodeAudioData(await blob.arrayBuffer());
+        if (!Number.isFinite(audio?.duration) || audio.duration <= 0) return null;
+        return { duration: audio.duration, toWav: () => KriahRecorder.wav(audio) };
+      } catch (_) { return null; } finally { try { await decoder?.close(); } catch (_) {} }
+    }
+    // Mono 16-bit WAV: every browser reports its exact length and can seek it.
+    static wav(audio) {
+      const channels = audio.numberOfChannels, length = audio.length, rate = audio.sampleRate;
+      const data = new DataView(new ArrayBuffer(44 + length * 2));
+      const text = (offset, value) => { for (let i = 0; i < value.length; i++) data.setUint8(offset + i, value.charCodeAt(i)); };
+      text(0, 'RIFF'); data.setUint32(4, 36 + length * 2, true); text(8, 'WAVE'); text(12, 'fmt ');
+      data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, 1, true);
+      data.setUint32(24, rate, true); data.setUint32(28, rate * 2, true); data.setUint16(32, 2, true); data.setUint16(34, 16, true);
+      text(36, 'data'); data.setUint32(40, length * 2, true);
+      const parts = []; for (let c = 0; c < channels; c++) parts.push(audio.getChannelData(c));
+      for (let i = 0; i < length; i++) {
+        let sample = 0; for (let c = 0; c < channels; c++) sample += parts[c][i];
+        sample = Math.max(-1, Math.min(1, sample / channels));
+        data.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      }
+      return new Blob([data.buffer], { type: 'audio/wav' });
+    }
+    // MediaRecorder WebM files carry no length, so a player reports Infinity
+    // until it has been sent to the end once. Wait for that seek to really
+    // finish: a length reported part-way through can be far too short.
+    // Resolves with the player's final length in seconds, or null if unknown.
+    static resolveDuration(player, { timeout = 8000, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+      return new Promise(resolve => {
+        let done = false, probing = false, reachedEnd = false, timer = null;
+        const known = () => Number.isFinite(player.duration) && player.duration > 0;
+        const finish = () => {
+          if (done) return; done = true; clearTimer(timer);
+          handlers.forEach(([name, fn]) => player.removeEventListener(name, fn));
+          if (probing) { try { player.currentTime = 0; } catch (_) {} }
+          resolve(known() ? player.duration : null);
+        };
+        const begin = () => {
+          if (done || probing) return;
+          if (known()) { finish(); return; }
+          probing = true;
+          try { player.currentTime = 1e101; } catch (_) { finish(); }
+        };
+        const arrived = () => { if (!probing) return; reachedEnd = true; if (known()) finish(); };
+        const changed = () => { if (!probing) { if (known()) finish(); } else if (reachedEnd && known()) finish(); };
+        const handlers = [['loadedmetadata', begin], ['seeked', arrived], ['ended', arrived], ['durationchange', changed], ['error', finish]];
+        handlers.forEach(([name, fn]) => player.addEventListener(name, fn));
+        timer = setTimer(finish, timeout);
+        if (player.readyState >= 1) begin();
+      });
+    }
     stop() { if (this.state === 'recording') { this.state = 'stopping'; this.recorder.stop(); } }
     cleanup() { clearInterval(this.timer); this.timer = null; this.stream?.getTracks().forEach(t => { t.onended = null; t.stop(); }); this.stream = null; }
     cancel() { this.cancelled = true; this.session++; this.stop(); this.cleanup(); this.state = 'idle'; }

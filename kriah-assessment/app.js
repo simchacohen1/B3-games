@@ -34,6 +34,7 @@
     if (name === 'reports') renderReport();
   }
   function options(node, rows, id = '') { node.replaceChildren(); rows.forEach(r => { const o = el('option', r.name); o.value = r.id; node.append(o); }); if (rows.some(r => r.id === id)) node.value = id; }
+  window.KriahMagic.trail($('trailLetters'), $('trailName'));
   C.TYPES.forEach(t => { const o = el('option', t); o.value = t; $('type').append(o); });
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tabs(b.dataset.tab));
   window.addEventListener('beforeunload', event => { if (state.dirty || state.blob || state.recording?.state === 'recording') { event.preventDefault(); event.returnValue = ''; } });
@@ -45,9 +46,12 @@
     options($('classSelect'), []); options($('studentSelect'), []);
     $('signIn').hidden = API.fixture || !!API.uid(); $('studentSignIn').hidden = API.fixture || !!API.uid(); $('signOut').hidden = API.fixture || !API.uid();
     $('fixtureLogin').hidden = !API.staging || !!API.uid();
-    if (!API.uid()) { status('Sign in with a fictional staging account. Students use the staging homepage sign-in.'); return; }
+    if (!API.uid()) { status('Sign in with a fictional staging account to begin.'); return; }
     status('Checking your assigned classes…');
-    const result = await call({ action: 'classes' }); state.role = result.role; document.body.dataset.role = state.role;
+    let result;
+    try { result = await call({ action: 'classes' }); }
+    catch (error) { if (error.status === 403) error.message = 'You are signed in, but this account is not set up for the Kriah center on staging yet. (' + error.message + ') Use a fictional Kriah test account, or ask the site owner to add this account to a Kriah test class.'; throw error; }
+    state.role = result.role; document.body.dataset.role = state.role;
     state.studentId = result.studentId || '';
     options($('classSelect'), result.classes);
     state.classId = $('classSelect').value;
@@ -166,30 +170,47 @@
   function renderAttempts() {
     queue.hidden = state.role !== 'teacher' || !state.students.length;
     $('attemptList').replaceChildren(); $('more').hidden = !state.next;
-    $('attemptHeading').textContent = state.role === 'teacher' ? 'Assessments · ' + ($('studentSelect').selectedOptions[0]?.textContent || '') : 'My reading assignments';
+    $('attemptHeading').textContent = state.role === 'teacher' ? 'Assessments · ' + ($('studentSelect').selectedOptions[0]?.textContent || '') : 'My reading quests';
     if (!state.records.length) $('attemptList').append(el('p', 'No assessments assigned yet.'));
+    if (state.role === 'student' && !state.records.length) $('attemptList').lastChild.textContent = 'No reading quests yet. Your teacher will send you one soon!';
     state.records.forEach(r => {
       const row = el('article', null, 'row'), text = el('div');
+      if (state.role === 'student') {
+        // Child-facing quest card: same record, friendlier words.
+        const todo = r.status === 'assigned', badge = el('div', todo ? '📖' : r.status === 'reviewed' ? '💌' : '⭐', 'quest-badge');
+        badge.setAttribute('aria-hidden', 'true'); row.classList.add('quest', 'quest-' + r.status);
+        text.append(el('strong', r.exercise.title), el('p', todo ? 'Ready when you are. Read it out loud!' : r.status === 'reviewed' ? 'Your teacher listened. Open it to see!' : 'Sent! Your teacher will listen soon.'), el('span', statusLabel(r.status), 'tag tag-' + r.status));
+        row.append(badge, text, button(todo ? 'Start reading' : 'Open my reading', () => openAssessment(r.id), todo ? 'quest-go' : 'secondary')); $('attemptList').append(row);
+        return;
+      }
       text.append(el('strong', r.exercise.title), el('p', new Date(r.createdAt).toLocaleString() + ' · ' + r.exercise.level), el('span', statusLabel(r.status), 'tag tag-' + r.status));
       row.append(text, button('Open assessment', () => openAssessment(r.id), 'secondary')); $('attemptList').append(row);
     });
   }
   function statusLabel(s) {
-    const labels = state.role === 'student' ? { assigned: 'To record', submitted: 'Sent to teacher', in_progress: 'Sent to teacher', reviewed: 'Reviewed' } : { assigned: 'Not recorded', submitted: 'Ungraded', in_progress: 'Review in progress', reviewed: 'Reviewed' };
+    const labels = state.role === 'student' ? { assigned: 'Ready to read', submitted: 'Sent to teacher', in_progress: 'Sent to teacher', reviewed: 'Teacher listened' } : { assigned: 'Not recorded', submitted: 'Ungraded', in_progress: 'Review in progress', reviewed: 'Reviewed' };
     return labels[s] || s;
   }
-  // Chromium's MediaRecorder WebM files report duration Infinity until the end
-  // is seeked once. Resolve it so the teacher gets a seek bar and the
-  // truncation check below can run.
-  function whenDurationKnown(player, done) {
-    player.onloadedmetadata = () => {
-      if (Number.isFinite(player.duration)) { done(); return; }
-      player.ondurationchange = () => { if (!Number.isFinite(player.duration)) return; player.ondurationchange = null; player.currentTime = 0; done(); };
-      try { player.currentTime = 1e101; } catch (_) {}
-    };
+  const clock = seconds => { const whole = Math.max(0, Math.round(seconds)); return Math.floor(whole / 60) + ':' + String(whole % 60).padStart(2, '0'); };
+  // Put a recording in the player and find its real length. MediaRecorder files
+  // carry no length of their own, so the player is measured (waiting for its
+  // end-seek to finish) and the audio is also fully decoded. If the player
+  // cannot show the full decoded length, it plays a plain WAV copy instead, so
+  // the listener always hears and can seek the whole recording. The stored
+  // original is never changed.
+  async function loadAudio(player, blob, gen) {
+    const url = URL.createObjectURL(blob); state.urls.push(url);
+    const inspecting = KriahRecorder.inspect(blob);
+    player.preload = 'auto'; player.src = url; player.hidden = false;
+    const [shown, decoded] = await Promise.all([KriahRecorder.resolveDuration(player), inspecting]);
+    if (gen !== state.generation) return null;
+    let seconds = shown, copy = false;
+    if (decoded && (!shown || shown + 1.5 < decoded.duration)) {
+      const wav = URL.createObjectURL(decoded.toWav()); state.urls.push(wav);
+      player.src = wav; seconds = decoded.duration; copy = true;
+    }
+    return { seconds: seconds || null, copy };
   }
-  // Preload local audio so the duration fix runs before the first Play press.
-  function showAudio(player, url) { player.preload = 'auto'; player.src = url; player.hidden = false; }
   const draftKey = () => state.classId + ':' + state.studentId + ':' + state.record.id;
   let draftQueue = Promise.resolve();
   function draftValue() { return { revision: state.record.revision, marks: state.marks, feedback: $('feedback')?.value || '', recommendation: $('recommendation')?.value || '', shareFeedback: $('shareFeedback')?.checked || false, countSelfCorrection: $('countSelf')?.checked || false, timing: $('confirmTiming')?.checked ? { confirmed: true, seconds: Number($('timing')?.value) } : null }; }
@@ -210,28 +231,36 @@
     if (record.audio) { const load = button('Load original recording', async () => {
       const data = await call({ action: 'audioRead', id });
       const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: data.type })); state.urls.push(url);
-      whenDurationKnown(player, () => { const expected = Number(record.audio?.duration), actual = player.duration; if (Number.isFinite(expected) && expected >= 3 && Number.isFinite(actual) && actual > 0 && actual + Math.max(2, expected * 0.12) < expected) status('Warning: playback is only ' + Math.round(actual) + ' seconds, but the original was reported as ' + Math.round(expected) + ' seconds. This recording may be incomplete; do not grade it as complete.', true); });
-      // showAudio preloads: with preload "none" the truncation check would wait for Play.
-      showAudio(player, url); load.hidden = true;
-      status('Original recording loaded. Expected duration: ' + Math.round(record.audio?.duration || 0) + 's. No automatic word alignment.');
+      load.hidden = true; status('Loading the original recording…');
+      const loaded = await loadAudio(player, new Blob([bytes], { type: data.type }), gen);
+      if (!loaded) return;
+      const expected = Number(record.audio?.duration), actual = loaded.seconds;
+      const length = el('p', null, 'audio-length'); length.id = 'audioLength';
+      length.textContent = actual ? 'Recording length: ' + clock(actual) + (Number.isFinite(expected) ? ' · the student recorded for ' + clock(expected) : '') : 'This browser could not measure the recording length. Press play to listen.';
+      player.after(length);
+      if (Number.isFinite(expected) && expected >= 3 && actual && actual + Math.max(2, expected * 0.12) < expected) status('Warning: playback is only ' + Math.round(actual) + ' seconds, but the original was reported as ' + Math.round(expected) + ' seconds. This recording may be incomplete; do not grade it as complete.', true);
+      else if (Number.isFinite(expected) && expected < 3) { length.classList.add('short'); length.textContent += ' · This is a very short clip. It was recorded this short (for example a test clip); nothing was cut off.'; status('Original recording loaded. It is only ' + Math.max(1, Math.round(expected)) + ' second(s) long because that is all that was recorded.'); }
+      else status('Original recording loaded. Full length ' + (actual ? clock(actual) : Math.round(record.audio?.duration || 0) + 's') + (loaded.copy ? ' (playing a compatible copy so the whole recording can be heard).' : '.') + ' No automatic word alignment.');
     }, 'secondary'); box.append(load); }
     if (state.role === 'student') await studentAssessment(box, record, player, gen);
     else await teacherAssessment(box, record, gen);
     if (gen === state.generation) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   async function studentAssessment(box, record, player, gen) {
-    const text = el('p', record.exercise.text, 'hebrew passage'); text.dir = 'rtl'; text.lang = 'he'; box.append(text);
+    box.classList.add('quest-open');
+    box.append(el('p', record.audio ? 'Here is what you read. Tap a letter to light it up.' : 'Read these out loud, starting on the right. Tap a letter to light it up as you go.', 'read-hint'));
+    box.append(window.KriahMagic.passage(record.exercise.text, C));
     if (record.feedback || record.recommendation) box.append(el('h3', 'Teacher feedback'), el('p', record.feedback), el('p', record.recommendation));
     if (record.summary) box.append(scorePanel(record.summary));
     if (record.audio) {
-      box.append(el('p', record.status === 'reviewed' ? '✓ Your teacher has reviewed this reading.' : '✓ Your recording was sent. Your teacher will listen and review it. You are done with this one.', 'done-note'));
+      box.append(el('p', record.status === 'reviewed' ? '✓ Your teacher has reviewed this reading. Well done!' : '✓ Your recording was sent. Your teacher will listen and review it. You are done with this one. Great job!', 'done-note'));
       box.append(button('Start a new attempt', async () => {
         if (!confirm('Record this reading again as a new attempt? Your teacher keeps the recording you already sent, too.')) return;
         const result = await call({ action: 'retry', id: record.id }); await loadRecords(); await openAssessment(result.id);
       }, 'secondary'));
       return;
     }
+    const steps = el('ol', null, 'quest-steps'); ['Tick the box', 'Press the microphone', 'Read out loud', 'Stop, listen, and send'].forEach(step => steps.append(el('li', step))); box.append(steps);
     const consent = input('checkbox'), consentLabel = field('I am using a fictional test reading. Record my voice and share it with my assigned teacher.', consent); consentLabel.className = 'check'; box.append(consentLabel);
     const timer = el('p', 'Up to 5 minutes · 2 MiB maximum. Nothing is sent until you press Submit.', 'subtle'); timer.id = 'recordTimer'; box.append(timer);
     const actions = el('div', null, 'actions');
@@ -267,7 +296,7 @@
         const captured = state.blob; captured.uploadStarted = true; await API.draft(draftKey() + ':audio', captured).catch(() => {}); const audio = await API.blob64(captured.blob);
         if (gen !== state.generation) return;
         await call({ action: 'submit', id: record.id, audio, type: captured.blob.type, duration: captured.duration }, { progress: percent => { if (gen === state.generation) status('Uploading ' + percent + '% · Waiting for server confirmation…'); } });
-        await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; await loadRecords(); await openAssessment(record.id); status('Recording submitted. Your original is preserved.');
+        await API.draft(draftKey() + ':audio', null).catch(() => {}); state.blob = null; await loadRecords(); await openAssessment(record.id); status('Recording submitted. ' + window.KriahMagic.cheer() + ' Your teacher will listen soon.'); window.KriahMagic.burst($('assessment'));
       } catch (error) {
         if (error.status === 400 && state.blob) { state.blob.uploadStarted = false; await API.draft(draftKey() + ':audio', state.blob); }
         throw error;
@@ -278,14 +307,14 @@
       if (gen !== state.generation) return;
       await KriahRecorder.verifyPlayableDuration(value.blob, value.duration);
       if (gen !== state.generation) return;
-      state.blob = value; const url = URL.createObjectURL(value.blob); state.urls.push(url); whenDurationKnown(player, () => {}); showAudio(player, url);
-      timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds recorded · Listen, then press Submit (or Retry to record again).'; sync();
+      state.blob = value; loadAudio(player, value.blob, gen);
+      timer.className = 'subtle'; timer.textContent = Math.round(value.duration) + ' seconds recorded · Listen, then press Submit (or Retry to record again).' + (value.duration < 2 ? ' That was very short. If you meant to read more, press Retry.' : ''); sync();
       await API.draft(draftKey() + ':audio', value); status('Recording saved on this device for recovery. Listen, retry, or submit.');
     } });
     state.recording = recorder; recordButton.classList.add('record-primary'); recordButton.setAttribute('aria-label', 'Record reading'); actions.append(recordButton, stop, cancel, retry, submit); box.append(actions); sync();
     const recovered = await API.draft(draftKey() + ':audio').catch(error => { status(error.message, true); return null; });
     if (gen !== state.generation) return;
-    if (recovered?.blob) { state.blob = recovered; const url = URL.createObjectURL(recovered.blob); state.urls.push(url); whenDurationKnown(player, () => {}); showAudio(player, url); sync(); timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
+    if (recovered?.blob) { state.blob = recovered; loadAudio(player, recovered.blob, gen); sync(); timer.textContent = 'Recovered an unsent recording from this device. ' + (recovered.uploadStarted ? 'Upload may have started; submit these same original bytes again.' : 'Listen, confirm permission and submit, or retry.'); }
   }
   function scorePanel(summary) {
     const panel = el('div', null, 'score');
