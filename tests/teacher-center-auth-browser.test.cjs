@@ -56,7 +56,13 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    // collapsed grade/class details until the supervisor expands them.
    await page.waitForSelector('#classes .class-card',{state:'attached',timeout:10000});
    if(role==='principal'){
+    // Compact on arrival: school and grade rows only, no class cards on screen.
+    assert.equal(await page.locator('#classes .class-card').filter({visible:true}).count(),0,'principal homepage starts collapsed');
     await page.locator('.principal-overview-controls button').filter({hasText:'Expand all'}).click();
+    // Rosters come only from the principal's own supervised classes (ET and New Room, never WT).
+    await page.waitForSelector('.principal-student',{state:'visible',timeout:10000});
+    assert.deepEqual((await page.locator('.principal-student > summary .pd-title').allInnerTexts()).sort(),['ET Student','New Student']);
+    assert.equal(await page.locator('.principal-overview').getByText('WT Student').count(),0);
    }
    await page.waitForSelector('#classes .class-card',{state:'visible',timeout:10000});
    const measuredMs=Date.now()-start;

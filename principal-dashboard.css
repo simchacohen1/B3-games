@@ -1,15 +1,100 @@
-/* Principal-only progressive disclosure, scoped to the new overview component. */
-.principal-overview{max-width:1160px;margin:12px auto 30px;padding:16px;background:#fff;border:2px solid #dbeafe;border-radius:22px;box-shadow:0 8px 22px rgba(15,23,42,.08)}
-.principal-overview>h2{font:700 1.6rem 'Fredoka',sans-serif;color:#0f3b5f;margin:0 0 6px}
-.principal-overview-summary{font-weight:700;color:#475569;margin:0 0 16px}
-.principal-overview-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
-.principal-overview-controls input{flex:1 1 240px;min-width:0;border:2px solid #cbd5e1;border-radius:12px;padding:10px;font:inherit}
-.principal-overview-controls button{border:2px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:12px;padding:9px 14px;font:inherit;font-weight:800;cursor:pointer}
-.principal-grade,.principal-class{border:2px solid #e2e8f0;border-radius:14px;margin:9px 0;background:#f8fafc}
-.principal-grade>summary,.principal-class>summary{cursor:pointer;padding:14px 16px;font-weight:800;color:#0f3b5f}
-.principal-grade-classes{padding:0 12px 12px}
-.principal-class{background:white}
-.principal-class>.class-card{margin:0;padding:8px 14px 16px}
+/* Principal-only progressive disclosure, scoped to the overview component.
+ * School → Grade → Class → Students → Details. */
+.principal-overview{max-width:1160px;margin:12px auto 30px;padding:16px;background:#fff;border:2px solid #dbeafe;border-radius:22px;box-shadow:0 8px 22px rgba(15,23,42,.08);text-align:left}
+.principal-overview>h2{font:700 1.6rem 'Fredoka',sans-serif;color:#0f3b5f;margin:0 0 10px}
 .principal-overview [hidden]{display:none!important}
-.principal-overview :is(summary,input,button):focus-visible{outline:3px solid #2563eb;outline-offset:3px}
-@media(max-width:600px){.principal-overview{padding:10px}.principal-grade-classes{padding:0 6px 6px}}
+
+/* At-a-glance statistics */
+.pd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;margin:0 0 12px}
+.pd-stat{background:#f1f5f9;border:2px solid #e2e8f0;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;min-width:0}
+.pd-stat strong{font:700 1.7rem 'Fredoka',sans-serif;color:#0f3b5f;line-height:1.1}
+.pd-stat span{font-weight:800;font-size:.82rem;color:#475569}
+.pd-stat-online{background:#ecfdf5;border-color:#a7f3d0}
+.pd-stat-online strong{color:#047857}
+.pd-hint{margin:-4px 0 12px;font-size:.82rem;font-weight:700;color:#64748b}
+
+/* Search, filters, expand/collapse */
+.principal-overview-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;align-items:stretch}
+.principal-overview-controls input,.principal-overview-controls select{border:2px solid #cbd5e1;border-radius:12px;padding:10px;font:inherit;font-weight:700;color:#0f172a;background:#fff;min-width:0;min-height:44px;box-sizing:border-box}
+.principal-overview-controls input{flex:1 1 240px}
+.principal-overview-controls select{flex:0 1 160px}
+.principal-overview-controls button{border:2px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:12px;padding:9px 14px;font:inherit;font-weight:800;cursor:pointer;min-height:44px}
+.principal-overview-controls button:hover{background:#dbeafe}
+.principal-overview-controls .pd-clear{border-color:#e2e8f0;background:#fff;color:#475569}
+.principal-overview-summary{font-weight:700;color:#475569;margin:0 0 12px}
+.pd-empty,.pd-none{margin:8px 0;padding:12px;border-radius:12px;background:#f8fafc;color:#475569;font-weight:700}
+
+/* Folds */
+.pd-fold{border:2px solid #e2e8f0;border-radius:14px;margin:9px 0;background:#f8fafc}
+.pd-summary{cursor:pointer;padding:12px 14px;font-weight:800;color:#0f3b5f;display:flex;align-items:center;gap:10px;flex-wrap:wrap;list-style:none;border-radius:12px;min-height:44px;box-sizing:border-box}
+.pd-summary::-webkit-details-marker{display:none}
+.pd-summary:hover{background:rgba(37,99,235,.06)}
+.pd-chevron{flex:none;width:9px;height:9px;border-right:3px solid #64748b;border-bottom:3px solid #64748b;transform:rotate(-45deg);transition:transform .2s ease;margin:0 4px 0 2px}
+.pd-fold[open]>.pd-summary>.pd-chevron{transform:rotate(45deg)}
+.pd-icon{flex:none;font-size:1.15rem}
+.pd-title{flex:1 1 140px;min-width:0;overflow-wrap:anywhere}
+.pd-subtitle{display:block;font-size:.82rem;font-weight:700;color:#64748b}
+.pd-badges{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.pd-badge{display:inline-block;padding:3px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:.78rem;font-weight:800;white-space:nowrap}
+.pd-badge-online{background:#d1fae5;color:#065f46}
+.pd-badge-offline{background:#f1f5f9;color:#64748b}
+.pd-body{padding:0 12px 12px}
+
+/* Smooth open/close where the browser supports it, with a gentle reveal everywhere else. */
+.principal-overview{interpolate-size:allow-keywords}
+.pd-fold::details-content{block-size:0;overflow:hidden;transition:block-size .22s ease,content-visibility .22s allow-discrete}
+.pd-fold[open]::details-content{block-size:auto}
+.pd-fold[open]>.pd-body{animation:pd-reveal .22s ease}
+@keyframes pd-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* Levels */
+.principal-school{background:#fff;border-color:#bfdbfe}
+.principal-school>.pd-summary{font-size:1.1rem}
+.principal-grade{background:#f8fafc}
+.principal-class{background:#fff}
+.principal-students,.principal-tools{background:#f8fafc}
+.principal-students>.pd-summary,.principal-tools>.pd-summary{font-size:.95rem}
+.pd-trail{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.85rem;font-weight:800;color:#64748b;margin:0 0 4px}
+.pd-crumb{border:0;background:none;color:#1d4ed8;font:inherit;font-weight:800;cursor:pointer;padding:6px 4px;text-decoration:underline}
+.pd-here{color:#0f3b5f}
+
+/* Students */
+.pd-student-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;align-items:start}
+.principal-student{margin:0;background:#fff;border-width:1px}
+.principal-student>.pd-summary{padding:8px 10px;font-weight:700;flex-wrap:nowrap}
+.principal-student .pd-chevron{width:7px;height:7px;border-width:2px}
+.pd-dot{flex:none;width:10px;height:10px;border-radius:50%;background:#cbd5e1}
+.pd-dot-on{background:#10b981;box-shadow:0 0 0 3px #d1fae5}
+.pd-facts{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0 0 8px;font-size:.88rem}
+.pd-facts dt{font-weight:800;color:#64748b}
+.pd-facts dd{margin:0;font-weight:700;color:#0f172a;overflow-wrap:anywhere}
+.pd-actions{display:flex;flex-wrap:wrap;gap:6px}
+.pd-action{display:inline-block;padding:7px 11px;border-radius:10px;border:2px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-weight:800;font-size:.85rem;text-decoration:none}
+.pd-action:hover{background:#dbeafe}
+
+/* The original class card lives inside "Class tools & settings"; its name and
+ * teacher line are already shown on the class row above. */
+.principal-tools .class-card{margin:0;padding:4px 2px 8px}
+.principal-tools .class-card>h2,.principal-tools .class-card>p.sub{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+.principal-overview :is(summary,input,select,button,a):focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+
+@media(max-width:600px){
+  .principal-overview{padding:10px;border-radius:16px;margin:8px auto 20px}
+  .principal-overview>h2{font-size:1.3rem}
+  .pd-stats{grid-template-columns:repeat(2,1fr);gap:8px}
+  .pd-stat strong{font-size:1.4rem}
+  .principal-overview-controls input{flex:1 1 100%}
+  .principal-overview-controls select{flex:1 1 calc(50% - 5px)}
+  .principal-overview-controls button{flex:1 1 calc(50% - 5px)}
+  .pd-summary{padding:10px}
+  .pd-body{padding:0 6px 8px}
+  .pd-fold{margin:7px 0}
+  .pd-badges{margin-left:0;flex-basis:100%;padding-left:26px}
+  .principal-student .pd-badges{flex-basis:auto;padding-left:0}
+  .pd-student-list{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  .pd-fold::details-content,.pd-chevron{transition:none}
+  .pd-fold[open]>.pd-body{animation:none}
+}

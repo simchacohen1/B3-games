@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="home-island.css?v=20261102-teacher-match">
-<link rel="stylesheet" href="principal-dashboard.css?v=20261111-780">
+<link rel="stylesheet" href="principal-dashboard.css?v=20261113-780-tree">
 <style>
 /* Only what the owner's homepage does not already have. Everything else comes from home-island.css. */
 #app{max-width:1190px;margin:auto}
@@ -47,7 +47,7 @@
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
-<script src="principal-dashboard.js?v=20261111-780"></script>
+<script src="principal-dashboard.js?v=20261113-780-tree"></script>
 </head><body>
 <button id="signOut" class="signout-pill hidden">Sign out</button>
 <h1 id="homeTitle">Fun Torah Tools</h1>
@@ -145,22 +145,50 @@ async function render(user,access){
    // Move the existing cards without cloning so links and tool control behavior are preserved.
    const cards=Array.from(q("classes").querySelectorAll(":scope > .class-card"));
    if(cards.length){
-     // Count unique active members from class snapshots already loaded for this principal.
-     const studentIds=new Set();
-     snaps.forEach(snapshot=>{
-       const row=snapshot.val()||{};
-       if(!snapshot.exists()||row.active===false)return;
-       Object.entries(row.members||{}).forEach(([id,member])=>{
-         if(member&&member.active!==false)studentIds.add(id);
-       });
+     // School → Grade → Class → Students → Details, built only from the class
+     // snapshots already loaded above for this principal's supervised classes.
+     const rows={};
+     snaps.forEach((snapshot,i)=>{const row=snapshot.val()||{};if(snapshot.exists()&&row.active!==false)rows[ids[i]]=row;});
+     // Display names for schools, plus the Class Gallery's "who is here now"
+     // list for the two classes that keep it outside the class record. Both are
+     // optional labels: a failed read only removes the label, never access.
+     const [schoolSnap,legacyPresenceSnap]=await Promise.all([
+       db.ref("b3Games/workspaces/"+WS+"/schools").once("value").catch(()=>null),
+       ids.some(id=>id==="et"||id==="wt")?db.ref("b3Games/classGalleryPresence").once("value").catch(()=>null):null
+     ]);
+     if(generation!==renderGeneration)return;
+     const schools=schoolSnap&&schoolSnap.val()||{},legacyPresence=legacyPresenceSnap&&legacyPresenceSnap.val()||{},now=Date.now();
+     // Same freshness rule the Class Gallery uses for its live classmates list.
+     const liveNow=sessions=>!!sessions&&typeof sessions==="object"&&Object.values(sessions).some(data=>{
+       if(!data||typeof data!=="object")return false;
+       const updated=Number(data.updatedAt)||0;
+       return !updated||now-updated<=50000;
      });
-     const items=cards.map(card=>({
-       name:card.querySelector("h2")?.textContent||"",
-       teacher:(card.querySelector(":scope > p.sub")?.textContent||"").replace(/^Teacher:\s*/,""),
-       id:decodeURIComponent(card.dataset.classId||""),
-       card
-     }));
-     window.B3PrincipalDashboard.build(q("classes"),items,{teacherCount:supervised.length,studentCount:studentIds.size,persistKey:user?.uid||"principal"});
+     const items=cards.map(card=>{
+       const id=decodeURIComponent(card.dataset.classId||""),row=rows[id]||{};
+       const presence=["et","wt"].includes(id)?legacyPresence[id]:row.resources?.gallery?.presence?.[id];
+       const school=typeof row.schoolId==="string"?schools[row.schoolId]:null;
+       return {
+         id,card,
+         name:card.querySelector("h2")?.textContent||"",
+         teacher:(card.querySelector(":scope > p.sub")?.textContent||"").replace(/^Teacher:\s*/,""),
+         grade:row.grade,
+         schoolId:school?row.schoolId:"",
+         schoolName:school&&typeof school.name==="string"?school.name:"",
+         students:Object.entries(row.members||{}).filter(([,member])=>member&&member.active!==false)
+           .map(([sid,member])=>({id:sid,name:member.name||sid,online:liveNow(presence&&presence[sid])}))
+       };
+     });
+     window.B3PrincipalDashboard.build(q("classes"),items,{
+       teacherCount:supervised.length,
+       persistKey:user?.uid||"principal",
+       onlineHint:"“Online” counts students in the live Class Gallery when this page loaded.",
+       // The same pages the class card already links to; each enforces its own access.
+       studentActions:(cls,student)=>[
+         {label:"Student Report",href:"student-report/index.html?class="+encodeURIComponent(cls.id)+"&student="+encodeURIComponent(student.id)},
+         {label:"Manage Class",href:"admin.html?tab=students&class="+encodeURIComponent(cls.id)}
+       ]
+     });
    }
  }
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
