@@ -43,3 +43,34 @@ test('principal dashboard removes class links immediately when supervision is re
  assert.doesNotMatch(x.nodes.classes.innerHTML,/ET/);
  assert.ok(x.nodes.signOut.classList.values.has('hidden'));
 });
+
+const CLS='b3Games/workspaces/b3-2026/classes/';
+test('teacher home uses the Learning Island groups, only for tools turned on',async()=>{
+ const x=dashboard({[CLS+'mine']:{name:'Mine',active:true,toolGrants:{chazara:true,shorashim:true,'weekly-quiz':true,'class-pointer':true}}});
+ await x.run({authorized:true,role:'teacher',classIds:['mine']});
+ const html=x.nodes.classes.innerHTML;
+ for(const t of ['Chumash Cheder','Shorashim Grove','Challenge Playground','Teacher Tools'])assert.ok(html.includes(t),t);
+ for(const t of ['Skills Library','Learning Beis Midrash','Class Village'])assert.ok(!html.includes(t),t+' should be hidden when none of its tools are on');
+ assert.match(html,/class-pointer-prototype\/dashboard.html\?teacher=1&class=mine/);
+ assert.ok(!html.includes('rashi-letters/teacher'));
+});
+test('owner-only links never appear on a teacher home',async()=>{
+ const all={};for(const k of ['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','gallery','class-pointer','name-picker','chavrusa','davening'])all[k]=true;
+ const x=dashboard({[CLS+'mine']:{name:'Mine',active:true,toolGrants:all}});
+ await x.run({authorized:true,role:'teacher',classIds:['mine']});
+ const html=x.nodes.classes.innerHTML;
+ for(const bad of ['sync-to-nigri','owner-admin','class-dashboard','comment-log'])assert.ok(!html.includes(bad),bad);
+});
+test('a new class with no tools shows a friendly empty state and no tool groups',async()=>{
+ const x=dashboard({[CLS+'fresh']:{name:'Fresh',active:true}});
+ await x.run({authorized:true,role:'teacher',classIds:['fresh']});
+ const html=x.nodes.classes.innerHTML;
+ assert.match(html,/No tools have been enabled for this class yet/);
+ assert.ok(!html.includes('chazara/teacher')&&!html.includes('data-place="learn"'));
+});
+test('addClass in Owner Admin creates classes without any tool grants',()=>{
+ const src=fs.readFileSync('owner-admin.html','utf8');
+ const line=src.split('\n').find(l=>l.includes('q("addClass").onclick'));
+ assert.ok(line&&/\.set\(\{name:name,active:true\}\)/.test(line));
+ assert.ok(!/toolGrants/.test(line));
+});
