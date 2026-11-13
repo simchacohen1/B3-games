@@ -4,7 +4,7 @@ const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 async function fixture(){
  let auth,releaseWrite,failRemoval=false;const operations=[];
  const ref=path=>({key:path.split('/').pop(),child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),
- onDisconnect:()=>({remove:async()=>{},cancel:async()=>{operations.push(['cancel',path])}}),
+ onDisconnect:()=>({remove:async()=>{},set:async()=>{},cancel:async()=>{operations.push(['cancel',path])}}),
  set:async value=>{operations.push(['set',path,value]);if(path.startsWith('b3Private/classPointerSharePermissions/'))await new Promise(resolve=>releaseWrite=resolve)},
  update:async value=>{operations.push(['update',path,value])},
  remove:async()=>{operations.push(['remove',path]);if(failRemoval)throw Error('offline')}});
@@ -24,7 +24,7 @@ test('End drains an in-flight permission write and drops queued writes before re
  assert.equal(f.operations.filter(([op])=>op==='remove').length,0,'must wait for the in-flight write');
  await assert.rejects(()=>f.dashboard.publish(room),/still ending/);
  f.release();await Promise.all([first,queued,ending]);
- assert.deepEqual(f.operations.map(([op])=>op),['set','set','update','remove','remove','cancel','cancel']);
+ assert.deepEqual(f.operations.map(([op])=>op),['set','set','update','remove','remove','cancel']);
  assert.ok(f.operations[0][1].includes('/classes/wt/classPointerSessions/'+room));
  assert.equal(f.operations[1][1],'b3Private/classPointerSharePermissions/b3-2026/wt/'+room);
  assert.ok(f.operations[2][1].includes('/classes/wt/classPointerSessions/'+room));
@@ -39,7 +39,7 @@ test('failed deletion retains the exact previous session reference for retry',as
  assert.equal(removals.length,4);
  assert.equal(removals[0][1],removals[2][1]);
  assert.equal(removals[1][1],removals[3][1]);
- assert.equal(f.operations.filter(([op])=>op==='cancel').length,2);
+ assert.equal(f.operations.filter(([op])=>op==='cancel').length,1);
 });
 
 test('teacher can End and Restart three times; duplicate clicks never overlap cleanup',async()=>{

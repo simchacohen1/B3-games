@@ -404,6 +404,7 @@
       try{
         stopPresence();stop();
         try{sessions.off('value',onSessions)}catch{}
+        cancelLater(graceTimer);graceTimer=null;cancelLater(resubscribeTimer);resubscribeTimer=null;lastRows=null;
         latestSession=null;active=null;presenceTarget='';presenceDelay=0;presenceFailures=0;
         permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';
         // The "removed from this lesson" note belongs to the previous boy's browser session only.
@@ -481,10 +482,29 @@
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
     }
+    // ---------- Teacher connection drops (issue #801) ----------
+    // When the teacher's page loses its database connection, the lesson is stamped teacherOfflineAt
+    // instead of being deleted. A short drop must not end every boy's share or hide his button, so the
+    // lesson still counts for a grace period. If the teacher has not returned by then, it counts as
+    // over: this page stops its own capture and hides the button, exactly as when a lesson ends.
+    // When the teacher returns the stamp is cleared and the button comes back without a refresh.
+    const TEACHER_GRACE_MS=120000;
+    let serverOffset=0,lastRows=null,graceTimer=null,resubscribeTimer=null,resubscribeDelay=0;
+    try{firebase.database().ref('.info/serverTimeOffset').on('value',snapshot=>{serverOffset=Number(snapshot.val())||0})}catch{}
+    const serverNow=()=>Date.now()+serverOffset;
+    const teacherGone=v=>Number.isFinite(v.teacherOfflineAt)&&serverNow()-v.teacherOfflineAt>=TEACHER_GRACE_MS;
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
-        &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
+        &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000&&!teacherGone(v))
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
+    }
+    // No database event arrives when the grace period runs out, so look again at that moment.
+    function watchGrace(next){
+      cancelLater(graceTimer);graceTimer=null;
+      if(!next||!Number.isFinite(next.teacherOfflineAt))return;
+      const rows=lastRows;
+      graceTimer=later(()=>{graceTimer=null;if(lastRows===rows)void onSessions({val:()=>rows})},Math.max(250,next.teacherOfflineAt+TEACHER_GRACE_MS-serverNow()+250));
+      graceTimer?.unref?.();
     }
     async function onSessions(snapshot){
       // Student switching must never reuse another boy's classroom invitation.
@@ -494,12 +514,24 @@
         followSession(null);
         return;
       }
-      const next=current(snapshot.val());
+      resubscribeDelay=0;
+      lastRows=snapshot.val();
+      const next=current(lastRows);
+      watchGrace(next);
       latestSession=next;
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     }
-    function onSessionsError(){stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()}
+    function onSessionsError(){
+      stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop();
+      // The database cancelled this listener. Without listening again this boy would have no
+      // Share My Screen button for the rest of the day, so try again, slowly.
+      cancelLater(graceTimer);graceTimer=null;lastRows=null;
+      cancelLater(resubscribeTimer);resubscribeDelay=Math.min(60000,(resubscribeDelay||5000)*2);
+      const watched=sessions;
+      resubscribeTimer=later(()=>{resubscribeTimer=null;if(sessions===watched&&sameStudent())sessions.on('value',onSessions,onSessionsError)},resubscribeDelay);
+      resubscribeTimer?.unref?.();
+    }
     sessions.on('value',onSessions,onSessionsError);
     async function beginShare(){
       if(stream){stop();return}
