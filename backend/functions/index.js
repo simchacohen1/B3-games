@@ -2767,6 +2767,8 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
 exports.cleanupClassPointerShareTickets = require('./class-pointer-share-ticket-cleanup').cleanupClassPointerShareTickets;
 exports.funTorahVocabularyBank = require('./vocabulary-bank').funTorahVocabularyBank;
+// Chazara AI Practice (#688): off until the owner enables it in b3Private/chazaraAiPractice/config.
+exports.chazaraAiPractice = require('./chazara-ai-practice').chazaraAiPractice;
 
 // Mishnayos Practice (issue #634): Silverstein answer key stays server-side.
 const mishnayosPractice = require("./mishnayos-practice")({ ANTHROPIC_API_KEY, setCors, parseMultipart, transcribeAudio });
