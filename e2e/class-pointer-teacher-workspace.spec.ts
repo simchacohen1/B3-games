@@ -101,7 +101,8 @@ test('full-screen Students panel is a compact popover that can be dragged by its
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
-  await page.locator('#tbStudentsBtn').click();
+  // The old dock is gone (#770): the yellow Students button on the drawing toolbar opens the panel in full screen.
+  await page.locator('#fttAnnotate [data-action="students"]').click();
   const drawer = page.locator('#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open');
   await expect(drawer).toBeVisible();
   const before = (await drawer.boundingBox())!;
@@ -113,11 +114,11 @@ test('full-screen Students panel is a compact popover that can be dragged by its
   const h = (await head.boundingBox())!;
   await page.mouse.move(h.x + 30, h.y + h.height / 2);
   await page.mouse.down();
-  await page.mouse.move(h.x + 260, h.y + 90, { steps: 8 });
+  await page.mouse.move(h.x - 100, h.y + 90, { steps: 8 });
   await page.mouse.up();
   const moved = (await drawer.boundingBox())!;
   await shot(page, 'drawer-moved');
-  expect(moved.x).toBeGreaterThan(before.x + 200);
+  expect(moved.x).toBeLessThan(before.x - 80);
   expect(moved.y).toBeGreaterThan(before.y + 50);
 
   expect(Math.round(moved.width)).toBe(Math.round(before.width));
@@ -127,7 +128,8 @@ test('full-screen Students panel is a compact popover that can be dragged by its
 
   // Permission rows still work inside the moved panel and leaving full screen restores the normal layout.
   await expect(drawer.getByText('Pointer Test Student One').first()).toBeVisible();
-  await page.evaluate(() => (document.getElementById('tbFullscreen') as HTMLButtonElement).click());
+  await page.locator('#fttAnnotate [data-action="more"]').click();
+  await page.locator('#fttAnnotate .fa-fly').getByRole('button', { name: 'Exit full screen' }).click();
   await expect(page.locator('#stage')).not.toHaveClass(/lesson-fullscreen/);
   const restored = await page.locator('.cp-permissions-sidebar').evaluate((el: HTMLElement) => ['left', 'top', 'width', 'height'].map(k => el.style.getPropertyValue(k)).join(''));
   expect(restored).toBe('');
@@ -135,30 +137,40 @@ test('full-screen Students panel is a compact popover that can be dragged by its
   await context.close();
 });
 
-test('full-screen Present controls are large, labelled and open clear choices', async ({ browser }) => {
+test('full screen: the drawing toolbar is the only toolbar and its Lesson menu opens clear choices', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
-  const present = page.locator('#stage .teacher-dock [data-menu="tbShareMenu"]');
-  await expect(present).toBeVisible();
-  const box = (await present.boundingBox())!;
-  expect(box.height).toBeGreaterThanOrEqual(44);
-  const docked = await page.locator('#teacherDock').evaluate(el => el.classList.contains('dock-left'));
-  if (docked) expect(await present.evaluate(el => getComputedStyle(el, '::after').content)).toContain('Present');
-  else expect(await present.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(15);
-  await present.click();
-  const menu = page.locator('#tbShareMenu');
+  // The old dock and its left rail are gone (#770).
+  await expect(page.locator('.teacher-dock, #studentDock, #fullscreenTeacherToolbar')).toHaveCount(0);
+  await expect(page.locator('#teacherDock')).toBeHidden();
+  const bar = page.locator('#fttAnnotate .fa-bar');
+  await expect(bar).toBeVisible();
+  // The toolbar has its own strip: the lesson starts to the right of it.
+  const barBox = (await bar.boundingBox())!;
+  await expect.poll(async () => (await page.locator('#stage').boundingBox())!.x).toBeGreaterThanOrEqual(barBox.x + barBox.width);
+  const lesson = bar.locator('[data-action="lesson"]');
+  await expect(lesson).toContainText('Lesson');
+  await lesson.click();
+  const menu = page.locator('#fttAnnotate .fa-fly.fa-list');
   await expect(menu).toBeVisible();
-  await shot(page, 'present-menu');
-  const rows = menu.locator('button[data-source]');
+  await shot(page, 'lesson-menu');
+  const rows = menu.locator('button');
   expect(await rows.count()).toBeGreaterThanOrEqual(5);
-  for (const row of await rows.all()) {
-    if (!(await row.isVisible())) continue;
-    expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(48);
-    expect(await row.evaluate(el => getComputedStyle(el, '::before').content)).not.toBe('none');
-  }
-  await menu.getByRole('button', { name: 'Show a whiteboard' }).click();
+  for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(38);
+  await menu.getByRole('button', { name: 'Whiteboard', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(true);
+  // Live in full screen: the toolbar shows the red Stop, and the pen draws with the lesson's own tool.
+  await expect(bar.locator('[data-action="stop"]')).toBeVisible();
+  // Nothing from the page behind lies on top of the full-screen lesson: where the tabs and the red Stop sit on the page, the lesson is in front.
+  expect(await page.evaluate(() => ['.cp-workspace-tabs', '#cpStopBtn'].map(sel => {
+    const r = document.querySelector(sel)!.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return r.width > 0 && !!top && !!top.closest('#stage') && !top.closest('.cp-tabs-row');
+  }))).toEqual([true, true]);
+  await expect(bar.getByRole('button', { name: /^Pen:/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
+  await bar.locator('[data-action="stop"]').click();
+  await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(false);
   expect(errors).toEqual([]);
   await context.close();
 });
@@ -173,6 +185,19 @@ async function boardPixel(page: Page, fx: number, fy: number) {
     const x = c.getContext('2d')!; x.drawImage(img, 0, 0);
     return [...x.getImageData(Math.floor(fx * c.width), Math.floor(fy * c.height), 1, 1).data].slice(0, 3);
   }, { fx, fy });
+}
+// The drawing toolbar opens in its own strip on the left shortly after a lesson starts (#770): the lesson moves
+// right and gets a little narrower, and the whiteboard opens on the pen. Positions measured before that are stale,
+// so wait until the strip is there, the pen is chosen and the lesson has stopped moving.
+async function whiteboardSettled(page: Page) {
+  await expect(page.locator('body')).toHaveClass(/cp-tool-gutter/);
+  await expect.poll(() => page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
+  const bar = (await page.locator('#fttAnnotate .fa-bar').boundingBox())!;
+  let last = '';
+  await expect.poll(async () => {
+    const box = (await page.locator('#pdfContent').boundingBox())!, now = JSON.stringify(box), still = now === last && box.x >= bar.x + bar.width;
+    last = now; return still;
+  }, { intervals: [200] }).toBe(true);
 }
 async function pasteRedPicture(page: Page) {
   await page.evaluate(async () => {
@@ -191,6 +216,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(true);
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
   expect(Math.min(...await boardPixel(page, 0.5, 0.5))).toBeGreaterThan(245);
+  await whiteboardSettled(page);
 
   // An existing pen mark must survive adding pictures.
   const content = (await page.locator('#pdfContent').boundingBox())!;
@@ -244,7 +270,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
 
   // Closing the whiteboard discards its pictures.
-  await page.locator('#cpDockStop').click();
+  await page.locator('#cpStopBtn').click();
   expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(0);
   expect(errors).toEqual([]);
   await context.close();
@@ -410,6 +436,7 @@ test('My Screen whiteboard supplies live frames with published pictures and pen 
   await pasteRedPicture(page);await page.getByRole('button',{name:'✓ Show to class'}).click();
   // Sample every pixel from the actual video, rather than only inspecting source canvas state.
   await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>{const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d')!;ctx.drawImage(v,0,0);const pixels=ctx.getImageData(0,0,c.width,c.height).data;let red=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>180&&pixels[i+1]<90&&pixels[i+2]<120)red++;return red})).toBeGreaterThan(100);
+  await whiteboardSettled(page);
   const box=(await page.locator('#pdfContent').boundingBox())!;await page.mouse.move(box.x+40,box.y+40);await page.mouse.down();await page.mouse.move(box.x+180,box.y+70,{steps:8});await page.mouse.up();await expect.poll(()=>inkCount(page)).toBeGreaterThan(0);const marks=await inkCount(page);
   await page.getByRole('button',{name:'Student screens',exact:true}).click();await page.getByRole('button',{name:'My screen',exact:true}).click();
   expect(await inkCount(page)).toBe(marks);expect(await page.evaluate(()=>(window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
@@ -426,7 +453,7 @@ test('Follow Teacher launch opens the shared whiteboard automatically without ca
   const page=await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(BASE+'/class-pointer-prototype/classroom.html?dashboard=teacher&class=pointer_test&followTeacherWhiteboard=1');
   await expect(page.locator('#pdfView')).toBeVisible({timeout:20000});
-  await expect(page.locator('#cpDockStop')).toBeVisible();
+  await expect(page.locator('#cpStopBtn')).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__captureCalls)).toBe(0);
   expect(context.pages()).toHaveLength(1);expect(errors).toEqual([]);
   await context.close();
@@ -456,7 +483,7 @@ test('Stop sharing stays on the Live bar on every tab and ends the share from on
     } });
   });
   const page = await context.newPage(); const errors = await openTeacher(page);
-  const stop = page.locator('#cpDockStop');
+  const stop = page.locator('#cpStopBtn');
   const stopScreen = page.locator('#stopScreen');
   const share = async () => { await page.evaluate(() => (document.getElementById('shareScreen') as HTMLButtonElement).click()); await expect(stopScreen).toBeEnabled(); };
   const tab = (name: string) => page.getByRole('button', { name, exact: true }).click();
