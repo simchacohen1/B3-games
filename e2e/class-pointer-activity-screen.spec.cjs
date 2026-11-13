@@ -3,7 +3,7 @@ const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const fs=require('node:fs');
 
-test('student shares directly from small activity button without an extra popup, and can stop and restart',async({page,browserName})=>{
+test('the sharing tab shares the screen by itself without an extra popup, and can stop and restart',async({page,browserName})=>{
   test.skip(browserName!=='chromium','Synthetic canvas capture video dimensions are only asserted in Chromium');
   await page.route('https://share.test/**',route=>{
     const url=new URL(route.request().url());
@@ -11,7 +11,8 @@ test('student shares directly from small activity button without an extra popup,
     if(url.pathname.endsWith('/activity-share.js'))return route.fulfill({status:200,contentType:'text/javascript',body:fs.readFileSync(path.join(__dirname,'..','class-pointer-prototype','activity-share.js'),'utf8')});
     return route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html><head></head><body><main id="stage"></main><input id="joinLink"><button id="endClass"></button></body></html>'});
   });
-  await page.goto('https://share.test/shorashim/index.html?dashboard=teacher&class=et');
+  // pointerShare=1: this page plays the dedicated sharing tab that Share My Screen opens.
+  await page.goto('https://share.test/shorashim/index.html?dashboard=teacher&class=et&pointerShare=1');
   await page.evaluate(()=>{
     const room='class-pointer-12345678-1234-1234-1234-123456789abc';
     sessionStorage.setItem('b3Games_studentId','arik');
@@ -24,6 +25,8 @@ test('student shares directly from small activity button without an extra popup,
     window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
     // The activity must not open a second tab or popup to ask for sharing.
     window.__openCount=0;window.open=()=>{window.__openCount++;return null};
+    // Stop closes the real sharing tab; keep this test page open and count it instead.
+    window.__closeCount=0;window.close=()=>{window.__closeCount++};
     window.fetch=async(url,options)=>{
       const body=options?.body?JSON.parse(options.body):{};
       if(String(url).includes('funTorahStudentAuth'))return {ok:true,status:200,json:async()=>({ok:true})};
@@ -80,7 +83,8 @@ test('student shares directly from small activity button without an extra popup,
     }})}),requestAt);
     await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toHaveCount(0);
     await expect(page.locator('#fttActivityScreenShare')).toBeVisible();
-    await page.locator('#fttActivityScreenShare button').first().click();
+    // The sharing tab asks for the screen by itself when it opens; after a stop the student clicks.
+    if(cycle>0)await page.locator('#fttActivityScreenShare button').first().click();
     await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.answered===true)).toBe(true);
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#activityScreenTray video')?.videoWidth||0)).toBe(320);
     const initialFrame=await page.locator('#activityScreenTray video').evaluate(video=>{
@@ -97,6 +101,8 @@ test('student shares directly from small activity button without an extra popup,
     expect(await page.evaluate(()=>window.__verified.length)).toBe(cycle+1);
     await page.locator('#fttActivityScreenShare button').first().click();
     await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.closed===true)).toBe(true);
+    // The student's own tab reports the stop to the teacher's page (here both are this one page).
+    await page.evaluate(()=>window.ClassPointerActivityShares.studentStopped('arik'));
     await expect(page.locator('#activityScreenTray video')).toHaveCount(0);
     expect(await page.evaluate(()=>window.__streams.at(-1).stream.getVideoTracks()[0].readyState)).toBe('ended');
   }
@@ -121,6 +127,7 @@ test('student shares directly from small activity button without an extra popup,
   }));
   expect(result.issued).toBe(4);
   expect(await page.evaluate(()=>window.__openCount)).toBe(0);
+  expect(await page.evaluate(()=>window.__closeCount)).toBe(3); // each student Stop closes the sharing tab
   expect(result.activeCalls).toBe(0);
   expect(result.permissionCheck).toEqual({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:'class-pointer-12345678-1234-1234-1234-123456789abc'});
   expect(result.verified).toHaveLength(4);

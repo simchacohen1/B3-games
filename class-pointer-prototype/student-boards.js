@@ -1062,6 +1062,8 @@
       return true;
     },
     fromStudent(m,message){
+      // His own page reports that he stopped sharing from his sharing tab: take his screen tile away straight away.
+      if(m.presence&&m.studentId&&message.type==='board-screen'&&message.sharing===false&&message.from==='share-tab'){window.ClassPointerActivityShares?.studentStopped?.(m.studentId);return}
       if(!on)return;
       if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
