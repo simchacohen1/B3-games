@@ -183,6 +183,108 @@ async function pasteRedPicture(page: Page) {
     document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   });
 }
+async function pasteWords(page: Page, text: string) {
+  await page.evaluate((value) => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => [{ types: ['text/plain'], getType: async () => new Blob([value], { type: 'text/plain' }) }] } });
+  }, text);
+  await page.getByRole('button', { name: '📋 Paste', exact: true }).click();
+}
+// The teacher's own controls on this page: the "Shapes ▾" menu in the tool bar above the lesson.
+// Works with the Shapes menu on the teacher tool bar, and with the single drawing toolbar (#821) once that is merged.
+const NEW_TOOLBAR_SHAPE: Record<string, string> = { line: 'Line', 'pen-arrow': 'Arrow', rectangle: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle' };
+async function choosePenShape(page: Page, label: string, tool: string) {
+  const menu = page.locator('#teacherDock').getByRole('button', { name: 'Shapes ▾' });
+  if (await menu.count()) {
+    await menu.click();
+    await page.locator('#tbPenShapes').getByRole('button', { name: label, exact: true }).click();
+    await expect(page.locator('#tbPenShapes')).toBeHidden();
+  } else if (tool === 'text') {
+    await page.locator('#fttAnnotate button[data-tool="text"]').click();
+  } else {
+    await page.locator('#fttAnnotate button[data-tool="shape"]').click();
+    await page.locator(`#fttAnnotate .fa-fly button[title="${NEW_TOOLBAR_SHAPE[tool]}"]`).click();
+  }
+  await expect(page.locator('#teacherTool')).toHaveValue(tool);
+}
+// The lesson can move sideways a moment after a whiteboard opens (the drawing toolbar takes its place), so measure it once it is still.
+async function settledContentBox(page: Page) {
+  let last = '';
+  await expect.poll(async () => { const now = JSON.stringify(await page.locator('#pdfContent').boundingBox()), still = now === last; last = now; return still; }, { intervals: [250] }).toBe(true);
+  return (await page.locator('#pdfContent').boundingBox())!;
+}
+
+test('teacher pastes editable text onto the shared whiteboard and can edit it', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  await pasteWords(page, 'Read this lesson');
+  const mark = page.locator('#pdfInk text[data-text-mark]').filter({ hasText: 'Read this lesson' });
+  await expect(mark).toBeVisible();
+  await page.getByRole('button', { name: '✏ Edit latest text' }).click();
+  await page.locator('#pdfTextEditInput').fill('Updated lesson note');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(1);
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveText('Updated lesson note');
+  expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === 'text' && s.text === 'Updated lesson note'))).toBe(true);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline text', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  // A newly opened whiteboard opens the drawing toolbar on the Pen by itself within half a second, and a shape
+  // chosen before that is put back to Pen. Wait for the toolbar, as a teacher would see it, before choosing a shape.
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toBeVisible();
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Pen');
+  await expect(page.locator('#teacherTool')).toHaveValue('pen');
+  const content = await settledContentBox(page);
+  const shapes: Array<[string, string, string]> = [['line', 'line', '━ Straight line'], ['pen-arrow', 'g', '➜ Pen arrow'], ['rectangle', 'rect', '▭ Rectangle'], ['ellipse', 'ellipse', '◯ Circle / oval'], ['triangle', 'polygon', '△ Triangle']];
+  for (let i = 0; i < shapes.length; i++) {
+    const [name, tag, label] = shapes[i];
+    await choosePenShape(page, label, name);
+    const x = content.x + 80 + i * 110, y = content.y + 100;
+    await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 65, y + 45, { steps: 4 }); await page.mouse.up();
+    const mark = page.locator(`#pdfInk [data-stroke-tool="${name}"]`);
+    await expect(mark).toHaveCount(1);
+    expect(await mark.evaluate((el: SVGElement) => el.tagName.toLowerCase())).toBe(tag);
+    if (name === 'pen-arrow') await expect(mark.locator(':scope > line, :scope > path')).toHaveCount(2);
+    expect(await page.evaluate((expected) => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === expected), name)).toBe(true);
+  }
+  // The picture "Copy board" makes shows the shapes too.
+  const copied = await page.evaluate(async () => {
+    const blob = await (window as any).ClassPointerPdf.exportPng(), bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d')!; ctx.drawImage(bitmap, 0, 0); bitmap.close();
+    const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data; let nonWhite = 0;
+    for (let i = 0; i < rgba.length; i += 4) if (rgba[i] < 240 || rgba[i + 1] < 240 || rgba[i + 2] < 240) nonWhite++;
+    return { width: canvas.width, height: canvas.height, nonWhite };
+  });
+  expect(copied.nonWhite, JSON.stringify(copied)).toBeGreaterThan(100);
+
+  await choosePenShape(page, 'T Text box', 'text');
+  await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
+  await expect(page.locator('#pdfTextEditDialog')).toBeVisible();
+  await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  const textMarks = page.locator('#pdfInk text[data-text-mark]');
+  await expect(textMarks).toHaveCount(2);
+  await expect(textMarks.nth(0)).toHaveText('שלום עולם');
+  await expect(textMarks.nth(0)).toHaveAttribute('direction', 'rtl');
+  await expect(textMarks.nth(1)).toHaveText('שורה שניה');
+
+  await page.getByRole('button', { name: '✏ Edit latest text' }).click();
+  await page.locator('#pdfTextEditInput').fill('תיקון ראשון\nתיקון שני');
+  await page.getByRole('button', { name: 'Save text' }).click();
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(3);
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון ראשון');
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(2)).toHaveText('תיקון שני');
+  expect(errors).toEqual([]);
+  await context.close();
+});
 
 test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and annotates it', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
