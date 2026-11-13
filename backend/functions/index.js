@@ -2776,3 +2776,4 @@ exports.generateMishnahQuestions = mishnayosPractice.generateMishnahQuestions;
 exports.gradeMishnahQuestionAnswer = mishnayosPractice.gradeMishnahQuestionAnswer;
 exports.gradeMishnahExplanation = mishnayosPractice.gradeMishnahExplanation;
 exports.mishnayosAnswerKey = mishnayosPractice.mishnayosAnswerKey;
+exports.mishnayosSubmissions = require('./mishnayos-submissions').mishnayosSubmissions;

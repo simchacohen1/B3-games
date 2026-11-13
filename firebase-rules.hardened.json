@@ -434,6 +434,59 @@
           ".read": "auth != null",
           ".write": false
         },
+        "drafts": {
+          "$studentId": {
+            ".read": "auth != null && auth.token.b3StudentId == $studentId",
+            "$mishnaKey": {
+              ".write": "auth != null && auth.token.b3StudentRole == 'student' && auth.token.b3StudentId == $studentId && root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/status').val() != 'submitted' && root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/status').val() != 'submitting' && (root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/lockedUntil').val() == null || root.child('posukPractice/mishnayos/submissions/' + $studentId + '/' + $mishnaKey + '/lockedUntil').val() < now)",
+              ".validate": "$mishnaKey.matches(/^[a-z]{2,30}_[0-9]{1,3}_[0-9]{1,3}$/)",
+              "lines": {
+                "$line": {
+                  ".validate": "$line.matches(/^[0-9]{1,3}$/) && newData.hasChildren(['path', 'savedAt'])",
+                  "path": {
+                    ".validate": "newData.isString() && newData.val().length < 300 && newData.val().beginsWith('posukPractice/' + $studentId + '/mishnayosDrafts/' + $mishnaKey + '/') && !newData.val().contains('..')"
+                  },
+                  "mime": {
+                    ".validate": "newData.isString() && newData.val().length < 60"
+                  },
+                  "durationMs": {
+                    ".validate": "newData.isNumber() && newData.val() >= 0"
+                  },
+                  "savedAt": {
+                    ".validate": "newData.isNumber()"
+                  },
+                  "$other": {
+                    ".validate": false
+                  }
+                }
+              },
+              "updatedAt": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        },
+        "submissions": {
+          "$studentId": {
+            ".read": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+          }
+        },
+        "submissionHistory": {
+          ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+        },
+        "notices": {
+          "$studentId": {
+            ".read": "auth != null && (auth.token.b3StudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+            "$noticeId": {
+              "seen": {
+                ".write": "auth != null && auth.token.b3StudentId == $studentId && data.parent().exists() && newData.val() == true"
+              }
+            }
+          }
+        },
         "answerKey": {
           ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true)",
           ".write": false

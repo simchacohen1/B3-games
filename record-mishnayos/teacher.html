@@ -549,6 +549,8 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
     <header>
       <h1>📖 Mishnayos Practice — Teacher</h1>
       <p>Disputes, progress and recordings for your class</p>
+      <p style="margin:8px 0;"><a class="btn gold" id="gradeSubmissionsLink" href="grade.html" style="text-decoration:none;display:inline-block;">📥 Grade submitted mishnayos</a></p>
+      <script>(function(){var c=new URLSearchParams(location.search).get('class');if(c)document.getElementById('gradeSubmissionsLink').href='grade.html?class='+encodeURIComponent(c);})();</script>
       <label style="display:inline-flex;gap:8px;align-items:center;margin-top:6px;font-weight:700;">Maseches:
         <select id="teacherSeferSelect" style="padding:6px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"></select>
       </label>
