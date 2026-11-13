@@ -458,6 +458,37 @@
     return teacherRestore;
   }
 
+  // Owner Admin and several teacher tools have their own Google button, which
+  // signs in on the default app only. Nothing was remembered for those logins,
+  // so once the default app's login became tab-only (student view, or a
+  // student identity arriving browser-wide) every new tab, such as Class
+  // Pointer or Class Access, asked for Google sign-in again. Copy an
+  // authorized Google login to the remembered app when it holds none. This
+  // never runs in a student tab, never replaces a remembered login, and an
+  // explicit sign-out still clears it.
+  function rememberTeacher(user) {
+    if (!isGoogleUser(user) || isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
+    const signOutVersion = teacherSignOutVersion;
+    const stillWanted = function () {
+      return signOutVersion === teacherSignOutVersion && !isStudentTab() && !teacherRestoreBlocked();
+    };
+    let savedAuth;
+    try { savedAuth = getRememberedTeacherAuth(); } catch (error) { return Promise.resolve(false); }
+    return Promise.resolve(waitForAuthState(savedAuth)).then(function () {
+      if (savedAuth.currentUser || !stillWanted()) return false;
+      return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL).then(function () {
+        if (savedAuth.currentUser || !stillWanted()) return false;
+        return savedAuth.updateCurrentUser(user).then(function () {
+          if (stillWanted()) return true;
+          return savedAuth.signOut().then(function () { return false; });
+        });
+      });
+    }).catch(function (error) {
+      console.warn("Could not remember teacher sign-in:", error);
+      return false;
+    });
+  }
+
   function ensureFirebase() {
     const config = getConfiguredFirebaseOptions();
     if (!config || !window.firebase || !window.firebase.database) return null;
@@ -1159,6 +1190,7 @@
         else showToolVersions(access);
         showOwnerTeacherView(access);
         setSignedInHint(access.authorized);
+        if (access.authorized) rememberTeacher(user);
         callback(user, access.authorized, access);
         endAuthChecking();
         // Issue #667: the legacy migration below downloads the whole student list
