@@ -319,22 +319,23 @@
         invitationSummary.textContent = "Waiting games are temporarily unavailable. You can still start a new class game.";
       });
   }
+  function showSignInPrompt(message) {
+    statusBox.className = "notice error";
+    statusBox.replaceChildren(document.createTextNode(message));
+    var link = make("a", "", "Go to sign in");
+    link.href = "../index.html";
+    link.addEventListener("click", function () {
+      try { sessionStorage.setItem("b3StudentReturnTo", "multiplayer/index.html"); } catch (e) {}
+    });
+    statusBox.appendChild(link);
+  }
   function start() {
     drawCategoryHome();
     try {
       sessionId = String(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "").trim();
       sessionName = String(sessionStorage.getItem("b3Games_studentName") || sessionStorage.getItem("posukPractice_studentName") || "Student");
     } catch (e) {}
-    if (!window.firebase || !window.B3_FIREBASE_CONFIG) {
-      statusBox.className = "notice error";
-      statusBox.replaceChildren(document.createTextNode("Sign in on Fun Torah Tools first. "));
-      var link = make("a", "", "Go to sign in");
-      link.href = "../index.html";
-      link.addEventListener("click", function () {
-        try { sessionStorage.setItem("b3StudentReturnTo", "multiplayer/index.html"); } catch (e) {}
-      });
-      statusBox.appendChild(link); return;
-    }
+    if (!window.firebase || !window.B3_FIREBASE_CONFIG) { showSignInPrompt("Sign in on Fun Torah Tools first. "); return; }
     try {
       if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       db = firebase.database();
@@ -343,7 +344,8 @@
     }
     firebase.auth().onAuthStateChanged(async function (user) {
       if (!user) {
-        statusBox.className = "notice error"; statusBox.textContent = "Your saved sign-in has expired. Please sign in on Fun Torah Tools again."; return;
+        // A signed-out student needs the same way in: the link remembers to come back to the arcade.
+        showSignInPrompt("You are not signed in. Please sign in on Fun Torah Tools to play. "); return;
       }
       try {
         var params = new URLSearchParams(location.search);
