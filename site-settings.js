@@ -494,7 +494,7 @@
     if (window.B3OwnerTeacherView) return Promise.resolve(window.B3OwnerTeacherView);
     return new Promise(function (resolve, reject) {
       const tag = document.createElement("script");
-      tag.src = SITE_BASE + "owner-teacher-view.js?v=20261109-726";
+      tag.src = SITE_BASE + "owner-teacher-view.js?v=20261110-switch";
       tag.onload = function () { if (window.B3OwnerTeacherView) resolve(window.B3OwnerTeacherView); else reject(new Error("Teacher view is unavailable.")); };
       tag.onerror = function () { reject(new Error("Teacher view could not load.")); };
       document.head.appendChild(tag);
@@ -507,12 +507,29 @@
       return view.resolve(services.db, WORKSPACE_ID, user);
     }).then(function (teaching) { return teaching || full; }).catch(function () { return full; });
   }
-  // The "Teacher view" reminder with the way back to Owner Admin.
-  function showOwnerTeacherView(access) {
-    const view = window.B3OwnerTeacherView;
-    if (!view) return;
-    if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access); }, { once:true }); return; }
-    if (access && access.ownerTeacherView === true && !getActingStudent()) view.mountBanner(SITE_BASE); else view.unmountBanner();
+  // The "Teacher view" reminder with the way back to Owner Admin, and, in owner
+  // mode on the owner's home page, the switch into Teacher view.
+  function isOwnerHomePage() {
+    try {
+      const base = new URL(SITE_BASE), current = new URL(location.href);
+      if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return false;
+      const path = current.pathname.slice(base.pathname.length);
+      return path === "" || path === "index.html";
+    } catch (e) { return false; }
+  }
+  function showOwnerTeacherView(access, user) {
+    if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access, user); }, { once:true }); return; }
+    const acting = getActingStudent(), view = window.B3OwnerTeacherView;
+    if (view) {
+      if (access && access.ownerTeacherView === true && !acting) view.mountBanner(SITE_BASE); else view.unmountBanner();
+    }
+    const offerSwitch = !acting && window.top === window && isBootstrapAdmin(user) && access && access.role === "admin" && isOwnerHomePage();
+    if (!offerSwitch) { if (view && view.unmountSwitch) view.unmountSwitch(); return; }
+    const services = ensureFirebase();
+    if (!services || !services.db) return;
+    loadOwnerTeacherView().then(function (loaded) {
+      if (loaded.mountSwitch) return loaded.mountSwitch(services.db, WORKSPACE_ID, user, SITE_BASE);
+    }).catch(function () {});
   }
 
   let currentAccess = { authorized: false, role: "", classIds: [] };
@@ -1138,6 +1155,7 @@
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
+        if (window.B3OwnerTeacherView && window.B3OwnerTeacherView.unmountSwitch) window.B3OwnerTeacherView.unmountSwitch();
         setSignedInHint(false);
         callback(null, false, currentAccess);
         endAuthChecking();
@@ -1157,7 +1175,7 @@
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
-        showOwnerTeacherView(access);
+        showOwnerTeacherView(access, user);
         setSignedInHint(access.authorized);
         callback(user, access.authorized, access);
         endAuthChecking();
