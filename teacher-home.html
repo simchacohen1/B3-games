@@ -42,6 +42,8 @@
 .teacher-tools-container{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .teacher-tools-section{max-width:1130px}
 </style>
+<link rel="stylesheet" href="grade-themes.css?v=20261110-737">
+<script src="grade-themes.js?v=20261110-737"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261020-demo-student"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
@@ -76,7 +78,7 @@ const PLACES=[
 ];
 function esc(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 const previewParams=new URLSearchParams(location.search),previewTeacherId=previewParams.get('previewTeacher');
-let renderGeneration=0,previewActive=false;
+let renderGeneration=0,previewActive=false,themeClassNames=[];
 function previewHref(tool,classId){const p=new URLSearchParams({previewTeacher:previewTeacherId,previewType:previewParams.get('previewType')||'teacher',class:classId,tool});return 'teacher-preview-tool.html?'+p.toString();}
 function showTeacherSignIn(message){
  q('app').classList.add('hidden');q('gate').classList.remove('hidden');
@@ -116,9 +118,11 @@ async function render(user,access){
  if(access.claimPending){const pending=document.createElement("p");pending.textContent="Your invitation is recognized. The owner still needs to deploy teacher account linking before class changes can be saved.";q("who").parentElement.appendChild(pending);}
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value"))),siteSettings=access.role!=="admin"&&ids.some(id=>id==="et"||id==="wt")?(await db.ref("b3Games/siteSettings").once("value")).val()||{}:{};
  if(generation!==renderGeneration)return;
+ themeClassNames=snaps.filter(s=>s.exists()&&s.val().active!==false).map(s=>String(s.val().name||""));
  q("classes").innerHTML=snaps.map((s,i)=>{
  const id=ids[i],row=s.val()||{};
  if(!s.exists()||row.active===false)return "";
+ const themeGrade=window.FTTGradeThemes?window.FTTGradeThemes.gradeFromName(row.name):null;
  const grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]);
  if(["et","wt"].includes(id)&&siteSettings.games?.["multiplayer-center"]!==false&&siteSettings.classGames?.[id]?.["multiplayer-center"]!==false&&!enabled.some(x=>x[0]==="multiplayer-center"))enabled.push(["multiplayer-center",true]);
  if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);
@@ -134,11 +138,13 @@ async function render(user,access){
   +actionTile('🎛️','Manage Class',previewActive?previewHref('manage-class',id):'admin.html?tab=students&class='+cls)
   +(previewActive?'':actionTile('👣','Follow the Teacher','follow-teacher/teacher.html?class='+cls,' target="_blank" rel="noopener"'))
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
+  +(themeGrade&&!previewActive?'<button type="button" class="teacher-tool-card" data-ftt-theme-picker="'+themeGrade+'"><span class="card-icon" aria-hidden="true">🎨</span><span class="card-title">Class Theme</span></button>':'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card" data-ftt-class-name="'+esc(row.name||"")+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
+ if(window.FTTGradeThemes)window.FTTGradeThemes.decorate(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;
@@ -147,7 +153,9 @@ async function render(user,access){
    if(!q('exitTeacherPreview')){const exit=document.createElement('a');exit.id='exitTeacherPreview';exit.href='admin.html?v=20261008-teacher-preview';exit.className='sign';exit.textContent='Exit teacher view';exit.style.cssText='display:inline-block;margin-top:14px;color:#fff';welcome.append(exit);}
  }
 }
-q("classes").onclick=e=>{if(e.target.closest&&e.target.closest("[data-act-as-student]"))api.openActAsStudentPicker();};
+q("classes").onclick=e=>{if(e.target.closest&&e.target.closest("[data-act-as-student]"))api.openActAsStudentPicker();
+ const themeTile=e.target.closest&&e.target.closest("[data-ftt-theme-picker]");
+ if(themeTile&&window.FTTGradeThemes)window.FTTGradeThemes.openPicker({classNames:themeClassNames,focusGrade:themeTile.dataset.fttThemePicker});};
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
 let principalAccessRef=null,principalAccessHandler=null;
 function stopPrincipalAccessWatch(){
