@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact green head commit of PR #779
+        description: Merge commit of PR #779 (or its green head while open)
         required: true
         type: string
 
@@ -46,16 +46,37 @@ jobs:
               repo: context.repo.repo,
               pull_number: 779
             });
-            if (pr.state !== "open" || pr.draft || pr.base.ref !== "main" ||
-                pr.head.repo.full_name !== "simchacohen1/B3-games" || pr.head.sha !== sha) {
-              core.setFailed("The source SHA must be the current open, non-draft PR #779 head targeting main.");
+            if (pr.draft || pr.base.ref !== "main" ||
+                pr.head.repo.full_name !== "simchacohen1/B3-games") {
+              core.setFailed("PR #779 must be a non-draft pull request from this repository targeting main.");
+              return;
+            }
+            // PR #779 was merged before the function was deployed. Accept either
+            // its head while it is open, or its exact merge commit once merged.
+            if (pr.merged) {
+              if (pr.merge_commit_sha !== sha) {
+                core.setFailed("PR #779 is merged; the source SHA must be its exact merge commit.");
+                return;
+              }
+              const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                basehead: `main...${sha}`
+              });
+              if (!["behind", "identical"].includes(comparison.status)) {
+                core.setFailed("The PR #779 merge commit is not part of main.");
+                return;
+              }
+            } else if (pr.state !== "open" || pr.head.sha !== sha) {
+              core.setFailed("The source SHA must be the current open PR #779 head, or its merge commit once merged.");
               return;
             }
 
+            // The reviewed checks ran on the PR head, also for a merged PR.
             const { data } = await github.rest.checks.listForRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: sha,
+              ref: pr.head.sha,
               per_page: 100
             });
             const latestByName = new Map();
