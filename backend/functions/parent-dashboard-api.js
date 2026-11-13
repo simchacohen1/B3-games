@@ -160,6 +160,9 @@ function summarizeShorashim(allStudents) {
   return result;
 }
 
+// The only parts of b3Quiz that summarizeQuizzes() reads.
+const QUIZ_SUMMARY_PATHS = ["launches", "responses", "completions"];
+
 function summarizeQuizzes(root) {
   const result = {};
   const launches = obj(root.launches);
@@ -255,21 +258,27 @@ exports.parentDashboardApi = onRequest(
     }
 
     try {
+      // Firebase cost (#51): the quiz summary uses only launches, responses and
+      // completions. Reading the whole b3Quiz tree also downloaded every saved
+      // quiz, the audit log and the settings on each call, and none of it was used.
       const [
         allowedSnap,
         attemptsSnap,
         chazaraSnap,
         shorashimSnap,
-        quizSnap,
-        rewardsSnap
+        rewardsSnap,
+        ...quizSnaps
       ] = await Promise.all([
         db.ref("posukPractice/allowedStudents").get(),
         db.ref("posukPractice/attempts").get(),
         db.ref("posukPractice/chazara/students").get(),
         db.ref("posukPractice/shorashimLearning/students").get(),
-        db.ref("b3Quiz").get(),
-        db.ref("studentRewards/students").get()
+        db.ref("studentRewards/students").get(),
+        ...QUIZ_SUMMARY_PATHS.map(name => db.ref("b3Quiz/" + name).get())
       ]);
+      const quizRoot = Object.fromEntries(
+        QUIZ_SUMMARY_PATHS.map((name, index) => [name, quizSnaps[index].val()])
+      );
 
       return res.json({
         ok: true,
@@ -278,7 +287,7 @@ exports.parentDashboardApi = onRequest(
         posuk: summarizePosuk(attemptsSnap.val()),
         chazara: summarizeChazara(chazaraSnap.val()),
         shorashim: summarizeShorashim(shorashimSnap.val()),
-        quizzes: summarizeQuizzes(obj(quizSnap.val())),
+        quizzes: summarizeQuizzes(quizRoot),
         rewards: summarizeRewards(rewardsSnap.val())
       });
 
