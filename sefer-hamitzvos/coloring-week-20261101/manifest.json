@@ -1,0 +1,33 @@
+{
+  "week": "2026-11-01/2026-11-07",
+  "artworkVersion": "nov20261101",
+  "cards": {
+    "481": {
+      "source": "coloring-v2/481.png",
+      "sha256": "dce3d499e740843388a22555dc5b448dde1f6aa1a344ef4e7ce44b9463da26f4",
+      "width": 1100,
+      "height": 1650,
+      "closingRadius": 6,
+      "regions": 46,
+      "labelsSha256": "07651dead71f2d8d337784007a6774ed318ff56421623b06f95704ec2fed8385"
+    },
+    "499": {
+      "source": "coloring-v2/499.png",
+      "sha256": "d3ef38ef780c869c7ddb9d148c099f3365047b7923108533e5f560beb50125aa",
+      "width": 1100,
+      "height": 1650,
+      "closingRadius": 6,
+      "regions": 122,
+      "labelsSha256": "0671c573d5c77613d47778b9ec68a3761a2ebf1b74978525bd014b22f38ff452"
+    },
+    "503": {
+      "source": "coloring-v2/503.png",
+      "sha256": "45edc70b608051c37a8c7e369de5855e3a8eb44acd7c03212a7714acac63ec76",
+      "width": 1100,
+      "height": 1650,
+      "closingRadius": 6,
+      "regions": 75,
+      "labelsSha256": "1cd0974ed3f9fdf4aa30516c22a627e2422137ccd22253047460d89d2ae2ff71"
+    }
+  }
+}

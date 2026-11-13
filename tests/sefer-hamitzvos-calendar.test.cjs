@@ -91,7 +91,7 @@ test('new October artwork has isolated coloring keys and cloud save paths',()=>{
  assert.match(html,/newArt=new Set\(\[475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502,503\]\)/);
  assert.match(html,/versionedSaveArt=new Set\(\[482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502,503\]\)/);
  const savePathSource=html.match(/function studentCardPath\(card\)\{[^}]+\}/)[0];
- const savePath=vm.runInNewContext('('+savePathSource+')',{sessionStorage:{getItem:key=>key==='b3Games_studentId'?'student-1':null},versionedSaveArt:new Set(Array.from({length:22},(_,i)=>i+482)),replacementArt:new Set([502,503])});
+ const savePath=vm.runInNewContext('('+savePathSource+')',{sessionStorage:{getItem:key=>key==='b3Games_studentId'?'student-1':null},versionedSaveArt:new Set(Array.from({length:22},(_,i)=>i+482)),replacementArt:new Set([502,503]),useNextWeekArt:()=>false});
  assert.equal(savePath(481),'b3Games/students/student-1/seferHamitzvos/coloring/481');
  assert.equal(savePath(482),'b3Games/students/student-1/seferHamitzvos/coloring/482-v2');
  assert.equal(savePath(499),'b3Games/students/student-1/seferHamitzvos/coloring/499-v2');
