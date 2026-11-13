@@ -65,7 +65,7 @@ test('teacher assignment reads a server roster and student views hide other stud
   assert.equal(student.parts.ashrei.mine, false);
 });
 
-test('teacher Chazzan point awards require a started assignment and invoke Rewards once', async () => {
+test('teacher Chazzan point awards require a completed assignment and invoke Rewards once', async () => {
   const state = new Map();
   const db = { ref: path => ({
     get: async () => ({ val: () => structuredClone(state.get(path) ?? null) }),
@@ -83,6 +83,8 @@ test('teacher Chazzan point awards require a started assignment and invoke Rewar
   await call('teacher', { action: 'assign', sessionId: opened.id, partId: 'ashrei', studentId: 'boy-a' });
   await assert.rejects(call('teacher', { action: 'award', sessionId: opened.id, partId: 'ashrei', requestId: 'award-a' }), /not started/);
   await call('teacher', { action: 'playback', sessionId: opened.id, partId: 'ashrei', speed: 1, position: 0, playing: false });
+  await assert.rejects(call('teacher', { action: 'award', sessionId: opened.id, partId: 'ashrei', requestId: 'award-a' }), /Finish this assigned part/);
+  await call('teacher', { action: 'finish', sessionId: opened.id });
   const awardBody = { action: 'award', sessionId: opened.id, partId: 'ashrei', requestId: 'award-a' };
   const result = await call('teacher', awardBody);
   assert.equal(result.parts.ashrei.awarded, true);

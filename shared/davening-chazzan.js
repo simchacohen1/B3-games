@@ -159,7 +159,7 @@
         const assign = document.createElement('button'); assign.type = 'button'; assign.textContent = 'Save'; assign.className = 'btn'; assign.style.cssText = 'padding:4px 8px;margin-left:5px';
         assign.onclick = () => request('assign', { partId: `part-${i + 1}`, studentId: select.value || null }).catch(error => { status.textContent = error.message; });
         row.append(assign);
-        if (part?.started && part.studentId) {
+        if (part?.started && part.studentId && (part.completed || session.phase === 'ended')) {
           const reward = document.createElement('button'); reward.type = 'button'; reward.className = 'btn';
           reward.style.cssText = 'padding:4px 8px;margin-left:5px;background:#fff5cf';
           reward.textContent = part.awarded ? '✓ 1 point awarded' : '⭐ Award 1 Rewards point';

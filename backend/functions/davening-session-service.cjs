@@ -78,6 +78,7 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
         if (!session || session.id !== sessionId) fail(409, 'This session has changed.');
         const part = session.parts?.[partId];
         if (!part?.studentId || !part.started) fail(409, 'This assignment has not started.');
+        if (!part.completed && session.phase !== 'ended') fail(409, 'Finish this assigned part before awarding a point.');
         if (part.awarded || part.awardPending) return session;
         return { ...session, parts: { ...session.parts, [partId]: { ...part, awardPending: true } } };
       } catch (error) { claimError = error; return undefined; }
@@ -88,6 +89,7 @@ async function act({ db, actor, catalog, body, getRoster, awardPoint }) {
     const part = current.parts?.[partId];
     if (part?.awarded) return publicSession(current, actor);
     if (!part?.studentId || !part.started) fail(409, 'This assignment has not started.');
+    if (!part.completed && current.phase !== 'ended') fail(409, 'Finish this assigned part before awarding a point.');
     const assignmentKey = `${sessionId}_${partId}`;
     try { await awardPoint({ classId: actor.classId, studentId: part.studentId, assignmentKey }); }
     catch (error) {
