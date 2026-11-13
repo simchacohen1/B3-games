@@ -162,6 +162,11 @@ test('full screen: the drawing toolbar is the only toolbar and its Lesson menu o
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(true);
   // Live in full screen: the toolbar shows the red Stop, and the pen draws with the lesson's own tool.
   await expect(bar.locator('[data-action="stop"]')).toBeVisible();
+  // Nothing from the page behind lies on top of the full-screen lesson: where the tabs and the red Stop sit on the page, the lesson is in front.
+  expect(await page.evaluate(() => ['.cp-workspace-tabs', '#cpStopBtn'].map(sel => {
+    const r = document.querySelector(sel)!.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return r.width > 0 && !!top && !!top.closest('#stage') && !top.closest('.cp-tabs-row');
+  }))).toEqual([true, true]);
   await expect(bar.getByRole('button', { name: /^Pen:/ })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
   await bar.locator('[data-action="stop"]').click();
@@ -181,6 +186,19 @@ async function boardPixel(page: Page, fx: number, fy: number) {
     return [...x.getImageData(Math.floor(fx * c.width), Math.floor(fy * c.height), 1, 1).data].slice(0, 3);
   }, { fx, fy });
 }
+// The drawing toolbar opens in its own strip on the left shortly after a lesson starts (#770): the lesson moves
+// right and gets a little narrower, and the whiteboard opens on the pen. Positions measured before that are stale,
+// so wait until the strip is there, the pen is chosen and the lesson has stopped moving.
+async function whiteboardSettled(page: Page) {
+  await expect(page.locator('body')).toHaveClass(/cp-tool-gutter/);
+  await expect.poll(() => page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
+  const bar = (await page.locator('#fttAnnotate .fa-bar').boundingBox())!;
+  let last = '';
+  await expect.poll(async () => {
+    const box = (await page.locator('#pdfContent').boundingBox())!, now = JSON.stringify(box), still = now === last && box.x >= bar.x + bar.width;
+    last = now; return still;
+  }, { intervals: [200] }).toBe(true);
+}
 async function pasteRedPicture(page: Page) {
   await page.evaluate(async () => {
     const c = document.createElement('canvas'); c.width = 400; c.height = 200;
@@ -198,6 +216,7 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(true);
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
   expect(Math.min(...await boardPixel(page, 0.5, 0.5))).toBeGreaterThan(245);
+  await whiteboardSettled(page);
 
   // An existing pen mark must survive adding pictures.
   const content = (await page.locator('#pdfContent').boundingBox())!;
@@ -417,6 +436,7 @@ test('My Screen whiteboard supplies live frames with published pictures and pen 
   await pasteRedPicture(page);await page.getByRole('button',{name:'✓ Show to class'}).click();
   // Sample every pixel from the actual video, rather than only inspecting source canvas state.
   await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>{const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d')!;ctx.drawImage(v,0,0);const pixels=ctx.getImageData(0,0,c.width,c.height).data;let red=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>180&&pixels[i+1]<90&&pixels[i+2]<120)red++;return red})).toBeGreaterThan(100);
+  await whiteboardSettled(page);
   const box=(await page.locator('#pdfContent').boundingBox())!;await page.mouse.move(box.x+40,box.y+40);await page.mouse.down();await page.mouse.move(box.x+180,box.y+70,{steps:8});await page.mouse.up();await expect.poll(()=>inkCount(page)).toBeGreaterThan(0);const marks=await inkCount(page);
   await page.getByRole('button',{name:'Student screens',exact:true}).click();await page.getByRole('button',{name:'My screen',exact:true}).click();
   expect(await inkCount(page)).toBe(marks);expect(await page.evaluate(()=>(window as any).ClassPointerPdf.boardPictureCount())).toBe(1);

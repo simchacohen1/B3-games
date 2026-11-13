@@ -64,6 +64,8 @@ body.cp-simple #connectionStatus{font-size:13px;font-weight:500;color:var(--cp-m
 
 /* ---------- Tabs row: tabs left, live status right ---------- */
 .cp-tabs-row{position:relative;z-index:2147483646;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+/* Full screen: this row goes behind the lesson (the drawing toolbar has Stop, Lesson and Exit full screen), so it never covers the lesson. */
+body.lesson-expanded .cp-tabs-row{z-index:40}
 body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-tabs-spacer{flex:1 1 auto}
 .cp-live-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
