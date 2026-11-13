@@ -8,7 +8,7 @@
    • kinds of a tool: pointer shapes, highlight box, triangle (click the chosen tool again);
    • Clear: my drawings, my pointer, everyone's drawings, all pointers;
    • Students (who can point and draw), a red Stop in full screen, Lesson (switch what students see, zoom
-     the shared screen) and More (full screen, spotlight);
+     the shared screen) and More (full screen, spotlight, save);
    • keys: P pointer, H highlight, B highlight box, D pen, E eraser, U undo.
    It sits in its own strip on the left, so it never covers the lesson.
 
@@ -138,10 +138,14 @@
     return out;
   }
   function moreItems(){
-    const full=expanded(),spot=$('spotlight');
+    const full=expanded(),spot=$('spotlight'),saved=window.FTTSavedWork;
     const out=[{icon:full?'⤢':'⛶',label:full?'Exit full screen':'Full screen',onClick:()=>$(full?'exitFullScreenLesson':'fullScreenLesson')?.click()}];
     if(spot)out.push({icon:'🔦',label:spot.checked?'Spotlight: on':'Spotlight',title:'Dim the lesson around your pointer',pressed:spot.checked,
       onClick(){spot.checked=!spot.checked;spot.dispatchEvent(new Event('change',{bubbles:true}))}});
+    // Saved work is another script that may load later: look for it each time the menu opens.
+    if(saved)out.push({heading:'Saved work'},
+      {id:'save',icon:'💾',label:'Save',onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
+      {id:'files',icon:'📂',label:'My files',onClick:()=>window.FTTSavedWork?.open?.()});
     return out;
   }
   function actions(){
@@ -152,14 +156,14 @@
       // Outside full screen the red Stop button is right above the lesson.
       {id:'stop',icon:'⏹',label:'Stop',danger:true,hidden:!(expanded()&&live()),title:stopLabel(),onClick:()=>click('cpStopBtn')},
       {id:'lesson',icon:'🖥',label:'Lesson',title:'Lesson: change what students see',items:lessonItems},
-      {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight',items:moreItems}
+      {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight'+(window.FTTSavedWork?', save':''),items:moreItems}
     ];
   }
   FA.setActions?.(actions);
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,
+    return [B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 

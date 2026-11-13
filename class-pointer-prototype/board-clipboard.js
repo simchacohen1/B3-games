@@ -10,6 +10,8 @@
   const DATA_IMAGE=/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/]+=*$/i;
   // imageChars: the longest picture (as a data: URL) one board message may carry. Up to imagesPerBoard per board.
   const LIMITS={imageChars:150000,imageSide:900,imagesPerBoard:6,sourceBytes:15*1024*1024,textChars:2000,itemChars:200,itemLines:8};
+  // A saved teacher whiteboard (exportWhiteboard / importWhiteboard in pdf-mode.js).
+  const LESSON={pictures:12,pictureChars:700000,strokes:400};
   const round=value=>Math.round(value*1e4)/1e4;
   const clamp=(value,low,high)=>Math.max(low,Math.min(Math.max(low,high),value));
   const isRtl=text=>/[֐-ࣿיִ-﷿ﹰ-ﻼ]/.test(String(text==null?'':text));
@@ -130,7 +132,22 @@
   function cleanImageData(data,maxChars=LIMITS.imageChars){
     return typeof data==='string'&&data.length<=maxChars&&DATA_IMAGE.test(data)?data:null;
   }
-  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,fitSize,placeImage,cleanImageData};
+  // A saved teacher whiteboard, checked as strictly as anything from the network. cleanStroke is
+  // ClassPointerCore.cleanStroke. Marks that were not the teacher's come back as "saved" marks.
+  function cleanLessonBoard(raw,cleanStroke){
+    if(!raw||raw.version!==1||raw.kind!=='lesson-whiteboard'||typeof cleanStroke!=='function')return null;
+    const pictures=[],strokes=[];
+    for(const p of Array.isArray(raw.pictures)?raw.pictures.slice(0,LESSON.pictures):[]){
+      if(p&&cleanImageData(p.data,LESSON.pictureChars)&&[p.x,p.y,p.w,p.h].every(Number.isFinite)&&p.w>=.005&&p.w<=4&&p.h>=.005&&p.h<=4&&Math.abs(p.x)<=4&&Math.abs(p.y)<=4)
+        pictures.push({data:p.data,x:p.x,y:p.y,w:p.w,h:p.h});
+    }
+    for(const s of Array.isArray(raw.strokes)?raw.strokes.slice(0,LESSON.strokes):[]){
+      const stroke=cleanStroke(s);
+      if(stroke)strokes.push({...stroke,owner:s.owner==='teacher'?'teacher':'saved'});
+    }
+    return{pictures,strokes};
+  }
+  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,fitSize,placeImage,cleanImageData,cleanLessonBoard};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}
   if(root.ClassPointerClipboard)return;
 

@@ -803,11 +803,12 @@
     for(const item of pictureEdits)item.el.remove();
     pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
   }
-  function loadPicture(blob){
+  // source: a picture file, or a data: URL from a saved whiteboard.
+  function loadPicture(source){
     return new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(blob),image=new Image();
-      image.onload=()=>{URL.revokeObjectURL(url);image.naturalWidth&&image.naturalHeight?resolve(image):reject(Error('empty'))};
-      image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This picture could not be read.'))};
+      const saved=typeof source==='string',url=saved?source:URL.createObjectURL(source),image=new Image(),done=()=>{if(!saved)URL.revokeObjectURL(url)};
+      image.onload=()=>{done();image.naturalWidth&&image.naturalHeight?resolve(image):reject(Error('empty'))};
+      image.onerror=()=>{done();reject(Error('This picture could not be read.'))};
       image.src=url;
     });
   }
@@ -970,6 +971,44 @@
     paintInk(c.getContext('2d'),c,strokes,c.width,c.height);
     return new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of the whiteboard.'))},'image/png'));
   }
+  // ---------- Save and restore (used by "Save whiteboard") ----------
+  const SAVED_PICTURE=700000;
+  function savedPicture(image){
+    const scale=Math.min(1,1400/Math.max(image.naturalWidth,image.naturalHeight)),c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(image.naturalWidth*scale));c.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(image,0,0,c.width,c.height);
+    let data='';
+    for(const quality of [0.85,0.7,0.5,0.3]){data=c.toDataURL('image/jpeg',quality);if(data.length<=SAVED_PICTURE)break}
+    c.width=0;return data.length<=SAVED_PICTURE?data:null;
+  }
+  // Everything needed to rebuild the teacher whiteboard: its pictures (also ones still being placed) and all marks.
+  // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
+  async function exportWhiteboard(){
+    if(!isBoardOpen())return null;
+    const pictures=[];
+    for(const p of [...boardPictures,...pictureEdits]){const data=savedPicture(p.image);if(data)pictures.push({data,x:p.x,y:p.y,w:p.w,h:p.h})}
+    return{version:1,kind:'lesson-whiteboard',size:{w:boardSize.w,h:boardSize.h},pictures,
+      strokes:B.highlights().map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text}:{})}))};
+  }
+  // Opens the whiteboard exactly as the Whiteboard button does, then puts the saved pictures and marks back for
+  // everyone. Saved data is checked as strictly as anything from the network.
+  async function importWhiteboard(saved){
+    const data=isTeacher?window.ClassPointerClipboard?.cleanLessonBoard(saved,C.cleanStroke):null,open=$('openWhiteboard');
+    if(!data||!open||open.disabled||!B.restoreMarks)return false;
+    const before=docId;open.click();
+    for(let i=0;i<150&&!(isBoardOpen()&&docId!==before);i++)await sleep(100);
+    if(!isBoardOpen()||docId===before)return false;
+    const board=docId;
+    for(const p of data.pictures){
+      let image=null;try{image=await loadPicture(p.data)}catch{}
+      if(!isBoardOpen()||docId!==board)return false;
+      if(image)boardPictures.push({image,x:p.x,y:p.y,w:p.w,h:p.h,after:null});
+    }
+    if(boardPictures.length)await publishBoard();
+    if(!isBoardOpen())return false;
+    B.restoreMarks(data.strokes);updateControls();
+    return true;
+  }
   if(isTeacher){
     const hookClipboard=()=>{window.ClassPointerClipboard?.register(clipTarget);updateControls()};
     if(window.ClassPointerClipboard)hookClipboard();else document.addEventListener('class-pointer-clipboard-ready',hookClipboard,{once:true});
@@ -1006,7 +1045,7 @@
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
-    exportPng,
+    exportWhiteboard,importWhiteboard,exportPng,
     presentationStream:()=>boardPresentation
   };
 })();

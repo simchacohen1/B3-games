@@ -232,3 +232,68 @@ test('the teacher whiteboard offers paste, copy and editing of pasted text',()=>
   assert.match(pdfSource,/marks\.splice\(index,1\);next\.forEach\(item=>B\.submitStroke\(item\)\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
 });
+
+
+// ---------- Saved work: a student's own board is saved and restored ----------
+test('a student board is saved with its marks and pictures, and only while it is open',()=>{
+  const {api}=studentBoard();
+  assert.equal(api.exportBoard(),null);assert.equal(api.importBoard({version:1,kind:'student-board',strokes:[]}),false);
+  api.fromTeacher({type:'board-mode',on:true,mode:'boards',strokes:[line('s1-a'),{...line('t1-a'),by:'teacher'},picture('s1-p')]});
+  // Results come from another JavaScript world; copy them into plain objects before comparing.
+  const saved=JSON.parse(JSON.stringify(api.exportBoard()));
+  assert.equal(saved.version,1);assert.equal(saved.kind,'student-board');
+  assert.deepEqual(saved.strokes.map(s=>[s.id,s.by]),[['s1-a','student'],['t1-a','teacher'],['s1-p','student']]);
+  assert.deepEqual(saved.images,['s1-p']);assert.equal(saved.strokes[2].image,PNG);assert.equal(saved.activity,null);
+});
+test('restoring a saved board replaces only my own marks, is checked like network data, and is sent as normal changes',()=>{
+  const {api,sent}=studentBoard();
+  api.fromTeacher({type:'board-mode',on:true,mode:'boards',strokes:[line('s1-old'),{...line('t1-keep'),by:'teacher'}]});
+  const ok=api.importBoard({version:1,kind:'student-board',strokes:[
+    line('s9-a','student'),{...line('t9-b'),by:'teacher'},picture('s9-p'),
+    picture('s9-evil','javascript:alert(1)'),picture('s9-html','data:text/html;base64,AAAA'),picture('s9-big','data:image/png;base64,'+'A'.repeat(150000)),
+    {id:'s9-t',tool:'text',color:'#1f2937',size:.03,points:[{x:.2,y:.2}],text:'x'.repeat(201)},
+    {...line('s9-c'),color:'red'},null,'junk',{...line('s9-d'),points:[{x:2,y:0}]}]});
+  assert.equal(ok,true);
+  const now=JSON.parse(JSON.stringify(api.exportBoard())).strokes;
+  assert.deepEqual(now.map(s=>s.by),['teacher','student','student']);
+  assert.equal(now[0].id,'t1-keep');
+  assert.ok(now.slice(1).every(s=>s.id[0]==='s'&&!s.id.startsWith('s9-')));
+  assert.equal(now[2].image,PNG);
+  assert.deepEqual(sent.map(m=>m.type),['board-clear','board-add','board-add']);
+  assert.ok(sent.slice(1).every(m=>m.stroke.id[0]==='s'&&!('by' in m.stroke)));
+  for(const bad of [null,{},{version:2,kind:'student-board',strokes:[]},{version:1,kind:'lesson-whiteboard',strokes:[]},{version:1,kind:'student-board',strokes:'x'}])assert.equal(api.importBoard(bad),false);
+});
+
+// ---------- Saved work: the teacher lesson whiteboard is saved and restored ----------
+test('a saved teacher whiteboard is checked before it is restored',()=>{
+  const stroke={tool:'pen',color:'#1f2937',size:0.016,points:[{x:.1,y:.1},{x:.2,y:.2}]};
+  const jpeg='data:image/jpeg;base64,'+'A'.repeat(64);
+  const clean=Clip.cleanLessonBoard({version:1,kind:'lesson-whiteboard',
+    pictures:[{data:jpeg,x:.1,y:.1,w:.3,h:.3},{data:'https://example.com/x.png',x:0,y:0,w:.3,h:.3},{data:jpeg,x:NaN,y:0,w:.3,h:.3},{data:jpeg,x:0,y:0,w:90,h:.3},null],
+    strokes:[{...stroke,owner:'teacher'},{...stroke,owner:'student:peer-123'},{...stroke,tool:'evil'},{...stroke,points:[{x:5,y:5},{x:6,y:6}]},{tool:'text',color:'#1f2937',size:0.016,points:stroke.points,text:'שלום',owner:'student'}]},Core.cleanStroke);
+  assert.equal(clean.pictures.length,1);
+  assert.deepEqual(clean.strokes.map(s=>s.owner),['teacher','saved','saved']);
+  assert.equal(clean.strokes[2].text,'שלום');
+  assert.equal(Clip.cleanLessonBoard({version:1,kind:'student-board'},Core.cleanStroke),null);
+  assert.equal(Clip.cleanLessonBoard({version:2,kind:'lesson-whiteboard'},Core.cleanStroke),null);
+  assert.equal(Clip.cleanLessonBoard(null,Core.cleanStroke),null);
+  const many=Clip.cleanLessonBoard({version:1,kind:'lesson-whiteboard',pictures:Array.from({length:30},()=>({data:jpeg,x:0,y:0,w:.2,h:.2})),strokes:Array.from({length:900},()=>stroke)},Core.cleanStroke);
+  assert.equal(many.pictures.length,12);assert.equal(many.strokes.length,400);
+});
+test('restored marks replace the old ones, are capped at 400, and nobody but the teacher owns them',()=>{
+  const store=new Core.HighlightStore(),stroke={tool:'pen',color:'#1f2937',size:0.016,points:[{x:.1,y:.1},{x:.2,y:.2}]};
+  store.add('student:old',stroke);
+  assert.equal(store.restore([{...stroke,owner:'teacher'},{...stroke,owner:'student:peer'},{tool:'nope'},{...stroke,owner:'saved'}]),3);
+  assert.deepEqual(store.strokes.map(s=>s.owner),['teacher','saved','saved']);
+  assert.equal(new Set(store.strokes.map(s=>s.id)).size,3);
+  store.edit('teacher','undo');assert.equal(store.strokes.length,2); // the teacher can still undo his own restored mark
+  assert.equal(store.restore(Array.from({length:500},()=>stroke)),400);
+  assert.equal(store.restore('junk'),0);
+});
+test('the whiteboards expose the save / restore API that saved-work.js calls',()=>{
+  assert.match(pdfSource,/exportWhiteboard,importWhiteboard,exportPng,/);
+  assert.match(pdfSource,/kind:'lesson-whiteboard'/);
+  assert.match(pdfSource,/cleanLessonBoard\(saved,C\.cleanStroke\)/);
+  assert.match(boardsSource,/window\.ClassPointerBoards=\{fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,/);
+  assert.match(fs.readFileSync(path.join(dir,'classroom.js'),'utf8'),/restoreMarks\(list\)\{if\(!isTeacher\)return;/);
+});

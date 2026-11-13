@@ -27,6 +27,8 @@
   html.b3-home-auth-pending #loginCard{display:none!important}
   .student-bar{max-width:900px;margin:0 auto 18px;background:white;border-radius:16px;padding:12px 16px;box-shadow:0 3px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
   .student-bar strong{font-size:16px}.student-bar span{color:#64748b;font-size:13px}.student-bar button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#1f2937}
+  .student-saved-files{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:7px 12px;border:1px solid #c7d2fe;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;text-decoration:none}
+  .student-saved-files:hover{background:#e0e7ff}
   .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
   .login-card h2,.locked-card h2{margin:0 0 8px;color:#26364a}.login-card p,.locked-card p{color:#64748b;line-height:1.45}
   .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-card button:disabled{opacity:.6;cursor:wait}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
@@ -432,7 +434,7 @@ document.addEventListener("DOMContentLoaded",function(){
   <div id="homeAuthLoading" role="status" aria-live="polite">⏳ Checking your sign-in…</div>
 
   <div id="studentBar" class="student-bar hidden">
-    <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
+    <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span><br><a id="studentSavedFilesLink" class="student-saved-files hidden" href="class-pointer-prototype/my-files.html" aria-label="Open your saved whiteboards and PDFs">📂 My files</a></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
     <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" class="hidden" style="display:none!important" aria-hidden="true" tabindex="-1">👆 Class Pointer</a>
   </div>
@@ -1460,6 +1462,12 @@ document.addEventListener("DOMContentLoaded",function(){
 
   // ---- Guest Mode: a preview of the site, never a login. See guest-mode.js. ----
   function isGuest(){return Boolean(window.B3Guest&&window.B3Guest.isGuest());}
+  function renderStudentSavedFilesLink(){
+    const link=el("studentSavedFilesLink");
+    if(!link)return;
+    const signedInStudent=!isAuthorizedTeacher&&!isGuest()&&!isStudentPreview&&Boolean(myStudentId&&myClassId);
+    link.classList.toggle("hidden",!signedInStudent);
+  }
   const GUEST_TOOL_INFO={
     "student-rewards/teacher.html":"Teachers award daily points and rewards to their students here.",
     "class-pointer-prototype/dashboard.html":"Teachers start a live lesson and point at the screen together with the class.",
@@ -1477,6 +1485,7 @@ document.addEventListener("DOMContentLoaded",function(){
   };
   function renderGuest(){
     el("classPointerStudentLink").classList.add("hidden");
+    renderStudentSavedFilesLink();
     el("loginCard").classList.add("hidden");
     el("lockedCard").classList.add("hidden");
     el("studentBar").classList.remove("hidden");
@@ -1544,6 +1553,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function renderStudentAccess(){
     el("classPointerStudentLink").classList.add("hidden"); // Student Pointer is now embedded in their activities.
+    renderStudentSavedFilesLink();
     queueMicrotask(renderStudentNudges);
     queueMicrotask(renderCardLocks);
     setTeacherToolPairVisibility();
