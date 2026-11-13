@@ -177,7 +177,16 @@
       '.instruction-play{font-size:18px;font-weight:800;padding:12px 20px;min-height:48px;border-radius:14px;background:#2d7ecc;color:#fff;border:0;cursor:pointer}',
       '.instruction-play[aria-pressed="true"]{background:#1a2744}',
       '.instruction-status{color:#8a1c1c;font-weight:700}',
-      '.conversation-record[data-recording="true"]{background:#e02424!important;border-color:#e02424!important;color:#fff!important}'
+      '.conversation-record[data-recording="true"]{background:#e02424!important;border-color:#e02424!important;color:#fff!important}',
+      /* The always-there microphone on every homework, and the list of recordings. */
+      '.home-recordings{border:1.5px solid #f3d3a4;border-radius:16px;background:#fff8ec;padding:14px;margin:14px 0}',
+      '.home-recordings .recording-mic{margin:0!important;min-height:54px;padding:12px 24px;border-radius:14px;font-size:19px;font-weight:800}',
+      '.recording-hint{display:inline-block;margin-left:10px;color:#6b5a3a;font-size:14px}',
+      '.recording-title{display:block;margin:12px 0 4px;color:#1a2744}',
+      '.home-recordings>.recording-title:first-child{margin-top:0}',
+      '.recording-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
+      '.recording-row .conversation-listen{display:inline-flex;align-items:center;gap:6px;margin:6px 0 0!important;min-height:40px;padding:6px 16px;border-radius:999px;font-size:15px}',
+      '.recording-row audio{display:block;max-width:100%;width:280px;margin-top:6px}'
     ].join('\n');
     document.head.append(style);
   }
@@ -337,6 +346,99 @@
     wrap.append(button, status);
     return wrap;
   }
+  // A play button for one saved voice note. The audio is fetched only when it is pressed.
+  function voicePlayButton(message, send, tell, label) {
+    var listen = el('button', label, 'conversation-listen'); listen.type = 'button';
+    listen.onclick = async function () {
+      listen.disabled = true; listen.textContent = 'Loading…';
+      try {
+        var audio = await send({ action: 'voiceRead', messageId: message.id });
+        var player = el('audio'); player.controls = true; player.preload = 'auto';
+        var type = String(audio.voiceDataURL || '').slice(5).split(';')[0];
+        var cantPlay = 'This voice note was recorded on a different kind of device and can’t play here. Try opening it in Chrome or on a computer.';
+        if (type && player.canPlayType && !player.canPlayType(type)) tell(cantPlay, 'error');
+        player.onerror = function () { tell(cantPlay, 'error'); };
+        player.src = audio.voiceDataURL;
+        listen.replaceWith(player);
+        var playing = player.play && player.play();
+        if (playing && playing.catch) playing.catch(function () { /* the player controls are there to press */ });
+      } catch (error) {
+        tell(error.message || 'This voice note could not play.', 'error');
+        listen.disabled = false; listen.textContent = label;
+      }
+    };
+    return listen;
+  }
+  // Recordings on one homework (#755). Student page: an always-visible microphone button plus the
+  // recordings already sent. Teacher page: the student's recordings, ready to play (null when there are none).
+  // A recording is saved as a voice note on that homework's notes thread, so the same server limits apply.
+  var recordingNotices = {};
+  function recordings(options) {
+    addConversationStyles();
+    var student = options.role === 'student', key = options.key ? String(options.key) : '';
+    var clips = (options.messages || []).filter(function (m) { return m && m.voice && m.role === 'student'; });
+    if (!student && !clips.length) return null;
+    var box = el('section', null, 'home-recordings');
+    var feedback = el('p', null, 'conversation-feedback'); feedback.setAttribute('aria-live', 'polite');
+    function tell(text, tone) {
+      feedback.textContent = text || '';
+      feedback.classList.toggle('is-error', tone === 'error');
+      feedback.classList.toggle('is-good', tone === 'good');
+    }
+    if (student) {
+      var recorder = voiceRecorder({ feedback: feedback, tell: tell, host: box, buttonClass: 'conversation-record recording-mic',
+        idleLabel: clips.length ? '🎤 Record again' : '🎤 Record', stopLabel: '■ Stop & send to my teacher',
+        recordingText: 'Recording now. Speak, then press Stop & send to my teacher.', busyText: 'Sending your recording…',
+        cancelledText: 'Recording cancelled. Nothing was sent.',
+        unsupportedText: 'Recording is not supported in this browser. You can write to your teacher instead.',
+        failText: 'Could not start recording. Check your microphone and try again.',
+        onStart: options.onStart, onEnd: options.onEnd,
+        onRecorded: async function (voiceDataURL) {
+          await options.send({ action: 'comment', voiceDataURL: voiceDataURL });
+          var sent = 'Recording sent to your teacher ✓';
+          if (key) recordingNotices[key] = sent; // the page may redraw this box
+          if (options.onSent) { try { await options.onSent(); } catch (e) { /* the next refresh will show it */ } }
+          return sent;
+        } });
+      recorder.button.setAttribute('aria-label', 'Record your voice for your teacher');
+      box.append(recorder.button, el('span', 'Up to 15 seconds. Your teacher will hear it.', 'recording-hint'), recorder.panel);
+    }
+    if (clips.length) {
+      box.append(el('strong', student ? 'Your recordings · ' + clips.length : '🎤 Recordings from ' + (options.studentName || 'this student') + ' · ' + clips.length, 'recording-title'));
+      var list = el('div', null, 'recording-list');
+      clips.forEach(function (message, i) {
+        var row = el('div', null, 'recording-row');
+        row.append(voicePlayButton(message, options.send, tell, '▶ Play recording ' + (i + 1)),
+          el('span', [dayLabel(message.createdAt), sentAt(message.createdAt)].filter(Boolean).join(' · '), 'conversation-time'));
+        list.append(row);
+      });
+      box.append(list);
+    }
+    box.append(feedback);
+    if (key && recordingNotices[key]) { tell(recordingNotices[key], 'good'); delete recordingNotices[key]; }
+    return box;
+  }
+  // Today's Hebrew date in English letters, e.g. "29 Cheshvan". Worked out by the browser's Hebrew
+  // calendar (the civil day; it does not switch at nightfall). Falls back to the ordinary date.
+  var HEBREW_MONTHS = { Tishri: 'Tishrei', Heshvan: 'Cheshvan', Tevet: 'Teves', Nisan: 'Nissan', Tamuz: 'Tammuz' };
+  function hebrewDate(date) {
+    date = date || new Date();
+    try {
+      var format = new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long' });
+      if (format.resolvedOptions().calendar !== 'hebrew') throw new Error('no Hebrew calendar');
+      var day = '', month = '';
+      format.formatToParts(date).forEach(function (part) {
+        if (part.type === 'day') day = part.value;
+        if (part.type === 'month') month = part.value;
+      });
+      if (!day || !month) throw new Error('no Hebrew date');
+      return day + ' ' + (HEBREW_MONTHS[month] || month);
+    } catch (e) {
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+  }
+  // The name given to an assignment whose name was left blank: "Homework, 29 Cheshvan".
+  function autoTitle(typeLabel, date) { return (typeLabel || 'Homework') + ', ' + hebrewDate(date); }
   function conversation(options) {
     addConversationStyles();
     var box = el('section', null, 'home-conversation');
@@ -409,28 +511,7 @@
       if (isNew) who.append(el('span', 'New', 'conversation-new'));
       item.append(who);
       if (message.text) item.append(el('p', message.text));
-      if (message.voice) {
-        var listen = el('button', '▶ Play voice note', 'conversation-listen'); listen.type = 'button';
-        listen.onclick = async function () {
-          listen.disabled = true; listen.textContent = 'Loading voice note…';
-          try {
-            var audio = await options.send({ action: 'voiceRead', messageId: message.id });
-            var player = el('audio'); player.controls = true; player.preload = 'auto';
-            var type = String(audio.voiceDataURL || '').slice(5).split(';')[0];
-            var cantPlay = 'This voice note was recorded on a different kind of device and can’t play here. Try opening it in Chrome or on a computer.';
-            if (type && player.canPlayType && !player.canPlayType(type)) tell(cantPlay, 'error');
-            player.onerror = function () { tell(cantPlay, 'error'); };
-            player.src = audio.voiceDataURL;
-            listen.replaceWith(player);
-            var playing = player.play && player.play();
-            if (playing && playing.catch) playing.catch(function () { /* the player controls are there to press */ });
-          } catch (error) {
-            tell(error.message || 'This voice note could not play.', 'error');
-            listen.disabled = false; listen.textContent = '▶ Play voice note';
-          }
-        };
-        item.append(listen);
-      }
+      if (message.voice) item.append(voicePlayButton(message, options.send, tell, '▶ Play voice note'));
       history.append(item);
     });
     if (!messages.length) history.append(el('p', options.emptyText || 'No notes yet. Send a message if you have a question.', 'muted'));
@@ -489,7 +570,8 @@
   root.HomeworkCommon = { API: API, TYPES: TYPES, STATUS: STATUS, ACTIVITY_URLS: ACTIVITY_URLS,
     isStagingRuntime: function () { return isStagingRuntime; }, isAllowedRuntime: function () { return isStagingRuntime || isLiveRuntime; }, activityUrl: activityUrl, el: el, call: call, when: when,
     dueFromInput: dueFromInput, assignedFromInput: assignedFromInput, inputFromDue: inputFromDue, conversation: conversation,
-    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts, dayLabel: dayLabel, voiceRecorder: voiceRecorder, instructionPlayer: instructionPlayer };
+    unreadCount: unreadCount, teacherStatusCounts: teacherStatusCounts, dayLabel: dayLabel, voiceRecorder: voiceRecorder, instructionPlayer: instructionPlayer,
+    recordings: recordings, hebrewDate: hebrewDate, autoTitle: autoTitle };
   if (root.document && root.document.head) addConversationStyles(); // "N new" tags can show before any notes box
   if (typeof module === 'object' && module.exports) module.exports = root.HomeworkCommon;
 })(typeof window !== 'undefined' ? window : globalThis);
