@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="home-island.css?v=20261102-teacher-match">
+<link rel="stylesheet" href="principal-dashboard.css?v=20261111-780">
 <style>
 /* Only what the owner's homepage does not already have. Everything else comes from home-island.css. */
 #app{max-width:1190px;margin:auto}
@@ -46,6 +47,7 @@
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
+<script src="principal-dashboard.js?v=20261111-780"></script>
 </head><body>
 <button id="signOut" class="signout-pill hidden">Sign out</button>
 <h1 id="homeTitle">Fun Torah Tools</h1>
@@ -136,8 +138,31 @@ async function render(user,access){
   +(grants['class-pointer']===true&&!previewActive?actionTile('🖥','Send Everyone to Share Screen','class-pointer-prototype/classroom.html?dashboard=teacher&amp;class='+cls+'&amp;sendEveryoneShare=1',' rel="noopener"'):'')
   +teacherOnly.map(x=>tileFor('teacher-tool-card',x)).join("");
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card" data-class-id="'+encodeURIComponent(id)+'"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
+ if(principal&&window.B3PrincipalDashboard){
+   // Group only the classes already resolved through this user's scoped access checks.
+   // Move the existing cards without cloning so links and tool control behavior are preserved.
+   const cards=Array.from(q("classes").querySelectorAll(":scope > .class-card"));
+   if(cards.length){
+     // Count unique active members from class snapshots already loaded for this principal.
+     const studentIds=new Set();
+     snaps.forEach(snapshot=>{
+       const row=snapshot.val()||{};
+       if(!snapshot.exists()||row.active===false)return;
+       Object.entries(row.members||{}).forEach(([id,member])=>{
+         if(member&&member.active!==false)studentIds.add(id);
+       });
+     });
+     const items=cards.map(card=>({
+       name:card.querySelector("h2")?.textContent||"",
+       teacher:(card.querySelector(":scope > p.sub")?.textContent||"").replace(/^Teacher:\s*/,""),
+       id:decodeURIComponent(card.dataset.classId||""),
+       card
+     }));
+     window.B3PrincipalDashboard.build(q("classes"),items,{teacherCount:supervised.length,studentCount:studentIds.size,persistKey:user?.uid||"principal"});
+   }
+ }
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');

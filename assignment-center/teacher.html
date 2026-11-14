@@ -339,7 +339,7 @@ var WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
 if(!H.isAllowedRuntime()){$('signinMsg').textContent='Homework is not available on this site.';$('go').disabled=true;return}
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 var auth=firebase.auth();
-var state={openReview:{},classId:'',data:null,editing:null,editingPublication:null,createStep:1,reportView:'assignments',reportSort:'newest',detailSort:'name',openAssignmentId:null,openStudentId:null,openNotes:null,reviewDrafts:{}};
+var state={openReview:{},classId:'',data:null,editing:null,editingPublication:null,createStep:1,reportView:'assignments',reportSort:'newest',detailSort:'name',openAssignmentId:null,openStudentId:null,openNotes:null,reviewDrafts:{},openReviewGroups:{},openAssignmentGroups:{}};
 // Recorded instructions (#629): one optional voice message per assignment. Only the teacher who created
 // the assignment can add, replace or remove it; the server checks this too.
 var voice={pending:null,remove:false,existing:false,owned:true,assignmentId:null,recorder:null};
@@ -516,10 +516,27 @@ function renderReports(){var d=state.data,box=$('list');if(!d)return;box.replace
   if(byStudents){renderStudentList(box);return}
   $('reportSummary').textContent=plural(d.assignments.length,'assignment')+' · '+plural(waiting,'student')+' waiting for your check';
   if(!d.assignments.length){box.append(el('div','No assignments yet. Choose Create Assignment to make your first one.','card muted'));return}
-  sortedAssignments().forEach(function(a){var p=pubOf(a),row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
+  var grouped=new Map(),ordered=sortedAssignments();
+  var titles={published:'Published assignments',draft:'Draft assignments',archived:'Archived assignments'};
+  var statuses=['published','draft','archived'];
+  var totals={published:0,draft:0,archived:0},pending={published:0,draft:0,archived:0};
+  ordered.forEach(function(a){var p=pubOf(a);if(!statuses.includes(p))p='published';totals[p]=(totals[p]||0)+1;pending[p]=(pending[p]||0)+assignmentCounts(a).waiting});
+  var controls=el('div',null,'review-group-actions'),expand=el('button','Expand all','sec'),collapse=el('button','Collapse all','sec');
+  expand.type=collapse.type='button';
+  expand.onclick=function(){grouped.forEach(function(g,k){g.open=true;state.openAssignmentGroups[k]=true})};
+  collapse.onclick=function(){grouped.forEach(function(g,k){g.open=false;delete state.openAssignmentGroups[k]})};
+  controls.append(expand,collapse);box.append(controls);
+  statuses.filter(function(p){return totals[p]>0}).forEach(function(p){
+    var fold=el('details',null,'card assignment-fold'),sum=el('summary',null,'review-sum');
+    fold.open=!!state.openAssignmentGroups[p];
+    sum.append(el('strong',titles[p]+' · '+totals[p]+(pending[p]?' · '+pending[p]+' waiting':'') ));
+    fold.append(sum);box.append(fold);grouped.set(p,fold);
+    fold.addEventListener('toggle',function(){if(fold.open)state.openAssignmentGroups[p]=true;else delete state.openAssignmentGroups[p]});
+  });
+  ordered.forEach(function(a){var p=pubOf(a);if(!statuses.includes(p))p='published';var row=el('button',null,'report-row'+(p==='draft'?' draft':p==='archived'?' archived':''));row.type='button';row.dataset.assignmentId=a.id;row.setAttribute('aria-label','Open report for '+a.title);
     var top=el('div',null,'row-top'),name=el('span',null,'row-name');name.append(document.createTextNode(a.title+' '),labelBadge(a));if(a.subject)name.append(el('span',a.subject,'badge'));if(p==='draft')name.append(el('span','Draft · students can’t see it','badge state'));if(p==='archived')name.append(el('span','Archived','badge state'));top.append(name,el('span',dateLine(a),'row-dates'));row.append(top);
     if(p!=='draft')row.append(countLine(assignmentCounts(a)));var fresh=newNotesIn(a);if(fresh)name.append(el('span','💬 '+fresh+' new','badge new-msg'));
-    row.onclick=function(){openAssignment(a.id)};box.append(row)})}
+    row.onclick=function(){openAssignment(a.id)};grouped.get(p).append(row)})}
 // One row per student across every assignment they were given (drafts are not counted: students never saw them).
 function studentSummaries(){var map={},d=state.data;Object.keys(d.students||{}).forEach(function(id){map[id]={id:id,name:d.students[id].name,given:0,done:0,handedIn:0,pastDue:0}});
   d.assignments.forEach(function(a){if(pubOf(a)==='draft')return;Object.keys(a.students||{}).forEach(function(id){var s=a.students[id],m=map[id]||(map[id]={id:id,name:s.name,given:0,done:0,handedIn:0,pastDue:0});m.given++;if(s.status==='approved')m.done++;if(s.status==='approved'||s.status==='submitted')m.handedIn++;if(isPastDue(s))m.pastDue++})});
@@ -606,7 +623,23 @@ function renderReview(){var box=$('reviewList');box.replaceChildren();var waitin
   $('reviewCount').textContent=String(waiting.length);
   $('reviewSummary').textContent=waiting.length?(waiting.length===1?'1 student is':waiting.length+' students are')+' waiting for you to check their work. Open one to read it, then approve it or send it back with a note.':'Nothing is waiting for review. You can check again later.';
   if(!waiting.length){box.append(el('div','You’re all caught up! When students hand in work, it will show up here.','card muted'));return}
+  var counts=new Map(),groups=new Map();
+  waiting.forEach(function(x){counts.set(x.a.id,(counts.get(x.a.id)||0)+1)});
+  var actions=el('div',null,'review-group-actions'),expand=el('button','Expand all','sec'),collapse=el('button','Collapse all','sec');
+  expand.type=collapse.type='button';
+  expand.onclick=function(){groups.forEach(function(g,id){g.open=true;state.openReviewGroups[id]=true})};
+  collapse.onclick=function(){groups.forEach(function(g,id){g.open=false;delete state.openReviewGroups[id]})};
+  actions.append(expand,collapse);box.append(actions);
   waiting.forEach(function(x){var a=x.a,s=x.s,key=a.id+'|'+x.id,draft=state.reviewDrafts[key]||(state.reviewDrafts[key]={feedback:'',stars:''});
+    var group=groups.get(a.id);
+    if(!group){
+      group=el('details',null,'card review-group');
+      group.open=!!state.openReviewGroups[a.id]||waiting.some(function(item){return item.a.id===a.id&&!!state.openReview[item.a.id+'|'+item.id]});
+      var header=el('summary',null,'review-sum');
+      header.append(el('strong',a.title+' · '+counts.get(a.id)+' '+(counts.get(a.id)===1?'submission':'submissions')+' waiting'));
+      group.append(header);groups.set(a.id,group);box.append(group);
+      group.addEventListener('toggle',function(){if(group.open)state.openReviewGroups[a.id]=true;else delete state.openReviewGroups[a.id]});
+    }
     var d=el('details',null,'card review-item'),sum=el('summary',null,'review-sum'),c=el('div',null,'review-body');
     d.open=!!state.openReview[key];d.addEventListener('toggle',function(){if(d.open)state.openReview[key]=1;else delete state.openReview[key]});
     sum.append(el('span',s.name,'review-name'),el('span','For: '+a.title,'badge'));
@@ -635,7 +668,7 @@ function renderReview(){var box=$('reviewList');box.replaceChildren();var waitin
       try{await api({action:'return',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});done('Sent back to '+s.name+' with your note. It is on their To Do list again.');await load()}catch(e){say(msg,e.message);busy(false)}};
     approve.onclick=async function(){busy(true);say(msg,'Approving…',true);
       try{await api({action:'approve',assignmentId:a.id,studentId:x.id,feedback:fb.value,stars:stars.value});done('Approved '+s.name+'’s work on “'+a.title+'”.');await load()}catch(e){say(msg,e.message);busy(false)}};
-    var actions=el('div',null,'review-actions');actions.append(approve,back,msg);c.append(actions);box.append(d)})}
+    var actions=el('div',null,'review-actions');actions.append(approve,back,msg);c.append(actions);group.append(d)})}
 })();
 </script>
 <script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home" data-mode="inline"></script></body></html>

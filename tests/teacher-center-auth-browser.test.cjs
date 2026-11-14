@@ -52,7 +52,13 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    await page.route(/firebase-config\.js/,route=>route.fulfill({contentType:'text/javascript',body:"window.B3_FIREBASE_CONFIG={apiKey:'synthetic',authDomain:'localhost',databaseURL:'https://synthetic.invalid',projectId:'demo',storageBucket:'synthetic',messagingSenderId:'1',appId:'synthetic'};window.B3_APP_CONTEXT={workspaceId:'b3-2026'};"}));
    const start=Date.now();
    await page.goto(`http://127.0.0.1:${port}/teacher-home.html${query}`);
-   await page.waitForSelector('#classes .class-card',{timeout:10000});
+   // Principal class cards remain in the DOM but are intentionally hidden inside
+   // collapsed grade/class details until the supervisor expands them.
+   await page.waitForSelector('#classes .class-card',{state:'attached',timeout:10000});
+   if(role==='principal'){
+    await page.locator('.principal-overview-controls button').filter({hasText:'Expand all'}).click();
+   }
+   await page.waitForSelector('#classes .class-card',{state:'visible',timeout:10000});
    const measuredMs=Date.now()-start;
    results[role]=await page.evaluate(()=>({
     elapsedMs:performance.now(),
