@@ -1,6 +1,7 @@
 'use strict';
 // Homework Messages (#647): one-on-one conversations between a student and each of their
-// teachers (and the principal). WhatsApp-style: text or voice, voice up to 5 minutes.
+// teachers. WhatsApp-style: text or voice, voice up to 5 minutes. A principal or the owner can
+// write to a student first and the student can then answer; a student cannot start one (#730).
 // Callers in homework-core.cjs have already proved who the student or teacher is; this file
 // only decides who may talk to whom and stores the messages.
 //
@@ -38,15 +39,20 @@ function adultName(row, fallback) {
 }
 const isPrincipal = row => row && (row.accountType === 'principal' || row.role === 'principal');
 
-// Teachers and principals assigned to a class, from the teacher records the owner manages.
-// This is the student's contact list, so it follows class enrollment automatically.
+// Teachers and principals with access to a class, from the teacher records the owner manages.
+// A principal holds the classes of every teacher they supervise, so being listed here does not
+// make someone the student's teacher: studentContacts() decides who a student may write to.
 async function classAdults(store, ws, classId) {
   const rows = (await store.get('b3Games/workspaces/' + ws + '/teachers')) || {};
   const out = {};
   for (const [uid, row] of Object.entries(rows)) {
     if (!key(uid) || !row || row.active === false || row.classIds?.[classId] !== true) continue;
     const kind = isPrincipal(row) ? 'principal' : 'teacher';
-    out[uid] = { id: uid, kind, name: adultName(row, kind === 'principal' ? 'Principal' : 'Teacher') };
+    // `supervisor`: a principal who has this class only through a teacher they supervise. A
+    // principal given a class of their own (not through a teacher) is that class's teacher.
+    const supervisor = kind === 'principal' &&
+      Object.values(row.supervisedTeachers || {}).some(t => t && t.classIds?.[classId] === true);
+    out[uid] = { id: uid, kind, name: adultName(row, kind === 'principal' ? 'Principal' : 'Teacher'), ...(supervisor ? { supervisor } : {}) };
   }
   return out;
 }
@@ -156,7 +162,19 @@ async function readVoice(store, t, messageId) {
 async function studentContacts(store, s) {
   const [adults, rows] = await Promise.all([classAdults(store, s.ws, s.classId),
     store.get(root(s.ws) + '/dmSummary/students/' + s.classId + '/' + s.sid)]);
-  const contacts = { ...adults };
+  const contacts = {};
+  for (const [uid, { supervisor, ...adult }] of Object.entries(adults)) {
+    // The teachers of the student's class: the only people a student can write to first.
+    if (!supervisor) { contacts[uid] = adult; continue; }
+    // This principal supervises the class but does not teach it. The student sees the principal
+    // only once the principal has written to them, and can then answer. Messages a student
+    // sent to the principal before this rule stay readable, with no new sending.
+    const row = rows?.[uid];
+    if (!row?.lastAt && !row?.adultKind) continue;
+    const wrote = row.adultKind === 'principal' || row.lastRole === 'teacher' ||
+      ((await store.get(threadPath(s.ws, s.classId, s.sid, uid) + '/messages')) || []).some(m => m && m.role === 'teacher');
+    contacts[uid] = wrote ? adult : { ...adult, readOnly: true };
+  }
   // Someone not on the teacher list (the owner or an admin) who already wrote to this student.
   for (const [uid, row] of Object.entries(rows || {}))
     if (!contacts[uid] && key(uid) && row?.adultKind === 'admin') contacts[uid] = { id: uid, kind: 'admin', name: row.adultName || 'Teacher' };
@@ -178,6 +196,7 @@ async function studentApi(store, s, body, now, newId) {
   if (body.action === 'dmRead') return markRead(store, t, now);
   if (body.action === 'dmVoice') return readVoice(store, t, body.messageId);
   if (body.action === 'dmSend') {
+    if (contacts[uid].readOnly) fail(403, 'You can only message your own teachers.');
     let link = null;
     if (body.assignmentId != null && body.assignmentId !== '') {
       const def = key(body.assignmentId) ? s.defs[body.assignmentId] : null;

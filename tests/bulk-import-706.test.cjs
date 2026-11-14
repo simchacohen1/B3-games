@@ -8,6 +8,7 @@ const DIR=process.env.STUDENT_FUNCTIONS_DIR||path.join(__dirname,'..','backend',
 const {manageStudents}=require(path.join(DIR,'student-management-core.cjs'));
 const {studentAuth}=require(path.join(DIR,'student-auth-core.cjs'));
 const R=require('../bulk-roster.js');
+const {legacyCreate}=require('./helpers/legacy-create.cjs');
 
 const OWNER={uid:'owner_uid',email:'simcha5770@gmail.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
 const TEACHER={uid:'teacher_uid',email:'teacher@test.example',email_verified:true,firebase:{sign_in_provider:'google.com'}};
@@ -164,12 +165,12 @@ test('10: unknown class names are refused on the server even if the browser skip
  assert.match(p.errors.join(' '),/does not exist/);
  await assert.rejects(manageStudents(store,OWNER,{action:'importApply',...body,planHash:p.planHash}),/Fix the problems/);
 });
-test('12, 20: a new row matching an existing account stops for review; owner decides',async()=>{
- const store=site(),text=csv(['Student,Reuven Alpha,,111111,B2 ET Morning']);
+test('12, 20: a new row with the same name but another passcode stops for review; owner decides',async()=>{
+ const store=site(),text=csv(['Student,Reuven Alpha,,222222,B2 ET Morning']);
  const {preview}=await runImport(store,text);
- assert.equal(preview.conflicts.length,1);assert.deepEqual(preview.conflicts[0].samePasscode,['old_reuven']);
- assert.equal(preview.conflicts[0].allowNew,false,'cannot create a second account with the same name and passcode');
- assert.equal(byName(store,'Reuven Alpha').length,1);
+ assert.equal(preview.conflicts.length,1);assert.deepEqual(preview.conflicts[0].samePasscode,[]);
+ assert.equal(preview.conflicts[0].allowNew,true);
+ assert.equal(byName(store,'Reuven Alpha').length,1,'nothing is created while the row waits for a decision');
  const {result}=await runImport(store,text,{'Reuven Alpha':{type:'same',studentId:'old_reuven'}});
  assert.equal(result.counts.studentsUpdated,1);
  assert.deepEqual(classesOf(store,'old_reuven'),['b2_et_morning','et']);
@@ -208,7 +209,7 @@ test('the bug: old importer data (two accounts, same name+passcode) blocks sign-
 // ---- Rollback -----------------------------------------------------------------
 async function legacyImport(store,rows,at){
  // Reproduces the OLD importer: one 'create' per class row.
- for(const [name,pin,cid] of rows)await manageStudents(store,OWNER,{action:'create',classId:cid,name,passcode:pin},at);
+ for(const [name,pin,cid] of rows)await legacyCreate(store,OWNER,{classId:cid,name,passcode:pin},at);
 }
 const legacySource=at=>({legacy:{from:at-1000,to:at+60000,createdBy:OWNER.uid}});
 test('18, 22: rollback removes only accounts proven to be created by the import; pre-existing never touched',async()=>{

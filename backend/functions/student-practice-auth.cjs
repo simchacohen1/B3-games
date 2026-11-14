@@ -1,7 +1,7 @@
 'use strict';
 
 const validKey=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
-const toolForSource=source=>['reading100','translation100','understand100'].includes(source)?'posuk-practice-scroll'
+const toolForSource=source=>['reading100','translation100','understand100','posuk-submit'].includes(source)?'posuk-practice-scroll'
   :String(source||'').startsWith('shorashim-')?'shorashim':String(source||'').startsWith('rashi-')?'rashi-letters':'chazara';
 
 // The parts of a class record a student access check uses: its active flag,

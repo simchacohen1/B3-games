@@ -8,7 +8,7 @@ async function setup(page,{activity='/shorashim/',classId='et',joinAuthorized=tr
   await page.evaluate(({classId,joinAuthorized})=>{
     window.room=classId==='et'?'class-pointer-12345678-1234-1234-1234-123456789abc':'class-pointer-12345678-1234-1234-1234-123456789abd';
     sessionStorage.setItem('b3Games_studentId','test-boy');sessionStorage.setItem('b3Games_classPin','test-pin');
-    window.firebase={apps:[{}],database:()=>({ref:path=>{window.sessionPath=path;return {on:(_e,fn)=>window.sessionListener=fn}}})};
+    window.firebase={apps:[{}],database:()=>({ref:path=>{if(String(path).startsWith('.info/'))return {on:(_e,fn)=>fn({val:()=>0})};window.sessionPath=path;return {on:(_e,fn)=>window.sessionListener=fn}}})};
     window.B3_FIREBASE_CONFIG={};window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId})};
     window.requests=[];window.fetch=async(url,options)=>{const body=JSON.parse(options?.body||'{}');window.requests.push(body);const ok=body.action!=='joinIssue'||joinAuthorized;return {ok,status:ok?200:403,json:async()=>({ok,token:'test-ticket'})}};
     window.sent=[];window.calls=[];window.captureCount=0;
