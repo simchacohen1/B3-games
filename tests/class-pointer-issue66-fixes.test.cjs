@@ -6,23 +6,27 @@ const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const dash=read('class-pointer-prototype/teacher-dashboard.js');
 const css=read('class-pointer-prototype/teacher-dashboard.css');
-const rail=read('class-pointer-prototype/teacher-dock-left.js');
+const annotate=read('class-pointer-prototype/classroom-annotate.js');
 const share=read('class-pointer-prototype/activity-share.js');
 
 test('whiteboard buttons are not squashed in full screen (issue 66, bug 1)',()=>{
-  // The PDF/whiteboard button bar is centred in the space right of the rail, not shifted under it.
-  assert.match(rail,/#stage\.tb-docked-left > #pdfNav\{left:calc\(\$\{RAIL\}px \+ \(100% - \$\{RAIL\}px\) \/ 2\)!important;transform:translateX\(-50%\)!important/);
-  assert.match(rail,/max-width:calc\(100% - \$\{RAIL \+ 24\}px\)!important/);
-  // The Stop button gets a readable two-line label inside the narrow rail.
-  assert.match(rail,/cp-dock-stop::after\{content:attr\(data-short\)/);
+  // The old left rail shifted the things inside the lesson and squashed the PDF/whiteboard buttons under it.
+  // The rail is gone (#770). The one drawing toolbar gets its own strip: the whole lesson moves over, so the
+  // button bar is simply centred in the lesson again and nothing inside the lesson is shifted.
+  assert.ok(!fs.existsSync(path.join(root,'class-pointer-prototype/teacher-dock-left.js')));
+  assert.doesNotMatch(css,/tb-docked-left|dock-left/);
+  assert.match(css,/body\.teacher-view\.cp-tool-gutter\.lesson-expanded #stage\.lesson-fullscreen\{left:var\(--cp-tool-gutter\)!important;width:calc\(100% - var\(--cp-tool-gutter\)\)!important\}/);
+  assert.doesNotMatch(css,/cp-tool-gutter[^{]*#pdfNav/);
 });
 
 test('one Stop button while live, in every view (issue 66, bug 2)',()=>{
-  assert.match(css,/body\.cp-simple\.teacher-view \.cp-live-wrap>\.cp-stop-btn\{display:none\}/);
+  // The red Stop above the lesson is the one Stop button (it is no longer hidden in favour of a copy in the old dock).
+  assert.doesNotMatch(css,/\.cp-live-wrap>\.cp-stop-btn\{display:none\}/);
+  assert.match(css,/\.cp-live-wrap>\.cp-stop-btn\{[^}]*background:#dc2626/);
+  assert.match(dash,/stopBtn\.id='cpStopBtn'/);
   assert.match(css,/#pdfNav \.pdf-close\{display:none!important\}/);
-  // It stays visible even when the floating toolbar is collapsed.
-  assert.match(css,/\.collapsed > \.tb-group:last-child > \.cp-dock-stop:not\(\[hidden\]\)\{display:inline-flex!important\}/);
-  assert.match(dash,/dockStop\.addEventListener\('click',\(\)=>stopBtn\.click\(\)\)/);
+  // Full screen hides that row, so the drawing toolbar shows a red Stop there (and only there) that clicks the same button.
+  assert.match(annotate,/\{id:'stop',icon:'⏹',label:'Stop',danger:true,hidden:!\(expanded\(\)&&live\(\)\),title:stopLabel\(\),onClick:\(\)=>click\('cpStopBtn'\)\}/);
 });
 
 test('reminder appears for an unused whiteboard and never closes it by itself',()=>{
