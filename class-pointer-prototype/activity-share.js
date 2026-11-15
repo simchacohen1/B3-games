@@ -170,6 +170,8 @@
       viewOnly.title=lessonLevel==='none'?'Your teacher has not turned on pointing or drawing for you.':'Pick a tool, then use it on the lesson. Everyone sees it.';
       undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';for(const button of [...colorButtons,...sizeButtons])button.disabled=lessonLevel==='none';colorSelect.style.display=sizeSelect.style.display=lessonLevel==='none'?'none':'flex';
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
+      if(lessonTool!=='text')finishTextEditor(true);
+      textOptions.style.display=lessonLevel!=='none'&&lessonTool==='text'&&allowedMode('text')?'flex':'none';
     }
     for(const [mode,symbol,name] of lessonModes){
       // Icon plus a visible name, so a student never has to guess what a tool does.
@@ -197,14 +199,128 @@
     clear.addEventListener('click',()=>{if(admitted&&lessonActive&&presenceConn?.open&&lessonLevel!=='none')presenceConn.send({type:'edit-highlights',action:'clear'})});
     const bottomRow=document.createElement('div');bottomRow.style.cssText='display:flex;gap:8px;align-items:center;justify-content:center';
     bottomRow.append(sizeSelect,undo,clear);
-    drawTools.append(colorSelect,bottomRow,viewOnly);
     selectColor(lessonColor);selectSize(lessonSize);
+
+    // Size (A-, a number box for any size from 10 to 200, A+) and bold (B), shown while the Text tool is chosen.
+    let textLabel=24,textBold=false,textEditor=null;
+    const textOptions=document.createElement('div');textOptions.setAttribute('role','group');textOptions.setAttribute('aria-label','Text size and bold');
+    textOptions.style.cssText='display:none;gap:6px;align-items:center;justify-content:center;color:#dbeafe;font:700 14px system-ui';
+    const textButton=(label,title,onClick)=>{
+      const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
+      b.style.cssText='min-width:44px;height:44px;padding:0 10px;border:3px solid #86a6df;border-radius:11px;background:#193b6c;color:white;font:800 18px system-ui;cursor:pointer;touch-action:manipulation';
+      // Pressing these must not take the typing cursor out of the words.
+      b.addEventListener('mousedown',event=>event.preventDefault());b.addEventListener('click',onClick);return b;
+    };
+    const textSizeBox=document.createElement('input');textSizeBox.type='number';textSizeBox.min='10';textSizeBox.max='200';textSizeBox.step='1';textSizeBox.inputMode='numeric';textSizeBox.value=String(textLabel);
+    textSizeBox.setAttribute('aria-label','Text size in pixels, 10 to 200');textSizeBox.title='Type any size from 10 to 200';
+    textSizeBox.style.cssText='width:68px;height:44px;box-sizing:border-box;text-align:center;border:3px solid #86a6df;border-radius:11px;background:#fff;color:#102748;font:800 17px system-ui';
+    const boldButton=textButton('B','Bold (Ctrl+B)',()=>setTextBold(!textBold));boldButton.style.fontFamily='Georgia,serif';boldButton.style.fontWeight='900';boldButton.setAttribute('aria-pressed','false');
+    function setTextLabel(value){textLabel=Math.max(10,Math.min(200,Math.round(value)));textSizeBox.value=String(textLabel);restyleTextEditor()}
+    function stepTextLabel(direction){const next=direction>0?STUDENT_TEXT_STEPS.find(v=>v>textLabel):[...STUDENT_TEXT_STEPS].reverse().find(v=>v<textLabel);if(next)setTextLabel(next)}
+    function setTextBold(on){
+      textBold=on;boldButton.setAttribute('aria-pressed',String(on));boldButton.style.background=on?'#fef08a':'#193b6c';boldButton.style.color=on?'#102748':'white';restyleTextEditor();
+    }
+    const applyTypedSize=()=>{const typed=Number(textSizeBox.value);if(textSizeBox.value===''||!Number.isFinite(typed)){textSizeBox.value=String(textLabel);return}setTextLabel(typed)};
+    textSizeBox.addEventListener('change',applyTypedSize);
+    textSizeBox.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Enter'){event.preventDefault();applyTypedSize();textEditor?.box.focus()}});
+    textOptions.append(textButton('A−','Smaller letters',()=>stepTextLabel(-1)),textSizeBox,textButton('A+','Bigger letters',()=>stepTextLabel(1)),boldButton);
+    // The typing box: on the board where the student clicked, the size the words will have.
+    function restyleTextEditor(){
+      if(!textEditor)return;const b=picture(),box=textEditor.box;
+      box.style.fontSize=(studentTextSize(textLabel)*2.4*b.width)+'px';box.style.fontWeight=textBold?'700':'400';
+      box.style.height='auto';box.style.height=box.scrollHeight+'px';
+    }
+    function startTextEditor(p){
+      finishTextEditor(true);
+      const b=picture();if(!b.width||!b.height)return;
+      // The box stays on the board: the picture can be wider or taller than the board, and words past its edge would be cut.
+      const fit=lessonMarks.boardBox,right=fit&&fit.w>.2?Math.min(.96,fit.w-.02):.96,bottom=fit&&fit.h>.2?Math.min(1,fit.h):1;
+      const left=Math.max(0,Math.min(p.x,right-.25)),maxW=right-left,step=studentTextSize(textLabel)*1.25*2.4*(b.width/b.height),top=Math.max(0,Math.min(bottom-step,p.y-step/2));
+      const box=document.createElement('textarea');box.rows=1;box.maxLength=600;box.dir='auto';box.spellcheck=false;
+      box.setAttribute('aria-label','Type your words. Click anywhere else when you are done. Escape cancels.');
+      box.style.cssText='position:absolute;box-sizing:border-box;margin:0;padding:0 2px;resize:none;overflow:hidden;border:2px dashed #38bdf8;background:#ffffffd9;font-family:sans-serif;line-height:1.25;outline:none;z-index:3';
+      Object.assign(box.style,{left:(b.left+left*b.width)+'px',top:(b.top+top*b.height)+'px',width:(maxW*b.width)+'px',color:lessonColor});
+      textEditor={box,left,maxW,top,bottom};
+      lessonStage.append(box);restyleTextEditor();box.focus();
+      box.addEventListener('input',restyleTextEditor);
+      box.addEventListener('keydown',event=>{
+        event.stopPropagation();
+        if(event.key==='Escape'){event.preventDefault();finishTextEditor(false)}
+        else if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();finishTextEditor(true)}
+        else if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'){event.preventDefault();setTextBold(!textBold)}
+      });
+      for(const type of ['keyup','paste','pointerdown','click','dblclick'])box.addEventListener(type,event=>event.stopPropagation());
+      // Going to the size or bold buttons keeps the words open; anywhere else keeps what was typed.
+      box.addEventListener('blur',event=>{if(event.relatedTarget&&textOptions.contains(event.relatedTarget))return;finishTextEditor(true)});
+    }
+    function finishTextEditor(save){
+      const open=textEditor;if(!open)return;textEditor=null;
+      const text=open.box.value;open.box.remove();
+      if(!save||!text.trim()||!admitted||!lessonActive||!presenceConn?.open||!allowedMode('text'))return;
+      const b=picture(),block='b'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
+      const made=studentTextStrokes({text,label:textLabel,bold:textBold,color:lessonColor,block,top:open.top,bottom:open.bottom,left:open.left,maxW:open.maxW,aspect:b.width/Math.max(1,b.height),measure:measureStudentText});
+      for(const stroke of made.strokes)presenceConn.send({type:'highlight',stroke});
+    }
+    drawTools.append(colorSelect,textOptions,bottomRow,viewOnly);
         const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
     function picture(){
       const rect=typeof lessonStage.getBoundingClientRect==='function'?lessonStage.getBoundingClientRect():{width:0,height:0},width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
       if(!width||!height||!rect.width||!rect.height)return{left:0,top:0,width:rect.width,height:rect.height};
       const scale=Math.min(rect.width/width,rect.height/height),w=width*scale,h=height*scale;
       return{left:(rect.width-w)/2,top:(rect.height-h)/2,width:w,height:h};
+    }
+
+    // ---------- Words a student types on the board ----------
+    // The student clicks where the words go and types right there, like the teacher. Each line of the words is one text mark
+    // (the lines share a block id; a line that only wrapped is "soft"), sized as a fraction of the picture's width, 2.4 times
+    // the mark size, exactly as the teacher's board draws words. The teacher's page sees each mark as it is sent.
+    function wrapStudentText(paragraph,widthOf,fit){
+      const out=[];let line='';
+      for(const part of paragraph.split(/(\s+)/)){
+        if(!part)continue;
+        const next=line+part;
+        if(widthOf(next.replace(/\s+$/,''))<=fit&&next.length<=200){line=next;continue}
+        if(line.trim())out.push(line.replace(/\s+$/,''));
+        line='';
+        if(!part.trim())continue;
+        // One word wider than the box: break it between letters.
+        for(const letter of Array.from(part)){if(line&&(widthOf(line+letter)>fit||line.length>=200)){out.push(line);line=''}line+=letter}
+      }
+      if(line.trim())out.push(line.replace(/\s+$/,''));
+      return out;
+    }
+    // o: text, label (size in pixels on a board 1280 wide), bold, color, block, top and left (where the box starts), maxW (its
+    // width), aspect (picture width / height) and measure(line,bold) (width of a line at a 100px font). All positions are
+    // fractions of the picture. Returns {strokes,cut,size}.
+    function studentTextStrokes(o){
+      const round=value=>Math.round(value*1e4)/1e4;
+      const size=round(Math.max(.003,Math.min(.08,o.label/(2.4*1280)))),step=size*1.25*2.4*o.aspect;
+      const rtl=/[\u0590-\u08ff]/.test(o.text),right=Math.min(.96,o.left+o.maxW),fit=Math.max(.05,o.maxW-.008);
+      const widthOf=line=>o.measure(line,o.bold)/100*size*2.4;
+      const lines=[];
+      for(const paragraph of String(o.text).replace(/\r/g,'').split('\n')){
+        let first=true;
+        for(const line of wrapStudentText(paragraph,widthOf,fit)){if(!line.trim())continue;lines.push({text:line,soft:!first});first=false}
+      }
+      const maxLines=Math.max(1,Math.floor(((o.bottom==null?1:o.bottom)-o.top)/step+1e-9)),cut=lines.length>maxLines;
+      if(cut)lines.length=maxLines;
+      const strokes=lines.map((line,index)=>{
+        const y=Math.min(1,o.top+index*step),reach=Math.max(.02,Math.min(fit,widthOf(line.text))),start=rtl?right:o.left;
+        const out={tool:'text',color:o.color,size,text:line.text.slice(0,240),block:o.block,
+          points:[{x:round(start),y:round(y)},{x:round(rtl?Math.max(0,start-reach):Math.min(1,start+reach)),y:round(Math.min(1,y+step))}]};
+        if(o.bold)out.bold=true;
+        if(line.soft)out.soft=true;
+        return out;
+      });
+      return{strokes,cut,size};
+    }
+    const STUDENT_TEXT_STEPS=[10,12,14,16,18,20,24,28,32,40,48,64,80,96,120,144,200];
+    const studentTextSize=label=>Math.round(Math.max(.003,Math.min(.08,label/(2.4*1280)))*1e4)/1e4;
+    let studentMeasure=null;
+    function measureStudentText(line,bold){
+      if(!studentMeasure)studentMeasure=document.createElement('canvas').getContext('2d');
+      studentMeasure.font=(bold?'bold ':'')+'100px sans-serif';
+      return studentMeasure.measureText(line).width;
     }
     function renderLessonMarks(){
       if(typeof markLayer.replaceChildren!=='function'||typeof pointerLayer.replaceChildren!=='function')return;
@@ -257,12 +373,7 @@
       if(!admitted||!lessonActive||!allowedMode(lessonTool)||e.button!==0)return;
       const p=normalized(e);if(!p)return;e.preventDefault();
       if(lessonTool==='point'){presenceConn?.send({type:'point',point:{...p,tool:'target'}});return}
-      if(lessonTool==='text'){
-        const content=window.prompt('Text for the lesson (Hebrew or English):','');
-        if(!content?.trim())return;
-        const stroke={tool:'text',color:lessonColor,size:lessonSize,points:[p,{x:Math.min(1,p.x+.2),y:Math.min(1,p.y+.06)}],text:content.slice(0,240)};
-        presenceConn?.send({type:'highlight',stroke});return;
-      }
+      if(lessonTool==='text'){startTextEditor(p);return}
       lessonDraft={tool:lessonTool,color:lessonColor,size:lessonSize,points:[p,p]};
       try{hitLayer.setPointerCapture(e.pointerId)}catch{}renderLessonMarks();
     });
@@ -393,7 +504,7 @@
             return;
           }
           if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
-          if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[],marksInVideo:message.marksInVideo===true};renderLessonMarks()}return}
+          if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[],marksInVideo:message.marksInVideo===true,boardBox:Number.isFinite(message.boardBox?.w)&&Number.isFinite(message.boardBox?.h)?{w:message.boardBox.w,h:message.boardBox.h}:null};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.

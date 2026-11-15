@@ -49,13 +49,17 @@ function studentMessageToDocument(message){
   const pin=value=>Math.max(0,Math.min(1,value));
   const toDocument=point=>{const at=pdf.activityPoint(point);return at&&Number.isFinite(at.x)&&Number.isFinite(at.y)?{...at,x:pin(at.x),y:pin(at.y)}:at};
   if(message.type==='point'&&C.validPoint(message.point))return{...message,point:toDocument(message.point)};
-  if(message.type==='highlight'&&C.cleanStroke(message.stroke))return{...message,stroke:{...message.stroke,points:message.stroke.points.map(toDocument)}};
+  if(message.type==='highlight'&&C.cleanStroke(message.stroke)){
+    // Words are sized as a fraction of the width: the student's view is not always as wide as the board.
+    const scale=pdf.activityTextScale?.()||1,resized=message.stroke.tool==='text'?{size:Math.max(C.TEXT_MIN,Math.min(C.TEXT_MAX,Math.round(message.stroke.size*scale*1e4)/1e4))}:{};
+    return{...message,stroke:{...message.stroke,...resized,points:message.stroke.points.map(toDocument)}};
+  }
   return message;
 }
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
 // student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
 function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
-function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo()};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
+function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo(),boardBox:window.ClassPointerPdf?.active()?window.ClassPointerPdf.activityBoardBox?.()||null:null};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function memberTools(member){return member?.tools||state.tools}
