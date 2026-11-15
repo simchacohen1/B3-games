@@ -129,7 +129,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes5"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes6"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -145,8 +145,13 @@ test('pasted words can be recolored and resized: a size click in Select goes to 
  const id=store.strokes[0].id;
  assert.equal(store.replace('teacher',id,{...store.strokes[0],size:.028,color:'#c62828'}),true);
  assert.equal(store.strokes[0].size,.028);assert.equal(store.strokes[0].color,'#c62828');assert.equal(store.strokes[0].text,'שלום');
+ // Words may be any size between the limits; anything else falls back to medium, as for a new mark.
  assert.equal(store.replace('teacher',id,{...store.strokes[0],size:.05}),true);
- assert.equal(store.strokes[0].size,.016,'a size the lesson does not have falls back to medium, as for a new mark');
+ assert.equal(store.strokes[0].size,.05);
+ assert.equal(store.replace('teacher',id,{...store.strokes[0],size:.5}),true);
+ assert.equal(store.strokes[0].size,.016);
+ // A line or a shape still has only the three sizes.
+ assert.equal(C.cleanStroke({tool:'rectangle',color:'#1f2937',size:.05,points:[{x:.1,y:.1},{x:.2,y:.2}]}).size,.016);
 });
 
 test('the lines of one pasted text are picked, moved, recolored and resized together, and sent once',()=>{
@@ -173,15 +178,15 @@ test('lines of words on the teacher whiteboard are spaced for the real size of t
  assert.ok(Math.abs(step(roomy)-.016*1.25*2.4*16/9)<1e-6);
  // Student boards (no scale) are laid out exactly as before.
  assert.deepEqual(Clip.textStrokes('one\ntwo',width100,{...opts,scale:1}).strokes,tight);
- assert.equal((pdf.match(/scale:TEXT_SCALE/g)||[]).length,2,'typed words and pasted words');
+ assert.match(pdf,/clip\.flowText\(text,width100,\{aspect:W\/Math\.max\(1,H\),scale:TEXT_SCALE,block:newBlockId\(\),\.\.\.opts\}\)/);
  assert.match(pdf,/const lineStep=size=>size\*1\.25\*TEXT_SCALE\*W\/Math\.max\(1,H\);/);
 });
 
 test('a block of words is edited and removed as one piece',()=>{
  // The edit box opens with every line of the block, and saving replaces the whole block.
  assert.match(pdf,/const block=stroke\.id\?textBlock\(stroke,B\.highlights\?\.\(\)\|\|strokes\):\[stroke\];/);
- assert.ok(pdf.includes("textEditInput.value=block.map(item=>item.text).join('\\n');"));
- assert.match(pdf,/places\.sort\(\(a,b\)=>b-a\)\.forEach\(index=>marks\.splice\(index,1\)\);selectedId=null;next\.forEach\(item=>B\.submitStroke\(item\)\);/);
+ assert.match(pdf,/textEditInput\.value=stroke\.id\?blockFrame\(block\)\.text:stroke\.text;/);
+ assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text\}\);/);
  // Delete and the Eraser take every line.
  assert.match(pdf,/function eraseBlock\(stroke\)\{const ids=textBlock\(stroke\)\.map\(item=>item\.id\);return ids\.length>1\?B\.eraseMarks\?\.\(ids\):B\.eraseMark\?\.\(ids\[0\]\)\}/);
  assert.match(classroom,/eraseMarks\(ids\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\)return false;/);
@@ -190,11 +195,97 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes5/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes6/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
  // Wrapping measures with "100px sans-serif" and the class picture paints with "px sans-serif".
  assert.match(pdf,/ctx\.font='100px sans-serif'/);
  assert.match(pdf,/svg\('text',\{x:first\.x\*W,y:first\.y\*H,'font-family':'sans-serif','font-size':/);
+});
+
+
+// ---------- Words as one block that is laid out again (one line when it fits; corner and side handles) ----------
+const Clip=require('../class-pointer-prototype/board-clipboard.js');
+// Every letter is half the size wide, so the arithmetic below is easy to follow.
+const letters=line=>line.length*50,LONG='aaaa bbbb cccc dddd eeee'; // 24 letters
+
+test('words stay on one line when they fit the board, and wrap only when they do not',()=>{
+ // 24 letters at .05 are .6 wide: one line. At .08 they are .96 wide, more than the board less its margins: two lines.
+ const one=Clip.flowText(LONG,letters,{size:.05,center:{x:.5,y:.5},block:'b1'});
+ assert.deepEqual(one.strokes.map(s=>s.text),[LONG]);assert.equal(one.strokes[0].soft,undefined);
+ const two=Clip.flowText(LONG,letters,{size:.08,center:{x:.5,y:.5},block:'b1'});
+ assert.equal(two.strokes.length,2);
+ assert.deepEqual(two.strokes.map(s=>!!s.soft),[false,true],'the second line only wrapped');
+ for(const s of two.strokes){assert.equal(s.block,'b1');assert.ok(Math.abs(s.points[1].x-s.points[0].x)<=.92+1e-9)}
+});
+
+test('a wrapped block joins back into one line when the letters get smaller',()=>{
+ const two=Clip.flowText(LONG,letters,{size:.08,center:{x:.5,y:.5}});
+ assert.equal(Clip.blockText(two.strokes),LONG,'wrapped lines join with a space');
+ const again=Clip.flowText(Clip.blockText(two.strokes),letters,{size:.03,left:two.frame.left,top:two.frame.top});
+ assert.deepEqual(again.strokes.map(s=>s.text),[LONG]);
+ assert.ok(Math.abs(again.strokes[0].points[0].y-two.strokes[0].points[0].y)<1e-3,'the top stays where it was');
+});
+
+test('a line break the writer chose is kept, a wrap is not',()=>{
+ const made=Clip.flowText('aaaa bbbb cccc dddd eeee\nffff',letters,{size:.08,center:{x:.5,y:.5}});
+ assert.deepEqual(made.strokes.map(s=>!!s.soft),[false,true,false]);
+ assert.equal(Clip.blockText(made.strokes),'aaaa bbbb cccc dddd eeee\nffff');
+ const small=Clip.flowText(Clip.blockText(made.strokes),letters,{size:.02,center:{x:.5,y:.5}});
+ assert.deepEqual(small.strokes.map(s=>s.text),['aaaa bbbb cccc dddd eeee','ffff']);
+});
+
+test('the teacher can choose the width of the box, and the lines wrap to it',()=>{
+ // .02 letters: 24 letters are .24 wide. A box .13 wide holds 13 letters a line.
+ const narrow=Clip.flowText(LONG,letters,{size:.02,boxW:.13,left:.3,top:.2,block:'b2'});
+ assert.deepEqual(narrow.strokes.map(s=>s.text),['aaaa bbbb','cccc dddd','eeee']);
+ for(const s of narrow.strokes){assert.equal(s.boxW,.13);assert.equal(s.points[0].x,.3)}
+ assert.ok(Math.abs(narrow.frame.width-.13)<1e-9);
+ // Wider again: back to one line, and the box keeps the chosen width.
+ const wide=Clip.flowText(Clip.blockText(narrow.strokes),letters,{size:.02,boxW:.5,left:.3,top:.2});
+ assert.deepEqual(wide.strokes.map(s=>s.text),[LONG]);assert.equal(wide.strokes[0].boxW,.5);
+});
+
+test('Hebrew lines start at the right edge of the block, and the block never leaves the board',()=>{
+ const made=Clip.flowText('אבגד הוזח טיכל מנסע פצקר',letters,{size:.08,right:.99,top:.9});
+ assert.equal(made.frame.rtl,true);assert.equal(made.strokes.length,2);
+ for(const s of made.strokes){assert.ok(s.points[0].x>s.points[1].x,'first point is the right end');for(const p of s.points)assert.ok(p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1)}
+ assert.ok(made.frame.top+made.frame.height<=1+1e-9,'pushed up so both lines are on the board');
+});
+
+test('a block laid out again takes the place of the old lines in the pile, all or nothing',()=>{
+ const store=new C.HighlightStore();
+ store.add('teacher',{tool:'pen',color:'#1f2937',size:.016,points:[{x:.1,y:.1},{x:.2,y:.2}]});
+ for(const s of Clip.flowText(LONG,letters,{size:.08,center:{x:.5,y:.5},block:'b1'}).strokes)assert.ok(store.add('teacher',s));
+ store.add('student:a',{tool:'pen',color:'#57b8ff',size:.016,points:[{x:.3,y:.3},{x:.4,y:.4}]});
+ const [pen,l1,l2,theirs]=store.strokes.map(s=>s.id);
+ assert.deepEqual(store.strokes.slice(1,3).map(s=>[s.block,!!s.soft]),[['b1',false],['b1',true]],'the block id and the wrap mark are kept');
+ const one=Clip.flowText(LONG,letters,{size:.03,center:{x:.5,y:.5},block:'b9'}).strokes;
+ const made=store.swap('teacher',[l1,l2],one);
+ assert.equal(made.length,1);
+ assert.deepEqual(store.strokes.map(s=>s.id),[pen,made[0],theirs],'same place in the pile');
+ assert.equal(store.strokes[1].size,.03);assert.equal(store.strokes[1].owner,'teacher');
+ // Not someone else's marks, not marks that are gone, and nothing changes if one new mark is bad.
+ assert.equal(store.swap('teacher',[theirs],one),null);
+ assert.equal(store.swap('teacher',[l1],one),null);
+ assert.equal(store.swap('teacher',made,[one[0],{tool:'text',color:'#1f2937',size:.03,points:[{x:.1,y:.1},{x:2,y:.2}],text:'bad'}]),null);
+ assert.deepEqual(store.strokes.map(s=>s.id),[pen,made[0],theirs]);
+});
+
+test('on the teacher board words have corner handles for size and side handles for width',()=>{
+ assert.match(pdf,/function textHandles\(f\)\{/);
+ assert.match(pdf,/\{id:'nw',x:f\.left,y:f\.top\},\{id:'ne',x:f\.right,y:f\.top\},\{id:'sw',x:f\.left,y:f\.bottom\},\{id:'se',x:f\.right,y:f\.bottom\},\{id:'w',x:f\.left,y:mid\},\{id:'e',x:f\.right,y:mid\}/);
+ // A side sets a chosen width; a corner sets the size and keeps the opposite corner where it is.
+ assert.match(pdf,/made=reflow\(edit\.group,\{boxW:Math\.max\(\.08,h==='e'\?at\.x-f\.left:f\.right-at\.x\),fixX:h==='e'\?'left':'right'\}\);/);
+ assert.match(pdf,/made=reflow\(edit\.group,\{size,boxW:f\.boxW\?Math\.min\(1,f\.boxW\*size\/f\.size\):0,fixX:h\[1\]==='w'\?'right':'left',fixY:h\[0\]==='n'\?'bottom':'top'\}\);/);
+ assert.match(pdf,/const ids=B\.swapMarks\?\.\(done\.swap\.ids,done\.swap\.strokes\);if\(ids\)selectedId=ids\[0\];/);
+ assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\)return null;const made=highlightStore\.swap\('teacher',ids,strokes\);if\(made\)publishHighlights\(\);return made\}/);
+});
+
+test('a paste picks the biggest size at which the words fit on one line',()=>{
+ assert.match(pdf,/for\(const size of \[0\.028,0\.016,0\.008\]\)\{const tried=flow\(payload\.text,\{size,color:B\.ownColor\(\),center:\{x:\.5,y:\.5\}\}\);if\(tried\.strokes\.length&&!tried\.cut&&!tried\.strokes\.some\(line=>line\.soft\)\)\{made=tried;break\}\}/);
+ assert.match(pdf,/if\(!made\)made=flow\(payload\.text,\{size:0\.016,color:B\.ownColor\(\),center:\{x:\.5,y:\.5\}\}\);/);
+ // The lines of a block are found by its id first.
+ assert.match(pdf,/if\(stroke\.block\)\{const same=list\.filter\(item=>item\.tool==='text'&&item\.owner===stroke\.owner&&item\.block===stroke\.block\);if\(same\.length\)return same\}/);
 });

@@ -728,6 +728,8 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
   eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
+  swapMarks(ids,strokes){if(!isTeacher)return null;const made=highlightStore.swap('teacher',ids,strokes);if(made)publishHighlights();return made},
   replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace('teacher',id,stroke))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
   replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace('teacher',id,stroke)||changed;if(changed)publishHighlights();return changed},

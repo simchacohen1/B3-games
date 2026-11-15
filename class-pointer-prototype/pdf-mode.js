@@ -37,7 +37,7 @@
   function showNote(text){note.textContent=text||'';note.hidden=!text}
   const textEditDialog=el('dialog','pdfTextEditDialog'),textEditForm=el('form');textEditForm.method='dialog';
   const textEditLabel=el('label',null,null,'Edit whiteboard text');textEditLabel.htmlFor='pdfTextEditInput';
-  const textEditInput=el('textarea','pdfTextEditInput');textEditInput.maxLength=240;textEditInput.rows=4;
+  const textEditInput=el('textarea','pdfTextEditInput');textEditInput.maxLength=2000;textEditInput.rows=4;
   const textEditSave=el('button',null,null,'Save text');textEditSave.type='submit';
   const textEditCancel=el('button',null,null,'Cancel');textEditCancel.type='button';textEditCancel.addEventListener('click',()=>textEditDialog.close());
   textEditForm.append(textEditLabel,textEditInput,textEditSave,textEditCancel);textEditDialog.appendChild(textEditForm);stage.appendChild(textEditDialog);
@@ -49,30 +49,53 @@
   // Words that are already on the board open as their whole block: every line, one under the other.
   function openTextEditor(stroke){
     const block=stroke.id?textBlock(stroke,B.highlights?.()||strokes):[stroke];
-    textEditStroke=stroke.id?{...stroke,block}:stroke;textEditInput.value=block.map(item=>item.text).join('\n');
+    textEditStroke=stroke.id?{...stroke,block}:stroke;textEditInput.value=stroke.id?blockFrame(block).text:stroke.text;
     textEditDialog.showModal();textEditInput.focus();textEditInput.select();
   }
-  function layoutTextStrokes(text,center,size,color){
-    const clip=window.ClassPointerClipboard;if(!clip)return{strokes:[],cut:false};
-    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
-    return clip.textStrokes(text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),center,sizes:[size],color,scale:TEXT_SCALE});
+  // ---------- Words on the lesson: one block that is laid out again when it changes ----------
+  // A block is one text mark per line (that is what every student page draws). The lines share a block id; a
+  // line that only wrapped is marked soft, so a smaller size or a wider box lets the lines join up again.
+  const TEXT_MIN=C.TEXT_MIN||.004,TEXT_MAX=C.TEXT_MAX||.08;
+  let measurer=null;
+  function width100(line){
+    if(!measurer){measurer=document.createElement('canvas').getContext('2d');measurer.font='100px sans-serif'}
+    return measurer.measureText(line).width*TEXT_SCALE;
+  }
+  const newBlockId=()=>'b'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36);
+  // Lay words out. opts: size, color, and center (new words) or left|right + top|bottom (placed words), boxW.
+  function flow(text,opts){
+    const clip=window.ClassPointerClipboard;if(!clip?.flowText)return{strokes:[],cut:false};
+    const made=clip.flowText(text,width100,{aspect:W/Math.max(1,H),scale:TEXT_SCALE,block:newBlockId(),...opts});
+    return{...made,strokes:made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean)};
+  }
+  // Where a block is: its box (fractions of the board), its size, the width the teacher chose (0 = as wide as
+  // the words need), and the words as they were written.
+  function blockFrame(block){
+    const first=block[0],rtl=first.points[0].x>first.points[1].x,xs=block.flatMap(item=>item.points.map(q=>q.x)),boxW=first.boxW||0;
+    const farLeft=Math.min(...xs),farRight=Math.max(...xs);
+    const left=boxW&&rtl?Math.max(0,farRight-boxW):farLeft,right=boxW&&!rtl?Math.min(1,farLeft+boxW):farRight;
+    const top=first.points[0].y,bottom=Math.min(1,block[block.length-1].points[0].y+lineStep(first.size));
+    return{left,right,top,bottom,rtl,size:first.size,boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
+  }
+  // The block laid out again with something changed: size, boxW (0 = no chosen width), text. One corner stays
+  // where it is: fixX 'left'|'right' (default: where the lines start), fixY 'top'|'bottom'.
+  function reflow(block,patch={}){
+    const f=blockFrame(block),size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,patch.size||f.size)),boxW=patch.boxW!==undefined?patch.boxW:f.boxW;
+    const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
+    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,[fixX]:f[fixX],[fixY]:f[fixY]});
   }
   function addTextStroke(point,text,size,color){
-    const made=layoutTextStrokes(text,point,size,color),valid=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean);
-    if(!valid.length){B.status('Enter some text to add it to the whiteboard.');return false}
-    valid.forEach(stroke=>B.submitStroke(stroke));
+    const made=flow(text,{size,color,center:point});
+    if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
+    made.strokes.forEach(stroke=>B.submitStroke(stroke));
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
   function replaceTextStroke(stroke,text){
-    // The new words go where the whole block was (all of its lines), in the same color and size.
-    const block=stroke.block?.length?stroke.block:[stroke],xs=block.flatMap(item=>item.points.map(q=>q.x)),ys=block.flatMap(item=>item.points.map(q=>q.y));
-    const center={x:(Math.min(...xs)+Math.max(...xs))/2,y:(Math.min(...ys)+Math.max(...ys))/2};
-    const made=layoutTextStrokes(text,center,stroke.size,stroke.color),next=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean),marks=B.highlights?.();
-    if(!next.length){B.status('Enter some text to keep this text box.');return false}
-    const places=Array.isArray(marks)?block.map(line=>marks.findIndex(item=>item.id===line.id&&item.owner==='teacher')).filter(index=>index>=0):[];
-    if(!places.length){B.status('That whiteboard text is no longer available to edit.');return false}
-    // Remove only this block's teacher marks, then submit the replacement to publish the complete mark list.
-    places.sort((a,b)=>b-a).forEach(index=>marks.splice(index,1));selectedId=null;next.forEach(item=>B.submitStroke(item));
+    // The new words go where the whole block was, in the same color, size and width.
+    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text});
+    if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
+    selectedId=null;
+    if(!B.swapMarks?.(block.map(item=>item.id),made.strokes)){B.status('That whiteboard text is no longer available to edit.');return false}
     B.status(made.cut?'The words were too long. Only the first part was kept.':'Whiteboard text updated.');return true;
   }
 
@@ -362,7 +385,9 @@
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
     // A mark that is being dragged or resized is shown where it will land.
-    const shown=edit?.moved?strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke):strokes;
+    let shown=strokes;
+    if(edit?.moved&&edit.swap){const gone=new Set(edit.swap.ids);shown=strokes.filter(stroke=>!gone.has(stroke.id)).concat(edit.swap.strokes.map((stroke,index)=>({...stroke,owner:'teacher',id:'preview'+index})))}
+    else if(edit?.moved)shown=strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke);
     const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
     for(const stroke of all){
       const kind=PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
@@ -384,27 +409,35 @@
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
   function drawSelection(list){
     if(!selecting())return;const picked=selectedStroke(),G=geometry();if(!picked||!G)return;
-    const stroke=list.find(item=>item.id===picked.id)||picked,width=content.getBoundingClientRect().width;if(!width)return;
-    const unit=W/width; // one screen pixel in the ink layer's own units
-    let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
-    const grow=(ax,ay,bx,by)=>{x1=Math.min(x1,ax);y1=Math.min(y1,ay);x2=Math.max(x2,bx);y2=Math.max(y2,by)};
-    // Words: the box goes around every line of the block, by the real size of the letters on screen.
-    for(const line of stroke.tool==='text'?textBlock(stroke,list):[stroke]){
-      const node=line.tool==='text'?[...ink.querySelectorAll('[data-text-mark]')].find(item=>item.dataset.strokeId===line.id):null;
-      let bb=null;try{bb=node?.getBBox?.()||null}catch{}
-      if(bb&&bb.width)grow(bb.x,bb.y,bb.x+bb.width,bb.y+bb.height);
-      else{const xs=line.points.map(q=>q.x*W),ys=line.points.map(q=>q.y*H);grow(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys))}
+    const width=content.getBoundingClientRect().width;if(!width)return;
+    const unit=W/width,pad=6*unit,group=svg('g',{'data-selection':'true','pointer-events':'none'}); // unit: one screen pixel in the ink layer's own units
+    const frameRect=(x1,y1,x2,y2)=>group.appendChild(svg('rect',{x:x1-pad,y:y1-pad,width:x2-x1+pad*2,height:y2-y1+pad*2,fill:'none',stroke:'#2563eb','stroke-width':1.5*unit,'stroke-dasharray':(6*unit)+' '+(4*unit)}));
+    const knob=(id,x,y)=>group.appendChild(svg('rect',{'data-handle':id,x:x-5*unit,y:y-5*unit,width:10*unit,height:10*unit,fill:'#fff',stroke:'#2563eb','stroke-width':1.5*unit}));
+    if(picked.tool==='text'){
+      // Words: a box around the whole block. Corners make the letters bigger or smaller; the sides choose
+      // how wide the box is, and so where the lines wrap.
+      const preview=edit?.moved&&edit.swap?list.filter(item=>String(item.id).startsWith('preview')):null;
+      const block=preview?.length?preview:textBlock(list.find(item=>item.id===picked.id)||picked,list),f=blockFrame(block);
+      frameRect(f.left*W,f.top*H,f.right*W,f.bottom*H);
+      for(const handle of textHandles(f))knob(handle.id,handle.x*W,handle.y*H);
+    }else{
+      const stroke=list.find(item=>item.id===picked.id)||picked,xs=stroke.points.map(q=>q.x*W),ys=stroke.points.map(q=>q.y*H);
+      frameRect(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys));
+      for(const handle of G.handlesOf(stroke))knob(handle.id,handle.x*W,handle.y*H);
     }
-    const pad=6*unit,group=svg('g',{'data-selection':'true','pointer-events':'none'});
-    group.appendChild(svg('rect',{x:x1-pad,y:y1-pad,width:x2-x1+pad*2,height:y2-y1+pad*2,fill:'none',stroke:'#2563eb','stroke-width':1.5*unit,'stroke-dasharray':(6*unit)+' '+(4*unit)}));
-    for(const handle of G.handlesOf(stroke))group.appendChild(svg('rect',{'data-handle':handle.id,x:handle.x*W-5*unit,y:handle.y*H-5*unit,width:10*unit,height:10*unit,fill:'#fff',stroke:'#2563eb','stroke-width':1.5*unit}));
     ink.appendChild(group);
+  }
+  // Handles of a block of words: four corners and the middle of each side.
+  function textHandles(f){
+    const mid=(f.top+f.bottom)/2;
+    return [{id:'nw',x:f.left,y:f.top},{id:'ne',x:f.right,y:f.top},{id:'sw',x:f.left,y:f.bottom},{id:'se',x:f.right,y:f.bottom},{id:'w',x:f.left,y:mid},{id:'e',x:f.right,y:mid}];
   }
   // Pasted or typed words are one mark per line. The lines that belong together: my text marks next to each
   // other in the pile, same color and size, each one line-height below the one before.
   const lineStep=size=>size*1.25*TEXT_SCALE*W/Math.max(1,H);
   function textBlock(stroke,list=strokes){
     if(stroke.tool!=='text')return [stroke];
+    if(stroke.block){const same=list.filter(item=>item.tool==='text'&&item.owner===stroke.owner&&item.block===stroke.block);if(same.length)return same}
     const at=list.findIndex(item=>item.id===stroke.id);if(at<0)return [stroke];
     const follows=(upper,lower)=>!!upper&&!!lower&&upper.tool==='text'&&lower.tool==='text'&&upper.owner==='teacher'&&lower.owner==='teacher'&&upper.color===lower.color&&upper.size===lower.size&&Math.abs(lower.points[0].y-upper.points[0].y-lineStep(upper.size))<.004;
     let first=at,last=at;
@@ -448,6 +481,10 @@
   }
   function startSelect(event,p){
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
+    if(picked?.tool==='text'&&at){
+      const group=textBlock(picked),frame=blockFrame(group),grip=textHandles(frame).find(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12);
+      if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
+    }
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
     const hit=teacherMarkAt(event,p,true);
@@ -462,6 +499,21 @@
     const G=geometry(),at=clampedPoint(event);if(!G||!at)return;
     if(!edit.moved&&Math.hypot(at.px-edit.start.px,at.py-edit.start.py)<3)return;
     edit.moved=true;
+    if(edit.kind==='text'){
+      const f=edit.frame,h=edit.handle;let made;
+      if(h==='e'||h==='w'){
+        // A side: the box gets wider or narrower and the lines wrap to it. The other side stays put.
+        made=reflow(edit.group,{boxW:Math.max(.08,h==='e'?at.x-f.left:f.right-at.x),fixX:h==='e'?'left':'right'});
+      }else{
+        // A corner: bigger or smaller letters. The opposite corner stays put. A chosen width grows with them.
+        const ax=h[1]==='w'?f.right:f.left,ay=h[0]==='n'?f.bottom:f.top;
+        const k=Math.max(Math.abs(at.x-ax)/Math.max(f.right-f.left,1e-6),Math.abs(at.y-ay)/Math.max(f.bottom-f.top,1e-6));
+        const size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,f.size*k));
+        made=reflow(edit.group,{size,boxW:f.boxW?Math.min(1,f.boxW*size/f.size):0,fixX:h[1]==='w'?'right':'left',fixY:h[0]==='n'?'bottom':'top'});
+      }
+      if(made.strokes.length)edit.swap={ids:edit.group.map(item=>item.id),strokes:made.strokes};
+      drawInk();return;
+    }
     if(edit.kind==='resize')edit.preview=new Map([[edit.stroke.id,G.resizePoints(edit.stroke,edit.handle,at.x,at.y)]]);
     else{
       // One shift for the whole group, held back so that no part of it leaves the board.
@@ -474,6 +526,10 @@
   function endSelect(commit){
     const done=edit;edit=null;if(!done)return;
     if(content.hasPointerCapture?.(done.pid))content.releasePointerCapture(done.pid);
+    if(done.kind==='text'){
+      if(commit&&done.moved&&done.swap){const ids=B.swapMarks?.(done.swap.ids,done.swap.strokes);if(ids)selectedId=ids[0];else B.status('Those words could not be changed.')}
+      drawInk();return;
+    }
     if(commit&&done.moved&&!changeMarks(done.group.filter(item=>done.preview.has(item.id)).map(item=>[item.id,{...item,points:done.preview.get(item.id)}])))B.status('That mark could not be changed.');
     drawInk();
   }
@@ -492,16 +548,12 @@
   function resizeSelected(size){
     if(!selecting()||!Number.isFinite(size))return false;const stroke=selectedStroke();if(!stroke)return false;
     if(stroke.size===size)return true;
-    let changes;
-    if(stroke.tool!=='text')changes=[[stroke.id,{...stroke,size}]];
-    else{
-      const block=textBlock(stroke),top=block[0].points[0].y,scale=size/stroke.size,lim=v=>Math.max(0,Math.min(1,v));
-      changes=block.map((item,index)=>{
-        const [a,b]=item.points,y=lim(top+index*lineStep(size));
-        return [item.id,{...item,size,points:[{x:a.x,y},{x:lim(a.x+(b.x-a.x)*scale),y:lim(y+Math.max(.02,lineStep(size)))}]}];
-      });
+    if(stroke.tool==='text'){
+      const block=textBlock(stroke),made=reflow(block,{size}),ids=made.strokes.length?B.swapMarks?.(block.map(item=>item.id),made.strokes):null;
+      if(ids)selectedId=ids[0];else B.status('That size cannot be used for these words.');
+      return true;
     }
-    if(!changeMarks(changes))B.status('That size cannot be used for this mark.');
+    if(!changeMarks([[stroke.id,{...stroke,size}]]))B.status('That size cannot be used for this mark.');
     return true;
   }
   if(isTeacher){
@@ -1115,8 +1167,12 @@
       if(payload.kind==='image'){await pastePicture(payload.blob);return}
       if(!B.live()||!B.writingAllowed()){B.status('You cannot add whiteboard text right now.');return}
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
-      const made=clip.textStrokes(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008],color:B.ownColor(),scale:TEXT_SCALE});
-      let added=0;for(const value of made.strokes){const stroke=C.cleanStroke(value);if(stroke){B.submitStroke(stroke);added++}}
+      // The biggest size at which the words fit the board without wrapping. Only words that do not fit even
+      // at the smallest size are wrapped (at the middle size, so they stay readable).
+      let made=null;
+      for(const size of [0.028,0.016,0.008]){const tried=flow(payload.text,{size,color:B.ownColor(),center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
+      if(!made)made=flow(payload.text,{size:0.016,color:B.ownColor(),center:{x:.5,y:.5}});
+      let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
       B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag to move them, or click them again to change the words.');
     },
