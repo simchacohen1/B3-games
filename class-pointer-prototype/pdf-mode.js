@@ -57,7 +57,38 @@
   // ---------- Words on the lesson: one block that is laid out again when it changes ----------
   // A block is one text mark per line (that is what every student page draws). The lines share a block id; a
   // line that only wrapped is marked soft, so a smaller size or a wider box lets the lines join up again.
-  const TEXT_MIN=C.TEXT_MIN||.004,TEXT_MAX=C.TEXT_MAX||.08;
+  const TEXT_MIN=C.TEXT_MIN||.003,TEXT_MAX=C.TEXT_MAX||.08;
+  // Letter sizes the teacher picks from, named like sizes in a word processor: the number is the height of the
+  // letters in pixels on a board 1280 wide. New words start at 24.
+  const TEXT_LABELS=[12,14,16,18,20,24,28,32,40,48,64,80,96],TEXT_REF=1280,TEXT_FLOOR=16;
+  const sizeOfLabel=label=>Math.round(label/(TEXT_SCALE*TEXT_REF)*1e4)/1e4,labelOfSize=size=>Math.round(size*TEXT_SCALE*TEXT_REF);
+  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null;
+  // What the size control works on: the words being typed, the picked words, or the next new words (Text tool).
+  function textTarget(){
+    if(!isTeacher)return null;
+    if(inlineEdit)return{kind:'typing',size:inlineEdit.size};
+    const picked=selecting()?selectedStroke():null;
+    if(picked?.tool==='text')return{kind:'picked',size:picked.size};
+    return $('teacherTool')?.value==='text'?{kind:'new',size:textSize}:null;
+  }
+  function setTextSize(size){
+    const target=textTarget();if(!target)return;
+    size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,size));textSize=size;
+    if(target.kind==='typing'){inlineEdit.size=size;if(inlineEdit.create)inlineEdit.create.size=size;sizeInline()}
+    else if(target.kind==='picked')resizeSelected(size);
+    syncTextSize();
+  }
+  // One step up or down the list of sizes, from whatever size the words have now.
+  function stepTextSize(direction){
+    const target=textTarget();if(!target)return;
+    const now=labelOfSize(target.size),next=direction>0?TEXT_LABELS.find(label=>label>now):[...TEXT_LABELS].reverse().find(label=>label<now);
+    if(next)setTextSize(sizeOfLabel(next));
+  }
+  // The control shows only while there are words to size, with their size.
+  function syncTextSize(){
+    if(!textSizeBox)return;const target=textTarget();
+    textSizeBox.hidden=!target;if(target)textSizeValue.textContent=String(labelOfSize(target.size));
+  }
   let measurer=null;
   function width100(line){
     if(!measurer){measurer=document.createElement('canvas').getContext('2d');measurer.font='100px sans-serif'}
@@ -111,7 +142,7 @@
     box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
     if(fresh)box.placeholder='Type here';
     Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color});
-    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,before:value};
+    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,before:value};
     content.appendChild(box);sizeInline();drawInk();
     box.focus();box.setSelectionRange(box.value.length,box.value.length);
     // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
@@ -136,7 +167,7 @@
     const text=open.box.value;open.box.remove();
     if(open.create){if(save&&text.trim())addTextStroke(open.create,text)}
     else if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
-    else if(save&&text!==open.before)replaceTextStroke(open.stroke,text);
+    else if(save&&(text!==open.before||open.size!==open.sizeBefore))replaceTextStroke(open.stroke,text,open.size);
     drawInk();
   }
   window.addEventListener('resize',sizeInline);
@@ -147,9 +178,9 @@
     made.strokes.forEach(stroke=>B.submitStroke(stroke));
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
-  function replaceTextStroke(stroke,text){
-    // The new words go where the whole block was, in the same color, size and width.
-    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text});
+  function replaceTextStroke(stroke,text,size){
+    // The new words go where the whole block was, in the same color and width (and size, unless it was changed).
+    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size});
     if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
     const ids=B.swapMarks?.(block.map(item=>item.id),made.strokes);
     if(!ids){selectedId=null;B.status('That whiteboard text is no longer available to edit.');return false}
@@ -289,6 +320,13 @@
     flipBtn=button('⇄ Flip sides','Swap which side the first page of each pair is on',()=>changeLayout({rtl:!layoutOpts.rtl}),'pdf-btn pdf-spread-only');
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
+    // Text size: A− 24 A+. It shows while the Text tool is chosen, words are picked, or words are being typed.
+    textSizeBox=el('span',null,'pdf-textsize');textSizeBox.hidden=true;textSizeBox.setAttribute('role','group');textSizeBox.setAttribute('aria-label','Text size');
+    textSizeValue=el('span',null,'pdf-textsize-value','24');textSizeValue.setAttribute('aria-live','polite');
+    const smaller=button('A−','Smaller letters',()=>stepTextSize(-1),'pdf-btn pdf-textsize-btn'),bigger=button('A+','Bigger letters',()=>stepTextSize(1),'pdf-btn pdf-textsize-btn');
+    // Pressing these must not take the typing cursor out of the words.
+    for(const b of [smaller,bigger])for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
+    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger);nav.appendChild(textSizeBox);
     button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     button('✏ Edit latest text','Change the words you added last (all of their lines).',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
     button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
@@ -457,7 +495,7 @@
       if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
       const mark=inkPath(stroke,stroke.color);mark.dataset.strokeTool=stroke.tool;if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
     }
-    drawSelection(shown);
+    drawSelection(shown);syncTextSize();
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
 
@@ -625,14 +663,15 @@
     if(stroke.size===size)return true;
     if(stroke.tool==='text'){
       const block=textBlock(stroke),made=reflow(block,{size}),ids=made.strokes.length?B.swapMarks?.(block.map(item=>item.id),made.strokes):null;
-      if(ids)selectedId=ids[0];else B.status('That size cannot be used for these words.');
+      // The new lines are picked again, with their box and handles.
+      if(ids){selectedId=ids[0];drawInk()}else B.status('That size cannot be used for these words.');
       return true;
     }
     if(!changeMarks([[stroke.id,{...stroke,size}]]))B.status('That size cannot be used for this mark.');
     return true;
   }
   if(isTeacher){
-    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false)});
+    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false);syncTextSize()});
     // Delete removes the picked mark; Escape lets go of it.
     document.addEventListener('keydown',event=>{
       if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
@@ -714,7 +753,7 @@
         if(!p)return;event.preventDefault();event.stopPropagation();
         const words=teacherMarkAt(event,p,true);
         if(words?.tool==='text'){editInline(words);return}
-        editInline({point:p,color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value)});return;
+        editInline({point:p,color:$(colorId).value||B.ownColor(),size:textSize});return;
       }
     }
     const tool=$(toolId).value;
@@ -1289,8 +1328,9 @@
       // The biggest size at which the words fit the board without wrapping. Only words that do not fit even
       // at the smallest size are wrapped (at the middle size, so they stay readable).
       let made=null;
-      for(const size of [0.028,0.016,0.008]){const tried=flow(payload.text,{size,color:B.ownColor(),center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
-      if(!made)made=flow(payload.text,{size:0.016,color:B.ownColor(),center:{x:.5,y:.5}});
+      const chosen=labelOfSize(textSize),steps=[chosen,...[...TEXT_LABELS].reverse().filter(label=>label<chosen&&label>=TEXT_FLOOR)];
+      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:B.ownColor(),center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
+      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:B.ownColor(),center:{x:.5,y:.5}});
       let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
       B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');

@@ -224,6 +224,8 @@
   const css=`
 #fttAnnotate{position:fixed;inset:0;z-index:${Z};pointer-events:none;font:600 13px system-ui,"Segoe UI",sans-serif}
 #fttAnnotate.fa-fly-open{z-index:2147483647}
+#fttAnnotate .fa-tool[hidden]{display:none}
+#fttAnnotate .fa-ico svg{display:block;width:1.15em;height:1.15em;margin:auto}
 #fttAnnotate[hidden],#fttAnnotate [hidden]{display:none!important}
 #fttAnnotate .fa-ink{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
 #fttAnnotate .fa-capture{position:fixed;pointer-events:auto;touch-action:none;background:transparent}
@@ -453,9 +455,15 @@
     for(const [tool,b] of toolButtons){
       const kinds=variantsOf(s,tool),kind=kinds&&kinds.find(k=>k[0]===variantOf(tool));
       b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));
+      // A surface that says so shows only the tools it has (no greyed-out buttons that do nothing).
+      b.hidden=!!s.hideUnused&&b.disabled;
       b.classList.toggle('fa-more',!!kinds&&!b.disabled);
       const own=s.toolLabels?.[tool],usual=TOOLS.find(t=>t[0]===tool),name=own?own[1]:usual[2];
-      b.querySelector('.fa-ico').textContent=kind?kind[1]:own?own[0]:TOOL_ICON[tool];
+      // A surface's own icon may be a small drawing (our own fixed SVG text, never anything from outside).
+      const ico=b.querySelector('.fa-ico'),mark=kind?kind[1]:own?own[0]:TOOL_ICON[tool];
+      if(String(mark).startsWith('<svg')){if(ico.dataset.mark!==mark){ico.dataset.mark=mark;ico.innerHTML=mark}}
+      else{delete ico.dataset.mark;ico.textContent=mark}
+      b.style.order=own&&own[3]!=null?String(own[3]):'';
       b.querySelector('.fa-name').textContent=name;b.title=name+': '+(own?own[2]:usual[3]);b.setAttribute('aria-label',name);
     }
     // Colors and sizes for this surface. A color of '' means "the page's own color" (shown as ↺).
@@ -474,7 +482,7 @@
     }
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
-    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=!drawing&&st.tool!=='select';
+    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
     sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{
         // Select: the size goes to the picked mark (thicker line, bigger words) and the tool stays Select.

@@ -107,6 +107,10 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNote{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80%;padding:14px 20px;border-radius:12px;background:#172033ee;color:#fff;font-size:20px;font-weight:700;text-align:center;pointer-events:none}
 #pdfNav{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX(-50%);width:max-content;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;max-width:calc(100% - 24px);padding:10px 12px;background:#101827ee;border:1px solid #ffffff38;border-radius:16px;box-shadow:0 8px 28px #0008;cursor:default;color:#fff}
 #pdfNav[hidden]{display:none}
+#pdfNav .pdf-textsize{display:inline-flex;align-items:center;gap:6px;color:#dbeafe;font-size:14px;font-weight:700;white-space:nowrap}
+#pdfNav .pdf-textsize[hidden]{display:none}
+#pdfNav .pdf-textsize-value{min-width:30px;text-align:center;color:#fff;font-size:17px;font-weight:800}
+#pdfNav .pdf-textsize-btn{min-width:44px}
 /* A whiteboard shown whole: the board ends above the bar of buttons, and the bar is slim. */
 #stage.board-whole #pdfView{bottom:var(--pdf-nav-h,0px)}
 #stage.board-whole #pdfNav{bottom:3px;padding:3px 8px;gap:6px;border-radius:10px;flex-wrap:nowrap}
