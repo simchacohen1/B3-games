@@ -208,7 +208,7 @@
     }
     function renderLessonMarks(){
       if(typeof markLayer.replaceChildren!=='function'||typeof pointerLayer.replaceChildren!=='function')return;
-      const b=picture();
+      const b=picture(),textRatio=b.width/Math.max(1,b.height);
       for(const layer of [markLayer,pointerLayer,hitLayer])Object.assign(layer.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
       markLayer.replaceChildren();pointerLayer.replaceChildren();
       for(const stroke of [...(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]),...(lessonDraft?[lessonDraft]:[])]){
@@ -227,7 +227,10 @@
         else if(stroke.tool==='triangle')mark=svg('polygon',{points:`${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}`,...attrs});
         else if(stroke.tool==='line')mark=svg('line',{x1,y1,x2,y2,...attrs});
         else if(stroke.tool==='pen-arrow'){mark=svg('g',{});mark.append(svg('line',{x1,y1,x2,y2,...attrs}));const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(width*3,10);mark.append(svg('path',{d:`M${x2-radius*Math.cos(angle-.5)} ${y2-radius*Math.sin(angle-.5)} L${x2} ${y2} L${x2-radius*Math.cos(angle+.5)} ${y2-radius*Math.sin(angle+.5)}`,...attrs}));}
-        else if(stroke.tool==='text'){mark=svg('text',{x:x1,y:y1,'font-size':Math.max(16,width*2.2),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
+        // Words are drawn at the teacher's size: 2.4 times the mark size, as a fraction of the board width.
+        // This layer is 1000 x 1000 stretched over the picture, so the text is scaled back up by the
+        // picture's width/height to keep its letters undistorted.
+        else if(stroke.tool==='text'){mark=svg('text',{x:0,y:0,'font-family':'sans-serif',transform:`translate(${x1} ${y1}) scale(1 ${textRatio})`,'font-size':Math.max(4,(Number(stroke.size)||.016)*1000*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
         else {const drawn=stroke.tool==='underline'?[a,{x:b.x,y:a.y}]:points;mark=svg('path',{d:drawn.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' '),...attrs})}
         markLayer.appendChild(mark);
       }

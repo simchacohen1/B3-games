@@ -35,6 +35,10 @@ body.cp-is-live.cp-drawer-closed .cp-students-toggle{animation:cpStudentsPulse 2
 .cp-students-hint{position:absolute;z-index:60;top:calc(100% + 12px);right:0;display:flex;align-items:center;gap:8px;width:max-content;max-width:min(300px,80vw);padding:10px 8px 10px 14px;border-radius:12px;background:#ffd60a;color:#17233b;font:800 15px/1.3 system-ui,sans-serif;box-shadow:0 10px 28px #0f172a59}
 .cp-students-hint::before{content:"";position:absolute;bottom:100%;right:34px;border:9px solid transparent;border-bottom-color:#ffd60a}
 .cp-students-hint[hidden]{display:none}
+/* The tabs row under the header sits on a very high layer (its Stop button must stay reachable), which hid this tip behind the tabs. While the tip shows, the header goes in front. */
+body:not(.lesson-expanded) .app-header.cp-header:has(.cp-students-hint:not([hidden])){position:relative;z-index:2147483647}
+/* Wide windows: the tip sits beside the button, inside the top bar, so it never lies over the Live label or the red Stop button in the row below. */
+@media (min-width:901px){.cp-students-hint{top:50%;right:calc(100% + 12px);transform:translateY(-50%);max-width:none;white-space:nowrap;padding:4px 6px 4px 12px}.cp-students-hint::before{bottom:auto;right:auto;left:100%;top:50%;transform:translateY(-50%);border-color:transparent;border-left-color:#ffd60a}}
 /* Narrow windows wrap the button to the left edge: open the tip rightwards so it stays on screen. */
 @media (max-width:900px){.cp-students-hint{right:auto;left:0}.cp-students-hint::before{right:auto;left:34px}}
 .cp-students-hint-x{flex:none;width:30px;height:30px;min-height:0;padding:0;margin:0;border:0;border-radius:8px;background:#17233b1f;color:#17233b;font-size:14px;font-weight:800;cursor:pointer}
@@ -163,7 +167,9 @@ body.cp-drawer-closed .cp-permissions-sidebar{display:none}
 
 /* ---------- Desktop: fill the window, drawer beside the lesson ---------- */
 @media(min-width:1000px){
-body.teacher-view.cp-compact-workspace main{max-width:none;margin:0;border:0;border-radius:0;background:transparent;padding:12px calc(var(--cp-drawer) + 28px) 12px 16px;height:100dvh;min-height:550px;display:flex;flex-direction:column;gap:0;box-sizing:border-box}
+body.teacher-view.cp-compact-workspace{display:flex;flex-direction:column;height:100dvh;min-height:0}
+body.teacher-view.cp-compact-workspace>*{flex:none}
+body.teacher-view.cp-compact-workspace main{flex:1 1 0;max-width:none;margin:0;border:0;border-radius:0;background:transparent;padding:12px calc(var(--cp-drawer) + 28px) 12px 16px;height:auto;min-height:550px;display:flex;flex-direction:column;gap:0;box-sizing:border-box}
 body.teacher-view.cp-compact-workspace.cp-drawer-closed main{padding-right:16px}
 body.teacher-view.cp-compact-workspace main>*{flex-shrink:0}
 body.teacher-view .cp-permissions-sidebar{position:fixed;right:12px;top:var(--cp-drawer-top,12px);bottom:12px;width:var(--cp-drawer);overflow:auto;z-index:8}
@@ -265,3 +271,23 @@ dialog.cp-guide::backdrop{background:#0f172a99}
 .cp-guide-note{margin:14px 0 16px;font-size:14px;color:#64748b}
 .cp-guide-ok{display:block;margin-left:auto;min-height:44px;padding:0 26px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:700 16px system-ui,sans-serif;cursor:pointer}
 .cp-guide-ok:focus-visible,.cp-guide-x:focus-visible{outline:3px solid #f5b800;outline-offset:2px}
+
+/* ---------- A slim top: the lesson gets the height (teacher workspace) ---------- */
+body.teacher-view.cp-compact-workspace main{padding-top:6px;padding-bottom:6px}
+body.teacher-view.cp-compact-workspace .app-header.cp-header{margin-bottom:6px}
+body.teacher-view.cp-compact-workspace .cp-topbar{padding:4px 12px;gap:8px;border-radius:10px}
+body.teacher-view.cp-compact-workspace .cp-topbar-title h1{font-size:17px}
+body.teacher-view.cp-compact-workspace .cp-topbar-btn{min-height:34px;padding:0 10px;font-size:14px}
+body.teacher-view.cp-compact-workspace .cp-topbar .pointer-class-picker select{min-height:32px;padding:4px 10px}
+body.teacher-view.cp-compact-workspace .cp-tabs-row{margin-bottom:4px;gap:8px}
+body.cp-simple.teacher-view.cp-compact-workspace .cp-workspace-tabs{padding:3px}
+body.cp-simple.teacher-view.cp-compact-workspace .cp-workspace-tab{min-height:32px;padding:0 12px;font-size:14px}
+body.teacher-view.cp-compact-workspace .cp-live-wrap button,body.teacher-view.cp-compact-workspace .cp-live-wrap .tab-controls button{min-height:34px;padding:0 12px;font-size:14px}
+body.teacher-view.cp-compact-workspace .cp-live-wrap .cp-icon-btn{width:34px;padding:0}
+body.teacher-view.cp-compact-workspace #stage{margin:2px 0}
+/* While a lesson is open: one row for the top bar (nothing wraps under it), and the message line sits inside the
+   tabs row instead of taking a row of its own. */
+body.teacher-view.cp-is-live .cp-topbar-back{display:none}
+@media (min-width:1000px){body.teacher-view.cp-is-live .cp-topbar{flex-wrap:nowrap}}
+.cp-tabs-row .cp-tabs-spacer{flex:1 1 0;min-width:0;overflow:hidden}
+.cp-tabs-spacer #connectionStatus{margin:0!important;padding:0 6px!important;background:none!important;min-height:0!important;font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

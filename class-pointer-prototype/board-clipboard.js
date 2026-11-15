@@ -76,14 +76,15 @@
   // text mark may be). width100(line) is the line's width in pixels at a 100px font. Positions and sizes are
   // fractions of the board (size: of its width). Long text gets smaller letters; what still does not fit is cut.
   function layoutText(text,width100,opts={}){
-    const aspect=opts.aspect||16/9,sizes=opts.sizes||[.045,.03,.02],margin=opts.margin==null?.04:opts.margin,space=1-2*margin;
+    // opts.scale: how many times bigger than `size` the renderer draws the letters (the teacher whiteboard: 2.4).
+    const aspect=opts.aspect||16/9,scale=opts.scale||1,sizes=opts.sizes||[.045,.03,.02],margin=opts.margin==null?.04:opts.margin,space=1-2*margin;
     const center=opts.center||{x:.5,y:.5};
     let size=sizes[0],lines=[];
     for(size of sizes){
       lines=wrapLines(text,line=>width100(line)/100*size,space);
-      if(lines.length*size*1.25*aspect<=space)break;
+      if(lines.length*size*1.25*aspect*scale<=space)break;
     }
-    const lineHeight=size*1.25*aspect,maxLines=Math.max(1,Math.floor(space/lineHeight+1e-9)),cut=lines.length>maxLines;
+    const lineHeight=size*1.25*aspect*scale,maxLines=Math.max(1,Math.floor(space/lineHeight+1e-9)),cut=lines.length>maxLines;
     if(cut)lines=lines.slice(0,maxLines);
     const widths=lines.map(line=>Math.min(space,width100(line)/100*size)),full=Math.max(0,...widths),total=lines.length*lineHeight;
     const left=clamp(center.x-full/2,margin,1-margin-full),top=clamp(center.y-total/2,margin,1-margin-total),rtl=isRtl(text),items=[];
@@ -102,19 +103,58 @@
   // Convert pasted words to validated-shape text strokes. `width100` must measure text at a 100px font and
   // include any scale used by the renderer, so the stored hit box follows the visible text.
   function textStrokes(text,width100,opts={}){
-    const aspect=opts.aspect||16/9,layout=layoutText(text,width100,opts);
+    const aspect=opts.aspect||16/9,scale=opts.scale||1,layout=layoutText(text,width100,opts);
     const strokes=[];
     for(const item of layout.items){
       const lines=item.text.split('\n'),widths=lines.map(line=>Math.min(1,width100(line)/100*item.size)),wide=Math.max(0,...widths),rtl=isRtl(item.text);
       lines.forEach((line,index)=>{
         if(!line.trim())return;
-        const width=widths[index],x=rtl?item.x+wide-width:item.x,y=item.y+index*item.size*1.25*aspect,edge=Math.max(.02,width);
+        const width=widths[index],x=rtl?item.x+wide-width:item.x,y=item.y+index*item.size*1.25*aspect*scale,edge=Math.max(.02,width);
         strokes.push({tool:'text',color:opts.color||'#ffcc00',size:item.size,
-          points:[{x:clamp(rtl?x+width:x,0,1),y:clamp(y,0,1)},{x:clamp(rtl?x:x+width,0,1),y:clamp(y+Math.max(.02,item.size*1.25*aspect),0,1)}],text:line});
+          points:[{x:clamp(rtl?x+width:x,0,1),y:clamp(y,0,1)},{x:clamp(rtl?x:x+width,0,1),y:clamp(y+Math.max(.02,item.size*1.25*aspect*scale),0,1)}],text:line});
       });
     }
     return{strokes,cut:layout.cut,size:layout.size};
   }
+  // Lay ONE block of words out as lines, one text mark per line, for the teacher's lesson board.
+  // In `text` a line break is one the writer chose. A line too wide for maxWidth wraps, and the wrapped lines are
+  // marked `soft`, so the block can be laid out again later (other size, other width) and join up into one line
+  // when there is room. Sizes and positions are fractions of the board (size: of its width).
+  // opts: size, aspect, scale, maxWidth (default: the board less its margins), color, block (the block's id),
+  //       boxW (a width the teacher chose by dragging the side of the box), and where the block goes:
+  //       center:{x,y} for new words, or left|right and top|bottom for words that are already placed.
+  function flowText(text,width100,opts={}){
+    const aspect=opts.aspect||16/9,scale=opts.scale||1,size=opts.size||.016,margin=opts.margin==null?.04:opts.margin;
+    const boxW=opts.boxW?clamp(opts.boxW,.05,1):0,maxWidth=boxW||clamp(opts.maxWidth||1-2*margin,.05,1);
+    const lineHeight=size*1.25*aspect*scale,measure=line=>width100(line)/100*size,lines=[];
+    for(const chosen of String(text==null?'':text).split('\n')){
+      let first=true;
+      for(const line of wrapLines(chosen,measure,maxWidth)){if(!line.trim())continue;lines.push({text:line,soft:!first});first=false}
+    }
+    const maxLines=Math.max(1,Math.floor(1/lineHeight+1e-9)),cut=lines.length>maxLines;
+    if(cut)lines.length=maxLines;
+    const widths=lines.map(line=>Math.min(maxWidth,measure(line.text))),full=Math.max(0,...widths),total=lines.length*lineHeight;
+    const width=boxW?Math.max(full,boxW):full,rtl=isRtl(text);
+    let left,top;
+    if(opts.center){left=clamp(opts.center.x-width/2,margin,1-margin-width);top=opts.top!=null?clamp(opts.top,0,1-total):clamp(opts.center.y-total/2,margin,1-margin-total)}
+    else{
+      left=clamp(opts.left!=null?opts.left:opts.right!=null?opts.right-width:(1-width)/2,0,1-width);
+      top=clamp(opts.top!=null?opts.top:opts.bottom!=null?opts.bottom-total:(1-total)/2,0,1-total);
+    }
+    const strokes=lines.map((line,index)=>{
+      // Hebrew lines start at the right edge of the block; the first point is where the line starts.
+      const reach=Math.max(.02,widths[index]),y=top+index*lineHeight,start=rtl?left+width:left;
+      const out={tool:'text',color:opts.color||'#ffcc00',size:round(size),text:line.text,
+        points:[{x:round(clamp(start,0,1)),y:round(clamp(y,0,1))},{x:round(clamp(rtl?start-reach:start+reach,0,1)),y:round(clamp(y+Math.max(.02,lineHeight),0,1))}]};
+      if(opts.block)out.block=opts.block;
+      if(line.soft)out.soft=true;
+      if(boxW)out.boxW=round(width);
+      return out;
+    });
+    return{strokes,cut,lines:lines.length,frame:{left,top,width,height:total,rtl}};
+  }
+  // The words of a block as the writer wrote them: wrapped lines join with a space, chosen line breaks stay.
+  function blockText(lines){return (lines||[]).map((line,index)=>(index?(line.soft?' ':'\n'):'')+String(line.text||'')).join('')}
   function fitSize(width,height,maxSide){
     const scale=Math.min(1,maxSide/Math.max(width,height,1));
     return{w:Math.max(1,Math.round(width*scale)),h:Math.max(1,Math.round(height*scale))};
@@ -147,7 +187,7 @@
     }
     return{pictures,strokes};
   }
-  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,fitSize,placeImage,cleanImageData,cleanLessonBoard};
+  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,flowText,blockText,fitSize,placeImage,cleanImageData,cleanLessonBoard};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}
   if(root.ClassPointerClipboard)return;
 

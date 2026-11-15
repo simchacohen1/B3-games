@@ -45,7 +45,7 @@
     if(!view||typeof view!=='object')return null;
     const zoom=Number(view.zoom),top=Number(view.top),left=Number(view.left);
     if(![zoom,top,left].every(Number.isFinite))return null;
-    return{zoom:clamp(zoom,MIN_ZOOM,MAX_ZOOM),top:clamp(top,0,1),left:clamp(left,0,1),spread:view.spread===true,rtl:view.rtl===true,shift:view.shift===true};
+    return{zoom:clamp(zoom,MIN_ZOOM,MAX_ZOOM),top:clamp(top,0,1),left:clamp(left,0,1),spread:view.spread===true,rtl:view.rtl===true,shift:view.shift===true,whole:view.whole===true};
   }
   function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f<>]/g,'').trim().slice(0,80)||'Lesson PDF':'Lesson PDF'}
   function chunkCount(size){return Math.max(1,Math.ceil(size/CHUNK))}

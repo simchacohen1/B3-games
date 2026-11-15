@@ -17,9 +17,9 @@ test('teacher-approved words with missing art are not skipped',()=>{
  assert.ok(js.includes('const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);'));
  assert.ok(js.includes('if(existing&&!sanitizeClassArt(existing.art).length&&art.length)'));
 });
-test('paid teacher-requested suggestions are opt-in and never replace selected pictures',()=>{
- assert.ok(js.includes('New picture suggestions use separate OpenAI API credits.'));
- assert.ok(js.includes('const fresh=candidates.filter(x=>!oldPool.includes(x));'));
- assert.ok(js.includes('item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);'));
- assert.match(html,/teacher\.js\?v=20261113-cost51/);
+test('the paid Regenerate Pictures button is gone (PR 745)',()=>{
+ assert.ok(!js.includes('regeneratePictures'));
+ assert.ok(!js.includes('data-a="regen"'));
+ assert.ok(!js.includes('Regenerate Pictures'));
+ assert.match(html,/teacher\.js\?v=20261114-745/);
 });

@@ -256,7 +256,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     assert.match(injector.inject(html), /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} gets the staging guard in the preview copy`);
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
-  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites');
+  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/sols\.tools','https:\/\/www\.sols\.tools','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites (funtorahtools.com and sols.tools, #825)');
   assert.doesNotMatch(fnSource, /fun-torah-tools-staging/, 'the live function never lists staging sites');
   for (const file of ['homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(

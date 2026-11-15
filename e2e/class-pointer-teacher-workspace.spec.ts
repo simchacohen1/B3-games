@@ -167,7 +167,7 @@ test('full screen: the drawing toolbar is the only toolbar and its Lesson menu o
     const r = document.querySelector(sel)!.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return r.width > 0 && !!top && !!top.closest('#stage') && !top.closest('.cp-tabs-row');
   }))).toEqual([true, true]);
-  await expect(bar.getByRole('button', { name: /^Pen:/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(bar.getByRole('button', { name: 'Pen', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
   await bar.locator('[data-action="stop"]').click();
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(false);
@@ -248,7 +248,7 @@ test('teacher pastes editable text onto the shared whiteboard and can edit it', 
   await expect(mark).toBeVisible();
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('Updated lesson note');
-  await page.getByRole('button', { name: 'Save text' }).click();
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(1);
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveText('Updated lesson note');
   expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === 'text' && s.text === 'Updated lesson note'))).toBe(true);
@@ -292,9 +292,11 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
 
   await choosePenShape(page, 'T Text box', 'text');
   await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
-  await expect(page.locator('#pdfTextEditDialog')).toBeVisible();
+  // The words are typed in a text box on the board itself; there is no popup.
+  await expect(page.locator('#pdfTextEditDialog')).toHaveCount(0);
+  await expect(page.locator('#pdfContent textarea.board-text-inline')).toBeVisible();
   await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
-  await page.getByRole('button', { name: 'Save text' }).click();
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
   const textMarks = page.locator('#pdfInk text[data-text-mark]');
   await expect(textMarks).toHaveCount(2);
   await expect(textMarks.nth(0)).toHaveText('שלום עולם');
@@ -303,10 +305,11 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
 
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('תיקון ראשון\nתיקון שני');
-  await page.getByRole('button', { name: 'Save text' }).click();
-  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(3);
-  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון ראשון');
-  await expect(page.locator('#pdfInk text[data-text-mark]').nth(2)).toHaveText('תיקון שני');
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
+  // The two lines are one block: editing replaces both, not only the last line.
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(2);
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(0)).toHaveText('תיקון ראשון');
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון שני');
   expect(errors).toEqual([]);
   await context.close();
 });
@@ -643,14 +646,14 @@ test('teacher points and draws on an enlarged student screen; only that student 
   await tile.locator('video').click();
   await expect(tools).toBeVisible();
   // It starts on Hand: nothing is sent until the teacher picks a tool.
-  await expect(tools.getByRole('button', { name: /^Hand:/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(tools.getByRole('button', { name: 'Hand', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // Point: the student gets the moving pointer.
-  await tools.getByRole('button', { name: /^Pointer:/ }).click();
+  await tools.getByRole('button', { name: 'Pointer', exact: true }).click();
   const ink = tile.locator('canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
   await expect.poll(async () => (await sentOf(page, 'board-screen-live')).some((m: any) => m.point && Math.abs(m.point.x - 0.25) < 0.02)).toBe(true);
   // Pen: a finished line goes to Student One, never to Student Two.
-  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await tools.getByRole('button', { name: 'Pen', exact: true }).click();
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.4, { steps: 8 }); await page.mouse.up();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
@@ -686,7 +689,7 @@ test('the Student screens gallery offers the same Point and Pen tools on a scree
   await grid.first().click();
   const tools = page.locator('#fttAnnotate .fa-bar');
   await expect(tools).toBeVisible();
-  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await tools.getByRole('button', { name: 'Pen', exact: true }).click();
   const ink = page.locator('#boardsView .board-screen-large canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6, { steps: 6 }); await page.mouse.up();

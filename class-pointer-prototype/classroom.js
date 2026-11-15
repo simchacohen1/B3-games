@@ -614,7 +614,7 @@ function sendHover(){
   if(isTeacher){state.points.teacher=point;queuePoint('teacher')}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
-  if(isTeacher&&$('teacherTool').value==='eraser'){hideOwnPointer();return}
+  if(isTeacher&&['eraser','select'].includes($('teacherTool').value)){hideOwnPointer();return}
   if(navigating||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:pointerPictureBox(rect,video);if(!box)return;
@@ -723,6 +723,16 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   navigating:()=>navigating,
   refreshActivityMarks(){for(const entry of presence.values())if(entry.admitted)send(entry.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})},
   highlights:()=>highlightStore.strokes,
+  // Teacher only: erase one of the teacher's own marks, or change it in place (Select: move, resize, recolor).
+  // The whole mark list is sent again, exactly as after a new mark, so student pages need nothing new.
+  eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
+  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
+  swapMarks(ids,strokes){if(!isTeacher)return null;const made=highlightStore.swap('teacher',ids,strokes);if(made)publishHighlights();return made},
+  replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace('teacher',id,stroke))return false;publishHighlights();return true},
+  // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
+  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace('teacher',id,stroke)||changed;if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
