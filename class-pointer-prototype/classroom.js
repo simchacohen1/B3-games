@@ -56,6 +56,9 @@ function studentMessageToDocument(message){
   }
   return message;
 }
+// The teacher's Select works on any mark. The store still files a changed mark under its own owner (a student's mark stays that
+// student's, with its id), so only the teacher's page, never a student's message, can change a mark that is not the sender's.
+function markOwner(id){return highlightStore.strokes.find(mark=>mark.id===id)?.owner||'\u0000none'}
 // A student picks, moves, resizes, recolors and deletes their OWN marks (activity-share.js Select). The store files every
 // mark under the connection that made it and only ever changes marks of the sender, so no message can reach another
 // student's marks or the teacher's. Each change is converted like a new mark. Returns true when something changed.
@@ -767,14 +770,14 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   highlights:()=>highlightStore.strokes,
   // Teacher only: erase one of the teacher's own marks, or change it in place (Select: move, resize, recolor).
   // The whole mark list is sent again, exactly as after a new mark, so student pages need nothing new.
-  eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
-  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit('teacher','erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
-  swapMarks(ids,strokes){if(!isTeacher)return null;const made=highlightStore.swap('teacher',ids,strokes);if(made)publishHighlights();return made},
-  replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace('teacher',id,stroke))return false;publishHighlights();return true},
+  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.swap(owner,ids,strokes);if(made)publishHighlights();return made},
+  replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace(markOwner(id),id,stroke))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
-  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace('teacher',id,stroke)||changed;if(changed)publishHighlights();return changed},
+  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed;if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
