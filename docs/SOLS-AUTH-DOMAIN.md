@@ -1,109 +1,110 @@
 # SOLS Google sign-in domain
 
-Status: prepared, NOT activated or deployed. External owner setup is required.
+Status (2026-11-15): implementation enabled in PR #838; **not deployed**.
+**HIGH RISK authentication change: do not merge until real sign-in verification
+passes and the owner explicitly approves release.**
 
-## Inspection (2026-11-15)
+## Implementation and scope
 
-- Read AGENTS.md, open PR file lists, docs/MIGRATION_AUDIT.md, staging/README.md,
-  staging/generate-config.cjs and the merged SOLS migration PRs #826, #830, #831, #833.
-- No open PR touches the files changed in this PR.
-- B3-games Pages serves funtorahtools.com from main. sols-school-site Pages serves
-  sols.tools; B3-games main automatically syncs it through sols-site/build.mjs.
-- sols.tools resolves to GitHub Pages; /__/auth/handler returns 404.
-  auth.sols.tools has no DNS record. Do not point the apex at Firebase.
-- Production public Auth config authorizes sols.tools and www.sols.tools, but
-  not auth.sols.tools. SDK authDomain is b3-games.firebaseapp.com.
-- Both existing production and staging /__/auth/handler and /__/auth/iframe
-  endpoints return 200. This is infrastructure evidence, NOT a successful login.
-- Staging SDK project is fun-torah-tools-staging, with its own Auth and RTDB;
-  its generator requires the existing staging firebaseapp.com domain. Preserve it.
-- No Firebase/Google Cloud/DNS credentials or browser-control tools are available
-  in this session. OAuth redirect URI lists, Hosting custom-domain ownership,
-  and private account/role state could not be inspected.
+`sols-site/auth-domain.json` enables `auth.sols.tools` in the generated SOLS
+copy. `sols-site/auth-domain.cjs` changes all 12 production configuration files
+containing authDomain literals together, including the shared Firebase config
+and inline fallbacks in teacher/game/recording tools. Default and named apps
+(including FTTRememberedTeacher) consequently receive the same domain.
+The production project remains b3-games. The build refuses staging source configs.
 
-## Rabbi Cohen: required external setup
+Source funtorahtools.com configuration remains b3-games.firebaseapp.com. The main
+SOLS website remains on GitHub Pages through the existing sync workflow; Firebase
+Hosting serves the authentication subdomain only. No Hosting release is required
+by this PR. The optional firebase.auth-hosting.json is not run by this change.
 
-1. Open https://console.firebase.google.com/project/b3-games/hosting . Inspect
-   existing sites/releases first. Add custom domain **auth.sols.tools** to the
-   **b3-games** Hosting site (not a redirect to sols.tools). Complete ownership
-   verification and copy exactly the DNS records Firebase supplies into the
-   sols.tools DNS provider. Change only auth and the requested verification TXT;
-   leave apex/www GitHub Pages records alone. Wait until Firebase says Connected
-   and HTTPS is valid. Do not guess the A/CNAME/TXT values.
-2. In https://console.firebase.google.com/project/b3-games/authentication/settings
-   → Authorized domains, add **auth.sols.tools**. Keep every existing entry.
-3. In Authentication → Sign-in method → Google, identify the configured Web SDK
-   OAuth client ID. Open that SAME client in
-   https://console.cloud.google.com/apis/credentials?project=b3-games . Add the
-   authorized redirect URI **https://auth.sols.tools/__/auth/handler**. Keep the
-   existing firebaseapp.com URI, origins, client ID/secret and account audience.
-   Do not create a replacement OAuth client. If Google requires domain
-   verification/Branding authorized domains, add/verify **sols.tools** there.
-4. Confirm HTTPS /__/auth/handler and /__/auth/iframe on auth.sols.tools serve the
-   Firebase helpers, not the website, a redirect, or a generic 200/404 page.
-   Check the handler's Google request uses the SAME OAuth client and the new
-   redirect_uri. Verify the mapping in Firebase Hosting, not just HTTP status.
+No SDK upgrade, sign-in-method, persistence, app-name, API-key, UID, role,
+permission, database, function, student-data, recording or reward change is made.
+The remembered-teacher restoration and explicit sign-out behavior are retained.
+Changing authDomain does not change the application's origin or its existing
+Firebase persistence keys (API key and app name). This supports continuity but
+is not evidence that existing live sessions have been tested after cutover.
 
-Firebase supplies reserved /__/auth/* helpers; do not copy an HTML login page to
-GitHub Pages as a substitute. firebase.auth-hosting.json is an isolated optional
-Hosting-only config, with no functions/database/storage deployment. If the default
-site needs its first Hosting release, review its current content before running:
+## External setup and independent checks
+
+The owner reports Firebase Hosting Connected with working HTTPS for auth.sols.tools,
+Cloudflare DNS-only CNAME auth -> b3-games.web.app, no redirect, Google enabled,
+public-facing project name sols.tools, and both redirect URIs retained on the
+existing Google Web OAuth client. Handler and iframe were opened by the owner.
+No DNS, Firebase, OAuth, account or permission settings were modified here.
+
+Independent read-only checks in this session:
+
+- Production Firebase Auth public project configuration includes localhost,
+  b3-games.firebaseapp.com, b3-games.web.app, simchacohen1.github.io,
+  funtorahtools.com, www.funtorahtools.com, sols.tools, www.sols.tools and
+  **auth.sols.tools** as authorized domains.
+- Firebase accounts:createAuthUri produces Google authorization URLs using the
+  **same existing client** for both handler addresses:
+  `568530046190-635djfva1m4s1rbl07t2d5pvq8q27hhs.apps.googleusercontent.com`.
+  The custom request uses https://auth.sols.tools/__/auth/handler; the legacy
+  request uses https://b3-games.firebaseapp.com/__/auth/handler. These are URL
+  generation checks, not successful Google consent or redirect acceptance.
+- The legacy handler returns HTTP 200.
+- Direct requests to sols.tools and auth.sols.tools are denied by this Cloud
+  environment's enforced outbound hostname policy (proxy CONNECT 403). The
+  custom handler/iframe content, TLS and DNS could not be independently inspected.
+  This is an environment limitation, not evidence that the endpoint is broken.
+- No shared-desktop/browser-control tool is exposed for an interactive account
+  handoff. Headless Chromium is available for isolated synthetic browser tests.
+
+## Automated verification
+
+73/73 focused Node tests passed:
 
 ```
-npx firebase-tools@15.26.0 deploy --project b3-games --config firebase.auth-hosting.json --only hosting:b3-games
+node --test tests/sols-auth-domain.test.cjs tests/sols-pointer-only.test.cjs \
+  tests/teacher-remember-login.test.cjs tests/migration-access.test.cjs \
+  tests/student-auth.test.cjs tests/homework-staging-deployment-isolation.test.cjs
 ```
 
-This is a live Hosting release and still needs explicit approval. Do not overwrite
-an existing Hosting release just to attach the custom domain; attaching it may be
-sufficient. Main site hosting must stay on GitHub Pages.
+The source-wide audit checks all 12 production config files, unchanged session
+and permission code, consistent inline fallbacks, idempotence, disabled-build
+legacy fallback, resource preservation and staging exclusion. The SOLS build
+fixture runs with activation enabled.
 
-## Controlled cutover and verification
+The existing `tests/teacher-center-auth-browser.test.cjs` passed in Chromium:
+synthetic ET/WT/new-class teachers, principal, owner, remembered returning teacher
+and popup sign-in rendering, including class scoping and authorization waits.
+Firebase is mocked in that suite; no real account or student data is used.
+An additional isolated browser smoke check loaded the actual vendored Firebase
+SDK and initialized default and FTTRememberedTeacher apps with auth.sols.tools,
+b3-games and the existing SESSION/LOCAL persistence modes. It did not authenticate.
+Syntax checks and git diff --check passed.
 
-After external setup, change only sols-site/auth-domain.json enabled to true.
-The SOLS build changes production authDomain literals in root configuration and
-inline fallbacks together, including tools that do not use the root config. It
-leaves source funtorahtools.com configuration, staging files, project IDs, RTDB,
-Storage, roles, UIDs, account policies and persistence code unchanged. Repeated
-builds are idempotent. The switch is currently false; merging this preparation
-alone cannot change the live authDomain.
+## Remaining release blockers
 
-Before requesting a live merge, build an isolated SOLS preview from the task
-branch, authorize its exact origin in production Auth, and test ONLY fictional
-adult accounts whose assigned classes/roles are known. Do not use staging's
-accounts or database as production fixtures. A preview has separate browser
-storage and cannot prove that existing live sessions survive; check those after
-an approved production release too.
+Real Google login is **BLOCKED, not passed**. No safe authenticated Google test
+account/session with known role assignments was available during verification.
+Before merge, allow sols.tools and auth.sols.tools in the test environment's
+outbound policy and provide an owner-operated fictional adult test session on an
+approved preview. Do not use real students, change permissions, or modify staging.
 
-Verify desktop Chrome and a real Android phone: Google account chooser shows
-**auth.sols.tools**; teacher lands on teacher-home.html with assigned classes;
-owner/admin and principal retain their expected permissions; Pointer and Class
-Access use the same session; student passcodes work; refresh, tab reopen, tool
-navigation and sign-out/sign-in add no loops or unexpected prompts. Check staging
-Google login separately using its existing authorized accounts and Firebase
-project; never import production users, claims or data into staging.
+Verify desktop Chrome and real Android: sign-in starts on SOLS, the chooser uses
+the custom domain and existing client, and authentication returns to teacher home;
+teacher/admin/principal permissions remain correct; Pointer and Class Access
+reuse the session; sign-out/sign-in works; refresh and tab reopening work;
+student passcode access remains functional with fictional fixtures. Exercise
+popup-blocked redirect fallback and recovery: a sibling auth domain alone does
+not prove cross-origin redirect-storage compatibility. No authenticated staging
+test was performed; staging is outside this task's mutation scope.
 
-site-settings.js uses popup sign-in with a redirect fallback on selected errors.
-Firebase documents cross-origin iframe/storage limitations for redirect sign-in.
-A sibling auth subdomain is not proof that every browser fallback works. Exercise
-popup-blocked and redirect recovery on Android before enabling. If recovery fails,
-keep the gate off and address that path separately; do not change authentication
-methods blindly or move the main site off Pages.
+An isolated preview has different browser storage and cannot prove preservation
+of existing sols.tools sessions. Check an existing production session immediately
+after an explicitly approved release. No production merge, sync, Firebase Hosting
+release or deploy has been performed. PR #838 remains draft and not safe to merge
+until the above pre-release checks pass and the owner approves.
 
-No real Google login, chooser branding, return URL, permissions, existing-session
-continuity, Android flow or authenticated staging flow was verified in this session.
+## Rollback
 
-Rollback: set enabled false and rebuild/sync the SOLS copy after an approved
-release. Retain old OAuth redirect URIs throughout; no user/data migration occurs.
-Allow already-open tabs to finish authentication before changing/removing domain
-settings. Do not remove the custom handler during rollback.
-
-## Validation
-
-58 local tests passed across SOLS auth-domain/build, pointer-only branding,
-staging isolation/claims, migration access and student authentication. Source tests
-prove configuration boundaries, not external OAuth or browser compatibility.
-
-Official references:
-- https://firebase.google.com/docs/auth/web/google-signin#customizing-the-redirect-domain-for-google-sign-in
-- https://firebase.google.com/docs/hosting/custom-domain
-- https://firebase.google.com/docs/auth/web/redirect-best-practices
+Set `sols-site/auth-domain.json` enabled to false, then build/sync from a **fresh
+source checkout**, after explicit production approval. The source production
+config and all source inline fallbacks retain b3-games.firebaseapp.com. Do not
+reuse an already transformed output for rollback. Keep both OAuth redirect URIs,
+all authorized domains and the custom helper available; let in-flight sign-ins
+finish. No account/data migration or replacement OAuth client is needed.

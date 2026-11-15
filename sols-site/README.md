@@ -47,7 +47,7 @@ funtorahtools.com entries, or that feature will fail on sols.tools.
 
 ## Google sign-in domain
 
-The custom-domain cutover is prepared but disabled in `auth-domain.json`.
-Follow [the setup and verification steps](../docs/SOLS-AUTH-DOMAIN.md) before
-activating it. The website stays on GitHub Pages; Firebase Hosting serves only
+The custom-domain cutover is enabled in PR #838 through `auth-domain.json`.
+Complete [the sign-in verification and release checks](../docs/SOLS-AUTH-DOMAIN.md)
+before merging or deploying it. The website stays on GitHub Pages; Firebase Hosting serves only
 the authentication subdomain. Staging keeps its separate Firebase project.

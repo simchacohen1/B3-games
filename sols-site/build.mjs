@@ -129,7 +129,7 @@ function* htmlFiles(dir) {
   }
 }
 
-// Disabled until Firebase Hosting, DNS/TLS and OAuth have been verified.
+// Production SOLS cutover; auth-domain.json also provides the legacy-domain rollback.
 const authSettings = JSON.parse(readFileSync(join(here, 'auth-domain.json'), 'utf8'));
 authDomain.applyAuthDomain(target, authSettings);
 

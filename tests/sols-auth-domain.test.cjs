@@ -7,8 +7,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const {applyAuthDomain} = require('../sols-site/auth-domain.cjs');
 const config = fs.readFileSync(path.join(__dirname, '../firebase-config.js'), 'utf8');
-test('cutover remains off until owner completes external provisioning', () => {
-  assert.deepEqual(require('../sols-site/auth-domain.json'), {enabled:false, domain:'auth.sols.tools'});
+test('SOLS build enables the owner-provisioned production custom domain', () => {
+  assert.deepEqual(require('../sols-site/auth-domain.json'), {enabled:true, domain:'auth.sols.tools'});
 });
 test('generated production configs and inline fallbacks change together; staging and account resources stay separate', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sols-auth-'));
@@ -42,4 +42,43 @@ test('auth-only hosting cannot deploy functions or database rules or redirect th
   assert.equal(config.hosting.public,'auth-hosting');
   assert.equal(config.hosting.rewrites,undefined);
   assert.equal(config.hosting.redirects,undefined);
+});
+
+test('every published production initializer uses the same domain; disabled builds retain the legacy fallback', () => {
+  const root = path.join(__dirname, '..');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sols-auth-audit-'));
+  const production = [];
+  // Independently audit every shipped JS/HTML config, including named apps and
+  // inline fallbacks, rather than maintaining a short list of known pages.
+  const skip = /^(?:\.git|\.github|node_modules|backend|staging|sols-site|tests|e2e.*|docs|security|scripts|vendor|backup.*|preview.*)$/;
+  function copy(folder, relative = '') {
+    for (const entry of fs.readdirSync(folder, {withFileTypes:true})) {
+      const rel = path.join(relative, entry.name), source = path.join(folder, entry.name);
+      if (entry.isDirectory()) { if (!skip.test(entry.name)) copy(source, rel); }
+      else if (entry.isFile() && /\.(?:js|html?)$/.test(entry.name)) {
+        const text = fs.readFileSync(source, 'utf8');
+        if (/authDomain\s*:\s*["']b3-games\.firebaseapp\.com["']/.test(text)) production.push(rel);
+        fs.mkdirSync(path.dirname(path.join(dir, rel)), {recursive:true});
+        fs.writeFileSync(path.join(dir, rel), text);
+      }
+    }
+  }
+  try {
+    copy(root);
+    assert.ok(production.includes('firebase-config.js'));
+    assert.ok(production.includes(path.join('shorashim', 'teacher.js')));
+    assert.ok(production.length > 10, 'audit covers inline production fallbacks');
+    const before = new Map(production.map(rel => [rel, fs.readFileSync(path.join(dir,rel),'utf8')]));
+    assert.equal(applyAuthDomain(dir,{enabled:false,domain:'auth.sols.tools'}),0);
+    for (const [rel, text] of before) assert.equal(fs.readFileSync(path.join(dir,rel),'utf8'),text);
+    assert.equal(applyAuthDomain(dir,{enabled:true,domain:'auth.sols.tools'}),production.length);
+    for (const [rel, text] of before) {
+      assert.equal(fs.readFileSync(path.join(dir,rel),'utf8'),
+        text.replace(/(authDomain\s*:\s*["'])b3-games\.firebaseapp\.com/g,'$1auth.sols.tools'), rel);
+    }
+    for (const rel of ['site-settings.js','admin.html','teacher-home.html','class-pointer-prototype/dashboard.js']) {
+      assert.equal(fs.readFileSync(path.join(dir,rel),'utf8'),fs.readFileSync(path.join(root,rel),'utf8'),rel+' session/role code unchanged');
+    }
+    console.log('Audited production authDomain initializers: '+production.length);
+  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
 });

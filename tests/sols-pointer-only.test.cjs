@@ -61,7 +61,7 @@ test('the sols.tools build puts the rule first in the one script every page load
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sols-build-'));
  try{
   fs.cpSync(path.join(root,'sols-site'),path.join(dir,'sols-site'),{recursive:true});
-  fs.writeFileSync(path.join(dir,'firebase-config.js'),'// test\n');
+  fs.copyFileSync(path.join(root,'firebase-config.js'),path.join(dir,'firebase-config.js'));
   fs.writeFileSync(path.join(dir,'index.html'),'<!doctype html><html><head><title>Fun Torah Tools</title></head><body><h1>Fun Torah Tools</h1></body></html>');
   fs.mkdirSync(path.join(dir,'halacha'));
   fs.writeFileSync(path.join(dir,'halacha','index.html'),'<!doctype html><html><head><title>Halacha | Fun Torah Tools</title></head><body></body></html>');
