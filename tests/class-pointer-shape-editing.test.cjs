@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes22"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes23"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes22/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes23/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes22/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes23/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -661,4 +661,85 @@ test('the shared drawing toolbar (student boards, screen marks) nudges the picke
  assert.match(toolbar,/if\(e\.target\?\.closest\?\.\('input,textarea,select,\[contenteditable="true"\]'\)\)return;/,'typing in a box is left alone');
  assert.match(toolbar,/moveItem\(s,item,direction\[0\]\*px\/r\.width,direction\[1\]\*px\/r\.height\);\s*return true;/);
  assert.match(toolbar,/Arrow keys move it 1 pixel \(Shift: 10\)\. Delete removes it\./);
+});
+
+// ---------- Student marks on a whiteboard: none may be refused for reaching the margin ----------
+// A student on an activity page draws on a picture of the teacher's view. A whiteboard can be smaller than that view
+// (empty strip at the bottom or right), so a mark that reaches the strip used to land outside the board and the teacher
+// refused the whole mark. The real conversion (classroom.js) and the real store (classroom-core.js) are run here.
+function grabFunction(source,start){
+ const i=source.indexOf(start);assert.ok(i>=0,start+' is in the source');
+ let depth=0;for(let k=source.indexOf('{',i);k<source.length;k++){const c=source[k];if(c==='{')depth++;else if(c==='}'&&!--depth)return source.slice(i,k+1)}
+ assert.fail('unbalanced '+start);
+}
+function whiteboardRoom({viewW=1200,viewH=800,boardRatio=9/16,scrollLeft=0,scrollTop=0}={}){
+ // The whiteboard fits whole inside the view: pdf-mode.js relayout(), base=min(width,floor(height/ratio)).
+ const W=Math.min(viewW,Math.floor(viewH/boardRatio)),H=W*boardRatio;
+ const sandbox={scroller:{clientWidth:viewW,clientHeight:viewH,scrollLeft,scrollTop},W,H};
+ const activityPoint=vm.runInNewContext(grabFunction(pdf,'function activityPoint(point,toDocument=true)')+';activityPoint',sandbox);
+ const convert=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)');
+ const win={ClassPointerPdf:{active:()=>true,activityPoint}};
+ const toDocument=vm.runInNewContext(convert+';studentMessageToDocument',{window:win,C,Number,Math});
+ return{W,H,toDocument,activityPoint};
+}
+const marksOfDifferentSizes=()=>{
+ const pen=(n,x0,y0,dx,dy)=>({tool:'pen',color:'#c62828',size:.016,points:Array.from({length:n},(_,i)=>({x:Math.min(1,x0+i*dx),y:Math.min(1,y0+i*dy)}))});
+ const rect=(x1,y1,x2,y2)=>({tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:x1,y:y1},{x:x2,y:y2}]});
+ return [
+  pen(8,.1,.1,.02,.01),rect(.1,.2,.2,.3),pen(40,.2,.4,.012,.004),rect(.3,.3,.6,.6),pen(120,.05,.5,.007,.003),
+  rect(.1,.1,.9,.9),pen(255,.02,.02,.0035,.0035),rect(.5,.6,.95,.97),pen(30,.4,.9,.01,.002),
+  {tool:'ellipse',color:'#2e7d32',size:.028,points:[{x:.2,y:.7},{x:.8,y:.99}]},{tool:'line',color:'#ef6c00',size:.008,points:[{x:.05,y:.95},{x:.99,y:.99}]},
+  {tool:'triangle',color:'#7b1fa2',size:.016,points:[{x:.6,y:.5},{x:.99,y:.98}]}
+ ];
+};
+
+test('twelve student marks of different sizes all stay, even ones that reach the empty strip around the board',()=>{
+ const room=whiteboardRoom(),marks=marksOfDifferentSizes();
+ assert.equal(marks.length,12);
+ const store=new C.HighlightStore();
+ let before=0;
+ for(const stroke of marks){
+  const sent=room.toDocument({type:'highlight',stroke});
+  assert.ok(sent.stroke.points.every(C.validPoint),'every point is on the board');
+  assert.ok(store.add('student:a',sent.stroke),'the teacher keeps the mark');
+  // What the old code did: convert and hand the points over unchecked. Count the marks it would have refused.
+  const old={...stroke,points:stroke.points.map(point=>room.activityPoint(point))};
+  if(!C.cleanStroke(old))before++;
+ }
+ assert.equal(store.strokes.length,12);
+ assert.ok(before>=4,'before the fix several of these marks were refused (here '+before+')');
+});
+
+test('a mark drawn fully inside the board is not moved by the fix',()=>{
+ const room=whiteboardRoom(),stroke={tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:.2,y:.2},{x:.4,y:.4}]};
+ const sent=room.toDocument({type:'highlight',stroke}),expected=stroke.points.map(point=>room.activityPoint(point));
+ assert.deepEqual(plain(sent.stroke.points.map(p=>({x:p.x,y:p.y}))),plain(expected.map(p=>({x:p.x,y:p.y}))));
+});
+
+test('a mark in the empty strip is held at the board edge, in every direction',()=>{
+ const wide=whiteboardRoom({viewW:1600,viewH:700}),tall=whiteboardRoom({viewW:900,viewH:1000});
+ for(const room of [wide,tall]){
+  const sent=room.toDocument({type:'highlight',stroke:{tool:'pen',color:'#c62828',size:.016,points:[{x:.99,y:.99},{x:1,y:1},{x:.95,y:.97}]}});
+  assert.ok(sent.stroke.points.every(p=>p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1));
+ }
+ // A pointer in the strip is pinned too.
+ const pointer=tall.toDocument({type:'point',point:{x:.99,y:.99,tool:'target'}});
+ assert.ok(pointer.point.x<=1&&pointer.point.y<=1&&pointer.point.tool==='target');
+});
+
+test('no whiteboard or document open: the message passes through untouched',()=>{
+ const convert=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)');
+ const pass=vm.runInNewContext(convert+';studentMessageToDocument',{window:{ClassPointerPdf:{active:()=>false}},C,Number,Math});
+ const message={type:'highlight',stroke:{tool:'pen',color:'#c62828',size:.016,points:[{x:.1,y:.1},{x:.2,y:.2}]}};
+ assert.equal(pass(message),message);
+});
+
+test('the teacher page uses the helper, the student page says when a mark is refused and keeps off-view points',()=>{
+ const teacherPage=read('class-pointer-prototype/classroom.js'),share=read('class-pointer-prototype/activity-share.js');
+ assert.match(teacherPage,/message=studentMessageToDocument\(message\);/);
+ assert.doesNotMatch(teacherPage,/const toDocument=p=>window\.ClassPointerPdf\.activityPoint\(p\);/,'the unchecked conversion is gone');
+ assert.match(share,/if\(message\.type==='highlight-error'\)\{\s*if\(admitted\)\{const before=lessonStatus\.textContent;lessonStatus\.textContent='That mark could not be added\./);
+ assert.match(share,/Math\.abs\(p\.x\)<=8&&Math\.abs\(p\.y\)<=8\);/);
+ assert.doesNotMatch(share,/p\.x>=0&&p\.x<=1&&p\.y>=0&&p\.y<=1\);\s*if\(!points\.length\)continue;/);
+ assert.match(share,/markLayer\.style\.cssText='position:absolute;pointer-events:none;overflow:hidden';/);
 });
