@@ -56,11 +56,13 @@ test('Sefer pictures keep correctly aligned fill after rapid date navigation (sy
     const match = new URL(response.url()).pathname.match(/\/coloring-v2\/(\d+)\.png$/);
     if (match) servedArt.set(match[1], crypto.createHash('sha256').update(await response.body()).digest('hex'));
   });
+  // Pin "today" inside the approved week so the test does not start failing when the
+  // real calendar moves past it. October 27, 2026 at noon in Kingston is card 501.
+  await page.clock.setFixedTime(new Date('2026-10-27T16:00:00Z'));
   await page.goto('https://sefer.local.test/sefer-hamitzvos/index.html');
   await page.waitForFunction(() => typeof regionMask !== 'undefined' && !!regionMask && !paintLoading, { timeout: 30000 });
   const firstCard = await page.locator('#card').inputValue();
-  // Today's picture must be the owner-approved artwork, byte for byte. When a new
-  // week's art is approved, add its SHA-256 here.
+  // The pinned day's picture must be the owner-approved artwork, byte for byte.
   const todayArt = firstCard.padStart(3, '0');
   expect(APPROVED_ART_SHA256[todayArt], `today's card ${firstCard} has no approved artwork registered`).toBeTruthy();
   await expect(page.locator('#outline')).toHaveAttribute('src', new RegExp(`coloring-v2/${todayArt}\\.png(?:\\?|$)`));

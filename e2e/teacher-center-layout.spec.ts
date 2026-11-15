@@ -20,7 +20,7 @@ for (const role of ['admin', 'teacher']) {
           const access={authorized:true,role:${JSON.stringify(role)},classIds:${JSON.stringify(role === 'admin' ? ['*'] : ['mine'])}};
           const settings={siteEnabled:true,games:{},classGames:{},classAccess:{et:{mode:'open',lockWindows:{}},wt:{mode:'open',lockWindows:{}}}};
           window.B3SiteSettings={workspaceId:'b3-2026',getCurrentAccess:()=>access,subscribe:cb=>cb(settings),normalizeSettings:s=>s,describeClassAccess:()=>({open:true}),isClassOpen:()=>true,activeLockedGameList:()=>[]};
-          window.firebase={auth:()=>({currentUser:{uid:'test',email:'test@example.test'}}),database:()=>({ref:()=>({once:async()=>({val:()=>({name:'My Class',active:true})})})})};
+          window.firebase={auth:()=>({currentUser:{uid:'test',email:'test@example.test'}}),database:()=>({ref:()=>({once:async()=>({val:()=>({name:'My Class',active:true})}),on:(event,callback)=>{callback({val:()=>({name:'My Class',active:true})});return ()=>{}},off:()=>{}})})};
           document.getElementById('adminControls').classList.remove('hidden');
           document.getElementById('classMemberList').textContent='Test Student';
           document.getElementById('studentToolChoices').textContent='Individual student tool choices';
@@ -49,8 +49,12 @@ for (const role of ['admin', 'teacher']) {
       await expect(content.getByText('Test Student', { exact: true })).toBeHidden();
       await page.getByRole('button', { name: /Administration.*Teachers/ }).click();
       const administration = page.frameLocator('#administrationFrame');
-      await expect(administration.getByRole('heading', { name: 'Teachers', exact: true })).toBeVisible();
-      await expect(administration.getByRole('heading', { name: 'Classes', exact: true })).toBeVisible();
+      // Owner Admin is drill-down: it opens on the school list, and the
+      // Teachers and Classes sections stay hidden until a school is opened.
+      await expect(administration.getByRole('heading', { name: /Schools$/ })).toBeVisible();
+      await expect(administration.locator('#addSchool')).toBeVisible();
+      await expect(administration.locator('[data-view="teachers"]')).toBeHidden();
+      await expect(administration.locator('[data-view="classes"]')).toBeHidden();
       await expect(page.locator('#adminFrame')).toBeHidden();
       await page.getByRole('button', { name: /View as Teacher/ }).click();
       await expect(page.getByRole('dialog')).toBeVisible();

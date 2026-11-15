@@ -100,6 +100,7 @@ button:disabled{opacity:.55;cursor:wait}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../backend/functions/student-tool-policy.js"></script>
 <script src="../yiddish/api.js"></script>
 <script src="quiz-history.js?v=20261026-simple-csv"></script>
 <script src="quiz-export.js?v=20261030-quizzes-only"></script>
@@ -222,6 +223,18 @@ function sumQuiz(hist){
  return {...q,count:q.completed};
 }
 
+/* Report tool -> the activity id used for class access on the Learning Island home page. */
+const TOOL_IDS={posuk:'posuk-practice-scroll',chazara:'chazara',shorashim:'shorashim',rashi:'rashi-letters',gematria:'gematria',yiddish:'yiddish',halacha:'halacha',quiz:'weekly-quiz'};
+/* Tools turned on for this class, decided the same way as the Learning Island home page:
+   the class's tool grants, or the site settings for the legacy ET/WT classes. */
+async function enabledToolsFor(c,legacy){
+ const keys=Object.keys(TOOL_IDS);
+ try{
+  if(legacy){const st=await api.readOnce();return keys.filter(k=>api.isGameEnabledForClass(st,c.id,TOOL_IDS[k]))}
+  return keys.filter(k=>window.B3StudentTools.granted(c,TOOL_IDS[k]));
+ }catch(e){console.warn('Enabled tools',e);return keys}
+}
+
 /* ---------- Loading ---------- */
 async function classIdsFor(acc,u){
  const all=obj(await get('b3Games/workspaces/'+WS+'/classes'));
@@ -231,7 +244,7 @@ async function classIdsFor(acc,u){
   ids=(acc.classIds||[]).filter(Boolean);
   if(!ids.length&&u){const row=obj(await get('b3Games/workspaces/'+WS+'/teachers/'+u.uid));ids=Object.keys(obj(row.classIds)).filter(id=>id!=='*'&&row.classIds[id]===true)}
  }
- return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members)}));
+ return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members),toolGrants:obj(all[id].toolGrants)}));
 }
 async function loadClass(c){
  const legacy=LEGACY.includes(c.id);
@@ -242,6 +255,7 @@ async function loadClass(c){
   (async()=>{const q=legacy?'b3Quiz':'b3Quiz/classes/'+c.id;const [launches,responses,completions]=await Promise.all([get(q+'/launches'),get(q+'/responses'),get(q+'/completions')]);return {launches,responses,completions}})(),
   (async()=>{try{if(!user||!window.YiddishAPI)return null;const r=await YiddishAPI.call('teacherLoad',{classId:legacy?'':c.id,idToken:await user.getIdToken()});return r&&r.storyGranted!==false?obj(r.students):null}catch(e){console.warn('Yiddish',e);return null}})()
  ]);
+ const enabled=(await enabledToolsFor(c,legacy)).filter(k=>k!=='yiddish'||yid);
  const students=await Promise.all(ids.map(async id=>{
   const m=obj(c.members[id]);
   const [profile,att,pinfo,chz,chzEv,sh,rashi,hal,rew]=await Promise.all([
@@ -254,7 +268,7 @@ async function loadClass(c){
   const name=String(m.name||(profile&&profile.name)||(pinfo&&pinfo.name)||id);
   return {id,name,raw:{att,pinfo,chz,chzEv,sh,rashi,hal,gem:obj(gem)[id],yid:yid?yid[id]:null,rew}};
  }));
- return {classId:c.id,quizRoot:quiz,students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
+ return {classId:c.id,enabled,quizRoot:quiz,students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
 }
 function summarize(s,d){
  const days=+$('period').value,since=days?Date.now()-days*DAY:0,r=s.raw,x=extras[d.classId+'/'+s.id]||{};
@@ -265,8 +279,8 @@ function summarize(s,d){
  };
  const rew=r.rew&&typeof r.rew==='object'?{balance:+(r.rew.rewardBalance||r.rew.currentBalance||0)}:null;
  const last=Math.max(0,...Object.values(t).map(v=>v&&v.last||0));
- const toolsUsed=Object.values(t).filter(v=>v&&(v!==t.quiz||v.attempts>0)).length;
- return {...s,t,rew,last,toolsUsed,quizHist};
+ const toolsUsed=d.enabled.filter(k=>t[k]&&(k!=='quiz'||t[k].attempts>0)).length;
+ return {...s,t,rew,last,toolsUsed,toolsTotal:d.enabled.length,quizHist};
 }
 
 /* ---------- Class table ---------- */
@@ -284,7 +298,7 @@ function sortVal(s,k){const t=s.t;switch(k){
 function cell(k,s){
  const t=s.t,none='<td class="none">—</td>',pl=$('period').selectedOptions[0].text.toLowerCase();
  switch(k){
-  case'name':return '<td><button class="name" data-id="'+esc(s.id)+'">'+esc(s.name)+'</button><span class="m">'+s.toolsUsed+' of 8 tools used</span></td>';
+  case'name':return '<td><button class="name" data-id="'+esc(s.id)+'">'+esc(s.name)+'</button><span class="m">'+s.toolsUsed+' of '+s.toolsTotal+' tools used</span></td>';
   case'last':return '<td><span class="dot '+dotFor(s.last)+'"></span>'+esc(ago(s.last))+'</td>';
   case'posuk':return t.posuk?'<td>'+t.posuk.mastered+' of '+t.posuk.pesukim+' pesukim at 100%<span class="m">'+t.posuk.tries+' tries '+esc(pl)+'</span></td>':none;
   case'chazara':return t.chazara?'<td>'+t.chazara.inPeriod+' chazaras <span class="m">'+esc(pl)+' · '+t.chazara.reviewed+' pesukim reviewed</span></td>':none;
@@ -297,7 +311,7 @@ function cell(k,s){
   case'rewards':return s.rew?'<td>'+s.rew.balance+'</td>':none;
  }
 }
-function visibleCols(){const d=loaded[current]||{};return COLS.filter(([k])=>(k!=='yiddish'||d.yiddishOk)&&(k!=='rewards'||d.rewardsOk))}
+function visibleCols(){const d=loaded[current]||{};return COLS.filter(([k])=>(!(k in TOOL_IDS)||(d.enabled||[]).includes(k))&&(k!=='rewards'||d.rewardsOk))}
 function drawTable(){
  const d=loaded[current];if(!d)return;
  const rows=d.students.map(s=>summarize(s,d));d.view=rows;

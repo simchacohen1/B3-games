@@ -36,3 +36,23 @@ test('Chazara only skips the UID-based teacher lookup inside a verified read-onl
  assert.equal((html.match(/if\(needsTeacherAssignmentRefresh\(access\)\)\{/g)||[]).length,2,
   'initial load and one-minute refresh must have the same policy');
 });
+
+function readonlyAccess(previewContext){
+ const fs=require('node:fs'),vm=require('node:vm');
+ const noop=()=>{},proto=function(){};proto.prototype={};
+ const api={getCurrentAccess:()=>({authorized:true,role:'admin'})};
+ const win={B3SiteSettings:api,fetch:async()=>({}),addEventListener:noop};
+ win.parent={__B3_PREVIEW_CONTEXT:previewContext,location:{origin:'https://example.test'}};
+ const sandbox={window:win,document:{addEventListener:noop,documentElement:{replaceChildren:noop},createTextNode:noop},
+  XMLHttpRequest:proto,HTMLFormElement:proto,navigator:{},location:{href:'https://example.test/'},URL,Promise,Set,Array,Object,String,Error};
+ vm.runInNewContext(fs.readFileSync('teacher-preview-readonly.js','utf8'),sandbox);
+ const access=api.getCurrentAccess();return {...access,classIds:[...access.classIds]};
+}
+test('tool preview gives tools every class the teacher is assigned to, selected class first',()=>{
+ const access=readonlyAccess({verified:true,teacherName:'T',classId:'b',className:'B',classIds:['a','b','c']});
+ assert.deepEqual(access.classIds,['b','a','c']);assert.equal(access.role,'teacher');assert.equal(access.preview,true);
+});
+test('tool preview drops unsafe class ids and still works without a class list',()=>{
+ assert.deepEqual(readonlyAccess({verified:true,classId:'b',classIds:['a','../x','',7,'a']}).classIds,['b','a']);
+ assert.deepEqual(readonlyAccess({verified:true,classId:'b'}).classIds,['b']);
+});

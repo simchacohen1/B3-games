@@ -4,10 +4,16 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const root='b3Games/workspaces/b3-2026/';
+// A child path resolves inside its nearest stored parent, as in the real database.
+function readRow(rows,key){
+  if(key in rows)return rows[key];
+  const parent=Object.keys(rows).filter(k=>key.startsWith(k+'/')).sort((a,b)=>b.length-a.length)[0];
+  return parent?key.slice(parent.length+1).split('/').reduce((v,k)=>v?.[k],rows[parent]):undefined;
+}
 function harness(identity,rows){
   const reads=[];
   const snap=value=>({exists:()=>value!=null,val:()=>value??null,child:key=>snap(key.split('/').reduce((v,k)=>v?.[k],value))});
-  const admin={apps:[{}],auth:()=>({verifyIdToken:async(token,revoked)=>{assert.equal(token,'synthetic-token');assert.equal(revoked,true);return identity;}}),database:()=>({ref:key=>({get:async()=>{reads.push(key);return snap(rows[key]);}})})};
+  const admin={apps:[{}],auth:()=>({verifyIdToken:async(token,revoked)=>{assert.equal(token,'synthetic-token');assert.equal(revoked,true);return identity;}}),database:()=>({ref:key=>({get:async()=>{reads.push(key);return snap(readRow(rows,key));}})})};
   const mod={exports:{}};
   new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/class-gallery-read.js'),'utf8'))(name=>name==='node:crypto'?require('node:crypto'):name==='firebase-admin'?admin:{onRequest:(options,handler)=>handler},mod,mod.exports);
   return async(classId,authenticated=true)=>{
@@ -30,4 +36,14 @@ test('synthetic assigned teacher sees legacy pending queue; unassigned teacher i
   const run=harness({uid:'teacher',firebase:{sign_in_provider:'google.com'}},{[root+'classes/et']:{active:true},[root+'classes/wt']:{active:true},[root+'teachers/teacher']:{active:true,classIds:{et:true}},'classGallery/posts':{pending:{className:'B3 ET',status:'pending'},other:{className:'B3 WT',status:'pending'}}});
   assert.deepEqual((await run('et')).body.posts,{pending:{className:'B3 ET',status:'pending'}});
   assert.equal((await run('wt')).code,403);
+});
+test('gallery poll never downloads the whole class record',async()=>{
+  const run=harness({uid:'synthetic',b3StudentRole:'student',b3ClassId:'et',b3StudentId:'one'},{[root+'classes/et']:{active:true,members:{one:{active:true}}},'classGallery/posts':{}});
+  const {code,reads}=await run('et');
+  assert.equal(code,200);
+  assert.equal(reads.includes(root+'classes/et'),false);
+});
+test('a class with no record at all is rejected',async()=>{
+  const run=harness({uid:'synthetic',b3StudentRole:'student',b3ClassId:'gone',b3StudentId:'one'},{'classGallery/posts':{}});
+  assert.equal((await run('gone')).code,403);
 });

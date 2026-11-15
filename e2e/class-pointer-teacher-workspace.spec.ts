@@ -488,3 +488,131 @@ test('Stop sharing stays on the Live bar on every tab and ends the share from on
   expect(errors).toEqual([]);
   await context.close();
 });
+
+// ---------- Two-way sharing: the teacher points and draws on a student's shared screen ----------
+async function addPresenceStudent(page: Page, studentId: string, name: string) {
+  await page.evaluate(({ studentId, name }) => {
+    (window as any).__sent = (window as any).__sent || [];
+    const connection = { open: true, peer: 'synthetic-presence-' + studentId, send: (m: any) => (window as any).__sent.push({ to: studentId, ...JSON.parse(JSON.stringify(m)) }), close() {} };
+    (window as any).ClassPointerBridge.presence().set('presence:' + studentId, { id: 'presence:' + studentId, presence: true, admitted: true, studentId, name, activity: 'Shorashim', connection, connectedAt: Date.now() });
+  }, { studentId, name });
+}
+const sentOf = (page: Page, type: string) => page.evaluate(t => ((window as any).__sent || []).filter((m: any) => m.type === t), type);
+const shareAs = (studentId: string, studentName: string) => (route: any) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true, studentId, studentName }) });
+
+test('teacher points and draws on an enlarged student screen; only that student receives the marks', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  await context.route(SHARE_API, shareAs('pt1', 'Pointer Test Student One'));
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await addPresenceStudent(page, 'pt1', 'Pointer Test Student One');
+  await addPresenceStudent(page, 'pt2', 'Pointer Test Student Two');
+  await fakeScreenCall(page, 'a'.repeat(64));
+  const tile = page.locator('#activityScreenTray .cp-activity-screen').first();
+  // Small tiles have no drawing tools; the shared drawing toolbar opens by itself once the screen is enlarged.
+  const tools = page.locator('#fttAnnotate .fa-bar');
+  await expect(tools).toBeHidden();
+  await tile.locator('video').click();
+  await expect(tools).toBeVisible();
+  // It starts on Hand: nothing is sent until the teacher picks a tool.
+  await expect(tools.getByRole('button', { name: /^Hand:/ })).toHaveAttribute('aria-pressed', 'true');
+  // Point: the student gets the moving pointer.
+  await tools.getByRole('button', { name: /^Pointer:/ }).click();
+  const ink = tile.locator('canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
+  await expect.poll(async () => (await sentOf(page, 'board-screen-live')).some((m: any) => m.point && Math.abs(m.point.x - 0.25) < 0.02)).toBe(true);
+  // Pen: a finished line goes to Student One, never to Student Two.
+  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3); await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.4, { steps: 8 }); await page.mouse.up();
+  await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
+  const stroke = (await sentOf(page, 'board-screen-marks')).at(-1).strokes[0];
+  expect(stroke.tool).toBe('pen'); expect(stroke.points.length).toBeGreaterThan(2);
+  expect(await page.evaluate(() => (window as any).__sent.every((m: any) => m.to === 'pt1'))).toBe(true);
+  await shot(page, 'teacher-draws-on-student-screen');
+  await tools.getByRole('button', { name: /Undo my last change/ }).click();
+  await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(0);
+  // Drawing on the student's screen never placed the teacher's own lesson pointer.
+  expect(await page.locator('#pointerLayer [data-person="teacher"]').count()).toBe(0);
+  await page.getByRole('button', { name: '◀ Back to gallery' }).click();
+  await expect(tools).toBeHidden();
+  // When the student stops sharing, his screen is told to clear the marks.
+  const before = (await sentOf(page, 'board-screen-marks')).length;
+  await page.evaluate(() => (window as any).__calls[0].close());
+  await expect(page.locator('#activityScreenTray .cp-activity-screen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect((await sentOf(page, 'board-screen-marks')).length).toBeGreaterThanOrEqual(before);
+  await context.close();
+});
+
+test('the Student screens gallery offers the same Point and Pen tools on a screen opened large', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  await context.route(SHARE_API, shareAs('pt1', 'Pointer Test Student One'));
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await addPresenceStudent(page, 'pt1', 'Pointer Test Student One');
+  await fakeScreenCall(page, 'a'.repeat(64));
+  await expect(page.locator('#studentBoards')).toBeEnabled();
+  await page.getByRole('button', { name: 'Student screens' }).click();
+  const grid = page.locator('#boardsView .board-tile');
+  await expect(grid).toHaveCount(1);
+  await grid.first().click();
+  const tools = page.locator('#fttAnnotate .fa-bar');
+  await expect(tools).toBeVisible();
+  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  const ink = page.locator('#boardsView .board-screen-large canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
+  await shot(page, 'gallery-draws-on-student-screen');
+  await tools.getByRole('button', { name: /Erase all my marks here/ }).click();
+  await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(0);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('a student sees the teacher’s pointer and drawing on top of his activity, and it clears when told', async ({ browser }) => {
+  const s = await studentActivity(browser, () => ({ status: 200, body: { ok: true, token: 'synthetic-token' } }));
+  await expect.poll(() => s.page.evaluate(() => typeof (window as any).ClassPointerBoards?.fromTeacher), { timeout: 15000 }).toBe('function');
+  // This harness has no teacher to connect to: wait until that attempt has ended (which resets the class connection).
+  await expect.poll(() => s.calls.includes('joinIssue'), { timeout: 15000 }).toBe(true); await s.page.waitForTimeout(300);
+  const line = { id: 't1-a', tool: 'pen', color: '#ef4444', size: 0.004, points: [{ x: 0.2, y: 0.5 }, { x: 0.8, y: 0.5 }] };
+  await s.page.evaluate(line => {
+    const B = (window as any).ClassPointerBoards;
+    // Anything malformed is ignored.
+    B.fromTeacher({ type: 'board-screen-marks', strokes: [{ id: 'evil', tool: 'pen', color: 'red', size: 9, points: [{ x: 5, y: 5 }] }] });
+    B.fromTeacher({ type: 'board-screen-marks', strokes: [line] });
+    B.fromTeacher({ type: 'board-screen-live', point: { x: 0.5, y: 0.3 }, draft: null });
+  }, line);
+  const layer = s.page.locator('.cp-my-screen-ink');
+  await expect(layer).toBeVisible();
+  await expect(layer.locator('[role="status"]')).toHaveText(/Your teacher is showing you something/);
+  // The red line is painted across the middle of the screen, and the layer never blocks the activity.
+  const red = await s.page.evaluate(() => {
+    const c = document.querySelector('.cp-my-screen-ink canvas') as HTMLCanvasElement; const ctx = c.getContext('2d')!;
+    const sx = c.width / innerWidth, sy = c.height / innerHeight, border = Math.max(0, (outerWidth - innerWidth) / 2);
+    const ox = (screenX || 0) + border, oy = (screenY || 0) + Math.max(0, outerHeight - innerHeight - border);
+    const px = ctx.getImageData(Math.round((0.5 * screen.width - ox) * sx), Math.round((0.5 * screen.height - oy) * sy), 1, 1).data;
+    return [px[0], px[1], px[2], px[3]];
+  });
+  expect(red[0]).toBeGreaterThan(200); expect(red[3]).toBeGreaterThan(200);
+  expect(await layer.evaluate(el => getComputedStyle(el).pointerEvents)).toBe('none');
+  await shot(s.page, 'student-sees-teacher-marks');
+  await s.page.evaluate(() => (window as any).ClassPointerBoards.clearScreenMarks());
+  await expect(layer).toBeHidden();
+  await s.context.close();
+});
+
+test('a first-time teacher can open a short guide from the top bar', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.getByRole('button', { name: '❓ Help' }).click();
+  const guide = page.getByRole('dialog', { name: 'How Class Pointer works' });
+  await expect(guide).toBeVisible();
+  await expect(guide.locator('.cp-guide-steps li')).toHaveCount(5);
+  await expect(guide).toContainText('Point or draw on a student’s screen');
+  await shot(page, 'first-time-guide');
+  await guide.getByRole('button', { name: 'Got it' }).click();
+  await expect(guide).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('classPointerGuideSeen'))).toBe('1');
+  expect(errors).toEqual([]);
+  await context.close();
+});

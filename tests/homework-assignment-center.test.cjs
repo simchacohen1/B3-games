@@ -109,6 +109,9 @@ test('homework runs only on the live site with live config, or on staging; activ
 
   const html = fs.readFileSync(__dirname + '/../assignment-center/student.html', 'utf8');
   assert.match(html, /data-assignment-launch/);
+  // The activity tab must inherit the student's sessionStorage sign-in; noopener blocks that copy.
+  assert.match(html, /launch.rel='opener'/);
+  assert.doesNotMatch(html, /launch.rel='noopener'/);
   assert.match(html, /press Hand In\. The activity does not send your homework/);
   const cardCode = html.slice(html.indexOf('function card(a)'), html.indexOf('async function refresh()'));
   const launchCode = cardCode.slice(cardCode.indexOf('var activityUrl'), cardCode.indexOf("if(a.status==='returned'"));
@@ -173,7 +176,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   assert.match(homeSource, /id="homeworkCenterCard" href="assignment-center\/teacher\.html"[^>]*>[\s\S]*?Homework &amp; Assignments/,
     'the main Teacher Tools panel links directly to the Homework Center');
-  assert.match(homeSource, /fun-torah-tools-staging--homework-406-preview/,
+  assert.match(homeSource, /homework-406-preview\|pr-597-homework-notes/,
     'the signed-in student auth route recognizes only the staging Homework preview host');
   assert.match(homeSource, /return "https:\/\/us-central1-b3-games\.cloudfunctions\.net\/funTorahStudentAuth"/,
     'student auth keeps the production function target on production hosts');
@@ -253,7 +256,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     assert.match(injector.inject(html), /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} gets the staging guard in the preview copy`);
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
-  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites');
+  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/sols\.tools','https:\/\/www\.sols\.tools','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites (funtorahtools.com and sols.tools, #825)');
   assert.doesNotMatch(fnSource, /fun-torah-tools-staging/, 'the live function never lists staging sites');
   for (const file of ['homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(
@@ -274,7 +277,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     'staging student login honors and validates the requested class');
   const e2eSource = fs.readFileSync(__dirname + '/../e2e-staging/staging-common.ts', 'utf8');
   assert.match(e2eSource, /FTT_STAGING_SITE must be the staging live site/);
-  assert.match(e2eSource, /fun-torah-tools-staging--homework-406-preview/);
+  assert.match(e2eSource, /homework-406-preview\|pr-597-homework-notes/);
   const smokeSource = fs.readFileSync(__dirname + '/../e2e-staging/public-smoke.spec.ts', 'utf8');
   assert.match(smokeSource, /tool\.previewOnly && process\.env\.GITHUB_EVENT_NAME === 'pull_request'/);
 });

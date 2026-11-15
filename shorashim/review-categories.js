@@ -36,7 +36,7 @@
   function cardsForReviewTrack(track = reviewTrack, s = student(), applyPerekFilter = true) {
     let cards = learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
     if (track === 'shorashim' && applyPerekFilter && typeof reviewPerekFilter !== 'undefined' && reviewPerekFilter !== 'all') {
-      cards = cards.filter(c => reviewPerekFilter === 'booklet' ? !!getItem(c.itemKey)?.bookletWeek : itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
+      cards = cards.filter(c => reviewPerekFilter === 'booklet' ? !!getItem(c.itemKey)?.bookletWeek : !getItem(c.itemKey)?.bookletWeek && unitKeyOf(getItem(c.itemKey)) === reviewPerekFilter);
     }
     return cards;
   }
@@ -67,6 +67,7 @@
   function updatePerekFilterVisibility() {
     const filter = document.querySelector('.review-perek-filter');
     if (!filter) return;
+    if (typeof renderReviewUnitFilters === 'function') renderReviewUnitFilters();
     filter.classList.toggle('hidden', reviewTrack !== 'shorashim');
   }
 
@@ -147,6 +148,7 @@
   };
 
   renderReviewAvailability = function categoryAwareRenderReviewAvailability() {
+    if (typeof renderReviewUnitFilters === 'function') renderReviewUnitFilters();
     const hasAny = eligibleLearnedCards().length > 0;
     const empty = document.getElementById('reviewEmpty');
     const setup = document.getElementById('reviewSetup');

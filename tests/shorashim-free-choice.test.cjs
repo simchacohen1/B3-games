@@ -38,42 +38,64 @@ test('word list does not label or disable future available words',()=>{
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the perek-choice release');
 });
 
-test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
+const Units=require('../shorashim/units.js');
+const unitCtx=(items,extra={})=>{
+  const s={cards:{}};
+  const ctx=vm.createContext({window:{B3ShorashimUnits:Units},currentTrack:'shorashim',learningPerek:null,db:{settings:{}},
+    visibleCatalog:()=>items.filter(x=>!x.hidden),student:()=>s,keyFor:(t,id)=>t+':'+id,...extra});
+  ['unitKeyOf','unitLabels','studentUnits','currentLearningUnit','learningCatalog','nextLearningUncreated'].forEach(n=>vm.runInContext(fn(n),ctx));
+  return {ctx,s};
+};
+
+test('every perek is its own learning list, with no ordering locks and no hardcoded perakim',()=>{
   const items=[
     {id:'18-first',perek:18},{id:'18-second',perek:18},
     {id:'19-first',perek:19},{id:'19-second',perek:19},
-    {id:'19-hidden',perek:19,hidden:true}
-  ],s={cards:{}};
-  const ctx=vm.createContext({currentTrack:'shorashim',learningPerek:18,
-    visibleCatalog:()=>items.filter(x=>!x.hidden),itemPerek:x=>Number(x.perek),
-    student:()=>s,keyFor:(t,id)=>t+':'+id});
-  vm.runInContext(fn('learningCatalog'),ctx);
-  vm.runInContext(fn('nextLearningUncreated'),ctx);
+    {id:'19-hidden',perek:19,hidden:true},
+    {id:'20-first',perek:20},{id:'7-first',perek:'7'}
+  ];
+  const {ctx,s}=unitCtx(items);
+  // With no choice yet, the first perek in number order is used (Perek 7 here).
+  assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['7-first']);
+  ctx.learningPerek='perek:18';
   assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['18-first','18-second']);
   assert.equal(ctx.nextLearningUncreated().id,'18-first');
-  ctx.learningPerek=19;
+  ctx.learningPerek='perek:19';
   assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['19-first','19-second']);
-  assert.equal(ctx.nextLearningUncreated().id,'19-first');
   s.cards['shorashim:19-first']={learnedAt:Date.now()};
   assert.equal(ctx.nextLearningUncreated().id,'19-second');
-  assert.equal(ctx.learningCatalog('prefix').length,4); // non-Shorashim tracks are not filtered
+  ctx.learningPerek='perek:20';
+  assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['20-first'],'Perek 20 words are shown, not dropped or relabelled as 18');
+  assert.equal(ctx.learningCatalog('prefix').length,6); // non-Shorashim tracks are not filtered
 });
 
-test('choosing a perek updates the menu without leaving Shorashim',()=>{
-  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',followAllowsScreen:()=>true,goScreen:x=>screens.push(x)}); // no Follow Teacher restriction active
-  vm.runInContext(fn('chooseLearningPerek'),ctx);
-  ctx.chooseLearningPerek('19');
+test('words without a perek are grouped by their list/category and teacher labels are used',()=>{
+  const items=[{id:'a',listName:'Animals'},{id:'b',listName:'Animals'},{id:'c'},{id:'p',perek:3}];
+  const {ctx}=unitCtx(items,{db:{settings:{unitLabels:{'perek:3':'Lech Lecha',[Units.labelStorageKey('list:Animals')]:'Animal words'}}}});
+  assert.deepEqual(Array.from(ctx.studentUnits().map(u=>u.key)),['perek:3','list:Animals','list:Main List']);
+  assert.deepEqual(Array.from(ctx.studentUnits().map(u=>u.label)),['Lech Lecha','Animal words','Main List']);
+  ctx.learningPerek='list:Animals';
+  assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['a','b']);
+});
+
+test('choosing a unit updates the menu without leaving Shorashim',()=>{
+  const screens=[],items=[{id:'x',perek:18},{id:'y',perek:19},{id:'z',perek:20}];
+  const ctx=vm.createContext({window:{B3ShorashimUnits:Units},db:{settings:{}},visibleCatalog:()=>items,currentTrack:'prefix',learningPerek:'perek:18',selectedItemKey:'prefix:p',followAllowsScreen:()=>true,goScreen:x=>screens.push(x)}); // no Follow Teacher restriction active
+  ['unitLabels','bookletAllowed','studentUnits','chooseLearningPerek'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ctx.chooseLearningPerek('perek:19');
   assert.equal(ctx.currentTrack,'shorashim');
-  assert.equal(ctx.learningPerek,19);
+  assert.equal(ctx.learningPerek,'perek:19');
   assert.equal(ctx.selectedItemKey,null);
   assert.deepEqual(screens,['learnScreen']);
-  ctx.chooseLearningPerek('18');
-  assert.equal(ctx.learningPerek,18);
+  ctx.chooseLearningPerek('perek:20');
+  assert.equal(ctx.learningPerek,'perek:20');
   assert.deepEqual(screens,['learnScreen','learnScreen']);
-  ctx.chooseLearningPerek('22');
+  ctx.chooseLearningPerek('perek:22'); // not in this class
+  assert.deepEqual(screens,['learnScreen','learnScreen']);
+  ctx.db.settings.showBooklet=false;
+  ctx.chooseLearningPerek('booklet'); // the teacher turned the booklet off
   assert.deepEqual(screens,['learnScreen','learnScreen']);
   assert.match(html,/data-go="shorashimPerekScreen" data-track="shorashim"/);
-  assert.match(html,/data-learning-perek="18"/);
-  assert.match(html,/data-learning-perek="19"/);
+  assert.match(html,/id="perekUnitChoices"/);
   assert.match(html,/changeLearningPerekBtn/);
 });

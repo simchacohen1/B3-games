@@ -1,6 +1,6 @@
 // Only the exact issue #406 Firebase Hosting preview channel uses the
 // generated staging config. Production keeps its existing config.
-if (/^fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app$/.test(location.hostname.toLowerCase())) {
+if (/^fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app$/.test(location.hostname.toLowerCase())) {
   var stagingConfig = window.B3_STAGING_FIREBASE_CONFIG;
   if (!stagingConfig || stagingConfig.projectId !== 'fun-torah-tools-staging') {
     throw new Error('Homework preview is blocked: staging Firebase config is missing.');
@@ -84,7 +84,7 @@ window.B3_DATA_MODEL = Object.freeze({
   const current = document.currentScript;
   if (!current || !current.src) return;
   const loader = document.createElement('script');
-  loader.src = new URL('gallery-share.js?v=20261022-pointer2', current.src).href;
+  loader.src = new URL('gallery-share.js?v=20261110-buttons1', current.src).href;
   loader.async = true;
   (document.head || document.documentElement).appendChild(loader);
 })();

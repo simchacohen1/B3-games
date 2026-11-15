@@ -1,0 +1,47 @@
+{
+  "environment": "isolated staging, fictional accounts/data only",
+  "projectId": "fun-torah-tools-staging",
+  "preview": "https://fun-torah-tools-staging--kriah-624-h422du6m.web.app/kriah-assessment/index.html",
+  "frontendCommit": "7362e6b75506ea796d61eb408e7070e8d919b434",
+  "backendCommit": "a0671925c3aa3ab22706d5e78009a1da0e717a97",
+  "hostingVersion": "7fe8914eb797c888",
+  "hostingExpiresUtc": "2026-11-15T03:27:07.727338931Z",
+  "bucket": {
+    "name": "fun-torah-tools-staging-kriah-private",
+    "projectNumber": "644865469135",
+    "uniformBucketLevelAccess": true,
+    "publicAccessPrevention": "enforced"
+  },
+  "focusedNodeTests": { "passed": 21, "failed": 0 },
+  "authenticatedApi": {
+    "passed": true,
+    "fictionalAccounts": 4,
+    "requests": 19,
+    "responseBytes": 7124,
+    "originalAudioBytes": 318,
+    "originalPreserved": true,
+    "privateDatabaseDirectStatus": 401,
+    "publicAudioStatus": 403,
+    "audioReadAttempts": 3,
+    "authorizedAudioDownloads": 1,
+    "teacherAndStudentIsolation": true,
+    "studentGradingDenied": true,
+    "teacherAndMembershipRevocationDenied": true,
+    "revokedTokenDenied": true
+  },
+  "connectedEdgeBrowser": {
+    "fictionalTeacherSignIn": true,
+    "audioDurationSeconds": 1,
+    "audioReadyState": 4,
+    "audioError": null,
+    "nekudahMarkupSaved": true,
+    "draftThenFinalSaved": true,
+    "reportCorrectUnits": 1,
+    "reportAssessedUnits": 2,
+    "reportNotAssessedUnits": 20,
+    "reportPercent": 50
+  },
+  "notVerified": ["complete remote automated microphone browser journey (runtime download timeout)", "real Safari/iPad"],
+  "productionChanged": false,
+  "merged": false
+}

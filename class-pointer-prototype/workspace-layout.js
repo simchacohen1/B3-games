@@ -10,17 +10,17 @@
     tabs.className='cp-workspace-tabs';
     tabs.setAttribute('aria-label','Classroom sections');
     const items=[
-      ['teach','✏️','My screen'],
-      ['screens','🖥️','Student screens'],
-      ['whiteboards','🎨','Student whiteboards']
+      ['teach','✏️','My screen','Teach from your screen, a PDF, a webpage or a whiteboard. Students see it.'],
+      ['screens','🖥️','Student screens','Asks every student to share their screen with you. Click My screen to bring them back.'],
+      ['whiteboards','🎨','Student whiteboards','Opens a private whiteboard on every student’s computer. Click My screen to bring them back.']
     ];
     const buttons=new Map();
-    for(const [id,icon,name] of items){
+    for(const [id,icon,name,help] of items){
       const b=document.createElement('button');
       b.type='button';b.className='cp-workspace-tab';b.dataset.workspace=id;
       b.innerHTML='<span class="cp-tab-icon" aria-hidden="true">'+icon+'</span><span>'+name+'</span>';
       b.setAttribute('aria-selected',String(id==='teach'));
-      b.setAttribute('aria-label',name);
+      b.setAttribute('aria-label',name);b.title=help;
       b.addEventListener('click',()=>activate(id));
       tabs.appendChild(b);buttons.set(id,b);
     }
@@ -50,6 +50,16 @@
       }
     }
     organize();
+    // Keep the tabs truthful when the gallery is opened or closed some other way
+    // (Student sharing button, Students menu, closing the gallery).
+    function syncTabs(){
+      const current=window.ClassPointerBoards?.workspace?.();
+      const id=current==='screens'?'screens':current==='boards'?'whiteboards':'teach';
+      for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
+      document.body.classList.toggle('cp-student-workspace',id!=='teach');
+    }
+    document.addEventListener('classpointer:sharing-state',syncTabs);
+    document.addEventListener('class-pointer-workspace',()=>setTimeout(syncTabs,0));
     new MutationObserver(organize).observe(dock,{childList:true,subtree:false});
     const observer=new MutationObserver(()=>{tabs.hidden=panel.hidden});
     observer.observe(panel,{attributes:true,attributeFilter:['hidden']});

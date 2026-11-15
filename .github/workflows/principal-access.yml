@@ -8,6 +8,7 @@ on:
       - 'site-settings.js'
       - 'backend/functions/teacher-claim-core.cjs'
       - 'tests/principal-scope.test.cjs'
+      - 'tests/owner-admin-bulk-upload.test.cjs'
       - '.github/workflows/principal-access.yml'
 permissions:
   contents: read
@@ -39,4 +40,4 @@ jobs:
           }
           NODE
       - name: Principal and teacher onboarding security regressions
-        run: node --test tests/principal-scope.test.cjs tests/direct-teacher-onboarding.test.cjs
+        run: node --test tests/principal-scope.test.cjs tests/direct-teacher-onboarding.test.cjs tests/owner-admin-bulk-upload.test.cjs

@@ -8,7 +8,7 @@ async function setup(page,{activity='/shorashim/',classId='et',joinAuthorized=tr
   await page.evaluate(({classId,joinAuthorized})=>{
     window.room=classId==='et'?'class-pointer-12345678-1234-1234-1234-123456789abc':'class-pointer-12345678-1234-1234-1234-123456789abd';
     sessionStorage.setItem('b3Games_studentId','test-boy');sessionStorage.setItem('b3Games_classPin','test-pin');
-    window.firebase={apps:[{}],database:()=>({ref:path=>{window.sessionPath=path;return {on:(_e,fn)=>window.sessionListener=fn}}})};
+    window.firebase={apps:[{}],database:()=>({ref:path=>{if(String(path).startsWith('.info/'))return {on:(_e,fn)=>fn({val:()=>0})};window.sessionPath=path;return {on:(_e,fn)=>window.sessionListener=fn}}})};
     window.B3_FIREBASE_CONFIG={};window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId})};
     window.requests=[];window.fetch=async(url,options)=>{const body=JSON.parse(options?.body||'{}');window.requests.push(body);const ok=body.action!=='joinIssue'||joinAuthorized;return {ok,status:ok?200:403,json:async()=>({ok,token:'test-ticket'})}};
     window.sent=[];window.calls=[];window.captureCount=0;
@@ -138,14 +138,14 @@ test('dedicated presentation view follows surface changes, hides exit only while
     expect(page.url()).toContain('/class-pointer-prototype/student-view.html');
   }
   // Since #263/#264 the toolbar always lists colour and thickness swatches, but with no permission
-  // every drawing control is hidden or disabled and the "View only" note is shown.
+  // every drawing control is hidden or disabled and the "Watch only" note is shown.
   const usableTools=page.locator('#fttLessonDrawTools button:visible:enabled');
   await expect(usableTools).toHaveCount(0);
-  await expect(page.locator('#fttLessonDrawTools').getByText('View only',{exact:true})).toBeVisible();
+  await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeVisible();
   await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
   // Pen permission: 10 drawing modes + 9 colours + 3 thicknesses + Undo + Clear.
   await expect(usableTools).toHaveCount(24);
-  await expect(page.locator('#fttLessonDrawTools').getByText('View only',{exact:true})).toBeHidden();
+  await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeHidden();
   // Run the actual shared gate's capture handlers while ordinary activity UI is locked.
   const gate=fs.readFileSync(path.join(__dirname,'../game-gate.js'),'utf8');
   const handlers=gate.slice(gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach'),gate.indexOf('  if (!isGuestPreview()) watchTeacherAccess();'));

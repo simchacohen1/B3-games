@@ -91,7 +91,8 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   await waitFor(()=>{
     const tray=stage.children.find(node=>node.id==='activityScreenTray');
     const card=tray?.children[0];
-    return card?.children.some(node=>node.tag==='video'&&node.srcObject===captured);
+    // The video sits in a positioned wrapper so the teacher can point or draw over it.
+    return card?.children.flatMap(node=>[node,...(node.children||[])]).some(node=>node.tag==='video'&&node.srcObject===captured);
   },'teacher video receiver did not attach the student MediaStream');
 
   assert.deepEqual({...issued},{action:'issue',studentId:'arik',pin:'123456',classId:'et',room});
@@ -101,7 +102,7 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   assert.equal(verified.token,'a'.repeat(64));
   assert.equal(verified.authorization,'Bearer teacher-id-token');
   const tray=stage.children.find(node=>node.id==='activityScreenTray');
-  const rendered=tray.children[0].children.find(node=>node.tag==='video');
+  const rendered=tray.children[0].children.flatMap(node=>[node,...(node.children||[])]).find(node=>node.tag==='video');
   assert.equal(tray.hidden,false,'the teacher screen tray is visible');
   assert.equal(rendered.srcObject,captured,'the teacher displays the live student capture stream');
   assert.equal(rendered.played,true);

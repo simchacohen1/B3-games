@@ -1,11 +1,17 @@
 param(
-  [switch]$SkipFunction
+  [switch]$SkipFunction,
+  # Optional separate preview link (for example 'pr-597-homework-notes'). Default is the issue #406 channel.
+  [string]$ChannelName
 )
 
 $ErrorActionPreference = 'Stop'
 $projectId = 'fun-torah-tools-staging'
 $siteId = 'fun-torah-tools-staging'
 $channelId = 'homework-406-preview'
+if ($ChannelName) {
+  if ($ChannelName -notmatch '^[a-z0-9][a-z0-9-]{2,40}$') { throw 'Channel name may only use lowercase letters, numbers and dashes.' }
+  $channelId = $ChannelName
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $firebaseConfig = Join-Path $repoRoot 'firebase.staging-preview.json'
 

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 
 const BASE_SITE = 'https://fun-torah-tools-staging.web.app';
 const requestedSite = (process.env.FTT_STAGING_SITE || BASE_SITE).replace(/\/$/, '');
-if (!/^https:\/\/(?:fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--homework-406-preview-[a-z0-9]+\.web\.app)$/.test(requestedSite)) {
+if (!/^https:\/\/(?:fun-torah-tools-staging\.web\.app|fun-torah-tools-staging--(?:homework-406-preview|pr-597-homework-notes)-[a-z0-9]+\.web\.app)$/.test(requestedSite)) {
   throw new Error('FTT_STAGING_SITE must be the staging live site or the exact issue #406 preview channel.');
 }
 const isHomeworkPreview = requestedSite !== BASE_SITE;

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!-- Mishnayos Practice Teacher View v1 — 2026-11-08 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<title>Mishnayos Practice — Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+body{margin:0;padding:0;font-family:'Nunito',sans-serif;background:#f0f9f9;color:#1f2937;}
+.wrap{max-width:860px;margin:0 auto;padding:28px 18px 60px;}
+h1{font-family:'Fredoka',sans-serif;font-size:2rem;color:#135555;margin:0 0 4px;text-align:center;}
+.sub{text-align:center;color:#6b7280;font-size:.95rem;margin:0 0 24px;}
+.assign-panel{background:#fff;border-radius:16px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.08);border:2px solid #a7f3d0;margin-bottom:24px;}
+.assign-panel h2{font-family:'Fredoka',sans-serif;font-size:1.3rem;color:#135555;margin:0 0 14px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+select{flex:1 1 160px;max-width:230px;min-width:140px;font-family:'Nunito',sans-serif;font-size:.95rem;padding:9px 11px;border-radius:10px;border:2px solid #d1d5db;background:#fff;direction:rtl;text-align:center;text-align-last:center;}
+.btn{font-family:'Nunito',sans-serif;font-weight:800;font-size:.95rem;border:none;border-radius:10px;padding:11px 22px;cursor:pointer;color:#fff;background:#1A6E6E;box-shadow:0 3px 0 #135555;transition:transform .08s;}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #135555;}
+.btn.red{background:#dc2626;box-shadow:0 3px 0 #991b1b;}
+.btn.red:active{box-shadow:0 1px 0 #991b1b;}
+.assign-list{display:grid;gap:10px;}
+.assign-row{background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.assign-label{font-weight:700;color:#135555;font-size:.95rem;direction:rtl;}
+.assign-label span{color:#6b7280;font-weight:600;font-size:.85rem;display:block;}
+.progress-panel{background:#fff;border-radius:16px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.08);border:2px solid #c7d2fe;}
+.progress-panel h2{font-family:'Fredoka',sans-serif;font-size:1.3rem;color:#3730a3;margin:0 0 14px;}
+table{width:100%;border-collapse:collapse;font-size:.9rem;}
+th{background:#e0e7ff;color:#3730a3;font-weight:800;padding:9px 12px;text-align:left;}
+td{padding:9px 12px;border-bottom:1px solid #f3f4f6;}
+tr:last-child td{border-bottom:0;}
+.empty{color:#9ca3af;text-align:center;padding:20px;}
+.pct-bar{height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden;min-width:60px;}
+.pct-fill{height:100%;border-radius:999px;background:#1A6E6E;transition:width .3s;}
+.status-pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:800;}
+.status-pill.done{background:#dcfce7;color:#166534;}
+.status-pill.prog{background:#fef9c3;color:#854d0e;}
+.status-pill.none{background:#f3f4f6;color:#6b7280;}
+.signout-pill{position:fixed;top:12px;right:12px;z-index:999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:#fff;font:inherit;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15);}
+.hidden{display:none!important;}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+</head>
+<body>
+<button id="signOut" class="signout-pill hidden">Sign out</button>
+<div class="wrap">
+  <h1>📖 Mishnayos Practice</h1>
+  <p class="sub">Assign mishnayos to your class and track student progress</p>
+  <div class="assign-panel">
+    <h2>➕ Assign a Mishna</h2>
+    <div class="row"><select id="sederSel" onchange="onSederChange()"></select><select id="masechSel" onchange="onMasechChange()"></select></div>
+    <div class="row"><select id="perekSel" onchange="onPerekChange()"></select><select id="mishnaSel"></select></div>
+    <div style="margin-top:12px;"><button class="btn" onclick="assignMishna()">Assign to Class</button></div>
+    <div style="margin-top:18px;">
+      <strong style="font-size:.85rem;color:#6b7280;">Current Assignments</strong>
+      <div class="assign-list" id="assignList" style="margin-top:8px;"><div class="empty">No mishnayos assigned yet.</div></div>
+    </div>
+  </div>
+  <div class="progress-panel">
+    <h2>📊 Student Progress</h2>
+    <div id="progressWrap"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+<script src="../back-nav.js" data-mode="inline" data-href="../teacher-home.html" data-label="← Fun Torah Tools"></script>
+<script>
+const SEDER_DATA={"זרעים":{"ברכות":[5,8,6,7,5,8,5,8,5],"פאה":[6,8,7,11,8,11,8,9],"דמאי":[4,5,6,8,11,12,8],"כלאים":[9,11,7,10,8,9,8,6,10],"שביעית":[8,10,10,10,9,6,7,11,9,9],"תרומות":[10,6,9,13,9,6,7,12,7,8,10],"מעשרות":[5,8,10,6,8],"מעשר שני":[3,13,13,12,15],"חלה":[9,8,10,11],"ערלה":[9,17,9],"ביכורים":[3,11,12,5]},"מועד":{"שבת":[11,7,6,2,4,10,4,7,7,5,6,5,7,4,3,8,8,3,6,5,5,6],"עירובין":[10,6,9,11,10,10,11,11,4,15],"פסחים":[7,8,8,10,10,6,13,8,11],"שקלים":[7,5,4,9,6,7,7,8],"יומא":[8,7,11,6,7,8,5,9],"סוכה":[11,9,15,10,8],"ביצה":[10,10,8,9,7],"ראש השנה":[4,8,8,9],"תענית":[7,10,9,8],"מגילה":[11,6,6,10],"מועד קטן":[9,5,9],"חגיגה":[8,7,8]},"נשים":{"יבמות":[4,10,10,13,13,6,6,6,6,9,7,6,13,9,10,7],"כתובות":[10,10,9,12,9,7,10,8,9,6,6,4,11],"נדרים":[4,5,11,8,6,10,9,7,8,8],"נזיר":[7,10,7,7,7,11,4,2,5],"סוטה":[9,6,8,3,5,4,8,7,15],"גיטין":[6,7,8,9,9,7,9,10,10],"קידושין":[10,10,13,14]},"נזיקין":{"בבא קמא":[4,6,11,9,7,6,7,7,12,10],"בבא מציעא":[8,11,12,12,11,8,11,9,13,6],"בבא בתרא":[6,14,10,9,11,8,8,8,10],"סנהדרין":[6,5,8,5,5,6,11,7,6,6,6],"מכות":[10,8,16],"שבועות":[7,5,11,13,5,7,8,6],"עדיות":[14,10,12,12,7,3,9,7],"עבודה זרה":[9,7,10,12,12],"אבות":[18,16,18,22,23,11],"הוריות":[5,7,8]},"קדשים":{"זבחים":[4,5,10,6,8,7,6,12,7,8,8,6,8],"מנחות":[4,5,7,5,9,7,4,7,9,9,9,5,11],"חולין":[7,10,10,7,5,7,6,6,8,4,2,5],"בכורות":[7,9,4,10,6,12,7,10],"ערכין":[4,6,5,4,6,5,5,7,8],"תמורה":[6,3,5,4,6,5,6],"כריתות":[10,6,10,3,8,9],"מעילה":[4,9,8,6,5,6],"תמיד":[4,5,9,3,6,3,4],"מידות":[9,6,8,7,4],"קינים":[4,5,6]},"טהרות":{"כלים":[9,8,8,4,11,4,6,11,8,8,9,8,8,8,6,8,17,9,9,10,3,10,5,17,9,9,9,10,9,8],"אהלות":[8,7,7,3,7,7,6,6,16,7,9,8,9,7,10,5,5,10],"נגעים":[6,5,8,11,5,8,5,10,3,10,12,7,12,13],"פרה":[4,5,11,4,9,5,12,12,9,8,9],"טהרות":[9,8,8,13,9,10,9,9,9,8],"מקואות":[8,10,8,5,6,11,7,5,8,8],"נדה":[7,7,7,7,9,14,5,4,11,8],"מכשירין":[6,11,8,10,11,8],"זבים":[6,4,3,7,12],"טבול יום":[4,8,6,7],"ידים":[5,4,5,8],"עוקצין":[6,10,12]}};
+function getSederList(){return Object.keys(SEDER_DATA);}
+function getMasechList(seder){return Object.keys(SEDER_DATA[seder]||{});}
+function getPerekCount(seder,masech){const v=SEDER_DATA[seder]?.[masech];return v?v.length:0;}
+function getMishnaCount(seder,masech,perek){const v=SEDER_DATA[seder]?.[masech];return v?v[perek-1]||0:0;}
+function toHebNum(n){const h=['','א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','יג','יד','טו','טז','יז','יח','יט','כ'];return h[n]||String(n);}
+const api=window.B3SiteSettings,WS=api.workspaceId||'b3-2026';
+const params=new URLSearchParams(location.search),classId=params.get('class')||'';
+let db,currentAssignments=[],students=[];
+(function(){if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);db=firebase.database();loadSederOptions();api.onAuthStateChanged((user,authorized,access)=>{if(!access?.authorized){location.replace('../teacher-home.html');return;}document.getElementById('signOut').classList.remove('hidden');document.getElementById('signOut').onclick=()=>api.signOut().then(()=>location.reload());loadAssignments();loadStudentProgress();});})();
+function loadSederOptions(){const sel=document.getElementById('sederSel');getSederList().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});onSederChange();}
+function onSederChange(){const seder=document.getElementById('sederSel').value;const sel=document.getElementById('masechSel');sel.innerHTML='';getMasechList(seder).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});onMasechChange();}
+function onMasechChange(){const seder=document.getElementById('sederSel').value,masech=document.getElementById('masechSel').value;const count=getPerekCount(seder,masech);const sel=document.getElementById('perekSel');sel.innerHTML='';for(let i=1;i<=count;i++){const o=document.createElement('option');o.value=i;o.textContent='פרק '+toHebNum(i);sel.appendChild(o);}onPerekChange();}
+function onPerekChange(){const seder=document.getElementById('sederSel').value,masech=document.getElementById('masechSel').value;const perek=parseInt(document.getElementById('perekSel').value)||1;const count=getMishnaCount(seder,masech,perek);const sel=document.getElementById('mishnaSel');sel.innerHTML='';for(let i=1;i<=count;i++){const o=document.createElement('option');o.value=i;o.textContent='משנה '+toHebNum(i);sel.appendChild(o);}}
+function assignMishna(){const seder=document.getElementById('sederSel').value;const masech=document.getElementById('masechSel').value;const perek=parseInt(document.getElementById('perekSel').value)||1;const mishna=parseInt(document.getElementById('mishnaSel').value)||1;const key=`${masech}_${perek}_${mishna}`;db.ref(`b3Games/workspaces/${WS}/classes/${classId}/mishnayos/assignments/${key}`).set({seder,masech,perek,mishna,assignedAt:Date.now()});}
+function loadAssignments(){db.ref(`b3Games/workspaces/${WS}/classes/${classId}/mishnayos/assignments`).on('value',snap=>{const val=snap.val()||{};currentAssignments=Object.entries(val).map(([k,v])=>({key:k,...v}));renderAssignments();});}
+function renderAssignments(){const el=document.getElementById('assignList');if(!currentAssignments.length){el.innerHTML='<div class="empty">No mishnayos assigned yet.</div>';return;}el.innerHTML=currentAssignments.map(a=>`<div class="assign-row"><div class="assign-label">${a.masech} · פרק ${toHebNum(a.perek)} · משנה ${toHebNum(a.mishna)}<span>${a.seder}</span></div><button class="btn red" style="padding:7px 14px;font-size:.8rem;" onclick="removeAssignment('${a.key}')">Remove</button></div>`).join('');}
+function removeAssignment(key){db.ref(`b3Games/workspaces/${WS}/classes/${classId}/mishnayos/assignments/${key}`).remove();}
+function loadStudentProgress(){db.ref(`b3Games/workspaces/${WS}/classes/${classId}/students`).once('value',snap=>{const val=snap.val()||{};students=Object.entries(val).filter(([,v])=>v&&v.name).map(([id,v])=>({id,name:v.name}));renderProgress();});}
+function renderProgress(){const el=document.getElementById('progressWrap');if(!students.length){el.innerHTML='<div class="empty">No students in this class yet.</div>';return;}el.innerHTML=`<table><tr><th>Student</th><th>Mishna</th><th>Progress</th><th>Status</th></tr>${students.map(s=>`<tr><td>${esc(s.name)}</td><td style="direction:rtl">${currentAssignments.length?`${currentAssignments[0]?.masech||''} ${toHebNum(currentAssignments[0]?.perek||1)}:${toHebNum(currentAssignments[0]?.mishna||1)}`:'-'}</td><td><div class="pct-bar"><div class="pct-fill" style="width:0%"></div></div></td><td><span class="status-pill none">Not started</span></td></tr>`).join('')}</table>`;students.forEach(s=>{db.ref(`b3Games/workspaces/${WS}/mishnayosProgress/${classId}/${s.id}`).once('value',snap=>{updateStudentRow(s.id,s.name,snap.val()||{});});});}
+function updateStudentRow(sid,name,data){if(!currentAssignments.length)return;const a=currentAssignments[0];const key=`${a.masech}_${a.perek}_${a.mishna}`;const prog=data[key];document.querySelectorAll('#progressWrap table tr').forEach(row=>{if(row.cells[0]&&row.cells[0].textContent===name){const pct=prog?.mastered?100:prog?.reviewed?50:0;row.cells[2].innerHTML=`<div class="pct-bar"><div class="pct-fill" style="width:${pct}%"></div></div>`;const pill=prog?.mastered?'done':prog?.reviewed?'prog':'none';row.cells[3].innerHTML=`<span class="status-pill ${pill}">${prog?.mastered?'Mastered ⭐':prog?.reviewed?'In Progress':'Not started'}</span>`;}});}
+function esc(s){const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML;}
+</script>
+</body>
+</html>

@@ -203,8 +203,13 @@ exports.classGalleryPowerPurchase=onRequest(
       const legacy=['et','wt'].includes(classId);
       const resourceRoot='b3Games/workspaces/b3-2026/classes/'+classId+'/resources/gallery';
       if(!legacy){
-        const cls=(await rtdb.ref('b3Games/workspaces/b3-2026/classes/'+classId).get()).val();
-        if(!cls||cls.active===false||!cls.members?.[b3StudentId]||cls.members[b3StudentId].active===false)return res.status(403).json({error:'This class is not available to your account.'});
+        // Only the active flag and this student's membership, not the whole class record.
+        const clsPath='b3Games/workspaces/b3-2026/classes/'+classId;
+        const [clsActive,member]=await Promise.all([
+          rtdb.ref(clsPath+'/active').get().then(s=>s.val()),
+          rtdb.ref(clsPath+'/members/'+b3StudentId).get().then(s=>s.val())
+        ]);
+        if(clsActive===false||!member||member.active===false)return res.status(403).json({error:'This class is not available to your account.'});
       }
       const context={mode,legacy,presenceRoot:legacy?PRESENCE_ROOT:resourceRoot+'/presence',classes:legacy?['et','wt','all']:[classId],tagRoot:legacy?'b3Games/classGalleryTag/'+(mode==='manhunt'?'manhunt':'all'):resourceRoot+'/tag/'+(mode==='manhunt'?'manhunt_':'class_')+classId,enabledPath:legacy?TAG_ENABLED_PATH:resourceRoot+'/settings/tagEnabled'};
 

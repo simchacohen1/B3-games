@@ -222,6 +222,7 @@
     '<div class="modal-box">' +
       '<div class="topline"><h2 style="margin:0">Send to Nigri</h2><button type="button" class="secondary" id="nigriClose">Close</button></div>' +
       '<div class="small" id="nigriBaseNote" style="margin-top:4px"></div>' +
+      '<div data-nigri-connect hidden></div>' +
       '<div class="ng-grid">' +
         '<label>Nigri Section<input id="nigriSection" type="text" value="Shluchim OS"></label>' +
         '<label>Grade<input id="nigriGrade" type="text"></label>' +
@@ -291,6 +292,11 @@
     if (!packet.date) { alert('Choose a date before saving.'); return; }
     const unresolved = students.filter((s) => s.attendance === 'review' && s.missing);
     if (unresolved.length && !confirm('These students still say Review / leave unchanged: ' + unresolved.map((s) => s.nigriName).join(', ') + '. Continue without guessing their attendance?')) return;
+    // A teacher syncs with his own Nigri login; stop here (nothing sent) if he has not connected it.
+    // If nigri-connect.js did not load: the owner keeps the old path; a teacher is stopped (never the old key).
+    const blocked = window.NigriConnect ? await window.NigriConnect.cannotSync()
+      : (window.B3NigriGate && (window.B3NigriGate.result || {}).reason !== 'owner' ? 'The Nigri sync helper did not load. Refresh the page.' : null);
+    if (blocked) { $('nigriStatus').className = 'err'; $('nigriStatus').textContent = blocked; return; }
     if (!confirm('Save "' + packet.name + '" to Nigri as ' + packet.topic + ' (' + packet.grade + ', ' + packet.date + ')?')) return;
 
     const btn = $('nigriSyncBtn'), status = $('nigriStatus');
@@ -321,13 +327,16 @@
     try {
       // Google sign-in first; the old key is used only if there is no sign-in or the server refuses it (401, before doing anything).
       let res, via = 'key';
-      if (window.NigriAuth) {
+      if (window.NigriConnect && (await window.NigriConnect.ready).role !== 'owner') {
+        // Teacher: his own Nigri login on the server, never the old key.
+        res = (await window.NigriConnect.sendMarks(body)).response; via = 'teacher';
+      } else if (window.NigriAuth) {
         const sent = await window.NigriAuth.request('/sync-marks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, SYNC_KEY);
         res = sent.response; via = sent.via;
       } else {
         res = await fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sync-Key': SYNC_KEY }, body: JSON.stringify(body) });
       }
-      $('nigriVia').textContent = via === 'signin' ? 'Signed in' : 'Used key';
+      $('nigriVia').textContent = via === 'teacher' ? 'Used your Nigri login' : via === 'signin' ? 'Signed in' : 'Used key';
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.status === 'success') {
         const failed = (data.results || []).filter((r) => String(r).includes('FAILED'));
@@ -340,7 +349,7 @@
         } catch (e) { console.warn('Could not record Nigri sync on the launch:', e); }
       } else {
         status.className = 'err';
-        status.textContent = 'Nigri did not save this: ' + (data.detail || 'Unknown error (' + res.status + ').');
+        status.textContent = 'Nigri did not save this: ' + (data.detail || data.error || 'Unknown error (' + res.status + ').');
       }
     } catch (e) {
       status.className = 'err';
@@ -357,7 +366,10 @@
     const btn = document.createElement('button');
     btn.id = 'nigriOpenBtn'; btn.type = 'button'; btn.className = 'good'; btn.textContent = 'Send to Nigri';
     btn.addEventListener('click', openNigri);
+    // Hidden until the school check says this teacher's school syncs to Nigri (the owner always passes).
+    btn.hidden = true;
     controls.insertBefore(btn, controls.firstChild);
+    if (window.B3NigriGate) window.B3NigriGate.ready.then(r => { btn.hidden = !(r && r.allowed); });
   }
 
   // Show "Already sent to Nigri" on the button when this test was synced before.

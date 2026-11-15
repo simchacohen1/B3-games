@@ -12,6 +12,8 @@ if (!admin.apps.length) admin.initializeApp();
 const OPTIONS = { region: 'us-central1', memory: '256MiB', maxInstances: 20 };
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_SPECTATORS = 12;
+// How long a player who left mid-game has to come back before classmates may continue without them.
+const AWAY_GRACE_MS = 45_000;
 const twoPlayerGame = gameKey => core.gameConfig(gameKey)?.maxPlayers === 2;
 const activeQueue = room => (Array.isArray(room.winnerQueue) ? room.winnerQueue : []).filter(id => room.spectators?.[id]);
 const now = () => Date.now();
@@ -109,6 +111,13 @@ function roomPublic(gameKey, room, state, timestamp) {
   view.invitedStudentName = room.invitedStudentName || null;
   view.round = room.round || 1;
   if (room.state === 'countdown' && Number.isFinite(Number(room.countdownAt))) view.countdownAt = Number(room.countdownAt);
+  if (room.state === 'playing') {
+    const away = Object.entries(room.players || {})
+      .filter(([, player]) => player && player.active === false && player.role !== 'computer')
+      .map(([studentId, player]) => ({ studentId, name: safeName(player.name), leftAt: Number(player.leftAt) || 0 }));
+    if (away.length) { view.awayPlayers = away; view.awayGraceMs = AWAY_GRACE_MS; }
+  }
+  if (room.forfeitBy) view.forfeitBy = room.forfeitBy;
   return view;
 }
 
@@ -339,7 +348,9 @@ async function gameLeaderboard(db, actor) {
   const personal = ledger.balances?.[actor.studentId] || {};
   const peerCoins = Number.isSafeInteger(personal.coins) && personal.coins >= 0 ? personal.coins : 0;
   const computerCoins = Number.isSafeInteger(personal.computerCoins) && personal.computerCoins >= 0 ? personal.computerCoins : 0;
+  const policy = (await db.ref(`b3Games/workspaces/${actor.workspaceId}/classes/${actor.classId}/multiplayerGameCoins`).get()).val();
   return {
+    rewardsConfigured: Boolean(policy),
     leaderboard: matchmaking.leaderboard(ledger.balances || {}),
     balance: { peerCoins, computerCoins, totalCoins: Math.min(Number.MAX_SAFE_INTEGER, peerCoins + computerCoins) },
   };
@@ -388,11 +399,26 @@ async function persistCompletionAwards(db, actor, gameKey, roomCode, room) {
   const configPath = `b3Games/workspaces/${actor.workspaceId}/classes/${actor.classId}/multiplayerGameCoins`;
   const policy = (await db.ref(configPath).get()).val();
   // No implicit/default economy: a class must have an explicit reward policy.
-  if (!policy) return;
+  if (!policy) return { configured: false };
   const results = matchmaking.completionResults(room);
   const ledgerPath = `b3Private/multiplayerGames/workspaces/${actor.workspaceId}/classes/${actor.classId}/coins`;
-  const awardId = room.awardId || `${roomCode}_${room.createdAt}`;
-  await db.ref(ledgerPath).transaction(current => matchmaking.awardGameCoins(current, awardId, results, policy).ledger);
+  // Rematches and next-challenger rounds reuse the room, so each round needs its own award id;
+  // otherwise only round 1 would ever pay out.
+  const baseAwardId = room.awardId || `${roomCode}_${room.createdAt}`;
+  const awardId = Number(room.round) > 1 ? `${baseAwardId.slice(0, 56)}_r${Number(room.round)}` : baseAwardId;
+  const tx = await db.ref(ledgerPath).transaction(current => matchmaking.awardGameCoins(current, awardId, results, policy).ledger);
+  const ledger = tx?.snapshot?.val?.() || {};
+  return { configured: true, awards: ledger.awards?.[awardId] || {}, balances: ledger.balances || {} };
+}
+
+function coinSummary(result, room, studentId) {
+  if (!result) return null;
+  if (!result.configured) return { configured: false };
+  const row = result.balances?.[studentId] || {};
+  const peerCoins = Number.isSafeInteger(row.coins) && row.coins > 0 ? row.coins : 0;
+  const computerCoins = Number.isSafeInteger(row.computerCoins) && row.computerCoins > 0 ? row.computerCoins : 0;
+  return { configured: true, earned: Number(result.awards?.[studentId]) || 0, computerGame: room.computerOpponent === true,
+    peerCoins, computerCoins, totalCoins: peerCoins + computerCoins };
 }
 
 async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedInvite = null) {
@@ -493,7 +519,7 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedI
       delete room.invitedStudentId; delete room.invitedStudentName;
       room.game = core.createGameState(gameKey, room.players, { seed: crypto.randomInt(1, 0x7fffffff) });
       core.startGameState(gameKey, room.game, core.participantIds(room.players));
-      room.round = (Number(room.round) || 1) + 1; room.state = 'playing'; room.startedAt = now(); delete room.finishedAt;
+      room.round = (Number(room.round) || 1) + 1; room.state = 'playing'; room.startedAt = now(); delete room.finishedAt; delete room.forfeitBy;
     } else if (action === 'rematch-draw') {
       if (!twoPlayerGame(gameKey) || room.state !== 'finished' || !room.game?.draw || !room.players?.[actor.studentId] || room.players[actor.studentId].active === false) {
         operationError = 'Only current players can restart a drawn match.'; return;
@@ -538,14 +564,40 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedI
       if (!room.players?.[actor.studentId] || room.players[actor.studentId].active === false) {
         if (!room.spectators?.[actor.studentId]) { operationError = 'Join this room before leaving it.'; return; }
         delete room.spectators[actor.studentId]; room.winnerQueue = activeQueue(room);
-      } else room.players[actor.studentId].active = false;
+      } else { room.players[actor.studentId].active = false; room.players[actor.studentId].leftAt = now(); }
       if (matchmaking.shouldAbortCountdown(room)) {
         room.state = 'closed'; room.closedAt = now();
       }
-      if (room.host === actor.studentId) {
-        room.state = 'closed';
-        room.closedAt = now();
+      if (room.host === actor.studentId && room.state !== 'closed') {
+        // A host leaving a game in progress hands the room to another player instead of
+        // ending it for everyone (the host can still rejoin). A lobby host closes the room.
+        const humans = core.participantIds(room.players).filter(id => room.players[id]?.role !== 'computer');
+        if (room.state === 'playing' && humans.length) {
+          room.host = humans[0]; room.hostName = room.players[humans[0]].name;
+          // Bingo numbers are drawn by the first seat, so the new host takes it.
+          if (gameKey === 'bingo') game.playersOrder = [humans[0], ...core.participantIds(room.players).filter(id => id !== humans[0])];
+        } else {
+          room.state = 'closed';
+          room.closedAt = now();
+        }
       }
+    } else if (action === 'claim-forfeit') {
+      if (room.state !== 'playing' || !room.players?.[actor.studentId] || room.players[actor.studentId].active === false) {
+        operationError = 'Only a player in this game can continue without a classmate.'; return;
+      }
+      const away = Object.entries(room.players).filter(([, player]) => player && player.active === false && player.role !== 'computer');
+      if (!away.length) { operationError = 'Everyone is still in the game.'; return; }
+      if (away.some(([, player]) => now() - Number(player.leftAt || 0) < AWAY_GRACE_MS)) {
+        operationError = 'Give your classmate a little longer to come back.'; return;
+      }
+      if (core.participantIds(room.players).length === 1) {
+        // Everyone else left: the student who stayed wins. Players who left earn nothing.
+        game.finished = true; game.winner = actor.studentId; game.draw = false;
+        room.forfeitBy = away.map(([id]) => id).slice(0, 8);
+      } else if (!core.skipAbsentPlayers(gameKey, game, room.players)) {
+        operationError = 'The game can continue — it is not an absent classmate’s turn.'; return;
+      }
+      if (game.finished) { room.state = 'finished'; room.finishedAt = now(); }
     } else { operationError = 'Unknown game action.'; return; }
     room.updatedAt = now();
     return room;
@@ -566,12 +618,14 @@ async function mutateRoom(db, actor, gameKey, roomCode, action, move, validatedI
   if (action === 'join' && previousRoom?.invitedStudentId === actor.studentId) {
     await updateInviteQueue(db, actor, gameKey, roomCode, '');
   }
+  let coins = null;
   if (room.state === 'finished' && (previousRoom?.state !== 'finished' || action === 'settle')) {
     // Publish completion first so every client can retry the idempotent
     // settlement if the separate coin-ledger transaction temporarily fails.
-    await persistCompletionAwards(db, actor, gameKey, roomCode, room);
+    coins = coinSummary(await persistCompletionAwards(db, actor, gameKey, roomCode, room), room, actor.studentId);
   }
-  return { roomCode, public: roomPublic(gameKey, room, room.game, now()), private: core.privateView(gameKey, room.game, actor.studentId) };
+  return { roomCode, public: roomPublic(gameKey, room, room.game, now()), private: core.privateView(gameKey, room.game, actor.studentId),
+    ...(coins ? { coins } : {}) };
 }
 
 exports.multiplayerGameAction = onCall(OPTIONS, async request => {

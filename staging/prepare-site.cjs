@@ -58,6 +58,17 @@ function listFiles(dir) {
   return result;
 }
 
+// firebase-config.js also defines window.B3_APP_CONTEXT (workspace id) and the
+// path helpers that teacher pages read. Replacing the whole file dropped them,
+// so keep everything from the app-context block onward.
+function appContextTail(productionConfig) {
+  const at = productionConfig.indexOf('window.B3_APP_CONTEXT');
+  if (at < 0) throw new Error('firebase-config.js has no window.B3_APP_CONTEXT block to keep.');
+  const start = productionConfig.lastIndexOf('/*', at);
+  const from = start >= 0 && !productionConfig.slice(start, at).includes('*/') ? start : at;
+  return '\n' + productionConfig.slice(from);
+}
+
 function stageSource(siteRoot, env = process.env) {
   const root = path.resolve(siteRoot);
   const config = configFromEnvironment(env);
@@ -101,6 +112,16 @@ function stageSource(siteRoot, env = process.env) {
     if (relative === 'weekly-quiz/nigri-sync.js') {
       content = "window.B3_STAGING_DISABLED_INTEGRATIONS = window.B3_STAGING_DISABLED_INTEGRATIONS || [];\n" +
         "window.B3_STAGING_DISABLED_INTEGRATIONS.push('nigri-sync');\n";
+    }
+    if (relative === 'paid-api.js') {
+      // The allowlist is a regex, so its host is written with escaped dots and
+      // the plain-text host replacement above never reaches it. Point the
+      // packaged copy at the staging Functions host only; production paid-api.js
+      // is never edited.
+      const productionHost = 'us-central1-b3-games\\.cloudfunctions\\.net';
+      if (!content.includes(productionHost)) throw new Error('Cannot find the learning-service host allowlist in paid-api.js.');
+      const stagingHost = new URL(functionsOrigin).hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      content = content.split(productionHost).join(stagingHost);
     }
     if (relative === 'chossid-lamdan.html') {
       const fictionalRoster = "const DEFAULT_DATA={date:'2026-10-26',classes:[" +
@@ -202,6 +223,8 @@ function stageSource(siteRoot, env = process.env) {
     if (file === path.join(stageDir, 'staging-config.js')) continue;
     const content = fs.readFileSync(file, 'utf8').toLowerCase();
     for (const value of FORBIDDEN) if (content.includes(value)) violations.push(path.relative(root, file) + ' contains a production endpoint/config marker');
+    // Regex-escaped production hosts (e.g. b3-games\.cloudfunctions\.net) slip past the plain-text check.
+    if (/b3-games(?:-default-rtdb)?\\\.(?:cloudfunctions|firebaseapp|firebasestorage|firebaseio)/.test(content)) violations.push(path.relative(root, file) + ' contains an escaped production endpoint');
     // Homework's own "is this the live site?" guards compare against 'b3-games' to REFUSE live use; they never connect to it.
     const rel = path.relative(root, file).split(path.sep).join('/');
     const isLiveGuard = ['assignment-center/home-link.js', 'assignment-center/homework-common.js', 'assignment-center/staging-guard.js'].includes(rel);

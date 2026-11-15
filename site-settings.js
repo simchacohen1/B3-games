@@ -458,6 +458,37 @@
     return teacherRestore;
   }
 
+  // Owner Admin and several teacher tools have their own Google button, which
+  // signs in on the default app only. Nothing was remembered for those logins,
+  // so once the default app's login became tab-only (student view, or a
+  // student identity arriving browser-wide) every new tab, such as Class
+  // Pointer or Class Access, asked for Google sign-in again. Copy an
+  // authorized Google login to the remembered app when it holds none. This
+  // never runs in a student tab, never replaces a remembered login, and an
+  // explicit sign-out still clears it.
+  function rememberTeacher(user) {
+    if (!isGoogleUser(user) || isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
+    const signOutVersion = teacherSignOutVersion;
+    const stillWanted = function () {
+      return signOutVersion === teacherSignOutVersion && !isStudentTab() && !teacherRestoreBlocked();
+    };
+    let savedAuth;
+    try { savedAuth = getRememberedTeacherAuth(); } catch (error) { return Promise.resolve(false); }
+    return Promise.resolve(waitForAuthState(savedAuth)).then(function () {
+      if (savedAuth.currentUser || !stillWanted()) return false;
+      return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL).then(function () {
+        if (savedAuth.currentUser || !stillWanted()) return false;
+        return savedAuth.updateCurrentUser(user).then(function () {
+          if (stillWanted()) return true;
+          return savedAuth.signOut().then(function () { return false; });
+        });
+      });
+    }).catch(function (error) {
+      console.warn("Could not remember teacher sign-in:", error);
+      return false;
+    });
+  }
+
   function ensureFirebase() {
     const config = getConfiguredFirebaseOptions();
     if (!config || !window.firebase || !window.firebase.database) return null;
@@ -481,6 +512,57 @@
     localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(normalizeSettings(settings)));
   }
 
+  // Owner as a teacher (#726). The owner also teaches classes. Owner mode is
+  // the default and is unchanged. Only when the owner switched this browser to
+  // "Teacher view" is the owner's access NARROWED to the classes assigned to
+  // the owner's own email in Owner Admin (see owner-teacher-view.js). Any
+  // doubt (no classes, a failed load or read) keeps the normal owner access.
+  // This never applies to another account and never adds access.
+  function ownerTeacherViewWanted() {
+    try { return localStorage.getItem("b3OwnerViewMode") === "teacher"; } catch (e) { return false; }
+  }
+  function loadOwnerTeacherView() {
+    if (window.B3OwnerTeacherView) return Promise.resolve(window.B3OwnerTeacherView);
+    return new Promise(function (resolve, reject) {
+      const tag = document.createElement("script");
+      tag.src = SITE_BASE + "owner-teacher-view.js?v=20261110-switch";
+      tag.onload = function () { if (window.B3OwnerTeacherView) resolve(window.B3OwnerTeacherView); else reject(new Error("Teacher view is unavailable.")); };
+      tag.onerror = function () { reject(new Error("Teacher view could not load.")); };
+      document.head.appendChild(tag);
+    });
+  }
+  function readOwnerAccess(services, user) {
+    const full = { authorized:true, role:"admin", classIds:["*"] };
+    if (!ownerTeacherViewWanted()) return Promise.resolve(full);
+    return loadOwnerTeacherView().then(function (view) {
+      return view.resolve(services.db, WORKSPACE_ID, user);
+    }).then(function (teaching) { return teaching || full; }).catch(function () { return full; });
+  }
+  // The "Teacher view" reminder with the way back to Owner Admin, and, in owner
+  // mode on the owner's home page, the switch into Teacher view.
+  function isOwnerHomePage() {
+    try {
+      const base = new URL(SITE_BASE), current = new URL(location.href);
+      if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return false;
+      const path = current.pathname.slice(base.pathname.length);
+      return path === "" || path === "index.html";
+    } catch (e) { return false; }
+  }
+  function showOwnerTeacherView(access, user) {
+    if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access, user); }, { once:true }); return; }
+    const acting = getActingStudent(), view = window.B3OwnerTeacherView;
+    if (view) {
+      if (access && access.ownerTeacherView === true && !acting) view.mountBanner(SITE_BASE); else view.unmountBanner();
+    }
+    const offerSwitch = !acting && window.top === window && isBootstrapAdmin(user) && access && access.role === "admin" && isOwnerHomePage();
+    if (!offerSwitch) { if (view && view.unmountSwitch) view.unmountSwitch(); return; }
+    const services = ensureFirebase();
+    if (!services || !services.db) return;
+    loadOwnerTeacherView().then(function (loaded) {
+      if (loaded.mountSwitch) return loaded.mountSwitch(services.db, WORKSPACE_ID, user, SITE_BASE);
+    }).catch(function () {});
+  }
+
   let currentAccess = { authorized: false, role: "", classIds: [] };
   // Popup completion and Firebase's auth-state callback can request the same
   // authorization check at the same time. Share only in-flight work for this
@@ -494,7 +576,7 @@
   function readUserAccessFromFirebase(user) {
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
-    if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
+    if (isBootstrapAdmin(user)) return readOwnerAccess(services, user);
 
     // Established admins/teachers are the common case. Resolve those two small
     // records first instead of always downloading the entire teacherInvites
@@ -640,6 +722,16 @@
   // the new teacher -> class -> membership model. No student names or PINs are
   // embedded in source code. Legacy records remain in place until every app has
   // switched to the new paths.
+  const WORKSPACE_SEED_KEY = "b3Games_workspaceSeedAt";
+  function workspaceSeedDue() {
+    try {
+      const last = Number(localStorage.getItem(WORKSPACE_SEED_KEY) || 0);
+      if (last && Date.now() - last < 24 * 60 * 60 * 1000) return false;
+      localStorage.setItem(WORKSPACE_SEED_KEY, String(Date.now()));
+    } catch (e) {}
+    return true;
+  }
+
   function migrateWorkspaceData(services, user) {
     if (!services || !services.db || !user || !isBootstrapAdmin(user)) return Promise.resolve();
     return Promise.all([
@@ -718,6 +810,26 @@
       .then(function () { return normalized; });
   }
 
+  function saveTeacherClassAccess(classId, payload) {
+    if (typeof classId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(classId)) return Promise.reject(new Error("Choose an assigned class."));
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) return Promise.reject(new Error("Google sign-in required."));
+    return user.getIdToken().then(function (token) {
+      return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahClassAccess", {
+        method:"POST", headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({classId:classId,actorMode:"teacher"},payload))
+      });
+    }).then(async function (response) {
+      const result = await response.json().catch(function(){ return {}; });
+      if (!response.ok) throw new Error(result.error || "Could not save class access.");
+      return result;
+    });
+  }
+  function manageClassAccessAction(classId, action, fields) {
+    return saveTeacherClassAccess(classId,Object.assign({action:action},fields||{}));
+  }
+
   function updateSiteEnabled(enabled) {
     return readOnce().then(function (settings) {
       settings.siteEnabled = Boolean(enabled);
@@ -734,6 +846,7 @@
 
   function updateClassGameEnabled(classId, gameId, enabled) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"game",gameId:gameId,enabled:Boolean(enabled)});
     return readOnce().then(function (settings) {
       settings.classGames = settings.classGames || { et: {}, wt: {} };
       settings.classGames[classId] = settings.classGames[classId] || {};
@@ -866,6 +979,9 @@
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     gameId = String(gameId || "").trim();
     if (!gameId) return Promise.reject(new Error("Activity is required."));
+    if (currentAccess.role === "teacher") {
+      return readOnce().then(function(settings){ return saveTeacherClassAccess(classId,{action:"star",gameId:gameId,keepOpen:Boolean(keepOpen),expiresAt:keepOpen?lockedGameExpiryFor(settings,classId):0}); });
+    }
     return readOnce().then(function (settings) {
       const list = activeLockedGameList(settings, classId).filter(function (id) { return id !== gameId; });
       if (keepOpen) list.push(gameId);
@@ -886,6 +1002,7 @@
   function updateClassMode(classId, mode) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     if (!["auto", "open", "locked"].includes(mode)) return Promise.reject(new Error("Unknown access mode."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"mode",mode:mode});
     return readOnce().then(function (settings) {
       settings.classAccess[classId].mode = mode;
       return save(settings);
@@ -894,6 +1011,7 @@
 
   function updateClassLockWindows(classId, lockWindows) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"lockWindows",lockWindows:lockWindows});
     return readOnce().then(function (settings) {
       const fallback = settings.classAccess[classId].lockWindows;
       const normalized = {};
@@ -1094,6 +1212,7 @@
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
+        if (window.B3OwnerTeacherView && window.B3OwnerTeacherView.unmountSwitch) window.B3OwnerTeacherView.unmountSwitch();
         setSignedInHint(false);
         callback(null, false, currentAccess);
         endAuthChecking();
@@ -1113,10 +1232,15 @@
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
+        showOwnerTeacherView(access, user);
         setSignedInHint(access.authorized);
+        if (access.authorized) rememberTeacher(user);
         callback(user, access.authorized, access);
         endAuthChecking();
-        if (access.authorized && access.role === "admin") {
+        // Issue #667: the legacy migration below downloads the whole student list
+        // (several MB). It only needs to catch up occasionally, so run it at most
+        // once a day per browser instead of on every owner page view.
+        if (access.authorized && access.role === "admin" && workspaceSeedDue()) {
           services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
             return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
               return migrateWorkspaceData(services, user);
@@ -1413,6 +1537,17 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
   else showBackToHome();
 
+  // ---- Student class lookup (for student login pages) ---------------------
+  // After a successful name+passcode login, call this to get the student's
+  // assigned class IDs. Returns array of classId strings. Falls back to
+  // legacyClassId if the student has no workspace record yet.
+  async function getStudentAssignedClassIds(db, studentId, legacyClassId) {
+    if (window.B3StudentScope && db && studentId) {
+      return B3StudentScope.getStudentClassIds(db, WORKSPACE_ID, studentId, legacyClassId);
+    }
+    return legacyClassId ? [legacyClassId] : [];
+  }
+
   window.B3SiteSettings = {
     defaultSettings: cloneDefaultSettings(),
     normalizeSettings: normalizeSettings,
@@ -1422,6 +1557,7 @@
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
+    manageClassAccessAction: manageClassAccessAction,
     updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
@@ -1455,7 +1591,8 @@
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,
     openActAsStudentPicker: openActAsStudentPicker,
-    openMyDemoStudent: openMyDemoStudent
+    openMyDemoStudent: openMyDemoStudent,
+    getStudentAssignedClassIds: getStudentAssignedClassIds
   };
   // Pages that never ask about sign-in still need their sign-in screens shown.
   if (authChecking) {

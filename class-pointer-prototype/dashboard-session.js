@@ -12,6 +12,65 @@
     for(const id of ids){const row={};if(screens[id]===true)row.screenSharingDenied=true;if(boards[id]===true)row.whiteboardDenied=true;if(Object.keys(row).length)rows[id]=row}
     return rows;
   }
+  // ---------- Teacher connection drops (issue #801) ----------
+  // The lesson record is what every student page watches. It used to be DELETED the moment this
+  // page's database connection blinked, and nothing wrote it back, so the whole class lost its
+  // shares and its Share My Screen button until the lesson was restarted. Now a drop only stamps
+  // the record with the time the teacher went offline. Students keep going for a short grace
+  // period (activity-share.js) and stop by themselves if the teacher does not return. When the
+  // connection returns, the stamp is cleared here and armed again for the next drop.
+  // End Class and closing this page still remove the record straight away.
+  const OFFLINE='teacherOfflineAt',LAST_ROOM='classPointerLastRoom:'+classId;
+  let sharingOn=false,wentOffline=false,connectionWatched=false,restoreTimer=null,endRequested=null;
+  function armOffline(ref){return ref.child(OFFLINE).onDisconnect().set(firebase.database.ServerValue.TIMESTAMP)}
+  function disarmOffline(ref){return ref.child(OFFLINE).onDisconnect().cancel()}
+  async function restoreSession(ref,context,attempt){
+    if(ending||activeRef!==ref||endRequested===ref)return;
+    try{
+      await writeSession(ref,async()=>{
+        await armOffline(ref);
+        const row=(await ref.once('value')).val();
+        if(row&&row.roomId===ref.key)await ref.child(OFFLINE).remove();
+        // The record is gone (for example removed by an older copy of this page): put it back.
+        else await ref.set({roomId:ref.key,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:sharingOn});
+      });
+    }catch(error){
+      // Still offline or the sign-in is refreshing: try a few more times, then wait for the next reconnect.
+      if(attempt<5&&activeRef===ref&&typeof setTimeout==='function'){if(restoreTimer)clearTimeout(restoreTimer);restoreTimer=setTimeout(()=>void restoreSession(ref,context,attempt+1),3000);restoreTimer?.unref?.()}
+      else console.warn('Class Pointer could not restore the lesson after reconnecting',error);
+    }
+  }
+  function watchConnection(context){
+    if(connectionWatched)return;
+    const info=context.db.ref('.info/connected');
+    if(typeof info?.on!=='function')return;
+    connectionWatched=true;
+    info.on('value',snapshot=>{
+      if(snapshot.val()!==true){wentOffline=true;return}
+      if(!wentOffline)return;
+      wentOffline=false;
+      if(!activeRef||ending)return;
+      // End Class was pressed while offline: finish ending it; never bring that lesson back.
+      if(endRequested===activeRef)void window.ClassPointerDashboard.end().catch(()=>{});
+      else void restoreSession(activeRef,context,0);
+    });
+  }
+  // A lesson this browser left behind without End Class (crash, power loss) is cleared when the next one opens.
+  async function clearAbandoned(context,room){
+    let last='';try{last=localStorage.getItem(LAST_ROOM)||''}catch{}
+    try{localStorage.setItem(LAST_ROOM,room)}catch{}
+    if(!C.validRoom(last)||last===room)return;
+    try{
+      const old=context.ref.child('classPointerSessions/'+last),row=(await old.once('value')).val();
+      if(row&&row.roomId===last&&row.teacherUid===context.user.uid&&Number.isFinite(row[OFFLINE]))await Promise.all([old.remove(),context.db.ref(permissionPath(last)).remove()]);
+    }catch{/* best effort: students already ignore a lesson whose teacher stayed offline */}
+  }
+  // Closing or reloading the teacher page ends the lesson for students at once (no grace period).
+  if(typeof window.addEventListener==='function')window.addEventListener('pagehide',event=>{
+    if(event?.persisted||!activeRef)return;
+    try{activeRef.remove().catch(()=>{})}catch{}
+    try{activePolicyRef?.remove().catch(()=>{})}catch{}
+  });
   function writeSession(ref,operation){
     if(ending)throw Error('The previous classroom is still ending.');
     const current=revision;
@@ -126,20 +185,31 @@
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;
     const policyRef=context.db.ref(permissionPath(room));activePolicyRef=policyRef;
-    await Promise.all([ref.onDisconnect().remove(),policyRef.onDisconnect().remove()]);
-    if(current!==revision){await Promise.all([ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()]);return}
+    // A dropped connection marks this lesson offline; it never deletes it (see the note above).
+    // Arm it before the lesson is written, so there is no moment when a live lesson is unprotected.
+    // Stricter database rules refuse this until the lesson exists; it is armed again just below.
+    await armOffline(ref).catch(()=>{});
+    if(current!==revision){await disarmOffline(ref);return}
+    sharingOn=false;
     await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
-    if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),ref.onDisconnect().cancel(),policyRef.onDisconnect().cancel()])}
+    // A lesson that cannot be marked offline must not open: students would trust it for hours after a crash.
+    try{await armOffline(ref)}catch(error){await ref.remove().catch(()=>{});if(activeRef===ref){activeRef=null;activePolicyRef=null}throw error}
+    if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),disarmOffline(ref)]);return}
+    watchConnection(context);
+    void clearAbandoned(context,room);
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     // An authenticated, class-scoped live session is the only broadcast source.
     // Keep the existing session and use a server timestamp so stale prompts cannot replay.
-    await writeSession(ref,()=>ref.update({
-      studentScreenSharing:true,
-      shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
-    }));
+    await writeSession(ref,async()=>{
+      await ref.update({
+        studentScreenSharing:true,
+        shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
+      });
+      sharingOn=true;
+    });
   },async requestStudentDestination(mode,policy){
     if(!['screens','boards'].includes(mode))throw Error('Choose screens or whiteboards.');
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
@@ -154,7 +224,7 @@
       await context.db.ref(permissionPath(ref.key)).set(rows);
       const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
       window.ClassPointerActivityShares?.revokeStudents(denied);
-      return ref.update({
+      await ref.update({
         // Moving to whiteboards changes what is displayed, not the student's
         // already approved Entire Screen capture. Only an explicit Disable
         // student sharing or the class ending may revoke that permission.
@@ -162,6 +232,7 @@
         permissionRevision:firebase.database.ServerValue.TIMESTAMP,
         destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
       });
+      if(mode==='screens')sharingOn=true;
     });
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
@@ -169,6 +240,7 @@
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     await writeSession(ref,async()=>{
       await ref.child('studentScreenSharing').set(enabled===true);
+      sharingOn=enabled===true;
       if(enabled!==true)window.ClassPointerActivityShares?.closeAll();
     });
   },async end(){
@@ -176,15 +248,18 @@
     const ref=activeRef,policyRef=activePolicyRef;
     if(!ref)return;
     const context=await ready;
-    // Preserve the reference if cleanup fails, so a refresh/onDisconnect
-    // or another attempt can still remove the previous classroom session.
-    ending=true;
+    // Preserve the reference if cleanup fails, so another attempt (or closing
+    // the page) can still remove the previous classroom session.
+    ending=true;endRequested=ref;
     try{
       // Drain writes already sent; queued changes are invalidated by revision.
       // The final removal must happen after them so no child can resurrect a room.
       await sessionWrites.catch(()=>{});
       await Promise.all([ref.remove(),policyRef?.remove()]);
-      await Promise.all([ref.onDisconnect().cancel(),policyRef?.onDisconnect().cancel()]);
+      await disarmOffline(ref);
+      if(restoreTimer)clearTimeout(restoreTimer);
+      try{if(localStorage.getItem(LAST_ROOM)===ref.key)localStorage.removeItem(LAST_ROOM)}catch{}
+      if(endRequested===ref)endRequested=null;
       if(activeRef===ref){activeRef=null;activePolicyRef=null}
     }finally{ending=false}
   }};

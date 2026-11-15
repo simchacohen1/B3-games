@@ -8,7 +8,7 @@ const {resolveStudent} = require('./student-login-core.cjs');
 if (!admin.apps.length) admin.initializeApp();
 
 const ORIGINS = [
-  'https://funtorahtools.com',
+  'https://funtorahtools.com','https://sols.tools','https://www.sols.tools',
   'https://www.funtorahtools.com',
   'https://simchacohen1.github.io'
 ];

@@ -31,6 +31,8 @@
   const CARD_BIG='background:#0b1222;color:white;padding:10px;border-radius:14px;flex:1;min-width:0;min-height:0;box-shadow:0 12px 40px #0008;display:flex;flex-direction:column;gap:8px';
   const VIDEO_SMALL='pointer-events:auto;position:static;width:100%;height:180px;object-fit:contain;background:#050a16;cursor:zoom-in';
   const VIDEO_BIG='pointer-events:auto;position:static;width:100%;flex:1;min-height:0;height:auto;object-fit:contain;background:#050a16;cursor:zoom-out';
+  const WRAP_SMALL='position:relative;display:flex';
+  const WRAP_BIG='position:relative;display:flex;flex-direction:column;flex:1;min-height:0';
   const BUTTON='min-height:40px;padding:0 14px;border-radius:10px;border:1px solid #ffffff55;background:#1d4ed8;color:#fff;font:700 15px system-ui;cursor:pointer';
   let focused=null; // student id shown large
 
@@ -55,19 +57,26 @@
       entry.card.hidden=!!focused&&!big;
       entry.card.style.cssText=big?CARD_BIG:CARD_SMALL;
       entry.video.style.cssText=big?VIDEO_BIG:VIDEO_SMALL;
+      entry.wrap.style.cssText=big?WRAP_BIG:WRAP_SMALL;
+      entry.ink?.refresh();
       entry.enlarge.textContent=big?'◀ Back to gallery':'⤢ Enlarge';
       entry.enlarge.setAttribute?.('aria-pressed',String(big));
       entry.enlarge.title=big?'Return to all student screens (sharing continues)':'Show '+entry.name+'’s screen large';
     }
     if(focused)students.get(focused).enlarge.focus?.({preventScroll:true});
+    // While a student's screen is open large, hide the lesson drawing tools so only one Point/Pen toolbar shows.
+    document.body?.classList?.toggle('cp-viewing-student',!!focused);
   }
   document.addEventListener?.('keydown',event=>{if(event.key==='Escape'&&focused){event.stopPropagation();setFocus(null)}},true);
   // The adaptive gallery owns the full lesson area; avoid a duplicate floating tray on top.
   document.addEventListener?.('classpointer:sharing-state',()=>setFocus(null));
 
   // Show the newest live screen this student is sharing (another tab's share replaces the picture, not the tile).
+  // A tab that was just closed can take a while to report its call closed over the real PeerJS service; its video
+  // stops first. Prefer the newest call whose video is still arriving, so the tile never goes blank.
+  const liveVideo=stream=>!!stream?.getVideoTracks?.().some(track=>track.readyState==='live'&&!track.muted);
   function showLatest(entry){
-    const latest=entry.calls[entry.calls.length-1];
+    const latest=[...entry.calls].reverse().find(item=>liveVideo(item.stream))||entry.calls[entry.calls.length-1];
     const stream=latest?.stream||null;
     if(entry.video.srcObject!==stream){entry.video.srcObject=stream;if(stream)entry.video.play?.().catch?.(()=>{})}
     notify();
@@ -86,11 +95,14 @@
     // Clicking the screen itself enlarges it; clicking the large screen returns to the gallery.
     video.addEventListener?.('click',()=>setFocus(focused===studentId?null:studentId));
     const dismiss=document.createElement('button');dismiss.textContent='Stop viewing';dismiss.type='button';
-    dismiss.title='Close this student’s screen (he can share again)';
+    dismiss.title='Close this student’s screen (they can share again)';
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
     dismiss.onclick=()=>closeStudent(studentId);
-    card.append(top,video,dismiss);tray.appendChild(card);
-    entry={card,video,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    // Enlarged, the teacher can point or draw on this screen; the student sees it on his own screen.
+    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video);
+    card.append(top,wrap,dismiss);tray.appendChild(card);
+    entry={card,video,wrap,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    entry.ink=window.ClassPointerScreenMarks?.attach?.(wrap,video,()=>focused===studentId&&students.get(studentId)===entry?{id:studentId,name:entry.name}:null)||null;
     setFocus(focused);
     return entry;
   }
@@ -102,7 +114,7 @@
       entry.calls=entry.calls.filter(item=>item.call!==call);
       // Another tab of the same boy is still sharing: keep his tile and show that screen.
       if(entry.calls.length)showLatest(entry);
-      else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null}
+      else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null;window.ClassPointerScreenMarks?.clearFor(studentId)}
     }
     setFocus(focused);
     notify();
@@ -132,7 +144,11 @@
       const priorFailure=document.getElementById('activityScreenFailure');if(priorFailure)priorFailure.hidden=true;
       const entry=tileFor(verified.studentId,String(verified.studentName||'Student'));
       const item={call,stream:null};entry.calls.push(item);screens.set(call,verified.studentId);
-      call.on('stream',stream=>{if(!screens.has(call))return;item.stream=stream;showLatest(entry)});
+      call.on('stream',stream=>{
+        if(!screens.has(call))return;item.stream=stream;showLatest(entry);
+        // Re-pick the picture whenever this screen's video stops or starts again.
+        for(const track of stream.getVideoTracks?.()||[])for(const type of ['mute','unmute','ended'])track.addEventListener?.(type,()=>{if(screens.has(call))showLatest(entry)});
+      });
       // Tidy up after the closing call has finished its own work (keeps this safe if close fires more than once).
       const later=()=>(typeof queueMicrotask==='function'?queueMicrotask:fn=>fn())(()=>clear(call));
       call.on('close',later);call.on('error',later);

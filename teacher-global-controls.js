@@ -16,6 +16,12 @@
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
   var lastFollowClass = '';
+  // A button pressed before any class is chosen waits here ('access', 'follow'
+  // or 'pointer') while the panel asks "Which class?" (issue 769).
+  var pending = '', chooser = null, popoutBtn = null;
+  // The class the teacher confirmed on this page's own "confirm your class"
+  // screen (class-confirm-gate.js), which does not always put it in the link.
+  var gateClass = '';
   var ID = /^[A-Za-z0-9_-]{1,100}$/;
   var workspace = 'b3-2026';
 
@@ -37,15 +43,76 @@
   function classIsValid(id) {
     return authorized && ID.test(id) && classes.some(function(row) { return row.id === id; });
   }
+  // Some pages define their own global function named open() (the Yiddish app
+  // does), which replaces window.open on that page, so window.open cannot be
+  // trusted here. A link click opens the tab on every page; the same target
+  // name reuses the tab on repeat presses.
+  function openWindow(url, name, noOpener) {
+    var link = el('a');
+    link.href = url; link.target = name;
+    if (noOpener) link.rel = 'noopener';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
   // Class Pointer needs screen sharing and PeerJS, so it opens in its own named
   // tab (reused on repeat clicks), never in the panel iframe.
   function openPointer() {
     var id = currentClass();
     if (onPointerPage() || !classIsValid(id)) return;
-    window.open(classUrl(POINTER_PATH, id, {dashboard:'teacher'}), 'classPointer');
+    openWindow(classUrl(POINTER_PATH, id, {dashboard:'teacher'}), 'classPointer');
+  }
+  // The class the buttons act on. Never guessed between several classes: it is
+  // the class already chosen, the class named in the link (also when the page
+  // adds it after loading), the class confirmed on this page's confirm screen,
+  // or the teacher's only class. Otherwise ''.
+  function resolveClass() {
+    var id = currentClass();
+    if (classIsValid(id)) return id;
+    var linked = new URLSearchParams(location.search).get('class') || '';
+    if (classIsValid(linked)) id = linked;
+    else if (classIsValid(gateClass)) id = gateClass;
+    else if (authorized && classes.length === 1) id = classes[0].id;
+    else return '';
+    remember(id);
+    if (select) select.value = id;
+    if (modalClassSelect) modalClassSelect.value = id;
+    return id;
+  }
+  // Every button press goes through here, so a press always does something:
+  // it opens its tool, or asks which class first.
+  function act(which) {
+    if (!authorized || !modal) return;
+    if (which === 'pointer' && onPointerPage()) return;
+    if (!resolveClass()) { askClass(which); return; }
+    if (which === 'pointer') openPointer(); else openPanel(which);
+  }
+  function askClass(which) {
+    if (!modal.hidden && pending === which) { closePanel(); return; }
+    closePanel();
+    pending = which;
+    modalTitle.textContent = which === 'access' ? '🔒 Class Access' : which === 'follow' ? '👣 Follow the Teacher' : '👆 Class Pointer';
+    accessFrame.hidden = true; followFrame.hidden = true;
+    popoutBtn.hidden = true;
+    if (modalClassSelect) modalClassSelect.value = '';
+    chooser.replaceChildren(el('h2', '', 'Which class?'), el('p', '', 'Choose a class to continue.'));
+    var last = getPreferred(), list = el('div', 'ftt-quick-classes');
+    classes.forEach(function(row) {
+      var btn = el('button', '', row.name + (row.id === last ? ' (last used)' : ''));
+      btn.type = 'button';
+      btn.addEventListener('click', function() { updatePanelClass(row.id); });
+      list.appendChild(btn);
+    });
+    chooser.appendChild(list);
+    chooser.hidden = false;
+    modal.hidden = false;
+    var first = list.querySelector('button');
+    if (first) first.focus();
   }
   function syncPointerButtons() {
-    var ok = classIsValid(currentClass());
+    // Always shown to a signed-in teacher: with no class yet, pressing asks.
+    var ok = authorized && classes.length > 0;
     [pointer, homePointer].forEach(function(btn) {
       if (!btn) return;
       btn.hidden = !ok;
@@ -77,6 +144,8 @@
     if (!modal) return;
     modal.hidden = true;
     activePanel = '';
+    pending = '';
+    if (chooser) chooser.hidden = true;
     if (follow) follow.setAttribute('aria-expanded', 'false');
     if (homeFollow) homeFollow.setAttribute('aria-expanded', 'false');
     if (lock) lock.setAttribute('aria-expanded', 'false');
@@ -87,6 +156,13 @@
     if (select) select.value = id;
     syncPointerButtons();
     if (modalClassSelect) modalClassSelect.value = id;
+    if (pending) {
+      // The class was just chosen for a waiting button press: carry it out.
+      var waiting = pending;
+      closePanel();
+      if (waiting === 'pointer') openPointer(); else openPanel(waiting);
+      return;
+    }
     if (!modal || modal.hidden || !activePanel) return;
     var which = activePanel;
     activePanel = '';
@@ -98,6 +174,9 @@
     if (!modal) return;
     if (!modal.hidden && activePanel === which) { closePanel(); return; }
     activePanel = which;
+    pending = '';
+    if (chooser) chooser.hidden = true;
+    if (popoutBtn) popoutBtn.hidden = false;
     modal.hidden = false;
     modalTitle.textContent = which === 'access' ? '🔒 Class Access' : '👣 Follow the Teacher';
     if (modalClassSelect) modalClassSelect.value = id;
@@ -139,6 +218,13 @@
       '#fttTeacherQuickModal .ftt-quick-close,#fttTeacherQuickModal .ftt-quick-popout{padding:8px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font:700 13px Arial;color:#1e293b;cursor:pointer}',
       '#fttTeacherQuickModal iframe{width:100%;flex:1;min-height:0;border:0;background:#fff}',
       '#fttTeacherQuickModal iframe[hidden]{display:none!important}',
+      '#fttTeacherQuickModal .ftt-quick-choose{flex:1;overflow:auto;padding:28px 18px;text-align:center}',
+      '#fttTeacherQuickModal .ftt-quick-choose[hidden],#fttTeacherQuickModal .ftt-quick-popout[hidden]{display:none!important}',
+      '#fttTeacherQuickModal .ftt-quick-choose h2{margin:0 0 6px;font:900 24px Arial,sans-serif}',
+      '#fttTeacherQuickModal .ftt-quick-choose p{margin:0 0 18px;color:#475569;font:400 16px Arial,sans-serif}',
+      '#fttTeacherQuickModal .ftt-quick-classes{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:640px;margin:0 auto}',
+      '#fttTeacherQuickModal .ftt-quick-classes button{min-width:150px;padding:14px 18px;border:2px solid #1d4ed8;border-radius:12px;background:#fff;color:#1d4ed8;font:700 17px Arial,sans-serif;cursor:pointer}',
+      '#fttTeacherQuickModal .ftt-quick-classes button:hover,#fttTeacherQuickModal .ftt-quick-classes button:focus-visible{background:#1d4ed8;color:#fff}',
       '@media(max-width:620px){#fttTeacherQuickBar{top:8px;bottom:auto;right:auto;left:50%;transform:translateX(-50%)}#fttTeacherQuickBar label{display:block}#fttTeacherQuickBar select{min-width:100px}#fttTeacherQuickBar button{padding:0;font-size:18px}#fttTeacherQuickModal{padding:0}#fttTeacherQuickModal .ftt-quick-card{width:100%;height:100%;border-radius:0}}'
     ].join('\n');
     document.head.appendChild(style);
@@ -154,9 +240,9 @@
     bar.append(lock, follow, pointer);
     document.body.appendChild(bar);
     select.addEventListener('change', function () { updatePanelClass(select.value); });
-    lock.addEventListener('click', function(){ openPanel('access'); });
-    follow.addEventListener('click', function(){ openPanel('follow'); });
-    pointer.addEventListener('click', openPointer);
+    lock.addEventListener('click', function(){ act('access'); });
+    follow.addEventListener('click', function(){ act('follow'); });
+    pointer.addEventListener('click', function(){ act('pointer'); });
 
     modal = el('div'); modal.id = 'fttTeacherQuickModal'; modal.hidden = true;
     modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-label','Teacher quick controls');
@@ -169,19 +255,20 @@
     modalClassSelect.style.cssText = 'max-width:180px;padding:8px;border:1px solid #cbd5e1;border-radius:9px;background:white;color:#1e293b;font:700 14px Arial';
     modalClassSelect.addEventListener('change', function(){ updatePanelClass(modalClassSelect.value); });
     actions.append(classLabel, modalClassSelect);
-    var popout = el('button','ftt-quick-popout','↗ Separate window'); popout.type = 'button';
+    var popout = popoutBtn = el('button','ftt-quick-popout','↗ Separate window'); popout.type = 'button';
     popout.title = 'Keep Follow running in its own window while you visit other teacher pages';
     var dismiss = el('button','ftt-quick-close','✕ Close'); dismiss.type = 'button';
     actions.append(popout,dismiss);head.append(modalTitle,actions);
     accessFrame = el('iframe');accessFrame.title = 'Class Access';accessFrame.hidden = true;
     followFrame = el('iframe');followFrame.title = 'Follow the Teacher controls';followFrame.hidden = true;
-    card.append(head,accessFrame,followFrame);modal.appendChild(card);document.body.appendChild(modal);
+    chooser = el('div','ftt-quick-choose'); chooser.hidden = true;
+    card.append(head,chooser,accessFrame,followFrame);modal.appendChild(card);document.body.appendChild(modal);
     dismiss.addEventListener('click',closePanel);
     modal.addEventListener('click',function(e){if(e.target===modal)closePanel();});
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)closePanel();});
     popout.addEventListener('click',function(){
       var url=activePanel==='follow'?classUrl('follow-teacher/teacher.html',currentClass()):classUrl('admin.html',currentClass(),{tab:'access'});
-      window.open(url,'_blank','noopener');
+      openWindow(url,'_blank',true);
     });
   }
   function syncClassPicker() {
@@ -220,14 +307,14 @@
       homeFollow.type = 'button';homeFollow.title = 'Open or close Follow the Teacher';
       homeFollow.setAttribute('aria-label','Open or close Follow the Teacher tools');
       homeFollow.setAttribute('aria-expanded','false');
-      homeFollow.addEventListener('click',function(){openPanel('follow');});
+      homeFollow.addEventListener('click',function(){act('follow');});
       homeBar.appendChild(homeFollow);
     }
     if (!homePointer || !homeBar.contains(homePointer)) {
       homePointer = el('button','ftt-home-follow','👆');
       homePointer.type = 'button';homePointer.title = 'Open Class Pointer for the selected class';
       homePointer.setAttribute('aria-label','Open Class Pointer for the selected class');
-      homePointer.addEventListener('click',openPointer);
+      homePointer.addEventListener('click',function(){act('pointer');});
       homeBar.appendChild(homePointer);
     }
     if (homeBar && !homeBar.__fttPointerWatch) {
@@ -236,7 +323,21 @@
     }
     syncPointerButtons();
   }
+  // Shared drawing toolbar: a teacher always has the pencil button (class-pointer-prototype/annotation-toolbar.js).
+  var annotateLoading = null;
+  function teacherAnnotate(on) {
+    if (!on) { if (window.FTTAnnotate) window.FTTAnnotate.setRole(null); return; }
+    if (window.FTTAnnotate) { window.FTTAnnotate.setRole('teacher'); return; }
+    if (annotateLoading) return;
+    annotateLoading = document.createElement('script');
+    annotateLoading.src = new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1', base).href;
+    annotateLoading.async = true;
+    annotateLoading.onload = function() { if (authorized && window.FTTAnnotate) window.FTTAnnotate.setRole('teacher'); };
+    annotateLoading.onerror = function() { annotateLoading = null; };
+    document.head.appendChild(annotateLoading);
+  }
   function reset() {
+    teacherAnnotate(false);
     authorized = false; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
@@ -279,6 +380,7 @@
       // pre-selected; otherwise the bar shows "Choose a class\u2026".
       selected = ids.includes(requested) ? requested : '';
       authorized=true;
+      teacherAnnotate(true);
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
@@ -287,8 +389,20 @@
       console.warn('Teacher quick controls unavailable:',e);
     }
   }
+  function watchClassGate() {
+    if (!window.MutationObserver) return;
+    new MutationObserver(function(changes) {
+      changes.forEach(function(change) {
+        Array.prototype.forEach.call(change.removedNodes, function(node) {
+          if (node.id !== 'b3ClassGate') return;
+          try { gateClass = localStorage.getItem('b3LastConfirmedClass') || ''; } catch (_) { gateClass = ''; }
+        });
+      });
+    }).observe(document.body, {childList:true});
+  }
   function connect() {
     if (document.readyState === 'loading' || !document.body) {document.addEventListener('DOMContentLoaded',connect,{once:true});return;}
+    watchClassGate();
     var tries = 0;
     function ready() {
       API = window.B3SiteSettings;

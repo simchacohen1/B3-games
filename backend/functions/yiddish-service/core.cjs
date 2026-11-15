@@ -174,12 +174,19 @@ return async function handle(b,ip='unknown'){
  }
 
  if(b.action==='login'){
-  const bucket='yiddishPrivate/loginLimits/'+hash(ip);let blocked=false;
-  await store.tx(bucket,p=>{blocked=false;if(!p||p.until<now())p={count:0,until:now()+600000};if(p.count>=30){blocked=true;return undefined}return {...p,count:p.count+1}});
+  // Only WRONG passcodes use up the lockout allowance (issue #421). Correct sign-ins never do,
+  // so a classroom sharing one internet address cannot lock itself out. Counter keys are hashes.
+  const win=600000,addr=hash('ip:'+ip),id=String(b.studentId||'');
+  const volumeKey='yiddishPrivate/loginVolume/'+addr,ipKey='yiddishPrivate/loginFailures/ip/'+addr,pairKey='yiddishPrivate/loginFailures/pair/'+hash(id+'|'+ip);
+  let blocked=false;
+  await store.tx(volumeKey,p=>{blocked=false;if(!p||p.until<now())p={count:0,until:now()+win};if(p.count>=1000){blocked=true;return undefined}return {...p,count:p.count+1}});
   if(blocked)fail(429,'Too many sign-in attempts. Try again in 10 minutes.');
-  const id=String(b.studentId||'');if(!validKey(id))fail(401,'Check your name and individual passcode.');
+  const rows=await Promise.all([get(ipKey),get(pairKey)]);
+  if((rows[0]&&rows[0].until>=now()&&rows[0].count>=100)||(rows[1]&&rows[1].until>=now()&&rows[1].count>=8))fail(429,'Too many sign-in attempts. Try again in 10 minutes.');
+  const wrong=async()=>{const bump=k=>store.tx(k,p=>{if(!p||p.until<now())p={count:0,until:now()+win};return {...p,count:p.count+1}});await Promise.all([bump(ipKey),bump(pairKey)]);fail(401,'Check your name and individual passcode.')};
+  if(!validKey(id))fail(401,'Check your name and individual passcode.');
   const row=await studentRecord(id,b.classId),person=row.profile,code=person?await passcodeFor(id,person,row.classId):'';
-  if(!person||!code||!crypto.timingSafeEqual(Buffer.from(hash(String(b.pin||'').trim())),Buffer.from(hash(code))))fail(401,'Check your name and individual passcode.');
+  if(!person||!code||!crypto.timingSafeEqual(Buffer.from(hash(String(b.pin||'').trim())),Buffer.from(hash(code))))await wrong();
   const token=random();await store.set('yiddishPrivate/sessions/'+hash(token),{studentId:id,classId:row.classId,passcodeHash:hash(code),expires:now()+12*3600000});return {token};
  }
  const who=await identity(b),c=await cfg(who.classId),path=studentPath(who.classId,who.id);
