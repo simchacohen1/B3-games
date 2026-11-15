@@ -15,6 +15,13 @@ test("production class-access deployment is manual, owner-only, and target-bound
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /pull_number: 779/);
   assert.match(workflow, /pr\.head\.sha !== sha/);
+  // Once PR #779 is merged, only its exact merge commit on main is accepted,
+  // and the reviewed PR-head checks are still required.
+  assert.match(workflow, /pr\.merged/);
+  assert.match(workflow, /pr\.merge_commit_sha !== sha/);
+  assert.match(workflow, /basehead: `main\.\.\.\$\{sha\}`/);
+  assert.match(workflow, /\["behind", "identical"\]\.includes\(comparison\.status\)/);
+  assert.match(workflow, /ref: pr\.head\.sha/);
   assert.match(workflow, /checks\.listForRef/);
   assert.match(workflow, /check\.conclusion !== "success"/);
   assert.match(workflow, /workloadIdentityPools\/github-actions-prod\/providers\/teacher-class-access/);
