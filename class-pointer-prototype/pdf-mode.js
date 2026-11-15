@@ -587,7 +587,23 @@
       if(picked.tool==='text'){if(textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
       else if(G?.handleAt(picked,at.px,at.py,at.w,at.h,12))return true;
     }
-    return !!teacherMarkAt(event,normalized(event),true);
+    const point=normalized(event);
+    return !!teacherMarkAt(event,point,true)||!!pictureAt(point);
+  }
+  // The pasted picture under a point of the whiteboard (the one on top), or null. Marks lie over pictures, so a
+  // mark at the same spot is picked first.
+  function pictureAt(point){
+    if(!point||!isBoardOpen())return null;
+    return [...boardPictures].reverse().find(q=>point.x>=q.x&&point.x<=q.x+q.w&&point.y>=q.y&&point.y<=q.y+q.h)||null;
+  }
+  // The arrow on a pasted picture: the picture is lifted off the board into its movable frame (corners resize,
+  // Delete or ✕ removes) and the drag that picked it carries on moving it. It goes back on the board for everyone
+  // when the drag ends, or with the next click anywhere else.
+  function pickPicture(picture,event){
+    boardPictures=boardPictures.filter(other=>other!==picture);
+    const item=startPictureEdit(picture.image,{x:picture.x,y:picture.y,w:picture.w,h:picture.h,after:picture.after});
+    publishBoard();item.grab(event);
+    B.status('Drag the picture to move it, drag a corner to resize it, press Delete to remove it.');
   }
   // Starts picking, dragging or resizing. False when nothing was under the pointer (then the click is the mouse's).
   function startSelect(event,p){
@@ -747,7 +763,13 @@
       // spot for new words. Every other tool draws, also on top of words.
       // The arrow: a click on one of my marks picks it; a click on nothing is a plain mouse click (the page is
       // dragged, a link is opened), so it is not swallowed here.
-      if(tool==='select'){if(!usable||!p)return;if(startSelect(event,p)){event.preventDefault();event.stopPropagation()}return}
+      if(tool==='select'){
+        if(!usable||!p)return;
+        if(startSelect(event,p)){event.preventDefault();event.stopPropagation();return}
+        const picture=pictureAt(p);
+        if(picture){event.preventDefault();event.stopPropagation();pickPicture(picture,event)}
+        return;
+      }
       if(tool==='eraser'){if(!ready||!p)return;event.preventDefault();event.stopPropagation();erasePid=event.pointerId;content.setPointerCapture(erasePid);eraseUnder(event);return}
       if(tool==='text'&&ready){
         if(!p)return;event.preventDefault();event.stopPropagation();
@@ -1094,7 +1116,9 @@
   stage.addEventListener('pointerdown',event=>{
     if(!webMode||!isTeacher||!B.navigating()||notReady()||event.button!==0||scroller.hidden||!stage.contains(event.target))return;
     if(event.target.closest?.('[data-stage-ui],button,input,select,textarea'))return;
-    // The arrow on one of my marks (or a handle): that mark is picked instead, by the lesson's own click handler.
+    // With the arrow, a picture that was lifted to move it goes back on the board with the next click elsewhere.
+    if(pictureEdits.length&&selecting())finishPictureEdit();
+    // The arrow on one of my marks, a handle or a picture: that is picked instead, by the lesson's own click handler.
     if(grabAt(event))return;
     if(inlineEdit)finishInline(true);
     if(selectedId){selectedId=null;drawInk()}
@@ -1245,20 +1269,27 @@
     const remove=el('button',null,'board-picture-remove','✕');remove.type='button';remove.title='Remove this picture';remove.setAttribute('aria-label','Remove this picture');
     remove.addEventListener('click',event=>{event.stopPropagation();item.el.remove();pictureEdits=pictureEdits.filter(other=>other!==item);if(!pictureEdits.length)finishPictureEdit()});
     item.el.appendChild(remove);
-    let drag=null;
+    let drag=null,moved=false;
+    const begin=(event,corner)=>{
+      const r=content.getBoundingClientRect();
+      drag={id:event.pointerId,corner,x:event.clientX,y:event.clientY,start:{x:item.x,y:item.y,w:item.w,h:item.h},rw:r.width,rh:r.height};moved=false;
+      try{item.el.setPointerCapture(event.pointerId)}catch{}
+      item.el.classList.add('dragging');
+      for(const other of pictureEdits)other.el.classList.toggle('selected',other===item);
+    };
+    // The arrow starts a move with the same press that picked the picture.
+    item.grab=event=>begin(event,null);
     item.el.addEventListener('pointerdown',event=>{
       event.stopPropagation();
       if(event.button!==0||event.target===remove)return;
       event.preventDefault();
-      const r=content.getBoundingClientRect();
-      drag={id:event.pointerId,corner:event.target.dataset?.corner||null,x:event.clientX,y:event.clientY,start:{x:item.x,y:item.y,w:item.w,h:item.h},rw:r.width,rh:r.height};
-      item.el.setPointerCapture(event.pointerId);item.el.classList.add('dragging');
-      for(const other of pictureEdits)other.el.classList.toggle('selected',other===item);
+      begin(event,event.target.dataset?.corner||null);
     });
     item.el.addEventListener('pointermove',event=>{
       event.stopPropagation();
       if(!drag||drag.id!==event.pointerId)return;
       const dx=(event.clientX-drag.x)/drag.rw,dy=(event.clientY-drag.y)/drag.rh,s=drag.start,clamp=P.clamp;
+      if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>=3)moved=true;
       if(!drag.corner){item.x=clamp(s.x+dx,-s.w*0.8,1-s.w*0.2);item.y=clamp(s.y+dy,-s.h*0.8,1-s.h*0.2)}
       else{
         // Corners resize and keep the picture's shape (worked out in screen pixels).
@@ -1269,7 +1300,12 @@
       }
       placeEditElement(item);
     });
-    const end=event=>{if(drag&&(!event||drag.id===event.pointerId)){drag=null;item.el.classList.remove('dragging')}};
+    const end=event=>{
+      if(!drag||(event&&drag.id!==event.pointerId))return;
+      drag=null;item.el.classList.remove('dragging');
+      // With the arrow, a picture that was moved or resized goes straight back on the board for everyone.
+      if(moved&&selecting()&&pictureEdits.includes(item)){moved=false;finishPictureEdit()}
+    };
     item.el.addEventListener('pointerup',event=>{event.stopPropagation();end(event)});
     item.el.addEventListener('pointercancel',end);item.el.addEventListener('lostpointercapture',()=>end());
     ['click','dblclick','wheel'].forEach(type=>item.el.addEventListener(type,event=>event.stopPropagation()));
@@ -1277,6 +1313,7 @@
     for(const other of pictureEdits)other.el.classList.toggle('selected',other===item);
     showPictureBar();updateControls();
     B.status('Picture added. Move or resize it, then press ✓ Show to class. Students see it after that.');
+    return item;
   }
   function finishPictureEdit(){
     if(!pictureEdits.length){if(pictureBar)pictureBar.hidden=true;updateControls();return}

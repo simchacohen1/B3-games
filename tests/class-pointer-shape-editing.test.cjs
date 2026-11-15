@@ -123,14 +123,14 @@ test('words are opened for editing only with Text or a second click in Select; o
  assert.equal((down.match(/editInline\(/g)||[]).length,2,'a click with the Text tool types on the board: in words that are there, or new words on an empty spot');
  assert.ok(!down.includes('openTextEditor'),'no popup');
  assert.match(down,/if\(tool==='text'&&ready\)\{/);
- assert.match(down,/if\(tool==='select'\)\{if\(!usable\|\|!p\)return;if\(startSelect\(event,p\)\)\{event\.preventDefault\(\);event\.stopPropagation\(\)\}return\}/);
+ assert.match(down,/if\(startSelect\(event,p\)\)\{event\.preventDefault\(\);event\.stopPropagation\(\);return\}/);
  assert.match(down,/if\(tool==='eraser'\)\{if\(!ready\|\|!p\)return;[^}]*eraseUnder\(event\);return\}/);
  assert.match(pdf,/function eraseUnder\(event\)\{const p=normalized\(event\),hit=p&&teacherMarkAt\(event,p,false\);if\(hit\)eraseBlock\(hit\)\}/);
 });
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes18"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes19"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes18/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes19/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -311,10 +311,11 @@ test('one arrow button is both Select and the mouse on the teacher whiteboard, P
 test('the arrow picks a drawing that is clicked; a click on nothing is a plain mouse click',()=>{
  // What the arrow can grab: a handle of the picked mark, or one of the teacher's own marks.
  assert.match(pdf,/function grabAt\(event\)\{\s*if\(!selecting\(\)\|\|notReady\(\)\)return false;/);
- assert.match(pdf,/return !!teacherMarkAt\(event,normalized\(event\),true\);/);
+ assert.match(pdf,/return !!teacherMarkAt\(event,point,true\)\|\|!!pictureAt\(point\);/);
  // Dragging the page never starts on a mark; a click on nothing lets go of the pick and is the mouse's.
  const pan=pdf.slice(pdf.indexOf('let snapshotPan=null;'),pdf.indexOf("stage.addEventListener('pointermove'",pdf.indexOf('let snapshotPan=null;')));
  assert.match(pan,/if\(grabAt\(event\)\)return;\s*if\(inlineEdit\)finishInline\(true\);\s*if\(selectedId\)\{selectedId=null;drawInk\(\)\}/);
+ assert.match(pan,/if\(pictureEdits\.length&&selecting\(\)\)finishPictureEdit\(\);/);
  assert.ok(pan.indexOf('if(grabAt(event))return;')<pan.indexOf('snapshotPan={id:event.pointerId'),'checked before the drag starts');
  // The lesson's own click handler does not swallow a click that picked nothing, so a PDF can still be dragged.
  assert.match(pdf,/drawInk\(\);return !!hit;/);
@@ -348,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes18/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes19/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -519,4 +520,30 @@ test('words have a size control (A- number A+) and new words start smaller',()=>
 
 test('words stay picked, with their handles, after their size is changed',()=>{
  assert.match(pdf,/if\(ids\)\{selectedId=ids\[0\];drawInk\(\)\}else B\.status\('That size cannot be used for these words\.'\);/);
+});
+
+
+// ---------- The arrow moves, resizes and deletes pasted pictures ----------
+test('the arrow picks a pasted picture on the whiteboard and the same press moves it',()=>{
+ assert.match(pdf,/function pictureAt\(point\)\{\s*if\(!point\|\|!isBoardOpen\(\)\)return null;/);
+ // The picture on top wins; a point outside every picture gives nothing.
+ const pics=[{x:.1,y:.1,w:.3,h:.3,n:1},{x:.2,y:.2,w:.3,h:.3,n:2}];
+ const at=point=>[...pics].reverse().find(q=>point.x>=q.x&&point.x<=q.x+q.w&&point.y>=q.y&&point.y<=q.y+q.h)||null;
+ assert.equal(at({x:.25,y:.25}).n,2);assert.equal(at({x:.12,y:.12}).n,1);assert.equal(at({x:.8,y:.8}),null);
+ // A mark at the same spot is picked first; only then a picture.
+ const down=pdf.slice(pdf.indexOf("content.addEventListener('pointerdown'"),pdf.indexOf('function extend(event)'));
+ assert.ok(down.indexOf('if(startSelect(event,p))')<down.indexOf('const picture=pictureAt(p);'));
+ assert.match(down,/if\(picture\)\{event\.preventDefault\(\);event\.stopPropagation\(\);pickPicture\(picture,event\)\}/);
+ // The picture is lifted into its frame and the drag carries on.
+ assert.match(pdf,/const item=startPictureEdit\(picture\.image,\{x:picture\.x,y:picture\.y,w:picture\.w,h:picture\.h,after:picture\.after\}\);\s*publishBoard\(\);item\.grab\(event\);/);
+ assert.match(pdf,/item\.grab=event=>begin\(event,null\);/);
+});
+
+test('with the arrow a moved or resized picture goes straight back on the board; Move pictures still works',()=>{
+ assert.match(pdf,/if\(moved&&selecting\(\)&&pictureEdits\.includes\(item\)\)\{moved=false;finishPictureEdit\(\)\}/);
+ assert.match(pdf,/if\(Math\.hypot\(event\.clientX-drag\.x,event\.clientY-drag\.y\)>=3\)moved=true;/,'a plain click only picks it');
+ // Delete removes the picked picture (the existing key handler), and the button and its bar are untouched.
+ assert.match(pdf,/const item=pictureEdits\.find\(other=>other\.el\.classList\.contains\('selected'\)\);/);
+ assert.match(pdf,/movePicturesBtn=button\('🖼 Move pictures',/);
+ assert.match(pdf,/done\.addEventListener\('click',\(\)=>finishPictureEdit\(\)\);/);
 });
