@@ -179,7 +179,8 @@ small.warn{display:block;color:#b45309;margin-top:4px}
 
 <section class="card hidden" id="bulkManageCard" data-view="manage"><div class="card-head"><h2>&#x1F9F9; Students &rarr; Bulk Management</h2></div>
 <p class="hint">Find this school&rsquo;s students by class, import, creation date or name. Preview shows each account's history and any saved student work. Only accounts with <b>no</b> student work can be deleted, every deletion is backed up first and can be undone, and the server checks everything again.</p>
-<div class="formrow"><button id="bmLoad" type="button">Load students</button><button id="bmAudit" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Audit log</button></div>
+<div class="formrow"><button id="bmLoad" type="button">Load students</button><button id="bmAudit" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Audit log</button><button id="dupFind" type="button" style="background:#fff;color:#172033;border:1px solid #cbd5e1">Find possible duplicates</button></div>
+<div id="dupArea" style="margin:10px 0"></div>
 <div id="bmArea" style="display:none">
  <div class="formrow" style="flex-wrap:wrap">
   <select id="bmClass" aria-label="Class"><option value="">All classes</option></select>
@@ -696,6 +697,35 @@ async function bmLoad(){
   finally{q("bmLoad").disabled=false;}
 }
 q("bmLoad").onclick=bmLoad;
+// Possible duplicates (Issue #51 / #665). This only LOOKS and lists: it never
+// deletes, merges, renames or changes a student or a class, and it never shows
+// a passcode (only whether two accounts share one).
+async function dupFind(){
+  const area=q("dupArea");q("dupFind").disabled=true;area.innerHTML='<p>Looking for possible duplicates&hellip;</p>';
+  try{
+    const r=await manageCall({action:"duplicateReport"},120000),sum=r.summary;
+    const classList=a=>a.classNames.length?a.classNames.map(safe).join(", "):"<i>no class</i>";
+    const row=a=>'<tr><td>'+safe(a.name)+(a.active?"":' <b>(account off)</b>')+'</td><td><code>'+safe(a.studentId)+'</code></td><td>'+classList(a)+(a.formerClassNames.length?'<br><span style="color:#64748b">was in: '+a.formerClassNames.map(safe).join(", ")+'</span>':"")+'</td><td>'+safe(fmtDate(a.createdAt))+'</td><td>'+safe(a.importBatchId||"")+'</td><td>'+(a.passcodeGroup?"Passcode "+safe(a.passcodeGroup):"none saved")+'</td><td>'+(a.savedWork.length?safe(a.savedWork.join(", ")):"none")+'</td></tr>';
+    const group=g=>'<div class="notice" style="margin:8px 0;'+(g.blocksSignIn?"background:#fef2f2;border-color:#fecaca":"")+'"><b>'+safe(g.name)+'</b> &middot; '+g.accounts.length+' accounts'+
+      (g.blocksSignIn?' &middot; <b>same passcode: none of these can sign in</b>':g.samePasscode?' &middot; same passcode':' &middot; different passcodes (may be different boys)')+
+      (g.sharedClassNames.length?' &middot; both in '+g.sharedClassNames.map(safe).join(", "):"")+
+      '<div style="overflow:auto"><table style="width:100%;font-size:14px;border-collapse:collapse;margin-top:6px"><tr style="text-align:left"><th>Name</th><th>Account ID</th><th>Classes</th><th>Created</th><th>Import</th><th>Passcode</th><th>Saved work</th></tr>'+g.accounts.map(row).join("")+'</table></div></div>';
+    area.innerHTML='<h3>Possible duplicates</h3><p class="hint">Nothing here has been changed. This is a list for you to review. Accounts marked with the same passcode letter share a passcode; the passcode itself is not shown.</p>'+
+      '<p><b>'+sum.sameNameGroups+'</b> name(s) with more than one account ('+sum.accountsInGroups+' accounts), <b>'+sum.blockingSignIn+'</b> blocking sign-in &middot; <b>'+sum.sameClassNameGroups+'</b> class name(s) used by more than one class &middot; <b>'+sum.mismatches+'</b> class-list entries that do not match an account.</p>'+
+      '<div class="formrow"><button type="button" id="dupCsv">Download this list (CSV)</button></div>'+
+      '<h3>Students with the same name</h3>'+(r.studentGroups.length?r.studentGroups.map(group).join(""):'<p style="color:#64748b">None</p>')+
+      '<h3>Classes with the same name</h3>'+bulkList(r.classGroups,g=>'<li><b>'+safe(g.name)+'</b><ul>'+g.classes.map(c=>'<li><code>'+safe(c.classId)+'</code> &middot; '+c.members+' student(s)'+(c.active?"":" &middot; turned off")+(c.brokenName?" &middot; name shows a broken character":"")+'</li>').join("")+'</ul></li>')+
+      '<h3>Class lists that do not match an account</h3>'+bulkList(r.mismatches,m=>'<li>'+safe(m.name)+' (<code>'+safe(m.studentId)+'</code>) in '+safe(m.className)+': '+safe(m.problem)+'</li>');
+    q("dupCsv").onclick=()=>downloadFile("possible-duplicates.csv",FTTBulkRoster.toCsv([
+      ["Kind","Name","Account or class ID","Classes","Former classes","Created","Import","Passcode group","Saved work","Note"],
+      ...r.studentGroups.flatMap(g=>g.accounts.map(a=>["Student",a.name,a.studentId,a.classNames.join("; "),a.formerClassNames.join("; "),fmtDate(a.createdAt),a.importBatchId||"",a.passcodeGroup,a.savedWork.join("; "),g.blocksSignIn?"Same name and passcode: cannot sign in":g.samePasscode?"Same passcode":"Different passcodes"])),
+      ...r.classGroups.flatMap(g=>g.classes.map(c=>["Class",c.name,c.classId,"","","","","","",c.members+" student(s)"+(c.active?"":"; turned off")+(c.brokenName?"; broken character in name":"")])),
+      ...r.mismatches.map(m=>["Class list entry",m.name,m.studentId,m.className,"","","","","",m.problem])
+    ]));
+  }catch(err){console.error(err);area.innerHTML='<p class="notice" style="background:#fef2f2;border-color:#fecaca">Could not look for duplicates: '+safe(err.message)+'</p>';}
+  finally{q("dupFind").disabled=false;}
+}
+q("dupFind").onclick=dupFind;
 ["bmClass","bmBatch","bmFrom","bmTo"].forEach(id=>q(id).onchange=bmRender);q("bmSearch").oninput=bmRender;
 q("bmSelectShown").onclick=()=>{bmFiltered().forEach(s=>bm.selected.add(s.studentId));bmRender();};
 q("bmClear").onclick=()=>{bm.selected.clear();bmRender();q("bmPreviewArea").innerHTML="";};

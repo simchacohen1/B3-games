@@ -121,6 +121,9 @@
                   "studentScreenSharing": {
                     ".validate": "newData.isBoolean()"
                   },
+                  "teacherOfflineAt": {
+                    ".validate": "newData.isNumber()"
+                  },
                   "permissionRevision": {
                     ".validate": "newData.isNumber()"
                   },
