@@ -473,6 +473,17 @@ function mergeCatalogWithoutReplacingPictures(current,local){
 function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||(t==='shorashim'&&Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM.find(x=>x.id===id):null)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt&&(!type||c.itemType===type)&&itemFor(c.itemKey)&&!itemFor(c.itemKey).hidden)}function reviewDone(s){const r=s.dailyReview||{};const total=learned(s).length;const seen=r.date===today()?Object.keys(r.seen||{}).length:0;return{total,seen,complete:!!total&&r.date===today()&&seen>=total}}
 function status(t,k=''){const e=$('teacherCloudStatus');e.textContent=t;e.className='cloud-status '+k}
+// Firebase cost (#51): loadAll() reads the catalog, settings, students and scores once, and the
+// live listeners bound right after it subscribe to the same paths. Holding the paths open first
+// makes that one download instead of two (the class student list with its card drawings is the
+// big one). The hold is dropped once the real listeners are attached.
+const noSync=()=>{};
+function holdPaths(paths){
+  const refs=paths.map(path=>db.ref(path));
+  refs.forEach(ref=>ref.on('value',noSync,noSync));
+  return()=>refs.forEach(ref=>ref.off('value',noSync));
+}
+let releaseStartupHold=noSync;
 async function loadAll(){
   status('☁️ Loading…','syncing');
   if(legacyScoped()){
@@ -480,6 +491,8 @@ async function loadAll(){
     const selected=roster.classes.find(row=>row.id===activeLegacyClassScope);
     if(!selected)throw new Error('This class is not assigned to your teacher account.');
     scopedStudentIds=selected.studentIds||[];
+    releaseStartupHold();
+    releaseStartupHold=holdPaths([`${ROOT}/catalog`,`${ROOT}/settings`,`${ROOT}/classes/${activeLegacyClassScope}/settings`,...scopedStudentIds.map(id=>`${ROOT}/students/${id}`),...scopedStudentIds.map(id=>`${ROOT}/leaderboards/match/8/${id}`)]);
     const [catalogSnap,globalSettingsSnap,classSettingsSnap,...studentSnaps]=await Promise.all([
       db.ref(`${ROOT}/catalog`).once('value'),db.ref(`${ROOT}/settings`).once('value'),db.ref(`${ROOT}/classes/${activeLegacyClassScope}/settings`).once('value'),
       ...scopedStudentIds.map(id=>db.ref(`${ROOT}/students/${id}`).once('value'))
@@ -491,12 +504,16 @@ async function loadAll(){
     const scores=await Promise.all(scopedStudentIds.map(id=>db.ref(`${ROOT}/leaderboards/match/8/${id}`).once('value')));
     scores.forEach((snap,index)=>{if(snap.exists())state.leaderboards.match['8'][scopedStudentIds[index]]=snap.val();});
     bindLegacyScopedListeners(globalSettingsSnap.val()||{});
+    releaseStartupHold();releaseStartupHold=noSync;
     $('teacherMinReview').value=String(state.settings.minReviewMs||500);renderStudentSiteControl();renderAll();
     loadShorashimRecordings();status('☁️ Connected');applyRequestedTeacherView();return;
   }
   // Stricter database rules may refuse the whole class student list. That must not
   // stop the words, settings or the teacher's library from loading.
   let studentListBlocked=false;
+  // Kept for the life of the page: the live score listener sits one level below
+  // `leaderboards`, so letting go of this would download the scores a second time.
+  holdPaths([`${SPACE}/catalog`,`${SPACE}/settings`,`${SPACE}/students`,`${SPACE}/leaderboards`]);
   const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value').catch(err=>{studentListBlocked=true;console.warn('Could not read the class student list',err);return null;}),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};

@@ -25,8 +25,10 @@ test.before(async () => {
     const rows = {
       'b3Games/admins/owner_alpha': { active: true, role: 'admin' },
       'b3Games/workspaces/b3-2026/teachers/owner_alpha': { active: true, role: 'owner' },
-      'b3Games/workspaces/b3-2026/classes/alpha': { active: true, teacherIds: { owner_alpha: true }, toolGrants: { 'multiplayer-center': true } },
-      'b3Games/workspaces/b3-2026/classes/beta': { active: true, teacherIds: { owner_beta: true }, toolGrants: { 'multiplayer-center': true } },
+      'b3Games/workspaces/b3-2026/teachers/teacher_alpha': { active: true, role: 'teacher', classIds: { alpha: true } },
+      'b3Games/workspaces/b3-2026/teachers/teacher_beta': { active: true, role: 'teacher', classIds: { beta: true } },
+      'b3Games/workspaces/b3-2026/classes/alpha': { active: true, teacherIds: { owner_alpha: true, teacher_alpha: true }, members: { student_alpha: { active: true } }, toolGrants: { 'multiplayer-center': true } },
+      'b3Games/workspaces/b3-2026/classes/beta': { active: true, teacherIds: { owner_beta: true, teacher_beta: true }, toolGrants: { 'multiplayer-center': true } },
       'multiplayerCenter/workspaces/b3-2026/classes/alpha/rooms/shorashim-1234': { host: 'teacher_owner_alpha', gameKey: 'shorashim', state: 'lobby', classId: 'alpha' },
       'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/123456/hands/teacher_owner_alpha': { hand: ['private-to-owner'] },
       'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/123456/hands/student_alpha': { hand: ['private-to-student'] },
@@ -50,4 +52,27 @@ testEmulator('owner can play in explicitly assigned Multiplayer Center classes w
   await assertSucceeds(get(ref(owner, 'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/123456/hands/teacher_owner_alpha')));
   await assertFails(get(ref(owner, 'b3Private/multiplayerGames/workspaces/b3-2026/classes/alpha/rooms/123456/hands/student_alpha')));
   await assertFails(get(ref(otherAdmin, alphaRooms)));
+});
+
+testEmulator('only a teacher of the class can change the Multiplayer Arcade game lock; students can only read it', async () => {
+  const lock = 'multiplayerCenter/workspaces/b3-2026/classes/alpha/gamesLocked';
+  const teacher = env.authenticatedContext('teacher_alpha', { email: 'teacher@example.test' }).database();
+  const otherTeacher = env.authenticatedContext('teacher_beta', { email: 'other-teacher@example.test' }).database();
+  const student = env.authenticatedContext('student-session', { b3StudentId: 'student_alpha', b3ClassId: 'alpha' }).database();
+  const signedOut = env.unauthenticatedContext().database();
+
+  await assertSucceeds(set(ref(teacher, lock), true));
+  await assertSucceeds(get(ref(teacher, lock)));
+  assert.equal((await get(ref(student, lock))).val(), true);
+  await assertFails(set(ref(student, lock), false));
+  await assertFails(set(ref(otherTeacher, lock), false));
+  await assertFails(get(ref(otherTeacher, lock)));
+  await assertFails(set(ref(signedOut, lock), false));
+  await assertFails(get(ref(signedOut, lock)));
+  await assertFails(set(ref(teacher, lock), 'yes'));
+  await assertFails(set(ref(teacher, lock), { nested: true }));
+  await assertFails(set(ref(teacher, 'multiplayerCenter/workspaces/b3-2026/classes/beta/gamesLocked'), true));
+  await assertFails(set(ref(teacher, 'multiplayerCenter/workspaces/b3-2026/classes/alpha/somethingElse'), true));
+  await assertSucceeds(set(ref(teacher, lock), false));
+  assert.equal((await get(ref(student, lock))).val(), false);
 });
