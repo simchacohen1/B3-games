@@ -42,7 +42,7 @@
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Delete removes it. Double-click text to change it.'],
+    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -684,6 +684,15 @@
     if(item.color!==color.toLowerCase())changeItem(s,item,{color:color.toLowerCase()});
     return true;
   }
+  // One arrow-key step of `px` screen pixels for the picked mark, as a fraction of the surface. True when a mark moved.
+  const ARROW_STEP={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+  function nudgeSelected(direction,px){
+    const s=surface();if(!selected||isDelegate(s))return false;
+    const item=itemsOf(s).find(i=>i.id===selected),r=s.rect();
+    if(!item||!r||!r.width||!r.height)return false;
+    moveItem(s,item,direction[0]*px/r.width,direction[1]*px/r.height);
+    return true;
+  }
   function deleteSelected(){
     const s=surface();if(!selected||isDelegate(s))return false;
     const items=itemsOf(s),next=items.filter(i=>i.id!==selected);selected=null;
@@ -750,6 +759,8 @@
     }
     if(mode!=='open')return;
     if((e.key==='Delete'||e.key==='Backspace')&&selected){if(deleteSelected()){e.preventDefault();e.stopPropagation()}}
+    // Arrow keys move the picked mark 1 pixel (Shift: 10); the page does not scroll while a mark is picked.
+    else if(selected&&ARROW_STEP[e.key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){if(nudgeSelected(ARROW_STEP[e.key],e.shiftKey?10:1)){e.preventDefault();e.stopPropagation()}}
     // Escape closes an open little menu first (and nothing else, so a full-screen lesson stays open).
     else if(e.key==='Escape'&&flyOpen){e.stopPropagation();closeFly()}
     else if(e.key==='Escape'&&selected){selected=null;scheduleRender()}

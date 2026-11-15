@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes21"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes22"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes21/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes22/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes21/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes22/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -588,4 +588,77 @@ test('students are told when the whiteboard picture already has the marks, and t
  // PDF lessons paint no marks into their picture, so their overlay keeps drawing words.
  const pdfPaint=pdf.slice(pdf.indexOf('function paintPdfPresentation(canvas)'),pdf.indexOf('function startPdfPresentation()'));
  assert.doesNotMatch(pdfPaint,/paintInk\(/);
+});
+
+// ---------- Arrow keys on a picked mark or picture ----------
+// pdf-mode.js: the nudge helpers are taken out of the file and run on their own with a fake board 1000 x 500 pixels.
+function nudgeHarness(picked,{width=1000,height=500}={}){
+ const from=pdf.indexOf('const NUDGE={'),to=pdf.indexOf("if(isTeacher){",from);
+ assert.ok(from>0&&to>from,'the nudge helpers are in pdf-mode.js');
+ const changes=[];
+ const sandbox={content:{getBoundingClientRect:()=>({width,height})},selectedStroke:()=>picked,geometry:()=>G,textBlock:s=>s.block?picked.group:[s],
+  changeMarks:list=>{changes.push(list);return true}};
+ // G (the pure geometry helpers above) runs in its own sandbox, so its answers are plain copies.
+ sandbox.G={movePoints:(...a)=>raw.movePoints(...a)};
+ const api=vm.runInNewContext(pdf.slice(from,to)+';({NUDGE,nudgeSelected,nudgeFractions})',sandbox);
+ return{api,changes};
+}
+const shifted=(changes,i=0)=>plain(changes[0].map(([id,stroke])=>[id,stroke.points.map(p=>[Math.round(p.x*1e6)/1e6,Math.round(p.y*1e6)/1e6])])).map(([id,pts])=>({id,pts}))[i];
+
+test('an arrow key moves a picked shape 1 pixel; Shift moves it 10; the class gets the change at once',()=>{
+ const rect={id:'r1',tool:'rectangle',color:'#ff0000',size:.016,points:[{x:.2,y:.2},{x:.6,y:.5}]};
+ const h=nudgeHarness(rect);
+ assert.deepEqual(plain(Object.keys(h.api.NUDGE)),['ArrowLeft','ArrowRight','ArrowUp','ArrowDown']);
+ assert.equal(h.api.nudgeSelected(h.api.NUDGE.ArrowRight,1),true);
+ assert.deepEqual(shifted(h.changes).pts,[[.201,.2],[.601,.5]],'1 px of a 1000 px wide board is .001');
+ h.api.nudgeSelected(h.api.NUDGE.ArrowDown,10);
+ assert.deepEqual(shifted([h.changes[1]]).pts,[[.2,.22],[.6,.52]],'10 px of a 500 px tall board is .02');
+ h.api.nudgeSelected(h.api.NUDGE.ArrowLeft,10);h.api.nudgeSelected(h.api.NUDGE.ArrowUp,1);
+ assert.deepEqual(shifted([h.changes[2]]).pts,[[.19,.2],[.59,.5]]);
+ assert.deepEqual(shifted([h.changes[3]]).pts,[[.2,.198],[.6,.498]]);
+});
+
+test('a nudge is held back at the board edge, and every line of picked words moves together',()=>{
+ const edge={id:'e1',tool:'rectangle',color:'#ff0000',size:.016,points:[{x:.5,y:.5},{x:1,y:.9}]};
+ const h=nudgeHarness(edge);
+ h.api.nudgeSelected(h.api.NUDGE.ArrowRight,10);
+ assert.equal(h.changes.length,0,'already at the right edge: nothing to change');
+ const lines=[{id:'t1',tool:'text',text:'one',points:[{x:.1,y:.1},{x:.3,y:.15}]},{id:'t2',tool:'text',text:'two',points:[{x:.1,y:.2},{x:.3,y:.25}]}];
+ const words=nudgeHarness({...lines[0],block:'b1',group:lines});
+ words.api.nudgeSelected(words.api.NUDGE.ArrowDown,10);
+ assert.deepEqual(plain(words.changes[0].map(([id])=>id)),['t1','t2']);
+ assert.deepEqual(shifted(words.changes,0).pts,[[.1,.12],[.3,.17]]);
+ assert.deepEqual(shifted(words.changes,1).pts,[[.1,.22],[.3,.27]]);
+});
+
+test('nothing is nudged without a picked mark or a board to measure',()=>{
+ assert.equal(nudgeHarness(null).api.nudgeSelected([1,0],1),false);
+ assert.equal(nudgeHarness({id:'x',tool:'rectangle',points:[{x:.1,y:.1},{x:.2,y:.2}]},{width:0,height:0}).api.nudgeSelected([1,0],1),false);
+});
+
+test('the teacher whiteboard keys: arrows nudge, Shift is 10, no scrolling, nothing while typing, Delete still removes',()=>{
+ const from=pdf.indexOf('// Delete removes the picked mark; Escape lets go of it.'),block=pdf.slice(from,pdf.indexOf('// Hover or tap a mark on a whiteboard',from));
+ assert.match(block,/if\(!selecting\(\)\|\|!selectedId\|\|event\.target\?\.closest\?\.\('input,textarea,select,dialog,\[contenteditable="true"\]'\)\)return;/,'typing in a box is left alone');
+ assert.match(block,/else if\(NUDGE\[event\.key\]&&!event\.ctrlKey&&!event\.metaKey&&!event\.altKey&&selectedStroke\(\)\)\{event\.preventDefault\(\);event\.stopPropagation\(\);if\(!edit&&!inlineEdit\)nudgeSelected\(NUDGE\[event\.key\],event\.shiftKey\?10:1\)\}/);
+ assert.match(block,/if\(event\.key==='Delete'\|\|event\.key==='Backspace'\)\{event\.preventDefault\(\);event\.stopPropagation\(\);const picked=selectedStroke\(\);selectedId=null;endSelect\(false\);if\(picked\)eraseBlock\(picked\)\}/);
+ assert.match(pdf,/return changeMarks\(group\.map\(item=>\[item\.id,\{\.\.\.item,points:item\.points\.map\(q=>\(\{x:q\.x\+dx,y:q\.y\+dy\}\)\)\}\]\)\);/,'moves go through the same path as a drag');
+});
+
+test('a picked picture: arrows move it, it goes back on the board for the class after a short pause (arrow tool only)',()=>{
+ const from=pdf.indexOf('// Arrow keys move the picked picture 1 pixel'),block=pdf.slice(from,from+1100);
+ assert.ok(from>0);
+ assert.match(block,/else if\(NUDGE\[event\.key\]&&!event\.ctrlKey&&!event\.metaKey&&!event\.altKey\)\{/);
+ assert.match(block,/const item=pictureEdits\.find\(other=>other\.el\.classList\.contains\('selected'\)\),step=item&&nudgeFractions\(NUDGE\[event\.key\],event\.shiftKey\?10:1\);/);
+ assert.match(block,/event\.preventDefault\(\);event\.stopPropagation\(\);/);
+ assert.match(block,/item\.x=P\.clamp\(item\.x\+step\.x,-item\.w\*0\.8,1-item\.w\*0\.2\);item\.y=P\.clamp\(item\.y\+step\.y,-item\.h\*0\.8,1-item\.h\*0\.2\);placeEditElement\(item\);/);
+ assert.match(block,/if\(selecting\(\)\)pictureNudgeTimer=setTimeout\(\(\)=>\{if\(selecting\(\)&&pictureEdits\.includes\(item\)\)finishPictureEdit\(\)\},400\);/);
+ // The same handler ignores keys typed in a box.
+ assert.match(pdf,/if\(!pictureEdits\.length\|\|event\.target\?\.closest\?\.\('input,textarea,select,\[contenteditable\]'\)\)return;/);
+});
+
+test('the shared drawing toolbar (student boards, screen marks) nudges the picked mark the same way',()=>{
+ assert.match(toolbar,/if\(\(e\.key==='Delete'\|\|e\.key==='Backspace'\)&&selected\)\{if\(deleteSelected\(\)\)\{e\.preventDefault\(\);e\.stopPropagation\(\)\}\}\s*\/\/ Arrow keys move the picked mark 1 pixel \(Shift: 10\); the page does not scroll while a mark is picked\.\s*else if\(selected&&ARROW_STEP\[e\.key\]&&!e\.ctrlKey&&!e\.metaKey&&!e\.altKey\)\{if\(nudgeSelected\(ARROW_STEP\[e\.key\],e\.shiftKey\?10:1\)\)\{e\.preventDefault\(\);e\.stopPropagation\(\)\}\}/);
+ assert.match(toolbar,/if\(e\.target\?\.closest\?\.\('input,textarea,select,\[contenteditable="true"\]'\)\)return;/,'typing in a box is left alone');
+ assert.match(toolbar,/moveItem\(s,item,direction\[0\]\*px\/r\.width,direction\[1\]\*px\/r\.height\);\s*return true;/);
+ assert.match(toolbar,/Arrow keys move it 1 pixel \(Shift: 10\)\. Delete removes it\./);
 });
