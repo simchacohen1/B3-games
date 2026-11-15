@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR 838 — Google sign-in test</title>
+<style>body{font:18px system-ui;max-width:650px;margin:50px auto;padding:20px;line-height:1.6}button{font:inherit;padding:12px;margin:8px 8px 8px 0}#status{white-space:pre-wrap}</style>
+<h1>PR #838 Google sign-in test</h1><p>Isolated authentication check for <strong>auth.sols.tools</strong>. No student data, databases, roles or rewards are loaded or changed. Google sign-in uses the existing production Firebase Auth service and may update its normal sign-in metadata.</p>
+<p>This page tests the popup and return only. It does not prove teacher permissions, full-site navigation or mobile redirect recovery.</p>
+<button id="login" disabled>Sign in with Google</button><button id="logout" disabled>Sign out of this test</button><p id="status" role="status">Loading…</p>
+<script src="firebase-app-compat.js"></script><script src="firebase-auth-compat.js"></script><script>
+(async()=>{
+ const status=document.getElementById('status'),login=document.getElementById('login'),logout=document.getElementById('logout');
+ try{
+  const config=await fetch('config.json').then(r=>r.json());
+  if(config.projectId!=='b3-games'||config.authDomain!=='auth.sols.tools')throw Error('Unexpected Firebase configuration');
+  const active=firebase.initializeApp(config).auth(),saved=firebase.initializeApp(config,'FTTRememberedTeacher').auth();
+  // Keep this test isolated from any existing localhost persisted sessions.
+  await Promise.all([active.setPersistence(firebase.auth.Auth.Persistence.NONE),saved.setPersistence(firebase.auth.Auth.Persistence.NONE)]);
+  status.textContent='Ready. Config from PR #838 at 2b9e0a1c. Sign in in Google’s popup; never paste credentials here.';login.disabled=false;
+  login.onclick=async()=>{
+   login.disabled=true;status.textContent='Complete sign-in in the Google popup.';
+   try{
+    const provider=new firebase.auth.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
+    const result=await saved.signInWithPopup(provider);await active.updateCurrentUser(result.user);
+    if(!active.currentUser||active.currentUser.uid!==saved.currentUser.uid)throw Error('Active and remembered identities differ');
+    status.textContent='PASS: Google sign-in returned to this test page, and both Firebase apps have the same signed-in identity. No student data or permission checks were accessed. Click Sign out, then sign in again to test a second round.';logout.disabled=false;
+   }catch(error){status.textContent='Sign-in did not complete. Error code: '+(error.code||'unknown')+'. No tokens or credentials are displayed.';login.disabled=false;}
+  };
+  logout.onclick=async()=>{await Promise.all([active.signOut(),saved.signOut()]);logout.disabled=true;login.disabled=false;status.textContent='Signed out of this test. You can sign in again. This page does not sign you out of Google or sols.tools.';};
+ }catch(error){status.textContent='Test could not initialize: '+(error.code||error.message);}
+})();
+</script></html>
