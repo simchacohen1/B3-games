@@ -15,7 +15,7 @@
 
 `.github/workflows/deploy-class-access.yml` is manual only. The workflow:
 1. Runs only when `simchacohen1` dispatches it from `main`.
-2. Accepts only the current, open, non-draft head SHA of PR #779.
+2. Accepts only the current, open, non-draft head SHA of PR #779, or, now that #779 is merged, its exact merge commit on `main` (`e10cfb1fe95e5ad996b9fbe345728d7fd2c9d7b6`). The checks in step 3 are always read from the PR head.
 3. Requires all expected PR check contexts and the latest result for every check run to be green. The expected list is the four branch-protection checks plus the teacher, principal, Follow Teacher browser and synthetic access checks. `navigation-policy` is not listed because its workflow is path-filtered and does not run on #779; its test files run inside `access-tests`.
 4. Runs the focused class authorization and sign-in tests from that exact commit.
 5. Authenticates through GitHub OIDC / Google Workload Identity Federation. It stores no service-account key or Firebase token.
