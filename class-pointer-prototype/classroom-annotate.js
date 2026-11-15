@@ -196,6 +196,16 @@
   // Back on My screen the toolbar starts on the Pointer.
   document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select('pointer')});
 
+  // While a lesson is open the message line sits in the free room of the tabs row (one line; hover shows all of
+  // it), so the lesson gets its row. Without a lesson it goes back to where it was.
+  const statusLine=$('connectionStatus'),statusHome=statusLine?{parent:statusLine.parentNode,next:statusLine.nextSibling}:null;
+  function placeStatus(open){
+    if(!statusLine||!statusHome?.parent)return;
+    const spacer=document.querySelector?.('.cp-tabs-spacer');
+    if(open&&spacer){if(statusLine.parentNode!==spacer)spacer.appendChild(statusLine);if(statusLine.title!==statusLine.textContent)statusLine.title=statusLine.textContent}
+    else if(statusLine.parentNode!==statusHome.parent){statusHome.parent.insertBefore(statusLine,statusHome.next&&statusHome.next.parentNode===statusHome.parent?statusHome.next:null);statusLine.removeAttribute('title')}
+  }
+
   let pushed=false,lastKind=null,lastSig='',wasExpanded=false;
   function check(){
     const kind=B.lessonKind?.()||null,ended=!kind&&!!lastKind;
@@ -217,6 +227,7 @@
     wasExpanded=full;
     const sig=signature();
     if(sig!==lastSig){lastSig=sig;FA.refresh()}
+    placeStatus(!!kind);
     placeGutter();
     // Hand = the lesson's mouse mode. A key press there turns it off, so keep it on while Hand is chosen.
     const s=FA.state();

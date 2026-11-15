@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes14"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes16"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes14/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes16/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -346,7 +346,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes14/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes16/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -394,9 +394,9 @@ test('closing the text box keeps the change in place; Escape drops it; empty wor
 // ---------- The whole whiteboard at a glance ----------
 test('at 100% a whiteboard is shown whole; a PDF or webpage still fits the width',()=>{
  assert.match(pdf,/const base=fitWhole&&lay\.total>0\?Math\.min\(cw,Math\.floor\(ch\/lay\.total\)\):cw;\s*W=base\*zoom;H=W\*lay\.total;/);
- assert.match(pdf,/fitWhole=!!board;relayout\(\);scroller\.scrollTop=0;scroller\.scrollLeft=0;/);
- assert.match(pdf,/docLabel='webpage';fitWhole=false;await loadWebDoc\(data\)/);
- assert.match(pdf,/if\(isTeacher\)fitWhole=false; \/\/ a PDF fits the width/);
+ assert.match(pdf,/fitWhole=!!board;updateControls\(\);syncFit\(\);relayout\(\);scroller\.scrollTop=0;scroller\.scrollLeft=0;/);
+ assert.match(pdf,/docLabel='webpage';fitWhole=false;syncFit\(\);await loadWebDoc\(data\)/);
+ assert.match(pdf,/if\(isTeacher\)\{fitWhole=false;syncFit\(\)\} \/\/ a PDF fits the width/);
  // The arithmetic: a 16:9 board in a lesson area 1237 wide and 500 high is 888 wide, so all 500 of height show.
  const total=9/16,cw=1237,ch=500,base=Math.min(cw,Math.floor(ch/total));
  assert.equal(base,888);assert.ok(base*total<=ch);
@@ -410,8 +410,8 @@ test('students are told to show the whiteboard whole too',()=>{
  assert.equal(Core.cleanView({zoom:1,top:0,left:0}).whole,false);
  assert.equal(Core.cleanView({zoom:1,top:0,left:0,whole:'yes'}).whole,false);
  assert.match(pdf,/return\{zoom,top:P\.clamp\(scroller\.scrollTop\/H,0,1\),left:[^}]*\.\.\.layoutOpts,whole:fitWhole\};/);
- assert.match(pdf,/if\(!isTeacher&&'whole' in view\)fitWhole=view\.whole===true;/);
- assert.match(pdf,/function studentReset\(\)\{fitWhole=false;/);
+ assert.match(pdf,/if\(!isTeacher&&'whole' in view\)\{fitWhole=view\.whole===true;syncFit\(\)\}/);
+ assert.match(pdf,/function studentReset\(\)\{fitWhole=false;syncFit\(\);/);
 });
 
 test('the teacher workspace fills the window below whatever is above it, so the window does not scroll',()=>{
@@ -434,4 +434,47 @@ test('there is no popup at all: new words and Edit latest text use the text box 
  // Edit latest text: the same box, on the words that were added last.
  const latest=pdf.slice(pdf.indexOf('function editLatestText(){'),pdf.indexOf("content.addEventListener('pointerdown'"));
  assert.match(latest,/editInline\(stroke\);/);
+});
+
+
+// ---------- A big board: full width, the bar below it, a slim top ----------
+test('a new whiteboard is made in the shape of the lesson area, so it fills the width',()=>{
+ const boards=read('class-pointer-prototype/student-boards.js');
+ assert.match(boards,/const ratio=window\.ClassPointerPdf\.boardRatio\?\.\(\)\|\|9\/16;\s*const c=document\.createElement\('canvas'\);c\.width=1600;c\.height=Math\.round\(1600\*ratio\);/);
+ assert.match(pdf,/exportPng,boardRatio,/);
+ // The room under the tabs, less the bar; never an extreme shape.
+ assert.match(pdf,/return width>200&&height>120\?Math\.max\(\.36,Math\.min\(\.75,height\/width\)\):9\/16;/);
+ // With the board in the area's own shape, "whole" and "full width" are the same size.
+ const cw=1252,ch=560,total=ch/cw;assert.equal(Math.min(cw,Math.floor(ch/total)),cw);
+});
+
+test('the bar of buttons sits below a whiteboard that is shown whole, and is slim',()=>{
+ const css=read('class-pointer-prototype/classroom.css');
+ assert.match(css,/#stage\.board-whole #pdfView\{bottom:var\(--pdf-nav-h,0px\)\}/);
+ assert.match(css,/#stage\.board-whole #pdfNav \.pdf-btn\{min-height:30px;/);
+ assert.match(pdf,/stage\.classList\.toggle\('board-whole',fitWhole\);/);
+ assert.match(pdf,/stage\.style\.setProperty\('--pdf-nav-h',\(fitWhole&&nav&&!nav\.hidden\?nav\.offsetHeight\+8:0\)\+'px'\);/);
+ assert.match(pdf,/new ResizeObserver\(syncFit\)\.observe\(nav\)/,'the room follows the bar when it is hidden or wraps');
+ // Closing the lesson gives the room back.
+ assert.match(pdf,/function closePdf\(quiet\)\{\s*fitWhole=false;syncFit\(\);/);
+});
+
+test('the top of the teacher workspace is slim and the message line shares the tabs row while a lesson is open',()=>{
+ const css=read('class-pointer-prototype/teacher-dashboard.css');
+ assert.match(css,/body\.teacher-view\.cp-compact-workspace \.cp-topbar\{padding:4px 12px;gap:8px;border-radius:10px\}/);
+ assert.match(css,/body\.teacher-view\.cp-is-live \.cp-topbar-back\{display:none\}/);
+ assert.match(css,/\.cp-tabs-spacer #connectionStatus\{[^}]*white-space:nowrap;overflow:hidden;text-overflow:ellipsis\}/);
+ assert.match(annotate,/if\(open&&spacer\)\{if\(statusLine\.parentNode!==spacer\)spacer\.appendChild\(statusLine\);/);
+ assert.match(annotate,/placeStatus\(!!kind\);/);
+ // Without a lesson the line goes back to its own place.
+ assert.match(annotate,/statusHome\.parent\.insertBefore\(statusLine,/);
+});
+
+
+test('an empty new board takes the exact shape of the lesson area once the page has settled',()=>{
+ assert.match(pdf,/const opened=docId;setTimeout\(\(\)=>settleBoardShape\(opened\),900\)/);
+ // Only an untouched board is made again: nothing drawn, pasted or being typed.
+ assert.match(pdf,/if\(!isBoardOpen\(\)\|\|docId!==opened\|\|boardPictures\.length\|\|pictureEdits\.length\|\|\(B\.highlights\?\.\(\)\|\|\[\]\)\.length\|\|inlineEdit\)return;/);
+ assert.match(pdf,/const want=Math\.max\(\.36,Math\.min\(\.75,h\/w\)\),have=boardSize\.h\/boardSize\.w;\s*if\(Math\.abs\(want-have\)\/have<\.012\)return;/);
+ assert.match(pdf,/boardSize=\{w:boardSize\.w,h:Math\.round\(boardSize\.w\*want\)\};publishBoard\(\);/);
 });

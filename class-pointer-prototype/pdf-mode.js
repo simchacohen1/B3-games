@@ -14,7 +14,24 @@
   let webMode=false,opening=0,docLabel='webpage';
   // A whiteboard is shown whole: at 100% all of it fits in the lesson area, with nothing to scroll. A PDF or a
   // webpage fits the width, as before. Students are told which with every view the teacher sends (whole).
-  let fitWhole=false;
+  let fitWhole=false,navWatched=false;
+  // While a whiteboard is shown whole, the bar of buttons sits below the board (slim), not on top of it: the
+  // lesson area is told how much room the bar needs.
+  function syncFit(){
+    stage.classList.toggle('board-whole',fitWhole);
+    stage.style.setProperty('--pdf-nav-h',(fitWhole&&nav&&!nav.hidden?nav.offsetHeight+8:0)+'px');
+    if(nav&&!navWatched&&typeof ResizeObserver==='function'){navWatched=true;new ResizeObserver(syncFit).observe(nav)}
+  }
+  // The shape (height / width) a new whiteboard should have to fill the lesson area: the room that is left in the
+  // window under the tabs, less the bar below the board. Kept between a wide strip and a 4:3 page.
+  function boardRatio(){
+    const area=stage.getBoundingClientRect(),line=$('connectionStatus'),row=document.querySelector?.('.cp-tabs-row');
+    // The lesson starts where the message line is now (the line moves up into the tabs row once a lesson is open).
+    const top=line&&line.parentNode===stage.parentNode&&line.getBoundingClientRect().height?line.getBoundingClientRect().top:row?row.getBoundingClientRect().bottom+4:area.top;
+    const full=stage.classList.contains('lesson-fullscreen')||document.fullscreenElement===stage;
+    const height=(full?window.innerHeight:window.innerHeight-top-14)-46,width=area.width-6;
+    return width>200&&height>120?Math.max(.36,Math.min(.75,height/width)):9/16;
+  }
   function navWord(){return webMode?(docLabel==='whiteboard'?'Whiteboard':'Webpage'):'PDF'}
 
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
@@ -309,7 +326,7 @@
   function applyView(view){
     if(notReady())return;
     quietUntil=Date.now()+150;zoom=view.zoom;
-    if(!isTeacher&&'whole' in view)fitWhole=view.whole===true;
+    if(!isTeacher&&'whole' in view){fitWhole=view.whole===true;syncFit()}
     if(!isTeacher&&'spread' in view&&(view.spread!==layoutOpts.spread||view.rtl!==layoutOpts.rtl||view.shift!==layoutOpts.shift)){layoutOpts={spread:view.spread,rtl:view.rtl,shift:view.shift};lay=P.layout(ratiosList,layoutOpts)}
     relayout();
     scroller.scrollTop=view.top*H;scroller.scrollLeft=view.left*W;
@@ -729,7 +746,7 @@
 
   // ---------- Opening and closing ----------
   async function loadDoc(data,noCopy){
-    if(isTeacher)fitWhole=false; // a PDF fits the width
+    if(isTeacher){fitWhole=false;syncFit()} // a PDF fits the width
     if(!pdfjs)throw new Error('The PDF reader could not load. Refresh the page and try again.');
     pdfjs.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=3.11.174';
     const token=++loadToken;unload(false);loadToken=token;
@@ -809,7 +826,7 @@
       if(data.length>Web.MAX_BYTES)throw Error('This webpage is larger than 8 MB.');
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
-      docLabel='webpage';fitWhole=false;await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
+      docLabel='webpage';fitWhole=false;syncFit();await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
       showNote('');B.resetMarks();B.setPdf(true,'webpage');
       B.status('Webpage open. The ↖ arrow is your mouse: scroll, drag the page, click a link to open it for the class. Students follow you. Pick another tool on the left to point or draw.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
@@ -834,9 +851,9 @@
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
       boardSize=board?{w:width,h:height}:null;
       // The whole board at a glance; a captured tab keeps fitting the width.
-      fitWhole=!!board;relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
+      fitWhole=!!board;updateControls();syncFit();relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
-      if(board)startBoardPresentation(dataUrl);
+      if(board){startBoardPresentation(dataUrl);const opened=docId;setTimeout(()=>settleBoardShape(opened),900)}
       B.status(board?(opts.status||'Whiteboard open.')+' Press Ctrl+V or 📋 Paste to put a copied picture or words on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
@@ -880,6 +897,7 @@
     }
   }
   function closePdf(quiet){
+    fitWhole=false;syncFit();
     if(!isTeacher){return}
     opening++;
     const had=!!doc;
@@ -1029,7 +1047,7 @@
     image.alt='';image.draggable=false;image.src=url;pageUrls.set(i,url);
     pageEls[i].dataset.label='';pageEls[i].replaceChildren(image);if(old)setTimeout(()=>URL.revokeObjectURL(old),2000);
   }
-  function studentReset(){fitWhole=false;layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
+  function studentReset(){fitWhole=false;syncFit();layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
 
   // Static snapshots may be inside a sandboxed frame. Capture panning at the
   // lesson surface before the frame or annotation layers can swallow a drag.
@@ -1123,6 +1141,16 @@
     ctx.imageSmoothingQuality='high';
     for(const p of boardPictures)ctx.drawImage(p.image,p.x*c.width,p.y*c.height,p.w*c.width,p.h*c.height);
     return c;
+  }
+  // The shape of a new board is worked out before the lesson area has its final size (the top of the page gets
+  // slimmer once a lesson is open). When the area has settled and nothing is on the board yet, the empty board is
+  // made again in exactly the area's shape, so it fills it from side to side and top to bottom.
+  function settleBoardShape(opened){
+    if(!isBoardOpen()||docId!==opened||boardPictures.length||pictureEdits.length||(B.highlights?.()||[]).length||inlineEdit)return;
+    const w=scroller.clientWidth,h=scroller.clientHeight;if(w<200||h<120)return;
+    const want=Math.max(.36,Math.min(.75,h/w)),have=boardSize.h/boardSize.w;
+    if(Math.abs(want-have)/have<.012)return;
+    boardSize={w:boardSize.w,h:Math.round(boardSize.w*want)};publishBoard();
   }
   function composeBoard(){
     const c=boardCanvas();
@@ -1315,7 +1343,7 @@
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
-    exportPng,
+    exportPng,boardRatio,
     presentationStream:()=>boardPresentation
   };
 })();
