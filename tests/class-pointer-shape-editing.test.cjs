@@ -89,7 +89,7 @@ test('the lesson changes one of my own marks in place',()=>{
 
 test('only the teacher page can change or erase lesson marks, and the whole list is sent again',()=>{
  assert.match(classroom,/eraseMark\(id\)\{if\(!isTeacher\)return false;/);
- assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\|\|!highlightStore\.replace\('teacher',id,stroke\)\)return false;publishHighlights\(\);return true\}/);
+ assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\|\|!highlightStore\.replace\(markOwner\(id\),id,stroke\)\)return false;publishHighlights\(\);return true\}/);
  // Students still may only add, undo and clear: no new message type reaches the teacher.
  assert.match(classroom,/\['point','pointer-hide','highlight','edit-highlights'\]\.includes\(message\.type\)/);
  assert.match(classroom,/\['undo','clear'\]\.includes\(message\.action\)/);
@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes26"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes27"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -160,7 +160,7 @@ test('the lines of one pasted text are picked, moved, recolored and resized toge
  assert.match(pdf,/upper\.color===lower\.color&&upper\.size===lower\.size&&Math\.abs\(lower\.points\[0\]\.y-upper\.points\[0\]\.y-lineStep\(upper\.size\)\)<\.004/);
  assert.match(pdf,/group:textBlock\(hit\)/);
  assert.match(pdf,/changeMarks\(textBlock\(stroke\)\.map\(item=>\[item\.id,\{\.\.\.item,color:color\.toLowerCase\(\)\}\]\)\)/);
- assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\('teacher',id,stroke\)\|\|changed;if\(changed\)publishHighlights\(\);return changed\}/);
+ assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed;if\(changed\)publishHighlights\(\);return changed\}/);
 });
 
 test('after a paste the teacher is pointed at Select, which is always on screen',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes26/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes27/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -281,7 +281,7 @@ test('on the teacher board words have corner handles for size and side handles f
  assert.match(pdf,/made=reflow\(edit\.group,\{boxW:Math\.max\(\.08,h==='e'\?at\.x-f\.left:f\.right-at\.x\),fixX:h==='e'\?'left':'right'\}\);/);
  assert.match(pdf,/made=reflow\(edit\.group,\{size,boxW:f\.boxW\?Math\.min\(1,f\.boxW\*size\/f\.size\):0,fixX:h\[1\]==='w'\?'right':'left',fixY:h\[0\]==='n'\?'bottom':'top'\}\);/);
  assert.match(pdf,/const ids=B\.swapMarks\?\.\(done\.swap\.ids,done\.swap\.strokes\);if\(ids\)selectedId=ids\[0\];/);
- assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\)return null;const made=highlightStore\.swap\('teacher',ids,strokes\);if\(made\)publishHighlights\(\);return made\}/);
+ assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\|\|!ids\.length\)return null;const owner=markOwner\(ids\[0\]\);if\(!owner\|\|ids\.some\(id=>markOwner\(id\)!==owner\)\)return null;const made=highlightStore\.swap\(owner,ids,strokes\);if\(made\)publishHighlights\(\);return made\}/);
 });
 
 test('a paste picks the biggest size at which the words fit on one line',()=>{
@@ -311,7 +311,7 @@ test('one arrow button is both Select and the mouse on the teacher whiteboard, P
 test('the arrow picks a drawing that is clicked; a click on nothing is a plain mouse click',()=>{
  // What the arrow can grab: a handle of the picked mark, or one of the teacher's own marks.
  assert.match(pdf,/function grabAt\(event\)\{\s*if\(!selecting\(\)\|\|notReady\(\)\)return false;/);
- assert.match(pdf,/return !!teacherMarkAt\(event,point,true\)\|\|!!pictureAt\(point\);/);
+ assert.match(pdf,/return !!teacherMarkAt\(event,point,true,true\)\|\|!!pictureAt\(point\);/);
  // Dragging the page never starts on a mark; a click on nothing lets go of the pick and is the mouse's.
  const pan=pdf.slice(pdf.indexOf('let snapshotPan=null;'),pdf.indexOf("stage.addEventListener('pointermove'",pdf.indexOf('let snapshotPan=null;')));
  assert.match(pan,/if\(grabAt\(event\)\)return;\s*if\(inlineEdit\)finishInline\(true\);\s*if\(selectedId\)\{selectedId=null;drawInk\(\)\}/);
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes26/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes27/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -1191,4 +1191,77 @@ test('student Select does nothing without pen permission, and words move and res
  const change=room.sent.at(-1).changes;
  assert.deepEqual(change.map(c=>c.id),['l1','l2']);
  assert.ok(change.every(c=>c.stroke.tool==='text'&&c.stroke.block==='bk1'&&typeof c.stroke.text==='string'),'the words travel with the block');
+});
+
+// ---------- The teacher's Select works on anyone's mark ----------
+function teacherMarkApi({isTeacher=true}={}){
+ const room=read('class-pointer-prototype/classroom.js'),lines=room.split('\n');
+ const method=name=>{const line=lines.find(text=>text.startsWith('  '+name+'('));assert.ok(line,name+' is in classroom.js');return line.replace(/,\s*$/,'')};
+ const store=new C.HighlightStore(),published=[];
+ const code=grabFunction(room,'function markOwner(id)')+';({'+['eraseMark','eraseMarks','swapMarks','replaceMark','replaceMarks'].map(method).join(',')+'})';
+ const api=vm.runInNewContext(code,{isTeacher,highlightStore:store,publishHighlights:()=>published.push(1),Array,Number});
+ return{api,store,published};
+}
+
+test('the teacher can move, resize, recolor and delete a student\'s mark, and it stays that student\'s',()=>{
+ const {api,store,published}=teacherMarkApi();
+ const rect=(x1,y1,x2,y2)=>({tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:x1,y:y1},{x:x2,y:y2}]});
+ store.add('teacher',rect(.1,.1,.2,.2));store.add('presence:a',rect(.3,.3,.5,.5));store.add('presence:b',rect(.6,.6,.8,.8));
+ const ids=store.strokes.map(s=>s.id);
+ // Move (and resize) a student's mark.
+ assert.equal(api.replaceMark(ids[1],{...store.strokes[1],points:[{x:.35,y:.35},{x:.6,y:.6}]}),true);
+ assert.deepEqual(plain(store.strokes[1].points),[{x:.35,y:.35},{x:.6,y:.6}]);
+ assert.equal(store.strokes[1].owner,'presence:a','still the student\'s mark');assert.equal(store.strokes[1].id,ids[1]);
+ // Recolor two marks of two owners in one go.
+ assert.equal(api.replaceMarks([[ids[1],{...store.strokes[1],color:'#c62828'}],[ids[2],{...store.strokes[2],color:'#c62828'}]]),true);
+ assert.deepEqual(plain(store.strokes.map(s=>s.color)),['#1d4ed8','#c62828','#c62828']);
+ assert.deepEqual(plain(store.strokes.map(s=>s.owner)),['teacher','presence:a','presence:b']);
+ assert.ok(published.length>=2,'the class and the students are sent the change');
+ // Delete one student's mark and then the other's.
+ assert.equal(api.eraseMark(ids[1]),true);
+ assert.equal(api.eraseMarks([ids[2]]),true);
+ assert.deepEqual(plain(store.strokes.map(s=>s.owner)),['teacher']);
+ // Unknown marks change nothing.
+ assert.equal(api.eraseMark('nope'),false);assert.equal(api.replaceMark('nope',rect(.1,.1,.2,.2)),false);assert.equal(api.eraseMarks('x'),false);
+});
+
+test('a student\'s block of words is swapped for new lines of the same student; a swap across owners is refused',()=>{
+ const {api,store}=teacherMarkApi();
+ const line=(text,y,block)=>({tool:'text',color:'#1f2937',size:.0078,text,block,points:[{x:.1,y},{x:.4,y:y+.05}]});
+ store.add('presence:a',line('one',.1,'bk1'));store.add('presence:a',line('two',.16,'bk1'));store.add('teacher',line('mine',.5,'bk2'));
+ const [a1,a2,t1]=store.strokes.map(s=>s.id);
+ const made=api.swapMarks([a1,a2],[line('one two three',.1,'bk1')]);
+ assert.equal(made.length,1);
+ assert.equal(store.strokes.find(s=>s.id===made[0]).owner,'presence:a','the new lines are the student\'s');
+ assert.equal(store.strokes.length,2);
+ assert.equal(api.swapMarks([made[0],t1],[line('x',.2,'bk3')]),null,'not across two owners');
+ assert.equal(store.strokes.length,2);
+ assert.equal(api.swapMarks([],[line('x',.2,'bk3')]),null);
+});
+
+test('only the teacher\'s page can use these; a student page cannot',()=>{
+ const {api,store}=teacherMarkApi({isTeacher:false});
+ store.add('presence:a',{tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:.3,y:.3},{x:.5,y:.5}]});
+ const id=store.strokes[0].id;
+ assert.equal(api.eraseMark(id),false);assert.equal(api.eraseMarks([id]),false);
+ assert.equal(api.replaceMark(id,{...store.strokes[0],color:'#c62828'}),false);
+ assert.equal(api.replaceMarks([[id,{...store.strokes[0],color:'#c62828'}]]),false);
+ assert.equal(api.swapMarks([id],[{...store.strokes[0]}]),null);
+ assert.equal(store.strokes.length,1);assert.equal(store.strokes[0].color,'#1d4ed8');
+});
+
+test('Select picks anyone\'s mark; the eraser and the Text tool still reach only the teacher\'s own',()=>{
+ // The picked mark can belong to anyone; words that follow each other are one block only when they have the same owner.
+ assert.match(pdf,/const stroke=selectedId\?strokes\.find\(item=>item\.id===selectedId\):null;/);
+ assert.match(pdf,/upper\.tool==='text'&&lower\.tool==='text'&&upper\.owner===lower\.owner&&upper\.color===lower\.color/);
+ assert.match(pdf,/function teacherMarkAt\(event,p,inside,anyOwner\)\{/);
+ assert.match(pdf,/\(anyOwner\|\|item\.owner==='teacher'\)&&markHits\(item,p,inside\)/);
+ assert.match(pdf,/return !!teacherMarkAt\(event,point,true,true\)\|\|!!pictureAt\(point\);/,'the arrow cursor and a pick use any owner');
+ assert.match(pdf,/const hit=teacherMarkAt\(event,p,true,true\);\s*\/\/ Words that were already picked/);
+ assert.match(pdf,/function eraseUnder\(event\)\{const p=normalized\(event\),hit=p&&teacherMarkAt\(event,p,false\);/,'the eraser stays on the teacher\'s own marks');
+ assert.match(pdf,/const words=teacherMarkAt\(event,p,true\);\s*if\(words\?\.tool==='text'\)\{editInline\(words\);return\}/,'the Text tool stays on the teacher\'s own words');
+ // Students are untouched: a student's message still reaches only that student's marks.
+ const room=read('class-pointer-prototype/classroom.js');
+ assert.match(room,/if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/);
+ assert.match(room,/mark\.owner===member\.id&&mark\.id===id/);
 });

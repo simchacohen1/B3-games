@@ -545,7 +545,7 @@
   const geometry=()=>window.FTTAnnotate?.geometry||null;
   const selecting=()=>isTeacher&&$('teacherTool')?.value==='select';
   function selectedStroke(){
-    const stroke=selectedId?strokes.find(item=>item.id===selectedId&&item.owner==='teacher'):null;
+    const stroke=selectedId?strokes.find(item=>item.id===selectedId):null;
     if(!stroke)selectedId=null;return stroke||null;
   }
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
@@ -581,7 +581,7 @@
     if(stroke.tool!=='text')return [stroke];
     if(stroke.block){const same=list.filter(item=>item.tool==='text'&&item.owner===stroke.owner&&item.block===stroke.block);if(same.length)return same}
     const at=list.findIndex(item=>item.id===stroke.id);if(at<0)return [stroke];
-    const follows=(upper,lower)=>!!upper&&!!lower&&upper.tool==='text'&&lower.tool==='text'&&upper.owner==='teacher'&&lower.owner==='teacher'&&upper.color===lower.color&&upper.size===lower.size&&Math.abs(lower.points[0].y-upper.points[0].y-lineStep(upper.size))<.004;
+    const follows=(upper,lower)=>!!upper&&!!lower&&upper.tool==='text'&&lower.tool==='text'&&upper.owner===lower.owner&&upper.color===lower.color&&upper.size===lower.size&&Math.abs(lower.points[0].y-upper.points[0].y-lineStep(upper.size))<.004;
     let first=at,last=at;
     while(follows(list[first-1],list[first]))first--;
     while(follows(list[last],list[last+1]))last++;
@@ -609,12 +609,13 @@
     const rx=Math.max(t,(x2-x1)/2),ry=Math.max(ty,(y2-y1)/2),d=Math.hypot((p.x-(x1+x2)/2)/rx,(p.y-(y1+y2)/2)/ry);
     return Math.abs(d-1)<=Math.max(t/rx,ty/ry);
   }
-  // The teacher's own mark under the pointer: words first (by their real size on screen), then the newest mark.
-  function teacherMarkAt(event,p,inside){
+  // The mark under the pointer: words first (by their real size on screen), then the newest mark. Select picks anyone's mark
+  // (anyOwner); the eraser and the Text tool only reach the teacher's own.
+  function teacherMarkAt(event,p,inside,anyOwner){
     const textNode=[...ink.querySelectorAll('[data-text-mark]')].reverse().find(node=>{const rect=node.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom});
-    const text=textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId&&item.owner==='teacher');
+    const text=textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId&&(anyOwner||item.owner==='teacher'));
     if(text)return text;
-    return p?[...strokes].reverse().find(item=>item.owner==='teacher'&&markHits(item,p,inside))||null:null;
+    return p?[...strokes].reverse().find(item=>(anyOwner||item.owner==='teacher')&&markHits(item,p,inside))||null:null;
   }
   // Like normalized(), but a pointer dragged off the edge counts as the edge.
   function clampedPoint(event){
@@ -630,7 +631,7 @@
       else if(G?.handleAt(picked,at.px,at.py,at.w,at.h,12))return true;
     }
     const point=normalized(event);
-    return !!teacherMarkAt(event,point,true)||!!pictureAt(point);
+    return !!teacherMarkAt(event,point,true,true)||!!pictureAt(point);
   }
   // The pasted picture under a point of the whiteboard (the one on top), or null. Marks lie over pictures, so a
   // mark at the same spot is picked first.
@@ -656,7 +657,7 @@
     }
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
-    const hit=teacherMarkAt(event,p,true);
+    const hit=teacherMarkAt(event,p,true,true);
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
