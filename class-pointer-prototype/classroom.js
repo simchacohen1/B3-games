@@ -39,7 +39,10 @@ const pointerIcons={
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
-function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
+// A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
+// student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
+function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
+function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo()};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function memberTools(member){return member?.tools||state.tools}

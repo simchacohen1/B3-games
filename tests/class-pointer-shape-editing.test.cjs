@@ -572,3 +572,20 @@ test('a pasted paragraph has room between its lines at the size the board draws 
  }
  for(const stroke of made.strokes)assert.ok(Math.max(...stroke.points.map(p=>p.x))<=1,'no line runs off the right edge');
 });
+
+// A whiteboard lesson reaches an activity page as a picture with every mark (words too) already painted into it.
+// The page's own overlay must not draw the words a second time; PDF and screen lessons have no marks in the picture.
+test('students are told when the whiteboard picture already has the marks, and the overlay then skips words only',()=>{
+ const sender=read('class-pointer-prototype/classroom.js'),share=read('class-pointer-prototype/activity-share.js');
+ assert.match(sender,/function marksInVideo\(\)\{return state\.pdf===true&&state\.documentKind==='whiteboard'\}/);
+ assert.match(sender,/if\(message\.type==='lesson-marks'\)message=\{\.\.\.message,marksInVideo:marksInVideo\(\)\};connection\.send\(message\)/);
+ assert.match(share,/marksInVideo:message\.marksInVideo===true\};renderLessonMarks\(\)/);
+ assert.match(share,/if\(stroke\.tool==='text'&&lessonMarks\.marksInVideo===true\)continue;/);
+ // The whiteboard picture really does carry the words: paintInk draws text marks into it.
+ assert.match(pdf,/function paintBoardPresentation\(canvas\)/);
+ assert.match(pdf,/paintInk\(ctx,canvas,draft\?\[\.\.\.strokes,\{\.\.\.draft,owner:B\.owner\(\)\}\]:strokes,W,H\);/);
+ assert.match(pdf,/if\(stroke\.tool==='text'\)\{\s*lc\.font=/);
+ // PDF lessons paint no marks into their picture, so their overlay keeps drawing words.
+ const pdfPaint=pdf.slice(pdf.indexOf('function paintPdfPresentation(canvas)'),pdf.indexOf('function startPdfPresentation()'));
+ assert.doesNotMatch(pdfPaint,/paintInk\(/);
+});
