@@ -38,9 +38,11 @@ export function brandHtml(html) {
   let out = html.replace(/<title\b([^>]*)>([\s\S]*?)<\/title>/i, (all, attrs, text) =>
     '<title' + attrs + '>' + text.replace(/Fun Torah Tools/g, NAME) + '</title>');
   if (out.includes('/sols-brand.js')) return out;
-  const head = out.match(/<head\b[^>]*>/i);
-  if (!head) return null;
-  const at = head.index + head[0].length;
+  // Some pages leave out <head> (browsers allow that), so fall back to <html>
+  // and then <!doctype>. A file with none of these is a fragment, not a page.
+  const anchor = out.match(/<head\b[^>]*>/i) || out.match(/<html\b[^>]*>/i) || out.match(/<!doctype\b[^>]*>/i);
+  if (!anchor) return null;
+  const at = anchor.index + anchor[0].length;
   return out.slice(0, at) + '\n' + TAG + out.slice(at);
 }
 
@@ -73,5 +75,5 @@ if (!home.includes(TAG) || readFileSync(join(target, 'CNAME'), 'utf8').trim() !=
   console.error('Build check failed: the home page or CNAME was not updated.');
   process.exit(1);
 }
-console.log('sols.tools build ready: ' + branded + ' pages branded, ' + noHead.length + ' pages without <head> left as they were.');
-for (const file of noHead) console.log('  no <head>: ' + file);
+console.log('sols.tools build ready: ' + branded + ' pages branded, ' + noHead.length + ' files that are not full pages left as they were.');
+for (const file of noHead) console.log('  not a full page: ' + file);
