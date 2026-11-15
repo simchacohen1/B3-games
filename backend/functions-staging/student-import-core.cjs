@@ -11,7 +11,9 @@
 //  1. A student already created by THIS batch (same file) is that account.
 //  2. A Student ID column value matches profile.rosterId, or an internal ID
 //     whose profile has the same name.
-//  3. Otherwise, if any active student has the same name, the row is a
+//  3. Otherwise, if exactly one active student has the same name AND the same
+//     passcode, the row is that student (two such accounts could not sign in).
+//     Any other same-name student makes the row a
 //     CONFLICT until the owner decides: "same student" (pick which) or
 //     "new student". "New" is refused when the passcode is also the same,
 //     because then neither child could sign in.
@@ -142,6 +144,10 @@ async function buildPlan(store,input,state){
     const d=s.decision;
     if(d?.type==='same'&&candidates.includes(d.studentId)){target=d.studentId;reason='owner confirmed same student';}
     else if(d?.type==='new'&&!samePin.length){reason='owner confirmed different student';}
+    // Exactly one account has this name AND this passcode. A second account
+    // like it could never sign in, so this row is that student. This is what
+    // makes importing an edited copy of an earlier file safe to repeat.
+    else if(samePin.length===1){target=samePin[0];reason='same name and passcode';}
     else{
      conflicts.push({key:s.key,name:s.name,reason:samePin.length?'An account with this name and passcode already exists.':'An account with this name already exists.',candidates,samePasscode:samePin,allowNew:!samePin.length});
      continue;

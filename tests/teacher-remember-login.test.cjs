@@ -37,3 +37,37 @@ test('sign out during pending restoration cannot revive the login',async()=>{
  const t=setup();let release;t.savedAuth.authStateReady=()=>new Promise(r=>release=r);
  t.api.onAuthStateChanged(()=>{});await settle();await t.api.signOut();release();await settle();assert.equal(t.auth.currentUser,null);
 });
+
+// A Google login made with a page's own button (Owner Admin, some teacher tools) lives only on the
+// default app. It must also be remembered, or new tabs such as Class Pointer ask to sign in again.
+const google={uid:'teacher',email:'simcha5770@gmail.com',providerData:[{providerId:'google.com'}]};
+function seeded(options){
+ const t=setup(options);
+ t.savedAuth.updateCurrentUser=async u=>{t.savedAuth.currentUser=u};
+ return t;
+}
+test('an authorized Google login from a page button is remembered for new tabs',async()=>{
+ const t=seeded({saved:false,active:google});t.api.onAuthStateChanged(()=>{});await settle();await settle();
+ assert.equal(t.savedAuth.currentUser,google);assert.equal(t.savedAuth.persistence,'LOCAL');
+ assert.equal(t.auth.currentUser,google,'the active tab keeps its own login');
+});
+test('an already remembered teacher is never replaced',async()=>{
+ const t=seeded({saved:true,active:google});t.api.onAuthStateChanged(()=>{});await settle();await settle();
+ assert.equal(t.savedAuth.currentUser,t.teacher);
+});
+test('a student tab or a student identity is never remembered as a teacher',async()=>{
+ const inStudentTab=seeded({saved:false,active:google,student:true});inStudentTab.api.onAuthStateChanged(()=>{});await settle();await settle();
+ assert.equal(inStudentTab.savedAuth.currentUser,null);
+ const student=seeded({saved:false,active:{uid:'student',providerData:[]}});student.api.onAuthStateChanged(()=>{});await settle();await settle();
+ assert.equal(student.savedAuth.currentUser,null);
+});
+test('a Google account that is not an authorized teacher is not remembered',async()=>{
+ const stranger={uid:'stranger',email:'stranger@example.test',emailVerified:true,providerData:[{providerId:'google.com'}]};
+ const t=seeded({saved:false,active:stranger});let authorized;t.api.onAuthStateChanged((user,ok)=>{authorized=ok});await settle();await settle();
+ assert.equal(authorized,false);assert.equal(t.savedAuth.currentUser,null);
+});
+test('signing out while the login is being remembered leaves nothing remembered',async()=>{
+ const t=seeded({saved:false,active:google});let release;t.savedAuth.authStateReady=()=>new Promise(r=>release=r);
+ t.api.onAuthStateChanged(()=>{});await settle();await t.api.signOut();release();await settle();await settle();
+ assert.equal(t.savedAuth.currentUser,null);assert.equal(t.auth.currentUser,null);
+});

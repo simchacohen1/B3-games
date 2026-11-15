@@ -149,7 +149,9 @@ test('restart is gated on cleanup, never races with prior Firebase session remov
   assert.match(src,/endPromise=Promise\.resolve\(\)\.then/);
   assert.match(src,/button\.disabled=false;button\.textContent='↻ Start another class'/);
   assert.match(session,/policyRef\?\.remove\(\)/);
-  assert.match(session,/policyRef\?\.onDisconnect\(\)\.cancel\(\)/);
+  // #801: a dropped teacher connection no longer deletes the lesson or its permissions.
+  assert.doesNotMatch(session,/onDisconnect\(\)\.remove\(\)/);
+  assert.match(session,/await disarmOffline\(ref\)/);
   assert.match(boards,/Do not send an asynchronous child update here/);
 });
 
