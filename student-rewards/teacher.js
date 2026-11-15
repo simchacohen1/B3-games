@@ -255,11 +255,17 @@ function renderClassSelect(){
   el.innerHTML=rows.map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("");
   el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
 }
+const OWNER_ROOT_PATHS=["classes","students","categories","rewards","classRewardCatalog","settings","dailyRatings","dailyAwards","dailyAttendance","commentsByStudent","redemptionsByStudent","enrollments","pointAdjustments","audit","pointRequests","classRewardContributionsByStudent","refundRequests","classRewardRounds"];
 async function loadRoot(){
   if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
   else{
+    // Firebase cost (#51): this owner view re-reads all of these collections every 30 seconds.
+    // A plain read downloads the whole collection again each time. Holding each path open
+    // keeps a live copy in the page, so the database sends only what actually changed and the
+    // 30-second reads below are answered from that copy. Same data on screen, same refresh.
+    if(!state.ownerPathsHeld){state.ownerPathsHeld=true;const noSync=()=>{};for(const path of OWNER_ROOT_PATHS)db.ref(`${ROOT}/${path}`).on("value",noSync,noSync);}
     const adminRead=path=>db.ref(`${ROOT}/${path}`).once("value").then(s=>s.val());
-    const paths={classes:"classes",students:"students",categories:"categories",rewards:"rewards",classRewardCatalog:"classRewardCatalog",settings:"settings",dailyRatings:"dailyRatings",dailyAwards:"dailyAwards",dailyAttendance:"dailyAttendance",commentsByStudent:"commentsByStudent",redemptionsByStudent:"redemptionsByStudent",enrollments:"enrollments",pointAdjustments:"pointAdjustments",audit:"audit",pointRequests:"pointRequests",classRewardContributionsByStudent:"classRewardContributionsByStudent",refundRequests:"refundRequests",classRewardRounds:"classRewardRounds"};
+    const paths=Object.fromEntries(OWNER_ROOT_PATHS.map(path=>[path,path]));
     const entries=await Promise.all(Object.entries(paths).map(async([key,path])=>[key,await adminRead(path)]));
     state.root=Object.fromEntries(entries.map(([key,value])=>[key,value||{}]));
   }

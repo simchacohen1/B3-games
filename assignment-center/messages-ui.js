@@ -1,5 +1,5 @@
 /* Homework Messages tab (#647): WhatsApp-style one-on-one conversations.
- * Shared by student.html (contacts = my teachers + principal) and teacher.html
+ * Shared by student.html (contacts = my teachers; the principal only after writing first) and teacher.html
  * (contacts = my students, grouped by class). Needs homework-common.js first.
  *
  * HomeworkMessages.create({
@@ -236,10 +236,12 @@
       recBar.append(cancel, recBox, sendRec);
       var feedback = el('p', null, 'dm-feedback'); feedback.setAttribute('aria-live', 'polite');
       compose.append(chip, row, recBar, feedback);
+      // Older messages to someone who is not the student's teacher: readable, no new sending.
+      if (c.readOnly) { row.style.display = 'none'; compose.append(el('p', 'You can read these messages. To send a new message, write to your teacher.', 'dm-feedback')); }
       box.append(head, thread, compose);
       view = { thread: thread, input: input, action: action, row: row, recBar: recBar, clock: clock, meterBar: meterBar, meter: meter,
         cancel: cancel, sendRec: sendRec, feedback: feedback, chip: chip, chipText: chipText };
-      function drawChip() { chip.hidden = !state.link; if (state.link) chipText.textContent = 'About: ' + state.link.assignmentTitle; }
+      function drawChip() { chip.hidden = !state.link || !!c.readOnly; if (state.link) chipText.textContent = 'About: ' + state.link.assignmentTitle; }
       drawChip();
       function syncAction() {
         var typed = !!input.value.trim();
@@ -453,6 +455,11 @@
       state.link = { assignmentId: link.assignmentId, assignmentTitle: link.assignmentTitle || 'Homework' };
       var go = function () {
         var target = allContacts().find(function (c) { return c.id === link.contactId && (!link.classId || c.classId === link.classId); });
+        // A homework post made by the principal or the office goes to the class teacher instead.
+        if (!target || target.readOnly) {
+          var teachers = allContacts().filter(function (c) { return c.kind === 'teacher' && (!link.classId || c.classId === link.classId); });
+          target = teachers.length === 1 ? teachers[0] : null;
+        }
         if (target) openThread(target, state.link); else renderList();
       };
       state.visible = true;

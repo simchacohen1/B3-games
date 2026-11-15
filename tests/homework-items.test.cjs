@@ -194,7 +194,7 @@ test('student checklist links keep the sign-in (opener) and never hand in by ope
   const src = fs.readFileSync(path.join(__dirname, '../assignment-center/homework-items.js'), 'utf8');
   assert.match(src, /a\.target = '_blank'; a\.rel = 'opener';/);
   const student = fs.readFileSync(path.join(__dirname, '../assignment-center/student.html'), 'utf8');
-  assert.match(student, /<script src="homework-items\.js"><\/script>/);
+  assert.match(student, /<script src="homework-items\.js\?v=[0-9a-f]{8}"><\/script>/);
   assert.match(student, /HI\.checklist\(a,/);
   const teacher = fs.readFileSync(path.join(__dirname, '../assignment-center/teacher.html'), 'utf8');
   assert.match(teacher, /HI\.builder\(\$\('itemsBuilder'\)/);
