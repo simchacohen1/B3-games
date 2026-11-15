@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes20"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes21"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes20/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes21/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes20/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes21/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -370,7 +370,7 @@ test('the text box sits on the block: same place, color, size and width, and the
  assert.match(body,/Object\.assign\(box\.style,\{left:left\*100\+'%',top:top\*100\+'%',width:\(right-left\)\*100\+'%',color\}\);/);
  assert.match(body,/left=f\.boxW\?f\.left:/,'a chosen width is kept');
  assert.match(body,/box\.value=value;/);assert.match(body,/box\.dir=fresh\?'auto':rtl\?'rtl':'ltr';/);
- assert.match(body,/open\.box\.style\.fontSize=Math\.max\(16\*width\/Math\.max\(1,W\),open\.size\*TEXT_SCALE\*width\)\+'px';/);
+ assert.match(body,/open\.box\.style\.fontSize=Math\.max\(4\*width\/Math\.max\(1,W\),open\.size\*TEXT_SCALE\*width\)\+'px';/);
  assert.match(pdf,/let shown=inlineEdit\?strokes\.filter\(stroke=>!inlineEdit\.ids\.has\(stroke\.id\)\):strokes;/);
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/\.board-text-inline\{position:absolute;[^}]*font-family:sans-serif;[^}]*line-height:1\.25;/);
@@ -546,4 +546,29 @@ test('with the arrow a moved or resized picture goes straight back on the board;
  assert.match(pdf,/const item=pictureEdits\.find\(other=>other\.el\.classList\.contains\('selected'\)\);/);
  assert.match(pdf,/movePicturesBtn=button\('🖼 Move pictures',/);
  assert.match(pdf,/done\.addEventListener\('click',\(\)=>finishPictureEdit\(\)\);/);
+});
+
+// Words are drawn at one size everywhere: 2.4 times the mark size, as a fraction of the board width.
+test('every renderer draws words at the same size, with no fixed minimum that makes small text bigger than laid out',()=>{
+ const share=read('class-pointer-prototype/activity-share.js'),highlighting=read('class-pointer-prototype/highlighting.js');
+ for(const [name,source] of [['pdf-mode',pdf],['highlighting',highlighting]])assert.doesNotMatch(source,/Math\.max\(16,stroke\.size/,name+' has no 16px floor on words');
+ assert.match(pdf,/'font-size':Math\.max\(4,stroke\.size\*W\*2\.4\)/);
+ assert.match(highlighting,/'font-size':Math\.max\(4,stroke\.size\*w\*2\.4\)/);
+ // The class's copy of the words (a 1000 x 1000 layer stretched over the picture) is the teacher's size, undistorted.
+ assert.doesNotMatch(share,/Math\.max\(16,width\*2\.2\)/,'the old, smaller size is gone');
+ assert.match(share,/\(Number\(stroke\.size\)\|\|\.016\)\*1000\*2\.4/);
+ assert.match(share,/scale\(1 \$\{textRatio\}\)/);
+ assert.match(share,/textRatio=b\.width\/Math\.max\(1,b\.height\)/);
+});
+
+test('a pasted paragraph has room between its lines at the size the board draws it',()=>{
+ const Clip=require('../class-pointer-prototype/board-clipboard.js');
+ const width100=line=>line.length*50*2.4,aspect=16/9;
+ const made=Clip.flowText('One two three four five six seven\neight nine ten eleven twelve thirteen fourteen fifteen sixteen',width100,{aspect,scale:2.4,size:.0078});
+ assert.ok(made.strokes.length>=2);
+ for(let i=1;i<made.strokes.length;i++){
+  const step=made.strokes[i].points[0].y-made.strokes[i-1].points[0].y,letters=.0078*2.4*aspect;
+  assert.ok(step>=letters*1.2,'lines are at least a letter height and a bit apart');
+ }
+ for(const stroke of made.strokes)assert.ok(Math.max(...stroke.points.map(p=>p.x))<=1,'no line runs off the right edge');
 });

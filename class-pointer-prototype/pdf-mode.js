@@ -159,7 +159,7 @@
   // The letters in the box are the size they are on the board; the box is as tall as its lines.
   function sizeInline(){
     const open=inlineEdit;if(!open)return;const width=content.getBoundingClientRect().width;if(!width)return;
-    open.box.style.fontSize=Math.max(16*width/Math.max(1,W),open.size*TEXT_SCALE*width)+'px';
+    open.box.style.fontSize=Math.max(4*width/Math.max(1,W),open.size*TEXT_SCALE*width)+'px';
     open.box.style.height='auto';open.box.style.height=open.box.scrollHeight+'px';
   }
   function finishInline(save){
@@ -238,8 +238,8 @@
         lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(shapePen?0.45:1);lc.lineCap=lc.lineJoin='round';
         if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
         if(stroke.tool==='text'){
-          lc.font=`${Math.max(16,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
-          (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(16,stroke.size*W*2.4)*1.25));continue;
+          lc.font=`${Math.max(4,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
+          (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(4,stroke.size*W*2.4)*1.25));continue;
         }
         const x1=first.x*W,y1=first.y*H,x2=last.x*W,y2=last.y*H,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1);
         if(stroke.tool==='rectangle'){lc.strokeRect(x,y,sw,sh);continue}
@@ -462,7 +462,7 @@
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
     if(stroke.tool==='text'){
-      const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':'sans-serif','font-size':Math.max(16,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
+      const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':'sans-serif','font-size':Math.max(4,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
       (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
       return text;
     }
