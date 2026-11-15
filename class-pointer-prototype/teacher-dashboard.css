@@ -36,7 +36,9 @@ body.cp-is-live.cp-drawer-closed .cp-students-toggle{animation:cpStudentsPulse 2
 .cp-students-hint::before{content:"";position:absolute;bottom:100%;right:34px;border:9px solid transparent;border-bottom-color:#ffd60a}
 .cp-students-hint[hidden]{display:none}
 /* The tabs row under the header sits on a very high layer (its Stop button must stay reachable), which hid this tip behind the tabs. While the tip shows, the header goes in front. */
-.app-header.cp-header:has(.cp-students-hint:not([hidden])){position:relative;z-index:2147483647}
+body:not(.lesson-expanded) .app-header.cp-header:has(.cp-students-hint:not([hidden])){position:relative;z-index:2147483647}
+/* Wide windows: the tip sits beside the button, inside the top bar, so it never lies over the Live label or the red Stop button in the row below. */
+@media (min-width:901px){.cp-students-hint{top:50%;right:calc(100% + 12px);transform:translateY(-50%);max-width:none;white-space:nowrap;padding:4px 6px 4px 12px}.cp-students-hint::before{bottom:auto;right:auto;left:100%;top:50%;transform:translateY(-50%);border-color:transparent;border-left-color:#ffd60a}}
 /* Narrow windows wrap the button to the left edge: open the tip rightwards so it stays on screen. */
 @media (max-width:900px){.cp-students-hint{right:auto;left:0}.cp-students-hint::before{right:auto;left:34px}}
 .cp-students-hint-x{flex:none;width:30px;height:30px;min-height:0;padding:0;margin:0;border:0;border-radius:8px;background:#17233b1f;color:#17233b;font-size:14px;font-weight:800;cursor:pointer}

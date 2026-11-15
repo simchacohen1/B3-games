@@ -392,7 +392,7 @@ test('both directions: student points on the teacher lesson, teacher draws on th
   // The teacher opens it large, picks Pen and draws; the line appears on the student's own page.
   await tile.locator('video').click();
   const tools = t.page.locator('#fttAnnotate .fa-bar');
-  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await tools.getByRole('button', { name: 'Pen', exact: true }).click();
   const ink = await tile.locator('canvas.cp-screen-ink').boundingBox();
   await t.page.mouse.move(ink.x + ink.width * 0.2, ink.y + ink.height * 0.5); await t.page.mouse.down();
   await t.page.mouse.move(ink.x + ink.width * 0.7, ink.y + ink.height * 0.5, { steps: 10 }); await t.page.mouse.up();
@@ -400,7 +400,7 @@ test('both directions: student points on the teacher lesson, teacher draws on th
   await expect(layer).toBeVisible({ timeout: 15000 });
   await expect(layer).toContainText('Your teacher is showing you something on your screen');
   // Point: the student's page receives the live teacher pointer.
-  await tools.getByRole('button', { name: /^Pointer:/ }).click();
+  await tools.getByRole('button', { name: 'Pointer', exact: true }).click();
   await t.page.mouse.move(ink.x + ink.width * 0.5, ink.y + ink.height * 0.4); await t.page.mouse.move(ink.x + ink.width * 0.52, ink.y + ink.height * 0.42);
   if (process.env.POINTER_SHOTS) { await s.waitForTimeout(500); await s.screenshot({ path: process.env.POINTER_SHOTS + '/real-student-sees-teacher.png' }); await t.page.screenshot({ path: process.env.POINTER_SHOTS + '/real-teacher-draws.png' }); }
   // He stops sharing: the marks leave his screen.

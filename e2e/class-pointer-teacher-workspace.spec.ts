@@ -167,7 +167,7 @@ test('full screen: the drawing toolbar is the only toolbar and its Lesson menu o
     const r = document.querySelector(sel)!.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return r.width > 0 && !!top && !!top.closest('#stage') && !top.closest('.cp-tabs-row');
   }))).toEqual([true, true]);
-  await expect(bar.getByRole('button', { name: /^Pen:/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(bar.getByRole('button', { name: 'Pen', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
   await bar.locator('[data-action="stop"]').click();
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(false);
@@ -646,14 +646,14 @@ test('teacher points and draws on an enlarged student screen; only that student 
   await tile.locator('video').click();
   await expect(tools).toBeVisible();
   // It starts on Hand: nothing is sent until the teacher picks a tool.
-  await expect(tools.getByRole('button', { name: /^Hand:/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(tools.getByRole('button', { name: 'Hand', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // Point: the student gets the moving pointer.
-  await tools.getByRole('button', { name: /^Pointer:/ }).click();
+  await tools.getByRole('button', { name: 'Pointer', exact: true }).click();
   const ink = tile.locator('canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
   await expect.poll(async () => (await sentOf(page, 'board-screen-live')).some((m: any) => m.point && Math.abs(m.point.x - 0.25) < 0.02)).toBe(true);
   // Pen: a finished line goes to Student One, never to Student Two.
-  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await tools.getByRole('button', { name: 'Pen', exact: true }).click();
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.4, { steps: 8 }); await page.mouse.up();
   await expect.poll(async () => (await sentOf(page, 'board-screen-marks')).at(-1)?.strokes?.length).toBe(1);
@@ -689,7 +689,7 @@ test('the Student screens gallery offers the same Point and Pen tools on a scree
   await grid.first().click();
   const tools = page.locator('#fttAnnotate .fa-bar');
   await expect(tools).toBeVisible();
-  await tools.getByRole('button', { name: /^Pen:/ }).click();
+  await tools.getByRole('button', { name: 'Pen', exact: true }).click();
   const ink = page.locator('#boardsView .board-screen-large canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6, { steps: 6 }); await page.mouse.up();
