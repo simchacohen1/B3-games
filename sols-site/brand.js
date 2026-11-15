@@ -1,8 +1,8 @@
 /*
  * Shluchim Online School branding for https://sols.tools.
  *
- * This file is NOT loaded by funtorahtools.com. The "Sync sols.tools site"
- * workflow copies it to /sols-brand.js in the sols-school-site repository and
+ * This file is NOT loaded by funtorahtools.com. The "Update from B3-games"
+ * workflow in the sols-school-site repository copies it to /sols-brand.js and
  * adds one <script> tag for it to every page of that copy only.
  *
  * It changes what people SEE (the site name and the browser-tab icon). It does
