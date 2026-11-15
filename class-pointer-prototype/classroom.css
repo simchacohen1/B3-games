@@ -107,6 +107,8 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNote{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80%;padding:14px 20px;border-radius:12px;background:#172033ee;color:#fff;font-size:20px;font-weight:700;text-align:center;pointer-events:none}
 #pdfNav{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX(-50%);width:max-content;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;max-width:calc(100% - 24px);padding:10px 12px;background:#101827ee;border:1px solid #ffffff38;border-radius:16px;box-shadow:0 8px 28px #0008;cursor:default;color:#fff}
 #pdfNav[hidden]{display:none}
+/* Typing right in a block of words on the lesson board: a bare text box over the words, same font and size. */
+.board-text-inline{position:absolute;z-index:4;margin:-.14em 0 0;padding:0;border:0;border-radius:2px;outline:2px solid #2563eb;outline-offset:5px;background:#ffffffeb;font-family:sans-serif;font-weight:400;line-height:1.25;resize:none;overflow:hidden;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:break-word;min-height:1.25em;box-shadow:0 2px 14px #0f172a33}
 #pdfNav .pdf-btn{min-height:48px;min-width:48px;padding:8px 16px;border-radius:12px;font-size:18px;font-weight:800;background:#f8fafc;color:#172033;border:2px solid #cbd5e1;cursor:pointer;touch-action:manipulation}
 #pdfNav .pdf-btn:hover{background:#e0ebff}
 #pdfNav .pdf-zoom{min-width:56px;font-size:26px;line-height:1;padding:6px 12px}

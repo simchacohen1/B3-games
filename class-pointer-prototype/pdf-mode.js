@@ -21,7 +21,7 @@
   const PEN_TOOLS=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
   // Words on the lesson are drawn 2.4 times their mark size; line spacing has to count that too.
   const TEXT_SCALE=2.4;
-  let selectedId=null,edit=null,erasePid=null,lastPick=null;
+  let selectedId=null,edit=null,erasePid=null,inlineEdit=null;
   let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
   let textEditStroke=null;
@@ -84,6 +84,47 @@
     const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
     return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,[fixX]:f[fixX],[fixY]:f[fixY]});
   }
+  // ---------- Changing words right on the board ----------
+  // A plain text box is laid over the block: same place, color, size and width. While it is open the block's
+  // own lines are not drawn. Clicking anywhere else (or Ctrl+Enter) keeps the change; Escape drops it.
+  function editInline(stroke){
+    finishInline(true);
+    const block=textBlock(stroke,B.highlights?.()||strokes),f=blockFrame(block),margin=.04;
+    // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
+    // the board, so a longer sentence has room; the words are laid out properly when the box closes.
+    const left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left,right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
+    const box=el('textarea',null,'board-text-inline');
+    box.dataset.stageUi='true';box.value=f.text;box.maxLength=2000;box.dir=f.rtl?'rtl':'ltr';box.spellcheck=false;box.rows=1;
+    box.setAttribute('aria-label','Change the words on the board');
+    Object.assign(box.style,{left:left*100+'%',top:f.top*100+'%',width:(right-left)*100+'%',color:block[0].color});
+    inlineEdit={stroke:{...stroke,block},ids:new Set(block.map(item=>item.id)),box,size:f.size,before:f.text};
+    content.appendChild(box);sizeInline();drawInk();
+    box.focus();box.setSelectionRange(box.value.length,box.value.length);
+    // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
+    for(const type of ['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'])box.addEventListener(type,event=>event.stopPropagation());
+    box.addEventListener('keydown',event=>{
+      event.stopPropagation();
+      if(event.key==='Escape'){event.preventDefault();finishInline(false)}
+      else if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();finishInline(true)}
+    });
+    box.addEventListener('input',sizeInline);
+    box.addEventListener('blur',()=>finishInline(true));
+    B.status('Type to change the words. Click anywhere else when you are done. Esc cancels.');
+  }
+  // The letters in the box are the size they are on the board; the box is as tall as its lines.
+  function sizeInline(){
+    const open=inlineEdit;if(!open)return;const width=content.getBoundingClientRect().width;if(!width)return;
+    open.box.style.fontSize=Math.max(16*width/Math.max(1,W),open.size*TEXT_SCALE*width)+'px';
+    open.box.style.height='auto';open.box.style.height=open.box.scrollHeight+'px';
+  }
+  function finishInline(save){
+    const open=inlineEdit;if(!open)return;inlineEdit=null;
+    const text=open.box.value;open.box.remove();
+    if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
+    else if(save&&text!==open.before)replaceTextStroke(open.stroke,text);
+    drawInk();
+  }
+  window.addEventListener('resize',sizeInline);
   function addTextStroke(point,text,size,color){
     const made=flow(text,{size,color,center:point});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
@@ -94,8 +135,9 @@
     // The new words go where the whole block was, in the same color, size and width.
     const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text});
     if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
-    selectedId=null;
-    if(!B.swapMarks?.(block.map(item=>item.id),made.strokes)){B.status('That whiteboard text is no longer available to edit.');return false}
+    const ids=B.swapMarks?.(block.map(item=>item.id),made.strokes);
+    if(!ids){selectedId=null;B.status('That whiteboard text is no longer available to edit.');return false}
+    selectedId=selecting()?ids[0]:null;
     B.status(made.cut?'The words were too long. Only the first part was kept.':'Whiteboard text updated.');return true;
   }
 
@@ -385,7 +427,7 @@
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
     // A mark that is being dragged or resized is shown where it will land.
-    let shown=strokes;
+    let shown=inlineEdit?strokes.filter(stroke=>!inlineEdit.ids.has(stroke.id)):strokes;
     if(edit?.moved&&edit.swap){const gone=new Set(edit.swap.ids);shown=strokes.filter(stroke=>!gone.has(stroke.id)).concat(edit.swap.strokes.map((stroke,index)=>({...stroke,owner:'teacher',id:'preview'+index})))}
     else if(edit?.moved)shown=strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke);
     const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
@@ -408,7 +450,7 @@
   }
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
   function drawSelection(list){
-    if(!selecting())return;const picked=selectedStroke(),G=geometry();if(!picked||!G)return;
+    if(!selecting()||inlineEdit)return;const picked=selectedStroke(),G=geometry();if(!picked||!G)return;
     const width=content.getBoundingClientRect().width;if(!width)return;
     const unit=W/width,pad=6*unit,group=svg('g',{'data-selection':'true','pointer-events':'none'}); // unit: one screen pixel in the ink layer's own units
     const frameRect=(x1,y1,x2,y2)=>group.appendChild(svg('rect',{x:x1-pad,y:y1-pad,width:x2-x1+pad*2,height:y2-y1+pad*2,fill:'none',stroke:'#2563eb','stroke-width':1.5*unit,'stroke-dasharray':(6*unit)+' '+(4*unit)}));
@@ -488,11 +530,11 @@
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
     const hit=teacherMarkAt(event,p,true);
-    // A second quick click on the same words opens them for editing.
-    if(hit&&hit.tool==='text'&&lastPick&&lastPick.id===hit.id&&Date.now()-lastPick.at<450){lastPick=null;selectedId=hit.id;drawInk();openTextEditor(hit);return}
-    lastPick=hit?{id:hit.id,at:Date.now()}:null;selectedId=hit?hit.id:null;
+    // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
+    const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
+    selectedId=hit?hit.id:null;
     // Words move as a whole block, every line together.
-    if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid)}
+    if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,again,pid:event.pointerId};content.setPointerCapture(edit.pid)}
     drawInk();
   }
   function moveSelect(event){
@@ -530,6 +572,8 @@
       if(commit&&done.moved&&done.swap){const ids=B.swapMarks?.(done.swap.ids,done.swap.strokes);if(ids)selectedId=ids[0];else B.status('Those words could not be changed.')}
       drawInk();return;
     }
+    // A second click on picked words, without dragging: type right in them.
+    if(commit&&!done.moved&&done.again){editInline(done.stroke);return}
     if(commit&&done.moved&&!changeMarks(done.group.filter(item=>done.preview.has(item.id)).map(item=>[item.id,{...item,points:done.preview.get(item.id)}])))B.status('That mark could not be changed.');
     drawInk();
   }
@@ -557,7 +601,7 @@
     return true;
   }
   if(isTeacher){
-    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;if(!selecting()){selectedId=null;lastPick=null}endSelect(false)});
+    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false)});
     // Delete removes the picked mark; Escape lets go of it.
     document.addEventListener('keydown',event=>{
       if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
@@ -624,6 +668,8 @@
     openTextEditor(stroke);
   }
   content.addEventListener('pointerdown',event=>{
+    // A click on the board while words are being typed keeps what was typed and closes the box.
+    if(inlineEdit)finishInline(true);
     if(isTeacher&&event.button===0){
       const tool=$(toolId).value,p=normalized(event),ready=!B.navigating()&&!notReady()&&B.live()&&B.writingAllowed();
       // Select: pick, drag, resize. Eraser: rub out my marks. Text: click my words to change them, or an empty
@@ -633,7 +679,8 @@
       if(tool==='text'&&ready){
         if(!p)return;event.preventDefault();event.stopPropagation();
         const words=teacherMarkAt(event,p,true);
-        openTextEditor(words?.tool==='text'?words:{tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
+        if(words?.tool==='text'){editInline(words);return}
+        openTextEditor({tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
       }
     }
     const tool=$(toolId).value;
@@ -776,6 +823,7 @@
     }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
   }
   function unload(hide){
+    finishInline(false);
     if(hide)stopBoardPresentation();
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
     pageEls.forEach(node=>node.remove());pageEls=[];
@@ -1193,7 +1241,7 @@
       if(!made)made=flow(payload.text,{size:0.016,color:B.ownColor(),center:{x:.5,y:.5}});
       let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
-      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag to move them, or click them again to change the words.');
+      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');
     },
     async copy(){
       const clip=window.ClassPointerClipboard;

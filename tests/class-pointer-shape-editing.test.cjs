@@ -129,7 +129,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes9"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes10"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -195,7 +195,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes9/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes10/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -326,5 +326,46 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes9/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes10/);
+});
+
+// ---------- Typing right in the words on the board (no popup) ----------
+test('a second click on picked words opens a text box in place, not a popup',()=>{
+ // Select: the click must be on words that were already picked and must not drag.
+ assert.match(pdf,/const again=!!hit&&hit\.tool==='text'&&!!picked&&textBlock\(picked\)\.some\(item=>item\.id===hit\.id\);/);
+ assert.match(pdf,/if\(commit&&!done\.moved&&done\.again\)\{editInline\(done\.stroke\);return\}/);
+ // Text tool: a click on words opens them in place; only an empty spot asks for new words in the dialog.
+ assert.match(pdf,/if\(words\?\.tool==='text'\)\{editInline\(words\);return\}/);
+ const down=pdf.slice(pdf.indexOf("content.addEventListener('pointerdown'"),pdf.indexOf('function extend(event)'));
+ assert.ok(!/openTextEditor\((words|hit|stroke)\b/.test(down),'no popup for words that are already on the board');
+});
+
+test('the text box sits on the block: same place, color, size and width, and the block is not drawn under it',()=>{
+ const body=pdf.slice(pdf.indexOf('function editInline(stroke){'),pdf.indexOf('function addTextStroke('));
+ assert.match(body,/const block=textBlock\(stroke,B\.highlights\?\.\(\)\|\|strokes\),f=blockFrame\(block\),margin=\.04;/);
+ assert.match(body,/Object\.assign\(box\.style,\{left:left\*100\+'%',top:f\.top\*100\+'%',width:\(right-left\)\*100\+'%',color:block\[0\]\.color\}\);/);
+ assert.match(body,/const left=f\.boxW\?f\.left:/,'a chosen width is kept');
+ assert.match(body,/box\.value=f\.text;/);assert.match(body,/box\.dir=f\.rtl\?'rtl':'ltr';/);
+ assert.match(body,/open\.box\.style\.fontSize=Math\.max\(16\*width\/Math\.max\(1,W\),open\.size\*TEXT_SCALE\*width\)\+'px';/);
+ assert.match(pdf,/let shown=inlineEdit\?strokes\.filter\(stroke=>!inlineEdit\.ids\.has\(stroke\.id\)\):strokes;/);
+ const css=read('class-pointer-prototype/classroom.css');
+ assert.match(css,/\.board-text-inline\{position:absolute;[^}]*font-family:sans-serif;[^}]*line-height:1\.25;/);
+});
+
+test('closing the text box keeps the change in place; Escape drops it; empty words are not saved',()=>{
+ const body=pdf.slice(pdf.indexOf('function editInline(stroke){'),pdf.indexOf('function addTextStroke('));
+ assert.match(body,/box\.addEventListener\('blur',\(\)=>finishInline\(true\)\);/);
+ assert.match(body,/if\(event\.key==='Escape'\)\{event\.preventDefault\(\);finishInline\(false\)\}/);
+ assert.match(body,/else if\(save&&text!==open\.before\)replaceTextStroke\(open\.stroke,text\);/);
+ assert.match(body,/if\(save&&!text\.trim\(\)\)B\.status\(/);
+ // Typing never reaches the lesson's shortcuts, the Delete key or the drawing tools.
+ assert.match(body,/for\(const type of \['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'\]\)box\.addEventListener\(type,event=>event\.stopPropagation\(\)\);/);
+ assert.match(body,/box\.addEventListener\('keydown',event=>\{\s*event\.stopPropagation\(\);/);
+ // A click elsewhere on the board, another tool, or the lesson closing all close the box.
+ assert.match(pdf,/if\(inlineEdit\)finishInline\(true\);\s*if\(isTeacher&&event\.button===0\)\{/);
+ assert.match(pdf,/addEventListener\('change',\(\)=>\{erasePid=null;finishInline\(true\);/);
+ assert.match(pdf,/function unload\(hide\)\{\s*finishInline\(false\);/);
+ // The changed words go back as the same block: same color, size and chosen width, and they stay picked.
+ assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text\}\);/);
+ assert.match(pdf,/selectedId=selecting\(\)\?ids\[0\]:null;/);
 });
