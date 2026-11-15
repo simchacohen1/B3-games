@@ -12,7 +12,7 @@
     // Lines keep the three sizes. Words can be any size between TEXT_MIN and TEXT_MAX (the teacher drags a corner).
     const size=value.tool==='text'&&Number.isFinite(value.size)&&value.size>=TEXT_MIN&&value.size<=TEXT_MAX?Math.round(value.size*1e4)/1e4:[0.008,0.016,0.028].includes(value.size)?value.size:0.016;
     // The lines of one block of words share a block id; a wrapped line is marked soft; boxW is a width the teacher chose.
-    const extra=value.tool!=='text'?{}:{text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{})};
+    const extra=value.tool!=='text'?{}:{text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(value.bold===true?{bold:true}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{})};
     return{tool:value.tool,color:pointStyle(value).color||'#ffcc00',size,points:value.points.map(({x,y})=>({x,y})),...extra};
   }
   class HighlightStore{

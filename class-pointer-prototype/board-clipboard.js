@@ -148,6 +148,7 @@
         points:[{x:round(clamp(start,0,1)),y:round(clamp(y,0,1))},{x:round(clamp(rtl?start-reach:start+reach,0,1)),y:round(clamp(y+Math.max(.02,lineHeight),0,1))}]};
       if(opts.block)out.block=opts.block;
       if(line.soft)out.soft=true;
+      if(opts.bold)out.bold=true;
       if(boxW)out.boxW=round(width);
       return out;
     });

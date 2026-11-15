@@ -42,7 +42,7 @@
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it.'],
+    ['select','🖱️','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
