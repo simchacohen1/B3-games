@@ -746,7 +746,7 @@
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       docLabel='webpage';await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
       showNote('');B.resetMarks();B.setPdf(true,'webpage');
-      B.status('Webpage open. Students follow your scrolling and zoom. Use the lesson tools to point and highlight.');
+      B.status('Webpage open in 🖱 Mouse mode: scroll it, drag to move it, click a link to open it for the class. Students follow you. Pick a tool on the left to point or draw.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
     }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
     finally{$('openWebpage').disabled=false}
@@ -983,6 +983,25 @@
     if(snapshotPan&&stage.hasPointerCapture(snapshotPan.id))stage.releasePointerCapture(snapshotPan.id);
     snapshotPan=null;
   }
+  // The webpage is a still copy (nothing in it runs), so a click cannot reach it. In Mouse mode a click that did
+  // not drag is looked up in the copy instead: a link opens that page as the lesson, so the class follows.
+  function linkAt(event){
+    const frame=content.querySelector('iframe.lesson-webpage'),inner=frame?.contentDocument;if(!inner||!frame.offsetWidth)return null;
+    const r=frame.getBoundingClientRect(),k=r.width/frame.offsetWidth;if(!k)return null;
+    const link=inner.elementFromPoint((event.clientX-r.left)/k,(event.clientY-r.top)/k)?.closest?.('a[data-lesson-link]');
+    const url=link&&Web?.cleanUrl?.(link.getAttribute('data-lesson-link'));
+    return url||null;
+  }
+  // In Mouse mode the cursor turns into a hand over a link.
+  stage.addEventListener('pointermove',event=>{
+    if(!isTeacher||!webMode||docLabel!=='webpage'||snapshotPan||scroller.hidden)return;
+    content.style.cursor=B.navigating()&&linkAt(event)?'pointer':'';
+  },true);
+  stage.addEventListener('pointerup',event=>{
+    const p=snapshotPan;if(!p||event.pointerId!==p.id||docLabel!=='webpage'||Math.hypot(event.clientX-p.x,event.clientY-p.y)>=5)return;
+    const url=linkAt(event);if(!url)return;
+    B.status('Opening that link for the class…');void openWebpage(url);
+  },true);
   ['pointerup','pointercancel','lostpointercapture'].forEach(type=>stage.addEventListener(type,stopSnapshotPan,true));
   document.addEventListener('class-pointer-navigation',stopSnapshotPan);
   // Navigation mode keeps the selected tool intact. Dragging moves the document;

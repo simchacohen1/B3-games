@@ -129,7 +129,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes6"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes9"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -195,7 +195,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes6/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes9/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -288,4 +288,43 @@ test('a paste picks the biggest size at which the words fit on one line',()=>{
  assert.match(pdf,/if\(!made\)made=flow\(payload\.text,\{size:0\.016,color:B\.ownColor\(\),center:\{x:\.5,y:\.5\}\}\);/);
  // The lines of a block are found by its id first.
  assert.match(pdf,/if\(stroke\.block\)\{const same=list\.filter\(item=>item\.tool==='text'&&item\.owner===stroke\.owner&&item\.block===stroke\.block\);if\(same\.length\)return same\}/);
+});
+
+// ---------- Mouse mode on the lesson; nothing of the toolbar hidden behind the tabs ----------
+test('the lesson has a clear Mouse button and a webpage starts in Mouse mode',()=>{
+ assert.match(annotate,/mouseBtn\.id='cpMouseBtn';mouseBtn\.className='cp-mouse-btn';mouseBtn\.textContent='🖱 Mouse';/);
+ assert.match(annotate,/wrap\.insertBefore\(mouseBtn,wrap\.querySelector\('\.cp-switch-wrap'\)\)/);
+ assert.match(annotate,/placeMouseBtn\(\);mouseBtn\.hidden=!kind;/);
+ assert.match(annotate,/if\(mouseOn\(\)\)\{FA\.select\(lesson\.defaultTool\);return\}/);
+ assert.match(annotate,/else if\(kind==='webpage'\)FA\.select\('hand'\);/);
+ assert.match(annotate,/toolLabels:\{hand:\['🖱','Mouse',/);
+ // The toolbar shows a surface's own name for a tool.
+ assert.match(toolbar,/const own=s\.toolLabels\?\.\[tool\],usual=TOOLS\.find\(t=>t\[0\]===tool\),name=own\?own\[1\]:usual\[2\];/);
+});
+
+test('in Mouse mode a click on a link in the webpage opens that page for the class',()=>{
+ assert.match(pdf,/function linkAt\(event\)\{/);
+ assert.match(pdf,/const url=link&&Web\?\.cleanUrl\?\.\(link\.getAttribute\('data-lesson-link'\)\);/);
+ // The copy keeps where a link led as plain text only; the link itself stays dead.
+ const core=read('class-pointer-prototype/webpage-core.js');
+ assert.match(core,/node\.removeAttribute\('href'\);node\.removeAttribute\('target'\);/);
+ assert.match(core,/if\(dest\)node\.setAttribute\('data-lesson-link',dest\);else node\.removeAttribute\('data-lesson-link'\);/);
+ assert.match(core,/if\(dest&&new URL\(dest\)\.hostname==='invalid\.invalid'\)dest=null;/);
+ // Only a click that did not drag, only on a webpage, only while the Mouse is on (the pan was started in it).
+ assert.match(pdf,/if\(!p\|\|event\.pointerId!==p\.id\|\|docLabel!=='webpage'\|\|Math\.hypot\(event\.clientX-p\.x,event\.clientY-p\.y\)>=5\)return;/);
+ assert.ok(pdf.indexOf('const url=linkAt(event);if(!url)return;')<pdf.indexOf("forEach(type=>stage.addEventListener(type,stopSnapshotPan,true))"),'looked up before the drag is forgotten');
+ // The copy still cannot run anything.
+ assert.match(pdf,/iframe\.setAttribute\('sandbox','allow-same-origin'\)/);
+ const Web=require('../class-pointer-prototype/webpage-core.js');
+ assert.equal(Web.cleanUrl('javascript:alert(1)'),null);assert.equal(Web.cleanUrl('https://example.com/a'),'https://example.com/a');
+});
+
+test('the toolbar menus and the Students tip are not hidden behind the tabs row',()=>{
+ const css=read('class-pointer-prototype/teacher-dashboard.css');
+ assert.match(css,/\.cp-tabs-row\{position:relative;z-index:2147483646;/,'the tabs row is one layer above the toolbar');
+ assert.match(toolbar,/#fttAnnotate\.fa-fly-open\{z-index:2147483647\}/);
+ assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
+ assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
+ assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes9/);
 });

@@ -223,6 +223,7 @@
   // ---------- DOM ----------
   const css=`
 #fttAnnotate{position:fixed;inset:0;z-index:${Z};pointer-events:none;font:600 13px system-ui,"Segoe UI",sans-serif}
+#fttAnnotate.fa-fly-open{z-index:2147483647}
 #fttAnnotate[hidden],#fttAnnotate [hidden]{display:none!important}
 #fttAnnotate .fa-ink{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
 #fttAnnotate .fa-capture{position:fixed;pointer-events:auto;touch-action:none;background:transparent}
@@ -360,7 +361,7 @@
   }
   const itemSig=list=>list.map(i=>[i.id,i.icon,i.label,i.title,i.heading,!!i.disabled,i.pressed,!!i.danger,!!i.primary,i.badge||'',!!i.items].join('~')).join('|');
   function runItem(item){try{item.onClick?.()}catch(e){console.warn('Drawing tools:',e)}}
-  function closeFly(){flyOpen=null;flySig='';fly.hidden=true}
+  function closeFly(){flyOpen=null;flySig='';fly.hidden=true;root.classList.remove('fa-fly-open')}
   // Opens a menu; asking for the menu that is already open closes it.
   function openFly(key,anchor,items,list){
     if(flyOpen&&flyOpen.key===key)return closeFly();
@@ -378,7 +379,8 @@
         return itemButton(item,'',()=>{if(!item.keepOpen)closeFly();runItem(item);sync()});
       }));
     }
-    fly.hidden=false;placeFly();
+    // On top of everything while the menu is open (a page's own bars may sit one layer above the toolbar).
+    fly.hidden=false;root.classList.add('fa-fly-open');placeFly();
   }
   function placeFly(){
     if(fly.hidden||!flyOpen)return;
@@ -452,7 +454,9 @@
       const kinds=variantsOf(s,tool),kind=kinds&&kinds.find(k=>k[0]===variantOf(tool));
       b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));
       b.classList.toggle('fa-more',!!kinds&&!b.disabled);
-      b.querySelector('.fa-ico').textContent=kind?kind[1]:TOOL_ICON[tool];
+      const own=s.toolLabels?.[tool],usual=TOOLS.find(t=>t[0]===tool),name=own?own[1]:usual[2];
+      b.querySelector('.fa-ico').textContent=kind?kind[1]:own?own[0]:TOOL_ICON[tool];
+      b.querySelector('.fa-name').textContent=name;b.title=name+': '+(own?own[2]:usual[3]);b.setAttribute('aria-label',name);
     }
     // Colors and sizes for this surface. A color of '' means "the page's own color" (shown as ↺).
     const colors=colorsOf(s);

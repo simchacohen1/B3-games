@@ -15,7 +15,16 @@
     doc.querySelectorAll('script,iframe,frame,frameset,object,embed,applet,base,meta[http-equiv],link[rel="preload"],link[rel="modulepreload"]').forEach(node=>node.remove());
     doc.querySelectorAll('*').forEach(node=>{
       for(const attr of Array.from(node.attributes))if(/^on/i.test(attr.name)||['srcdoc','nonce','integrity','autofocus','formaction','action'].includes(attr.name.toLowerCase()))node.removeAttribute(attr.name);
-      if(node.tagName==='A'){node.removeAttribute('href');node.removeAttribute('target')}
+      if(node.tagName==='A'){
+        // A link in the copy never works by itself. Where it led is kept as plain text in data-lesson-link
+        // (full http/https address only), so the teacher's page can open that page as the next lesson.
+        const raw=node.getAttribute('href'),kept=node.getAttribute('data-lesson-link');let dest=null;
+        if(raw&&!/^\s*#/.test(raw)){try{dest=cleanUrl(new URL(raw,cleanUrl(base)||undefined).href)}catch{}}
+        else if(!raw&&kept)dest=cleanUrl(kept);
+        if(dest&&new URL(dest).hostname==='invalid.invalid')dest=null;
+        node.removeAttribute('href');node.removeAttribute('target');
+        if(dest)node.setAttribute('data-lesson-link',dest);else node.removeAttribute('data-lesson-link');
+      }
       if(['INPUT','BUTTON','SELECT','TEXTAREA'].includes(node.tagName))node.disabled=true;
     });
     const policy=doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';

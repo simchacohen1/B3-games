@@ -35,6 +35,8 @@ body.cp-is-live.cp-drawer-closed .cp-students-toggle{animation:cpStudentsPulse 2
 .cp-students-hint{position:absolute;z-index:60;top:calc(100% + 12px);right:0;display:flex;align-items:center;gap:8px;width:max-content;max-width:min(300px,80vw);padding:10px 8px 10px 14px;border-radius:12px;background:#ffd60a;color:#17233b;font:800 15px/1.3 system-ui,sans-serif;box-shadow:0 10px 28px #0f172a59}
 .cp-students-hint::before{content:"";position:absolute;bottom:100%;right:34px;border:9px solid transparent;border-bottom-color:#ffd60a}
 .cp-students-hint[hidden]{display:none}
+/* The tabs row under the header sits on a very high layer (its Stop button must stay reachable), which hid this tip behind the tabs. While the tip shows, the header goes in front. */
+.app-header.cp-header:has(.cp-students-hint:not([hidden])){position:relative;z-index:2147483647}
 /* Narrow windows wrap the button to the left edge: open the tip rightwards so it stays on screen. */
 @media (max-width:900px){.cp-students-hint{right:auto;left:0}.cp-students-hint::before{right:auto;left:34px}}
 .cp-students-hint-x{flex:none;width:30px;height:30px;min-height:0;padding:0;margin:0;border:0;border-radius:8px;background:#17233b1f;color:#17233b;font-size:14px;font-weight:800;cursor:pointer}
@@ -70,6 +72,8 @@ body.cp-simple.teacher-view .cp-tabs-row .cp-workspace-tabs{margin:0}
 .cp-tabs-spacer{flex:1 1 auto}
 .cp-live-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .cp-live-wrap[hidden]{display:none}
+.cp-live-wrap .cp-mouse-btn{font-weight:700}
+.cp-live-wrap .cp-mouse-btn[aria-pressed="true"]{background:#2563eb;border-color:#2563eb;color:#fff}
 .cp-live-chip{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:#b91c1c;font-size:14px;padding:0 4px}
 .cp-live-chip::before{content:"";width:10px;height:10px;border-radius:50%;background:#dc2626}
 .cp-live-wrap button,.cp-live-wrap .tab-controls button{min-height:44px;padding:0 16px;margin:0;border-radius:10px;border:1px solid #c3cbd9;background:#fff;color:var(--cp-navy);font-size:15px;font-weight:500}
