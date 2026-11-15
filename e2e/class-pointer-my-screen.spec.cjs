@@ -143,9 +143,11 @@ test('dedicated presentation view follows surface changes, hides exit only while
   await expect(usableTools).toHaveCount(0);
   await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeVisible();
   await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
-  // Pen permission: 10 drawing modes + 9 colours + 3 thicknesses + Undo + Clear.
-  await expect(usableTools).toHaveCount(24);
+  // Pen permission: 11 drawing modes (Select first) + 9 colours + 3 thicknesses + Undo + Clear.
+  await expect(usableTools).toHaveCount(25);
   await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeHidden();
+  // Select (the mouse) is the first drawing mode, only with pen permission.
+  await expect(page.locator('#fttLessonDrawTools button[aria-label="Select"]')).toBeVisible();
   // Run the actual shared gate's capture handlers while ordinary activity UI is locked.
   const gate=fs.readFileSync(path.join(__dirname,'../game-gate.js'),'utf8');
   const handlers=gate.slice(gate.indexOf('  ["click","pointerdown","keydown","submit"].forEach'),gate.indexOf('  if (!isGuestPreview()) watchTeacherAccess();'));
@@ -160,7 +162,7 @@ test('dedicated presentation view follows surface changes, hides exit only while
   expect(await page.evaluate(()=>window.__ordinaryClicks)).toBe(0);
   await page.getByRole('button',{name:'Pen',exact:true}).click();
   await expect(page.getByRole('button',{name:'Pen',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(usableTools).toHaveCount(24);
+  await expect(usableTools).toHaveCount(25);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(true);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#answer')))).toBe(false);
   await page.evaluate(()=>{window.__locked=false;window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'))});

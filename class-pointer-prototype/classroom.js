@@ -39,7 +39,49 @@ const pointerIcons={
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
-function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
+// A student on an activity page draws on a picture of the part of the teacher's screen that shows, but the teacher
+// keeps marks as fractions of the whole board. A whiteboard can be smaller than that picture (an empty strip along the
+// right or bottom), so a mark drawn partly there lands outside the board; one such point used to make the teacher
+// refuse the whole mark, so bigger marks vanished. Points are held at the board's edge instead.
+function studentMessageToDocument(message){
+  const pdf=window.ClassPointerPdf;
+  if(!pdf?.active()||!pdf.activityPoint)return message;
+  const pin=value=>Math.max(0,Math.min(1,value));
+  const toDocument=point=>{const at=pdf.activityPoint(point);return at&&Number.isFinite(at.x)&&Number.isFinite(at.y)?{...at,x:pin(at.x),y:pin(at.y)}:at};
+  if(message.type==='point'&&C.validPoint(message.point))return{...message,point:toDocument(message.point)};
+  if(message.type==='highlight'&&C.cleanStroke(message.stroke)){
+    // Words are sized as a fraction of the width: the student's view is not always as wide as the board.
+    const scale=pdf.activityTextScale?.()||1,resized=message.stroke.tool==='text'?{size:Math.max(C.TEXT_MIN,Math.min(C.TEXT_MAX,Math.round(message.stroke.size*scale*1e4)/1e4))}:{};
+    return{...message,stroke:{...message.stroke,...resized,points:message.stroke.points.map(toDocument)}};
+  }
+  return message;
+}
+// The teacher's Select works on any mark. The store still files a changed mark under its own owner (a student's mark stays that
+// student's, with its id), so only the teacher's page, never a student's message, can change a mark that is not the sender's.
+function markOwner(id){return highlightStore.strokes.find(mark=>mark.id===id)?.owner||'\u0000none'}
+// A student picks, moves, resizes, recolors and deletes their OWN marks (activity-share.js Select). The store files every
+// mark under the connection that made it and only ever changes marks of the sender, so no message can reach another
+// student's marks or the teacher's. Each change is converted like a new mark. Returns true when something changed.
+function replaceStudentMarks(member,changes){
+  if(!Array.isArray(changes))return false;
+  let changed=false;
+  for(const change of changes.slice(0,60)){
+    if(!change||typeof change.id!=='string'||!change.stroke||!C.cleanStroke(change.stroke))continue;
+    const converted=studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke;
+    if(highlightStore.replace(member.id,change.id,converted))changed=true;
+  }
+  return changed;
+}
+function eraseStudentMarks(member,ids){
+  if(!Array.isArray(ids))return false;
+  let changed=false;
+  for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id)){highlightStore.edit(member.id,'erase',id);changed=true}
+  return changed;
+}
+// A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
+// student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
+function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
+function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo(),boardBox:window.ClassPointerPdf?.active()?window.ClassPointerPdf.activityBoardBox?.()||null:null};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function memberTools(member){return member?.tools||state.tools}
@@ -219,11 +261,7 @@ function receiveStudent(connection){
       if(typeof message.type==='string'&&message.type.startsWith('board-')){window.ClassPointerBoards?.fromStudent(member,message);return}
       // The same authenticated, permission-checked drawing pipeline serves embedded students.
       if(!['point','pointer-hide','highlight','edit-highlights'].includes(message.type))return;
-      if(window.ClassPointerPdf?.active()&&window.ClassPointerPdf.activityPoint){
-        const toDocument=p=>window.ClassPointerPdf.activityPoint(p);
-        if(message.type==='point'&&C.validPoint(message.point))message={...message,point:toDocument(message.point)};
-        if(message.type==='highlight'&&C.cleanStroke(message.stroke))message={...message,stroke:{...message.stroke,points:message.stroke.points.map(toDocument)}};
-      }
+      message=studentMessageToDocument(message);
     }
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
@@ -249,7 +287,14 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
-    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
+    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
+      if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
+      // Select on an activity page: only with pen permission, and only the sender's own marks.
+      else if(member.presence&&selected(member)&&memberTools(member)?.pen===true){
+        if(message.action==='replace'&&replaceStudentMarks(member,message.changes))publishHighlights();
+        else if(message.action==='erase'&&eraseStudentMarks(member,message.ids))publishHighlights();
+      }
+      return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;queuePoint(member.id)}
     if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){
@@ -614,7 +659,7 @@ function sendHover(){
   if(isTeacher){state.points.teacher=point;queuePoint('teacher')}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
-  if(isTeacher&&$('teacherTool').value==='eraser'){hideOwnPointer();return}
+  if(isTeacher&&['eraser','select'].includes($('teacherTool').value)){hideOwnPointer();return}
   if(navigating||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:pointerPictureBox(rect,video);if(!box)return;
@@ -723,6 +768,16 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   navigating:()=>navigating,
   refreshActivityMarks(){for(const entry of presence.values())if(entry.admitted)send(entry.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})},
   highlights:()=>highlightStore.strokes,
+  // Teacher only: erase one of the teacher's own marks, or change it in place (Select: move, resize, recolor).
+  // The whole mark list is sent again, exactly as after a new mark, so student pages need nothing new.
+  eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
+  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
+  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.swap(owner,ids,strokes);if(made)publishHighlights();return made},
+  replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace(markOwner(id),id,stroke))return false;publishHighlights();return true},
+  // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
+  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed;if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()}};
