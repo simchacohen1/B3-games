@@ -56,6 +56,25 @@ function studentMessageToDocument(message){
   }
   return message;
 }
+// A student picks, moves, resizes, recolors and deletes their OWN marks (activity-share.js Select). The store files every
+// mark under the connection that made it and only ever changes marks of the sender, so no message can reach another
+// student's marks or the teacher's. Each change is converted like a new mark. Returns true when something changed.
+function replaceStudentMarks(member,changes){
+  if(!Array.isArray(changes))return false;
+  let changed=false;
+  for(const change of changes.slice(0,60)){
+    if(!change||typeof change.id!=='string'||!change.stroke||!C.cleanStroke(change.stroke))continue;
+    const converted=studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke;
+    if(highlightStore.replace(member.id,change.id,converted))changed=true;
+  }
+  return changed;
+}
+function eraseStudentMarks(member,ids){
+  if(!Array.isArray(ids))return false;
+  let changed=false;
+  for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id)){highlightStore.edit(member.id,'erase',id);changed=true}
+  return changed;
+}
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
 // student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
 function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
@@ -265,7 +284,14 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
-    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
+    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
+      if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
+      // Select on an activity page: only with pen permission, and only the sender's own marks.
+      else if(member.presence&&selected(member)&&memberTools(member)?.pen===true){
+        if(message.action==='replace'&&replaceStudentMarks(member,message.changes))publishHighlights();
+        else if(message.action==='erase'&&eraseStudentMarks(member,message.ids))publishHighlights();
+      }
+      return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;queuePoint(member.id)}
     if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){

@@ -145,8 +145,9 @@
     // The embedded activity presence view must have its own tools: the retired Pointer page is never opened.
     const drawTools=document.createElement('div');drawTools.id='fttLessonDrawTools';
     drawTools.style.cssText='display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;max-width:100%';
-    const lessonModes=[['point','☝','Pointer'],['highlight','🖍','Highlight'],['box','▧','Highlight box'],['pen','✎','Pen'],['line','━','Line'],['pen-arrow','➜','Arrow'],['rectangle','▭','Rectangle'],['ellipse','◯','Oval'],['triangle','△','Triangle'],['text','T','Text']];
+    const lessonModes=[['select','🖱️','Select'],['point','☝','Pointer'],['highlight','🖍','Highlight'],['box','▧','Highlight box'],['pen','✎','Pen'],['line','━','Line'],['pen-arrow','➜','Arrow'],['rectangle','▭','Rectangle'],['ellipse','◯','Oval'],['triangle','△','Triangle'],['text','T','Text']];
     const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonColor='#57b8ff',lessonSize=.016,lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
+    let selIds=[],selDrag=null,selPreview=new Map(),selSendAt=0;
     const lessonStage=document.createElement('div');
     lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
     const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
@@ -168,6 +169,7 @@
       undo.hidden=lessonLevel==='none';clear.hidden=lessonLevel==='none';for(const button of [...colorButtons,...sizeButtons])button.disabled=lessonLevel==='none';colorSelect.style.display=sizeSelect.style.display=lessonLevel==='none'?'none':'flex';
       hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
       if(lessonTool!=='text')finishTextEditor(true);
+      if(lessonTool!=='select'){selIds=[];selDrag=null;selPreview=new Map()}
       textOptions.style.display=lessonLevel!=='none'&&lessonTool==='text'&&allowedMode('text')?'flex':'none';
     }
     for(const [mode,symbol,name] of lessonModes){
@@ -184,7 +186,7 @@
     const colorSelect=document.createElement('div');colorSelect.setAttribute('role','group');colorSelect.setAttribute('aria-label','Choose drawing color');
     colorSelect.style.cssText='display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:center';
     const colorButtons=[];
-    const selectColor=color=>{lessonColor=color;for(const b of colorButtons){const on=b.dataset.color===color;b.setAttribute('aria-pressed',String(on));b.style.border=on?'4px solid #fff':'3px solid #55739c';b.style.outline=on?'3px solid #facc15':'none';b.style.transform=on?'scale(1.09)':'none'}};
+    const selectColor=color=>{lessonColor=color;if(lessonTool==='select')recolorSelection(color);for(const b of colorButtons){const on=b.dataset.color===color;b.setAttribute('aria-pressed',String(on));b.style.border=on?'4px solid #fff':'3px solid #55739c';b.style.outline=on?'3px solid #facc15':'none';b.style.transform=on?'scale(1.09)':'none'}};
     for(const [color,name] of colors){const b=document.createElement('button');b.type='button';b.dataset.color=color;b.title=name;b.setAttribute('aria-label',name);b.style.cssText='width:39px;height:39px;border-radius:50%;background:'+color+';cursor:pointer;touch-action:manipulation;flex:none';b.addEventListener('click',()=>selectColor(color));colorButtons.push(b);colorSelect.append(b)}
     const sizeSelect=document.createElement('div');sizeSelect.setAttribute('role','group');sizeSelect.setAttribute('aria-label','Choose line thickness');sizeSelect.style.cssText='display:flex;gap:6px;align-items:center';
     const sizeButtons=[];
@@ -319,12 +321,137 @@
       studentMeasure.font=(bold?'bold ':'')+'100px sans-serif';
       return studentMeasure.measureText(line).width;
     }
+
+    // ---------- Select (a student's own marks only) ----------
+    // Pure helpers: marks are {id,tool,size,points:[{x,y}]} with points as fractions of the picture; w and h are its size in pixels.
+    function selectionBox(list){
+      const xs=[],ys=[];
+      for(const mark of list)for(const point of mark.points){xs.push(point.x);ys.push(point.y)}
+      return xs.length?{x1:Math.min(...xs),y1:Math.min(...ys),x2:Math.max(...xs),y2:Math.max(...ys)}:null;
+    }
+    function segmentDistance(px,py,ax,ay,bx,by){
+      const dx=bx-ax,dy=by-ay,len=dx*dx+dy*dy,t=len?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/len)):0;
+      return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+    }
+    // The top mark under pixel (px,py): lines by their distance, everything else by the box around it.
+    function markHit(list,px,py,w,h){
+      for(let i=list.length-1;i>=0;i--){
+        const mark=list[i],pts=mark.points.map(point=>[point.x*w,point.y*h]);
+        if(['pen','highlight','underline','pencil','crayon','line','pen-arrow'].includes(mark.tool)){
+          for(let k=0;k<pts.length;k++){const a=pts[k],c=pts[k+1]||a;if(segmentDistance(px,py,a[0],a[1],c[0],c[1])<=10)return mark}
+        }else{
+          const xs=pts.map(point=>point[0]),ys=pts.map(point=>point[1]);
+          if(px>=Math.min(...xs)-6&&px<=Math.max(...xs)+6&&py>=Math.min(...ys)-6&&py<=Math.max(...ys)+6)return mark;
+        }
+      }
+      return null;
+    }
+    // orig: Map id -> {points,size}. Moved as one piece, held back so none of it leaves the picture.
+    function movedMarks(orig,box,dx,dy){
+      dx=Math.max(-box.x1,Math.min(1-box.x2,dx));dy=Math.max(-box.y1,Math.min(1-box.y2,dy));
+      return new Map([...orig].map(([id,o])=>[id,{points:o.points.map(q=>({x:q.x+dx,y:q.y+dy})),size:o.size}]));
+    }
+    // A corner dragged to p (fractions): everything scales about the opposite corner. Words scale evenly and change size.
+    function resizedMarks(orig,box,handle,p,words){
+      const ax=handle[1]==='w'?box.x2:box.x1,ay=handle[0]==='n'?box.y2:box.y1;
+      const w0=Math.max(1e-4,box.x2-box.x1),h0=Math.max(1e-4,box.y2-box.y1);
+      let kx=Math.abs(p.x-ax)/w0,ky=Math.abs(p.y-ay)/h0;
+      if(words)kx=ky=Math.max(kx,ky);
+      kx=Math.max(.05,kx);ky=Math.max(.05,ky);
+      const pin=v=>Math.max(0,Math.min(1,v));
+      return new Map([...orig].map(([id,o])=>[id,{size:words?Math.max(.003,Math.min(.08,o.size*kx)):o.size,
+        points:o.points.map(q=>({x:pin(ax+(q.x-ax)*kx),y:pin(ay+(q.y-ay)*ky)}))}]));
+    }
+
+    // The student's own marks are the ones the teacher's page filed under this page's connection (see classroom.js).
+    const myOwner=()=>presencePeer?.id?'presence:'+presencePeer.id:null;
+    const ownMarks=()=>{const me=myOwner();return me?(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]).filter(m=>m&&m.owner===me&&typeof m.id==='string'&&Array.isArray(m.points)&&m.points.length):[]};
+    const previewed=mark=>{const next=selPreview.get(mark.id);return next?{...mark,...next}:mark};
+    const NUDGE={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+    // Picked marks: words move and change together, every line of the block.
+    const selectedMarks=()=>{const wanted=new Set(selIds);return ownMarks().filter(m=>wanted.has(m.id))};
+    const groupOf=mark=>mark.tool==='text'&&mark.block?ownMarks().filter(m=>m.tool==='text'&&m.block===mark.block):[mark];
+    const markFields=(mark,change)=>({tool:mark.tool,color:change.color||mark.color,size:change.size==null?mark.size:change.size,points:change.points||mark.points,
+      ...(mark.tool==='text'?{text:mark.text,...(mark.block?{block:mark.block}:{}),...(mark.soft===true?{soft:true}:{}),...(mark.bold===true?{bold:true}:{})}:{})});
+    // One message, only ever about this student's marks: the teacher's page checks the owner again.
+    function sendChanges(map,color){
+      if(!admitted||!lessonActive||!presenceConn?.open||!allowedMode('select'))return;
+      const changes=selectedMarks().slice(0,60).map(mark=>({id:mark.id,stroke:markFields(mark,{...(map&&map.get(mark.id)||{}),...(color?{color}:{})})}));
+      if(changes.length)presenceConn.send({type:'edit-highlights',action:'replace',changes});
+    }
+    function pointerFraction(event){
+      const rect=hitLayer.getBoundingClientRect();
+      return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width))),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/Math.max(1,rect.height)))};
+    }
+    function startSelect(event,point){
+      const b=picture(),px=point.x*b.width,py=point.y*b.height,group=selectedMarks().map(previewed),box=group.length?selectionBox(group):null;
+      let handle=null;
+      if(box)for(const [id,hx,hy] of [['nw',box.x1,box.y1],['ne',box.x2,box.y1],['sw',box.x1,box.y2],['se',box.x2,box.y2]])if(Math.hypot(hx*b.width-px,hy*b.height-py)<=14)handle=id;
+      if(!handle){
+        const hit=markHit(ownMarks().map(previewed),px,py,b.width,b.height);
+        if(hit)selIds=groupOf(hit).map(m=>m.id);
+        else if(!(box&&px>=box.x1*b.width-6&&px<=box.x2*b.width+6&&py>=box.y1*b.height-6&&py<=box.y2*b.height+6)){selIds=[];selPreview=new Map();renderLessonMarks();return}
+      }
+      const picked=selectedMarks();
+      selDrag={kind:handle?'resize':'move',handle,start:point,box:selectionBox(picked),words:picked.some(m=>m.tool==='text'),pid:event.pointerId,moved:false,
+        orig:new Map(picked.map(m=>[m.id,{points:m.points.map(q=>({x:q.x,y:q.y})),size:m.size}]))};
+      try{hitLayer.setPointerCapture(event.pointerId)}catch{}
+      renderLessonMarks();
+    }
+    function moveSelect(event){
+      const drag=selDrag;if(!drag||event.pointerId!==drag.pid)return;
+      const p=pointerFraction(event),b=picture();
+      if(!drag.moved&&Math.hypot((p.x-drag.start.x)*b.width,(p.y-drag.start.y)*b.height)<3)return;
+      drag.moved=true;
+      selPreview=drag.kind==='move'?movedMarks(drag.orig,drag.box,p.x-drag.start.x,p.y-drag.start.y):resizedMarks(drag.orig,drag.box,drag.handle,p,drag.words);
+      // The teacher sees it while it is dragged (a few times a second), and once more when it is let go.
+      const now=Date.now();if(now-selSendAt>=90){selSendAt=now;sendChanges(selPreview)}
+      renderLessonMarks();
+    }
+    function endSelect(commit){
+      const drag=selDrag;selDrag=null;
+      if(drag&&commit&&drag.moved)sendChanges(selPreview);else if(drag&&!commit){selPreview=new Map();renderLessonMarks()}
+    }
+    function eraseSelection(){
+      const ids=selectedMarks().map(m=>m.id);selIds=[];selPreview=new Map();
+      if(ids.length&&presenceConn?.open&&allowedMode('select'))presenceConn.send({type:'edit-highlights',action:'erase',ids:ids.slice(0,60)});
+      renderLessonMarks();
+    }
+    function nudgeSelection(direction,px){
+      const picked=selectedMarks();if(!picked.length)return;
+      const b=picture(),box=selectionBox(picked);if(!b.width||!b.height||!box)return;
+      const orig=new Map(picked.map(m=>[m.id,{points:m.points,size:m.size}]));
+      selPreview=movedMarks(orig,box,direction[0]*px/b.width,direction[1]*px/b.height);
+      sendChanges(selPreview);renderLessonMarks();
+    }
+    function recolorSelection(color){if(selectedMarks().length)sendChanges(null,color)}
+    // The dashed frame and corner handles of the picked marks, in the layer that is not stretched.
+    function drawSelection(){
+      const picked=selectedMarks().map(previewed),box=picked.length?selectionBox(picked):null;if(!box)return;
+      const frame=document.createElement('div');
+      frame.style.cssText='position:absolute;box-sizing:border-box;border:2px dashed #2563eb;pointer-events:none;left:calc('+(box.x1*100)+'% - 4px);top:calc('+(box.y1*100)+'% - 4px);width:calc('+((box.x2-box.x1)*100)+'% + 8px);height:calc('+((box.y2-box.y1)*100)+'% + 8px)';
+      pointerLayer.appendChild(frame);
+      for(const [x,y] of [[box.x1,box.y1],[box.x2,box.y1],[box.x1,box.y2],[box.x2,box.y2]]){
+        const knob=document.createElement('div');
+        knob.style.cssText='position:absolute;width:12px;height:12px;box-sizing:border-box;background:#fff;border:2px solid #2563eb;pointer-events:none;transform:translate(-50%,-50%);left:'+(x*100)+'%;top:'+(y*100)+'%';
+        pointerLayer.appendChild(knob);
+      }
+    }
+    if(typeof document.addEventListener==='function')document.addEventListener('keydown',event=>{
+      if(lessonTool!=='select'||!selIds.length||!admitted||!lessonActive)return;
+      if(event.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();eraseSelection();return}
+      if(event.key==='Escape'){selIds=[];selPreview=new Map();renderLessonMarks();return}
+      const direction=NUDGE[event.key];
+      if(!direction||event.ctrlKey||event.metaKey||event.altKey)return;
+      event.preventDefault();event.stopPropagation();nudgeSelection(direction,event.shiftKey?10:1);
+    },true);
     function renderLessonMarks(){
       if(typeof markLayer.replaceChildren!=='function'||typeof pointerLayer.replaceChildren!=='function')return;
       const b=picture(),textRatio=b.width/Math.max(1,b.height);
       for(const layer of [markLayer,pointerLayer,hitLayer])Object.assign(layer.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
       markLayer.replaceChildren();pointerLayer.replaceChildren();
-      for(const stroke of [...(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]),...(lessonDraft?[lessonDraft]:[])]){
+      for(const stroke of [...(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]).map(previewed),...(lessonDraft?[lessonDraft]:[])]){
         if(!stroke||!Array.isArray(stroke.points)||!stroke.points.length||stroke.points.length>256)continue;
         // The whiteboard picture already has every word painted in. Drawing them again made each word show twice.
         if(stroke.tool==='text'&&lessonMarks.marksInVideo===true)continue;
@@ -363,6 +490,7 @@
         tag.append(dot);if(name.textContent)tag.append(name);
         tag.style.left=(point.x*100)+'%';tag.style.top=(point.y*100)+'%';pointerLayer.appendChild(tag);
       }
+      drawSelection();
     }
     const normalized=e=>{const rect=hitLayer.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width,y=(e.clientY-rect.top)/rect.height;return Number.isFinite(x)&&Number.isFinite(y)&&x>=0&&x<=1&&y>=0&&y<=1?{x,y}:null};
     let lastPointSend=0;
@@ -371,11 +499,13 @@
       const p=normalized(e);if(!p)return;e.preventDefault();
       if(lessonTool==='point'){presenceConn?.send({type:'point',point:{...p,tool:'target'}});return}
       if(lessonTool==='text'){startTextEditor(p);return}
+      if(lessonTool==='select'){startSelect(e,p);return}
       lessonDraft={tool:lessonTool,color:lessonColor,size:lessonSize,points:[p,p]};
       try{hitLayer.setPointerCapture(e.pointerId)}catch{}renderLessonMarks();
     });
     hitLayer.addEventListener('pointermove',e=>{
       if(!admitted||!lessonActive||!allowedMode(lessonTool))return;
+      if(lessonTool==='select'){moveSelect(e);return}
       const p=normalized(e);if(!p)return;
       if(lessonTool==='point'){if(Date.now()-lastPointSend>=75){lastPointSend=Date.now();presenceConn?.send({type:'point',point:{...p,tool:'target'}})}return}
       if(!lessonDraft)return;
@@ -383,12 +513,13 @@
       if(!['pen','highlight'].includes(lessonDraft.tool)){lessonDraft.points=[pts[0],p];renderLessonMarks()}else if(pts.length<256&&Math.hypot(p.x-last.x,p.y-last.y)>.003){pts.push(p);renderLessonMarks()}
     });
     function finishDrawing(e){
+      if(lessonTool==='select'){endSelect(true);return}
       if(!lessonDraft)return;
       const stroke=lessonDraft;lessonDraft=null;renderLessonMarks();
       if(admitted&&lessonActive&&allowedMode(stroke.tool)&&presenceConn?.open&&stroke.points.length>=2)presenceConn.send({type:'highlight',stroke});
     }
     hitLayer.addEventListener('pointerup',finishDrawing);
-    hitLayer.addEventListener('pointercancel',()=>{lessonDraft=null;renderLessonMarks()});
+    hitLayer.addEventListener('pointercancel',()=>{if(lessonTool==='select'){endSelect(false);return}lessonDraft=null;renderLessonMarks()});
     hitLayer.addEventListener('pointerleave',()=>{if(lessonTool==='point'&&presenceConn?.open)presenceConn.send({type:'pointer-hide'})});
     lessonVideo.addEventListener('loadedmetadata',renderLessonMarks);
     if(typeof ResizeObserver==='function')new ResizeObserver(renderLessonMarks).observe(lessonStage);
@@ -501,7 +632,7 @@
             return;
           }
           if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
-          if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[],marksInVideo:message.marksInVideo===true,boardBox:Number.isFinite(message.boardBox?.w)&&Number.isFinite(message.boardBox?.h)?{w:message.boardBox.w,h:message.boardBox.h}:null};renderLessonMarks()}return}
+          if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){if(!selDrag)selPreview=new Map();lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[],marksInVideo:message.marksInVideo===true,boardBox:Number.isFinite(message.boardBox?.w)&&Number.isFinite(message.boardBox?.h)?{w:message.boardBox.w,h:message.boardBox.h}:null};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
