@@ -1259,7 +1259,6 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
 
   <header class="top">
     <h1 id="toolTitle">📜 Posuk Practice Scroll</h1>
-    <p id="toolSubtitle">Read the posuk and translate it in one recording. Your teacher will grade it!</p>
   </header>
 
   <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
@@ -1337,13 +1336,6 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
         <div class="task-title-row">
           <h3>🎙️ Read &amp; Translate</h3>
         </div>
-        <div class="instruction-card">
-          <div class="instruction-copy">
-            <strong>Read a few Hebrew words, then say what they mean in English. Keep going like that, a few words at a time, to the end.</strong>
-            <span>Tap the microphone once to start. It keeps recording the whole time. Tap ⏹️ when you finish, then send it to your teacher.</span>
-          </div>
-          <button class="listen-btn" id="combinedInstructionBtn" type="button">🔊 Listen</button>
-        </div>
         <div id="combinedStateBox" class="combined-state hidden"></div>
         <div class="record-stage" id="combinedRecordStage">
           <div class="record-row">
@@ -1352,7 +1344,6 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
             <audio id="combinedAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="combinedDeleteBtn" title="Delete this recording">🗑️ Record again</button>
           </div>
-          <div class="record-caption">🎙️ Tap to start • a few Hebrew words • their English • the next few words • tap ⏹️ at the end</div>
           <span class="status-tag" id="combinedStatus">Not recorded yet</span>
         </div>
         <div style="text-align:center;margin-top:10px;">
@@ -2423,7 +2414,6 @@ function studentDirection(task){
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
 }
 
-document.getElementById('combinedInstructionBtn').onclick = () => speakText(studentDirection('combined'));
 document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
 document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
 document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));

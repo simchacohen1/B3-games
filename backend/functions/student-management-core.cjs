@@ -17,7 +17,9 @@ const BULK_ACTIONS={
  classSplitPreview:classSplit.classSplitPreview,classSplitCreate:classSplit.classSplitCreate,classSplitEnroll:classSplit.classSplitEnroll,
  classSplitRetire:classSplit.classSplitRetire,classSplitRestore:classSplit.classSplitRestore,
  // Read-only report of possible duplicate students and class names. Never writes.
- duplicateReport:duplicates.duplicateReport
+ duplicateReport:duplicates.duplicateReport,
+ // Issue #724: Owner Admin "Export Everything" (includes passcodes).
+ exportEverything:require('./student-export-core.cjs').exportEverything
 };
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 const nameKey=duplicates.nameKey;

@@ -16,6 +16,7 @@
 <script src="student-scope.js?v=20261108"></script>
 <script src="bulk-roster.js?v=20261109-706"></script>
 <script src="class-split.js?v=20261109-728"></script>
+<script src="owner-export.js?v=20261109-724"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
@@ -202,6 +203,12 @@ small.warn{display:block;color:#b45309;margin-top:4px}
  <p class="hint" style="margin-top:14px">To take back a whole import, use <b>Undo Import</b> in this school&rsquo;s menu.</p>
 </div>
 <div id="bmAuditArea" style="margin-top:10px"></div>
+</section>
+
+<!-- Whole site, not one school, so it sits on the Schools page. -->
+<section class="card" id="exportEverythingCard" data-view="schools"><div class="card-head"><h2>&#x1F4E5; Export Everything</h2></div>
+<p class="hint">Downloads two files with the same information: an Excel spreadsheet (.xlsx) and a CSV. One row for each student, with their name, passcode, school, classes, those classes&rsquo; teachers and the school&rsquo;s principal. Schools, classes, teachers and principals with no students are listed at the bottom, so nothing is missing. <b>The files contain every student&rsquo;s passcode, so keep them private.</b></p>
+<div class="formrow"><button id="exportEverything" type="button">Export Everything</button><span id="exportEverythingMsg" style="font-weight:700"></span></div>
 </section>
 </div><!-- end ownerArea -->
 <div id="status" class="toast"></div>
@@ -853,6 +860,21 @@ q("bmAudit").onclick=async()=>{
 
 // ---- Split ET and WT (Issue #728): drawn by class-split.js, decided by the server ----
 FTTClassSplit.mount({area:q("classSplitArea"),openButton:q("classSplitOpen"),call:body=>manageCall(body,120000),reload:()=>load(),notify:text=>{q("status").textContent=text},schoolName:id=>schoolData[id]?schoolData[id].name:id});
+// ---- Export Everything (Issue #724) ---------------------------------------
+// The table (passcodes included) is built by funTorahManageStudents, which
+// checks on the server that the caller is the owner. The browser only turns
+// the same rows into the two files.
+q("exportEverything").onclick=async()=>{
+  const btn=q("exportEverything"),msg=q("exportEverythingMsg");
+  btn.disabled=true;msg.textContent="Preparing the files...";
+  try{
+    const r=await manageCall({action:"exportEverything"}),table=[r.header,...r.rows],name="fun-torah-tools-export-"+new Date(r.exportedAt).toISOString().slice(0,10);
+    downloadFile(name+".xlsx",FTTOwnerExport.toXlsx(table,"Everything"),FTTOwnerExport.XLSX_TYPE);
+    downloadFile(name+".csv",FTTOwnerExport.toCsv(table),"text/csv;charset=utf-8");
+    msg.textContent="Downloaded "+r.counts.students+" student(s) and "+r.counts.withoutStudents+" row(s) with no students. If only one file arrived, allow this page to download multiple files.";
+  }catch(err){msg.textContent="";q("status").textContent=err.message;}
+  finally{btn.disabled=false;}
+};
 
 // ---- Classes: which school each class belongs to ------------------------
 function classSchoolPicker(classId,cls){const cur=cls&&cls.schoolId||"",known=!!schoolData[cur];return '<select class="schoolpick'+(known?'':' noschool')+'" data-class-school="'+safe(classId)+'" aria-label="School for '+safe(cls&&cls.name||classId)+'">'+(known?'':'<option value="" selected>No school</option>')+schoolOptions(cur)+'</select>'}

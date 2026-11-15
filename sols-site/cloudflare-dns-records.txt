@@ -1,0 +1,14 @@
+;; DNS records for sols.tools (GitHub Pages).
+;; Cloudflare: Websites > sols.tools > DNS > Records > "Import and Export" >
+;; choose this file, UNTICK "Proxy imported DNS records", Import.
+;; Leave them as "DNS only" (grey cloud) until GitHub shows the HTTPS
+;; certificate as issued; the orange cloud can be switched on afterwards.
+sols.tools.	300	IN	A	185.199.108.153
+sols.tools.	300	IN	A	185.199.109.153
+sols.tools.	300	IN	A	185.199.110.153
+sols.tools.	300	IN	A	185.199.111.153
+sols.tools.	300	IN	AAAA	2606:50c0:8000::153
+sols.tools.	300	IN	AAAA	2606:50c0:8001::153
+sols.tools.	300	IN	AAAA	2606:50c0:8002::153
+sols.tools.	300	IN	AAAA	2606:50c0:8003::153
+www.sols.tools.	300	IN	CNAME	simchacohen1.github.io.

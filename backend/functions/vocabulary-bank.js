@@ -3,7 +3,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const core = require('./vocabulary-bank-core.cjs');
 if (!admin.apps.length) admin.initializeApp();
-const cors = ['https://simchacohen1.github.io', 'https://funtorahtools.com', 'https://www.funtorahtools.com'];
+const cors = ['https://simchacohen1.github.io', 'https://funtorahtools.com','https://sols.tools','https://www.sols.tools', 'https://www.funtorahtools.com'];
 const ROOT = 'b3Games/workspaces/b3-2026/classes';
 const STUDENT_BANK = 'studentVocabulary';
 const err = (status, message) => Object.assign(new Error(message), { status });

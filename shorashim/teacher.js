@@ -366,8 +366,6 @@ function smartArtCandidatesFor(english='',front=''){
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
   PEREK19_ART_RULES.forEach(([re,choices])=>{if(re.test(String(english||'').trim()))choices.forEach(add)});
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
-  // Keep the full pool here so Regenerate Pictures can deliberately choose
-  // alternatives that are different from the pictures already on the word.
   return sanitizeClassArtPool(found);
 }
 
@@ -740,10 +738,7 @@ function renderCatalog(){
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
-      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
-         <div class="mini-actions">
-           <button data-a="regen" class="ghost">↻ Regenerate Pictures</button>
-         </div>`
+      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>`
       : '';
 
     return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
@@ -781,42 +776,10 @@ function renderCatalog(){
     if(mergeDuplicate)mergeDuplicate.onclick=()=>mergeDuplicateWord(id);
     const dismissDuplicate=row.querySelector('[data-a=dismiss-duplicate]');
     if(dismissDuplicate)dismissDuplicate.onclick=()=>dismissDuplicateSuggestion(id);
-    const regen=row.querySelector('[data-a=regen]');
-    if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
       btn.onclick=()=>togglePictureChoice(id,btn.dataset.art);
     });
   });
-}
-
-async function regeneratePictures(id){
-  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
-  if(!item)return;
-  const selected=sanitizeClassArt(item.art||[]);
-  const oldPool=suggestionPoolOf(item);
-  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
-  status('☁️ Looking for more matching pictures…','syncing');
-
-  const ai=await generateAiArtForItems([item]);
-  const candidates=sanitizeClassArtPool([
-    ...(ai.get(String(item.id))||[]),
-    ...smartArtCandidatesFor(item.english,item.front)
-  ]);
-  const fresh=candidates.filter(x=>!oldPool.includes(x));
-
-  if(!fresh.length){
-    status('☁️ No different matching pictures found');
-    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current suggestions were kept.`);
-    return;
-  }
-  // Teacher's selections first, then new suggestions, then older ones (max 20).
-  // Regenerating never changes what students see.
-  item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);
-  item.aiArtGenerated=ai.has(String(item.id));
-  item.aiArtGeneratedAt=Date.now();
-  renderCatalog();
-  await saveCatalog();
-  status(`☁️ Saved • ${fresh.length} new suggestion${fresh.length===1?'':'s'}`);
 }
 
 function englishDuplicateKey(value){
