@@ -253,7 +253,7 @@
   const current = document.currentScript;
   if (!current || !current.src) return;
   const script = document.createElement('script');
-  script.src = new URL('teacher-global-controls.js?v=20261109-annotate1', current.src).href;
+  script.src = new URL('teacher-global-controls.js?v=20261110-buttons1', current.src).href;
   script.async = true;
   (document.head || document.documentElement).appendChild(script);
 })();

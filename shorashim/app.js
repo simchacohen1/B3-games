@@ -284,6 +284,15 @@ function startMatchLeaderboard(pairCount){
   };
   ref.on('value',matchLeaderboardHandler,err=>console.warn('Could not load Match leaderboard',err));
 }
+// Firebase cost (#51): sign-in reads the catalog and settings once, and startCloudListeners()
+// then listens to the same two paths. Holding them open first makes that one download
+// instead of two; the hold is dropped as soon as the real listeners are attached.
+const noCloudSync=()=>{};
+function holdCloudPaths(paths){
+  const refs=paths.map(path=>cloudDb.ref(path));
+  refs.forEach(ref=>ref.on('value',noCloudSync,noCloudSync));
+  return()=>refs.forEach(ref=>ref.off('value',noCloudSync));
+}
 function startCloudListeners(){
   if(cloudListenersStarted)return;cloudListenersStarted=true;
   cloudDb.ref(`${CLOUD_ROOT}/catalog`).on('value',snap=>{const v=snap.val();if(!v)return;db.catalog=normalizeCatalogUnits(v);saveRaw(db);if(appStarted)renderAll();});
@@ -295,18 +304,19 @@ async function enterCloudStudent(name,studentId){
   await resolveStudentSpace(studentId);
   // A class with its own lists must never fall back to B3's built-in words or this browser's cached copy.
   const cachedCatalog=classSpaceId?emptyCatalog():clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(classSpaceId?{}:(db.settings||{}))},cachedStudent=!classSpaceId&&db.students?.[name]?clone(db.students[name]):null;
+  const releaseCloudHold=cloudListenersStarted?noCloudSync:holdCloudPaths([`${CLOUD_ROOT}/catalog`,`${CLOUD_ROOT}/settings`]);
   const [catalogSnap,settingsSnap,studentSnap]=await Promise.all([
     cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`).once('value')
-  ]);
-  const catalog=normalizeCatalogUnits(catalogSnap.val()||cachedCatalog);const settings={minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||cachedSettings)};if(settings.studentSiteOpen===false){applyStudentSiteOpen(false);throw new Error('STUDENT_SITE_CLOSED');}const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
+  ]).catch(err=>{releaseCloudHold();throw err;});
+  const catalog=normalizeCatalogUnits(catalogSnap.val()||cachedCatalog);const settings={minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||cachedSettings)};if(settings.studentSiteOpen===false){releaseCloudHold();applyStudentSiteOpen(false);throw new Error('STUDENT_SITE_CLOSED');}const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
   db={students:{[name]:s},currentStudent:name,catalog,settings};currentStudent=name;cloudStudentId=studentId;cloudStudentName=name;cloudEnabled=true;saveRaw(db);
   if(!catalogSnap.exists()&&!classSpaceId)cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(catalog).catch(console.warn);
   if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
   document.getElementById('loginGate').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('signedInStudentName').textContent=name;
   if(!appStarted){init();appStarted=true;}else{populateStudents();renderAll();goScreen('studentHome');}
-  showMode('student');startCloudListeners();renderGamesLock();
+  showMode('student');startCloudListeners();releaseCloudHold();renderGamesLock();
   // Do not rewrite a student's entire cards/history just to mark a sign-in.
   try{
     const studentRef=cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`);
