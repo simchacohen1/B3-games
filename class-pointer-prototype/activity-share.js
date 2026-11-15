@@ -150,7 +150,7 @@
     const lessonStage=document.createElement('div');
     lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
     const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
-    markLayer.style.cssText='position:absolute;pointer-events:none;overflow:visible';
+    markLayer.style.cssText='position:absolute;pointer-events:none;overflow:hidden';
     markLayer.setAttribute('viewBox','0 0 1000 1000');
     markLayer.setAttribute('preserveAspectRatio','none');
     const pointerLayer=document.createElement('div');
@@ -212,7 +212,9 @@
         if(!stroke||!Array.isArray(stroke.points)||!stroke.points.length||stroke.points.length>256)continue;
         // The whiteboard picture already has every word painted in. Drawing them again made each word show twice.
         if(stroke.tool==='text'&&lessonMarks.marksInVideo===true)continue;
-        const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
+        // A mark partly outside the teacher's view keeps its off-view points (the layer clips them); dropping them
+        // bent the shape or hid the whole mark.
+        const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&Math.abs(p.x)<=8&&Math.abs(p.y)<=8);
         if(!points.length)continue;
         const color=/^#[0-9a-fA-F]{6}$/.test(stroke.color)?stroke.color:'#57b8ff';
         const alpha=['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
@@ -380,6 +382,11 @@
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
+            return;
+          }
+          // The teacher's page refused a mark (too many marks, or not allowed): say so instead of letting it vanish quietly.
+          if(message.type==='highlight-error'){
+            if(admitted){const before=lessonStatus.textContent;lessonStatus.textContent='That mark could not be added. Try a shorter one, or ask your teacher.';setTimeout(()=>{if(lessonStatus.textContent.startsWith('That mark could not'))lessonStatus.textContent=before},4000)}
             return;
           }
           if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}

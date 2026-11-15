@@ -39,6 +39,19 @@ const pointerIcons={
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
+// A student on an activity page draws on a picture of the part of the teacher's screen that shows, but the teacher
+// keeps marks as fractions of the whole board. A whiteboard can be smaller than that picture (an empty strip along the
+// right or bottom), so a mark drawn partly there lands outside the board; one such point used to make the teacher
+// refuse the whole mark, so bigger marks vanished. Points are held at the board's edge instead.
+function studentMessageToDocument(message){
+  const pdf=window.ClassPointerPdf;
+  if(!pdf?.active()||!pdf.activityPoint)return message;
+  const pin=value=>Math.max(0,Math.min(1,value));
+  const toDocument=point=>{const at=pdf.activityPoint(point);return at&&Number.isFinite(at.x)&&Number.isFinite(at.y)?{...at,x:pin(at.x),y:pin(at.y)}:at};
+  if(message.type==='point'&&C.validPoint(message.point))return{...message,point:toDocument(message.point)};
+  if(message.type==='highlight'&&C.cleanStroke(message.stroke))return{...message,stroke:{...message.stroke,points:message.stroke.points.map(toDocument)}};
+  return message;
+}
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
 // student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
 function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
@@ -222,11 +235,7 @@ function receiveStudent(connection){
       if(typeof message.type==='string'&&message.type.startsWith('board-')){window.ClassPointerBoards?.fromStudent(member,message);return}
       // The same authenticated, permission-checked drawing pipeline serves embedded students.
       if(!['point','pointer-hide','highlight','edit-highlights'].includes(message.type))return;
-      if(window.ClassPointerPdf?.active()&&window.ClassPointerPdf.activityPoint){
-        const toDocument=p=>window.ClassPointerPdf.activityPoint(p);
-        if(message.type==='point'&&C.validPoint(message.point))message={...message,point:toDocument(message.point)};
-        if(message.type==='highlight'&&C.cleanStroke(message.stroke))message={...message,stroke:{...message.stroke,points:message.stroke.points.map(toDocument)}};
-      }
+      message=studentMessageToDocument(message);
     }
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
