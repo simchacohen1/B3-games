@@ -41,6 +41,23 @@ if (!existsSync(join(target, 'firebase-config.js')) || !existsSync(join(target, 
   process.exit(2);
 }
 
+const PREFIX = 'SOLS Tools';
+
+// Tab and share title. Students also use the real school site, so every sols.tools
+// tab starts with "SOLS Tools": "SOLS Tools | Shluchim Online School" on the home
+// page and "SOLS Tools | <page name>" on inner pages. sols-site/brand.js applies
+// the same rule to titles that a page sets while it runs.
+export function solsTitle(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (/^SOLS Tools\b/i.test(text)) return text;
+  const rest = text
+    .replace(/Fun Torah Tools/gi, ' ')
+    .replace(/Shluchim Online School/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
+  return PREFIX + ' | ' + (rest || NAME);
+}
+
 const esc = text => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const unesc = text => String(text).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
@@ -55,7 +72,7 @@ function headBlock(title, description, urlPath) {
     '<link rel="icon" type="image/png" sizes="16x16" href="/sols-favicon-16x16.png" data-sols="1">',
     '<link rel="apple-touch-icon" href="/sols-apple-touch-icon.png" data-sols="1">',
     '<meta property="og:type" content="website">',
-    '<meta property="og:site_name" content="' + NAME + '">',
+    '<meta property="og:site_name" content="' + PREFIX + '">',
     '<meta property="og:title" content="' + esc(title) + '">',
     '<meta property="og:description" content="' + esc(description) + '">',
     '<meta property="og:url" content="' + esc(page) + '">',
@@ -77,13 +94,13 @@ const findAnchor = text => text.match(/<head\b[^>]*>/i) || text.match(/<html\b[^
 
 export function brandHtml(html, urlPath = '/') {
   let out = html.replace(/<title\b([^>]*)>([\s\S]*?)<\/title>/i, (all, attrs, text) =>
-    '<title' + attrs + '>' + text.replace(/Fun Torah Tools/g, NAME) + '</title>');
+    '<title' + attrs + '>' + esc(solsTitle(unesc(text))) + '</title>');
   if (out.includes('/sols-brand.js')) return out;
   // Some pages leave out <head> (browsers allow that), so fall back to <html>
   // and then <!doctype>. A file with none of these is a fragment, not a page.
   if (!findAnchor(out)) return null;
   const titleMatch = out.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? unesc(titleMatch[1]).replace(/\s+/g, ' ').trim() : NAME;
+  const title = titleMatch ? unesc(titleMatch[1]).replace(/\s+/g, ' ').trim() : solsTitle('');
   const descTag = out.match(/<meta\b[^>]*\bname=["']description["'][^>]*>/i);
   const descContent = descTag ? descTag[0].match(/\bcontent=["']([^"']*)["']/i) : null;
   const description = descContent ? unesc(descContent[1]).replace(/Fun Torah Tools/g, NAME) : DESCRIPTION;
