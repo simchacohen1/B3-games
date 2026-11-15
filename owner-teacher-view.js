@@ -130,8 +130,37 @@
     if (bar) bar.remove();
   }
 
+  // The way INTO Teacher view on the pages the owner lands on (home page and Admin),
+  // so the switch is not only inside Owner Admin (#726 follow-up). Owner mode only,
+  // the verified owner only, and one small read of the owner's own invitation.
+  // With no class assigned yet it leads to Owner Admin, where the setup is explained.
+  let switchPending = false;
+  async function mountSwitch(db, workspaceId, user, base) {
+    const doc = root.document;
+    if (!doc || !doc.body || root.self !== root.top || !isOwnerUser(user) || getMode() !== 'owner') return;
+    if (switchPending || doc.getElementById('b3OwnerTeacherSwitch')) return;
+    switchPending = true;
+    let teaches = false;
+    try { teaches = (await readTeaching(db, workspaceId, user)).classIds.length > 0; } finally { switchPending = false; }
+    if (doc.getElementById('b3OwnerTeacherSwitch') || getMode() !== 'owner') return;
+    const button = doc.createElement('button');
+    button.id = 'b3OwnerTeacherSwitch';
+    button.type = 'button';
+    button.textContent = teaches ? '👨‍🏫 Switch to Teacher view' : '👨‍🏫 Set up Teacher view';
+    button.title = teaches ? 'Show only the classes you teach. You stay signed in.'
+      : 'Add your own email as a teacher in Owner Admin and assign your classes.';
+    button.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483000;border:0;border-radius:999px;padding:12px 18px;' +
+      'background:#2563eb;color:#fff;font:700 15px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)';
+    button.onclick = function () { if (teaches) toTeacherView(base); else toOwnerAdmin(base); };
+    doc.body.append(button);
+  }
+  function unmountSwitch() {
+    const button = root.document && root.document.getElementById('b3OwnerTeacherSwitch');
+    if (button) button.remove();
+  }
+
   const api = { OWNER_EMAIL, MODE_KEY, inviteKey, isOwnerUser, getMode, setMode, teachingClassIds, teacherAccess,
-    readTeaching, resolve, narrow, narrowInbox, toOwnerAdmin, toTeacherView, mountBanner, unmountBanner };
+    readTeaching, resolve, narrow, narrowInbox, toOwnerAdmin, toTeacherView, mountBanner, unmountBanner, mountSwitch, unmountSwitch };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.B3OwnerTeacherView = api;
 })(typeof window === 'undefined' ? globalThis : window);
