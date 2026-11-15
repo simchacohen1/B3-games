@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes25"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes26"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes25/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes26/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes25/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes26/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -971,4 +971,224 @@ test('a student\'s typing box stays on the board, and the teacher tells the stud
  assert.match(read('class-pointer-prototype/pdf-mode.js'),/function activityBoardBox\(\)\{\s*const vw=scroller\.clientWidth,vh=scroller\.clientHeight;/);
  // The sizes the teacher sends back are the sizes the student chose.
  assert.match(read('class-pointer-prototype/pdf-mode.js'),/\.\.\.\(stroke\.tool==='text'\?\{size:stroke\.size\/activityTextScale\(\)\}:\{\}\),points:stroke\.points\.map\(p=>activityPoint\(p,false\)\)/);
+});
+
+// ---------- A student's Select: their own marks only ----------
+function studentSelectApi(){
+ const names=['function selectionBox(list)','function segmentDistance(px,py,ax,ay,bx,by)','function markHit(list,px,py,w,h)','function movedMarks(orig,box,dx,dy)','function resizedMarks(orig,box,handle,p,words)'];
+ const code=names.map(name=>grabFunction(shareSource,name)).join(';')+';({selectionBox,markHit,movedMarks,resizedMarks})';
+ return vm.runInNewContext(code,{Math,Map,Number});
+}
+const ink=(id,tool,points,extra={})=>({id,tool,color:'#c62828',size:.016,points,...extra});
+const mapOf=list=>new Map(list.map(mark=>[mark.id,{points:mark.points,size:mark.size}]));
+const flat=map=>plain([...map].map(([id,v])=>[id,v.size,v.points.map(p=>[Math.round(p.x*1e4)/1e4,Math.round(p.y*1e4)/1e4])]));
+
+test('student Select finds the top mark under the pointer: lines by distance, shapes and words by their box',()=>{
+ const {markHit}=studentSelectApi();
+ const pen=ink('p1','pen',[{x:.1,y:.1},{x:.5,y:.1}]),box=ink('r1','rectangle',[{x:.2,y:.3},{x:.6,y:.6}]),words=ink('t1','text',[{x:.1,y:.8},{x:.4,y:.85}],{text:'hi'});
+ const list=[pen,box,words],w=1000,h=500;
+ assert.equal(markHit(list,300,50,w,h).id,'p1','on the line');
+ assert.equal(markHit(list,300,58,w,h).id,'p1','within a few pixels of the line');
+ assert.equal(markHit(list,300,100,w,h),null,'too far from the line');
+ assert.equal(markHit(list,400,225,w,h).id,'r1','inside the shape');
+ assert.equal(markHit(list,200,410,w,h).id,'t1','on the words');
+ assert.equal(markHit(list,900,450,w,h),null,'nothing there');
+ // The top one wins where marks overlap.
+ const over=ink('r2','rectangle',[{x:.3,y:.4},{x:.7,y:.7}]);
+ assert.equal(markHit([box,over],450,250,w,h).id,'r2');
+});
+
+test('student Select moves a pick as one piece and never off the picture; resizing scales about the opposite corner',()=>{
+ const {movedMarks,resizedMarks,selectionBox}=studentSelectApi();
+ const rect=ink('r1','rectangle',[{x:.2,y:.2},{x:.6,y:.5}]),orig=mapOf([rect]),box=selectionBox([rect]);
+ assert.deepEqual(flat(movedMarks(orig,box,.1,.05)),[['r1',.016,[[.3,.25],[.7,.55]]]]);
+ assert.deepEqual(flat(movedMarks(orig,box,5,5)),[['r1',.016,[[.6,.7],[1,1]]]],'held at the edge');
+ assert.deepEqual(flat(movedMarks(orig,box,-5,-5)),[['r1',.016,[[0,0],[.4,.3]]]]);
+ // Dragging the bottom right corner to (.8,.8): the top left corner stays put.
+ assert.deepEqual(flat(resizedMarks(orig,box,'se',{x:.8,y:.8},false)),[['r1',.016,[[.2,.2],[.8,.8]]]]);
+ // Dragging the top left corner to (.1,.1): the bottom right corner stays put.
+ assert.deepEqual(flat(resizedMarks(orig,box,'nw',{x:.1,y:.1},false)),[['r1',.016,[[.1,.1],[.6,.5]]]]);
+ // Never smaller than a twentieth, never off the picture.
+ const tiny=resizedMarks(orig,box,'se',{x:.2,y:.2},false).get('r1').points;
+ assert.ok(tiny[1].x>tiny[0].x&&tiny[1].y>tiny[0].y);
+ assert.ok(resizedMarks(orig,box,'se',{x:1,y:1},false).get('r1').points.every(p=>p.x<=1&&p.y<=1));
+ // Words: the whole block scales evenly and the size changes with it; lines keep their thickness.
+ const lines=[ink('a','text',[{x:.1,y:.1},{x:.3,y:.14}],{size:.0078,text:'one',block:'b1'}),ink('b','text',[{x:.1,y:.15},{x:.35,y:.19}],{size:.0078,text:'two',block:'b1'})];
+ const wordBox=selectionBox(lines),grown=resizedMarks(mapOf(lines),wordBox,'se',{x:.35,y:.19+.09},true);
+ const k=grown.get('a').size/.0078;
+ assert.ok(k>1.2&&k<=9.9,'bigger');
+ assert.ok(Math.abs(grown.get('b').size-grown.get('a').size)<1e-12,'every line the same size');
+ assert.ok(Math.abs((grown.get('b').points[0].y-grown.get('a').points[0].y)-.05*k)<1e-3,'line spacing grows with the letters');
+ assert.equal(resizedMarks(orig,box,'se',{x:.9,y:.9},false).get('r1').size,.016);
+});
+
+test('the teacher keeps a student\'s changes to that student\'s marks only',()=>{
+ const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function eraseStudentMarks(member,ids)')+';({replaceStudentMarks,eraseStudentMarks})';
+ const store=new C.HighlightStore();
+ const api=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array});
+ const A={id:'presence:a'},B={id:'presence:b'};
+ const rect=(x1,y1,x2,y2)=>({tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:x1,y:y1},{x:x2,y:y2}]});
+ store.add('teacher',rect(.1,.1,.2,.2));store.add(A.id,rect(.3,.3,.5,.5));store.add(B.id,rect(.6,.6,.8,.8));store.add(A.id,{tool:'text',color:'#1f2937',size:.0078,text:'mine',block:'bk1',points:[{x:.1,y:.7},{x:.3,y:.75}]});
+ const [teacherMark,aMark,bMark,aText]=store.strokes.map(s=>({...s}));
+ const moved=rect(.35,.35,.55,.55);
+ // A moves A's own mark.
+ assert.equal(api.replaceStudentMarks(A,[{id:aMark.id,stroke:moved}]),true);
+ assert.deepEqual(plain(store.strokes[1].points),plain(moved.points));assert.equal(store.strokes[1].owner,A.id);
+ // A cannot touch the teacher's mark or B's: nothing changes.
+ for(const target of [teacherMark,bMark]){
+  assert.equal(api.replaceStudentMarks(A,[{id:target.id,stroke:moved}]),false);
+ }
+ assert.deepEqual(plain(store.strokes[0].points),plain(teacherMark.points));assert.deepEqual(plain(store.strokes[2].points),plain(bMark.points));
+ // A cannot turn a rectangle into something else, or change its owner.
+ api.replaceStudentMarks(A,[{id:aMark.id,stroke:{...moved,tool:'pen',owner:'teacher'}}]);
+ assert.equal(store.strokes[1].tool,'rectangle');assert.equal(store.strokes[1].owner,A.id);
+ // Recolor and resize words keep the words, the block and bold.
+ assert.equal(api.replaceStudentMarks(A,[{id:aText.id,stroke:{tool:'text',color:'#c62828',size:.012,text:'hacked',block:'bk1',points:[{x:.1,y:.7},{x:.4,y:.78}]}}]),true);
+ const words=store.strokes.find(s=>s.id===aText.id);
+ assert.equal(words.text,'mine');assert.equal(words.color,'#c62828');assert.equal(words.size,.012);
+ // Garbage and too many changes are ignored; a hundred changes never go through.
+ assert.equal(api.replaceStudentMarks(A,'x'),false);
+ assert.equal(api.replaceStudentMarks(A,[null,{id:5,stroke:moved},{id:aMark.id,stroke:{tool:'nope',points:[]}}]),false);
+ // Erase: only the sender's own marks.
+ assert.equal(api.eraseStudentMarks(A,[teacherMark.id,bMark.id]),false);
+ assert.equal(store.strokes.length,4);
+ assert.equal(api.eraseStudentMarks(A,[aMark.id,bMark.id,aText.id]),true);
+ assert.deepEqual(plain(store.strokes.map(s=>s.owner)),['teacher',B.id],'only A\'s own marks went');
+ assert.equal(api.eraseStudentMarks(A,'x'),false);
+});
+
+test('the teacher page accepts student Select messages only from a student with pen permission',()=>{
+ const room=read('class-pointer-prototype/classroom.js');
+ assert.match(room,/else if\(member\.presence&&selected\(member\)&&memberTools\(member\)\?\.pen===true\)\{\s*if\(message\.action==='replace'&&replaceStudentMarks\(member,message\.changes\)\)publishHighlights\(\);\s*else if\(message\.action==='erase'&&eraseStudentMarks\(member,message\.ids\)\)publishHighlights\(\);/);
+ assert.match(room,/const converted=studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke;\s*if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
+ assert.doesNotMatch(room,/replace\(change\.owner|replace\(message\.owner/);
+});
+
+test('the student toolbar offers Select (mouse icon) only with pen permission, and wires drag, handles, recolor, delete and arrow keys',()=>{
+ assert.match(shareSource,/const lessonModes=\[\['select','🖱️','Select'\],\['point','☝','Pointer'\]/);
+ assert.match(shareSource,/const allowedMode=mode=>mode==='point'\?lessonLevel!=='none':lessonLevel==='pen'\|\|lessonLevel==='highlight'&&\['highlight','box'\]\.includes\(mode\);/,'the pen level, and only that, has Select');
+ // Only marks filed under this page's own connection can be picked.
+ assert.match(shareSource,/const myOwner=\(\)=>presencePeer\?\.id\?'presence:'\+presencePeer\.id:null;/);
+ assert.match(shareSource,/\.filter\(m=>m&&m\.owner===me&&typeof m\.id==='string'/);
+ assert.match(shareSource,/if\(lessonTool==='select'\)\{startSelect\(e,p\);return\}/);
+ assert.match(shareSource,/if\(lessonTool==='select'\)\{moveSelect\(e\);return\}/);
+ assert.match(shareSource,/if\(lessonTool==='select'\)\{endSelect\(true\);return\}/);
+ assert.match(shareSource,/const selectColor=color=>\{lessonColor=color;if\(lessonTool==='select'\)recolorSelection\(color\);/);
+ // Live to the teacher while dragging, and once more on release.
+ assert.match(shareSource,/const now=Date\.now\(\);if\(now-selSendAt>=90\)\{selSendAt=now;sendChanges\(selPreview\)\}/);
+ assert.match(shareSource,/if\(drag&&commit&&drag\.moved\)sendChanges\(selPreview\)/);
+ // Keys: Delete, Escape and the arrows (1 px, Shift 10), never while typing in a box, no scrolling.
+ assert.match(shareSource,/if\(event\.target\?\.closest\?\.\('input,textarea,select,\[contenteditable="true"\]'\)\)return;\s*if\(event\.key==='Delete'\|\|event\.key==='Backspace'\)\{event\.preventDefault\(\);event\.stopPropagation\(\);eraseSelection\(\);return\}/);
+ assert.match(shareSource,/event\.preventDefault\(\);event\.stopPropagation\(\);nudgeSelection\(direction,event\.shiftKey\?10:1\);/);
+ assert.match(shareSource,/presenceConn\.send\(\{type:'edit-highlights',action:'replace',changes\}\)/);
+ assert.match(shareSource,/presenceConn\.send\(\{type:'edit-highlights',action:'erase',ids:ids\.slice\(0,60\)\}\)/);
+ // Leaving the tool lets go of the pick, and the frame is drawn above everything else.
+ assert.match(shareSource,/if\(lessonTool!=='select'\)\{selIds=\[\];selDrag=null;selPreview=new Map\(\)\}/);
+ assert.match(shareSource,/pointerLayer\.appendChild\(tag\);\s*\}\s*drawSelection\(\);\s*\}/);
+});
+
+// The real Select code of a student page, driven with fake pointer and key events, talking to the teacher's real handlers.
+function selectRoom(marks,{level='pen',claims}={}){
+ const from=shareSource.indexOf('    // ---------- Select (a student\'s own marks only) ----------'),to=shareSource.indexOf('    function renderLessonMarks(){');
+ assert.ok(from>0&&to>from,'the select code is in activity-share.js');
+ const sent=[],kids=[];let keyHandler=null,renders=0;
+ const fakeEl=()=>({style:{},children:[],appendChild(node){kids.push(node)}});
+ const sandbox={Math,Map,Number,Array,Date,
+  presencePeer:{id:'peerA'},admitted:true,lessonActive:true,lessonTool:'select',lessonMarks:{strokes:marks},
+  allowedMode:mode=>mode==='select'&&level==='pen',
+  presenceConn:{open:true,send:message=>sent.push(JSON.parse(JSON.stringify(message)))},
+  picture:()=>({left:0,top:0,width:1000,height:500}),
+  hitLayer:{getBoundingClientRect:()=>({left:0,top:0,width:1000,height:500}),setPointerCapture(){}},
+  pointerLayer:fakeEl(),document:{createElement:fakeEl,addEventListener:(type,fn)=>{if(type==='keydown')keyHandler=fn}},
+  renderLessonMarks:()=>{renders++}};
+ const code='let selIds=[],selDrag=null,selPreview=new Map(),selSendAt=0;'+shareSource.slice(from,to)+';({startSelect,moveSelect,endSelect,eraseSelection,nudgeSelection,recolorSelection,state:()=>({selIds,selDrag,selPreview})})';
+ const api=vm.runInNewContext(code,sandbox);
+ return{api,sent,kids,sandbox,key:event=>keyHandler&&keyHandler(event),renders:()=>renders};
+}
+const pointer=(x,y,id=1)=>({pointerId:id,clientX:x*1000,clientY:y*500});
+
+test('a student picks and drags their own mark; the teacher\'s page applies it to that mark only',()=>{
+ const rect=(owner,id,x1,y1,x2,y2)=>({id,owner,tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:x1,y:y1},{x:x2,y:y2}]});
+ const marks=[rect('teacher','h1',.05,.05,.15,.15),rect('presence:peerB','h2',.6,.6,.8,.8),rect('presence:peerA','h3',.3,.3,.5,.5)];
+ const room=selectRoom(marks);
+ // Other people's marks cannot be picked: a click on them (or on nothing) picks nothing.
+ room.api.startSelect(pointer(.1,.1),{x:.1,y:.1});assert.deepEqual(plain(room.api.state().selIds),[]);
+ room.api.startSelect(pointer(.7,.7),{x:.7,y:.7});assert.deepEqual(plain(room.api.state().selIds),[]);
+ assert.equal(room.sent.length,0);
+ // Their own mark can be picked and dragged: it is shown moved at once and the teacher is told while it moves and when it stops.
+ room.api.startSelect(pointer(.4,.4),{x:.4,y:.4});assert.deepEqual(plain(room.api.state().selIds),['h3']);
+ room.api.moveSelect(pointer(.5,.45));
+ assert.equal(room.sent.length,1,'told while moving');
+ room.api.endSelect(true);
+ assert.equal(room.sent.length,2,'told again when let go');
+ const last=room.sent[1];
+ assert.equal(last.type,'edit-highlights');assert.equal(last.action,'replace');
+ assert.deepEqual(last.changes.map(change=>change.id),['h3']);
+ const moved=last.changes[0].stroke.points.map(p=>[Math.round(p.x*1e4)/1e4,Math.round(p.y*1e4)/1e4]);
+ assert.deepEqual(moved,[[.4,.35],[.6,.55]]);
+ // The teacher's real handlers, with the real store, apply it.
+ const store=new C.HighlightStore();
+ for(const mark of marks)store.add(mark.owner==='teacher'?'teacher':mark.owner,{tool:mark.tool,color:mark.color,size:mark.size,points:mark.points});
+ const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';replaceStudentMarks';
+ const apply=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array});
+ const ids=new Map(store.strokes.map((s,i)=>[marks[i].id,s.id]));
+ const wire=room.sent[1].changes.map(change=>({id:ids.get(change.id),stroke:change.stroke}));
+ assert.equal(apply({id:'presence:peerA'},wire),true);
+ assert.deepEqual(plain(store.strokes[2].points.map(p=>[Math.round(p.x*1e4)/1e4,Math.round(p.y*1e4)/1e4])),[[.4,.35],[.6,.55]]);
+ assert.deepEqual(plain(store.strokes[0].points),plain(marks[0].points),'the teacher\'s mark is untouched');
+ assert.deepEqual(plain(store.strokes[1].points),plain(marks[1].points),'the other student\'s mark is untouched');
+ // The same message from another student changes nothing.
+ assert.equal(apply({id:'presence:peerB'},wire),false);
+});
+
+test('student Select: corner resize, recolor, arrow keys, Delete, and no keys while typing in a box',()=>{
+ const own=(id,tool,points,extra={})=>({id,owner:'presence:peerA',tool,color:'#1d4ed8',size:.016,points,...extra});
+ const other={id:'h9',owner:'presence:peerB',tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:.7,y:.1},{x:.9,y:.3}]};
+ const marks=[own('h1','rectangle',[{x:.2,y:.2},{x:.4,y:.4}]),other];
+ const room=selectRoom(marks);
+ room.api.startSelect(pointer(.3,.3),{x:.3,y:.3});
+ room.api.endSelect(true);
+ assert.equal(room.sent.length,0,'a click without a drag sends nothing');
+ // Corner handle: drag the bottom right corner out.
+ room.api.startSelect(pointer(.4,.4),{x:.4,y:.4});
+ room.api.moveSelect(pointer(.6,.6));room.api.endSelect(true);
+ const resized=room.sent.at(-1).changes[0].stroke.points;
+ assert.deepEqual(plain(resized.map(p=>[Math.round(p.x*1e4)/1e4,Math.round(p.y*1e4)/1e4])),[[.2,.2],[.6,.6]]);
+ // Recolor.
+ room.sent.length=0;
+ room.api.recolorSelection('#2e7d32');
+ assert.equal(room.sent[0].changes[0].stroke.color,'#2e7d32');
+ assert.equal(room.sent[0].changes[0].id,'h1');
+ // Arrow keys: 1 pixel, Shift 10 pixels (a 1000 x 500 picture).
+ room.sent.length=0;
+ const prevented=[];
+ const key=(k,extra={})=>room.key({key:k,target:{closest:()=>null},preventDefault:()=>prevented.push(k),stopPropagation(){},shiftKey:false,ctrlKey:false,metaKey:false,altKey:false,...extra});
+ key('ArrowRight');key('ArrowDown',{shiftKey:true});
+ const step=index=>room.sent[index].changes[0].stroke.points[0];
+ assert.ok(Math.abs(step(0).x-(.2+.001))<1e-9);
+ assert.ok(Math.abs(step(1).y-(.2+.02))<1e-9,'10 px of a 500 px tall picture is .02');
+ assert.deepEqual(prevented,['ArrowRight','ArrowDown'],'no scrolling');
+ // Typing in a box: the keys belong to the box.
+ room.sent.length=0;prevented.length=0;
+ key('ArrowLeft',{target:{closest:()=>({})}});key('Delete',{target:{closest:()=>({})}});
+ assert.equal(room.sent.length,0);assert.equal(prevented.length,0);
+ // Delete removes only the pick.
+ key('Delete');
+ assert.deepEqual(room.sent.at(-1),{type:'edit-highlights',action:'erase',ids:['h1']});
+ assert.deepEqual(plain(room.api.state().selIds),[]);
+});
+
+test('student Select does nothing without pen permission, and words move and resize with every line',()=>{
+ const own=(id,points,extra={})=>({id,owner:'presence:peerA',tool:'text',color:'#1f2937',size:.0078,text:id,block:'bk1',points,...extra});
+ const marks=[own('l1',[{x:.1,y:.1},{x:.3,y:.14}]),own('l2',[{x:.1,y:.15},{x:.35,y:.19}])];
+ const off=selectRoom(marks,{level:'highlight'});
+ off.api.startSelect(pointer(.2,.12),{x:.2,y:.12});off.api.moveSelect(pointer(.3,.2));off.api.endSelect(true);
+ assert.equal(off.sent.length,0,'no pen permission: nothing is sent');
+ const room=selectRoom(marks);
+ room.api.startSelect(pointer(.2,.12),{x:.2,y:.12});
+ assert.deepEqual(plain(room.api.state().selIds),['l1','l2'],'picking one line picks the whole block');
+ room.api.moveSelect(pointer(.3,.22));room.api.endSelect(true);
+ const change=room.sent.at(-1).changes;
+ assert.deepEqual(change.map(c=>c.id),['l1','l2']);
+ assert.ok(change.every(c=>c.stroke.tool==='text'&&c.stroke.block==='bk1'&&typeof c.stroke.text==='string'),'the words travel with the block');
 });
