@@ -655,6 +655,8 @@
         on=message.on===true;mode=message.mode==='screens'?'screens':'boards';blocked=on&&message.blocked===true;
         if(!on||mode!=='screens'||blocked)stopShare(false);
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
+        // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
+        if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data});
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text):emptyBoard();
         // In embedded mode, screens are shared via the existing activity button;
         // never cover Shorashim with the old Pointer screen-sharing panel.
@@ -686,6 +688,10 @@
       }
       const word=cleanWord(data.text);
       if(word&&activity?.kind==='word'&&board.text)act({type:'board-text',text:word});
+      // A copy of a picture the teacher sent (see keepTeacherCopy in saved-work.js): bring the picture back as the
+      // locked background when the teacher has no picture of their own on this board now.
+      const picture=cleanActivity(data.activity);
+      if(picture?.kind==='image'&&!activity)chooseActivity(picture,redraw);
       return true;
     }
     const exportPng=()=>boardOpen()?boardPng(board):Promise.reject(Error('Your whiteboard is not open.'));
