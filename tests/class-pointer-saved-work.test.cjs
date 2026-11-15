@@ -237,3 +237,15 @@ test('saved-work Storage rules are present in review candidates, not selected by
   assert.equal(JSON.parse(fs.readFileSync(path.join(base,'firebase.json'),'utf8')).storage,undefined);
   assert.equal(JSON.parse(fs.readFileSync(path.join(base,'firebase.security-test.json'),'utf8')).storage.rules,'storage-rules.hardened.rules');
 });
+
+// Bold words survive Save and Open: the saved file keeps the flag and the opened board checks it like any mark.
+test('a saved whiteboard keeps bold words',()=>{
+  const pdf=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/pdf-mode.js'),'utf8');
+  assert.match(pdf,/\.\.\.\(s\.tool==='text'\?\{text:s\.text,\.\.\.\(s\.bold===true\?\{bold:true\}:\{\}\)\}:\{\}\)\}\)\)\};/);
+  const Clip=require('../class-pointer-prototype/board-clipboard.js'),C=require('../class-pointer-prototype/classroom-core.js');
+  const opened=Clip.cleanLessonBoard({version:1,kind:'lesson-whiteboard',pictures:[],strokes:[
+    {owner:'teacher',tool:'text',color:'#1f2937',size:.0078,points:[{x:.1,y:.1},{x:.4,y:.15}],text:'bold words',bold:true},
+    {owner:'teacher',tool:'text',color:'#1f2937',size:.0078,points:[{x:.1,y:.3},{x:.4,y:.35}],text:'plain words'}]},C.cleanStroke);
+  assert.equal(opened.strokes[0].bold,true);
+  assert.equal('bold' in opened.strokes[1],false);
+});

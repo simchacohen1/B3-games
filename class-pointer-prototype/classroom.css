@@ -111,6 +111,9 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNav .pdf-textsize[hidden]{display:none}
 #pdfNav .pdf-textsize-value{min-width:30px;text-align:center;color:#fff;font-size:17px;font-weight:800}
 #pdfNav .pdf-textsize-btn{min-width:44px}
+/* B: bold for the words. It shows lit while the words being typed, picked or about to be added are bold. */
+#pdfNav .pdf-bold-btn{margin-left:6px;font-weight:900;font-family:Georgia,'Times New Roman',serif}
+#pdfNav .pdf-bold-btn[aria-pressed="true"]{background:#fff;color:#1d4ed8;border-color:#fff}
 /* A whiteboard shown whole: the board ends above the bar of buttons, and the bar is slim. */
 #stage.board-whole #pdfView{bottom:var(--pdf-nav-h,0px)}
 #stage.board-whole #pdfNav{bottom:3px;padding:3px 8px;gap:6px;border-radius:10px;flex-wrap:nowrap}

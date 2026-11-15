@@ -62,14 +62,14 @@
   // letters in pixels on a board 1280 wide. New words start at 24.
   const TEXT_LABELS=[12,14,16,18,20,24,28,32,40,48,64,80,96],TEXT_REF=1280,TEXT_FLOOR=16;
   const sizeOfLabel=label=>Math.round(label/(TEXT_SCALE*TEXT_REF)*1e4)/1e4,labelOfSize=size=>Math.round(size*TEXT_SCALE*TEXT_REF);
-  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null;
+  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textBold=false,boldBtn=null;
   // What the size control works on: the words being typed, the picked words, or the next new words (Text tool).
   function textTarget(){
     if(!isTeacher)return null;
-    if(inlineEdit)return{kind:'typing',size:inlineEdit.size};
+    if(inlineEdit)return{kind:'typing',size:inlineEdit.size,bold:inlineEdit.bold===true};
     const picked=selecting()?selectedStroke():null;
-    if(picked?.tool==='text')return{kind:'picked',size:picked.size};
-    return $('teacherTool')?.value==='text'?{kind:'new',size:textSize}:null;
+    if(picked?.tool==='text')return{kind:'picked',size:picked.size,bold:picked.bold===true};
+    return $('teacherTool')?.value==='text'?{kind:'new',size:textSize,bold:textBold}:null;
   }
   function setTextSize(size){
     const target=textTarget();if(!target)return;
@@ -77,6 +77,23 @@
     if(target.kind==='typing'){inlineEdit.size=size;if(inlineEdit.create)inlineEdit.create.size=size;sizeInline()}
     else if(target.kind==='picked')resizeSelected(size);
     syncTextSize();
+  }
+  // Bold for the whole text mark (every line of it): the words being typed, the picked words, or the next new words.
+  function setTextBold(next){
+    const target=textTarget();if(!target)return;
+    textBold=next;
+    if(target.kind==='typing'){inlineEdit.bold=next;sizeInline()}
+    else if(target.kind==='picked')boldSelected(next);
+    syncTextSize();
+  }
+  function toggleTextBold(){const target=textTarget();if(target)setTextBold(!target.bold)}
+  // The picked words laid out again, bold or not. Every line of the block changes together, and the class gets the new lines at once.
+  function boldSelected(next){
+    const stroke=selectedStroke();if(!stroke||stroke.tool!=='text')return false;
+    const block=textBlock(stroke);if((block[0].bold===true)===next)return true;
+    const made=reflow(block,{bold:next}),ids=made.strokes.length?B.swapMarks?.(block.map(item=>item.id),made.strokes):null;
+    if(ids){selectedId=ids[0];drawInk()}else B.status('That text could not be changed.');
+    return true;
   }
   // One step up or down the list of sizes, from whatever size the words have now.
   function stepTextSize(direction){
@@ -87,18 +104,23 @@
   // The control shows only while there are words to size, with their size.
   function syncTextSize(){
     if(!textSizeBox)return;const target=textTarget();
-    textSizeBox.hidden=!target;if(target)textSizeValue.textContent=String(labelOfSize(target.size));
+    textSizeBox.hidden=!target;if(target){textSizeValue.textContent=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true))}
   }
   let measurer=null;
   function width100(line){
     if(!measurer){measurer=document.createElement('canvas').getContext('2d');measurer.font='100px sans-serif'}
     return measurer.measureText(line).width*TEXT_SCALE;
   }
+  let measurerBold=null;
+  function width100Bold(line){
+    if(!measurerBold){measurerBold=document.createElement('canvas').getContext('2d');measurerBold.font='bold 100px sans-serif'}
+    return measurerBold.measureText(line).width*TEXT_SCALE;
+  }
   const newBlockId=()=>'b'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36);
   // Lay words out. opts: size, color, and center (new words) or left|right + top|bottom (placed words), boxW.
   function flow(text,opts){
     const clip=window.ClassPointerClipboard;if(!clip?.flowText)return{strokes:[],cut:false};
-    const made=clip.flowText(text,width100,{aspect:W/Math.max(1,H),scale:TEXT_SCALE,block:newBlockId(),...opts});
+    const made=clip.flowText(text,opts&&opts.bold?width100Bold:width100,{aspect:W/Math.max(1,H),scale:TEXT_SCALE,block:newBlockId(),...opts});
     return{...made,strokes:made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean)};
   }
   // Where a block is: its box (fractions of the board), its size, the width the teacher chose (0 = as wide as
@@ -108,14 +130,14 @@
     const farLeft=Math.min(...xs),farRight=Math.max(...xs);
     const left=boxW&&rtl?Math.max(0,farRight-boxW):farLeft,right=boxW&&!rtl?Math.min(1,farLeft+boxW):farRight;
     const top=first.points[0].y,bottom=Math.min(1,block[block.length-1].points[0].y+lineStep(first.size));
-    return{left,right,top,bottom,rtl,size:first.size,boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
+    return{left,right,top,bottom,rtl,size:first.size,bold:first.bold===true,boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
   }
   // The block laid out again with something changed: size, boxW (0 = no chosen width), text. One corner stays
   // where it is: fixX 'left'|'right' (default: where the lines start), fixY 'top'|'bottom'.
   function reflow(block,patch={}){
     const f=blockFrame(block),size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,patch.size||f.size)),boxW=patch.boxW!==undefined?patch.boxW:f.boxW;
     const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
-    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,[fixX]:f[fixX],[fixY]:f[fixY]});
+    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,bold:patch.bold!==undefined?patch.bold===true:f.bold,[fixX]:f[fixX],[fixY]:f[fixY]});
   }
   // ---------- Typing right on the board ----------
   // All typing happens in a plain text box laid on the board; there is no popup.
@@ -125,14 +147,14 @@
   // Clicking anywhere else (or Ctrl+Enter) keeps what was typed; Escape drops it.
   function editInline(target){
     finishInline(true);
-    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null;
+    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null,bold=false;
     if(fresh){
       const half=Math.max(.1,Math.min(target.point.x-margin,1-margin-target.point.x));
-      size=target.size;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
+      size=target.size;bold=textBold;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
       top=Math.max(0,Math.min(1-lineStep(size),target.point.y-lineStep(size)/2));
     }else{
       block=textBlock(target,B.highlights?.()||strokes);const f=blockFrame(block);
-      size=f.size;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
+      size=f.size;bold=f.bold;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
       // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
       // the board, so a longer sentence has room; the words are laid out properly when the box closes.
       left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left;right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
@@ -142,7 +164,7 @@
     box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
     if(fresh)box.placeholder='Type here';
     Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color});
-    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,before:value};
+    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,bold,boldBefore:bold,before:value};
     content.appendChild(box);sizeInline();drawInk();
     box.focus();box.setSelectionRange(box.value.length,box.value.length);
     // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
@@ -151,6 +173,8 @@
       event.stopPropagation();
       if(event.key==='Escape'){event.preventDefault();finishInline(false)}
       else if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();finishInline(true)}
+      // Ctrl+B while typing: the whole text mark becomes bold, or plain again.
+      else if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'){event.preventDefault();toggleTextBold()}
     });
     box.addEventListener('input',sizeInline);
     box.addEventListener('blur',()=>finishInline(true));
@@ -159,28 +183,28 @@
   // The letters in the box are the size they are on the board; the box is as tall as its lines.
   function sizeInline(){
     const open=inlineEdit;if(!open)return;const width=content.getBoundingClientRect().width;if(!width)return;
-    open.box.style.fontSize=Math.max(4*width/Math.max(1,W),open.size*TEXT_SCALE*width)+'px';
+    open.box.style.fontSize=Math.max(4*width/Math.max(1,W),open.size*TEXT_SCALE*width)+'px';open.box.style.fontWeight=open.bold?'700':'400';
     open.box.style.height='auto';open.box.style.height=open.box.scrollHeight+'px';
   }
   function finishInline(save){
     const open=inlineEdit;if(!open)return;inlineEdit=null;
     const text=open.box.value;open.box.remove();
-    if(open.create){if(save&&text.trim())addTextStroke(open.create,text)}
+    if(open.create){if(save&&text.trim())addTextStroke({...open.create,bold:open.bold},text)}
     else if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
-    else if(save&&(text!==open.before||open.size!==open.sizeBefore))replaceTextStroke(open.stroke,text,open.size);
+    else if(save&&(text!==open.before||open.size!==open.sizeBefore||open.bold!==open.boldBefore))replaceTextStroke(open.stroke,text,open.size,open.bold);
     drawInk();
   }
   window.addEventListener('resize',sizeInline);
   // New words where the typing box was: centered on the clicked spot, first line where the box's line was.
   function addTextStroke(spot,text){
-    const made=flow(text,{size:spot.size,color:spot.color,center:spot.point,top:spot.top});
+    const made=flow(text,{size:spot.size,color:spot.color,bold:spot.bold===true,center:spot.point,top:spot.top});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
     made.strokes.forEach(stroke=>B.submitStroke(stroke));
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
-  function replaceTextStroke(stroke,text,size){
+  function replaceTextStroke(stroke,text,size,bold){
     // The new words go where the whole block was, in the same color and width (and size, unless it was changed).
-    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size});
+    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size,bold});
     if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
     const ids=B.swapMarks?.(block.map(item=>item.id),made.strokes);
     if(!ids){selectedId=null;B.status('That whiteboard text is no longer available to edit.');return false}
@@ -238,7 +262,7 @@
         lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(shapePen?0.45:1);lc.lineCap=lc.lineJoin='round';
         if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
         if(stroke.tool==='text'){
-          lc.font=`${Math.max(4,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
+          lc.font=`${stroke.bold?'bold ':''}${Math.max(4,stroke.size*W*2.4)}px sans-serif`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
           (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(4,stroke.size*W*2.4)*1.25));continue;
         }
         const x1=first.x*W,y1=first.y*H,x2=last.x*W,y2=last.y*H,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1);
@@ -325,8 +349,9 @@
     textSizeValue=el('span',null,'pdf-textsize-value','24');textSizeValue.setAttribute('aria-live','polite');
     const smaller=button('A−','Smaller letters',()=>stepTextSize(-1),'pdf-btn pdf-textsize-btn'),bigger=button('A+','Bigger letters',()=>stepTextSize(1),'pdf-btn pdf-textsize-btn');
     // Pressing these must not take the typing cursor out of the words.
-    for(const b of [smaller,bigger])for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
-    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger);nav.appendChild(textSizeBox);
+    boldBtn=button('B','Bold (Ctrl+B)',()=>toggleTextBold(),'pdf-btn pdf-textsize-btn pdf-bold-btn');boldBtn.setAttribute('aria-label','Bold');boldBtn.setAttribute('aria-pressed','false');boldBtn.style.fontWeight='900';
+    for(const b of [smaller,bigger,boldBtn])for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
+    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger,boldBtn);nav.appendChild(textSizeBox);
     button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     button('✏ Edit latest text','Change the words you added last (all of their lines).',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
     button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
@@ -462,7 +487,7 @@
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
     if(stroke.tool==='text'){
-      const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':'sans-serif','font-size':Math.max(4,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
+      const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':'sans-serif','font-size':Math.max(4,stroke.size*W*2.4),...(stroke.bold?{'font-weight':'700'}:{}),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
       (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
       return text;
     }
@@ -710,8 +735,17 @@
       if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
       if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();const picked=selectedStroke();selectedId=null;endSelect(false);if(picked)eraseBlock(picked)}
       else if(event.key==='Escape'){selectedId=null;endSelect(false)}
+      else if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'&&selectedStroke()?.tool==='text'){event.preventDefault();event.stopPropagation();toggleTextBold()}
       else if(NUDGE[event.key]&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&selectedStroke()){event.preventDefault();event.stopPropagation();if(!edit&&!inlineEdit)nudgeSelected(NUDGE[event.key],event.shiftKey?10:1)}
     },true);
+  }
+  if(isTeacher){
+    // Ctrl+B with the Text tool chosen (nothing typed or picked yet) sets bold for the next new words.
+    document.addEventListener('keydown',event=>{
+      if(!((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'))return;
+      if(event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]')||textTarget()?.kind!=='new')return;
+      event.preventDefault();toggleTextBold();
+    });
   }
   // Hover or tap a mark on a whiteboard or document to see who made it.
   const inkOwnerLabel=document.createElement('div');inkOwnerLabel.className='drawing-owner-label';inkOwnerLabel.hidden=true;inkOwnerLabel.setAttribute('aria-live','polite');stage.appendChild(inkOwnerLabel);
@@ -1385,11 +1419,11 @@
       // at the smallest size are wrapped (at the middle size, so they stay readable).
       let made=null;
       const chosen=labelOfSize(textSize),steps=[chosen,...[...TEXT_LABELS].reverse().filter(label=>label<chosen&&label>=TEXT_FLOOR)];
-      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:B.ownColor(),center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
-      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:B.ownColor(),center:{x:.5,y:.5}});
+      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:B.ownColor(),bold:textBold,center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
+      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:B.ownColor(),bold:textBold,center:{x:.5,y:.5}});
       let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
-      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');
+      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose 🖱️ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');
     },
     async copy(){
       const clip=window.ClassPointerClipboard;
@@ -1420,7 +1454,7 @@
     const pictures=[];
     for(const p of [...boardPictures,...pictureEdits]){const data=savedPicture(p.image);if(data)pictures.push({data,x:p.x,y:p.y,w:p.w,h:p.h})}
     return{version:1,kind:'lesson-whiteboard',size:{w:boardSize.w,h:boardSize.h},pictures,
-      strokes:B.highlights().map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text}:{})}))};
+      strokes:B.highlights().map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{})}:{})}))};
   }
   // Opens the whiteboard exactly as the Whiteboard button does, then puts the saved pictures and marks back for
   // everyone. Saved data is checked as strictly as anything from the network.
