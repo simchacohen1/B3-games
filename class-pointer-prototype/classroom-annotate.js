@@ -34,8 +34,12 @@
   // The teacher's choices show up as disabled options in the student's tool menu.
   const allowed=value=>{if(toolSel.disabled)return false;const o=Array.from(toolSel.options).find(o=>o.value===value);return !!o&&!o.disabled};
   const kinds=list=>list.filter(kind=>allowed(valueOf(kind))).map(kind=>kind.slice(0,3));
+  // Select (move, resize, recolor, delete a mark) works on the teacher's whiteboard, PDF and webpage marks.
+  // A shared screen keeps the old tools only.
+  const canSelect=()=>teacher&&allowed('select')&&['whiteboard','pdf','webpage'].includes(B.lessonKind?.());
   function tools(){
     const out=['hand'];
+    if(canSelect())out.push('select');
     if(kinds(POINTERS).length)out.push('pointer');
     if(kinds(HIGHLIGHTS).length)out.push('highlight');
     if(allowed('text'))out.push('text');
@@ -65,7 +69,7 @@
     get tools(){return tools()},
     get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(SHAPES)}},
     keys:{p:{tool:'pointer'},h:{tool:'highlight',variant:'highlight'},b:{tool:'highlight',variant:'box'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
-    label:teacher?'Drawing on your lesson. Students see it. (Select is not available here.)':'Your tools for the lesson. Your teacher chooses which ones you can use.',
+    get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. Select moves, resizes and recolors your marks.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
     rect:()=>lessonOn()&&inFront()?stage.getBoundingClientRect():null,
     colors:colors.length?colors:undefined,
     defaultColor:teacher?undefined:'',
@@ -76,10 +80,12 @@
         B.setNavigation?.(tool==='hand'&&open);
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
         else if(tool==='shape')set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]));
-        else if(['text','eraser','pen'].includes(tool))set(toolSel,tool);
-        if(tool!=='hand'&&tool!=='eraser'){set(colorSel,color);set(sizeSel,size)}
+        else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
+        if(tool!=='hand'&&tool!=='eraser'&&tool!=='select'){set(colorSel,color);set(sizeSel,size)}
       },
       minimized(){B.setNavigation?.(false)},
+      // Select: a color click recolors the picked mark (true = handled, the tool stays Select).
+      recolor:color=>!!window.ClassPointerPdf?.recolorSelected?.(color),
       undo(){click(teacher?'undoTeacherHighlight':'undoStudentHighlight')},
       // A student can only clear his own drawings. The teacher gets the four choices.
       clear:teacher?undefined:()=>click('clearStudentHighlights'),
@@ -98,7 +104,7 @@
     if(POINTERS.some(kind=>kind[0]===v)){tool='pointer';variant=v}
     else if(HIGHLIGHTS.some(kind=>kind[0]===v)){tool='highlight';variant=v}
     else if(SHAPES.some(kind=>valueOf(kind)===v)){tool='shape';variant=SHAPES.find(kind=>valueOf(kind)===v)[0]}
-    else if(['pen','text','eraser'].includes(v))tool=v;
+    else if(['pen','text','eraser','select'].includes(v))tool=v;
     if(!tool||FA.state().surface!=='classroom')return;
     fromLesson=true;try{FA.select(tool,{variant})}finally{fromLesson=false}
   });

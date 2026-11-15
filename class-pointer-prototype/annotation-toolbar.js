@@ -42,7 +42,7 @@
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','⬚','Select','Click a mark to pick it. Drag to move it. Delete removes it. Double-click text to change it.'],
+    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color to recolor it. Delete removes it. Double-click text to change it.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -147,6 +147,40 @@
     for(let i=1;i<pts.length;i++)if(segDist(px,py,pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1])<=reach)return true;
     return false;
   }
+
+  // ---------- Changing a mark after it is drawn (Select) ----------
+  // Pure helpers. pdf-mode.js uses the same ones for the teacher's lesson marks (FTTAnnotate.geometry).
+  // Marks drawn from one end to the other are resized by their two ends; every other mark by the corners of its box.
+  const END_TOOLS=['line','arrow','pen-arrow','underline'];
+  // The handles of a mark, in 0..1: its two ends, or the four corners of its box. Text has none.
+  function handlesOf(s){
+    const pts=s&&s.points||[];if(pts.length<2||s.tool==='text')return [];
+    if(END_TOOLS.includes(s.tool)&&pts.length===2)return [{id:'p0',x:pts[0].x,y:pts[0].y},{id:'p1',x:pts[1].x,y:pts[1].y}];
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys);
+    return [{id:'nw',x:x1,y:y1},{id:'ne',x:x2,y:y1},{id:'sw',x:x1,y:y2},{id:'se',x:x2,y:y2}];
+  }
+  // The mark's points after handle `id` is dragged to (x,y). The opposite corner (or the other end) stays put,
+  // and a box can never be turned inside out or squeezed to nothing.
+  function resizePoints(s,id,x,y){
+    x=clamp01(x);y=clamp01(y);const pts=s.points;
+    if(id==='p0'||id==='p1')return pts.map((p,i)=>i===(id==='p0'?0:1)?{x,y}:{x:p.x,y:p.y});
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys),MIN=.01;
+    const west=id[1]==='w',north=id[0]==='n',ax=west?x2:x1,ay=north?y2:y1,ox=west?x1:x2,oy=north?y1:y2;
+    const mx=west?Math.min(x,ax-MIN):Math.max(x,ax+MIN),my=north?Math.min(y,ay-MIN):Math.max(y,ay+MIN);
+    const fx=Math.abs(ox-ax)<1e-6?null:(mx-ax)/(ox-ax),fy=Math.abs(oy-ay)<1e-6?null:(my-ay)/(oy-ay);
+    return pts.map(p=>({x:clamp01(fx==null?p.x:ax+(p.x-ax)*fx),y:clamp01(fy==null?p.y:ay+(p.y-ay)*fy)}));
+  }
+  // The mark's points moved by (dx,dy), kept whole on the surface.
+  function movePoints(s,dx,dy){
+    const xs=s.points.map(p=>p.x),ys=s.points.map(p=>p.y);
+    dx=Math.max(-Math.min(...xs),Math.min(1-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(1-Math.max(...ys),dy));
+    return s.points.map(p=>({x:p.x+dx,y:p.y+dy}));
+  }
+  // Which handle (if any) is within `reach` pixels of pixel point (px,py) on a surface w by h pixels.
+  function handleAt(s,px,py,w,h,reach=11){
+    return handlesOf(s).find(k=>Math.hypot(k.x*w-px,k.y*h-py)<=reach)||null;
+  }
+  const geometry={END_TOOLS,handlesOf,resizePoints,movePoints,handleAt};
 
   // ---------- State ----------
   let role=null;                 // null | 'student' | 'teacher'
@@ -428,6 +462,8 @@
       colorBox.dataset.key=colorKey;colorBox.replaceChildren(...colors.map(([c,name])=>{const b=btn('fa-color',null,name,()=>{
         // Picking a color while no drawing tool is chosen starts the pen. A lesson's pointer has a color of its own.
         const now=surface();
+        // Select: the color goes to the picked mark and the tool stays Select.
+        if(st.tool==='select'&&(isDelegate(now)?now.delegate.recolor?.(c):recolorSelected(now,c))){st.color=c;sync();return}
         if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(now,'pen')&&!(st.tool==='pointer'&&isDelegate(now)))st.tool='pen';
         st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync()});
         b.dataset.color=c;b.style.setProperty('--c',c||'#fff');if(!c)b.textContent='↺';return b}));
@@ -538,6 +574,9 @@
     if(editor)finishEditor(true);
     pid=e.pointerId;try{capture.setPointerCapture(pid)}catch{}
     if(st.tool==='select'){
+      // A handle of the mark that is already picked comes first: drag it to resize.
+      const picked=selected&&itemsOf(s).find(i=>i.id===selected),handle=picked&&handleAt(picked,p.px,p.py,p.w,p.h);
+      if(handle){drag={start:p,item:picked,resize:handle.id,points:picked.points,moved:false};scheduleRender();return}
       const hit=topHit(s,p,true);selected=hit?hit.id:null;
       drag=hit?{start:p,item:hit,moved:false}:null;scheduleRender();return;
     }
@@ -554,7 +593,9 @@
     if(st.tool==='select'){
       if(!drag)return;const dx=p.x-drag.start.x,dy=p.y-drag.start.y;
       if(!drag.moved&&Math.hypot(p.px-drag.start.px,p.py-drag.start.py)<3)return;
-      drag.moved=true;drag.dx=dx;drag.dy=dy;scheduleRender();return;
+      drag.moved=true;
+      if(drag.resize)drag.points=resizePoints(drag.item,drag.resize,p.x,p.y);else{drag.dx=dx;drag.dy=dy}
+      scheduleRender();return;
     }
     if(st.tool==='eraser'){if(drag)eraseAt(s,p);return}
     if(!draft)return;
@@ -573,7 +614,7 @@
     if(e&&e.pointerId!==pid)return;pid=null;
     const s=surface();
     if(st.tool==='select'){
-      if(drag?.moved&&!cancel)moveItem(s,drag.item,drag.dx,drag.dy);
+      if(drag?.moved&&!cancel){if(drag.resize)changeItem(s,drag.item,{points:drag.points.map(q=>({x:round(q.x),y:round(q.y)}))});else moveItem(s,drag.item,drag.dx,drag.dy)}
       drag=null;scheduleRender();return;
     }
     if(st.tool==='eraser'){
@@ -605,12 +646,20 @@
     for(const it of items)if(!keep.includes(it))drag.erased.add(it.id);
     try{s.setItems(keep)}catch{}if(selected&&!keep.some(i=>i.id===selected))selected=null;scheduleRender();
   }
+  // Put a changed copy of a mark in its place (moved, resized or recolored) and keep it picked.
+  function changeItem(s,item,patch){
+    const next={...item,...patch,id:newId(s.idPrefix)};
+    commit(s,itemsOf(s).map(i=>i.id===item.id?next:i));selected=next.id;scheduleRender();
+  }
   function moveItem(s,item,dx,dy){
-    // Keep the whole mark on the surface.
-    const xs=item.points.map(p=>p.x),ys=item.points.map(p=>p.y);
-    dx=Math.max(-Math.min(...xs),Math.min(1-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(1-Math.max(...ys),dy));
-    const moved={...item,id:newId(s.idPrefix),points:item.points.map(p=>({x:round(p.x+dx),y:round(p.y+dy)}))};
-    commit(s,itemsOf(s).map(i=>i.id===item.id?moved:i));selected=moved.id;scheduleRender();
+    changeItem(s,item,{points:movePoints(item,dx,dy).map(p=>({x:round(p.x),y:round(p.y)}))});
+  }
+  // Give the picked mark another color. True when a mark is picked (so the tool stays on Select).
+  function recolorSelected(s,color){
+    const item=selected&&!isDelegate(s)&&itemsOf(s).find(i=>i.id===selected);
+    if(!item||!/^#[0-9a-f]{6}$/i.test(color||''))return false;
+    if(item.color!==color.toLowerCase())changeItem(s,item,{color:color.toLowerCase()});
+    return true;
   }
   function deleteSelected(){
     const s=surface();if(!selected||isDelegate(s))return false;
@@ -769,18 +818,21 @@
     const at=p=>[r.left+p.x*r.width,r.top+p.y*r.height];
     ctx.save();ctx.beginPath();ctx.rect(r.left,r.top,r.width,r.height);ctx.clip();
     let items=s.renders?[]:itemsOf(s);
-    if(drag?.moved&&drag.item){
-      const moved={...drag.item,points:drag.item.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))};
-      if(s.renders)items=[moved];else items=items.map(i=>i.id===drag.item.id?moved:i);
-    }
+    // While a mark is dragged or resized, show where it will land.
+    const moving=drag?.moved&&drag.item?{...drag.item,points:drag.resize?drag.points:drag.item.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))}:null;
+    if(moving){if(s.renders)items=[moving];else items=items.map(i=>i.id===drag.item.id?moving:i)}
     for(const it of items)drawItem(ctx,it,at,r.width);
     if(draft&&!s.renders)drawItem(ctx,draft,at,r.width);
     // Selection box.
     const sel=selected&&itemsOf(s).find(i=>i.id===selected);
     if(sel&&mode==='open'){
-      const shown=drag?.moved&&drag.item.id===sel.id?{...sel,points:sel.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))}:sel;
+      const shown=moving&&drag.item.id===sel.id?moving:sel;
       const b=boxOf(shown,r.width,r.height);
       ctx.setLineDash([6,4]);ctx.strokeStyle='#2563eb';ctx.lineWidth=1.5;ctx.strokeRect(r.left+b.x1-4,r.top+b.y1-4,b.x2-b.x1+8,b.y2-b.y1+8);ctx.setLineDash([]);
+      // Handles: drag one to resize.
+      if(st.tool==='select')for(const k of handlesOf(shown)){
+        const [x,y]=at(k);ctx.fillStyle='#fff';ctx.fillRect(x-5,y-5,10,10);ctx.strokeRect(x-5,y-5,10,10);
+      }
     }
     if(laser&&!s.drawsPoint&&mode==='open'&&st.tool==='pointer'){
       const [x,y]=at(laser);
@@ -849,6 +901,8 @@
     open(){openBar(false)},
     minimize,
     state:()=>({role,mode,tool:st.tool,reasons:[...reasons],surface:surface().id}),
+    // Move / resize helpers for marks, shared with the teacher's lesson (pdf-mode.js).
+    geometry,
     // True for the toolbar, the pencil and the drawing layer (pages with an activity lock let these through).
     owns(node){return !root.hidden&&!!node&&root.contains(node)}
   };

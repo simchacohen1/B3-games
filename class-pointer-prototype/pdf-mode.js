@@ -17,6 +17,9 @@
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
+  // Select (teacher): the picked mark, a drag or resize in progress, an eraser stroke, the last click.
+  const PEN_TOOLS=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
+  let selectedId=null,edit=null,erasePid=null,lastPick=null;
   let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
   let textEditStroke=null;
@@ -349,15 +352,113 @@
   }
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
-    const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes,groups=new Map();
+    // A mark that is being dragged or resized is shown where it will land.
+    const shown=edit?.moved?strokes.map(stroke=>stroke.id===edit.stroke.id?{...stroke,points:edit.points}:stroke):strokes;
+    const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
     for(const stroke of all){
-      const kind=['pen','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
+      const kind=PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=groups.get(key);
       if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
       const mark=inkPath(stroke,stroke.color);mark.dataset.strokeTool=stroke.tool;if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
     }
+    drawSelection(shown);
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
+
+  // ---------- Select (teacher): pick one of my marks, then move, resize, recolor or delete it ----------
+  const geometry=()=>window.FTTAnnotate?.geometry||null;
+  const selecting=()=>isTeacher&&$('teacherTool')?.value==='select';
+  function selectedStroke(){
+    const stroke=selectedId?strokes.find(item=>item.id===selectedId&&item.owner==='teacher'):null;
+    if(!stroke)selectedId=null;return stroke||null;
+  }
+  // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
+  function drawSelection(list){
+    if(!selecting())return;const picked=selectedStroke(),G=geometry();if(!picked||!G)return;
+    const stroke=list.find(item=>item.id===picked.id)||picked,width=content.getBoundingClientRect().width;if(!width)return;
+    const unit=W/width; // one screen pixel in the ink layer's own units
+    let x1,y1,x2,y2;
+    const node=stroke.tool==='text'?[...ink.querySelectorAll('[data-text-mark]')].find(item=>item.dataset.strokeId===stroke.id):null;
+    let bb=null;try{bb=node?.getBBox?.()||null}catch{}
+    if(bb&&bb.width){x1=bb.x;y1=bb.y;x2=bb.x+bb.width;y2=bb.y+bb.height}
+    else{const xs=stroke.points.map(q=>q.x*W),ys=stroke.points.map(q=>q.y*H);x1=Math.min(...xs);x2=Math.max(...xs);y1=Math.min(...ys);y2=Math.max(...ys)}
+    const pad=6*unit,group=svg('g',{'data-selection':'true','pointer-events':'none'});
+    group.appendChild(svg('rect',{x:x1-pad,y:y1-pad,width:x2-x1+pad*2,height:y2-y1+pad*2,fill:'none',stroke:'#2563eb','stroke-width':1.5*unit,'stroke-dasharray':(6*unit)+' '+(4*unit)}));
+    for(const handle of G.handlesOf(stroke))group.appendChild(svg('rect',{'data-handle':handle.id,x:handle.x*W-5*unit,y:handle.y*H-5*unit,width:10*unit,height:10*unit,fill:'#fff',stroke:'#2563eb','stroke-width':1.5*unit}));
+    ink.appendChild(group);
+  }
+  // Is point p on the line through pts (0..1 points)? t is the reach, as a share of the width.
+  function nearLine(p,pts,t){
+    const ty=t*W/Math.max(1,H);
+    for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[i+1]||a;const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;let k=len?((p.x-a.x)*dx+(p.y-a.y)*dy)/len:0;k=Math.max(0,Math.min(1,k));
+      const ex=(a.x+k*dx-p.x)/t,ey=(a.y+k*dy-p.y)/ty;if(ex*ex+ey*ey<=1)return true}
+    return false;
+  }
+  // Is p on this mark? inside: anywhere inside a closed shape counts (Select); otherwise only its outline (Eraser).
+  function markHits(stroke,p,inside){
+    if(!stroke.points?.length)return false;
+    if(!['rectangle','ellipse','triangle','box'].includes(stroke.tool))return inkHits(stroke,p);
+    const first=stroke.points[0],last=stroke.points[stroke.points.length-1],t=Math.max(0.008,(stroke.size||0.016)*0.6),ty=t*W/Math.max(1,H);
+    const x1=Math.min(first.x,last.x),x2=Math.max(first.x,last.x),y1=Math.min(first.y,last.y),y2=Math.max(first.y,last.y);
+    if(p.x<x1-t||p.x>x2+t||p.y<y1-ty||p.y>y2+ty)return false;
+    if(inside||stroke.tool==='box')return true;
+    if(stroke.tool==='rectangle')return nearLine(p,[{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2},{x:x1,y:y1}],t);
+    if(stroke.tool==='triangle')return nearLine(p,[{x:(x1+x2)/2,y:y1},{x:x2,y:y2},{x:x1,y:y2},{x:(x1+x2)/2,y:y1}],t);
+    const rx=Math.max(t,(x2-x1)/2),ry=Math.max(ty,(y2-y1)/2),d=Math.hypot((p.x-(x1+x2)/2)/rx,(p.y-(y1+y2)/2)/ry);
+    return Math.abs(d-1)<=Math.max(t/rx,ty/ry);
+  }
+  // The teacher's own mark under the pointer: words first (by their real size on screen), then the newest mark.
+  function teacherMarkAt(event,p,inside){
+    const textNode=[...ink.querySelectorAll('[data-text-mark]')].reverse().find(node=>{const rect=node.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom});
+    const text=textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId&&item.owner==='teacher');
+    if(text)return text;
+    return p?[...strokes].reverse().find(item=>item.owner==='teacher'&&markHits(item,p,inside))||null:null;
+  }
+  // Like normalized(), but a pointer dragged off the edge counts as the edge.
+  function clampedPoint(event){
+    if(notReady())return null;const r=content.getBoundingClientRect();if(!r.width||!r.height)return null;
+    return{x:Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.top)/r.height)),px:event.clientX-r.left,py:event.clientY-r.top,w:r.width,h:r.height};
+  }
+  function startSelect(event,p){
+    const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
+    const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
+    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,points:picked.points,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
+    const hit=teacherMarkAt(event,p,true);
+    // A second quick click on the same words opens them for editing.
+    if(hit&&hit.tool==='text'&&lastPick&&lastPick.id===hit.id&&Date.now()-lastPick.at<450){lastPick=null;selectedId=hit.id;drawInk();openTextEditor(hit);return}
+    lastPick=hit?{id:hit.id,at:Date.now()}:null;selectedId=hit?hit.id:null;
+    if(hit&&G&&at){edit={kind:'move',stroke:hit,points:hit.points,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid)}
+    drawInk();
+  }
+  function moveSelect(event){
+    const G=geometry(),at=clampedPoint(event);if(!G||!at)return;
+    if(!edit.moved&&Math.hypot(at.px-edit.start.px,at.py-edit.start.py)<3)return;
+    edit.moved=true;
+    edit.points=edit.kind==='resize'?G.resizePoints(edit.stroke,edit.handle,at.x,at.y):G.movePoints(edit.stroke,at.x-edit.start.x,at.y-edit.start.y);
+    drawInk();
+  }
+  function endSelect(commit){
+    const done=edit;edit=null;if(!done)return;
+    if(content.hasPointerCapture?.(done.pid))content.releasePointerCapture(done.pid);
+    if(commit&&done.moved&&!B.replaceMark?.(done.stroke.id,{...done.stroke,points:done.points}))B.status('That mark could not be changed.');
+    drawInk();
+  }
+  function eraseUnder(event){const p=normalized(event),hit=p&&teacherMarkAt(event,p,false);if(hit)B.eraseMark?.(hit.id)}
+  // A color click on the toolbar while Select is chosen: recolor the picked mark. True = handled.
+  function recolorSelected(color){
+    if(!selecting()||typeof color!=='string')return false;const stroke=selectedStroke();if(!stroke)return false;
+    if(stroke.color!==color.toLowerCase()&&!B.replaceMark?.(stroke.id,{...stroke,color:color.toLowerCase()}))B.status('That color cannot be used for this mark.');
+    return true;
+  }
+  if(isTeacher){
+    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;if(!selecting()){selectedId=null;lastPick=null}endSelect(false)});
+    // Delete removes the picked mark; Escape lets go of it.
+    document.addEventListener('keydown',event=>{
+      if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
+      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();const id=selectedId;selectedId=null;endSelect(false);B.eraseMark?.(id)}
+      else if(event.key==='Escape'){selectedId=null;endSelect(false)}
+    },true);
+  }
   // Hover or tap a mark on a whiteboard or document to see who made it.
   const inkOwnerLabel=document.createElement('div');inkOwnerLabel.className='drawing-owner-label';inkOwnerLabel.hidden=true;inkOwnerLabel.setAttribute('aria-live','polite');stage.appendChild(inkOwnerLabel);
   let inkLabelTimer=null;
@@ -418,13 +519,15 @@
   }
   content.addEventListener('pointerdown',event=>{
     if(isTeacher&&event.button===0){
-      const textNode=[...ink.querySelectorAll('[data-text-mark]')].reverse().find(node=>{const rect=node.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom});
-      const p=normalized(event),stroke=(textNode&&strokes.find(item=>item.id===textNode.dataset.strokeId))||(p&&[...strokes].reverse().find(item=>item.tool==='text'&&item.owner==='teacher'&&inkHits(item,p)));
-      if(stroke){event.preventDefault();event.stopPropagation();openTextEditor(stroke);return}
-      const tool=$(toolId).value;
-      if(tool==='text'&&!B.navigating()&&!notReady()&&B.live()&&B.writingAllowed()){
+      const tool=$(toolId).value,p=normalized(event),ready=!B.navigating()&&!notReady()&&B.live()&&B.writingAllowed();
+      // Select: pick, drag, resize. Eraser: rub out my marks. Text: click my words to change them, or an empty
+      // spot for new words. Every other tool draws, also on top of words.
+      if(tool==='select'){if(!ready||!p)return;event.preventDefault();event.stopPropagation();startSelect(event,p);return}
+      if(tool==='eraser'){if(!ready||!p)return;event.preventDefault();event.stopPropagation();erasePid=event.pointerId;content.setPointerCapture(erasePid);eraseUnder(event);return}
+      if(tool==='text'&&ready){
         if(!p)return;event.preventDefault();event.stopPropagation();
-        openTextEditor({tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
+        const words=teacherMarkAt(event,p,true);
+        openTextEditor(words?.tool==='text'?words:{tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
       }
     }
     const tool=$(toolId).value;
@@ -440,13 +543,18 @@
     const last=draft.points[draft.points.length-1];
     if(Math.hypot((p.x-last.x)*W,(p.y-last.y)*H)>4&&draft.points.length<256)draft.points.push(p);
   }
-  content.addEventListener('pointermove',event=>{if(!draft)return;if(!B.writingAllowed()){cancelDraft();return}extend(event);drawInk()});
+  content.addEventListener('pointermove',event=>{
+    if(edit&&event.pointerId===edit.pid){moveSelect(event);return}
+    if(erasePid===event.pointerId){eraseUnder(event);return}
+    if(!draft)return;if(!B.writingAllowed()){cancelDraft();return}extend(event);drawInk()});
   content.addEventListener('pointerup',event=>{
+    if(edit&&event.pointerId===edit.pid){endSelect(true);return}
+    if(erasePid===event.pointerId){erasePid=null;if(content.hasPointerCapture?.(event.pointerId))content.releasePointerCapture(event.pointerId);return}
     if(!draft||event.pointerId!==dragId)return;extend(event);
     const stroke=draft,may=B.writingAllowed()&&B.live();cancelDraft();
     if(may&&C.cleanStroke(stroke))B.submitStroke(stroke);
   });
-  content.addEventListener('pointercancel',cancelDraft);content.addEventListener('lostpointercapture',()=>{if(draft)cancelDraft()});
+  content.addEventListener('pointercancel',()=>{erasePid=null;endSelect(false);cancelDraft()});content.addEventListener('lostpointercapture',()=>{erasePid=null;if(edit)endSelect(false);if(draft)cancelDraft()});
   [toolId,colorId,sizeId].forEach(id=>$(id).addEventListener('change',cancelDraft));
 
   // ---------- Opening and closing ----------
@@ -999,7 +1107,7 @@
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
-    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,recolorSelected,
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),
