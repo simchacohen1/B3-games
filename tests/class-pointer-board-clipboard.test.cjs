@@ -229,6 +229,6 @@ test('the teacher whiteboard offers paste, copy and editing of pasted text',()=>
   assert.match(pdfSource,/data-text-mark/);
   assert.match(pdfSource,/Edit whiteboard text/);
   assert.match(pdfSource,/replaceTextStroke\(stroke,text\)/);
-  assert.match(pdfSource,/marks\.splice\(index,1\);next\.forEach\(item=>B\.submitStroke\(item\)\)/);
+  assert.match(pdfSource,/forEach\(index=>marks\.splice\(index,1\)\);selectedId=null;next\.forEach\(item=>B\.submitStroke\(item\)\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
 });

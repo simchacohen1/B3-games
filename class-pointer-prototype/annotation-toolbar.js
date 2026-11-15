@@ -42,7 +42,7 @@
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color to recolor it. Delete removes it. Double-click text to change it.'],
+    ['select','⬚','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Delete removes it. Double-click text to change it.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -470,9 +470,13 @@
     }
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
-    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=!drawing;
+    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=!drawing&&st.tool!=='select';
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
-    sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{st.sizeIndex=i;applyDelegate();sync()});b.querySelector('i').style.setProperty('--d',(5+i*4)+'px');b.setAttribute('aria-pressed',String(i===st.sizeIndex));return b}));
+    sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{
+        // Select: the size goes to the picked mark (thicker line, bigger words) and the tool stays Select.
+        const now=surface();
+        if(st.tool==='select'&&(isDelegate(now)?now.delegate.resize?.(v):resizeSelected(now,v))){st.sizeIndex=i;sync();return}
+        st.sizeIndex=i;applyDelegate();sync()});b.querySelector('i').style.setProperty('--d',(5+i*4)+'px');b.setAttribute('aria-pressed',String(i===st.sizeIndex));return b}));
     const mine=isDelegate(s)?null:itemsOf(s);
     undoBtn.disabled=isDelegate(s)?!s.delegate.undo:!(history.get(hk(s))||[]).length;
     clearBtn.disabled=isDelegate(s)?!(s.delegate.clear||s.delegate.clearMenu):!mine.length;
@@ -653,6 +657,13 @@
   }
   function moveItem(s,item,dx,dy){
     changeItem(s,item,{points:movePoints(item,dx,dy).map(p=>({x:round(p.x),y:round(p.y)}))});
+  }
+  // Give the picked mark another size (line thickness, or the size of words). True when a mark is picked.
+  function resizeSelected(s,size){
+    const item=selected&&!isDelegate(s)&&itemsOf(s).find(i=>i.id===selected);
+    if(!item||!Number.isFinite(size)||size<.001||size>.06)return false;
+    if(item.size!==size)changeItem(s,item,{size});
+    return true;
   }
   // Give the picked mark another color. True when a mark is picked (so the tool stays on Select).
   function recolorSelected(s,color){

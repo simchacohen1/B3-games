@@ -19,6 +19,8 @@
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
   // Select (teacher): the picked mark, a drag or resize in progress, an eraser stroke, the last click.
   const PEN_TOOLS=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
+  // Words on the lesson are drawn 2.4 times their mark size; line spacing has to count that too.
+  const TEXT_SCALE=2.4;
   let selectedId=null,edit=null,erasePid=null,lastPick=null;
   let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
@@ -44,11 +46,16 @@
     if(stroke.id)replaceTextStroke(stroke,textEditInput.value);
     else addTextStroke(stroke.points[0],textEditInput.value,stroke.size,stroke.color);
   });
-  function openTextEditor(stroke){textEditStroke=stroke;textEditInput.value=stroke.text;textEditDialog.showModal();textEditInput.focus();textEditInput.select()}
+  // Words that are already on the board open as their whole block: every line, one under the other.
+  function openTextEditor(stroke){
+    const block=stroke.id?textBlock(stroke,B.highlights?.()||strokes):[stroke];
+    textEditStroke=stroke.id?{...stroke,block}:stroke;textEditInput.value=block.map(item=>item.text).join('\n');
+    textEditDialog.showModal();textEditInput.focus();textEditInput.select();
+  }
   function layoutTextStrokes(text,center,size,color){
     const clip=window.ClassPointerClipboard;if(!clip)return{strokes:[],cut:false};
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
-    return clip.textStrokes(text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),center,sizes:[size],color});
+    return clip.textStrokes(text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),center,sizes:[size],color,scale:TEXT_SCALE});
   }
   function addTextStroke(point,text,size,color){
     const made=layoutTextStrokes(text,point,size,color),valid=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean);
@@ -57,13 +64,15 @@
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
   function replaceTextStroke(stroke,text){
-    const center={x:(stroke.points[0].x+stroke.points[1].x)/2,y:(stroke.points[0].y+stroke.points[1].y)/2};
+    // The new words go where the whole block was (all of its lines), in the same color and size.
+    const block=stroke.block?.length?stroke.block:[stroke],xs=block.flatMap(item=>item.points.map(q=>q.x)),ys=block.flatMap(item=>item.points.map(q=>q.y));
+    const center={x:(Math.min(...xs)+Math.max(...xs))/2,y:(Math.min(...ys)+Math.max(...ys))/2};
     const made=layoutTextStrokes(text,center,stroke.size,stroke.color),next=made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean),marks=B.highlights?.();
     if(!next.length){B.status('Enter some text to keep this text box.');return false}
-    const index=Array.isArray(marks)?marks.findIndex(item=>item.id===stroke.id&&item.owner==='teacher'):-1;
-    if(index<0){B.status('That whiteboard text is no longer available to edit.');return false}
-    // Remove only this teacher mark, then submit the replacement to publish the complete mark list.
-    marks.splice(index,1);next.forEach(item=>B.submitStroke(item));
+    const places=Array.isArray(marks)?block.map(line=>marks.findIndex(item=>item.id===line.id&&item.owner==='teacher')).filter(index=>index>=0):[];
+    if(!places.length){B.status('That whiteboard text is no longer available to edit.');return false}
+    // Remove only this block's teacher marks, then submit the replacement to publish the complete mark list.
+    places.sort((a,b)=>b-a).forEach(index=>marks.splice(index,1));selectedId=null;next.forEach(item=>B.submitStroke(item));
     B.status(made.cut?'The words were too long. Only the first part was kept.':'Whiteboard text updated.');return true;
   }
 
@@ -200,7 +209,7 @@
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
     button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
-    button('✏ Edit latest text','Edit the most recently pasted teacher text mark.',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
+    button('✏ Edit latest text','Change the words you added last (all of their lines).',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
     button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     movePicturesBtn=button('🖼 Move pictures','Move, resize or remove pictures pasted on the whiteboard',()=>editBoardPictures(),'pdf-btn pdf-board-pictures');movePicturesBtn.hidden=true;
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
@@ -330,7 +339,7 @@
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
     if(stroke.tool==='text'){
-      const text=svg('text',{x:first.x*W,y:first.y*H,'font-size':Math.max(16,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
+      const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':'sans-serif','font-size':Math.max(16,stroke.size*W*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
       (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
       return text;
     }
@@ -353,7 +362,7 @@
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
     // A mark that is being dragged or resized is shown where it will land.
-    const shown=edit?.moved?strokes.map(stroke=>stroke.id===edit.stroke.id?{...stroke,points:edit.points}:stroke):strokes;
+    const shown=edit?.moved?strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke):strokes;
     const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
     for(const stroke of all){
       const kind=PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
@@ -377,16 +386,34 @@
     if(!selecting())return;const picked=selectedStroke(),G=geometry();if(!picked||!G)return;
     const stroke=list.find(item=>item.id===picked.id)||picked,width=content.getBoundingClientRect().width;if(!width)return;
     const unit=W/width; // one screen pixel in the ink layer's own units
-    let x1,y1,x2,y2;
-    const node=stroke.tool==='text'?[...ink.querySelectorAll('[data-text-mark]')].find(item=>item.dataset.strokeId===stroke.id):null;
-    let bb=null;try{bb=node?.getBBox?.()||null}catch{}
-    if(bb&&bb.width){x1=bb.x;y1=bb.y;x2=bb.x+bb.width;y2=bb.y+bb.height}
-    else{const xs=stroke.points.map(q=>q.x*W),ys=stroke.points.map(q=>q.y*H);x1=Math.min(...xs);x2=Math.max(...xs);y1=Math.min(...ys);y2=Math.max(...ys)}
+    let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+    const grow=(ax,ay,bx,by)=>{x1=Math.min(x1,ax);y1=Math.min(y1,ay);x2=Math.max(x2,bx);y2=Math.max(y2,by)};
+    // Words: the box goes around every line of the block, by the real size of the letters on screen.
+    for(const line of stroke.tool==='text'?textBlock(stroke,list):[stroke]){
+      const node=line.tool==='text'?[...ink.querySelectorAll('[data-text-mark]')].find(item=>item.dataset.strokeId===line.id):null;
+      let bb=null;try{bb=node?.getBBox?.()||null}catch{}
+      if(bb&&bb.width)grow(bb.x,bb.y,bb.x+bb.width,bb.y+bb.height);
+      else{const xs=line.points.map(q=>q.x*W),ys=line.points.map(q=>q.y*H);grow(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys))}
+    }
     const pad=6*unit,group=svg('g',{'data-selection':'true','pointer-events':'none'});
     group.appendChild(svg('rect',{x:x1-pad,y:y1-pad,width:x2-x1+pad*2,height:y2-y1+pad*2,fill:'none',stroke:'#2563eb','stroke-width':1.5*unit,'stroke-dasharray':(6*unit)+' '+(4*unit)}));
     for(const handle of G.handlesOf(stroke))group.appendChild(svg('rect',{'data-handle':handle.id,x:handle.x*W-5*unit,y:handle.y*H-5*unit,width:10*unit,height:10*unit,fill:'#fff',stroke:'#2563eb','stroke-width':1.5*unit}));
     ink.appendChild(group);
   }
+  // Pasted or typed words are one mark per line. The lines that belong together: my text marks next to each
+  // other in the pile, same color and size, each one line-height below the one before.
+  const lineStep=size=>size*1.25*TEXT_SCALE*W/Math.max(1,H);
+  function textBlock(stroke,list=strokes){
+    if(stroke.tool!=='text')return [stroke];
+    const at=list.findIndex(item=>item.id===stroke.id);if(at<0)return [stroke];
+    const follows=(upper,lower)=>!!upper&&!!lower&&upper.tool==='text'&&lower.tool==='text'&&upper.owner==='teacher'&&lower.owner==='teacher'&&upper.color===lower.color&&upper.size===lower.size&&Math.abs(lower.points[0].y-upper.points[0].y-lineStep(upper.size))<.004;
+    let first=at,last=at;
+    while(follows(list[first-1],list[first]))first--;
+    while(follows(list[last],list[last+1]))last++;
+    return list.slice(first,last+1);
+  }
+  // Send changed marks to the class in one go. changes: [[id,stroke],...]
+  function changeMarks(changes){return changes.length===1?!!B.replaceMark?.(changes[0][0],changes[0][1]):!!B.replaceMarks?.(changes)}
   // Is point p on the line through pts (0..1 points)? t is the reach, as a share of the width.
   function nearLine(p,pts,t){
     const ty=t*W/Math.max(1,H);
@@ -422,32 +449,59 @@
   function startSelect(event,p){
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
-    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,points:picked.points,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
+    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
     const hit=teacherMarkAt(event,p,true);
     // A second quick click on the same words opens them for editing.
     if(hit&&hit.tool==='text'&&lastPick&&lastPick.id===hit.id&&Date.now()-lastPick.at<450){lastPick=null;selectedId=hit.id;drawInk();openTextEditor(hit);return}
     lastPick=hit?{id:hit.id,at:Date.now()}:null;selectedId=hit?hit.id:null;
-    if(hit&&G&&at){edit={kind:'move',stroke:hit,points:hit.points,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid)}
+    // Words move as a whole block, every line together.
+    if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid)}
     drawInk();
   }
   function moveSelect(event){
     const G=geometry(),at=clampedPoint(event);if(!G||!at)return;
     if(!edit.moved&&Math.hypot(at.px-edit.start.px,at.py-edit.start.py)<3)return;
     edit.moved=true;
-    edit.points=edit.kind==='resize'?G.resizePoints(edit.stroke,edit.handle,at.x,at.y):G.movePoints(edit.stroke,at.x-edit.start.x,at.y-edit.start.y);
+    if(edit.kind==='resize')edit.preview=new Map([[edit.stroke.id,G.resizePoints(edit.stroke,edit.handle,at.x,at.y)]]);
+    else{
+      // One shift for the whole group, held back so that no part of it leaves the board.
+      const all={points:edit.group.flatMap(item=>item.points)},moved=G.movePoints(all,at.x-edit.start.x,at.y-edit.start.y);
+      const dx=moved[0].x-all.points[0].x,dy=moved[0].y-all.points[0].y;
+      edit.preview=new Map(edit.group.map(item=>[item.id,item.points.map(q=>({x:q.x+dx,y:q.y+dy}))]));
+    }
     drawInk();
   }
   function endSelect(commit){
     const done=edit;edit=null;if(!done)return;
     if(content.hasPointerCapture?.(done.pid))content.releasePointerCapture(done.pid);
-    if(commit&&done.moved&&!B.replaceMark?.(done.stroke.id,{...done.stroke,points:done.points}))B.status('That mark could not be changed.');
+    if(commit&&done.moved&&!changeMarks(done.group.filter(item=>done.preview.has(item.id)).map(item=>[item.id,{...item,points:done.preview.get(item.id)}])))B.status('That mark could not be changed.');
     drawInk();
   }
-  function eraseUnder(event){const p=normalized(event),hit=p&&teacherMarkAt(event,p,false);if(hit)B.eraseMark?.(hit.id)}
+  // Words go as a whole block, every line together.
+  function eraseBlock(stroke){const ids=textBlock(stroke).map(item=>item.id);return ids.length>1?B.eraseMarks?.(ids):B.eraseMark?.(ids[0])}
+  function eraseUnder(event){const p=normalized(event),hit=p&&teacherMarkAt(event,p,false);if(hit)eraseBlock(hit)}
   // A color click on the toolbar while Select is chosen: recolor the picked mark. True = handled.
   function recolorSelected(color){
     if(!selecting()||typeof color!=='string')return false;const stroke=selectedStroke();if(!stroke)return false;
-    if(stroke.color!==color.toLowerCase()&&!B.replaceMark?.(stroke.id,{...stroke,color:color.toLowerCase()}))B.status('That color cannot be used for this mark.');
+    // Every line of a block of words gets the color.
+    if(stroke.color!==color.toLowerCase()&&!changeMarks(textBlock(stroke).map(item=>[item.id,{...item,color:color.toLowerCase()}])))B.status('That color cannot be used for this mark.');
+    return true;
+  }
+  // A size click on the toolbar while Select is chosen: a thicker or thinner line, or bigger or smaller words.
+  // True = handled. Words keep their top line and their starting edge; the lines are spaced again for the new size.
+  function resizeSelected(size){
+    if(!selecting()||!Number.isFinite(size))return false;const stroke=selectedStroke();if(!stroke)return false;
+    if(stroke.size===size)return true;
+    let changes;
+    if(stroke.tool!=='text')changes=[[stroke.id,{...stroke,size}]];
+    else{
+      const block=textBlock(stroke),top=block[0].points[0].y,scale=size/stroke.size,lim=v=>Math.max(0,Math.min(1,v));
+      changes=block.map((item,index)=>{
+        const [a,b]=item.points,y=lim(top+index*lineStep(size));
+        return [item.id,{...item,size,points:[{x:a.x,y},{x:lim(a.x+(b.x-a.x)*scale),y:lim(y+Math.max(.02,lineStep(size)))}]}];
+      });
+    }
+    if(!changeMarks(changes))B.status('That size cannot be used for this mark.');
     return true;
   }
   if(isTeacher){
@@ -455,7 +509,7 @@
     // Delete removes the picked mark; Escape lets go of it.
     document.addEventListener('keydown',event=>{
       if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
-      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();const id=selectedId;selectedId=null;endSelect(false);B.eraseMark?.(id)}
+      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();const picked=selectedStroke();selectedId=null;endSelect(false);if(picked)eraseBlock(picked)}
       else if(event.key==='Escape'){selectedId=null;endSelect(false)}
     },true);
   }
@@ -1061,10 +1115,10 @@
       if(payload.kind==='image'){await pastePicture(payload.blob);return}
       if(!B.live()||!B.writingAllowed()){B.status('You cannot add whiteboard text right now.');return}
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
-      const made=clip.textStrokes(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008],color:B.ownColor()});
+      const made=clip.textStrokes(payload.text,line=>ctx.measureText(line).width*2.4,{aspect:W/Math.max(1,H),sizes:[0.028,0.016,0.008],color:B.ownColor(),scale:TEXT_SCALE});
       let added=0;for(const value of made.strokes){const stroke=C.cleanStroke(value);if(stroke){B.submitStroke(stroke);added++}}
       if(!added){B.status('No whiteboard text could be added.');return}
-      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Pasted editable text. Use “Edit latest text” to change it.');
+      B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose ⬚ Select on the toolbar and click the words: pick a color or a size, drag to move them, or click them again to change the words.');
     },
     async copy(){
       const clip=window.ClassPointerClipboard;
@@ -1107,7 +1161,7 @@
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
-    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,recolorSelected,
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,recolorSelected,resizeSelected,
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),

@@ -86,6 +86,8 @@
       minimized(){B.setNavigation?.(false)},
       // Select: a color click recolors the picked mark (true = handled, the tool stays Select).
       recolor:color=>!!window.ClassPointerPdf?.recolorSelected?.(color),
+      // Select: a size click makes the picked mark (words too) smaller or bigger.
+      resize:size=>!!window.ClassPointerPdf?.resizeSelected?.(size),
       undo(){click(teacher?'undoTeacherHighlight':'undoStudentHighlight')},
       // A student can only clear his own drawings. The teacher gets the four choices.
       clear:teacher?undefined:()=>click('clearStudentHighlights'),

@@ -304,9 +304,10 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('תיקון ראשון\nתיקון שני');
   await page.getByRole('button', { name: 'Save text' }).click();
-  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(3);
-  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון ראשון');
-  await expect(page.locator('#pdfInk text[data-text-mark]').nth(2)).toHaveText('תיקון שני');
+  // The two lines are one block: editing replaces both, not only the last line.
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(2);
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(0)).toHaveText('תיקון ראשון');
+  await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון שני');
   expect(errors).toEqual([]);
   await context.close();
 });
