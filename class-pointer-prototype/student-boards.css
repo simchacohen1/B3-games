@@ -86,6 +86,11 @@ body.boards-on #studentDock{display:none!important}
 .boards-word-editor button{min-height:34px;padding:4px 8px}
 .boards-word-editor button[aria-pressed=true]{background:#3268e8;color:#fff}
 .boards-paste-hint{font-size:12px;color:#4b6181;font-weight:650}
+/* Paste, Copy board and the picture buttons on one large board. */
+.boards-clip,.boards-pictures{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.boards-pictures{padding:3px 5px;border:1px solid #cdd8eb;background:#f6f9ff;border-radius:9px}
+.boards-note{font-size:13px;font-weight:700;color:#1e4fae;max-width:340px}
+.boards-note:empty{display:none}
 .board-fit.moving canvas{cursor:move}
 
 /* Per-boy screens/whiteboards eligibility in the Students menu and gallery. */

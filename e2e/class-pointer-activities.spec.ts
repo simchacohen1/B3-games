@@ -37,6 +37,7 @@ async function openBoard(page: Page, teacher: boolean) {
       status: () => {}, fail: (message: any) => (window as any).__failures.push(message),
     };
   }, teacher);
+  await page.addScriptTag({ path: 'class-pointer-prototype/board-clipboard.js' });
   await page.addScriptTag({ path: 'class-pointer-prototype/student-boards.js' });
 }
 
@@ -153,7 +154,8 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
 
-    // Teacher pastes text from an ordinary clipboard outside text-entry fields.
+    // Teacher presses Ctrl+V outside text-entry fields. Nothing is sent until the preview is confirmed.
+    const preview = teacher.getByRole('dialog', { name: 'Preview paste to all whiteboards' });
     await teacher.evaluate(() => {
       const data = new DataTransfer();
       data.setData('text/plain', 'בראשית');
@@ -161,6 +163,11 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
       Object.defineProperty(event, 'clipboardData', { value: data });
       document.dispatchEvent(event);
     });
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('בראשית');
+    expect((await deliver(teacher, students)).filter((e: any) => e.message?.activity)).toHaveLength(0);
+    await teacher.getByRole('button', { name: '✓ Send to all boards' }).click();
+    await expect(preview).toBeHidden();
     const sent = await deliver(teacher, students);
     expect(sent.filter((e: any) => e.message?.activity?.text === 'בראשית')).toHaveLength(2);
     await expect(ari.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
@@ -219,6 +226,10 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
       Object.defineProperty(event, 'clipboardData', { value: data });
       document.dispatchEvent(event);
     });
+    await expect(preview).toBeVisible();
+    await expect(preview.getByAltText('Copied picture preview')).toBeVisible();
+    expect(await teacher.evaluate(() => (window as any).__out.filter((m: any) => m.message?.activity?.kind === 'image').length)).toBe(0);
+    await teacher.getByRole('button', { name: '✓ Send to all boards' }).click();
     await expect.poll(() => teacher.evaluate(() => (window as any).__out.filter((m: any) =>
       m.message?.activity?.kind === 'image').length)).toBeGreaterThanOrEqual(2);
     const imageMessages = await deliver(teacher, students);
@@ -233,6 +244,18 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
         Math.floor(canvas.width/2), Math.floor(canvas.height/2), 1, 1).data;
       return data[0] > data[1] * 1.5 && data[0] > data[2] * 1.5;
     })).toBeTruthy();
+
+    // The 📋 Paste to All Boards button reads the clipboard and ends in the same preview.
+    await teacher.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => 'שמות' } });
+    });
+    await teacher.getByRole('button', { name: '📋 Paste to All Boards' }).click();
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('שמות');
+    await teacher.getByRole('button', { name: '✓ Send to all boards' }).click();
+    const viaButton = await deliver(teacher, students);
+    expect(viaButton.filter((e: any) => e.message?.activity?.text === 'שמות')).toHaveLength(2);
+    await expect(ari.getByLabel('Edit Hebrew text')).toHaveValue('שמות');
 
     expect(await teacher.evaluate(() => (window as any).__failures)).toEqual([]);
   } finally {

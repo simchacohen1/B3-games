@@ -22,6 +22,15 @@
    Pass-through: while the toolbar is shrunk to the pencil, or the Hand or Pointer tool is chosen, this overlay
    catches no clicks at all, so the page underneath works normally.
 
+   Extras a page can add (the Class Pointer lesson uses all of them, see classroom-annotate.js)
+   • surface.variants — more kinds of one tool (pointer shapes, highlight box, triangle). A tool with kinds shows a
+     small corner mark; clicking the chosen tool again opens a little menu beside the toolbar.
+   • surface.delegate.clearMenu — Clear opens a little menu of choices instead of clearing right away.
+   • surface.keys — one-letter keyboard shortcuts.
+   • setActions(fn) — page buttons under the drawing tools (Students, Lesson, More...). A button may open a menu.
+
+   Full screen: the browser hides everything outside the full-screen element, so the toolbar moves inside it.
+
    Marks: {id, tool, color, size, points:[{x,y}], text?}. x and y are 0..1 across and down the surface; size is a
    fraction of the surface width. tool is pen | highlight | rect | ellipse | line | arrow | text. */
 (function(){
@@ -33,7 +42,7 @@
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','⬚','Select','Click a mark to pick it. Drag to move it. Delete removes it. Double-click text to change it.'],
+    ['select','🖱️','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -139,13 +148,49 @@
     return false;
   }
 
+  // ---------- Changing a mark after it is drawn (Select) ----------
+  // Pure helpers. pdf-mode.js uses the same ones for the teacher's lesson marks (FTTAnnotate.geometry).
+  // Marks drawn from one end to the other are resized by their two ends; every other mark by the corners of its box.
+  const END_TOOLS=['line','arrow','pen-arrow','underline'];
+  // The handles of a mark, in 0..1: its two ends, or the four corners of its box. Text has none.
+  function handlesOf(s){
+    const pts=s&&s.points||[];if(pts.length<2||s.tool==='text')return [];
+    if(END_TOOLS.includes(s.tool)&&pts.length===2)return [{id:'p0',x:pts[0].x,y:pts[0].y},{id:'p1',x:pts[1].x,y:pts[1].y}];
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys);
+    return [{id:'nw',x:x1,y:y1},{id:'ne',x:x2,y:y1},{id:'sw',x:x1,y:y2},{id:'se',x:x2,y:y2}];
+  }
+  // The mark's points after handle `id` is dragged to (x,y). The opposite corner (or the other end) stays put,
+  // and a box can never be turned inside out or squeezed to nothing.
+  function resizePoints(s,id,x,y){
+    x=clamp01(x);y=clamp01(y);const pts=s.points;
+    if(id==='p0'||id==='p1')return pts.map((p,i)=>i===(id==='p0'?0:1)?{x,y}:{x:p.x,y:p.y});
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys),MIN=.01;
+    const west=id[1]==='w',north=id[0]==='n',ax=west?x2:x1,ay=north?y2:y1,ox=west?x1:x2,oy=north?y1:y2;
+    const mx=west?Math.min(x,ax-MIN):Math.max(x,ax+MIN),my=north?Math.min(y,ay-MIN):Math.max(y,ay+MIN);
+    const fx=Math.abs(ox-ax)<1e-6?null:(mx-ax)/(ox-ax),fy=Math.abs(oy-ay)<1e-6?null:(my-ay)/(oy-ay);
+    return pts.map(p=>({x:clamp01(fx==null?p.x:ax+(p.x-ax)*fx),y:clamp01(fy==null?p.y:ay+(p.y-ay)*fy)}));
+  }
+  // The mark's points moved by (dx,dy), kept whole on the surface.
+  function movePoints(s,dx,dy){
+    const xs=s.points.map(p=>p.x),ys=s.points.map(p=>p.y);
+    dx=Math.max(-Math.min(...xs),Math.min(1-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(1-Math.max(...ys),dy));
+    return s.points.map(p=>({x:p.x+dx,y:p.y+dy}));
+  }
+  // Which handle (if any) is within `reach` pixels of pixel point (px,py) on a surface w by h pixels.
+  function handleAt(s,px,py,w,h,reach=11){
+    return handlesOf(s).find(k=>Math.hypot(k.x*w-px,k.y*h-py)<=reach)||null;
+  }
+  const geometry={END_TOOLS,handlesOf,resizePoints,movePoints,handleAt};
+
   // ---------- State ----------
   let role=null;                 // null | 'student' | 'teacher'
   const reasons=new Set();       // 'sharing', 'whiteboard', ...
   const stack=[];                // surfaces pushed by other scripts (top = last)
   let mode='hidden';             // hidden | mini | open
   let autoOpened=false;
-  const st={tool:'hand',shape:'rect',color:PALETTE[1][0],sizeIndex:1};
+  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1};
+  const TOOL_ICON=Object.fromEntries(TOOLS.map(t=>[t[0],t[1]]));
+  let actionsFn=null;            // page buttons under the tools (setActions)
   const toolColors={pen:PALETTE[1][0],highlight:PALETTE[6][0],shape:PALETTE[1][0],text:PALETTE[1][0]};
   const history=new Map();       // surface id -> [items snapshots]
   const seen=new WeakSet();     // surfaces that have been in use since they were pushed
@@ -163,6 +208,10 @@
   }
   const isDelegate=s=>!!s.delegate;
   function supports(s,tool){return !s.tools||s.tools.includes(tool)}
+  // Kinds of one tool: [[id, icon, name], ...]. Shapes always have kinds; a surface may add its own for any tool.
+  function variantsOf(s,tool){const v=s.variants&&s.variants[tool];return v&&v.length?v:tool==='shape'?SHAPES:null}
+  const variantOf=tool=>tool==='shape'?st.shape:st.variant[tool];
+  function setVariant(tool,id){if(tool==='shape')st.shape=id;else st.variant[tool]=id}
   // Undo history is kept per surface (and per student, for a student's screen).
   const hk=s=>{try{return s.historyKey?.()||s.id}catch{return s.id}};
   function itemsOf(s){try{return (s.getItems?.()||[]).slice()}catch{return[]}}
@@ -174,6 +223,9 @@
   // ---------- DOM ----------
   const css=`
 #fttAnnotate{position:fixed;inset:0;z-index:${Z};pointer-events:none;font:600 13px system-ui,"Segoe UI",sans-serif}
+#fttAnnotate.fa-fly-open{z-index:2147483647}
+#fttAnnotate .fa-tool[hidden]{display:none}
+#fttAnnotate .fa-ico svg{display:block;width:1.15em;height:1.15em;margin:auto}
 #fttAnnotate[hidden],#fttAnnotate [hidden]{display:none!important}
 #fttAnnotate .fa-ink{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
 #fttAnnotate .fa-capture{position:fixed;pointer-events:auto;touch-action:none;background:transparent}
@@ -181,10 +233,12 @@
 #fttAnnotate .fa-capture[data-tool="text"]{cursor:text}
 #fttAnnotate .fa-capture[data-tool="eraser"]{cursor:cell}
 #fttAnnotate .fa-capture[data-tool="select"]{cursor:default}
-#fttAnnotate .fa-bar{position:fixed;left:12px;top:max(12px,calc(50vh - 300px));pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 5px;border-radius:16px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f;max-height:calc(100vh - 24px);overflow:auto;user-select:none}
+#fttAnnotate .fa-bar{position:fixed;left:12px;top:50%;transform:translateY(-50%);pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 5px;border-radius:16px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f;max-height:calc(100vh - 24px);overflow:auto;user-select:none}
 #fttAnnotate .fa-grip{cursor:grab;color:#94a3b8;font-size:12px;letter-spacing:-2px;padding:0 0 2px;touch-action:none}
 #fttAnnotate button{font:inherit;color:inherit;margin:0;box-shadow:none;text-transform:none;letter-spacing:normal}
-#fttAnnotate .fa-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;min-height:44px;padding:3px 2px;border:0;border-radius:11px;background:transparent;cursor:pointer;line-height:1.05}
+#fttAnnotate .fa-tools,#fttAnnotate .fa-actions{display:flex;flex-direction:column;align-items:center;gap:3px}
+#fttAnnotate .fa-tool.fa-more::after{content:"";position:absolute;right:3px;bottom:3px;border:4px solid transparent;border-right-color:#64748b;border-bottom-color:#64748b}
+#fttAnnotate .fa-tool{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;min-height:44px;padding:3px 2px;border:0;border-radius:11px;background:transparent;cursor:pointer;line-height:1.05}
 #fttAnnotate .fa-tool:hover:enabled{background:#eef2ff}
 #fttAnnotate .fa-tool[aria-pressed="true"]{background:#dbeafe;color:#1e3a8a;box-shadow:inset 0 0 0 2px #3b82f6}
 #fttAnnotate .fa-tool:disabled{opacity:.35;cursor:default}
@@ -203,19 +257,46 @@
 #fttAnnotate .fa-small:hover:enabled{background:#f1f5f9}
 #fttAnnotate .fa-small:disabled{opacity:.35;cursor:default}
 #fttAnnotate .fa-min{background:#f1f5f9}
-#fttAnnotate .fa-shapes{position:fixed;pointer-events:auto;display:flex;gap:4px;padding:5px;border-radius:12px;background:#fff;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f}
-#fttAnnotate .fa-shapes button{width:42px;height:38px;border:0;border-radius:9px;background:transparent;font-size:18px;cursor:pointer}
-#fttAnnotate .fa-shapes button[aria-pressed="true"]{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
+#fttAnnotate .fa-pair{display:flex;gap:2px}
+#fttAnnotate .fa-half,#fttAnnotate .fa-act{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 1px;line-height:1.1}
+#fttAnnotate .fa-half{width:26px;min-height:34px}
+#fttAnnotate .fa-half .fa-al{font-size:9px}
+#fttAnnotate .fa-act{position:relative;min-height:36px}
+#fttAnnotate .fa-act .fa-al{font-size:10px}
+#fttAnnotate .fa-ai{font-size:16px;line-height:19px}
+#fttAnnotate .fa-al:empty,#fttAnnotate .fa-ai:empty{display:none}
+#fttAnnotate .fa-act.fa-primary{min-height:46px;background:#ffd60a;color:#17233b;box-shadow:inset 0 0 0 2px #17233b}
+#fttAnnotate .fa-act.fa-primary:hover:enabled{background:#ffe45c}
+#fttAnnotate .fa-act.fa-danger{background:#dc2626;color:#fff}
+#fttAnnotate .fa-act.fa-danger:hover:enabled{background:#b91c1c}
+#fttAnnotate .fa-act[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #3b82f6}
+#fttAnnotate .fa-badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#dc2626;color:#fff;font-size:10px;line-height:17px;text-align:center;box-shadow:0 0 0 2px #fff}
+#fttAnnotate .fa-fly{position:fixed;pointer-events:auto;display:flex;flex-wrap:wrap;gap:4px;max-width:min(300px,calc(100vw - 90px));max-height:calc(100vh - 12px);overflow:auto;padding:5px;border-radius:12px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f}
+#fttAnnotate .fa-fly button{position:relative;min-width:42px;height:38px;padding:0 6px;border:0;border-radius:9px;background:transparent;font-size:18px;cursor:pointer}
+#fttAnnotate .fa-fly button:hover:enabled{background:#eef2ff}
+#fttAnnotate .fa-fly button:disabled{opacity:.4;cursor:default}
+#fttAnnotate .fa-fly button[aria-pressed="true"]{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
+#fttAnnotate .fa-fly.fa-list{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:6px;width:max-content;min-width:200px}
+#fttAnnotate .fa-fly.fa-list button{display:flex;align-items:center;gap:8px;width:100%;height:auto;min-height:38px;padding:6px 10px;font-size:14px;font-weight:700;text-align:left;flex:none}
+#fttAnnotate .fa-fly.fa-list .fa-ai{width:22px;text-align:center;flex:none}
+#fttAnnotate .fa-fly.fa-list .fa-danger{color:#b91c1c}
+#fttAnnotate .fa-fly small{padding:7px 10px 2px;color:#64748b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
 #fttAnnotate .fa-tip{position:fixed;pointer-events:none;max-width:260px;padding:6px 10px;border-radius:10px;background:#0f172a;color:#fff;font-size:12px;box-shadow:0 4px 14px #0004}
 #fttAnnotate .fa-pencil{position:fixed;left:12px;top:calc(50% - 26px);pointer-events:auto;width:52px;height:52px;border-radius:50%;border:3px solid #fff;background:#2563eb;color:#fff;font-size:24px;line-height:1;cursor:grab;box-shadow:0 6px 22px #0f172a55;display:grid;place-items:center;touch-action:none;user-select:none}
 #fttAnnotate .fa-pencil:hover{background:#1d4ed8}
 #fttAnnotate .fa-pencil.dragging{cursor:grabbing}
 #fttAnnotate .fa-editor{position:fixed;pointer-events:auto;min-width:120px;min-height:1.4em;margin:0;padding:2px 4px;border:2px dashed #3b82f6;border-radius:4px;background:#ffffffd9;resize:none;overflow:hidden;font-family:Arial,"Segoe UI",sans-serif;font-weight:600;line-height:1.25;outline:none;unicode-bidi:plaintext}
-#fttAnnotate[data-side="right"] .fa-bar{left:auto;right:12px}
-#fttAnnotate[data-side="right"] .fa-pencil{left:auto;right:12px}
-@media (max-height:640px){#fttAnnotate .fa-tool{min-height:36px}#fttAnnotate .fa-name{display:none}}
+#fttAnnotate.fa-compact .fa-tools{display:grid;grid-template-columns:repeat(2,30px);gap:2px}
+#fttAnnotate.fa-compact .fa-tool{width:30px;min-height:30px;padding:2px}
+#fttAnnotate.fa-compact .fa-name{display:none}
+#fttAnnotate.fa-compact .fa-colors{grid-template-columns:repeat(3,18px);gap:4px}
+#fttAnnotate.fa-compact .fa-color{width:18px;height:18px}
+#fttAnnotate.fa-compact .fa-small{min-height:28px}
+#fttAnnotate.fa-compact .fa-act.fa-primary{min-height:40px}
 @media print{#fttAnnotate{display:none!important}}`;
   const root=document.createElement('div');root.id='fttAnnotate';root.hidden=true;root.setAttribute('data-ftt-annotate','');
+  // Pages that host the toolbar inside their own lesson area (full screen) treat it as a control, not as lesson content.
+  root.dataset.stageUi='true';
   const ink=document.createElement('canvas');ink.className='fa-ink';ink.setAttribute('aria-hidden','true');
   const capture=document.createElement('div');capture.className='fa-capture';capture.hidden=true;
   capture.setAttribute('aria-label','Drawing area');
@@ -223,91 +304,205 @@
   const grip=document.createElement('div');grip.className='fa-grip';grip.textContent='⠿⠿';grip.title='Drag to move the toolbar';
   const pencil=document.createElement('button');pencil.type='button';pencil.className='fa-pencil';pencil.textContent='✏️';
   pencil.title='Open drawing tools (drag to move)';pencil.setAttribute('aria-label','Open drawing tools');
-  const shapeMenu=document.createElement('div');shapeMenu.className='fa-shapes';shapeMenu.hidden=true;shapeMenu.setAttribute('role','group');shapeMenu.setAttribute('aria-label','Shape');
+  const fly=document.createElement('div');fly.className='fa-fly';fly.hidden=true;fly.setAttribute('role','group');fly.setAttribute('aria-label','More choices');
   const tip=document.createElement('div');tip.className='fa-tip';tip.hidden=true;tip.setAttribute('role','status');
   const btn=(cls,html,title,on)=>{const b=document.createElement('button');b.type='button';b.className=cls;if(html!=null)b.innerHTML=html;b.title=title;b.setAttribute('aria-label',title);b.addEventListener('click',on);return b};
   const toolButtons=new Map();
-  bar.append(grip);
+  const toolBox=document.createElement('div');toolBox.className='fa-tools';
+  bar.append(grip,toolBox);
   for(const [tool,icon,name,help] of TOOLS){
     const b=btn('fa-tool','<span class="fa-ico"></span><span class="fa-name"></span>',name+': '+help,()=>chooseTool(tool,true));
     b.dataset.tool=tool;b.querySelector('.fa-ico').textContent=icon;b.querySelector('.fa-name').textContent=name;
-    bar.append(b);toolButtons.set(tool,b);
+    toolBox.append(b);toolButtons.set(tool,b);
   }
-  const shapeButtons=new Map();
-  for(const [shape,icon,name] of SHAPES){const b=btn('',null,name,()=>{st.shape=shape;shapeMenu.hidden=true;chooseTool('shape')});b.textContent=icon;shapeMenu.append(b);shapeButtons.set(shape,b)}
+  // A button with an icon and a short name: the small toolbar buttons and every row of a little menu.
+  function itemButton(item,cls,on){
+    const b=btn(cls+(item.danger?' fa-danger':'')+(item.primary?' fa-primary':''),'<span class="fa-ai"></span><span class="fa-al"></span>',item.title||item.label||'',on);
+    b.querySelector('.fa-ai').textContent=item.icon||'';b.querySelector('.fa-al').textContent=item.label||'';
+    if(item.id)b.dataset.action=item.id;b.disabled=!!item.disabled;
+    if(item.pressed!=null)b.setAttribute('aria-pressed',String(!!item.pressed));
+    if(item.badge){const s=document.createElement('span');s.className='fa-badge';s.textContent=item.badge;b.append(s)}
+    return b;
+  }
   const sep1=document.createElement('div');sep1.className='fa-sep';
   const colorBox=document.createElement('div');colorBox.className='fa-colors';colorBox.setAttribute('role','group');colorBox.setAttribute('aria-label','Color');
   const sizeBox=document.createElement('div');sizeBox.className='fa-sizes';sizeBox.setAttribute('role','group');sizeBox.setAttribute('aria-label','Size');
   const sep2=document.createElement('div');sep2.className='fa-sep';
-  const undoBtn=btn('fa-small','↶ Undo','Undo my last change',()=>undo());
-  const clearBtn=btn('fa-small','🗑 Clear','Erase all my marks here',()=>clearAll());
+  const undoBtn=itemButton({icon:'↶',label:'Undo',title:'Undo my last change'},'fa-small fa-half',()=>undo());
+  const clearBtn=itemButton({icon:'🗑',label:'Clear',title:'Erase all my marks here'},'fa-small fa-half',()=>clearClick());
+  const pair=document.createElement('div');pair.className='fa-pair';pair.append(undoBtn,clearBtn);
+  const actionBox=document.createElement('div');actionBox.className='fa-actions';actionBox.hidden=true;
   const minBtn=btn('fa-small fa-min','➖ Hide','Shrink the toolbar to a pencil button. Clicks go to the page.',()=>minimize());
-  bar.append(sep1,colorBox,sizeBox,sep2,undoBtn,clearBtn,minBtn);
-  root.append(ink,capture,shapeMenu,bar,pencil,tip);
+  bar.append(sep1,colorBox,sizeBox,sep2,pair,actionBox,minBtn);
+  root.append(ink,capture,fly,bar,pencil,tip);
   pencil.addEventListener('click',()=>openBar());
-  // Clicks on the toolbar never reach the page or the lesson underneath.
-  for(const node of [bar,pencil,shapeMenu])for(const type of ['pointerdown','pointerup','click','dblclick','wheel','contextmenu'])node.addEventListener(type,e=>e.stopPropagation());
+  // Clicks and mouse moves on the toolbar never reach the page or the lesson underneath.
+  for(const node of [bar,pencil,fly])for(const type of ['pointerdown','pointermove','pointerup','click','dblclick','wheel','contextmenu'])node.addEventListener(type,e=>e.stopPropagation());
 
-  function mount(){
-    if(root.isConnected||!document.body)return;
-    const style=document.createElement('style');style.id='fttAnnotateCss';style.textContent=css;
-    (document.head||document.documentElement).append(style);document.body.append(root);
+  // The toolbar lives on the page. While something is in real full screen the browser hides everything outside
+  // that element, so the toolbar moves inside it and comes back afterwards.
+  function host(){
+    const f=document.fullscreenElement;
+    return f&&!root.contains(f)&&!/^(VIDEO|IFRAME|CANVAS|IMG|OBJECT|EMBED)$/.test(f.tagName)?f:document.body;
   }
+  function mount(){
+    if(!document.body)return;
+    if(!document.getElementById('fttAnnotateCss')){
+      const style=document.createElement('style');style.id='fttAnnotateCss';style.textContent=css;
+      (document.head||document.documentElement).append(style);
+    }
+    const home=host();if(root.parentNode!==home)home.append(root);
+  }
+  document.addEventListener('fullscreenchange',()=>sync());
+
+  // ---------- Little menus beside the toolbar: kinds of a tool, Clear choices, page button menus ----------
+  // An item: {id?, icon?, label?, title?, onClick?, heading?, danger?, primary?, pressed?, disabled?, badge?, hidden?, keepOpen?}
+  let flyOpen=null,flySig='';    // flyOpen: {key, anchor(), items(), list}
+  function listOf(value,arg){
+    try{return ((typeof value==='function'?value(arg):value)||[]).filter(i=>i&&!i.hidden)}catch(e){console.warn('Drawing tools:',e);return[]}
+  }
+  const itemSig=list=>list.map(i=>[i.id,i.icon,i.label,i.title,i.heading,!!i.disabled,i.pressed,!!i.danger,!!i.primary,i.badge||'',!!i.items].join('~')).join('|');
+  function runItem(item){try{item.onClick?.()}catch(e){console.warn('Drawing tools:',e)}}
+  function closeFly(){flyOpen=null;flySig='';fly.hidden=true;root.classList.remove('fa-fly-open')}
+  // Opens a menu; asking for the menu that is already open closes it.
+  function openFly(key,anchor,items,list){
+    if(flyOpen&&flyOpen.key===key)return closeFly();
+    flyOpen={key,anchor,items,list:!!list};flySig='';renderFly();
+  }
+  function renderFly(){
+    if(!flyOpen)return;
+    const items=listOf(flyOpen.items),anchor=flyOpen.anchor();
+    if(mode!=='open'||!items.length||!anchor||!anchor.isConnected)return closeFly();
+    const sig=flyOpen.key+'#'+itemSig(items);
+    if(sig!==flySig){
+      flySig=sig;fly.className='fa-fly'+(flyOpen.list?' fa-list':'');
+      fly.replaceChildren(...items.map(item=>{
+        if(item.heading){const h=document.createElement('small');h.textContent=item.heading;return h}
+        return itemButton(item,'',()=>{if(!item.keepOpen)closeFly();runItem(item);sync()});
+      }));
+    }
+    // On top of everything while the menu is open (a page's own bars may sit one layer above the toolbar).
+    fly.hidden=false;root.classList.add('fa-fly-open');placeFly();
+  }
+  function placeFly(){
+    if(fly.hidden||!flyOpen)return;
+    const anchor=flyOpen.anchor();if(!anchor)return;
+    const r=anchor.getBoundingClientRect(),b=bar.getBoundingClientRect(),w=fly.offsetWidth||190,h=fly.offsetHeight||40;
+    const left=b.left+b.width/2>window.innerWidth/2?b.left-w-8:b.right+8;
+    fly.style.left=Math.round(Math.max(4,left))+'px';fly.style.top=Math.round(Math.max(4,Math.min(r.top,window.innerHeight-h-6)))+'px';
+  }
+  function variantItems(tool){
+    return (variantsOf(surface(),tool)||[]).map(([id,icon,name])=>({id,icon,title:name,pressed:id===variantOf(tool),onClick(){setVariant(tool,id);chooseTool(tool)}}));
+  }
+  const openVariants=tool=>openFly('tool:'+tool,()=>toolButtons.get(tool),()=>variantItems(tool));
+  function actionClick(item){
+    if(!item.items){closeFly();runItem(item);sync();return}
+    // The menu is read again each time it is shown, so its rows are always up to date.
+    openFly('act:'+item.id,()=>actionBox.querySelector('[data-action="'+item.id+'"]'),
+      ()=>{const now=listOf(actionsFn,actionContext()).find(a=>a.id===item.id);return now?listOf(now.items):[]},true);
+  }
+  const actionContext=()=>({surface:surface().id,role,mode});
+  function clearClick(){
+    const s=surface();
+    if(isDelegate(s)&&s.delegate.clearMenu)openFly('clear',()=>clearBtn,()=>listOf(surface().delegate?.clearMenu),true);
+    else clearAll();
+  }
+  // A click anywhere else closes the little menu.
+  document.addEventListener('pointerdown',e=>{if(flyOpen&&!bar.contains(e.target)&&!fly.contains(e.target))closeFly()},true);
 
   // ---------- Toolbar state ----------
   function chooseTool(tool,fromClick){
     const s=surface();if(!supports(s,tool))return;
-    if(tool==='shape'&&fromClick&&st.tool==='shape'){shapeMenu.hidden=!shapeMenu.hidden;placeShapeMenu();return}
+    // Clicking the chosen tool again shows its kinds (pointer shapes, highlight box, shapes).
+    if(fromClick&&st.tool===tool&&variantsOf(s,tool)){openVariants(tool);return}
     finishEditor(true);
     if(st.tool!==tool){selected=tool==='select'?selected:null;laser=null;try{s.live?.(null,null)}catch{}}
-    st.tool=tool;shapeMenu.hidden=tool!=='shape'||!fromClick;placeShapeMenu();
+    st.tool=tool;closeFly();
     // Each drawing tool keeps its own color (the highlighter starts yellow).
     if(toolColors[tool]&&colorsOf(s).some(c=>c[0]===toolColors[tool]))st.color=toolColors[tool];
-    applyDelegate();sync();
-  }
-  function placeShapeMenu(){
-    if(shapeMenu.hidden)return;
-    const r=toolButtons.get('shape').getBoundingClientRect(),b=bar.getBoundingClientRect(),w=shapeMenu.offsetWidth||190;
-    const left=b.left+b.width/2>window.innerWidth/2?b.left-w-8:b.right+8;
-    shapeMenu.style.left=Math.round(Math.max(4,left))+'px';shapeMenu.style.top=Math.round(r.top)+'px';
+    applyDelegate();
+    // Shapes show their kinds straight away.
+    if(tool==='shape'&&fromClick)openVariants(tool);
+    sync();
   }
   function applyDelegate(){
     const s=surface();if(!isDelegate(s))return;
-    try{s.delegate.apply({tool:st.tool,shape:st.shape,color:st.color,size:currentSize(s),open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
+    try{s.delegate.apply({tool:st.tool,shape:st.shape,variant:variantOf(st.tool),color:st.color,size:currentSize(s),open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
   }
   function sync(){
     mount();
     const s=surface(),show=visible()&&mode!=='hidden';
     root.hidden=!show;
     if(!show){capture.hidden=true;scheduleRender();return}
-    if(lastSurface!==s){
+    const fresh=lastSurface!==s;
+    if(fresh){
       // A different surface: keep the tool when it works there, otherwise use the surface's own starting tool.
       if(lastSurface&&lastSurface!==s){selected=null;draft=null;laser=null;finishEditor(true);try{lastSurface.live?.(null,null)}catch{}}
       // The first time a surface is in use, start with its own tool (Pen on a whiteboard, Hand on a page).
       if(!seen.has(s)){seen.add(s);if(mode==='open'&&s.defaultTool&&supports(s,s.defaultTool))st.tool=s.defaultTool}
-      if(!supports(s,st.tool))st.tool=s.defaultTool||'hand';
-      lastSurface=s;applyDelegate();
+      lastSurface=s;
     }
+    // A tool or a kind that is not allowed here (any more) gives way to one that is.
+    let changed=false;
+    if(!supports(s,st.tool)){st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';changed=true}
+    for(const [tool] of toolButtons){
+      const kinds=variantsOf(s,tool);
+      if(kinds&&!kinds.some(k=>k[0]===variantOf(tool))){setVariant(tool,kinds[0][0]);if(tool===st.tool)changed=true}
+    }
+    if(changed||fresh)applyDelegate();
     const open=mode==='open';
-    bar.hidden=!open;pencil.hidden=open;if(!open){shapeMenu.hidden=true;tip.hidden=true}
-    for(const [tool,b] of toolButtons){b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));}
-    const shapeIcon=SHAPES.find(x=>x[0]===st.shape);toolButtons.get('shape').querySelector('.fa-ico').textContent=shapeIcon?shapeIcon[1]:'◻';
-    for(const [shape,b] of shapeButtons)b.setAttribute('aria-pressed',String(shape===st.shape));
-    // Colors and sizes for this surface.
-    const colors=colorsOf(s);if(!colors.some(c=>c[0]===st.color))st.color=colors[Math.min(1,colors.length-1)][0];
+    bar.hidden=!open;pencil.hidden=open;if(!open){closeFly();tip.hidden=true}
+    for(const [tool,b] of toolButtons){
+      const kinds=variantsOf(s,tool),kind=kinds&&kinds.find(k=>k[0]===variantOf(tool));
+      b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));
+      // A surface that says so shows only the tools it has (no greyed-out buttons that do nothing).
+      b.hidden=!!s.hideUnused&&b.disabled;
+      b.classList.toggle('fa-more',!!kinds&&!b.disabled);
+      const own=s.toolLabels?.[tool],usual=TOOLS.find(t=>t[0]===tool),name=own?own[1]:usual[2];
+      // A surface's own icon may be a small drawing (our own fixed SVG text, never anything from outside).
+      const ico=b.querySelector('.fa-ico'),mark=kind?kind[1]:own?own[0]:TOOL_ICON[tool];
+      if(String(mark).startsWith('<svg')){if(ico.dataset.mark!==mark){ico.dataset.mark=mark;ico.innerHTML=mark}}
+      else{delete ico.dataset.mark;ico.textContent=mark}
+      b.style.order=own&&own[3]!=null?String(own[3]):'';
+      b.querySelector('.fa-name').textContent=name;b.title=name+': '+(own?own[2]:usual[3]);b.setAttribute('aria-label',name);
+    }
+    // Colors and sizes for this surface. A color of '' means "the page's own color" (shown as ↺).
+    const colors=colorsOf(s);
+    if(!colors.some(c=>c[0]===st.color))st.color=s.defaultColor!=null&&colors.some(c=>c[0]===s.defaultColor)?s.defaultColor:colors[Math.min(1,colors.length-1)][0];
     const colorKey=colors.map(c=>c[0]).join();
     if(colorBox.dataset.key!==colorKey){
-      colorBox.dataset.key=colorKey;colorBox.replaceChildren(...colors.map(([c,name])=>{const b=btn('fa-color',null,name,()=>{if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(s,'pen'))st.tool='pen';st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync()});b.dataset.color=c;b.style.setProperty('--c',c);return b}));
+      colorBox.dataset.key=colorKey;colorBox.replaceChildren(...colors.map(([c,name])=>{const b=btn('fa-color',null,name,()=>{
+        // Picking a color while no drawing tool is chosen starts the pen. A lesson's pointer has a color of its own.
+        const now=surface();
+        // Select: the color goes to the picked mark and the tool stays Select.
+        if(st.tool==='select'&&(isDelegate(now)?now.delegate.recolor?.(c):recolorSelected(now,c))){st.color=c;sync();return}
+        if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(now,'pen')&&!(st.tool==='pointer'&&isDelegate(now)))st.tool='pen';
+        st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync()});
+        b.dataset.color=c;b.style.setProperty('--c',c||'#fff');if(!c)b.textContent='↺';return b}));
     }
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
-    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=!drawing;
+    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
-    sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{st.sizeIndex=i;applyDelegate();sync()});b.querySelector('i').style.setProperty('--d',(5+i*4)+'px');b.setAttribute('aria-pressed',String(i===st.sizeIndex));return b}));
+    sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{
+        // Select: the size goes to the picked mark (thicker line, bigger words) and the tool stays Select.
+        const now=surface();
+        if(st.tool==='select'&&(isDelegate(now)?now.delegate.resize?.(v):resizeSelected(now,v))){st.sizeIndex=i;sync();return}
+        st.sizeIndex=i;applyDelegate();sync()});b.querySelector('i').style.setProperty('--d',(5+i*4)+'px');b.setAttribute('aria-pressed',String(i===st.sizeIndex));return b}));
     const mine=isDelegate(s)?null:itemsOf(s);
     undoBtn.disabled=isDelegate(s)?!s.delegate.undo:!(history.get(hk(s))||[]).length;
-    clearBtn.disabled=isDelegate(s)?!s.delegate.clear:!mine.length;
-    placeShapeMenu();layoutCapture();scheduleRender();
+    clearBtn.disabled=isDelegate(s)?!(s.delegate.clear||s.delegate.clearMenu):!mine.length;
+    // Page buttons (Students, Lesson, More...). Rebuilt only when something about them changed.
+    const acts=actionsFn?listOf(actionsFn,actionContext()):[],actSig=itemSig(acts);
+    if(actionBox.dataset.sig!==actSig){
+      actionBox.dataset.sig=actSig;
+      actionBox.replaceChildren(...acts.map(item=>{const b=itemButton(item,'fa-small fa-act',()=>actionClick(item));if(item.items)b.setAttribute('aria-haspopup','true');return b}));
+    }
+    actionBox.hidden=!acts.length;
+    // On a short screen the tools sit two in a row with no names, so the toolbar still fits without scrolling.
+    root.classList.remove('fa-compact');
+    if(open&&bar.scrollHeight>bar.clientHeight+1)root.classList.add('fa-compact');
+    renderFly();layoutCapture();scheduleRender();
   }
   function layoutCapture(){
     const s=surface(),r=s.rect?.();
@@ -384,7 +579,7 @@
   capture.addEventListener('pointerdown',e=>{
     if(e.button!==0||pid!==null)return;
     const s=surface(),p=rel(e,s);if(!p)return;
-    shapeMenu.hidden=true;
+    closeFly();
     e.preventDefault();e.stopPropagation();
     if(st.tool==='text'){
       const hit=topHit(s,p,true);
@@ -395,6 +590,9 @@
     if(editor)finishEditor(true);
     pid=e.pointerId;try{capture.setPointerCapture(pid)}catch{}
     if(st.tool==='select'){
+      // A handle of the mark that is already picked comes first: drag it to resize.
+      const picked=selected&&itemsOf(s).find(i=>i.id===selected),handle=picked&&handleAt(picked,p.px,p.py,p.w,p.h);
+      if(handle){drag={start:p,item:picked,resize:handle.id,points:picked.points,moved:false};scheduleRender();return}
       const hit=topHit(s,p,true);selected=hit?hit.id:null;
       drag=hit?{start:p,item:hit,moved:false}:null;scheduleRender();return;
     }
@@ -411,7 +609,9 @@
     if(st.tool==='select'){
       if(!drag)return;const dx=p.x-drag.start.x,dy=p.y-drag.start.y;
       if(!drag.moved&&Math.hypot(p.px-drag.start.px,p.py-drag.start.py)<3)return;
-      drag.moved=true;drag.dx=dx;drag.dy=dy;scheduleRender();return;
+      drag.moved=true;
+      if(drag.resize)drag.points=resizePoints(drag.item,drag.resize,p.x,p.y);else{drag.dx=dx;drag.dy=dy}
+      scheduleRender();return;
     }
     if(st.tool==='eraser'){if(drag)eraseAt(s,p);return}
     if(!draft)return;
@@ -430,7 +630,7 @@
     if(e&&e.pointerId!==pid)return;pid=null;
     const s=surface();
     if(st.tool==='select'){
-      if(drag?.moved&&!cancel)moveItem(s,drag.item,drag.dx,drag.dy);
+      if(drag?.moved&&!cancel){if(drag.resize)changeItem(s,drag.item,{points:drag.points.map(q=>({x:round(q.x),y:round(q.y)}))});else moveItem(s,drag.item,drag.dx,drag.dy)}
       drag=null;scheduleRender();return;
     }
     if(st.tool==='eraser'){
@@ -462,12 +662,36 @@
     for(const it of items)if(!keep.includes(it))drag.erased.add(it.id);
     try{s.setItems(keep)}catch{}if(selected&&!keep.some(i=>i.id===selected))selected=null;scheduleRender();
   }
+  // Put a changed copy of a mark in its place (moved, resized or recolored) and keep it picked.
+  function changeItem(s,item,patch){
+    const next={...item,...patch,id:newId(s.idPrefix)};
+    commit(s,itemsOf(s).map(i=>i.id===item.id?next:i));selected=next.id;scheduleRender();
+  }
   function moveItem(s,item,dx,dy){
-    // Keep the whole mark on the surface.
-    const xs=item.points.map(p=>p.x),ys=item.points.map(p=>p.y);
-    dx=Math.max(-Math.min(...xs),Math.min(1-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(1-Math.max(...ys),dy));
-    const moved={...item,id:newId(s.idPrefix),points:item.points.map(p=>({x:round(p.x+dx),y:round(p.y+dy)}))};
-    commit(s,itemsOf(s).map(i=>i.id===item.id?moved:i));selected=moved.id;scheduleRender();
+    changeItem(s,item,{points:movePoints(item,dx,dy).map(p=>({x:round(p.x),y:round(p.y)}))});
+  }
+  // Give the picked mark another size (line thickness, or the size of words). True when a mark is picked.
+  function resizeSelected(s,size){
+    const item=selected&&!isDelegate(s)&&itemsOf(s).find(i=>i.id===selected);
+    if(!item||!Number.isFinite(size)||size<.001||size>.06)return false;
+    if(item.size!==size)changeItem(s,item,{size});
+    return true;
+  }
+  // Give the picked mark another color. True when a mark is picked (so the tool stays on Select).
+  function recolorSelected(s,color){
+    const item=selected&&!isDelegate(s)&&itemsOf(s).find(i=>i.id===selected);
+    if(!item||!/^#[0-9a-f]{6}$/i.test(color||''))return false;
+    if(item.color!==color.toLowerCase())changeItem(s,item,{color:color.toLowerCase()});
+    return true;
+  }
+  // One arrow-key step of `px` screen pixels for the picked mark, as a fraction of the surface. True when a mark moved.
+  const ARROW_STEP={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+  function nudgeSelected(direction,px){
+    const s=surface();if(!selected||isDelegate(s))return false;
+    const item=itemsOf(s).find(i=>i.id===selected),r=s.rect();
+    if(!item||!r||!r.width||!r.height)return false;
+    moveItem(s,item,direction[0]*px/r.width,direction[1]*px/r.height);
+    return true;
   }
   function deleteSelected(){
     const s=surface();if(!selected||isDelegate(s))return false;
@@ -524,10 +748,22 @@
 
   // Keyboard: Delete removes the selected mark, Ctrl+Z undoes, Escape lets go.
   document.addEventListener('keydown',e=>{
-    if(mode!=='open'||root.hidden)return;
+    if(mode==='hidden'||root.hidden)return;
     if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+    // One-letter shortcuts a surface asks for (the lesson: P, H, B, D, E, U). They also work while shrunk to the pencil.
+    const s=surface(),hot=!e.ctrlKey&&!e.metaKey&&!e.altKey&&s.keys?s.keys[String(e.key).toLowerCase()]:null;
+    if(hot){
+      if(hot==='undo')undo();
+      else if(supports(s,hot.tool)&&(!hot.variant||(variantsOf(s,hot.tool)||[]).some(k=>k[0]===hot.variant))){if(hot.variant)setVariant(hot.tool,hot.variant);chooseTool(hot.tool)}
+      return;
+    }
+    if(mode!=='open')return;
     if((e.key==='Delete'||e.key==='Backspace')&&selected){if(deleteSelected()){e.preventDefault();e.stopPropagation()}}
-    else if(e.key==='Escape'&&(selected||!shapeMenu.hidden)){selected=null;shapeMenu.hidden=true;scheduleRender()}
+    // Arrow keys move the picked mark 1 pixel (Shift: 10); the page does not scroll while a mark is picked.
+    else if(selected&&ARROW_STEP[e.key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){if(nudgeSelected(ARROW_STEP[e.key],e.shiftKey?10:1)){e.preventDefault();e.stopPropagation()}}
+    // Escape closes an open little menu first (and nothing else, so a full-screen lesson stays open).
+    else if(e.key==='Escape'&&flyOpen){e.stopPropagation();closeFly()}
+    else if(e.key==='Escape'&&selected){selected=null;scheduleRender()}
     else if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'&&CAPTURES.has(st.tool)){e.preventDefault();e.stopPropagation();undo()}
   },true);
 
@@ -542,7 +778,7 @@
       if(!start)return;const r=bar.getBoundingClientRect();
       const left=Math.max(4,Math.min(window.innerWidth-r.width-4,start.left+e.clientX-start.x));
       const top=Math.max(4,Math.min(window.innerHeight-r.height-4,start.top+e.clientY-start.y));
-      Object.assign(bar.style,{left:left+'px',top:top+'px',right:'auto'});placeShapeMenu();
+      Object.assign(bar.style,{left:left+'px',top:top+'px',right:'auto',bottom:'auto',transform:'none'});placeFly();
     });
     const end=()=>{start=null;grip.style.cursor=''};grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
   })();
@@ -616,18 +852,21 @@
     const at=p=>[r.left+p.x*r.width,r.top+p.y*r.height];
     ctx.save();ctx.beginPath();ctx.rect(r.left,r.top,r.width,r.height);ctx.clip();
     let items=s.renders?[]:itemsOf(s);
-    if(drag?.moved&&drag.item){
-      const moved={...drag.item,points:drag.item.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))};
-      if(s.renders)items=[moved];else items=items.map(i=>i.id===drag.item.id?moved:i);
-    }
+    // While a mark is dragged or resized, show where it will land.
+    const moving=drag?.moved&&drag.item?{...drag.item,points:drag.resize?drag.points:drag.item.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))}:null;
+    if(moving){if(s.renders)items=[moving];else items=items.map(i=>i.id===drag.item.id?moving:i)}
     for(const it of items)drawItem(ctx,it,at,r.width);
     if(draft&&!s.renders)drawItem(ctx,draft,at,r.width);
     // Selection box.
     const sel=selected&&itemsOf(s).find(i=>i.id===selected);
     if(sel&&mode==='open'){
-      const shown=drag?.moved&&drag.item.id===sel.id?{...sel,points:sel.points.map(p=>({x:p.x+drag.dx,y:p.y+drag.dy}))}:sel;
+      const shown=moving&&drag.item.id===sel.id?moving:sel;
       const b=boxOf(shown,r.width,r.height);
       ctx.setLineDash([6,4]);ctx.strokeStyle='#2563eb';ctx.lineWidth=1.5;ctx.strokeRect(r.left+b.x1-4,r.top+b.y1-4,b.x2-b.x1+8,b.y2-b.y1+8);ctx.setLineDash([]);
+      // Handles: drag one to resize.
+      if(st.tool==='select')for(const k of handlesOf(shown)){
+        const [x,y]=at(k);ctx.fillStyle='#fff';ctx.fillRect(x-5,y-5,10,10);ctx.strokeRect(x-5,y-5,10,10);
+      }
     }
     if(laser&&!s.drawsPoint&&mode==='open'&&st.tool==='pointer'){
       const [x,y]=at(laser);
@@ -637,7 +876,7 @@
     }
     ctx.restore();
   }
-  window.addEventListener('resize',()=>{placeShapeMenu();sync()});
+  window.addEventListener('resize',()=>sync());
   // Pushed surfaces (a board or a video) can move or resize without telling us.
   setInterval(()=>{
     if(root.hidden)return;const s=surface();
@@ -668,7 +907,9 @@
       sync();
     },
     // A surface: {id, label, rect(), getItems(), setItems(list), live?(draft,point), idPrefix, renders?, drawsPoint?,
-    //   defaultTool?, tools?, colors?, sizes?(tool), maxItems?, maxPoints?, autoOpen?, delegate?}
+    //   defaultTool?, tools?, colors?, defaultColor?, sizes?(tool), maxItems?, maxPoints?, autoOpen?, delegate?,
+    //   variants?: {tool: [[id, icon, name], ...]}, keys?: {letter: 'undo' | {tool, variant?}}}
+    // delegate: {apply({tool, shape, variant, color, size, open}), minimized?(), undo?(), clear?(), clearMenu?: items}
     push(s){
       if(!s||stack.includes(s))return;stack.push(s);mount();
       if(s.autoOpen&&visible()){mode='open';autoOpened=true;st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:st.tool;lastSurface=null}
@@ -682,13 +923,20 @@
       sync();
     },
     refresh(){sync()},
-    // 'left' (default) or 'right': where the toolbar and pencil sit, for pages with their own tools on the left.
-    setSide(side){root.dataset.side=side==='right'?'right':'left';bar.style.left='';bar.style.top='';bar.style.right='';sync()},
+    // Page buttons under the drawing tools. fn({surface, role, mode}) returns a list of items:
+    //   {id, icon, label, title, onClick} or {id, icon, label, title, items} where items is a list (or a function
+    //   that returns one) of menu rows: {icon, label, onClick, heading?, danger?, pressed?, disabled?, hidden?, keepOpen?}.
+    // Extra item switches: primary (stands out), danger (red), badge (small count), disabled, hidden.
+    setActions(fn){actionsFn=typeof fn==='function'?fn:null;sync()},
+    // Where the open toolbar is on the screen (null while it is hidden or shrunk to the pencil).
+    barRect(){return mode==='open'&&!root.hidden?bar.getBoundingClientRect():null},
     // Pick a tool from code (for example: a whiteboard starts with a black pen).
-    select(tool,opts={}){if(opts.shape)st.shape=opts.shape;if(opts.color&&toolColors[tool])toolColors[tool]=opts.color;if(opts.color)st.color=opts.color;chooseTool(tool)},
+    select(tool,opts={}){if(opts.shape)st.shape=opts.shape;if(opts.variant)setVariant(tool,opts.variant);if(opts.color&&toolColors[tool])toolColors[tool]=opts.color;if(opts.color)st.color=opts.color;chooseTool(tool)},
     open(){openBar(false)},
     minimize,
     state:()=>({role,mode,tool:st.tool,reasons:[...reasons],surface:surface().id}),
+    // Move / resize helpers for marks, shared with the teacher's lesson (pdf-mode.js).
+    geometry,
     // True for the toolbar, the pencil and the drawing layer (pages with an activity lock let these through).
     owns(node){return !root.hidden&&!!node&&root.contains(node)}
   };

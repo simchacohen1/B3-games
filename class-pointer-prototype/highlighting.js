@@ -27,7 +27,7 @@ window.createClassHighlighter=function(options){
     if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...ink});
     if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...ink});
     if(stroke.tool==='pen-arrow'){const g=svg('g');g.appendChild(svg('line',{x1,y1,x2,y2,...ink}));const a=Math.atan2(y2-y1,x2-x1),r=Math.max(width*4,10);g.appendChild(svg('path',{d:`M${x2-r*Math.cos(a-0.5)} ${y2-r*Math.sin(a-0.5)} L${x2} ${y2} L${x2-r*Math.cos(a+0.5)} ${y2-r*Math.sin(a+0.5)}`,...ink}));return g;}
-    if(stroke.tool==='text'){const t=svg('text',{x:x1,y:y1,'font-size':Math.max(16,stroke.size*w*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text)?'rtl':'ltr'});t.textContent=stroke.text||'';return t;}
+    if(stroke.tool==='text'){const t=svg('text',{x:x1,y:y1,'font-size':Math.max(4,stroke.size*w*2.4),...(stroke.bold?{'font-weight':'700'}:{}),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text)?'rtl':'ltr'});t.textContent=stroke.text||'';return t;}
     const points=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
     return svg('path',{d:points.map((p,i)=>(i?'L':'M')+p.x*w+' '+p.y*h).join(' '),fill:'none',stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round'});
   }
