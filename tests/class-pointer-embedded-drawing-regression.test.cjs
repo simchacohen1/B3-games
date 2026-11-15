@@ -10,7 +10,7 @@ test('embedded student teacher lesson offers drawing controls in the existing ov
  const s=read('activity-share.js');
  assert.match(s,/fttTeacherLessonOverlay/);
  assert.match(s,/fttLessonDrawTools/);
- assert.match(s,/lessonModes=\[\['point'/);
+ assert.match(s,/lessonModes=\[\['select','🖱️','Select'\],\['point'/);
  assert.match(s,/\['highlight'/);
  assert.match(s,/\['pen'/);
  assert.match(s,/lessonStage\.append\(lessonVideo,markLayer,pointerLayer,hitLayer\)/);
