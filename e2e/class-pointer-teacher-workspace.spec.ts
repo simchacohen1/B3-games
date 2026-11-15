@@ -248,7 +248,7 @@ test('teacher pastes editable text onto the shared whiteboard and can edit it', 
   await expect(mark).toBeVisible();
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('Updated lesson note');
-  await page.getByRole('button', { name: 'Save text' }).click();
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(1);
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveText('Updated lesson note');
   expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().some((s: any) => s.tool === 'text' && s.text === 'Updated lesson note'))).toBe(true);
@@ -292,9 +292,11 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
 
   await choosePenShape(page, 'T Text box', 'text');
   await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
-  await expect(page.locator('#pdfTextEditDialog')).toBeVisible();
+  // The words are typed in a text box on the board itself; there is no popup.
+  await expect(page.locator('#pdfTextEditDialog')).toHaveCount(0);
+  await expect(page.locator('#pdfContent textarea.board-text-inline')).toBeVisible();
   await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
-  await page.getByRole('button', { name: 'Save text' }).click();
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
   const textMarks = page.locator('#pdfInk text[data-text-mark]');
   await expect(textMarks).toHaveCount(2);
   await expect(textMarks.nth(0)).toHaveText('שלום עולם');
@@ -303,7 +305,7 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
 
   await page.getByRole('button', { name: '✏ Edit latest text' }).click();
   await page.locator('#pdfTextEditInput').fill('תיקון ראשון\nתיקון שני');
-  await page.getByRole('button', { name: 'Save text' }).click();
+  await page.locator('#pdfTextEditInput').press('Control+Enter');
   // The two lines are one block: editing replaces both, not only the last line.
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(2);
   await expect(page.locator('#pdfInk text[data-text-mark]').nth(0)).toHaveText('תיקון ראשון');

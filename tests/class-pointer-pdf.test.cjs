@@ -21,9 +21,9 @@ test('zoom steps move one at a time and stay inside the limits',()=>{
   assert.equal(P.nextZoom(1.1,1),1.25);assert.equal(P.nextZoom(1.1,-1),1);
 });
 test('a student only accepts a sane view from the teacher',()=>{
-  assert.deepEqual(P.cleanView({zoom:2,top:0.5,left:0.25}),{zoom:2,top:0.5,left:0.25,spread:false,rtl:false,shift:false});
-  assert.deepEqual(P.cleanView({zoom:99,top:-4,left:9}),{zoom:4,top:0,left:1,spread:false,rtl:false,shift:false});
-  assert.deepEqual(P.cleanView({zoom:1,top:0,left:0,spread:true,rtl:true,shift:'yes'}),{zoom:1,top:0,left:0,spread:true,rtl:true,shift:false});
+  assert.deepEqual(P.cleanView({zoom:2,top:0.5,left:0.25}),{zoom:2,top:0.5,left:0.25,spread:false,rtl:false,shift:false,whole:false});
+  assert.deepEqual(P.cleanView({zoom:99,top:-4,left:9}),{zoom:4,top:0,left:1,spread:false,rtl:false,shift:false,whole:false});
+  assert.deepEqual(P.cleanView({zoom:1,top:0,left:0,spread:true,rtl:true,shift:'yes'}),{zoom:1,top:0,left:0,spread:true,rtl:true,shift:false,whole:false});
   assert.equal(P.cleanView({zoom:'x',top:0,left:0}),null);assert.equal(P.cleanView(null),null);assert.equal(P.cleanView({zoom:1,top:NaN,left:0}),null);
 });
 test('file offers are checked for size and chunk count',()=>{

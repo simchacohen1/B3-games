@@ -12,6 +12,9 @@
   const pdfjs=window.pdfjsLib;
   const Web=window.ClassPointerWebpageCore;
   let webMode=false,opening=0,docLabel='webpage';
+  // A whiteboard is shown whole: at 100% all of it fits in the lesson area, with nothing to scroll. A PDF or a
+  // webpage fits the width, as before. Students are told which with every view the teacher sends (whole).
+  let fitWhole=false;
   function navWord(){return webMode?(docLabel==='whiteboard'?'Whiteboard':'Webpage'):'PDF'}
 
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
@@ -24,7 +27,6 @@
   let selectedId=null,edit=null,erasePid=null,inlineEdit=null;
   let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
-  let textEditStroke=null;
 
   function el(tag,id,cls,text){const node=document.createElement(tag);if(id)node.id=id;if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
   function svg(tag,attrs){const node=document.createElementNS(ns,tag);for(const key in attrs)node.setAttribute(key,String(attrs[key]));return node}
@@ -35,23 +37,6 @@
   stage.insertBefore(scroller,$('highlightLayer'));
   const note=el('div','pdfNote');note.hidden=true;note.setAttribute('role','status');stage.appendChild(note);
   function showNote(text){note.textContent=text||'';note.hidden=!text}
-  const textEditDialog=el('dialog','pdfTextEditDialog'),textEditForm=el('form');textEditForm.method='dialog';
-  const textEditLabel=el('label',null,null,'Edit whiteboard text');textEditLabel.htmlFor='pdfTextEditInput';
-  const textEditInput=el('textarea','pdfTextEditInput');textEditInput.maxLength=2000;textEditInput.rows=4;
-  const textEditSave=el('button',null,null,'Save text');textEditSave.type='submit';
-  const textEditCancel=el('button',null,null,'Cancel');textEditCancel.type='button';textEditCancel.addEventListener('click',()=>textEditDialog.close());
-  textEditForm.append(textEditLabel,textEditInput,textEditSave,textEditCancel);textEditDialog.appendChild(textEditForm);stage.appendChild(textEditDialog);
-  textEditForm.addEventListener('submit',event=>{
-    event.preventDefault();textEditDialog.close();const stroke=textEditStroke;textEditStroke=null;if(!stroke)return;
-    if(stroke.id)replaceTextStroke(stroke,textEditInput.value);
-    else addTextStroke(stroke.points[0],textEditInput.value,stroke.size,stroke.color);
-  });
-  // Words that are already on the board open as their whole block: every line, one under the other.
-  function openTextEditor(stroke){
-    const block=stroke.id?textBlock(stroke,B.highlights?.()||strokes):[stroke];
-    textEditStroke=stroke.id?{...stroke,block}:stroke;textEditInput.value=stroke.id?blockFrame(block).text:stroke.text;
-    textEditDialog.showModal();textEditInput.focus();textEditInput.select();
-  }
   // ---------- Words on the lesson: one block that is laid out again when it changes ----------
   // A block is one text mark per line (that is what every student page draws). The lines share a block id; a
   // line that only wrapped is marked soft, so a smaller size or a wider box lets the lines join up again.
@@ -84,20 +69,32 @@
     const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
     return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,[fixX]:f[fixX],[fixY]:f[fixY]});
   }
-  // ---------- Changing words right on the board ----------
-  // A plain text box is laid over the block: same place, color, size and width. While it is open the block's
-  // own lines are not drawn. Clicking anywhere else (or Ctrl+Enter) keeps the change; Escape drops it.
-  function editInline(stroke){
+  // ---------- Typing right on the board ----------
+  // All typing happens in a plain text box laid on the board; there is no popup.
+  //  • words that are already there (target = their text mark): the box sits on the block, same place, color,
+  //    size and width, and the block's own lines are not drawn under it;
+  //  • new words (target = {point,color,size}): the box is centered on the spot that was clicked.
+  // Clicking anywhere else (or Ctrl+Enter) keeps what was typed; Escape drops it.
+  function editInline(target){
     finishInline(true);
-    const block=textBlock(stroke,B.highlights?.()||strokes),f=blockFrame(block),margin=.04;
-    // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
-    // the board, so a longer sentence has room; the words are laid out properly when the box closes.
-    const left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left,right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
-    const box=el('textarea',null,'board-text-inline');
-    box.dataset.stageUi='true';box.value=f.text;box.maxLength=2000;box.dir=f.rtl?'rtl':'ltr';box.spellcheck=false;box.rows=1;
-    box.setAttribute('aria-label','Change the words on the board');
-    Object.assign(box.style,{left:left*100+'%',top:f.top*100+'%',width:(right-left)*100+'%',color:block[0].color});
-    inlineEdit={stroke:{...stroke,block},ids:new Set(block.map(item=>item.id)),box,size:f.size,before:f.text};
+    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null;
+    if(fresh){
+      const half=Math.max(.1,Math.min(target.point.x-margin,1-margin-target.point.x));
+      size=target.size;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
+      top=Math.max(0,Math.min(1-lineStep(size),target.point.y-lineStep(size)/2));
+    }else{
+      block=textBlock(target,B.highlights?.()||strokes);const f=blockFrame(block);
+      size=f.size;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
+      // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
+      // the board, so a longer sentence has room; the words are laid out properly when the box closes.
+      left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left;right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
+    }
+    const box=el('textarea','pdfTextEditInput','board-text-inline'+(fresh?' fresh':''));
+    box.dataset.stageUi='true';box.value=value;box.maxLength=2000;box.dir=fresh?'auto':rtl?'rtl':'ltr';box.spellcheck=false;box.rows=1;
+    box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
+    if(fresh)box.placeholder='Type here';
+    Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color});
+    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,before:value};
     content.appendChild(box);sizeInline();drawInk();
     box.focus();box.setSelectionRange(box.value.length,box.value.length);
     // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
@@ -109,7 +106,7 @@
     });
     box.addEventListener('input',sizeInline);
     box.addEventListener('blur',()=>finishInline(true));
-    B.status('Type to change the words. Click anywhere else when you are done. Esc cancels.');
+    B.status(fresh?'Type the words. Click anywhere else when you are done. Esc cancels.':'Type to change the words. Click anywhere else when you are done. Esc cancels.');
   }
   // The letters in the box are the size they are on the board; the box is as tall as its lines.
   function sizeInline(){
@@ -120,13 +117,15 @@
   function finishInline(save){
     const open=inlineEdit;if(!open)return;inlineEdit=null;
     const text=open.box.value;open.box.remove();
-    if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
+    if(open.create){if(save&&text.trim())addTextStroke(open.create,text)}
+    else if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
     else if(save&&text!==open.before)replaceTextStroke(open.stroke,text);
     drawInk();
   }
   window.addEventListener('resize',sizeInline);
-  function addTextStroke(point,text,size,color){
-    const made=flow(text,{size,color,center:point});
+  // New words where the typing box was: centered on the clicked spot, first line where the box's line was.
+  function addTextStroke(spot,text){
+    const made=flow(text,{size:spot.size,color:spot.color,center:spot.point,top:spot.top});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
     made.strokes.forEach(stroke=>B.submitStroke(stroke));
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
@@ -267,7 +266,7 @@
     button('－','Zoom out',()=>setZoom(P.nextZoom(zoom,-1)),'pdf-btn pdf-zoom');
     zoomLabel=el('span',null,'pdf-zoom-label','100%');nav.appendChild(zoomLabel);
     button('＋','Zoom in',()=>setZoom(P.nextZoom(zoom,1)),'pdf-btn pdf-zoom');
-    button('↔ Fit width','Fit the page to the width of the lesson',()=>setZoom(1,true));
+    button('↔ Fit width','Fit the page to the width of the lesson. A whiteboard is shown whole.',()=>setZoom(1,true));
     nav.appendChild(el('span',null,'pdf-sep'));
     twoBtn=button('⧉ Two pages','Show two pages side by side (drawings are cleared when you switch)',()=>changeLayout({spread:!layoutOpts.spread,shift:!layoutOpts.spread}),'pdf-btn pdf-two');
     flipBtn=button('⇄ Flip sides','Swap which side the first page of each pair is on',()=>changeLayout({rtl:!layoutOpts.rtl}),'pdf-btn pdf-spread-only');
@@ -292,12 +291,15 @@
   // ---------- Layout ----------
   function notReady(){return !lay}
   function currentView(){
-    if(notReady()||!H)return{zoom,top:0,left:0,...layoutOpts};
-    return{zoom,top:P.clamp(scroller.scrollTop/H,0,1),left:W>scroller.clientWidth?P.clamp(scroller.scrollLeft/W,0,1):0,...layoutOpts};
+    if(notReady()||!H)return{zoom,top:0,left:0,...layoutOpts,whole:fitWhole};
+    return{zoom,top:P.clamp(scroller.scrollTop/H,0,1),left:W>scroller.clientWidth?P.clamp(scroller.scrollLeft/W,0,1):0,...layoutOpts,whole:fitWhole};
   }
   function relayout(){
     if(notReady())return;
-    const cw=Math.max(80,scroller.clientWidth);W=cw*zoom;H=W*lay.total;
+    const cw=Math.max(80,scroller.clientWidth),ch=Math.max(80,scroller.clientHeight);
+    // 100% is the full width of the lesson area, or, for a whiteboard, the biggest size at which all of it shows.
+    const base=fitWhole&&lay.total>0?Math.min(cw,Math.floor(ch/lay.total)):cw;
+    W=base*zoom;H=W*lay.total;
     content.style.width=W+'px';content.style.height=H+'px';
     pageEls.forEach((node,i)=>{node.style.top=(lay.tops[i]*W)+'px';node.style.height=(lay.heights[i]*W)+'px';node.style.left=(lay.lefts[i]*W)+'px';node.style.width=(lay.widths[i]*W)+'px'});
     if(webMode){const iframe=pageEls[0]?.querySelector('iframe');if(iframe)iframe.style.transform='scale('+(W/Web.WIDTH)+')'}
@@ -307,6 +309,7 @@
   function applyView(view){
     if(notReady())return;
     quietUntil=Date.now()+150;zoom=view.zoom;
+    if(!isTeacher&&'whole' in view)fitWhole=view.whole===true;
     if(!isTeacher&&'spread' in view&&(view.spread!==layoutOpts.spread||view.rtl!==layoutOpts.rtl||view.shift!==layoutOpts.shift)){layoutOpts={spread:view.spread,rtl:view.rtl,shift:view.shift};lay=P.layout(ratiosList,layoutOpts)}
     relayout();
     scroller.scrollTop=view.top*H;scroller.scrollLeft=view.left*W;
@@ -521,21 +524,32 @@
     if(notReady())return null;const r=content.getBoundingClientRect();if(!r.width||!r.height)return null;
     return{x:Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.top)/r.height)),px:event.clientX-r.left,py:event.clientY-r.top,w:r.width,h:r.height};
   }
+  // Is the pointer on something the arrow can grab: a handle of the picked mark, or one of my marks?
+  function grabAt(event){
+    if(!selecting()||notReady())return false;
+    const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
+    if(picked&&at){
+      if(picked.tool==='text'){if(textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
+      else if(G?.handleAt(picked,at.px,at.py,at.w,at.h,12))return true;
+    }
+    return !!teacherMarkAt(event,normalized(event),true);
+  }
+  // Starts picking, dragging or resizing. False when nothing was under the pointer (then the click is the mouse's).
   function startSelect(event,p){
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
     if(picked?.tool==='text'&&at){
       const group=textBlock(picked),frame=blockFrame(group),grip=textHandles(frame).find(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12);
-      if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
+      if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
     }
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
-    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return}
+    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
     const hit=teacherMarkAt(event,p,true);
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
     // Words move as a whole block, every line together.
     if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,again,pid:event.pointerId};content.setPointerCapture(edit.pid)}
-    drawInk();
+    drawInk();return !!hit;
   }
   function moveSelect(event){
     const G=geometry(),at=clampedPoint(event);if(!G||!at)return;
@@ -665,22 +679,25 @@
   function editLatestText(){
     const stroke=[...(B.highlights?.()||[])].reverse().find(item=>item.tool==='text'&&item.owner==='teacher');
     if(!stroke){B.status('There is no teacher text to edit yet.');return}
-    openTextEditor(stroke);
+    editInline(stroke);
   }
   content.addEventListener('pointerdown',event=>{
-    // A click on the board while words are being typed keeps what was typed and closes the box.
-    if(inlineEdit)finishInline(true);
+    // A click on the board while words are being typed keeps what was typed and closes the box. That click does
+    // nothing else (with the Text tool it would otherwise open a new box right away).
+    if(inlineEdit){finishInline(true);event.preventDefault();event.stopPropagation();return}
     if(isTeacher&&event.button===0){
-      const tool=$(toolId).value,p=normalized(event),ready=!B.navigating()&&!notReady()&&B.live()&&B.writingAllowed();
+      const tool=$(toolId).value,p=normalized(event),usable=!notReady()&&B.live()&&B.writingAllowed(),ready=usable&&!B.navigating();
       // Select: pick, drag, resize. Eraser: rub out my marks. Text: click my words to change them, or an empty
       // spot for new words. Every other tool draws, also on top of words.
-      if(tool==='select'){if(!ready||!p)return;event.preventDefault();event.stopPropagation();startSelect(event,p);return}
+      // The arrow: a click on one of my marks picks it; a click on nothing is a plain mouse click (the page is
+      // dragged, a link is opened), so it is not swallowed here.
+      if(tool==='select'){if(!usable||!p)return;if(startSelect(event,p)){event.preventDefault();event.stopPropagation()}return}
       if(tool==='eraser'){if(!ready||!p)return;event.preventDefault();event.stopPropagation();erasePid=event.pointerId;content.setPointerCapture(erasePid);eraseUnder(event);return}
       if(tool==='text'&&ready){
         if(!p)return;event.preventDefault();event.stopPropagation();
         const words=teacherMarkAt(event,p,true);
         if(words?.tool==='text'){editInline(words);return}
-        openTextEditor({tool:'text',color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],text:'',owner:'teacher'});return;
+        editInline({point:p,color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value)});return;
       }
     }
     const tool=$(toolId).value;
@@ -712,6 +729,7 @@
 
   // ---------- Opening and closing ----------
   async function loadDoc(data,noCopy){
+    if(isTeacher)fitWhole=false; // a PDF fits the width
     if(!pdfjs)throw new Error('The PDF reader could not load. Refresh the page and try again.');
     pdfjs.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=3.11.174';
     const token=++loadToken;unload(false);loadToken=token;
@@ -791,9 +809,9 @@
       if(data.length>Web.MAX_BYTES)throw Error('This webpage is larger than 8 MB.');
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
-      docLabel='webpage';await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
+      docLabel='webpage';fitWhole=false;await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
       showNote('');B.resetMarks();B.setPdf(true,'webpage');
-      B.status('Webpage open in 🖱 Mouse mode: scroll it, drag to move it, click a link to open it for the class. Students follow you. Pick a tool on the left to point or draw.');
+      B.status('Webpage open. The ↖ arrow is your mouse: scroll, drag the page, click a link to open it for the class. Students follow you. Pick another tool on the left to point or draw.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
     }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
     finally{$('openWebpage').disabled=false}
@@ -815,6 +833,8 @@
       await loadWebDoc(data);if(opening!==committed)return;
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
       boardSize=board?{w:width,h:height}:null;
+      // The whole board at a glance; a captured tab keeps fitting the width.
+      fitWhole=!!board;relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
       if(board)startBoardPresentation(dataUrl);
       B.status(board?(opts.status||'Whiteboard open.')+' Press Ctrl+V or 📋 Paste to put a copied picture or words on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
@@ -1009,7 +1029,7 @@
     image.alt='';image.draggable=false;image.src=url;pageUrls.set(i,url);
     pageEls[i].dataset.label='';pageEls[i].replaceChildren(image);if(old)setTimeout(()=>URL.revokeObjectURL(old),2000);
   }
-  function studentReset(){layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
+  function studentReset(){fitWhole=false;layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
 
   // Static snapshots may be inside a sandboxed frame. Capture panning at the
   // lesson surface before the frame or annotation layers can swallow a drag.
@@ -1017,6 +1037,10 @@
   stage.addEventListener('pointerdown',event=>{
     if(!webMode||!isTeacher||!B.navigating()||notReady()||event.button!==0||scroller.hidden||!stage.contains(event.target))return;
     if(event.target.closest?.('[data-stage-ui],button,input,select,textarea'))return;
+    // The arrow on one of my marks (or a handle): that mark is picked instead, by the lesson's own click handler.
+    if(grabAt(event))return;
+    if(inlineEdit)finishInline(true);
+    if(selectedId){selectedId=null;drawInk()}
     event.preventDefault();event.stopPropagation();cancelDraft();
     snapshotPan={id:event.pointerId,x:event.clientX,y:event.clientY,left:scroller.scrollLeft,top:scroller.scrollTop};
     stage.setPointerCapture(event.pointerId);

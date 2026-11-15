@@ -99,7 +99,7 @@ test('Select is offered on the teacher whiteboard, PDF and webpage, not on a sha
  assert.match(html,/<option value="eraser">Eraser<\/option><option value="select">Select<\/option>/);
  assert.equal((html.match(/value="select"/g)||[]).length,1,'only in the teacher tool menu');
  assert.match(annotate,/const canSelect=\(\)=>teacher&&allowed\('select'\)&&\['whiteboard','pdf','webpage'\]\.includes\(B\.lessonKind\?\.\(\)\);/);
- assert.match(annotate,/if\(canSelect\(\)\)out\.push\('select'\);/);
+ assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/,'one arrow button: Select where it works, the plain Mouse elsewhere');
  assert.match(annotate,/recolor:color=>!!window\.ClassPointerPdf\?\.recolorSelected\?\.\(color\)/);
  // Select never moves the teacher's pointer for the class.
  assert.match(classroom,/\['eraser','select'\]\.includes\(\$\('teacherTool'\)\.value\)\)\{hideOwnPointer\(\);return\}/);
@@ -120,16 +120,17 @@ test('shapes are solid for the teacher too, not see-through like a highlighter',
 
 test('words are opened for editing only with Text or a second click in Select; other tools draw over them',()=>{
  const down=pdf.slice(pdf.indexOf("content.addEventListener('pointerdown'"),pdf.indexOf('function extend(event)'));
- assert.equal((down.match(/openTextEditor\(/g)||[]).length,1,'one way into the edit box from a click');
+ assert.equal((down.match(/editInline\(/g)||[]).length,2,'a click with the Text tool types on the board: in words that are there, or new words on an empty spot');
+ assert.ok(!down.includes('openTextEditor'),'no popup');
  assert.match(down,/if\(tool==='text'&&ready\)\{/);
- assert.match(down,/if\(tool==='select'\)\{if\(!ready\|\|!p\)return;event\.preventDefault\(\);event\.stopPropagation\(\);startSelect\(event,p\);return\}/);
+ assert.match(down,/if\(tool==='select'\)\{if\(!usable\|\|!p\)return;if\(startSelect\(event,p\)\)\{event\.preventDefault\(\);event\.stopPropagation\(\)\}return\}/);
  assert.match(down,/if\(tool==='eraser'\)\{if\(!ready\|\|!p\)return;[^}]*eraseUnder\(event\);return\}/);
  assert.match(pdf,/function eraseUnder\(event\)\{const p=normalized\(event\),hit=p&&teacherMarkAt\(event,p,false\);if\(hit\)eraseBlock\(hit\)\}/);
 });
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode','classroom-annotate'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes10"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261114-shapes14"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -184,8 +185,8 @@ test('lines of words on the teacher whiteboard are spaced for the real size of t
 
 test('a block of words is edited and removed as one piece',()=>{
  // The edit box opens with every line of the block, and saving replaces the whole block.
- assert.match(pdf,/const block=stroke\.id\?textBlock\(stroke,B\.highlights\?\.\(\)\|\|strokes\):\[stroke\];/);
- assert.match(pdf,/textEditInput\.value=stroke\.id\?blockFrame\(block\)\.text:stroke\.text;/);
+ assert.match(pdf,/block=textBlock\(target,B\.highlights\?\.\(\)\|\|strokes\);const f=blockFrame\(block\);/);
+ assert.match(pdf,/size=f\.size;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
  assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text\}\);/);
  // Delete and the Eraser take every line.
  assert.match(pdf,/function eraseBlock\(stroke\)\{const ids=textBlock\(stroke\)\.map\(item=>item\.id\);return ids\.length>1\?B\.eraseMarks\?\.\(ids\):B\.eraseMark\?\.\(ids\[0\]\)\}/);
@@ -195,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261114-shapes10/);
+ assert.match(html,/classroom\.css\?v=20261114-shapes14/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -291,15 +292,34 @@ test('a paste picks the biggest size at which the words fit on one line',()=>{
 });
 
 // ---------- Mouse mode on the lesson; nothing of the toolbar hidden behind the tabs ----------
-test('the lesson has a clear Mouse button and a webpage starts in Mouse mode',()=>{
- assert.match(annotate,/mouseBtn\.id='cpMouseBtn';mouseBtn\.className='cp-mouse-btn';mouseBtn\.textContent='🖱 Mouse';/);
- assert.match(annotate,/wrap\.insertBefore\(mouseBtn,wrap\.querySelector\('\.cp-switch-wrap'\)\)/);
- assert.match(annotate,/placeMouseBtn\(\);mouseBtn\.hidden=!kind;/);
- assert.match(annotate,/if\(mouseOn\(\)\)\{FA\.select\(lesson\.defaultTool\);return\}/);
- assert.match(annotate,/else if\(kind==='webpage'\)FA\.select\('hand'\);/);
- assert.match(annotate,/toolLabels:\{hand:\['🖱','Mouse',/);
+test('one arrow button is both Select and the mouse on the teacher whiteboard, PDF and webpage',()=>{
+ // The toolbar shows Select (as an arrow) instead of the Mouse there; a shared screen and students keep the Mouse.
+ assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/);
+ assert.match(annotate,/select:\['↖','Select',/);
+ // With the arrow chosen the lesson is in mouse mode: no pointing, no drawing, the page scrolls and drags.
+ assert.match(annotate,/const arrow=tool=>tool==='hand'\|\|tool==='select';/);
+ assert.match(annotate,/B\.setNavigation\?\.\(arrow\(tool\)&&open\);/);
+ assert.equal((annotate.match(/arrow\(s\.tool\)&&!B\.navigating\?\.\(\)\)B\.setNavigation\?\.\(true\);/g)||[]).length,2,'kept on for the teacher and the student');
+ assert.match(annotate,/else if\(kind==='webpage'\)FA\.select\('select'\);/,'a webpage opens on the arrow');
+ assert.ok(!annotate.includes('cpMouseBtn'),'no second button for the mouse');
  // The toolbar shows a surface's own name for a tool.
  assert.match(toolbar,/const own=s\.toolLabels\?\.\[tool\],usual=TOOLS\.find\(t=>t\[0\]===tool\),name=own\?own\[1\]:usual\[2\];/);
+});
+
+test('the arrow picks a drawing that is clicked; a click on nothing is a plain mouse click',()=>{
+ // What the arrow can grab: a handle of the picked mark, or one of the teacher's own marks.
+ assert.match(pdf,/function grabAt\(event\)\{\s*if\(!selecting\(\)\|\|notReady\(\)\)return false;/);
+ assert.match(pdf,/return !!teacherMarkAt\(event,normalized\(event\),true\);/);
+ // Dragging the page never starts on a mark; a click on nothing lets go of the pick and is the mouse's.
+ const pan=pdf.slice(pdf.indexOf('let snapshotPan=null;'),pdf.indexOf("stage.addEventListener('pointermove'",pdf.indexOf('let snapshotPan=null;')));
+ assert.match(pan,/if\(grabAt\(event\)\)return;\s*if\(inlineEdit\)finishInline\(true\);\s*if\(selectedId\)\{selectedId=null;drawInk\(\)\}/);
+ assert.ok(pan.indexOf('if(grabAt(event))return;')<pan.indexOf('snapshotPan={id:event.pointerId'),'checked before the drag starts');
+ // The lesson's own click handler does not swallow a click that picked nothing, so a PDF can still be dragged.
+ assert.match(pdf,/drawInk\(\);return !!hit;/);
+ // Picking works while the lesson is in mouse mode (the eraser and the text tool still need it off).
+ assert.match(pdf,/usable=!notReady\(\)&&B\.live\(\)&&B\.writingAllowed\(\),ready=usable&&!B\.navigating\(\);/);
+ // A normal arrow cursor, not a grabbing hand.
+ assert.match(read('class-pointer-prototype/classroom.css'),/#stage\.mouse-navigation #pdfView,#stage\.mouse-navigation #pdfContent\{cursor:default\}/);
 });
 
 test('in Mouse mode a click on a link in the webpage opens that page for the class',()=>{
@@ -326,7 +346,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes10/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261114-shapes14/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -341,11 +361,12 @@ test('a second click on picked words opens a text box in place, not a popup',()=
 });
 
 test('the text box sits on the block: same place, color, size and width, and the block is not drawn under it',()=>{
- const body=pdf.slice(pdf.indexOf('function editInline(stroke){'),pdf.indexOf('function addTextStroke('));
- assert.match(body,/const block=textBlock\(stroke,B\.highlights\?\.\(\)\|\|strokes\),f=blockFrame\(block\),margin=\.04;/);
- assert.match(body,/Object\.assign\(box\.style,\{left:left\*100\+'%',top:f\.top\*100\+'%',width:\(right-left\)\*100\+'%',color:block\[0\]\.color\}\);/);
- assert.match(body,/const left=f\.boxW\?f\.left:/,'a chosen width is kept');
- assert.match(body,/box\.value=f\.text;/);assert.match(body,/box\.dir=f\.rtl\?'rtl':'ltr';/);
+ const body=pdf.slice(pdf.indexOf('function editInline(target){'),pdf.indexOf('function addTextStroke('));
+ assert.match(body,/block=textBlock\(target,B\.highlights\?\.\(\)\|\|strokes\);const f=blockFrame\(block\);/);
+ assert.match(body,/size=f\.size;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
+ assert.match(body,/Object\.assign\(box\.style,\{left:left\*100\+'%',top:top\*100\+'%',width:\(right-left\)\*100\+'%',color\}\);/);
+ assert.match(body,/left=f\.boxW\?f\.left:/,'a chosen width is kept');
+ assert.match(body,/box\.value=value;/);assert.match(body,/box\.dir=fresh\?'auto':rtl\?'rtl':'ltr';/);
  assert.match(body,/open\.box\.style\.fontSize=Math\.max\(16\*width\/Math\.max\(1,W\),open\.size\*TEXT_SCALE\*width\)\+'px';/);
  assert.match(pdf,/let shown=inlineEdit\?strokes\.filter\(stroke=>!inlineEdit\.ids\.has\(stroke\.id\)\):strokes;/);
  const css=read('class-pointer-prototype/classroom.css');
@@ -353,7 +374,7 @@ test('the text box sits on the block: same place, color, size and width, and the
 });
 
 test('closing the text box keeps the change in place; Escape drops it; empty words are not saved',()=>{
- const body=pdf.slice(pdf.indexOf('function editInline(stroke){'),pdf.indexOf('function addTextStroke('));
+ const body=pdf.slice(pdf.indexOf('function editInline(target){'),pdf.indexOf('function addTextStroke('));
  assert.match(body,/box\.addEventListener\('blur',\(\)=>finishInline\(true\)\);/);
  assert.match(body,/if\(event\.key==='Escape'\)\{event\.preventDefault\(\);finishInline\(false\)\}/);
  assert.match(body,/else if\(save&&text!==open\.before\)replaceTextStroke\(open\.stroke,text\);/);
@@ -362,10 +383,55 @@ test('closing the text box keeps the change in place; Escape drops it; empty wor
  assert.match(body,/for\(const type of \['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'\]\)box\.addEventListener\(type,event=>event\.stopPropagation\(\)\);/);
  assert.match(body,/box\.addEventListener\('keydown',event=>\{\s*event\.stopPropagation\(\);/);
  // A click elsewhere on the board, another tool, or the lesson closing all close the box.
- assert.match(pdf,/if\(inlineEdit\)finishInline\(true\);\s*if\(isTeacher&&event\.button===0\)\{/);
+ assert.match(pdf,/if\(inlineEdit\)\{finishInline\(true\);event\.preventDefault\(\);event\.stopPropagation\(\);return\}\s*if\(isTeacher&&event\.button===0\)\{/,'that click only closes the box');
  assert.match(pdf,/addEventListener\('change',\(\)=>\{erasePid=null;finishInline\(true\);/);
  assert.match(pdf,/function unload\(hide\)\{\s*finishInline\(false\);/);
  // The changed words go back as the same block: same color, size and chosen width, and they stay picked.
  assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text\}\);/);
  assert.match(pdf,/selectedId=selecting\(\)\?ids\[0\]:null;/);
+});
+
+// ---------- The whole whiteboard at a glance ----------
+test('at 100% a whiteboard is shown whole; a PDF or webpage still fits the width',()=>{
+ assert.match(pdf,/const base=fitWhole&&lay\.total>0\?Math\.min\(cw,Math\.floor\(ch\/lay\.total\)\):cw;\s*W=base\*zoom;H=W\*lay\.total;/);
+ assert.match(pdf,/fitWhole=!!board;relayout\(\);scroller\.scrollTop=0;scroller\.scrollLeft=0;/);
+ assert.match(pdf,/docLabel='webpage';fitWhole=false;await loadWebDoc\(data\)/);
+ assert.match(pdf,/if\(isTeacher\)fitWhole=false; \/\/ a PDF fits the width/);
+ // The arithmetic: a 16:9 board in a lesson area 1237 wide and 500 high is 888 wide, so all 500 of height show.
+ const total=9/16,cw=1237,ch=500,base=Math.min(cw,Math.floor(ch/total));
+ assert.equal(base,888);assert.ok(base*total<=ch);
+ // A tall, narrow area is limited by its width instead.
+ assert.equal(Math.min(600,Math.floor(900/total)),600);
+});
+
+test('students are told to show the whiteboard whole too',()=>{
+ const Core=require('../class-pointer-prototype/pdf-core.js');
+ assert.equal(Core.cleanView({zoom:1,top:0,left:0,whole:true}).whole,true);
+ assert.equal(Core.cleanView({zoom:1,top:0,left:0}).whole,false);
+ assert.equal(Core.cleanView({zoom:1,top:0,left:0,whole:'yes'}).whole,false);
+ assert.match(pdf,/return\{zoom,top:P\.clamp\(scroller\.scrollTop\/H,0,1\),left:[^}]*\.\.\.layoutOpts,whole:fitWhole\};/);
+ assert.match(pdf,/if\(!isTeacher&&'whole' in view\)fitWhole=view\.whole===true;/);
+ assert.match(pdf,/function studentReset\(\)\{fitWhole=false;/);
+});
+
+test('the teacher workspace fills the window below whatever is above it, so the window does not scroll',()=>{
+ const css=read('class-pointer-prototype/teacher-dashboard.css');
+ assert.match(css,/body\.teacher-view\.cp-compact-workspace\{display:flex;flex-direction:column;height:100dvh;min-height:0\}/);
+ assert.match(css,/body\.teacher-view\.cp-compact-workspace main\{flex:1 1 0;[^}]*height:auto;min-height:550px;/);
+});
+
+
+test('there is no popup at all: new words and Edit latest text use the text box on the board',()=>{
+ assert.ok(!/pdfTextEditDialog|openTextEditor|showModal\(\);textEditInput|Save text/.test(pdf));
+ // New words: the box is centered on the clicked spot, and the words land where the box was.
+ assert.match(pdf,/editInline\(\{point:p,color:\$\(colorId\)\.value\|\|B\.ownColor\(\),size:Number\(\$\(sizeId\)\.value\)\}\);return;/);
+ assert.match(pdf,/const half=Math\.max\(\.1,Math\.min\(target\.point\.x-margin,1-margin-target\.point\.x\)\);/);
+ assert.match(pdf,/if\(open\.create\)\{if\(save&&text\.trim\(\)\)addTextStroke\(open\.create,text\)\}/);
+ assert.match(pdf,/const made=flow\(text,\{size:spot\.size,color:spot\.color,center:spot\.point,top:spot\.top\}\);/);
+ const made=Clip.flowText('one\ntwo',letters,{size:.02,center:{x:.3,y:.5},top:.4});
+ assert.ok(Math.abs(made.strokes[0].points[0].y-.4)<1e-3,'the first line is where the typing box was');
+ assert.ok(Math.abs((made.frame.left+made.frame.width/2)-.3)<1e-9,'centered on the clicked spot');
+ // Edit latest text: the same box, on the words that were added last.
+ const latest=pdf.slice(pdf.indexOf('function editLatestText(){'),pdf.indexOf("content.addEventListener('pointerdown'"));
+ assert.match(latest,/editInline\(stroke\);/);
 });

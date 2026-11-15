@@ -37,9 +37,11 @@
   // Select (move, resize, recolor, delete a mark) works on the teacher's whiteboard, PDF and webpage marks.
   // A shared screen keeps the old tools only.
   const canSelect=()=>teacher&&allowed('select')&&['whiteboard','pdf','webpage'].includes(B.lessonKind?.());
+  // The arrow: where Select works it is also the mouse (scroll, drag the page, click a link), so there is one
+  // button for both. A shared screen and students keep the plain Mouse.
+  const arrow=tool=>tool==='hand'||tool==='select';
   function tools(){
-    const out=['hand'];
-    if(canSelect())out.push('select');
+    const out=[canSelect()?'select':'hand'];
     if(kinds(POINTERS).length)out.push('pointer');
     if(kinds(HIGHLIGHTS).length)out.push('highlight');
     if(allowed('text'))out.push('text');
@@ -69,9 +71,10 @@
     get tools(){return tools()},
     get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(SHAPES)}},
     // On the lesson the Hand is the Mouse: no pointing, no drawing, the page is used as a page.
-    toolLabels:{hand:['🖱','Mouse',teacher?'Stop pointing and drawing. Scroll the page, drag it to move it, and click a link to open it for the class.':'Stop pointing and drawing, and scroll the page.']},
+    toolLabels:{hand:['🖱','Mouse',teacher?'Stop pointing and drawing, and move the shared screen.':'Stop pointing and drawing, and scroll the page.'],
+      select:['↖','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them. Everything else works like a normal mouse: scroll, drag the page, click a link to open it for the class.']},
     keys:{p:{tool:'pointer'},h:{tool:'highlight',variant:'highlight'},b:{tool:'highlight',variant:'box'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
-    get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. Select moves, resizes and recolors your marks.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
+    get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. The arrow picks your marks and works as your mouse.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
     rect:()=>lessonOn()&&inFront()?stage.getBoundingClientRect():null,
     colors:colors.length?colors:undefined,
     defaultColor:teacher?undefined:'',
@@ -79,7 +82,7 @@
     delegate:{
       apply({tool,variant,color,size,open}){
         if(fromLesson)return;
-        B.setNavigation?.(tool==='hand'&&open);
+        B.setNavigation?.(arrow(tool)&&open);
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
         else if(tool==='shape')set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]));
         else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
@@ -124,7 +127,7 @@
       const sig=on?tools().join()+'|'+[POINTERS,HIGHLIGHTS,SHAPES].map(list=>kinds(list).length).join():'';
       if(sig!==lastSig){lastSig=sig;FA.refresh()}
       const s=FA.state();
-      if(pushed&&s.surface==='classroom'&&s.mode==='open'&&s.tool==='hand'&&!B.navigating?.())B.setNavigation?.(true);
+      if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true);
     };
     setInterval(check,400);check();
     return;
@@ -193,20 +196,6 @@
   // Back on My screen the toolbar starts on the Pointer.
   document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select('pointer')});
 
-  // A clear Mouse button above the lesson, beside Switch lesson and Stop: the same as the toolbar's Mouse tool.
-  const mouseOn=()=>{const s=FA.state();return s.surface==='classroom'&&s.mode==='open'&&s.tool==='hand'};
-  const mouseBtn=document.createElement('button');
-  mouseBtn.type='button';mouseBtn.id='cpMouseBtn';mouseBtn.className='cp-mouse-btn';mouseBtn.textContent='🖱 Mouse';mouseBtn.hidden=true;
-  mouseBtn.title='Mouse: stop pointing and drawing. Scroll the page, drag it to move it, and click a link to open it for the class. Click again to go back to your pointer.';
-  mouseBtn.setAttribute('aria-pressed','false');
-  mouseBtn.addEventListener('click',()=>{
-    if(mouseOn()){FA.select(lesson.defaultTool);return}
-    if(FA.state().mode!=='open')FA.open();
-    FA.select('hand');
-  });
-  // The row above the lesson is built by another script that may load later, so the button is put in when the row exists.
-  function placeMouseBtn(){if(mouseBtn.isConnected)return;const wrap=document.querySelector?.('.cp-live-wrap');if(wrap)wrap.insertBefore(mouseBtn,wrap.querySelector('.cp-switch-wrap'))}
-
   let pushed=false,lastKind=null,lastSig='',wasExpanded=false;
   function check(){
     const kind=B.lessonKind?.()||null,ended=!kind&&!!lastKind;
@@ -217,8 +206,8 @@
       // The toolbar opens by itself for every kind of lesson and shrinks to the pencil when the lesson ends.
       FA.setReason('lesson',!!kind);
       if(kind==='whiteboard')FA.select('pen',{color:black});
-      // A webpage starts in Mouse mode, so it can be scrolled and its links clicked right away.
-      else if(kind==='webpage')FA.select('hand');
+      // A webpage starts on the arrow, so it can be scrolled and its links clicked right away.
+      else if(kind==='webpage')FA.select('select');
       FA.setReason('sharing',kind==='screen');
       FA.setReason('whiteboard',kind==='whiteboard');
     }
@@ -228,11 +217,10 @@
     wasExpanded=full;
     const sig=signature();
     if(sig!==lastSig){lastSig=sig;FA.refresh()}
-    placeMouseBtn();mouseBtn.hidden=!kind;mouseBtn.setAttribute('aria-pressed',String(!!kind&&mouseOn()));
     placeGutter();
     // Hand = the lesson's mouse mode. A key press there turns it off, so keep it on while Hand is chosen.
     const s=FA.state();
-    if(pushed&&s.surface==='classroom'&&s.mode==='open'&&s.tool==='hand'&&!B.navigating?.())B.setNavigation?.(true);
+    if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true);
   }
   setInterval(check,400);check();
 })();

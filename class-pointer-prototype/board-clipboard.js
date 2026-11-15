@@ -134,7 +134,7 @@
     const widths=lines.map(line=>Math.min(maxWidth,measure(line.text))),full=Math.max(0,...widths),total=lines.length*lineHeight;
     const width=boxW?Math.max(full,boxW):full,rtl=isRtl(text);
     let left,top;
-    if(opts.center){left=clamp(opts.center.x-width/2,margin,1-margin-width);top=clamp(opts.center.y-total/2,margin,1-margin-total)}
+    if(opts.center){left=clamp(opts.center.x-width/2,margin,1-margin-width);top=opts.top!=null?clamp(opts.top,0,1-total):clamp(opts.center.y-total/2,margin,1-margin-total)}
     else{
       left=clamp(opts.left!=null?opts.left:opts.right!=null?opts.right-width:(1-width)/2,0,1-width);
       top=clamp(opts.top!=null?opts.top:opts.bottom!=null?opts.bottom-total:(1-total)/2,0,1-total);
