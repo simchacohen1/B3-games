@@ -1303,6 +1303,17 @@
     workspace:()=>on&&!suspended&&!view.hidden?mode:null,
     // A PNG picture of the student board that is open large.
     exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},
+    // Teacher: offer a picture (a PNG of a whiteboard) to every student whiteboard. It opens the usual
+    // "Send to every whiteboard?" preview and sends nothing until the teacher confirms. Each student then has the
+    // picture locked on their own board, with a private drawing layer of their own on top, so everyone gets a copy.
+    async sendPictureToAll(blob,note){
+      if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return false}
+      if(!blob||!/^image\/(png|jpeg|webp)$/.test(blob.type||'')){B.fail('There is no whiteboard picture to send.');return false}
+      if(!on||mode!=='boards'||suspended||view.hidden)await sendEveryone('boards');
+      if(!on||mode!=='boards')return false;
+      showPaste({kind:'image',file:blob,note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
+      return true;
+    },
     navigateWorkspace(destination){
       if(destination==='teach'){hideWorkspace();return true}
       if(destination!=='screens'&&destination!=='whiteboards')return false;

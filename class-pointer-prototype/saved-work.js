@@ -295,13 +295,41 @@
     }catch(error){ui.fail(error)}
   }
 
+  // ---------- Teacher: send a whiteboard to every student ----------
+  // The picture goes through student-boards.js: its "Send to every whiteboard?" preview asks first, and each
+  // student then has the picture on their own board with a private drawing layer of their own.
+  const NOT_READY='Open the classroom first, then try again.';
+  function boardsApi(){const api=window.ClassPointerBoards;return typeof api?.sendPictureToAll==='function'?api:null}
+  // The current whiteboard on the lesson screen.
+  async function sendCurrent(){
+    if(!teacherPage)return false;
+    const boards=boardsApi(),pdf=window.ClassPointerPdf;
+    if(!boards||typeof pdf?.exportPng!=='function'){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note',NOT_READY));return false}
+    let picture;
+    try{picture=await pdf.exportPng()}catch(_){picture=null}
+    if(!picture){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note','Open the whiteboard on the lesson first, then press Send whiteboard to students.'));return false}
+    return boards.sendPictureToAll(picture,'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.');
+  }
+  // A whiteboard saved earlier. Its small picture was saved with it.
+  async function sendFile(file,ui){
+    const boards=boardsApi();
+    if(!boards){ui.say(NOT_READY);return}
+    ui.say('Getting the picture…');
+    try{
+      const picture=await store.picture(file);
+      if(!picture)throw Core.plain('This saved whiteboard has no picture to send. Open it first, then use More, then Send whiteboard to students.');
+      ui.dialog.close();
+      await boards.sendPictureToAll(picture,'Saved whiteboard: '+file.name+'. Every student gets their own copy to draw on. What they draw stays on their own board.');
+    }catch(error){ui.fail(error)}
+  }
+
   async function open(){
     const ui=openDialog('My files'),list=h('div');
     const showFiles=async()=>{
       ui.say('Loading…');
       try{
         const [files,state]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS)]);
-        fileList(list,files.filter(file=>file.kind==='whiteboard'),state,file=>[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
+        fileList(list,files.filter(file=>file.kind==='whiteboard'),state,file=>[button('Open',()=>openBoard(file,ui),'main'),...(teacherPage?[button('📤 Send to students',()=>sendFile(file,ui))]:[]),...manageButtons(file,ui,showFiles)]);
         ui.say('');
       }catch(error){list.replaceChildren();ui.fail(error)}
     };
@@ -371,5 +399,5 @@
     if(spacer)spacer.before(save,files);else bar.append(save,files);
   }
 
-  window.FTTSavedWork={saveCurrent,open,store,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,store,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();
