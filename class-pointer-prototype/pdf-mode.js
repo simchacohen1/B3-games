@@ -686,13 +686,31 @@
     if(!changeMarks([[stroke.id,{...stroke,size}]]))B.status('That size cannot be used for this mark.');
     return true;
   }
+  // Arrow keys with a picked mark or picture: one step of `px` screen pixels, as a fraction of the board.
+  const NUDGE={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+  let pictureNudgeTimer=0;
+  function nudgeFractions(direction,px){
+    const r=content.getBoundingClientRect();
+    return r.width&&r.height?{x:direction[0]*px/r.width,y:direction[1]*px/r.height}:null;
+  }
+  // Moves the picked mark (every line of picked words together), held back so none of it leaves the board.
+  // Sent to the class straight away, like any other change.
+  function nudgeSelected(direction,px){
+    const picked=selectedStroke(),G=geometry(),step=nudgeFractions(direction,px);if(!picked||!G||!step)return false;
+    const group=textBlock(picked),all={points:group.flatMap(item=>item.points)},moved=G.movePoints(all,step.x,step.y);
+    const dx=moved[0].x-all.points[0].x,dy=moved[0].y-all.points[0].y;
+    if(!dx&&!dy)return true;
+    return changeMarks(group.map(item=>[item.id,{...item,points:item.points.map(q=>({x:q.x+dx,y:q.y+dy}))}]));
+  }
   if(isTeacher){
     $('teacherTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false);syncTextSize()});
-    // Delete removes the picked mark; Escape lets go of it.
+    // Delete removes the picked mark; Escape lets go of it. The arrow keys move it 1 pixel (Shift: 10 pixels) and
+    // the class sees each step. Nothing happens while typing in a box, and the page does not scroll while a mark is picked.
     document.addEventListener('keydown',event=>{
       if(!selecting()||!selectedId||event.target?.closest?.('input,textarea,select,dialog,[contenteditable="true"]'))return;
       if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();event.stopPropagation();const picked=selectedStroke();selectedId=null;endSelect(false);if(picked)eraseBlock(picked)}
       else if(event.key==='Escape'){selectedId=null;endSelect(false)}
+      else if(NUDGE[event.key]&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&selectedStroke()){event.preventDefault();event.stopPropagation();if(!edit&&!inlineEdit)nudgeSelected(NUDGE[event.key],event.shiftKey?10:1)}
     },true);
   }
   // Hover or tap a mark on a whiteboard or document to see who made it.
@@ -1436,6 +1454,16 @@
       else if((event.key==='Delete'||event.key==='Backspace')){
         const item=pictureEdits.find(other=>other.el.classList.contains('selected'));
         if(item){event.preventDefault();item.el.remove();pictureEdits=pictureEdits.filter(other=>other!==item);if(!pictureEdits.length)finishPictureEdit()}
+      }
+      // Arrow keys move the picked picture 1 pixel (Shift: 10). With the arrow tool the picture goes back on the board
+      // for the class a moment after the last key, like a finished drag; with Move pictures it waits for ✓ Show to class.
+      else if(NUDGE[event.key]&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
+        const item=pictureEdits.find(other=>other.el.classList.contains('selected')),step=item&&nudgeFractions(NUDGE[event.key],event.shiftKey?10:1);
+        if(!item||!step)return;
+        event.preventDefault();event.stopPropagation();
+        item.x=P.clamp(item.x+step.x,-item.w*0.8,1-item.w*0.2);item.y=P.clamp(item.y+step.y,-item.h*0.8,1-item.h*0.2);placeEditElement(item);
+        clearTimeout(pictureNudgeTimer);
+        if(selecting())pictureNudgeTimer=setTimeout(()=>{if(selecting()&&pictureEdits.includes(item))finishPictureEdit()},400);
       }
     });
   }
