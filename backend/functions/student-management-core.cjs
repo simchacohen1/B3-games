@@ -13,7 +13,9 @@ const BULK_ACTIONS={
  studentsOverview:rollback.studentsOverview,bulkPreview:rollback.bulkPreview,bulkDelete:rollback.bulkDelete,
  exportBackup:rollback.exportBackup,auditLog:rollback.auditLog,
  // Read-only report of possible duplicate students and class names. Never writes.
- duplicateReport:duplicates.duplicateReport
+ duplicateReport:duplicates.duplicateReport,
+ // Issue #724: Owner Admin "Export Everything" (includes passcodes).
+ exportEverything:require('./student-export-core.cjs').exportEverything
 };
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 const nameKey=duplicates.nameKey;
