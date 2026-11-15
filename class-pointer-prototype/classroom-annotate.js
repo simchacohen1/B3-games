@@ -161,7 +161,8 @@
     // Saved work is another script that may load later: look for it each time the menu opens.
     if(saved)out.push({heading:'Saved work'},
       {id:'save',icon:'💾',label:'Save',onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
-      {id:'files',icon:'📂',label:'My files',onClick:()=>window.FTTSavedWork?.open?.()});
+      {id:'files',icon:'📂',label:'My files',onClick:()=>window.FTTSavedWork?.open?.()},
+      {id:'send',icon:'📤',label:'Send whiteboard to students',title:'Every student gets their own copy of this whiteboard to draw on',hidden:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()});
     return out;
   }
   function actions(){
