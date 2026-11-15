@@ -127,7 +127,11 @@ whiteboard, with a private drawing layer of their own on top, so everyone gets t
 marks stay on their own board (the teacher sees them live). The same limits as before apply (a picture the size of one
 class picture, and a confirmation if students already have marks).
 
-No new data, Firebase rules, Storage rules or functions. A saved whiteboard is sent from the small picture saved beside
-it, so a file saved without a picture must be opened first and sent from the toolbar.
+No new Firebase rules, Storage rules or functions.
 
-Not included: a student's copy is not saved to their My files automatically; a student presses 💾 Save as usual.
+- **Each student keeps their own copy.** When the picture arrives, it is saved once in that student's own 📂 My files
+  (private, like every file there) as "From your teacher <date time>", and the student sees a short notice. Opening it
+  later puts the picture back as the locked background, with the student's own drawing layer on top. If saving is not
+  turned on yet, nothing is said and the picture is still on the board; if My files is full the student is told.
+- **Every saved teacher whiteboard has a picture.** Save makes a picture of the whiteboard first (made smaller if it is
+  too big to store) and refuses to save without one, so any saved whiteboard can be sent from the list.
