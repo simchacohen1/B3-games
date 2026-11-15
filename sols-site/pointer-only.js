@@ -1,0 +1,170 @@
+/*
+ * sols.tools shows only Class Pointer to teachers and students (issue #832).
+ *
+ * This file is NOT loaded by funtorahtools.com. sols-site/build.mjs puts it at the
+ * start of /sols-brand.js, the one extra script every page of the sols.tools copy
+ * loads, so it runs before anything else on the page.
+ *
+ * What it does, for everyone except a site administrator (the owner):
+ *   1. Any page that is not the home page, the teacher home page or a Class Pointer
+ *      page sends the visitor straight back to the home page.
+ *   2. On the student home page the other tools are not shown.
+ *   3. On the teacher home page only the Class Pointer tiles are shown.
+ *
+ * It changes what people SEE on sols.tools. It does not touch accounts, saved
+ * work, Firebase paths or rules: the same account still has every tool its class
+ * was given on funtorahtools.com. It is a tidy front door, not a security lock.
+ *
+ * A site administrator keeps the whole site. That is remembered in this browser
+ * (FULL_KEY) once the administrator has signed in on sols.tools, and forgotten
+ * when anyone else signs in or the administrator signs out.
+ */
+(function (root) {
+  'use strict';
+
+  var FULL_KEY = 'solsFullSite';
+  var POINTER_DIR = '/class-pointer-prototype/';
+  var HOME_PAGES = ['/', '/index.html', '/teacher-home.html'];
+
+  // Pages a teacher or student may open on sols.tools.
+  function allowedPath(pathname) {
+    var path = String(pathname || '/');
+    if (path.charAt(0) !== '/') path = '/' + path;
+    if (HOME_PAGES.indexOf(path) !== -1) return true;
+    return path.indexOf(POINTER_DIR) === 0;
+  }
+  // Does a link on a home page lead to Class Pointer?
+  function isPointerHref(href) {
+    var text = String(href || '');
+    if (!text || /^(javascript|data|mailto|tel):/i.test(text)) return false;
+    var path = text.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '');
+    if (path.charAt(0) !== '/') path = '/' + path.replace(/^(\.\/)+/, '');
+    return path.indexOf(POINTER_DIR) === 0;
+  }
+  // What the signed-in person is, from what the site already worked out:
+  // 'full' (site administrator), 'limited' (anyone else), or '' (not known yet).
+  function viewerKind(authKnown, user, access) {
+    if (!authKnown) return '';
+    if (!user) return 'limited';
+    if (access && access.authorized === true) return access.role === 'admin' ? 'full' : 'limited';
+    // A student signs in without an email address; a teacher always has one.
+    if (!user.email) return 'limited';
+    return '';
+  }
+
+  var api = { FULL_KEY: FULL_KEY, allowedPath: allowedPath, isPointerHref: isPointerHref, viewerKind: viewerKind };
+  if (typeof module === 'object' && module.exports) { module.exports = api; return; }
+  if (!root || !root.document || root.__solsPointerOnly) return;
+  root.__solsPointerOnly = api;
+
+  var doc = root.document;
+  function readFull() { try { return root.localStorage.getItem(FULL_KEY) === '1'; } catch (e) { return false; } }
+  function writeFull(on) { try { if (on) root.localStorage.setItem(FULL_KEY, '1'); else root.localStorage.removeItem(FULL_KEY); } catch (e) {} }
+
+  var full = readFull();
+  root.SOLS_POINTER_ONLY = !full;
+
+  // 1. Any other page: back to the home page, before the page shows anything.
+  if (!full && !allowedPath(root.location.pathname)) {
+    try { doc.documentElement.style.visibility = 'hidden'; } catch (e) {}
+    root.location.replace('/');
+    return;
+  }
+
+  // 2 and 3. The two home pages show Class Pointer only.
+  var path = root.location.pathname;
+  var studentHome = path === '/' || path === '/index.html';
+  var teacherHome = path === '/teacher-home.html';
+
+  function addStyle() {
+    if (doc.getElementById('solsPointerOnlyStyle') || !doc.head) return;
+    var style = doc.createElement('style');
+    style.id = 'solsPointerOnlyStyle';
+    style.textContent =
+      // Student home: no other tools, no "nothing is available" note, no homework link.
+      (studentHome ? '#gamesArea,#disabledMessage,#lockedCard,#homeworkStudentLink{display:none!important}' : '') +
+      '.sols-pointer-note{max-width:640px;margin:18px auto;padding:16px 18px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font:600 17px/1.45 system-ui,sans-serif;text-align:center}';
+    doc.head.appendChild(style);
+  }
+  // A signed-in student sees one friendly line where the tools used to be.
+  function studentNote() {
+    var bar = doc.getElementById('studentBar');
+    var signedIn = !!bar && !bar.classList.contains('hidden');
+    var note = doc.getElementById('solsPointerNote');
+    if (!signedIn) { if (note) note.remove(); return; }
+    if (note) return;
+    note = doc.createElement('p');
+    note.id = 'solsPointerNote';
+    note.className = 'sols-pointer-note';
+    note.textContent = 'When your teacher starts a lesson, it opens here by itself.';
+    bar.parentNode.insertBefore(note, bar.nextSibling);
+  }
+  // Teacher home: in every class card keep the Class Pointer tiles and hide the rest.
+  function hide(el, on) {
+    if (on) el.style.setProperty('display', 'none', 'important'); else el.style.removeProperty('display');
+  }
+  function limitTeacherHome() {
+    var cards = doc.querySelectorAll('.class-card');
+    for (var i = 0; i < cards.length; i += 1) {
+      var tiles = cards[i].querySelectorAll('a[href], button.act-as-student, button[data-act-as-student]');
+      for (var j = 0; j < tiles.length; j += 1) {
+        hide(tiles[j], !(tiles[j].nodeName === 'A' && isPointerHref(tiles[j].getAttribute('href'))));
+      }
+      // A place on the map with nothing left in it goes too.
+      var groups = cards[i].querySelectorAll('.game-group');
+      for (var k = 0; k < groups.length; k += 1) {
+        var links = groups[k].querySelectorAll('a[href]'), any = false;
+        for (var m = 0; m < links.length; m += 1) if (isPointerHref(links[m].getAttribute('href'))) any = true;
+        hide(groups[k], !any);
+      }
+    }
+  }
+  var queued = false;
+  function tidy() {
+    queued = false;
+    if (root.SOLS_POINTER_ONLY !== true) return;
+    addStyle();
+    if (studentHome) studentNote();
+    if (teacherHome) limitTeacherHome();
+  }
+  function queueTidy() {
+    if (queued) return;
+    queued = true;
+    // A plain timer: it also runs while the tab is in the background.
+    root.setTimeout(tidy, 30);
+  }
+  if (!full && (studentHome || teacherHome)) {
+    tidy();
+    new MutationObserver(queueTidy).observe(doc.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', tidy);
+  }
+
+  // Who is signed in? The site's own sign-in code already knows; this only listens.
+  var authKnown = false, user = null, hooked = false;
+  function hookAuth() {
+    if (hooked) return true;
+    var fb = root.firebase;
+    if (!fb || typeof fb.auth !== 'function') return false;
+    try {
+      if (!fb.apps || !fb.apps.length) return false;
+      fb.auth().onAuthStateChanged(function (next) { authKnown = true; user = next || null; check(); });
+      hooked = true;
+    } catch (e) { return false; }
+    return true;
+  }
+  function check() {
+    hookAuth();
+    var access = null;
+    try { access = root.B3SiteSettings && root.B3SiteSettings.getCurrentAccess ? root.B3SiteSettings.getCurrentAccess() : null; } catch (e) {}
+    var kind = viewerKind(authKnown, user, access);
+    if (!kind) return;
+    var wantFull = kind === 'full';
+    if (wantFull === full) return;
+    // The view changes: remember it and load the page again in the new view.
+    writeFull(wantFull);
+    full = wantFull;
+    root.location.reload();
+  }
+  root.setInterval(check, 1500);
+  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', check); else check();
+})(typeof window === 'undefined' ? null : window);

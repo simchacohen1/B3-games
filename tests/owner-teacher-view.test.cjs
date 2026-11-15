@@ -206,3 +206,60 @@ test('this change adds no owner or teacher grant to the database rules or the se
     assert.doesNotMatch(text, /ownerTeacherView|b3OwnerViewMode|B3OwnerTeacherView/, file + ' does not know about Teacher view');
   }
 });
+
+// ---- the switch on the pages the owner lands on (home page and Admin) --------------
+
+function page(mode, { framed = false } = {}) {
+  const added = [];
+  const document = { body: { append: el => added.push(el) }, currentScript: { src: 'https://site.test/owner-teacher-view.js' },
+    getElementById: id => added.find(el => el.id === id && !el.removed) || null,
+    createElement: () => ({ style: {}, remove() { this.removed = true; } }) };
+  const window = { document, localStorage: memory(mode), location: { href: 'https://site.test/index.html', origin: 'https://site.test' } };
+  window.self = window; window.top = framed ? {} : window;
+  const ctx = { window, URL };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'owner-teacher-view.js'), 'utf8'), ctx);
+  return { view: window.B3OwnerTeacherView, window, shown: () => added.filter(el => !el.removed) };
+}
+
+test('switch: the owner with classes gets "Switch to Teacher view", which turns Teacher view on', async () => {
+  const p = page(null), reads = [];
+  await p.view.mountSwitch(fakeDb({ [INVITE_PATH]: invite() }, reads), 'b3-2026', owner, 'https://site.test/');
+  assert.deepEqual(reads, [INVITE_PATH], 'one small read of the owner\'s own invitation');
+  assert.equal(p.shown().length, 1);
+  assert.match(p.shown()[0].textContent, /Switch to Teacher view/);
+  await p.view.mountSwitch(fakeDb({ [INVITE_PATH]: invite() }, reads), 'b3-2026', owner, 'https://site.test/');
+  assert.equal(p.shown().length, 1, 'never shown twice');
+  p.shown()[0].onclick();
+  assert.equal(p.view.getMode(), 'teacher');
+  assert.equal(p.window.location.href, 'https://site.test/teacher-home.html');
+});
+
+test('switch: with no class assigned yet it leads to Owner Admin and stays in owner mode', async () => {
+  for (const data of [{}, { [INVITE_PATH]: invite({ classIds: {} }) }, { [INVITE_PATH]: invite({ active: false }) }]) {
+    const p = page(null);
+    await p.view.mountSwitch(fakeDb(data), 'b3-2026', owner, 'https://site.test/');
+    assert.match(p.shown()[0].textContent, /Set up Teacher view/);
+    p.shown()[0].onclick();
+    assert.equal(p.view.getMode(), 'owner');
+    assert.equal(p.window.location.href, 'https://site.test/owner-admin.html');
+  }
+});
+
+test('switch: never shown to another account, inside a frame, or while already in Teacher view', async () => {
+  const reads = [], db = fakeDb({ [INVITE_PATH]: invite() }, reads);
+  let p = page(null); await p.view.mountSwitch(db, 'b3-2026', teacher, ''); assert.equal(p.shown().length, 0);
+  p = page(null); await p.view.mountSwitch(db, 'b3-2026', { ...owner, emailVerified: false }, ''); assert.equal(p.shown().length, 0);
+  p = page(null, { framed: true }); await p.view.mountSwitch(db, 'b3-2026', owner, ''); assert.equal(p.shown().length, 0);
+  p = page('teacher'); await p.view.mountSwitch(db, 'b3-2026', owner, ''); assert.equal(p.shown().length, 0);
+  assert.deepEqual(reads, [], 'and nothing is read for them');
+});
+
+test('switch: wired into the owner home page (site-settings) and the Admin page, owner only', () => {
+  const site = fs.readFileSync(path.join(ROOT, 'site-settings.js'), 'utf8');
+  assert.match(site, /const offerSwitch = !acting && window\.top === window && isBootstrapAdmin\(user\) && access && access\.role === "admin" && isOwnerHomePage\(\);/);
+  assert.match(site, /showOwnerTeacherView\(access, user\);/);
+  const admin = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
+  assert.match(admin, /<script src="owner-teacher-view\.js\?v=[^"]+"><\/script>/);
+  assert.match(admin, /if\(owner&&window\.B3OwnerTeacherView\)B3OwnerTeacherView\.mountSwitch\(/);
+});

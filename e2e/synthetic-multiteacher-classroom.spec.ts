@@ -254,10 +254,10 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   // Posuk Practice (#694): one combined Read & Translate step, one microphone.
   await expect(page.locator('#combinedPanel')).toBeVisible();
   for (const gone of ['.task-tabs', '#readingPanel', '#translationPanel', '#comprehensionPanel']) await expect(page.locator(gone)).toBeHidden();
-  await expect(page.locator('#combinedPanel .instruction-copy')).toContainText('Read a few Hebrew words, then say what they mean in English');
-  await page.locator('#combinedInstructionBtn').click();
-  await expect.poll(() => spokenTexts.join(' | ')).toContain('Read a few Hebrew words out loud, then say what those words mean in English');
-  expect(spokenTexts.join(' | ')).toContain('The recording keeps going the whole time');
+  // #732: the subtitle, the yellow instruction box and the mic caption are gone.
+  for (const removed of ['#toolSubtitle', '#combinedPanel .instruction-card', '#combinedInstructionBtn', '#combinedPanel .record-caption']) await expect(page.locator(removed)).toHaveCount(0);
+  await expect(page.locator('#combinedPanel h3')).toContainText('Read & Translate');
+  await expect(page.locator('#combinedRecordBtn')).toBeVisible();
   const attemptsPath = `posukPractice/attempts/${ariId}/Vayeira_18_1`;
   const rewardBalancePath = `studentRewards/students/${ariId}/rewardBalance`;
   await writeFixture(`studentRewards/students/${ariId}`, {name: 'Ari Example', rewardBalance: 3});
