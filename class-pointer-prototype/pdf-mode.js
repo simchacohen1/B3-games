@@ -60,7 +60,9 @@
   const TEXT_MIN=C.TEXT_MIN||.003,TEXT_MAX=C.TEXT_MAX||.08;
   // Letter sizes the teacher picks from, named like sizes in a word processor: the number is the height of the
   // letters in pixels on a board 1280 wide. New words start at 24.
-  const TEXT_LABELS=[12,14,16,18,20,24,28,32,40,48,64,80,96],TEXT_REF=1280,TEXT_FLOOR=16;
+  const TEXT_LABELS=[12,14,16,18,20,24,28,32,40,48,64,80,96,120,144,200],TEXT_REF=1280,TEXT_FLOOR=16,MIN_LABEL=10,MAX_LABEL=200;
+  // Pasted words always come in the board's black, whatever color is chosen for drawing.
+  const PASTE_INK='#1f2937';
   const sizeOfLabel=label=>Math.round(label/(TEXT_SCALE*TEXT_REF)*1e4)/1e4,labelOfSize=size=>Math.round(size*TEXT_SCALE*TEXT_REF);
   let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textBold=false,boldBtn=null;
   // What the size control works on: the words being typed, the picked words, or the next new words (Text tool).
@@ -104,7 +106,7 @@
   // The control shows only while there are words to size, with their size.
   function syncTextSize(){
     if(!textSizeBox)return;const target=textTarget();
-    textSizeBox.hidden=!target;if(target){textSizeValue.textContent=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true))}
+    textSizeBox.hidden=!target;if(target){if(document.activeElement!==textSizeValue)textSizeValue.value=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true))}
   }
   let measurer=null;
   function width100(line){
@@ -177,7 +179,8 @@
       else if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'){event.preventDefault();toggleTextBold()}
     });
     box.addEventListener('input',sizeInline);
-    box.addEventListener('blur',()=>finishInline(true));
+    // Going to the size or bold control keeps the words open; anywhere else keeps what was typed.
+    box.addEventListener('blur',event=>{if(event.relatedTarget&&textSizeBox?.contains(event.relatedTarget))return;finishInline(true)});
     B.status(fresh?'Type the words. Click anywhere else when you are done. Esc cancels.':'Type to change the words. Click anywhere else when you are done. Esc cancels.');
   }
   // The letters in the box are the size they are on the board; the box is as tall as its lines.
@@ -346,7 +349,21 @@
     nav.appendChild(el('span',null,'pdf-sep'));
     // Text size: A− 24 A+. It shows while the Text tool is chosen, words are picked, or words are being typed.
     textSizeBox=el('span',null,'pdf-textsize');textSizeBox.hidden=true;textSizeBox.setAttribute('role','group');textSizeBox.setAttribute('aria-label','Text size');
-    textSizeValue=el('span',null,'pdf-textsize-value','24');textSizeValue.setAttribute('aria-live','polite');
+    // The size is a number box: step with A- and A+, or type any size from 10 to 200.
+    textSizeValue=el('input',null,'pdf-textsize-value');textSizeValue.type='number';textSizeValue.min=String(MIN_LABEL);textSizeValue.max=String(MAX_LABEL);textSizeValue.step='1';textSizeValue.inputMode='numeric';textSizeValue.value='24';
+    textSizeValue.setAttribute('aria-label','Text size in pixels, 10 to 200');textSizeValue.title='Type any size from 10 to 200';
+    const applyTypedSize=()=>{
+      const typed=Number(textSizeValue.value);
+      if(textSizeValue.value===''||!Number.isFinite(typed)){syncTextSize();return}
+      setTextSize(sizeOfLabel(Math.max(MIN_LABEL,Math.min(MAX_LABEL,Math.round(typed)))));
+    };
+    textSizeValue.addEventListener('change',applyTypedSize);
+    textSizeValue.addEventListener('keydown',event=>{
+      event.stopPropagation();
+      if(event.key==='Enter'){event.preventDefault();applyTypedSize();inlineEdit?.box.focus()}
+      else if(event.key==='Escape'){event.preventDefault();syncTextSize();inlineEdit?.box.focus()}
+    });
+    for(const type of ['keyup','pointerdown','click'])textSizeValue.addEventListener(type,event=>event.stopPropagation());
     const smaller=button('A−','Smaller letters',()=>stepTextSize(-1),'pdf-btn pdf-textsize-btn'),bigger=button('A+','Bigger letters',()=>stepTextSize(1),'pdf-btn pdf-textsize-btn');
     // Pressing these must not take the typing cursor out of the words.
     boldBtn=button('B','Bold (Ctrl+B)',()=>toggleTextBold(),'pdf-btn pdf-textsize-btn pdf-bold-btn');boldBtn.setAttribute('aria-label','Bold');boldBtn.setAttribute('aria-pressed','false');boldBtn.style.fontWeight='900';
@@ -783,9 +800,17 @@
     return {...point,x:toDocument?(scroller.scrollLeft+point.x*vw)/W:(point.x*W-scroller.scrollLeft)/vw,
       y:toDocument?(scroller.scrollTop+point.y*vh)/H:(point.y*H-scroller.scrollTop)/vh};
   }
+  // A student draws on a picture of the teacher's view (width vw); the teacher keeps sizes as fractions of the board (width W).
+  function activityTextScale(){const vw=scroller.clientWidth;return vw&&W?vw/W:1}
+  // The part of the student's picture the board covers, as fractions of the picture: a student's words stay inside it.
+  function activityBoardBox(){
+    const vw=scroller.clientWidth,vh=scroller.clientHeight;
+    return vw&&vh&&W&&H?{w:Math.max(0,Math.min(1,(W-scroller.scrollLeft)/vw)),h:Math.max(0,Math.min(1,(H-scroller.scrollTop)/vh))}:null;
+  }
   function activityMarks(message){
     return {...message,points:Object.fromEntries(Object.entries(message.points||{}).map(([id,p])=>[id,activityPoint(p,false)])),
-      strokes:(message.strokes||[]).map(stroke=>({...stroke,points:stroke.points.map(p=>activityPoint(p,false))}))};
+      // Words are sized as a fraction of the board's width; the student's picture is the whole view, which can be wider.
+      strokes:(message.strokes||[]).map(stroke=>({...stroke,...(stroke.tool==='text'?{size:stroke.size/activityTextScale()}:{}),points:stroke.points.map(p=>activityPoint(p,false))}))};
   }
 
   // ---------- Pointing and drawing (positions are fractions of the whole PDF) ----------
@@ -1418,8 +1443,8 @@
       // at the smallest size are wrapped (at the middle size, so they stay readable).
       let made=null;
       const chosen=labelOfSize(textSize),steps=[chosen,...[...TEXT_LABELS].reverse().filter(label=>label<chosen&&label>=TEXT_FLOOR)];
-      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:B.ownColor(),bold:textBold,center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
-      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:B.ownColor(),bold:textBold,center:{x:.5,y:.5}});
+      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:PASTE_INK,bold:textBold,center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
+      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:PASTE_INK,bold:textBold,center:{x:.5,y:.5}});
       let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
       B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose 🖱️ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');
@@ -1475,7 +1500,7 @@
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
-    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,recolorSelected,resizeSelected,
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityTextScale,activityBoardBox,activityMarks,recolorSelected,resizeSelected,
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),

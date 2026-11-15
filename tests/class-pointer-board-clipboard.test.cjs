@@ -224,7 +224,7 @@ test('student boards offer Paste and Copy board, and keep paste inside text fiel
 // ---------- Teacher lesson whiteboard ----------
 test('the teacher whiteboard offers paste, copy and editing of pasted text',()=>{
   assert.match(pdfSource,/register\(clipTarget\)/);
-  assert.match(pdfSource,/flow\(payload\.text,\{size:label===chosen\?textSize:sizeOfLabel\(label\),color:B\.ownColor\(\),bold:textBold,center:\{x:\.5,y:\.5\}\}\)/);
+  assert.match(pdfSource,/flow\(payload\.text,\{size:label===chosen\?textSize:sizeOfLabel\(label\),color:PASTE_INK,bold:textBold,center:\{x:\.5,y:\.5\}\}\)/);
   assert.match(pdfSource,/clip\.copyImage\(exportPng\(\)\)/);
   assert.match(pdfSource,/data-text-mark/);
   assert.doesNotMatch(pdfSource,/pdfTextEditDialog|openTextEditor/,'no popup: words are typed in a text box on the board');
