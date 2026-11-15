@@ -77,6 +77,25 @@
     const old=(await ref.getMetadata()).customMetadata||{};
     await ref.updateMetadata({customMetadata:{...old,...changes}});
   }
+  // A whiteboard picture small enough to store (Storage allows Core.LIMITS.pngBytes). Returns the picture as it is when it
+  // already fits, a smaller PNG of it when it does not, or null when there is no picture or it cannot be made small enough.
+  async function fitPicture(picture){
+    if(!picture)return null;
+    if(!Core.sizeProblem('png',picture.size))return picture;
+    try{
+      const bitmap=await createImageBitmap(picture);
+      let scale=Math.min(1,1600/bitmap.width);
+      for(let step=0;step<6;step++){
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+        canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+        const smaller=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+        if(smaller&&!Core.sizeProblem('png',smaller.size))return smaller;
+        scale*=0.75;
+      }
+    }catch(_){/* not possible here: the save says so plainly */}
+    return null;
+  }
   const store={
     async list(){
       const me=await who(),found=await firebase.storage().ref(me.prefix).listAll();
@@ -97,11 +116,18 @@
       const me=await who(),blob=new Blob([JSON.stringify(data)],{type:'application/json'});
       const problem=Core.sizeProblem('whiteboard',blob.size,me.teacher);
       if(problem)throw Core.plain(problem);
+      // A teacher's saved whiteboard always has its picture: Send to students sends that picture, so a board saved
+      // without one could never be sent. The picture is made small enough first, and it is saved before the file.
+      if(me.teacher){
+        picture=await fitPicture(picture);
+        if(!picture)throw Core.plain('A picture of the whiteboard could not be made, so it was not saved. Open the whiteboard and try again.');
+      }
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
+      if(me.teacher)await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'});
       await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,savedAt:Date.now()})});
-      // The small picture is only for looking at the file later. The save counts without it.
-      if(picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
+      // A student's small picture is only for looking at the file later. The save counts without it.
+      if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;
     },
     async savePdf(file,{name,folderId},onProgress){
@@ -399,5 +425,44 @@
     if(spacer)spacer.before(save,files);else bar.append(save,files);
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,store,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  // ---------- Student: keep my own copy of a picture the teacher sent ----------
+  // When the teacher sends a whiteboard to every board, student-boards.js calls this with the picture. It is saved once as a
+  // file of the student's own in My files (private, like every other file there), as a whiteboard that shows the picture with
+  // nothing drawn on it yet. Opening it later puts the picture back (student-boards.js importBoard).
+  const COPIES='fttTeacherCopies:';
+  const copying=new Set(),kept=new Set();
+  function copyKey(data){let hash=2166136261;for(let i=0;i<data.length;i+=7){hash^=data.charCodeAt(i);hash=Math.imul(hash,16777619)}return data.length.toString(36)+'-'+(hash>>>0).toString(36)}
+  function toast(text){
+    // A notice that cannot be shown must never undo a copy that was saved.
+    try{
+      const node=h('div','ftt-saved ftt-saved-toast',text);node.setAttribute('role','status');
+      node.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483600;max-width:min(92vw,520px);padding:10px 16px;border-radius:12px;background:#143a73;color:#fff;font:600 15px system-ui,sans-serif;box-shadow:0 8px 30px #0006';
+      document.body.append(node);setTimeout(()=>node.remove(),5000);
+    }catch(_){}
+  }
+  async function keepTeacherCopy(activity){
+    if(teacherPage||activity?.kind!=='image'||typeof activity.data!=='string'||activity.data.length>420000)return false;
+    const key=copyKey(activity.data);
+    if(copying.has(key)||kept.has(key))return false;
+    copying.add(key);
+    try{
+      const me=await who(),memory=COPIES+me.prefix;
+      let seen=[];try{seen=JSON.parse(localStorage.getItem(memory)||'[]')}catch(_){}
+      if(!Array.isArray(seen)||seen.includes(key))return false;
+      const state=await store.folders().catch(()=>NO_FOLDERS);
+      const data={version:1,kind:'student-board',strokes:[],images:[],text:null,activity:{kind:'image',data:activity.data}};
+      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data});
+      kept.add(key);seen.push(key);try{localStorage.setItem(memory,JSON.stringify(seen.slice(-30)))}catch(_){}
+      toast('Your teacher sent a whiteboard. Your own copy is saved in 📂 My files.');
+      return true;
+    }catch(error){
+      // Saving may be off or the student may be signed out: the picture is still on their board, so say nothing,
+      // except when the only problem is a full My files.
+      const text=Core.errorText(error);
+      if(/already have \d+ saved files/.test(text))toast('Your teacher sent a whiteboard, but My files is full, so it was not saved. Delete a file to make room.');
+      return false;
+    }finally{copying.delete(key)}
+  }
+
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();
