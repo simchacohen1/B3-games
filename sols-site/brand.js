@@ -64,12 +64,21 @@
       links[i].parentNode.removeChild(links[i]);
     }
     if (!document.head || document.querySelector('link[data-sols="1"]')) return;
-    var icon = document.createElement('link');
-    icon.rel = 'icon';
-    icon.type = 'image/svg+xml';
-    icon.href = '/sols-favicon.svg';
-    icon.setAttribute('data-sols', '1');
-    document.head.appendChild(icon);
+    // The school emblem. 16 px has thickened lines so it stays readable in a tab.
+    var icons = [
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/sols-favicon-32x32.png' },
+      { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/sols-favicon-16x16.png' },
+      { rel: 'apple-touch-icon', href: '/sols-apple-touch-icon.png' }
+    ];
+    for (var j = 0; j < icons.length; j += 1) {
+      var icon = document.createElement('link');
+      icon.rel = icons[j].rel;
+      if (icons[j].type) icon.type = icons[j].type;
+      if (icons[j].sizes) icon.setAttribute('sizes', icons[j].sizes);
+      icon.href = icons[j].href;
+      icon.setAttribute('data-sols', '1');
+      document.head.appendChild(icon);
+    }
   }
   function fixAll() {
     fixTree(document.documentElement);
