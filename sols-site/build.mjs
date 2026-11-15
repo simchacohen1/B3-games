@@ -7,7 +7,8 @@
  * What it changes in that folder (and nothing else):
  *   - CNAME becomes sols.tools
  *   - .github is removed, so no workflow, monitor or deploy job runs in the copy
- *   - sols-brand.js and sols-favicon.svg are added at the top level
+ *   - sols-brand.js and the school emblem icons (sols-site/icons) are added at the
+ *     top level, and favicon.ico is replaced by the emblem
  *   - every .html page gets one <script src="/sols-brand.js"> tag in <head>,
  *     and "Fun Torah Tools" inside its <title> becomes "Shluchim Online School"
  *
@@ -59,7 +60,11 @@ function* htmlFiles(dir) {
 rmSync(join(target, '.github'), { recursive: true, force: true });
 writeFileSync(join(target, 'CNAME'), HOST + '\n');
 copyFileSync(join(here, 'brand.js'), join(target, 'sols-brand.js'));
-copyFileSync(join(here, 'favicon.svg'), join(target, 'sols-favicon.svg'));
+for (const name of ['sols-favicon-16x16.png', 'sols-favicon-32x32.png', 'sols-apple-touch-icon.png', 'sols-icon-192.png']) {
+  copyFileSync(join(here, 'icons', name), join(target, name));
+}
+// Browsers ask for /favicon.ico on their own, before any page script runs.
+copyFileSync(join(here, 'icons', 'sols-favicon.ico'), join(target, 'favicon.ico'));
 
 let branded = 0;
 const noHead = [];
