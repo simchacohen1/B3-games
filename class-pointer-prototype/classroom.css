@@ -109,7 +109,7 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNav[hidden]{display:none}
 #pdfNav .pdf-textsize{display:inline-flex;align-items:center;gap:6px;color:#dbeafe;font-size:14px;font-weight:700;white-space:nowrap}
 #pdfNav .pdf-textsize[hidden]{display:none}
-#pdfNav .pdf-textsize-value{min-width:30px;text-align:center;color:#fff;font-size:17px;font-weight:800}
+#pdfNav .pdf-textsize-value{box-sizing:border-box;width:72px;height:38px;padding:0 4px;text-align:center;color:#172033;background:#fff;border:2px solid #cbd5e1;border-radius:9px;font-size:17px;font-weight:800}
 #pdfNav .pdf-textsize-btn{min-width:44px}
 /* B: bold for the words. It shows lit while the words being typed, picked or about to be added are bold. */
 #pdfNav .pdf-bold-btn{margin-left:6px;font-weight:900;font-family:Georgia,'Times New Roman',serif}
@@ -131,6 +131,8 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNav .pdf-close:hover{background:#a8303b}
 #pdfNav .pdf-jump{display:inline-flex;align-items:center;gap:6px;font-size:18px;font-weight:700}
 #pdfNav .pdf-label{color:#dbeafe}
+/* A narrow or short window: the bar floats on the screen, so it can always be reached without scrolling. */
+@media (max-width:1100px),(max-height:700px){#pdfNav,#stage.board-whole #pdfNav{position:fixed;bottom:10px;z-index:2147483000;max-width:calc(100vw - 20px);max-height:45vh;overflow:auto}}
 #pdfNav .pdf-page-input{width:84px;min-height:48px;padding:6px 8px;border-radius:12px;font-size:20px;font-weight:800;text-align:center;background:#fff;color:#172033;border:2px solid #cbd5e1}
 #pdfNav .pdf-page-total{color:#dbeafe;white-space:nowrap}
 #pdfNav .pdf-zoom-label{min-width:64px;text-align:center;font-size:20px;font-weight:800;color:#dbeafe}

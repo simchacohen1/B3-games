@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  for(const file of ['classroom-core','annotation-toolbar','classroom','pdf-mode'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes24"'),file);
+  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes25"'),file);
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -196,7 +196,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes24/);
+ assert.match(html,/classroom\.css\?v=20261115-shapes25/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
@@ -295,9 +295,9 @@ test('a paste picks the biggest size at which the words fit on one line',()=>{
 
 // ---------- Mouse mode on the lesson; nothing of the toolbar hidden behind the tabs ----------
 test('one arrow button is both Select and the mouse on the teacher whiteboard, PDF and webpage',()=>{
- // The toolbar shows Select (as an arrow) instead of the Mouse there; a shared screen and students keep the Mouse.
+ // The toolbar shows Select (a computer mouse) instead of the Mouse there; a shared screen and students keep the Mouse.
  assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/);
- assert.match(annotate,/select:\['<svg viewBox="0 0 24 24" aria-hidden="true"><path d="[^"]+" fill="#1f2937"[^>]*\/><\/svg>','Select',/,'drawn as a normal mouse arrow');
+ assert.match(annotate,/select:\['🖱️','Select',/,'drawn as a computer mouse');
  // With the arrow chosen the lesson is in mouse mode: no pointing, no drawing, the page scrolls and drags.
  assert.match(annotate,/const arrow=tool=>tool==='hand'\|\|tool==='select';/);
  assert.match(annotate,/B\.setNavigation\?\.\(arrow\(tool\)&&open\);/);
@@ -349,7 +349,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes24/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes25/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
@@ -378,7 +378,7 @@ test('the text box sits on the block: same place, color, size and width, and the
 
 test('closing the text box keeps the change in place; Escape drops it; empty words are not saved',()=>{
  const body=pdf.slice(pdf.indexOf('function editInline(target){'),pdf.indexOf('function addTextStroke('));
- assert.match(body,/box\.addEventListener\('blur',\(\)=>finishInline\(true\)\);/);
+ assert.match(body,/box\.addEventListener\('blur',event=>\{if\(event\.relatedTarget&&textSizeBox\?\.contains\(event\.relatedTarget\)\)return;finishInline\(true\)\}\);/);
  assert.match(body,/if\(event\.key==='Escape'\)\{event\.preventDefault\(\);finishInline\(false\)\}/);
  assert.match(body,/else if\(save&&\(text!==open\.before\|\|open\.size!==open\.sizeBefore\|\|open\.bold!==open\.boldBefore\)\)replaceTextStroke\(open\.stroke,text,open\.size,open\.bold\);/);
  assert.match(body,/if\(save&&!text\.trim\(\)\)B\.status\(/);
@@ -495,7 +495,7 @@ test('the lesson toolbar shows only the tools it has: no greyed-out hand next to
 });
 
 test('words have a size control (A- number A+) and new words start smaller',()=>{
- assert.match(pdf,/const TEXT_LABELS=\[12,14,16,18,20,24,28,32,40,48,64,80,96\],TEXT_REF=1280,TEXT_FLOOR=16;/);
+ assert.match(pdf,/const TEXT_LABELS=\[12,14,16,18,20,24,28,32,40,48,64,80,96,120,144,200\],TEXT_REF=1280,TEXT_FLOOR=16,MIN_LABEL=10,MAX_LABEL=200;/);
  assert.match(pdf,/let textSize=sizeOfLabel\(24\),/);
  // 24 on a board 1280 wide is letters 24 pixels high: a mark size of 24 / (2.4 * 1280).
  const size=Math.round(24/(2.4*1280)*1e4)/1e4;
@@ -506,7 +506,7 @@ test('words have a size control (A- number A+) and new words start smaller',()=>
  assert.equal(C.cleanStroke({tool:'text',color:'#1f2937',size:.0039,points:[{x:.1,y:.1},{x:.2,y:.2}],text:'a'}).size,.0039);
  // The control is in the bar under the lesson and shows only while there are words to size.
  assert.match(pdf,/const smaller=button\('A−','Smaller letters',\(\)=>stepTextSize\(-1\),'pdf-btn pdf-textsize-btn'\),bigger=button\('A\+','Bigger letters',\(\)=>stepTextSize\(1\),'pdf-btn pdf-textsize-btn'\);/);
- assert.match(pdf,/textSizeBox\.hidden=!target;if\(target\)\{textSizeValue\.textContent=String\(labelOfSize\(target\.size\)\);boldBtn\?\.setAttribute\('aria-pressed',String\(target\.bold===true\)\)\}/);
+ assert.match(pdf,/textSizeBox\.hidden=!target;if\(target\)\{if\(document\.activeElement!==textSizeValue\)textSizeValue\.value=String\(labelOfSize\(target\.size\)\);boldBtn\?\.setAttribute\('aria-pressed',String\(target\.bold===true\)\)\}/);
  assert.match(pdf,/if\(inlineEdit\)return\{kind:'typing',size:inlineEdit\.size,bold:inlineEdit\.bold===true\};/);
  assert.match(pdf,/if\(picked\?\.tool==='text'\)return\{kind:'picked',size:picked\.size,bold:picked\.bold===true\};/);
  assert.match(pdf,/return \$\('teacherTool'\)\?\.value==='text'\?\{kind:'new',size:textSize,bold:textBold\}:null;/);
@@ -578,8 +578,8 @@ test('a pasted paragraph has room between its lines at the size the board draws 
 test('students are told when the whiteboard picture already has the marks, and the overlay then skips words only',()=>{
  const sender=read('class-pointer-prototype/classroom.js'),share=read('class-pointer-prototype/activity-share.js');
  assert.match(sender,/function marksInVideo\(\)\{return state\.pdf===true&&state\.documentKind==='whiteboard'\}/);
- assert.match(sender,/if\(message\.type==='lesson-marks'\)message=\{\.\.\.message,marksInVideo:marksInVideo\(\)\};connection\.send\(message\)/);
- assert.match(share,/marksInVideo:message\.marksInVideo===true\};renderLessonMarks\(\)/);
+ assert.match(sender,/if\(message\.type==='lesson-marks'\)message=\{\.\.\.message,marksInVideo:marksInVideo\(\),boardBox:window\.ClassPointerPdf\?\.active\(\)\?window\.ClassPointerPdf\.activityBoardBox\?\.\(\)\|\|null:null\};connection\.send\(message\)/);
+ assert.match(share,/marksInVideo:message\.marksInVideo===true,boardBox:Number\.isFinite\(message\.boardBox\?\.w\)&&Number\.isFinite\(message\.boardBox\?\.h\)\?\{w:message\.boardBox\.w,h:message\.boardBox\.h\}:null\};renderLessonMarks\(\)/);
  assert.match(share,/if\(stroke\.tool==='text'&&lessonMarks\.marksInVideo===true\)continue;/);
  // The whiteboard picture really does carry the words: paintInk draws text marks into it.
  assert.match(pdf,/function paintBoardPresentation\(canvas\)/);
@@ -834,4 +834,141 @@ test('Select shows a computer mouse; its name and tooltip text still start with 
  assert.match(line,/^\s*\['select','🖱️','Select','Click a mark to pick it\./);
  assert.doesNotMatch(toolbar,/\['select','⬚'/);
  assert.match(toolbar,/btn\('fa-tool','<span class="fa-ico"><\/span><span class="fa-name"><\/span>',name\+': '\+help,/,'the tooltip is still built from the name');
+});
+
+// ---------- Student words typed on the board; sizes up to 200; black paste; floating bar; mouse icon ----------
+const shareSource=read('class-pointer-prototype/activity-share.js');
+function studentTextApi(){
+ const code=grabFunction(shareSource,'function wrapStudentText(paragraph,widthOf,fit)')+';'+grabFunction(shareSource,'function studentTextStrokes(o)')+';({studentTextStrokes})';
+ return vm.runInNewContext(code,{Array,Math,String,Number});
+}
+// A line is as wide as 50 pixels per letter at a 100px font (a measure the test controls).
+const measure50=(line,bold)=>line.length*(bold?55:50);
+
+test('a student\'s words become one text mark per line, laid out like the teacher\'s: same size rule, same line spacing, in the box',()=>{
+ const {studentTextStrokes}=studentTextApi();
+ const o={text:'one two three four five six seven eight nine ten eleven twelve thirteen\nsecond paragraph',label:24,bold:false,color:'#c62828',block:'bk1',top:.1,left:.1,maxW:.5,aspect:16/9,measure:measure50};
+ const made=studentTextStrokes(o);
+ assert.ok(made.strokes.length>=3,'long text wraps inside the box');
+ const size=Math.round(24/(2.4*1280)*1e4)/1e4;
+ assert.equal(made.size,size);
+ assert.equal(size,.0078);
+ for(const stroke of made.strokes){
+  assert.equal(stroke.tool,'text');assert.equal(stroke.size,size);assert.equal(stroke.block,'bk1');assert.equal(stroke.color,'#c62828');
+  assert.ok(stroke.points.length===2&&stroke.points.every(C.validPoint),'every point is on the board');
+  assert.ok(C.cleanStroke(stroke),'the teacher\'s page accepts the mark');
+  assert.ok(stroke.text.length<=240);
+ }
+ // The teacher spaces lines size x 1.25 x 2.4 x (width / height); the student's lines use the same step.
+ const step=size*1.25*2.4*(16/9);
+ for(let i=1;i<made.strokes.length;i++)assert.ok(Math.abs(made.strokes[i].points[0].y-made.strokes[i-1].points[0].y-step)<2e-4,'line spacing is the teacher\'s');
+ // A wrapped line is soft; the first line of each paragraph is not.
+ assert.equal(made.strokes[0].soft,undefined);
+ assert.equal(made.strokes.filter(stroke=>stroke.soft===true).length>=1,true);
+ assert.equal(made.strokes.find(stroke=>stroke.text==='second paragraph').soft,undefined);
+ // No line is wider than the box.
+ for(const stroke of made.strokes)assert.ok(Math.abs(stroke.points[1].x-stroke.points[0].x)<=.5+1e-9);
+});
+
+test('student words: bold is measured and sent bold; Hebrew lines start at the right edge of the box; the last lines are cut at the bottom',()=>{
+ const {studentTextStrokes}=studentTextApi();
+ const plainBox={text:'aaa bbb ccc ddd eee fff ggg hhh',label:24,color:'#1f2937',block:'bk2',top:.1,left:.1,maxW:.3,aspect:16/9,measure:measure50};
+ const regular=studentTextStrokes({...plainBox,bold:false}),bold=studentTextStrokes({...plainBox,bold:true});
+ assert.ok(bold.strokes.length>=regular.strokes.length,'bold words are wider, so they wrap at least as often');
+ assert.ok(bold.strokes.every(stroke=>stroke.bold===true));
+ assert.ok(regular.strokes.every(stroke=>!('bold' in stroke)));
+ const hebrew=studentTextStrokes({...plainBox,text:'שלום עולם זה טקסט',bold:false});
+ for(const stroke of hebrew.strokes)assert.ok(stroke.points[0].x>stroke.points[1].x,'a Hebrew line runs right to left, starting at the right edge');
+ assert.ok(hebrew.strokes.every(stroke=>Math.abs(stroke.points[0].x-.4)<1e-9),'every line starts at the box\'s right edge');
+ const tall=studentTextStrokes({...plainBox,text:Array.from({length:60},(_,i)=>'line '+i).join('\n'),top:.8});
+ assert.equal(tall.cut,true);
+ assert.ok(tall.strokes.every(stroke=>stroke.points.every(C.validPoint)));
+ assert.ok(tall.strokes.length<20);
+});
+
+test('the teacher keeps a student\'s words at the size the student chose, even when the student\'s view is wider than the board',()=>{
+ const convert=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)');
+ // A view 1200 wide, a board 900 wide (so words are 4/3 of a board-width fraction to look the same).
+ const pdfApi={active:()=>true,activityPoint:point=>({...point,x:point.x*1200/900,y:point.y*800/506}),activityTextScale:()=>1200/900};
+ const toDocument=vm.runInNewContext(convert+';studentMessageToDocument',{window:{ClassPointerPdf:pdfApi},C,Number,Math});
+ const stroke={tool:'text',color:'#1f2937',size:.0078,text:'hello',block:'bk3',bold:true,points:[{x:.1,y:.1},{x:.3,y:.14}]};
+ const sent=toDocument({type:'highlight',stroke});
+ assert.equal(sent.stroke.size,Math.round(.0078*1200/900*1e4)/1e4);
+ assert.equal(sent.stroke.bold,true);assert.equal(sent.stroke.block,'bk3');
+ // The size is held inside what words may be.
+ assert.equal(toDocument({type:'highlight',stroke:{...stroke,size:.07}}).stroke.size,C.TEXT_MAX);
+ // Lines (not words) keep their thickness.
+ const pen={tool:'pen',color:'#c62828',size:.016,points:[{x:.1,y:.1},{x:.2,y:.2}]};
+ assert.equal(toDocument({type:'highlight',stroke:pen}).stroke.size,.016);
+ assert.match(read('class-pointer-prototype/pdf-mode.js'),/function activityTextScale\(\)\{const vw=scroller\.clientWidth;return vw&&W\?vw\/W:1\}/);
+});
+
+test('a student types where they click: no pop-up box, with size, bold and Ctrl+B like the teacher',()=>{
+ assert.doesNotMatch(shareSource,/window\.prompt\('Text for the lesson/);
+ assert.match(shareSource,/if\(lessonTool==='text'\)\{startTextEditor\(p\);return\}/);
+ assert.match(shareSource,/const boldButton=textButton\('B','Bold \(Ctrl\+B\)',\(\)=>setTextBold\(!textBold\)\);/);
+ assert.match(shareSource,/textSizeBox\.min='10';textSizeBox\.max='200';/);
+ assert.match(shareSource,/String\(event\.key\)\.toLowerCase\(\)==='b'\)\{event\.preventDefault\(\);setTextBold\(!textBold\)\}/);
+ assert.match(shareSource,/if\(event\.key==='Escape'\)\{event\.preventDefault\(\);finishTextEditor\(false\)\}/);
+ assert.match(shareSource,/if\(event\.relatedTarget&&textOptions\.contains\(event\.relatedTarget\)\)return;finishTextEditor\(true\)/,'the size and bold buttons do not close the words');
+ assert.match(shareSource,/textOptions\.style\.display=lessonLevel!=='none'&&lessonTool==='text'&&allowedMode\('text'\)\?'flex':'none';/);
+ assert.match(shareSource,/for\(const stroke of made\.strokes\)presenceConn\.send\(\{type:'highlight',stroke\}\);/,'each line goes to the teacher as it is made');
+ assert.match(shareSource,/drawTools\.append\(colorSelect,textOptions,bottomRow,viewOnly\);/);
+});
+
+test('undo takes back all the lines of the last block of words at once',()=>{
+ const store=new C.HighlightStore();
+ const line=(text,y,block)=>({tool:'text',color:'#1f2937',size:.0078,text,block,points:[{x:.1,y},{x:.4,y:y+.05}]});
+ store.add('student:a',{tool:'pen',color:'#c62828',size:.016,points:[{x:.1,y:.1},{x:.2,y:.2}]});
+ for(const [i,text] of ['one','two','three'].entries())store.add('student:a',line(text,.3+i*.06,'bk9'));
+ store.add('student:b',line('other student',.8,'bk9'));
+ store.edit('student:a','undo','');
+ assert.deepEqual(plain(store.strokes.map(s=>s.owner+':'+(s.text||s.tool))),['student:a:pen','student:b:other student'],'only this student\'s block went');
+ store.edit('student:a','undo','');
+ assert.deepEqual(plain(store.strokes.map(s=>s.owner)),['student:b']);
+});
+
+test('text size goes up to 200 and any size can be typed in the number box',()=>{
+ for(const label of [10,96,144,200]){
+  const size=Math.round(label/(2.4*1280)*1e4)/1e4;
+  assert.ok(size>=C.TEXT_MIN&&size<=C.TEXT_MAX,label+' is inside what words may be');
+  assert.equal(C.cleanStroke({tool:'text',color:'#1f2937',size,points:[{x:.1,y:.1},{x:.4,y:.2}],text:'x'}).size,size);
+  assert.ok(Math.abs(Math.round(size*2.4*1280)-label)<=1,'the label comes back');
+ }
+ assert.match(pdf,/TEXT_LABELS=\[12,14,16,18,20,24,28,32,40,48,64,80,96,120,144,200\],TEXT_REF=1280,TEXT_FLOOR=16,MIN_LABEL=10,MAX_LABEL=200;/);
+ assert.match(pdf,/textSizeValue=el\('input',null,'pdf-textsize-value'\);textSizeValue\.type='number';textSizeValue\.min=String\(MIN_LABEL\);textSizeValue\.max=String\(MAX_LABEL\);/);
+ assert.match(pdf,/setTextSize\(sizeOfLabel\(Math\.max\(MIN_LABEL,Math\.min\(MAX_LABEL,Math\.round\(typed\)\)\)\)\);/);
+ assert.match(pdf,/textSizeValue\.addEventListener\('change',applyTypedSize\);/);
+ assert.match(pdf,/if\(event\.key==='Enter'\)\{event\.preventDefault\(\);applyTypedSize\(\);inlineEdit\?\.box\.focus\(\)\}/,'Enter applies the size and returns to the words');
+ assert.match(pdf,/box\.addEventListener\('blur',event=>\{if\(event\.relatedTarget&&textSizeBox\?\.contains\(event\.relatedTarget\)\)return;finishInline\(true\)\}\);/);
+});
+
+test('pasted words are always black, whatever color is chosen',()=>{
+ assert.match(pdf,/const PASTE_INK='#1f2937';/);
+ assert.equal(C.cleanStroke({tool:'text',color:'#1f2937',size:.0078,points:[{x:.1,y:.1},{x:.4,y:.2}],text:'x'}).color,'#1f2937','the board\'s black is kept as it is');
+ const paste=pdf.slice(pdf.indexOf('async paste(payload){'),pdf.indexOf('async copy(){'));
+ assert.equal((paste.match(/color:PASTE_INK/g)||[]).length,2,'both paste layouts');
+ assert.doesNotMatch(paste,/ownColor/);
+});
+
+test('the bottom bar floats on the screen in a narrow or short window; Select is a computer mouse on the teacher toolbar',()=>{
+ const css=read('class-pointer-prototype/classroom.css');
+ assert.match(css,/@media \(max-width:1100px\),\(max-height:700px\)\{#pdfNav,#stage\.board-whole #pdfNav\{position:fixed;bottom:10px;z-index:2147483000;max-width:calc\(100vw - 20px\);max-height:45vh;overflow:auto\}\}/);
+ assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;/,'wide windows keep the bar where it was');
+ assert.match(annotate,/select:\['🖱️','Select','Click one of your marks to pick it/);
+ assert.doesNotMatch(annotate,/select:\['<svg/);
+});
+
+test('a student\'s typing box stays on the board, and the teacher tells the student page where the board is',()=>{
+ const {studentTextStrokes}=studentTextApi();
+ // A board that covers 89% of the width of the picture: lines never go past it, and the last lines are cut at its bottom.
+ const made=studentTextStrokes({text:'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen',label:24,bold:false,color:'#1f2937',block:'bk5',top:.1,bottom:.4,left:.3,maxW:.59,aspect:16/9,measure:measure50});
+ for(const stroke of made.strokes)assert.ok(Math.max(stroke.points[0].x,stroke.points[1].x)<=.89+1e-9,'inside the board');
+ const tall=studentTextStrokes({text:Array.from({length:40},(_,i)=>'line '+i).join('\n'),label:24,bold:false,color:'#1f2937',block:'bk6',top:.1,bottom:.4,left:.1,maxW:.5,aspect:16/9,measure:measure50});
+ assert.equal(tall.cut,true);
+ for(const stroke of tall.strokes)assert.ok(stroke.points[0].y+.0078*1.25*2.4*16/9<=.4+1e-6,'above the bottom of the board');
+ assert.match(shareSource,/const fit=lessonMarks\.boardBox,right=fit&&fit\.w>\.2\?Math\.min\(\.96,fit\.w-\.02\):\.96,bottom=fit&&fit\.h>\.2\?Math\.min\(1,fit\.h\):1;/);
+ assert.match(read('class-pointer-prototype/pdf-mode.js'),/function activityBoardBox\(\)\{\s*const vw=scroller\.clientWidth,vh=scroller\.clientHeight;/);
+ // The sizes the teacher sends back are the sizes the student chose.
+ assert.match(read('class-pointer-prototype/pdf-mode.js'),/\.\.\.\(stroke\.tool==='text'\?\{size:stroke\.size\/activityTextScale\(\)\}:\{\}\),points:stroke\.points\.map\(p=>activityPoint\(p,false\)\)/);
 });

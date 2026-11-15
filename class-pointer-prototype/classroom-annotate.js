@@ -72,8 +72,8 @@
     get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(SHAPES)}},
     // On the lesson the Hand is the Mouse: no pointing, no drawing, the page is used as a page.
     toolLabels:{hand:['🖱','Mouse',teacher?'Stop pointing and drawing, and move the shared screen.':'Stop pointing and drawing, and scroll the page.'],
-      // One button that looks like a normal mouse arrow, first on the toolbar.
-      select:['<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5v17l4.6-4.2 3 6.9 2.6-1.1-3-6.8H18z" fill="#1f2937" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them. Everything else works like a normal mouse: scroll, drag the page, click a link to open it for the class.',-1]},
+      // One button, a computer mouse, first on the toolbar.
+      select:['🖱️','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them. Everything else works like a normal mouse: scroll, drag the page, click a link to open it for the class.',-1]},
     // Only the tools this lesson has are shown; words have their own size control under the lesson.
     hideUnused:true,ownTextSize:true,
     keys:{p:{tool:'pointer'},h:{tool:'highlight',variant:'highlight'},b:{tool:'highlight',variant:'box'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
