@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>My Nigri login</title>
+<style>
+:root{font-family:system-ui,Arial,sans-serif;color:#152c44;background:#f2f6fb}*{box-sizing:border-box}body{margin:0}.wrap{max-width:560px;margin:26px auto;padding:0 18px}.card{background:#fff;border:1px solid #d8e2ee;border-radius:16px;padding:24px;margin-top:16px}h1{margin:0 0 8px;font-size:28px}label{display:block;font-weight:700;margin:14px 0 6px}input,button{font:inherit;border-radius:9px;padding:12px;border:1px solid #b8c8d9;width:100%}button{background:#215da0;color:#fff;border:0;font-weight:700;cursor:pointer;margin-top:16px}button.plain{background:#fff;color:#a11922;border:1px solid #b8c8d9}button:disabled{opacity:.55;cursor:not-allowed}.muted{color:#526779}.error{color:#a11922;font-weight:650}.state{font-size:20px;font-weight:700;color:#21603b}.test{background:#fff4d6;border:1px solid #e6c870;border-radius:10px;padding:10px 14px;font-size:14px}[hidden]{display:none!important}
+</style></head><body><main class="wrap">
+<div class="test"><strong>Test version.</strong> Works on the staging site only. Use made-up logins. It never contacts Nigri.</div>
+<section class="card"><h1>My Nigri login</h1>
+<p id="blocked" class="muted" hidden>This screen is being tested on the staging site only and is not available here.</p>
+<p id="noServer" class="muted" hidden>No staging server is connected yet, so nothing can be saved.</p>
+<div id="staging" hidden>
+<p class="muted">Save your own Nigri username and password once. They are locked on the server and used only for your classes. You can replace or remove them any time.</p>
+<p id="state" class="state" role="status" aria-live="polite">Checking…</p>
+<p id="msg" role="status" aria-live="polite"></p>
+<button id="signin" type="button">Sign in with Google</button>
+<form id="form" autocomplete="off">
+<label for="username">Nigri username</label><input id="username" name="nigri-user" autocomplete="off" maxlength="256" spellcheck="false" autocapitalize="off">
+<label for="password">Nigri password</label><input id="password" name="nigri-pass" type="password" autocomplete="new-password" maxlength="256">
+<button id="save" type="submit">Save my Nigri login</button>
+<button id="remove" class="plain" type="button" hidden>Remove my saved login</button>
+</form></div></section></main>
+<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"></script><script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"></script><script src="../firebase-config.js"></script>
+<script src="./nigri-login-client.js?v=20261102-step2"></script><script src="./my-login.js?v=20261102-step2"></script>
+</body></html>

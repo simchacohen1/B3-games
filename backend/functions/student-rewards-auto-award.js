@@ -8,6 +8,7 @@ const rewardsStore=require('./rewards-store.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
+const posukReviewCore=require('./posuk-review-core.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -121,10 +122,11 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,String(req.body?.action||'').startsWith('rashi-')?'rashi-letters':'chazara');
+    const act=String(req.body?.action||'');
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -137,6 +139,7 @@ async function authorizeChazaraAction(teacher,body){
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
+ if(action==='posuk-grade')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
    return;
@@ -160,6 +163,20 @@ async function authorizeChazaraAction(teacher,body){
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
 const RASHI_BUCKET='b3-games.firebasestorage.app';
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
+const RASHI_DAILY_LIMIT=3;
+const rashiDate=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const row=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${row.year}-${row.month}-${row.day}`;};
+const rashiDailyRef=(studentId,date)=>rtdb.ref(`rashiLetters/dailySubmissions/${studentId}/${date}`);
+async function rashiDailyCount(studentId,date){return Number((await rashiDailyRef(studentId,date).get()).val()?.count)||0;}
+async function rashiReserveDaily(studentId,date){
+  const tx=await rashiDailyRef(studentId,date).transaction(v=>{
+    const count=Number(v?.count)||0;if(count>=RASHI_DAILY_LIMIT)return;
+    return {count:count+1};
+  });return tx.committed;
+}
+async function rashiReleaseDaily(studentId,date){
+  await rashiDailyRef(studentId,date).transaction(v=>({count:Math.max(0,(Number(v?.count)||0)-1)}));
+}
+
 async function rashiRequestStatus(requestId){
   const v=(await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get()).val();
   return v?String(v.status||'pending'):null;
@@ -175,7 +192,8 @@ async function rashiStudentSubmit(req,res){
   if(!rashiCore.isSection(sectionId))return res.status(400).json({error:'Unknown Rashi section.'});
   const rewardStudentId=await resolveRewardStudentId(studentId);
   if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
-  const words=rashiCore.cleanWords(req.query.words);
+  // For Vayeira, the server supplies the canonical entire passage, never client-provided text.
+  const words=rashiCore.readingWords(sectionId,req.query.words);
   const durationMs=Math.max(0,Math.min(Number(req.query.durationMs)||0,60*60*1000));
   const label=rashiCore.sectionLabel(sectionId);
   const makeRequest=record=>createPendingRequest({requestId:record.requestId,rewardStudentId,studentId,source:rashiCore.RASHI_SOURCE,
@@ -204,27 +222,40 @@ async function rashiStudentSubmit(req,res){
   const attemptId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const ext=type==='audio/mp4'||type==='audio/x-m4a'||type==='audio/aac'?'m4a':type==='audio/ogg'?'ogg':type==='audio/mpeg'?'mp3':type==='audio/wav'?'wav':'webm';
   const storagePath=`rashi-recordings/${classId}/${studentId}/${sectionId}/${attemptId}.${ext}`;
+  // A student-wide atomic reservation prevents simultaneous submissions in separate sections
+  // from bypassing the same three-per-Eastern-day quota, including retry submissions.
+  const dailyDate=rashiDate();
+  if(!await rashiReserveDaily(studentId,dailyDate))return res.status(429).json({error:'You have completed your 3 Rashi readings for today. Come back tomorrow!',dailyCount:RASHI_DAILY_LIMIT,dailyLimit:RASHI_DAILY_LIMIT});
   const file=admin.storage().bucket(RASHI_BUCKET).file(storagePath);
-  await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});
+  try{await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});}
+  catch(err){await rashiReleaseDaily(studentId,dailyDate);throw err;}
   const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
   const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
   // 3. Claim the one slot for this student+section (only if nothing is
   //    pending/approved). A double-click loses here and its upload is removed.
   let claimed=null,blockedBy=null;
-  const tx=await rashiRecordRef(studentId,sectionId).transaction(cur=>{
-    const r=rashiCore.claim(cur,seed);
-    if(r.block){blockedBy=r.block;return;}
-    claimed=r.write;return r.write;
-  });
+  let tx;
+  try{
+    tx=await rashiRecordRef(studentId,sectionId).transaction(cur=>{
+      const r=rashiCore.claim(cur,seed);
+      if(r.block){blockedBy=r.block;return;}
+      claimed=r.write;return r.write;
+    });
+  }catch(err){
+    await file.delete().catch(()=>{});
+    await rashiReleaseDaily(studentId,dailyDate).catch(()=>{});
+    throw err;
+  }
   if(!tx.committed||!claimed||tx.snapshot.val()?.attemptId!==attemptId){
     await file.delete().catch(()=>{});
+    await rashiReleaseDaily(studentId,dailyDate);
     const live=(await rashiRecordRef(studentId,sectionId).get()).val();
     return res.status(200).json({ok:true,alreadySubmitted:true,status:String(live?.status||blockedBy||'pending'),sectionId});
   }
   if(claimed.previousAttemptId&&existing)await rtdb.ref(`rashiLetters/recordingHistory/${studentId}/${sectionId}/${existing.attemptId}`).set(existing).catch(()=>{});
   // 4. The points request (deterministic id, so a retry never doubles it).
   await makeRequest(claimed);
-  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt});
+  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt,dailyCount:await rashiDailyCount(studentId,dailyDate),dailyLimit:RASHI_DAILY_LIMIT});
 }
 // Student asks for the status of every section (one call, no polling).
 async function rashiStudentStatus(req,res){
@@ -241,7 +272,7 @@ async function rashiStudentStatus(req,res){
     }
     sections[sectionId]=rashiCore.publicStatus(record,reqStatus);
   }
-  return res.status(200).json({ok:true,sections});
+  return res.status(200).json({ok:true,sections,dailyCount:await rashiDailyCount(student.studentId,rashiDate()),dailyLimit:RASHI_DAILY_LIMIT});
 }
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
@@ -962,6 +993,14 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
   return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
+// Posuk Practice teacher review: one recording, graded by hand (Issue #694).
+const posukReview=posukReviewCore.createPosukReview({
+  rtdb,SR_ROOT,
+  resolveRewardStudentId:id=>resolveRewardStudentId(id),
+  studentInfo:id=>studentInfo(id),
+  fileExists:async path=>{const [exists]=await admin.storage().bucket('b3-games.firebasestorage.app').file(path).exists();return exists;}
+});
+
 async function resolveRewardStudentId(posukStudentId){
   // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
   // the Admin SDK refuses unindexed orderByChild queries.
@@ -1494,8 +1533,22 @@ exports.studentRewardsAutoAward = onRequest(
           if(!result.ok) return res.status(409).json({error:result.error});
           return res.status(200).json(result);
         }
+        if(action==="posuk-submit"){
+          const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
+          if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+          const result=await posukReview.submit({studentId:practice.studentId,classId:practice.classId,
+            selectionKey:String(body.selectionKey||''),attemptId:String(body.attemptId||''),
+            hebrewText:String(body.hebrewText||''),sefer:String(body.sefer||'')});
+          return res.status(200).json(result);
+        }
         const teacher=await requireTeacher(req);
         if(!teacher.ok) return res.status(401).json({error:teacher.error});
+        if(action==="posuk-grade"){
+          const result=await posukReview.grade({teacherEmail:teacher.email,scope:teacher.scope,
+            studentId:String(body.studentId||''),submissionId:String(body.submissionId||''),
+            gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note});
+          return res.status(200).json(result);
+        }
         await authorizeChazaraAction(teacher,body);
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
@@ -1506,9 +1559,21 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json({ok:true,requests});
         }
         if(action==="rashi-approve"||action==="rashi-reject"){
-          await rashiAuthorizeRequest(teacher,body.requestId);
+          const request=await rashiAuthorizeRequest(teacher,body.requestId);
+          const isPassage=!!rashiCore.sectionText(request.sectionId);
+          const grade=Number(body.grade),feedback=String(body.feedback||'').trim();
+          if(isPassage&&action==="rashi-approve"&&(!Number.isInteger(grade)||grade<0||grade>100||body.grade==null||String(body.grade).trim()===''))
+            return res.status(400).json({error:'Choose a reading grade from 0 to 100.'});
+          if(feedback.length>500)return res.status(400).json({error:'Feedback must be 500 characters or shorter.'});
           const result=action==="rashi-approve"?await approvePendingRequest(String(body.requestId),teacher.email):await rejectPendingRequest(String(body.requestId),teacher.email);
           if(!result.ok)return res.status(409).json({error:result.error});
+          // Add grade/feedback only to the matching submitted attempt after authorization.
+          if(!result.alreadyHandled&&isPassage){
+            await rashiRecordRef(request.practiceStudentId,request.sectionId).transaction(cur=>{
+              if(!cur||cur.requestId!==body.requestId)return;
+              return {...cur,...(action==="rashi-approve"?{grade}:{grade:null}),feedback,gradedBy:teacher.email,gradedAt:Date.now()};
+            });
+          }
           return res.status(200).json(result);
         }
         if(action==="list-chazara-pending"){

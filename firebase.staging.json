@@ -38,6 +38,9 @@
   "database": {
     "rules": "staging/database.rules.json"
   },
+  "storage": {
+    "rules": "staging/storage.rules"
+  },
   "functions": [
     {
       "source": "backend/functions-staging",

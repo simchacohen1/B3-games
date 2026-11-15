@@ -278,3 +278,35 @@ test('teacher panel shows student, class, section, audio, and approve / try agai
   expect(calls.filter(c => c.action === 'rashi-reject')).toHaveLength(1);
   await expect(page.locator('#recList')).toContainText('No Rashi recordings are waiting');
 });
+
+
+test('Vayeira browsing displays all 36 approved source Rashis with individual recording buttons', async ({ page }) => {
+  await openStudentPage(page, fresh());
+  await page.locator('.vayeira-reading-tile').click();
+  const hub=page.locator('#recordHub');
+  await expect(hub).toContainText('Parshas Vayeira');
+  const data=JSON.parse(fs.readFileSync(path.resolve(ROOT,'rashi-letters/data/vayeira-rashi.json'),'utf8'));
+  const select=hub.getByLabel('Choose perek');
+  const pereks=[...new Set(data.passages.map((p:any)=>p.perek))];
+  const seen:string[]=[];
+  for(const perek of pereks){
+    await select.selectOption(String(perek));
+    const items=data.passages.filter((p:any)=>p.perek===perek);
+    const rows=hub.locator('.rr-menu-row');
+    await expect(rows).toHaveCount(items.length);
+    for(let i=0;i<items.length;i++){
+      await expect(rows.nth(i)).toContainText('Pasuk '+items[i].pasuk);
+      seen.push(items[i].id);
+    }
+  }
+  expect(seen).toHaveLength(36);
+  expect(new Set(seen).size).toBe(36);
+  await select.selectOption(String(data.passages[0].perek));
+  await hub.locator('.rr-menu-row').first().getByRole('button',{name:/Record Reading/}).click();
+  const screen=page.locator('#recordScreen');
+  await expect(screen).toBeVisible();
+  await expect(screen.locator('.rr-passage')).toContainText(data.passages[0].text);
+  await expect(screen.getByRole('button',{name:/Record Reading/})).toBeVisible();
+  await screen.getByRole('button',{name:/All readings/}).click();
+  await expect(hub).toBeVisible();
+});

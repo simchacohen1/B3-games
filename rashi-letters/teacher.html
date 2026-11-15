@@ -117,6 +117,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   <section id="recPanel" aria-live="polite">
     <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
     <p class="rec-sub">Listen, then approve (+2 points) or ask the student to try again.</p>
+    <div class="rec-bulk"><button class="btn green hidden" id="approveLegacyAllBtn" type="button">✅ Approve All Legacy Readings</button><span id="approveLegacyAllMsg" aria-live="polite"></span></div>
     <div id="recList"><div class="empty">Loading…</div></div>
   </section>
 
@@ -242,9 +243,15 @@ async function rashiApi(action, extra){
   if(!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
+let pendingLegacyIds=[];
 function renderRecordings(rows){
   const list = document.getElementById('recList');
   document.getElementById('recCount').textContent = rows.length ? '(' + rows.length + ')' : '';
+  // Vayeira entries require an individual numeric reading grade, so bulk approve only legacy word missions.
+  pendingLegacyIds=rows.filter(r=>!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
+  const bulk=document.getElementById('approveLegacyAllBtn');
+  bulk.classList.toggle('hidden',!pendingLegacyIds.length);
+  bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
   if(!rows.length){ list.innerHTML = '<div class="empty">✅ No Rashi recordings are waiting.</div>'; return; }
   list.innerHTML = rows.map(r =>
     '<div class="rec-item" data-id="' + escapeHtml(r.id) + '">' +
@@ -252,6 +259,9 @@ function renderRecordings(rows){
         (r.className ? '<span class="rec-class">' + escapeHtml(r.className) + '</span>' : '') +
         '<span>' + escapeHtml(r.sectionLabel) + (r.attempt > 1 ? ' · try #' + Number(r.attempt) : '') + '</span></div>' +
       (r.words && r.words.length ? '<div class="rec-words" lang="he">' + r.words.map(escapeHtml).join(' &nbsp; ') + '</div>' : '') +
+      (String(r.sectionId||'').startsWith('vayeira-')
+        ? '<div class="rec-meta">Reading score (0–100): <input type="number" class="rashi-grade" min="0" max="100" step="1" required aria-label="Rashi reading score" style="width:90px;padding:6px"></div><label class="rec-meta">Feedback <input type="text" class="rashi-feedback" maxlength="500" placeholder="Optional student feedback" style="max-width:380px;width:90%;padding:6px"></label>'
+        : '') +
       '<div class="rec-meta">' + escapeHtml(fmtTime(r.createdAt)) + (r.durationMs ? ' · ' + Math.round(r.durationMs/1000) + ' sec' : '') + '</div>' +
       (r.audioUrl ? '<audio controls preload="none" src="' + escapeHtml(r.audioUrl) + '"></audio>' : '<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>') +
       '<div class="rec-actions"><button class="btn green" data-act="approve">✅ Approve (+2 Points)</button><button class="btn gold" data-act="reject">🔄 Try Again</button></div>' +
@@ -268,11 +278,33 @@ document.getElementById('recList').addEventListener('click', async e => {
   const item = btn.closest('.rec-item'), msg = item.querySelector('.rec-msg');
   item.querySelectorAll('button').forEach(b => b.disabled = true);   // one click only
   try{
-    const out = await rashiApi(btn.dataset.act === 'approve' ? 'rashi-approve' : 'rashi-reject', { requestId: item.dataset.id });
+    const scoreInput=item.querySelector('.rashi-grade'),feedbackInput=item.querySelector('.rashi-feedback');
+    const action=btn.dataset.act === 'approve' ? 'rashi-approve' : 'rashi-reject';
+    const grade=scoreInput?.value;
+    if(scoreInput&&action==='rashi-approve'&&(grade===''||!Number.isInteger(Number(grade))||Number(grade)<0||Number(grade)>100)){
+      throw new Error('Enter a reading grade from 0 to 100.');
+    }
+    const out = await rashiApi(action, { requestId: item.dataset.id,...(scoreInput&&action==='rashi-approve'?{grade:Number(grade)}:{}),...(feedbackInput?{feedback:feedbackInput.value}:{}) });
     msg.textContent = out.alreadyHandled ? 'Already handled earlier — nothing more was changed.'
       : btn.dataset.act === 'approve' ? '✅ Approved. +' + (out.actualAmount ?? 2) + ' points.' : '🔄 Sent back to try again.';
     setTimeout(loadRecordings, 1200);
   }catch(error){ msg.textContent = error.message || 'Could not save.'; item.querySelectorAll('button').forEach(b => b.disabled = false); }
+});
+
+
+document.getElementById('approveLegacyAllBtn').addEventListener('click',async e=>{
+  const btn=e.currentTarget,msg=document.getElementById('approveLegacyAllMsg'),ids=pendingLegacyIds.slice();
+  if(btn.disabled||!ids.length)return;
+  if(!confirm('Approve '+ids.length+' legacy Rashi word recording(s)? Vayeira Rashis must each receive their own grade.'))return;
+  btn.disabled=true;
+  document.querySelectorAll('#recList button').forEach(x=>x.disabled=true);
+  let done=0,failed=0;
+  for(const requestId of ids){
+    msg.textContent='Approving '+(done+failed+1)+' of '+ids.length+'…';
+    try{await rashiApi('rashi-approve',{requestId});done++;}catch(err){failed++;console.warn('Rashi bulk approval failed',err);}
+  }
+  msg.textContent='✅ '+done+' approved.'+(failed?' '+failed+' could not be approved.':'');
+  btn.disabled=false;await loadRecordings();
 });
 
 async function loadLockState(){

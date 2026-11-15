@@ -787,7 +787,17 @@ document.addEventListener("DOMContentLoaded",function(){
   function slugId(value){
     return String(value||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
   }
+  const escHtml=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  // A failure while loading must be shown, never left as a silently empty list.
   async function loadClassManagement(){
+    try{return await loadClassManagementNow();}
+    catch(error){
+      console.error("Class management could not load",error);
+      const status=el("classManagementStatus");
+      if(status)status.textContent="The student list could not be loaded. Check your connection and refresh the page. ("+((error&&error.message)||"unknown error")+")";
+    }
+  }
+  async function loadClassManagementNow(){
     if(!isAuthorizedTeacher)return;
     const isOwner=currentAccess.role==="admin";
     const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
@@ -811,7 +821,18 @@ document.addEventListener("DOMContentLoaded",function(){
       }
       return a.localeCompare(b);
     });
-    classSel.innerHTML=classIds.map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
+    // Two classes can carry the same name (Issue #665). Show them apart, with the
+    // student count and class ID, so the wrong one is never managed by mistake.
+    const labelKey=n=>String(n||"").normalize("NFKC").toLowerCase().replace(/[\u00b7\ufffd]/g," ").replace(/[^a-z0-9]+/g," ").trim();
+    const labelCounts={};
+    classIds.forEach(id=>{const k=labelKey((classes[id]&&classes[id].name)||id);labelCounts[k]=(labelCounts[k]||0)+1;});
+    const classLabel=id=>{
+      const raw=(classes[id]&&classes[id].name)||id, name=String(raw).replace(/\ufffd/g,"\u00b7");
+      if(labelCounts[labelKey(raw)]<2)return name;
+      const count=Object.keys((classes[id]&&classes[id].members)||{}).length;
+      return name+" \u2014 "+count+" student"+(count===1?"":"s")+" ["+id+"]";
+    };
+    classSel.innerHTML=classIds.map(id=>'<option value="'+escHtml(id)+'">'+escHtml(classLabel(id))+'</option>').join("");
     if(prior&&classes[prior])classSel.value=prior;
     if(!classSel.value&&classIds.length)classSel.value=classIds[0];
 
@@ -826,24 +847,30 @@ document.addEventListener("DOMContentLoaded",function(){
       studentIds=[...ids];
     }
     const studentRows=await Promise.all(studentIds.map(async id=>{
-      const snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
-      return [id,snap.val()||{}];
+      // One unreadable or missing profile must not empty the whole list.
+      try{const snap=await db.ref("b3Games/students/"+id+"/profile").once("value");return [id,snap.val()||{}];}
+      catch(error){console.warn("Could not read student profile "+id,error);return [id,{}];}
     }));
     const students={};
     studentRows.forEach(([id,profile])=>{students[id]={profile};});
     // Passcodes are private; teachers see them only through the backend.
-    const passcodeList=await trustedStudentAction("list",isOwner?{all:true}:{});
+    // Only the chosen class is asked for. Asking for every passcode in the school
+    // at once was slow enough to time out and leave the list without passcodes.
+    const passcodeList=classSel.value?await trustedStudentAction("list"):null;
     Object.entries(passcodeList?.passcodes||{}).forEach(([id,code])=>{if(students[id])students[id].profile={...students[id].profile,passcode:code};});
 
-    studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
+    studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+escHtml(id)+'">'+escHtml(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
 
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
       const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
       const passcode=String(profile.passcode||"");
-const active=(members[id]?.active!==false&&profile.active!==false);
-      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button><button type="button" data-remove-student="'+id+'" data-student-name="'+name.replace(/"/g,"&quot;")+'" style="border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Remove</button></div>';
+      // "Blocked" belongs to THIS class only. A whole account that was turned off
+      // is shown separately, so one class never appears to control another.
+      const accountOff=profile.active===false, active=(members[id]?.active!==false&&!accountOff);
+      const safeId=escHtml(id), safeName=escHtml(name);
+      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+safeName+'</strong><input data-student-passcode="'+safeId+'" value="'+escHtml(passcode)+'" inputmode="numeric" aria-label="Current passcode for '+safeName+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+safeId+'" data-active="'+active+'" data-account-off="'+accountOff+'" title="'+(accountOff?'This whole account is turned off, in every class.':'Applies to this class only.')+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':accountOff?'Account off':'Blocked')+'</button><button type="button" data-save-student="'+safeId+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button><button type="button" data-remove-student="'+safeId+'" data-student-name="'+safeName+'" style="border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Remove</button></div>';
     }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
 
     const selectedStudent=studentSel.value;
@@ -851,7 +878,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Teacher-account administration belongs only in Owner Admin.
     if(el("teacherList"))el("teacherList").innerHTML="";
   }
+  // Why the last student request was refused (for example a possible duplicate).
+  let lastStudentActionError=null;
   async function trustedStudentAction(action,data={}){
+    lastStudentActionError=null;
     try{
       const user=firebase.auth().currentUser;
       const response=await fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents",{
@@ -859,13 +889,30 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         body:JSON.stringify({action,classId:el("manageClassSelect").value,...data})
       });
       if(response.status===404)throw new Error("Teacher student management is awaiting backend deployment. Your invitation and class assignment are saved.");
-      const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not save the student.");return result;
-    }catch(error){el("classManagementStatus").textContent=error.message;return null;}
+      const result=await response.json();if(!response.ok)throw Object.assign(new Error(result.error||"Could not save the student."),{duplicate:result.duplicate||""});return result;
+    }catch(error){
+      const slow=error&&(error.name==="TimeoutError"||error.name==="AbortError");
+      const message=slow?"The server took too long to answer. Nothing was changed. Please try again.":error.message;
+      lastStudentActionError={message,duplicate:(error&&error.duplicate)||""};
+      el("classManagementStatus").textContent=message;return null;
+    }
   }
   async function createManagedStudent(){
     const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
     if(!name||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
-    {const result=await trustedStudentAction("create",{name,passcode});if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;}
+    const button=el("createManagedStudentButton");
+    // One request at a time: a second click must not create a second student.
+    if(button.disabled)return;
+    button.disabled=true;
+    try{
+      let result=await trustedStudentAction("create",{name,passcode});
+      // The same name exists in another class. A new account is made only on purpose.
+      if(!result&&lastStudentActionError&&lastStudentActionError.duplicate==="same-name"){
+        if(!confirm(lastStudentActionError.message+"\n\nPress OK only if this is a DIFFERENT boy who needs his own new account.\nPress Cancel to keep one account for the same boy."))return;
+        result=await trustedStudentAction("create",{name,passcode,confirmNew:true});
+      }
+      if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;
+    }finally{button.disabled=false;}
   }
   async function saveManagedStudentPasscode(){
     const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
@@ -2454,10 +2501,19 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       {if(await trustedStudentAction("passcode",{studentId:id,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
     }
     if(toggle){
-      const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true";
-      if(!isAuthorizedAdmin){if(await trustedStudentAction("active",{studentId:id,active}))await loadClassManagement();return;}
-      await db.ref("b3Games/students/"+id+"/profile/active").set(active);
-      el("classManagementStatus").textContent=active?"Student access enabled.":"Student access blocked."; await loadClassManagement();
+      const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true", status=el("classManagementStatus");
+      // A whole account that is turned off can only be turned back on by the administrator.
+      if(toggle.dataset.accountOff==="true"){
+        if(!isAuthorizedAdmin){status.textContent="This student's whole account is turned off. Ask the administrator to turn it back on.";return;}
+        await db.ref("b3Games/students/"+id+"/profile/active").set(true);
+        await loadClassManagement();status.textContent="Student account turned back on.";return;
+      }
+      // Blocking and enabling apply to the chosen class only, for the owner too.
+      // The same student's other classes (for example ET and WT) are not changed.
+      if(await trustedStudentAction("active",{studentId:id,active})){
+        await loadClassManagement();
+        status.textContent=active?"Student enabled in this class.":"Student blocked in this class only. His other classes are not changed.";
+      }
     }
   });
   el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
