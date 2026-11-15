@@ -7,7 +7,8 @@
  * What it changes in that folder (and nothing else):
  *   - CNAME becomes sols.tools
  *   - .github is removed, so no workflow, monitor or deploy job runs in the copy
- *   - sols-brand.js and the school emblem icons (sols-site/icons) are added at the
+ *   - sols-brand.js (sols-site/pointer-only.js followed by sols-site/brand.js) and
+ *     the school emblem icons (sols-site/icons) are added at the
  *     top level; favicon.ico, apple-touch-icon.png, favicon-*.png and
  *     android-chrome-*.png are replaced by the emblem
  *   - every .html page gets the emblem icons and og:/twitter: share tags written
@@ -128,7 +129,9 @@ function* htmlFiles(dir) {
 
 rmSync(join(target, '.github'), { recursive: true, force: true });
 writeFileSync(join(target, 'CNAME'), HOST + '\n');
-copyFileSync(join(here, 'brand.js'), join(target, 'sols-brand.js'));
+// One script for every page: first the rule that sols.tools shows only Class Pointer to teachers and students
+// (it may send the visitor to the home page before anything else runs), then the school's name and icons.
+writeFileSync(join(target, 'sols-brand.js'), readFileSync(join(here, 'pointer-only.js'), 'utf8') + '\n' + readFileSync(join(here, 'brand.js'), 'utf8'));
 for (const name of ['sols-favicon-16x16.png', 'sols-favicon-32x32.png', 'sols-apple-touch-icon.png', 'sols-icon-192.png', 'sols-icon-512.png', 'sols-share-image.png']) {
   copyFileSync(join(here, 'icons', name), join(target, name));
 }
