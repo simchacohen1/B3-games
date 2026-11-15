@@ -29,8 +29,26 @@
     var tag = el.nodeName;
     return tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEXTAREA' || el.isContentEditable;
   }
+  // Tab title: always starts with "SOLS Tools" so students can tell this site from
+  // the real school site. Same rule as solsTitle() in sols-site/build.mjs.
+  function solsTitle(raw) {
+    var text = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (/^SOLS Tools\b/i.test(text)) return text;
+    var rest = text
+      .replace(/Fun Torah Tools/gi, ' ')
+      .replace(/Shluchim Online School/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
+    return 'SOLS Tools | ' + (rest || NAME);
+  }
   function fixText(node) {
-    if (has(node.nodeValue) && !skipped(node.parentNode)) node.nodeValue = swap(node.nodeValue);
+    var parent = node.parentNode;
+    if (parent && parent.nodeName === 'TITLE' && parent.parentNode === document.head) {
+      var next = solsTitle(node.nodeValue);
+      if (next !== node.nodeValue) node.nodeValue = next;
+      return;
+    }
+    if (has(node.nodeValue) && !skipped(parent)) node.nodeValue = swap(node.nodeValue);
   }
   function fixAttrs(el) {
     for (var i = 0; i < ATTRS.length; i += 1) {

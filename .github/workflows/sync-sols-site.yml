@@ -51,7 +51,9 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/sols_site_key
           chmod 600 ~/.ssh/sols_site_key
           ssh-keyscan -t ed25519 github.com > ~/.ssh/known_hosts 2>/dev/null
-          echo "GIT_SSH_COMMAND=ssh -i $HOME/.ssh/sols_site_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o StrictHostKeyChecking=yes" >> "$GITHUB_ENV"
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sols_site_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o StrictHostKeyChecking=yes"
+          # Also for the later steps; a value written to GITHUB_ENV only applies after this step ends.
+          echo "GIT_SSH_COMMAND=$GIT_SSH_COMMAND" >> "$GITHUB_ENV"
           git clone --depth 1 git@github.com:simchacohen1/sols-school-site.git site
 
       - name: Copy the release into sols-school-site
