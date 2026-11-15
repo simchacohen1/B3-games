@@ -21,6 +21,18 @@
   let seq=0;
   const newId=letter=>letter+Date.now().toString(36)+'-'+(++seq).toString(36);
   const round=value=>Math.round(value*1e4)/1e4;
+  // A pasted picture is an ordinary board mark: a rectangle (two corners) that also carries a small picture.
+  // So it is added, moved, removed, undone, limited and sent exactly like every other mark.
+  const MAX_IMAGE=150000,MAX_IMAGES=6,IMAGE_DATA=/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/]+=*$/i,RTL=/[֐-ࣿיִ-﷿ﹰ-ﻼ]/;
+  const FULL='This board is full. Clear some marks first.';
+  // Paste and Copy (board-clipboard.js). Pages that did not load it get it from beside this file.
+  const here=document.currentScript?.src;
+  let Clip=window.ClassPointerClipboard||null;
+  const clipReady=Clip?Promise.resolve(Clip):new Promise(resolve=>{
+    const done=()=>resolve(Clip=window.ClassPointerClipboard||null);
+    if(!here){done();return}
+    const script=document.createElement('script');script.src=new URL('board-clipboard.js',here).href;script.onload=done;script.onerror=done;document.head.append(script);
+  });
 
   function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
   function button(text,title,onClick,cls){const node=el('button',cls,text);node.type='button';if(title)node.title=title;if(onClick)node.addEventListener('click',onClick);return node}
@@ -47,8 +59,15 @@
       else if(tool!=='highlight'&&out.points.length!==2)return null;
       out.tool=tool;
     }
+    if(s.image!=null){
+      // A picture: small, a real picture data: URL, and its corners are top-left then bottom-right.
+      const [a,b]=out.points;
+      if(tool!=='rect'||typeof s.image!=='string'||s.image.length>MAX_IMAGE||!IMAGE_DATA.test(s.image)||b.x-a.x<.02||b.y-a.y<.02)return null;
+      out.image=s.image;
+    }
     return out;
   }
+  const pictureCount=board=>board.strokes.filter(s=>s.image).length;
   // One teacher-owned activity is copied to every student's independent board.
   // Uploaded pictures remain locked under the boys' marks. Word activities have a
   // separate, editable text object on each boy's board.
@@ -114,8 +133,15 @@
     }
     if(op.type==='board-add'){
       const s=cleanStroke(op.stroke);
-      if(!s||s.id[0]!==by[0]||board.strokes.length>=MAX_STROKES||board.strokes.some(item=>item.id===s.id))return false;
+      if(!s||s.id[0]!==by[0]||board.strokes.length>=MAX_STROKES||board.strokes.some(item=>item.id===s.id)||(s.image&&pictureCount(board)>=MAX_IMAGES))return false;
       s.by=by;board.strokes.push(s);board.drafts[by]=null;return true;
+    }
+    // Move or resize one of my own marks without sending it again (a picture stays where it is in the pile).
+    if(op.type==='board-move'){
+      const old=board.strokes.find(item=>item.by===by&&item.id===op.id);if(!old)return false;
+      const s=cleanStroke({...old,id:typeof op.newId==='string'?op.newId:old.id,points:op.points});
+      if(!s||s.id[0]!==by[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
+      s.by=by;board.strokes[board.strokes.indexOf(old)]=s;return true;
     }
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
@@ -133,12 +159,38 @@
   function boardFromMessage(list,rawText){
     const board=emptyBoard();
     if(activity?.kind==='word')board.text=cleanWord(rawText)||defaultWord();
-    if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s){s.by=raw.by==='teacher'?'teacher':'student';board.strokes.push(s)}}
+    if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s&&!(s.image&&pictureCount(board)>=MAX_IMAGES)){s.by=raw.by==='teacher'?'teacher':'student';board.strokes.push(s)}}
     return board;
   }
 
   // ---------- Drawing on a canvas ----------
+  // Pasted pictures are decoded once and kept; pictureLoaded() repaints when one becomes ready.
+  const pictures=new Map();let pictureLoaded=()=>{};
+  function pictureOf(data){
+    let image=pictures.get(data);
+    if(!image){
+      if(pictures.size>=80)pictures.clear();
+      image=new Image();image.onload=()=>pictureLoaded();image.src=data;pictures.set(data,image);
+    }
+    return image.complete&&image.naturalWidth?image:null;
+  }
+  // Text boxes. Hebrew lines run right to left and line up on the right edge of the box.
+  function textOn(ctx,s,w,h){
+    const size=Math.max(4,s.size*w),lines=s.text.split('\n').slice(0,8),rtl=RTL.test(s.text);
+    ctx.save();ctx.fillStyle=s.color;ctx.font='600 '+size+'px Arial, "Segoe UI", sans-serif';ctx.textBaseline='top';
+    ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
+    const x=s.points[0].x*w+(rtl?Math.max(8,...lines.map(line=>ctx.measureText(line).width)):0);
+    lines.forEach((line,i)=>ctx.fillText(line,x,s.points[0].y*h+i*size*1.25));
+    ctx.restore();
+  }
   function strokeOn(ctx,s,w,h){
+    if(s.image){
+      const [a,b]=s.points,image=pictureOf(s.image);
+      if(image)ctx.drawImage(image,a.x*w,a.y*h,(b.x-a.x)*w,(b.y-a.y)*h);
+      else{ctx.fillStyle='#e5e7eb';ctx.fillRect(a.x*w,a.y*h,(b.x-a.x)*w,(b.y-a.y)*h)}
+      return;
+    }
+    if(s.tool==='text'){textOn(ctx,s,w,h);return}
     if(s.tool&&window.FTTAnnotate){window.FTTAnnotate.drawItem(ctx,s,p=>[p.x*w,p.y*h],w);return}
     const pts=s.points,width=Math.max(1,s.size*w);ctx.strokeStyle=s.color;ctx.fillStyle=s.color;
     if(pts.every(p=>p.x===pts[0].x&&p.y===pts[0].y)){ctx.beginPath();ctx.arc(pts[0].x*w,pts[0].y*h,width/2,0,Math.PI*2);ctx.fill();return}
@@ -152,9 +204,18 @@
     const dpr=Math.min(window.devicePixelRatio||1,2),pw=Math.round(w*dpr),ph=Math.round(h*dpr);
     if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph}
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+    paintOn(ctx,w,h,board,[board.drafts.student,board.drafts.teacher,local]);
+  }
+  function paintOn(ctx,w,h,board,drafts){
     ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);paintActivity(ctx,w,h,board);ctx.lineCap='round';ctx.lineJoin='round';
     for(const s of board.strokes)strokeOn(ctx,s,w,h);
-    for(const s of [board.drafts.student,board.drafts.teacher,local])if(s)strokeOn(ctx,s,w,h);
+    for(const s of drafts)if(s)strokeOn(ctx,s,w,h);
+  }
+  // A PNG picture of a whole board (for Copy board).
+  function boardPng(board){
+    const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=900;
+    paintOn(canvas.getContext('2d'),canvas.width,canvas.height,board,[]);
+    return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error('Could not make a picture of the board.')),'image/png'));
   }
   // Largest 16:9 board that fits inside the box.
   function fit(box,surface){
@@ -223,8 +284,27 @@
   // Mouse, pen, text move and touch input on one board canvas.
   // o: by ('student'|'teacher'), tools, enabled(), board(), apply(op) (apply locally + send), send(op) (send only), redraw()
   function attachDrawing(canvas,o){
-    let draft=null,pid=null,timer=0,lastSent=0,lastTextMove=0;
+    let draft=null,pid=null,timer=0,lastSent=0,lastTextMove=0,grab=null,hover=null;
     const pos=event=>{const r=canvas.getBoundingClientRect();return{x:round(Math.min(1,Math.max(0,(event.clientX-r.left)/r.width))),y:round(Math.min(1,Math.max(0,(event.clientY-r.top)/r.height)))}};
+    // Where the mouse is over this board (a pasted thing lands there), even while the drawing toolbar is on top.
+    document.addEventListener('pointermove',event=>{
+      const r=canvas.getBoundingClientRect();
+      hover=r.width&&event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom?pos(event):null;
+    },{passive:true,capture:true});
+    // Move tool: drag one of my own pictures.
+    function pictureAt(p){
+      const list=o.board().strokes;
+      for(let i=list.length-1;i>=0;i--){const s=list[i];if(s.image&&s.by===o.by&&p.x>=s.points[0].x&&p.x<=s.points[1].x&&p.y>=s.points[0].y&&p.y<=s.points[1].y)return s}
+      return null;
+    }
+    function movePicture(p,final){
+      if(!final&&Date.now()-lastTextMove<70)return;
+      lastTextMove=Date.now();
+      const s=o.board().strokes.find(item=>item.id===grab.id);if(!s)return;
+      const w=s.points[1].x-s.points[0].x,h=s.points[1].y-s.points[0].y;
+      const x=Math.min(1-w,Math.max(0,p.x-grab.dx)),y=Math.min(1-h,Math.max(0,p.y-grab.dy));
+      o.apply({type:'board-move',id:s.id,points:[{x,y},{x:x+w,y:y+h}]});
+    }
     // While a line is being drawn, the other side sees it live (about 12 updates a second).
     function sendDraft(){
       if(timer)return;
@@ -237,7 +317,8 @@
     function erase(p){
       const hit=[];
       for(const s of o.board().strokes){
-        if(s.by!==o.by)continue;const reach=ERASE+s.size/2;
+        // Pictures are not rubbed out by accident while erasing lines on top of them (use ✕ Remove picture or Undo).
+        if(s.by!==o.by||s.image)continue;const reach=ERASE+s.size/2;
         if(s.points.some((q,i)=>segDist(p,i?s.points[i-1]:q,q)<=reach))hit.push(s.id);
       }
       if(hit.length)o.apply({type:'board-remove',ids:hit});
@@ -252,7 +333,12 @@
       if(event.button!==0||pid!==null||!o.enabled())return;
       event.preventDefault();pid=event.pointerId;canvas.setPointerCapture(pid);
       const p=pos(event);
-      if(o.tools.tool==='move'){if(!o.board().text){pid=null;return}moveWord(p,true);return}
+      if(o.tools.tool==='move'){
+        const picture=pictureAt(p);
+        grab=picture?{id:picture.id,dx:p.x-picture.points[0].x,dy:p.y-picture.points[0].y}:null;
+        if(!grab){if(!o.board().text){pid=null;return}moveWord(p,true)}
+        return;
+      }
       if(o.tools.tool==='eraser'){erase(p);return}
       draft={id:newId(o.by[0]),color:o.tools.color,size:o.tools.size,points:[p]};o.redraw();sendDraft();
     });
@@ -262,7 +348,7 @@
       for(const item of list&&list.length?list:[event]){
         const p=pos(item);
         if(o.tools.tool==='eraser'){erase(p);continue}
-        if(o.tools.tool==='move'){moveWord(p,false);continue}
+        if(o.tools.tool==='move'){if(grab)movePicture(p,false);else moveWord(p,false);continue}
         if(!draft)continue;
         const last=draft.points[draft.points.length-1];
         if(Math.hypot(p.x-last.x,(p.y-last.y)/ASPECT)<STEP)continue;
@@ -272,13 +358,91 @@
       }
       if(draft){o.redraw();sendDraft()}
     });
-    const finish=event=>{if(event.pointerId!==pid)return;if(o.tools.tool==='move'&&o.board().text)moveWord(pos(event),true);pid=null;if(draft)commit()};
+    const finish=event=>{
+      if(event.pointerId!==pid)return;
+      if(grab){movePicture(pos(event),true);grab=null}
+      else if(o.tools.tool==='move'&&o.board().text)moveWord(pos(event),true);
+      pid=null;if(draft)commit();
+    };
     canvas.addEventListener('pointerup',finish);canvas.addEventListener('lostpointercapture',finish);
-    canvas.addEventListener('pointercancel',event=>{if(event.pointerId!==pid)return;pid=null;dropDraft()});
+    canvas.addEventListener('pointercancel',event=>{if(event.pointerId!==pid)return;pid=null;grab=null;dropDraft()});
     return{
       draft:()=>draft,
-      cancel(){if(pid!==null&&canvas.hasPointerCapture?.(pid))canvas.releasePointerCapture(pid);pid=null;if(draft)dropDraft()}
+      point:()=>hover,
+      cancel(){if(pid!==null&&canvas.hasPointerCapture?.(pid))canvas.releasePointerCapture(pid);pid=null;grab=null;if(draft)dropDraft()}
     };
+  }
+
+  // 📋 Paste, 📄 Copy board and the picture buttons for one large board (a student's own board, or the board the
+  // teacher opened large). Pasted pictures and words become ordinary board marks, so the other side sees them live.
+  // o: by, priority, tools, open(), key(), board(), act(op), point(), selected()
+  function clipboardTools(bar,o){
+    const root=el('span','boards-clip'),pictureGroup=el('span','boards-pictures'),note=el('span','boards-note');
+    note.setAttribute('role','status');
+    let noteTimer=0,measurer=null;
+    function say(text){note.textContent=text||'';clearTimeout(noteTimer);if(text)noteTimer=setTimeout(()=>{note.textContent=''},7000)}
+    const ink=()=>o.tools.color==='#ffffff'?COLORS[0]:o.tools.color;
+    const has=id=>!!o.board()?.strokes.some(s=>s.id===id);
+    const target={priority:o.priority,active:o.open,say,
+      async paste(payload){
+        const key=o.key(),board=o.board();
+        if(payload.kind==='image'){
+          if(pictureCount(board)>=MAX_IMAGES){say('This board already has '+MAX_IMAGES+' pictures. Remove one first.');return}
+          say('Adding your picture…');
+          const picture=await Clip.encodeImage(payload.blob,{maxChars:MAX_IMAGE});
+          // The teacher may have opened another student's board while the picture was being made ready.
+          if(!o.open()||o.key()!==key){say('');return}
+          const id=newId(o.by[0]);
+          o.act({type:'board-add',stroke:{id,tool:'rect',color:COLORS[0],size:SIZE_VALUES[0],points:Clip.placeImage(picture.width,picture.height,{aspect:ASPECT,center:o.point()||undefined}),image:picture.data}});
+          say(has(id)?'Picture pasted. Use ✋ Move picture to move it.':FULL);
+        }else{
+          measurer=measurer||document.createElement('canvas').getContext('2d');measurer.font='600 100px Arial, "Segoe UI", sans-serif';
+          const laid=Clip.layoutText(payload.text,line=>measurer.measureText(line).width,{aspect:ASPECT,center:o.point()||undefined});
+          let added=0;
+          for(const item of laid.items){
+            const id=newId(o.by[0]);
+            o.act({type:'board-add',stroke:{id,tool:'text',color:ink(),size:item.size,points:[{x:item.x,y:item.y}],text:item.text}});
+            if(has(id))added++;
+          }
+          say(!added?FULL:payload.cut||laid.cut||added<laid.items.length?Clip.MSG.textCut:'Words pasted.');
+        }
+        update();
+      },
+      // Ctrl+C: the picked text box or picture when the drawing toolbar has one picked, otherwise the whole board.
+      async copy(){
+        const board=o.board(),id=o.selected?.(),item=id?board.strokes.find(s=>s.id===id):null;
+        if(item?.tool==='text'){await Clip.copyText(item.text);say('Words copied.');return}
+        await Clip.copyImage(item?.image?Clip.pngOf(item.image):boardPng(board));
+        say(item?.image?'Picture copied.':'Copied a picture of the board. Press '+Clip.KEY+'+V to paste it somewhere.');
+      }};
+    // The picture the buttons work on: the one picked with the drawing toolbar, otherwise my newest one.
+    function mine(){
+      const list=o.open()?o.board().strokes.filter(s=>s.image&&s.by===o.by):[],id=o.selected?.();
+      return list.find(s=>s.id===id)||list[list.length-1]||null;
+    }
+    function resize(factor){
+      const s=mine();if(!s)return;
+      const [a,b]=s.points,w0=b.x-a.x,h0=b.y-a.y;
+      // Keep the picture's shape, on the board, and never tiny.
+      const f=factor>1?Math.min(factor,1/w0,1/h0):Math.min(1,Math.max(factor,.05/Math.min(w0,h0)));
+      const w=w0*f,h=h0*f,x=Math.min(1-w,Math.max(0,(a.x+b.x)/2-w/2)),y=Math.min(1-h,Math.max(0,(a.y+b.y)/2-h/2));
+      o.act({type:'board-move',id:s.id,points:[{x,y},{x:x+w,y:y+h}]});
+    }
+    const move=button('✋ Move picture','Drag a picture to move it',()=>{
+      // A student with the drawing toolbar open moves things with its Select tool.
+      const FA=window.FTTAnnotate,state=FA?.state?.();
+      if(o.by==='student'&&state?.mode==='open'&&state.surface==='board'){FA.select('select');say('Drag the picture to move it.');return}
+      o.tools.setTool(o.tools.tool==='move'?'pen':'move');update();
+    });
+    pictureGroup.append(move,button('➖ Smaller','Make the picture smaller',()=>resize(.8)),button('➕ Bigger','Make the picture bigger',()=>resize(1.25)),
+      button('✕ Remove picture','Take the picture off the board',()=>{const s=mine();if(s)o.act({type:'board-remove',ids:[s.id]});update()},'danger'));
+    root.append(button('📋 Paste','Put the picture or words you copied on this board. You can also press Ctrl+V.',()=>{if(Clip)void Clip.pasteInto(target)}),
+      button('📄 Copy board','Copy a picture of this board, so you can paste it somewhere else',()=>{if(Clip)void Clip.copyFrom(target)}),pictureGroup,note);
+    bar.append(root);
+    function update(){pictureGroup.hidden=!mine();move.setAttribute('aria-pressed',String(o.tools.tool==='move'))}
+    clipReady.then(clip=>{if(clip)clip.register(target);else root.hidden=true});
+    update();
+    return{root,update,say};
   }
 
   // =====================================================================
@@ -296,6 +460,9 @@
     drawGroup.append(
       button('↶ Undo','Undo my last line',()=>{const mine=board.strokes.filter(s=>s.by==='student');const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
       button('🗑 Clear','Clear everything I drew',()=>{if(board.strokes.some(s=>s.by==='student')&&confirm('Clear everything you drew on your board?'))act({type:'board-clear'})},'danger'));
+    // What is picked with the drawing toolbar's Select tool (when the toolbar reports it).
+    const pickedId=()=>{const state=window.FTTAnnotate?.state?.();return state?.surface==='board'?state.selected||null:null};
+    const clip=clipboardTools(bar,{by:'student',priority:3,tools,open:()=>on&&mode==='boards'&&!blocked&&!view.hidden&&canvas.getClientRects().length>0,key:()=>'mine',board:()=>board,act:op=>act(op),point:()=>drawer?.point(),selected:pickedId});
     const editWord=wordEditor(bar,()=>board,text=>act({type:'board-text',text}),tools);
     const full=button('⛶ Full screen','Full screen',()=>(expanded()?$('exitFullScreenLesson'):$('fullScreenLesson'))?.click());
     bar.append(el('span','boards-spacer'));
@@ -327,12 +494,14 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
+      clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
       shareBtn.textContent=stream?'⏹ Stop Sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share My Screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
     const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){fit(focus,surface);paint(canvas,board,drawer?.draft())}});
+    pictureLoaded=redraw;clipReady.then(redraw);
     function openShareWindow(){
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
@@ -351,9 +520,15 @@
       getItems:()=>board.strokes.filter(item=>item.by==='student'),
       setItems(list){
         const mine=board.strokes.filter(item=>item.by==='student'),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
-        const removed=mine.filter(item=>!keep.has(item.id)).map(item=>item.id);
+        const gone=mine.filter(item=>!keep.has(item.id)),moved=new Set();
+        // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
+        for(const item of list){
+          const from=!had.has(item.id)&&item.image?gone.find(old=>old.image===item.image&&!moved.has(old.id)):null;
+          if(from){moved.add(from.id);moved.add(item.id);act({type:'board-move',id:from.id,newId:item.id,points:item.points})}
+        }
+        const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
         if(removed.length)act({type:'board-remove',ids:removed});
-        for(const item of list)if(!had.has(item.id)){const {by,...stroke}=item;act({type:'board-add',stroke})}
+        for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by,...stroke}=item;act({type:'board-add',stroke})}
       },
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
@@ -624,7 +799,10 @@
   const sendImage=button('🖼 Coloring page','Upload a picture or coloring page for every student to color',()=>imageFile.click());
   // Explicit clipboard action for teachers: preview before replacing each student's
   // common background. Every boy's own drawing layer remains independent.
-  const pasteAll=button('📋 Paste to All Boards','Paste copied words or an image on every student whiteboard',()=>void readClipboardForClass());
+  const pasteAll=button('📋 Paste to All Boards','Paste copied words or an image on every student whiteboard',()=>{
+    if(!classTarget.active()){B.status('Open Student whiteboards before pasting.');return}
+    if(Clip)void Clip.pasteInto(classTarget);
+  });
   const pastePreview=el('div','boards-paste-preview');pastePreview.hidden=true;
   pastePreview.setAttribute('role','dialog');pastePreview.setAttribute('aria-label','Preview paste to all whiteboards');
   pastePreview.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
@@ -644,6 +822,7 @@
       img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
       previewBody.append(img);
     }
+    if(value.note)previewBody.append(el('p',null,value.note));
     pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
   }
   async function commitPaste(){
@@ -652,29 +831,17 @@
     if(item.kind==='image')await sendImageFile(item.file);
     else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
   }
-  async function readClipboardForClass(){
-    if(!on||mode!=='boards'){B.status('Open Student whiteboards before pasting.');return}
-    try{
-      if(navigator.clipboard?.read){
-        const entries=await navigator.clipboard.read();
-        for(const entry of entries){
-          const kind=entry.types.find(t=>/^image\/(png|jpeg|webp|gif)$/.test(t));
-          if(kind){showPaste({kind:'image',file:await entry.getType(kind)});return}
-          if(entry.types.includes('text/plain')){
-            const text=(await (await entry.getType('text/plain')).text()).trim();
-            if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
-          }
-        }
-      }
-      if(navigator.clipboard?.readText){
-        const text=(await navigator.clipboard.readText()).trim();
-        if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
-      }
-      B.status('Nothing to paste. Copy a picture or some text first.');
-    }catch(error){
-      B.status('Clipboard access was blocked. Click the whiteboard area and press Ctrl+V to paste instead.');
-    }
-  }
+  // The gallery of all boards: Ctrl+V and the 📋 Paste to All Boards button both end in the same preview, and
+  // nothing is sent until the teacher presses ✓ Send to all boards. Words too long for a class word (80 letters,
+  // one line) are never cut short: they are sent as a picture instead, and the preview says so.
+  const classTarget={priority:1,active:()=>on&&!suspended&&!view.hidden&&mode==='boards'&&!focusId,say:text=>B.status(text),
+    async paste(payload){
+      if(payload.kind==='image'){showPaste({kind:'image',file:payload.blob});return}
+      if(payload.text.length<=80&&!payload.text.includes('\n')){showPaste({kind:'word',text:payload.text});return}
+      const made=await Clip.textImage(payload.text);
+      showPaste({kind:'image',file:made.blob,note:'These words are too long for one class word, so they will be sent as a picture.'+(payload.cut||made.cut?' Only the first part fits.':'')});
+    }};
+  clipReady.then(clip=>{if(clip)clip.register(classTarget);else pasteAll.hidden=true});
   const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
   activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
@@ -683,7 +850,7 @@
     if(file)await sendImageFile(file);
   });
   async function sendImageFile(file){
-    if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)||file.size>8*1024*1024){B.fail('Please choose a JPG, PNG, WebP or GIF smaller than 8 MB.');return}
+    if(!/^image\/(jpeg|png|webp|gif|bmp)$/.test(file.type)||file.size>8*1024*1024){B.fail('Please choose a JPG, PNG, WebP or GIF smaller than 8 MB.');return}
     sendImage.disabled=true;activityLabel.textContent='Preparing picture…';
     try{
       const data=await pictureData(file);
@@ -692,22 +859,6 @@
     }catch(e){B.fail(e.message||'Could not load that picture.')}
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
-  // Ctrl+V on the teacher grid broadcasts pasted pictures directly (from screenshots,
-  // webpages, etc.) or pasted words. Normal pasting inside text fields still works.
-  document.addEventListener('paste',event=>{
-    if(!on||mode!=='boards'||focusId||!event.clipboardData)return;
-    const imageItem=Array.from(event.clipboardData.items||[]).find(item=>/^image\/(jpeg|png|webp|gif)$/.test(item.type));
-    if(imageItem){
-      const file=imageItem.getAsFile();if(!file)return;
-      event.preventDefault();void sendImageFile(file);return;
-    }
-    const target=event.target;
-    if(target?.closest?.('input,textarea,[contenteditable="true"]'))return;
-    const value=event.clipboardData.getData('text/plain')?.trim();
-    if(!value)return;
-    event.preventDefault();wordInput.value=value.slice(0,80);
-    sendActivity({kind:'word',text:wordInput.value,instruction:instructionInput.value});
-  });
 
   function pictureData(file){
     return new Promise((resolve,reject)=>{
@@ -788,6 +939,10 @@
   const focusMember=()=>focusId?admitted().find(m=>m.id===focusId)||null:null;
   const focusBoard=()=>{const m=focusMember();return m?boardFor(m):null};
   const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
+  // Paste and Copy on the one board that is open large. What the teacher pastes goes to that student.
+  const focusClip=clipboardTools(focusBar,{by:'teacher',priority:2,tools,key:()=>focusId,board:()=>focusBoard(),act:op=>act(op),point:()=>drawer?.point(),
+    open:()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!!m&&!isBlocked(m)}});
+  pictureLoaded=()=>dirtyAll();
   function closeScreen(m){const c=m.screenCall;m.screenCall=null;m.screenStream=null;try{c?.close()}catch(_){}if(c)window.ClassPointerScreenMarks?.clearFor(m.studentId||personId(m)||m.id)}
   function sendMode(m){
     if(!on||suspended||excluded(m,mode)){if(!on||excluded(m,mode))closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
@@ -827,6 +982,7 @@
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
+        focusClip.root.hidden=screens||paused||!Clip;focusClip.update();
         if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share their screen…'}
         else setVideo(screenVideo,null);
         screenInk?.refresh();
