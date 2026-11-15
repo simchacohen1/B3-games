@@ -10,10 +10,15 @@ The same website is served at two addresses from the same live Firebase project:
 How a release reaches sols.tools:
 
 1. Code is merged to `main` here. funtorahtools.com updates as it always has.
-2. Within about 15 minutes the **Update from B3-games** workflow in
-   `sols-school-site` notices the new commit, copies it, runs
-   `sols-site/build.mjs` on the copy and commits the result there.
-   GitHub Pages then publishes sols.tools.
+2. The **Sync sols.tools site** workflow (`.github/workflows/sync-sols-site.yml`)
+   runs on the same push, copies the release to `sols-school-site`, runs
+   `sols-site/build.mjs` on the copy and commits it there. GitHub Pages then
+   publishes sols.tools, usually within two minutes. It uses the
+   `SOLS_SITE_DEPLOY_KEY` secret, a deploy key that can write to
+   `sols-school-site` only.
+3. Backup: the **Update from B3-games** workflow in `sols-school-site` can do
+   the same copy on demand (Actions > Run workflow) and is a no-op when step 2
+   already copied the commit.
 
 Nothing in this folder is loaded by funtorahtools.com. `brand.js` only changes
 the visible site name and the browser-tab icon on the sols.tools copy; accounts,
