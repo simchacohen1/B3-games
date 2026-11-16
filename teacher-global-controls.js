@@ -253,7 +253,7 @@
     if (bar.parentNode !== top) {
       var spacer = top.querySelector('.cp-topbar-spacer');
       top.insertBefore(bar, spacer || top.children[1] || null);
-      bar.classList.add('docked'); bar.style.left = ''; bar.style.top = ''; bar.style.transform = '';
+      bar.classList.add('docked'); document.body.classList.add('ftt-quick-docked'); bar.style.left = ''; bar.style.top = ''; bar.style.transform = '';
     }
   }
   function setupUi() {
@@ -267,6 +267,8 @@
       '#fttTeacherQuickBar .ftt-quick-grip:focus-visible{outline:3px solid #2563eb;border-radius:6px}',
       '#fttTeacherQuickBar.docked{position:static;transform:none;left:auto;top:auto;z-index:auto;background:transparent;box-shadow:none;padding:0;gap:6px;max-width:none;flex:none}',
       '#fttTeacherQuickBar.docked .ftt-quick-grip{display:none}',
+      '#fttTeacherQuickBar.docked{gap:4px}#fttTeacherQuickBar.docked button{width:30px;height:30px;font-size:16px}',
+      'body.ftt-quick-docked .cp-topbar{gap:8px}',
       '#fttTeacherQuickBar.docked button{background:#ffffff26;color:#fff}',
       '#fttTeacherQuickBar.docked #fttTeacherQuickLock{background:#1f2937;box-shadow:0 0 0 1px #ffffff66}',
       '#fttTeacherQuickBar.docked button[aria-expanded=true],#fttTeacherQuickBar.docked button[aria-current=page]{background:#dbeafe;color:#1e3a8a}',
