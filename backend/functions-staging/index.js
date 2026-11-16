@@ -6,3 +6,4 @@ exports.weeklyQuizStudent = require('./weekly-quiz-student').weeklyQuizStudent;
 exports.studentRewardsAutoAward = require('./student-rewards-auto-award').studentRewardsAutoAward;
 exports.multiplayerGameAction = require('./multiplayer-games').multiplayerGameAction;
 exports.privateMediaUrl = require('./private-media-url').privateMediaUrl;
+exports.teacherStudentFiles = require('./teacher-student-files').teacherStudentFiles;

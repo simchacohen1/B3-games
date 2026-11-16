@@ -77,6 +77,18 @@
     const old=(await ref.getMetadata()).customMetadata||{};
     await ref.updateMetadata({customMetadata:{...old,...changes}});
   }
+  // Teacher only: ask the server about the students of this class (read only). The server checks that the signed-in
+  // teacher is assigned to the class and the student is in it; Storage rules give teachers no access to student files.
+  const STUDENT_FILES_URL='https://us-central1-b3-games.cloudfunctions.net/teacherStudentFiles';
+  async function studentFilesCall(body){
+    const me=await who();
+    if(!me.teacher)throw Core.plain('Only a teacher can look at student files.');
+    let response;
+    try{response=await fetch(STUDENT_FILES_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await me.user.getIdToken()},body:JSON.stringify({...body,classId:me.classId}),cache:'no-store'})}catch(_){throw Core.plain(OFFLINE)}
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Core.plain(data.error||'Student files could not be opened.');
+    return data;
+  }
   // A whiteboard picture small enough to store (Storage allows Core.LIMITS.pngBytes). Returns the picture as it is when it
   // already fits, a smaller PNG of it when it does not, or null when there is no picture or it cannot be made small enough.
   async function fitPicture(picture){
@@ -407,17 +419,75 @@
       return showFiles();
     }
     const folders=h('div');folders.hidden=true;
+    const studentsPanel=h('div');studentsPanel.hidden=true;
     const only=h('input');only.type='checkbox';only.id='fttSavedOnlyTemplates';
     const filter=h('label');filter.append(only,' Show templates only');
     only.addEventListener('change',()=>{onlyTemplates=only.checked;showFiles()});
     const tabs=h('div','ftt-saved-tabs');tabs.setAttribute('role','tablist');
     const tab=(text,panel,show)=>{
-      const node=button(text,()=>{for(const other of tabs.children)other.setAttribute('aria-selected',String(other===node));list.hidden=panel!==list;filter.hidden=panel!==list;folders.hidden=panel!==folders;ui.say('');show()});
+      const node=button(text,()=>{for(const other of tabs.children)other.setAttribute('aria-selected',String(other===node));list.hidden=panel!==list;filter.hidden=panel!==list;folders.hidden=panel!==folders;studentsPanel.hidden=panel!==studentsPanel;ui.say('');show()});
       node.setAttribute('role','tab');node.setAttribute('aria-selected',String(panel===list));tabs.append(node);
     };
-    tab('My whiteboards',list,showFiles);tab('Class folders',folders,()=>showFolders(folders,ui));
-    ui.body.append(tabs,filter,list,folders);
+    tab('My whiteboards',list,showFiles);tab('Class folders',folders,()=>showFolders(folders,ui));tab('Student files',studentsPanel,()=>showStudentFiles(studentsPanel,ui));
+    ui.body.append(tabs,filter,list,folders,studentsPanel);
     return showFiles();
+  }
+
+  // Teacher: look at one student's saved whiteboards and the copies of what the teacher sent them. Read only:
+  // small pictures, and View opens the picture larger. Nothing here can change or delete a student's file.
+  let thumbChain=Promise.resolve();
+  function studentFileRow(file,studentId,studentName){
+    const row=h('div','ftt-saved-row'),box=h('span','ftt-saved-thumb',file.hasPicture?'…':'📝');
+    box.setAttribute('aria-hidden','true');
+    const name=h('span','ftt-saved-name',file.name);
+    name.append(h('small',null,(file.fromTeacher?'Sent by you · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
+    row.append(box,name);
+    if(!file.hasPicture){name.append(h('small',null,'No picture saved for this file.'));return row}
+    // One picture at a time, so a long list does not flood the server.
+    thumbChain=thumbChain.then(async()=>{
+      if(!box.isConnected)return;
+      try{
+        const img=document.createElement('img');img.alt='';
+        img.src=(await studentFilesCall({action:'picture',studentId,fileId:file.id})).url;
+        await new Promise(resolve=>{img.onload=resolve;img.onerror=resolve});
+        box.replaceChildren(img);
+      }catch(_){box.textContent='📝'}
+    });
+    row.append(button('View',async()=>{
+      const view=openDialog(file.name+' · '+studentName);
+      view.say('Loading…');
+      try{
+        const img=document.createElement('img');img.alt='Saved whiteboard of '+studentName;img.style.cssText='max-width:100%;height:auto;border:1px solid #d3dcea;border-radius:8px;background:#fff';
+        img.src=(await studentFilesCall({action:'picture',studentId,fileId:file.id})).url;
+        await new Promise(resolve=>{img.onload=resolve;img.onerror=resolve});
+        view.body.append(img);view.say('');
+      }catch(error){view.fail(error)}
+    },'main'));
+    return row;
+  }
+  async function showStudentFiles(panel,ui){
+    panel.replaceChildren(h('p','ftt-saved-note','Loading students…'));
+    let students;
+    try{students=(await studentFilesCall({action:'students'})).students||[]}catch(error){panel.replaceChildren();ui.fail(error);return}
+    ui.say('');
+    const select=h('select');select.id='fttStudentPick';select.append(new Option(students.length?'Choose a student…':'No students in this class',''));
+    for(const student of students)select.append(new Option(student.name,student.id));
+    const label=h('label',null,'Student');label.htmlFor=select.id;
+    const results=h('div');
+    panel.replaceChildren(h('p','ftt-saved-note','Look at your students\' saved whiteboards and the copies of what you sent them. You can only look: nothing here changes a student\'s file.'),label,select,results);
+    select.addEventListener('change',async()=>{
+      results.replaceChildren();
+      const studentId=select.value;if(!studentId)return;
+      const studentName=students.find(student=>student.id===studentId)?.name||'Student';
+      ui.say('Loading…');
+      try{
+        const files=(await studentFilesCall({action:'files',studentId})).files||[];
+        if(select.value!==studentId)return;
+        ui.say('');
+        if(!files.length){results.append(h('p','ftt-saved-note',studentName+' has no saved whiteboards yet.'));return}
+        for(const file of files)results.append(studentFileRow(file,studentId,studentName));
+      }catch(error){ui.fail(error)}
+    });
   }
 
   // Teacher: make the folders students save into, and choose where they should save right now.
