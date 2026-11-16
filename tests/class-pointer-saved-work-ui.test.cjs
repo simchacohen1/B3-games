@@ -34,7 +34,7 @@ const walk=node=>[node,...(node.children||[]).flatMap(walk)];
 const texts=node=>walk(node).map(item=>item.textContent).filter(Boolean);
 const buttonNamed=(node,text)=>walk(node).find(item=>item.tag==='button'&&item.textContent.startsWith(text));
 
-function harness({claims=STUDENT,signedIn=true,tabStudent='stu1',teacher=false,deny=false,existing={},folders=null,board=true,answers={}}={}){
+function harness({title='',claims=STUDENT,signedIn=true,tabStudent='stu1',teacher=false,deny=false,existing={},folders=null,board=true,answers={}}={}){
   const objects=new Map(Object.entries(existing)),puts=[],deleted=[],metaUpdates=[],dbWrites=[],fetches=[];
   const user=signedIn?{uid:teacher?'teacherA':'student-uid',getIdToken:async()=>'ID-TOKEN',getIdTokenResult:async()=>({claims:teacher?{}:claims})}:null;
   const ref=full=>({
@@ -55,7 +55,7 @@ function harness({claims=STUDENT,signedIn=true,tabStudent='stu1',teacher=false,d
     storage:()=>({ref}),
     database:()=>({ref:dbPath=>({once:async()=>({val:()=>folders}),async update(changes){if(deny)throw{code:'PERMISSION_DENIED',message:'PERMISSION_DENIED: Permission denied'};dbWrites.push({path:dbPath,changes})}})})};
   const body=new El('body'),head=new El('head'),bar=new El('div'),spacer=new El('span');bar.found=spacer;
-  const document={body,head,currentScript:{src:'https://site.example/class-pointer-prototype/saved-work.js'},createElement:tag=>new El(tag),
+  const document={title,body,head,currentScript:{src:'https://site.example/class-pointer-prototype/saved-work.js'},createElement:tag=>new El(tag),
     querySelector:selector=>selector==='#myBoard .boards-bar'&&!teacher?bar:null};
   const imported=[];
   const boardApi=board?{exportBoard:()=>({version:1,kind:'student-board',strokes:[{id:'s1'}]}),importBoard(data){imported.push(data);return true},exportPng:async()=>new Blob(['png'],{type:'image/png'})}:undefined;
@@ -63,7 +63,7 @@ function harness({claims=STUDENT,signedIn=true,tabStudent='stu1',teacher=false,d
   const window={FTTSavedWorkCore:Core,firebase,B3_FIREBASE_CONFIG:{},ClassPointerBoards:teacher?undefined:boardApi,ClassPointerPdf:teacher?lessonApi:undefined,
     ClassPointerDashboard:teacher?{ready:Promise.resolve({user:{uid:'teacherA'}})}:undefined,open(url){window.opened=url}};
   const responses=[];
-  const context={window,document,firebase,URL,Blob,Date,Promise,Object,JSON,Error,String,queueMicrotask,setTimeout,
+  const context={window,document,firebase,URL,Blob,Date,Intl,Promise,Object,JSON,Error,String,queueMicrotask,setTimeout,
     location:{href:'https://site.example/class-pointer-prototype/classroom.html?'+(teacher?'dashboard=teacher&class=et':'dashboard=student&room=class-pointer-x')},
     sessionStorage:{getItem:key=>key==='b3Games_studentId'?tabStudent:null},
     Option:class{constructor(text,value){this.textContent=text;this.value=value}},
@@ -186,32 +186,32 @@ test('student whiteboard bar gets Save and My files; the teacher page gets none 
   assert.equal(harness({teacher:true}).spacer.placedBefore,undefined);
 });
 
-test('Save window: shows where the teacher asked students to save, preselects it, and saves there',async()=>{
+test('Student Save is one click: no name box, an automatic Hebrew-day name, saved in the folder the teacher asked for',async()=>{
   const folders={saveTarget:'p1',folders:{chumash:{name:'Chumash',order:1,createdAt:1},p1:{name:'Perek 1',parentId:'chumash',order:2,createdAt:2}}};
   const h=harness({folders});
-  await h.api.saveCurrent();
+  await h.api.saveCurrent();await tick();
   const dialog=h.body.children[0];
-  assert.ok(texts(dialog).includes('Your teacher asked you to save in: Chumash › Perek 1'));
-  assert.ok(texts(dialog).includes('Only you can see your saved files.'));
-  const select=walk(dialog).find(node=>node.tag==='select'),name=walk(dialog).find(node=>node.tag==='input');
-  assert.equal(select.value,'p1');
-  assert.deepEqual(select.children.map(option=>option.textContent),['No folder','Chumash','Chumash › Perek 1']);
-  await buttonNamed(dialog,'Save').click();
-  assert.equal(h.puts.length,0,'a name is needed first');
-  assert.ok(texts(dialog).includes('Type a name first.'));
-  name.value='My notes';
-  await buttonNamed(dialog,'Save').click();await tick();
-  assert.equal(h.puts[0].metadata.customMetadata.folderId,'p1');
-  assert.equal(h.puts[0].metadata.customMetadata.displayName,'My notes');
-  assert.ok(texts(dialog).includes('Saved.'));
-  // Saving again offers to save over the same file or to make a new one.
-  await h.api.saveCurrent();
-  const again=h.body.children[1];
-  assert.ok(buttonNamed(again,'Save over "My notes"'));
-  assert.ok(buttonNamed(again,'Save as new'));
-  await buttonNamed(again,'Save over').click();await tick();
-  assert.equal(h.puts.filter(put=>put.path.endsWith('.json')).length,2);
-  assert.equal(h.puts.at(-2).path,h.puts[0].path,'same file is replaced');
+  assert.equal(walk(dialog).find(node=>node.tag==='input'),undefined,'no typing');
+  assert.equal(h.puts.filter(put=>put.path.endsWith('.json')).length,1,'saved without another click');
+  const first=h.puts[0].metadata.customMetadata;
+  assert.equal(first.folderId,'p1');
+  assert.match(first.displayName,/^יום [א-ו]׳ [א-ת׳״]+ [א-ת]+$/,'Hebrew weekday, day and month');
+  assert.ok(texts(dialog).includes('Saved as "'+first.displayName+'".'));
+  // The same day again: (2), then (3).
+  await h.api.saveCurrent();await tick();
+  await h.api.saveCurrent();await tick();
+  const names=h.puts.filter(put=>put.path.endsWith('.json')).map(put=>put.metadata.customMetadata.displayName);
+  assert.deepEqual(names,[first.displayName,first.displayName+' (2)',first.displayName+' (3)']);
+});
+
+test('Student Save puts the lesson name first when the page has one',async()=>{
+  // The page title "Chumash | Fun Torah Tools" names the lesson; the site's own names do not.
+  const titled=harness({title:'Chumash | Fun Torah Tools'});
+  await titled.api.saveCurrent();await tick();
+  assert.match(titled.puts[0].metadata.customMetadata.displayName,/^Chumash · יום /);
+  const plain=harness({title:'Class Pointer | Fun Torah Tools'});
+  await plain.api.saveCurrent();await tick();
+  assert.match(plain.puts[0].metadata.customMetadata.displayName,/^יום /);
 });
 
 test('Save window says so plainly when there is no whiteboard code, no sign-in, or the rules refuse',async()=>{
@@ -219,10 +219,8 @@ test('Save window says so plainly when there is no whiteboard code, no sign-in, 
   assert.ok(texts(none.body.children[0]).includes('Saving is not ready on this page yet.'));
   const out=harness({signedIn:false});await out.api.saveCurrent();
   assert.ok(texts(out.body.children[0]).some(text=>/sign in on the Fun Torah home page/.test(text)));
-  const denied=harness({deny:true});await denied.api.saveCurrent();
+  const denied=harness({deny:true});await denied.api.saveCurrent();await tick();
   const dialog=denied.body.children[0];
-  walk(dialog).find(node=>node.tag==='input').value='Notes';
-  await buttonNamed(dialog,'Save').click();await tick();
   assert.ok(texts(dialog).includes('Saving is not turned on yet. Ask your teacher.'));
 });
 

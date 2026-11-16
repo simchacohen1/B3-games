@@ -203,6 +203,13 @@
   // The saved file this whiteboard came from or was last saved as, so Save can offer to save over it.
   let current=null;
 
+  // The lesson's name, taken from the activity page's title ("Chumash | Fun Torah Tools" gives "Chumash").
+  // The site's own names and the home page are not lesson names, so they give ''.
+  function lessonName(){
+    const first=Core.cleanName(String(document.title||'').split(/\s[|·–—-]\s/)[0],30);
+    return /^(class pointer|fun torah tools|shluchim online school|sols tools|home|student home|my files)/i.test(first)?'':first;
+  }
+
   async function saveCurrent(){
     const ui=openDialog(teacherPage?'Save whiteboard':'Save my whiteboard');
     ui.say('Getting ready…');
@@ -211,6 +218,16 @@
       const data=api.canSave?await api.read():null;
       if(!data)throw Core.plain(api.canSave?'Open your whiteboard first, then press Save.':'Saving is not ready on this page yet.');
       const state=me.teacher?NO_FOLDERS:await store.folders().catch(()=>NO_FOLDERS);
+      // A student saves with one click: no typing. The name is the lesson (when the page has one) and the Hebrew day;
+      // it can be changed later in My files.
+      if(!me.teacher){
+        ui.say('Saving…');
+        const existing=(await store.list()).map(file=>file.name);
+        const title=Core.autoName({date:new Date(),lesson:lessonName(),existing});
+        await store.saveBoard({name:title,folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await api.picture()});
+        ui.say('Saved as "'+title+'".');setTimeout(()=>ui.dialog.close(),1800);
+        return;
+      }
       const name=h('input');name.type='text';name.maxLength=Core.LIMITS.fileName;name.id='fttSavedName';name.value=current?.name||'';name.placeholder='For example: Chumash notes';
       const label=h('label',null,'Name');label.htmlFor=name.id;
       ui.body.append(label,name);

@@ -29,6 +29,36 @@
     return String(value??'').replace(/[\u0000-\u001f\u007f-\u009f]/g,' ').replace(/\s+/g,' ').trim().slice(0,max||LIMITS.fileName).trim();
   }
 
+  // ---------- Automatic names for a student's one-click Save ----------
+  // A Hebrew number in letters, as used for days of the month: 1 א׳, 15 ט״ו, 25 כ״ה, 30 ל׳.
+  function hebrewNumber(n){
+    n=Math.floor(Number(n));if(!(n>=1&&n<=399))return String(n||'');
+    if(n===15)return 'ט״ו';if(n===16)return 'ט״ז';
+    const tens=['','י','כ','ל'],ones=['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+    const letters=(tens[Math.floor(n/10)]||'')+ones[n%10];
+    return letters.length>1?letters.slice(0,-1)+'״'+letters.slice(-1):letters+'׳';
+  }
+  // The browser's built-in Hebrew calendar: "יום ב׳ כ״ה חשון". Returns '' when the browser cannot do it.
+  function hebrewDay(date,intl){
+    try{
+      const parts=(intl||Intl).DateTimeFormat('he-u-ca-hebrew',{weekday:'short',day:'numeric',month:'long'}).formatToParts(date);
+      const pick=type=>parts.find(part=>part.type===type)?.value||'';
+      const weekday=pick('weekday'),day=pick('day'),month=pick('month').replace('חשוון','חשון');
+      return weekday&&day&&month?weekday+' '+hebrewNumber(day)+' '+month:'';
+    }catch(_){return ''}
+  }
+  // "חומש · יום ב׳ כ״ה חשון", or just the day when there is no lesson name. A second save on the same day is
+  // "… (2)", then "(3)" and so on. "existing" is the names this student already has.
+  function autoName({date,lesson,existing}){
+    const day=hebrewDay(date||new Date())||new Date(date||Date.now()).toLocaleDateString();
+    const name=cleanName(lesson,Math.max(0,LIMITS.fileName-day.length-8));
+    const base=name?name+' · '+day:day;
+    const taken=new Set((existing||[]).map(item=>cleanName(item)));
+    if(!taken.has(base))return base;
+    for(let n=2;n<1000;n+=1){const next=base+' ('+n+')';if(!taken.has(next))return next}
+    return base+' ('+Date.now().toString(36)+')';
+  }
+
   // ---------- Where things are kept ----------
   function studentPrefix(classId,studentId){
     if(!validScopeId(classId)||!validScopeId(studentId))throw Error('Invalid student or class.');
@@ -215,7 +245,7 @@
   // An error whose words are already safe and plain enough to show.
   function plain(message){const error=Error(message);error.plain=true;return error}
 
-  const api={LIMITS,EXTENSIONS,NOT_ON,validId,newId,cleanName,studentPrefix,teacherPrefix,foldersPath,objectName,parseObjectName,sizeProblem,
+  const api={LIMITS,EXTENSIONS,NOT_ON,validId,newId,cleanName,hebrewNumber,hebrewDay,autoName,studentPrefix,teacherPrefix,foldersPath,objectName,parseObjectName,sizeProblem,
     fileMetadata,fileFromMetadata,parseBoard,cleanFolders,folderTree,folderLabel,folderOptions,addFolder,renameFolder,removeFolder,setSaveTarget,groupFiles,
     fingerprint,cleanPosition,readPosition,savePosition,errorText,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FTTSavedWorkCore=api;
