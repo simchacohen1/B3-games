@@ -3,10 +3,12 @@
    Tools: Pointer, Hand, Select, Highlighter, Text box, Shapes, Eraser and Pen.
 
    Who sees it
-   • Students: nothing at all, unless a "reason" is on: they are sharing their screen ("sharing") or the teacher
-     opened student whiteboards ("whiteboard"). When a reason starts, the toolbar opens by itself. The student can
-     shrink it to a small pencil button and open it again. When every reason ends it disappears completely and all
-     of its marks are removed. There is no other way for a student to open it.
+   • Students: nothing at all, unless a "reason" is on. "whiteboard" (the student's own whiteboard, or a worksheet
+     they fill in) always gives the full toolbar. "sharing" (the student is sharing their screen) gives NO toolbar by
+     default: sharing is for showing a program, not for drawing. It gives one only when the teacher has turned drawing
+     on for that student (setStudentLevel: none, point, highlight or pen, the same per-student control the teacher uses
+     for the lesson), and then only the tools that level allows. When every reason ends it disappears completely and
+     all of its marks are removed. There is no other way for a student to open it.
    • Teachers (setRole('teacher')): the pencil button is always there. The toolbar opens by itself on the
      teacher whiteboard, while sharing, and when the teacher opens a student's shared screen large.
 
@@ -184,6 +186,9 @@
 
   // ---------- State ----------
   let role=null;                 // null | 'student' | 'teacher'
+  let studentLevel='none';       // what the teacher allows this student off their own whiteboard: none | point | highlight | pen
+  // The tools of each level on a student's own shared screen (a pen level also writes and erases).
+  const LEVEL_TOOLS={none:[],point:['pointer'],highlight:['pointer','highlight'],pen:['select','pointer','highlight','text','shape','eraser','pen']};
   const reasons=new Set();       // 'sharing', 'whiteboard', ...
   const stack=[];                // surfaces pushed by other scripts (top = last)
   let mode='hidden';             // hidden | mini | open
@@ -197,7 +202,11 @@
   let selected=null,drag=null,draft=null,laser=null,editor=null,frame=0,lastSurface=null,lastRectKey='';
 
   // The whole-window surface: marks stay on this page only.
-  const viewport={id:'viewport',idPrefix:'a',items:[],defaultTool:'hand',
+  const viewport={id:'viewport',idPrefix:'a',items:[],
+    // A teacher's page keeps every tool. A student gets only the tools their level allows, and no greyed-out buttons.
+    get defaultTool(){return role==='teacher'?'hand':'pointer'},
+    get tools(){return role==='teacher'?undefined:LEVEL_TOOLS[studentLevel]},
+    get hideUnused(){return role!=='teacher'},
     label:()=>role==='teacher'?'Drawing on your screen.':'Drawing on your screen. Your teacher sees it while you share.',
     rect:()=>({left:0,top:0,width:window.innerWidth,height:window.innerHeight}),
     getItems(){return this.items},setItems(list){this.items=list}};
@@ -218,7 +227,12 @@
   function colorsOf(s){return s.colors||PALETTE}
   function sizesOf(s,tool){return s.sizes?.(tool)||SIZE_SETS[tool==='shape'?'shape':tool==='text'?'text':tool==='highlight'?'highlight':'pen']}
   function currentSize(s){const list=sizesOf(s,st.tool);return list[Math.min(st.sizeIndex,list.length-1)]}
-  function visible(){return role==='teacher'||reasons.size>0}
+  // The teacher: always. A student: on their own whiteboard (any reason except sharing), or while sharing only when the teacher allowed drawing.
+  function visible(){
+    if(role==='teacher')return true;
+    for(const name of reasons)if(name!=='sharing')return true;
+    return reasons.has('sharing')&&studentLevel!=='none';
+  }
 
   // ---------- DOM ----------
   const css=`
@@ -893,6 +907,17 @@
       if(was===role)return;
       if(visible()&&mode==='hidden')mode='mini';
       if(!visible())return hideAll();
+      sync();
+    },
+    // The teacher's permission for this student off their own whiteboard: 'none' (the default), 'point', 'highlight' or 'pen'.
+    // While the student shares their screen, the toolbar appears, with only those tools, when this is not 'none'.
+    setStudentLevel(next){
+      const level=Object.prototype.hasOwnProperty.call(LEVEL_TOOLS,next)?next:'none';
+      if(level===studentLevel)return;
+      const before=studentLevel;studentLevel=level;
+      if(role==='teacher')return;
+      if(!visible())return hideAll();
+      if(before==='none'&&reasons.has('sharing')){mount();st.tool=viewport.defaultTool;lastSurface=null;openBar(true);return}
       sync();
     },
     // name: 'sharing' | 'whiteboard'. Turning a reason on opens the toolbar.
