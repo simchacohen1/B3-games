@@ -109,6 +109,21 @@ test('Student whiteboards: opening one board puts the shared toolbar on it, and 
   assert.ok(!f.toolbar.stack.some(s=>s.id==='student-board'),'the toolbar surface is released');
 });
 
+test('Student whiteboards: in the grid the toolbar steps aside so any click opens a board, and it returns inside one board',async()=>{
+  const f=await boardFixture();
+  const grid=()=>f.toolbar.stack.find(s=>s.id==='student-grid');
+  assert.ok(grid(),'the grid of boards is a surface of the toolbar');
+  assert.equal(grid().bare,true,'it has no toolbar and no drawing layer, so a click reaches the tile');
+  assert.ok(grid().rect(),'it covers the grid');
+  assert.deepEqual(Array.from(grid().getItems()),[]);
+  f.tile.click();
+  assert.ok(!grid(),'inside one board the grid surface is gone');
+  assert.ok(f.toolbar.stack.some(s=>s.id==='student-board'),'and the full toolbar is on that board');
+  f.dom.created.find(node=>node.tag==='button'&&/Back to gallery/.test(node.textContent)).click();
+  assert.ok(grid(),'back in the grid the toolbar steps aside again');
+  assert.ok(!f.toolbar.stack.some(s=>s.id==='student-board'));
+});
+
 test('Student whiteboards: the teacher\'s marks are sent to that student and kept for his refresh',async()=>{
   const f=await boardFixture();
   f.tile.click();

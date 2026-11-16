@@ -1267,9 +1267,14 @@
       const op={type:'board-draft',stroke:draft||null};
       applyOp(boardFor(m),op,'teacher');B.send(m.connection,op);dirty(m.id);
     }};
+  // The grid of all the boards: nothing can be drawn there, so the toolbar and the drawing layer step aside
+  // (a click always opens the board, whatever tool was picked) and the full toolbar comes back inside one board.
+  const gridOpen=()=>on&&!suspended&&!view.hidden&&!focusId&&!grid.hidden;
+  const gridSurface=FA&&{id:'student-grid',bare:true,rect:()=>{if(!gridOpen())return null;const r=grid.getBoundingClientRect();return r.width&&r.height?r:null},getItems:()=>[],setItems(){}};
   function syncAnnotate(){
     if(!boardInk)return;
     if(boardOpen())FA.push(boardInk);else FA.release(boardInk);
+    if(gridOpen())FA.push(gridSurface);else FA.release(gridSurface);
   }
   // The old pen, eraser, color and size buttons are replaced by that toolbar (the Move button for a word stays).
   if(FA)for(const node of Array.from(drawGroup.children))if(!node.classList.contains('danger')&&!node.classList.contains('boards-spacer'))node.style.display='none';
