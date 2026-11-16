@@ -69,6 +69,25 @@ service firebase.storage {
           && request.resource.size <= 25 * 1024 * 1024)
       );
     }
+    // Each authenticated teacher owns a private PDF folder by Firebase UID (same rule as live). No other user's UID,
+    // and no anonymous visitor, can list/get/change it. Staging only needed it so the PDF Library can be tested here.
+    match /pointerPdfLibrary/{teacherUid}/{fileId} {
+      allow get, list, delete: if request.auth != null
+        && request.auth.uid == teacherUid;
+
+      allow create: if request.auth != null
+        && request.auth.uid == teacherUid
+        && fileId.matches('[-a-zA-Z0-9]+[.]pdf')
+        && request.resource.size <= 500 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+
+      // Rename/remember-page updates only: file bytes cannot be replaced.
+      allow update: if request.auth != null
+        && request.auth.uid == teacherUid
+        && resource.size == request.resource.size
+        && resource.md5Hash == request.resource.md5Hash
+        && request.resource.contentType == 'application/pdf';
+    }
     // Teacher lesson whiteboards follow the owner-only shape of pointerPdfLibrary.
     match /pointerWhiteboards/{teacherUid}/{fileId} {
       function ownsTeacherPath() {

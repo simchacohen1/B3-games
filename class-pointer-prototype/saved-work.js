@@ -457,7 +457,9 @@
         const [files,state]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS)]);
         const boards=files.filter(file=>file.kind==='whiteboard'&&(!(teacherPage&&onlyTemplates)||file.template));
         boards.templatesOnly=teacherPage&&onlyTemplates;
-        fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
+        fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):file.worksheet
+          ?[button('Continue in My files',()=>window.open(new URL('my-files.html',scriptUrl).href,'_blank'),'main'),...manageButtons(file,ui,showFiles)]
+          :[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
         ui.say('');
       }catch(error){list.replaceChildren();ui.fail(error)}
     };

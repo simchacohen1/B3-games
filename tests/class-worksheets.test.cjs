@@ -135,6 +135,24 @@ test('the pages: teacher button, student list, one-click save with a Hebrew-date
   assert.match(read('class-pointer-prototype/my-files.html'),/annotation-toolbar\.js\?v=20261116-worksheets1/);
 });
 
+test('student activity pages load the worksheet-aware saved-work code; the small pop-up sends a worksheet to My files and deleting removes its pages',()=>{
+  const share=read('class-pointer-prototype/activity-share.js');
+  assert.match(share,/saved-work-core\.js\?v=20261116-worksheets1/);assert.match(share,/saved-work\.js\?v=20261116-worksheets1/);
+  const pages=['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html'];
+  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261116-worksheets1/,page);
+  const saved=read('class-pointer-prototype/saved-work.js');
+  assert.match(saved,/file\.worksheet\n?\s*\?\[button\('Continue in My files'/);
+  assert.match(saved,/if\(file\.worksheet\)\{[\s\S]*?startsWith\(file\.id\+'-p'\)[\s\S]*?\.delete\(\)/,'page pictures are removed with the worksheet');
+});
+
+test('staging gets the same private PDF library rule as live (staging only, so Send can be tested there)',()=>{
+  const live=read('security/pointer-pdf-library-merged-storage.rules'),staging=read('staging/storage.rules');
+  const block=raw=>{const text=raw.replace(/\r/g,'');const start=text.indexOf('match /pointerPdfLibrary/'),end=text.indexOf('}\n',text.indexOf("request.resource.contentType == 'application/pdf';",text.indexOf('allow update',start)));return text.slice(start,end).replace(/\r/g,'')};
+  assert.equal(block(staging),block(live));
+  assert.match(staging,/match \/pointerPdfLibrary\/\{teacherUid\}\/\{fileId\}/);
+  assert.match(staging,/request\.auth\.uid == teacherUid/);
+});
+
 test('Storage and database rules are unchanged; the function is exported live and on staging with one shared core',()=>{
   for(const rules of ['staging/storage.rules','storage-rules.hardened.rules','security/pointer-pdf-library-merged-storage.rules'])
     assert.doesNotMatch(read(rules),/classWorksheets/,rules+' must not mention worksheets: the deny-all rule keeps browsers out');
