@@ -440,6 +440,17 @@
       document.body.append(node);setTimeout(()=>node.remove(),5000);
     }catch(_){}
   }
+  // A small PNG of the teacher's picture, so the copy has a thumbnail in My files like any other board. Never required:
+  // when it cannot be made the copy is saved without one.
+  async function copyPicture(dataUrl){
+    try{
+      const image=new Image();image.src=dataUrl;await image.decode();
+      const scale=Math.min(1,640/image.naturalWidth),canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    }catch(_){return null}
+  }
   async function keepTeacherCopy(activity){
     if(teacherPage||activity?.kind!=='image'||typeof activity.data!=='string'||activity.data.length>420000)return false;
     const key=copyKey(activity.data);
@@ -451,7 +462,7 @@
       if(!Array.isArray(seen)||seen.includes(key))return false;
       const state=await store.folders().catch(()=>NO_FOLDERS);
       const data={version:1,kind:'student-board',strokes:[],images:[],text:null,activity:{kind:'image',data:activity.data}};
-      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data});
+      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await copyPicture(activity.data)});
       kept.add(key);seen.push(key);try{localStorage.setItem(memory,JSON.stringify(seen.slice(-30)))}catch(_){}
       toast('Your teacher sent a whiteboard. Your own copy is saved in 📂 My files.');
       return true;
