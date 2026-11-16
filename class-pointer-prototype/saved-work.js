@@ -112,7 +112,7 @@
       await firebase.database().ref(Core.foldersPath(me.classId)).update(changes);
     },
     // Saves a whiteboard. With an id it replaces that saved file; without one it makes a new file.
-    async saveBoard({id,name,folderId,data,picture}){
+    async saveBoard({id,name,folderId,data,picture,subject,template}){
       const me=await who(),blob=new Blob([JSON.stringify(data)],{type:'application/json'});
       const problem=Core.sizeProblem('whiteboard',blob.size,me.teacher);
       if(problem)throw Core.plain(problem);
@@ -125,7 +125,7 @@
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
       if(me.teacher)await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'});
-      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,savedAt:Date.now()})});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,savedAt:Date.now()})});
       // A student's small picture is only for looking at the file later. The save counts without it.
       if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;
@@ -187,16 +187,27 @@
     select.value=chosen&&state.folders[chosen]?chosen:'';
     return{node:select,value:()=>select.value};
   }
+  // A teacher's own subject folder for a saved whiteboard: just a name written on the file. Suggests the folders the
+  // teacher already has plus a few common subjects.
+  const SUBJECT_IDEAS=['Chumash','Mishnayos','Gemara','Navi','Halacha','Dikduk','Hebrew reading','Tefillah'];
+  function subjectField(existing,chosen){
+    const input=h('input');input.type='text';input.id='fttSavedSubject';input.maxLength=Core.LIMITS.folderName;input.value=chosen||'';input.placeholder='For example: Chumash (or leave empty)';
+    const list=h('datalist');list.id='fttSavedSubjects';
+    for(const name of new Set([...existing,...SUBJECT_IDEAS])){const option=h('option');option.value=name;list.append(option)}
+    input.setAttribute('list',list.id);
+    const label=h('label',null,'Folder (subject)');label.htmlFor=input.id;
+    return{nodes:[label,input,list],value:()=>Core.cleanName(input.value,Core.LIMITS.folderName)||''};
+  }
   // Fills "container" with files grouped by folder. actions(file) returns the buttons for one file.
   function fileList(container,files,state,actions){
     container.replaceChildren();
-    const groups=Core.groupFiles(files,state);
-    if(!groups.length){container.append(h('p','ftt-saved-note','Nothing saved yet.'));return}
+    const groups=teacherPage?Core.groupBySubject(files):Core.groupFiles(files,state);
+    if(!groups.length){container.append(h('p','ftt-saved-note',teacherPage&&files.templatesOnly?'No templates yet. Press "Make template" on a whiteboard to make one.':'Nothing saved yet.'));return}
     for(const group of groups){
-      if(groups.length>1||group.folderId)container.append(h('h3','ftt-saved-group','📁 '+group.label));
+      if(groups.length>1||group.folderId||group.subject)container.append(h('h3','ftt-saved-group','📁 '+group.label));
       for(const file of group.files){
         const row=h('div','ftt-saved-row'),name=h('span','ftt-saved-name',file.name);
-        if(file.savedAt)name.append(h('small',null,'Saved '+savedText(file.savedAt)));
+        if(file.savedAt||file.template)name.append(h('small',null,(file.template?'⭐ Template · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
         row.append(thumb(file),name,...actions(file));container.append(row);
       }
     }
@@ -256,6 +267,8 @@
   }
   // The saved file this whiteboard came from or was last saved as, so Save can offer to save over it.
   let current=null;
+  // Set when a template was just opened: the next Save starts from the template's name and folder, as a new file.
+  let fromTemplate=null;
 
   // The lesson's name, taken from the activity page's title ("Chumash | Fun Torah Tools" gives "Chumash").
   // The site's own names and the home page are not lesson names, so they give ''.
@@ -282,9 +295,14 @@
         ui.say('Saved as "'+title+'".');setTimeout(()=>ui.dialog.close(),1800);
         return;
       }
-      const name=h('input');name.type='text';name.maxLength=Core.LIMITS.fileName;name.id='fttSavedName';name.value=current?.name||'';name.placeholder='For example: Chumash notes';
+      const name=h('input');name.type='text';name.maxLength=Core.LIMITS.fileName;name.id='fttSavedName';name.value=current?.name||fromTemplate?.name||'';name.placeholder='For example: Chumash notes';
       const label=h('label',null,'Name');label.htmlFor=name.id;
       ui.body.append(label,name);
+      const subject=subjectField(await store.list().then(Core.subjectsOf,()=>[]),current?current.subject:fromTemplate?.subject);
+      ui.body.append(...subject.nodes);
+      const asTemplate=h('input');asTemplate.type='checkbox';asTemplate.id='fttSavedTemplate';
+      const templateLabel=h('label');templateLabel.append(asTemplate,' Keep as a template (opening it always gives a fresh copy; the template never changes)');
+      ui.body.append(templateLabel);
       const picker=folderPicker(state,current?.folderId||state.saveTarget);
       if(picker.node){
         const folderLabel=h('label',null,'Folder');picker.node.id='fttSavedFolder';folderLabel.htmlFor=picker.node.id;
@@ -298,26 +316,30 @@
         if(!clean){ui.say('Type a name first.');name.focus();return}
         actions.querySelectorAll('button').forEach(node=>{node.disabled=true});ui.say('Saving…');
         try{
-          const saved=await store.saveBoard({id,name:clean,folderId:picker.value(),data,picture:await api.picture()});
-          current={id:saved,name:clean,folderId:picker.value()};
+          const saved=await store.saveBoard({id,name:clean,folderId:picker.value(),subject:subject.value(),template:asTemplate.checked,data,picture:await api.picture()});
+          current=asTemplate.checked?null:{id:saved,name:clean,folderId:picker.value(),subject:subject.value(),template:false};fromTemplate=null;
           ui.say('Saved.');setTimeout(()=>ui.dialog.close(),900);
         }catch(error){ui.fail(error);actions.querySelectorAll('button').forEach(node=>{node.disabled=false})}
       };
-      if(current)actions.append(button('Save over "'+current.name+'"',()=>run(current.id),'main'),button('Save as new',()=>run(null)));
+      if(current&&!current.template)actions.append(button('Save over "'+current.name+'"',()=>run(current.id),'main'),button('Save as new',()=>run(null)));
       else actions.append(button('Save',()=>run(null),'main'));
       actions.append(button('Cancel',()=>ui.dialog.close()));
       ui.say('');name.focus();
     }catch(error){ui.fail(error)}
   }
 
+  // A template is never changed: opening it gives a fresh copy on the whiteboard that is not tied to the file, so Save
+  // can only make a new file. An ordinary file opens as itself and Save can save over it.
   async function openBoard(file,ui){
     const api=board();
     if(!api.canOpen){ui.say('Open your whiteboard first, then open this file.');return}
-    if(!confirm('Open "'+file.name+'"? It will replace what is on the whiteboard now.'))return;
+    if(!confirm(file.template?'Open a fresh copy of the template "'+file.name+'"? It will replace what is on the whiteboard now. The template itself never changes.':'Open "'+file.name+'"? It will replace what is on the whiteboard now.'))return;
     ui.say('Opening…');
     try{
       if(!await api.write(await store.readBoard(file,api.kind)))throw Core.plain('This file could not be opened. Make sure your whiteboard is open.');
-      current={id:file.id,name:file.name,folderId:file.folderId};ui.dialog.close();
+      current=file.template?null:{id:file.id,name:file.name,folderId:file.folderId,subject:file.subject,template:false};
+      fromTemplate=file.template?{name:file.name+' – '+new Date().toLocaleDateString(),subject:file.subject}:null;
+      ui.dialog.close();
     }catch(error){ui.fail(error)}
   }
 
@@ -349,13 +371,33 @@
     }catch(error){ui.fail(error)}
   }
 
+  // The teacher's buttons for one whiteboard: open (a template opens fresh), send, folder and template.
+  function teacherButtons(file,ui,refresh){
+    return[
+      button(file.template?'Use template':'Open',()=>openBoard(file,ui),'main'),
+      button('📤 Send to students',()=>sendFile(file,ui)),
+      button('Move to folder',async()=>{
+        const next=prompt('Folder for "'+file.name+'" (for example Chumash). Leave empty for no folder:',file.subject||'');
+        if(next==null)return;
+        try{await patch(file,{subject:Core.cleanName(next,Core.LIMITS.folderName)||''});await refresh()}catch(error){ui.fail(error)}
+      }),
+      button(file.template?'Not a template':'Make template',async()=>{
+        try{await patch(file,{template:file.template?'':'1'});await refresh()}catch(error){ui.fail(error)}
+      }),
+      ...manageButtons(file,ui,refresh)
+    ];
+  }
+
   async function open(){
     const ui=openDialog('My files'),list=h('div');
+    let onlyTemplates=false;
     const showFiles=async()=>{
       ui.say('Loading…');
       try{
         const [files,state]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS)]);
-        fileList(list,files.filter(file=>file.kind==='whiteboard'),state,file=>[button('Open',()=>openBoard(file,ui),'main'),...(teacherPage?[button('📤 Send to students',()=>sendFile(file,ui))]:[]),...manageButtons(file,ui,showFiles)]);
+        const boards=files.filter(file=>file.kind==='whiteboard'&&(!(teacherPage&&onlyTemplates)||file.template));
+        boards.templatesOnly=teacherPage&&onlyTemplates;
+        fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
         ui.say('');
       }catch(error){list.replaceChildren();ui.fail(error)}
     };
@@ -365,13 +407,16 @@
       return showFiles();
     }
     const folders=h('div');folders.hidden=true;
+    const only=h('input');only.type='checkbox';only.id='fttSavedOnlyTemplates';
+    const filter=h('label');filter.append(only,' Show templates only');
+    only.addEventListener('change',()=>{onlyTemplates=only.checked;showFiles()});
     const tabs=h('div','ftt-saved-tabs');tabs.setAttribute('role','tablist');
     const tab=(text,panel,show)=>{
-      const node=button(text,()=>{for(const other of tabs.children)other.setAttribute('aria-selected',String(other===node));list.hidden=panel!==list;folders.hidden=panel!==folders;ui.say('');show()});
+      const node=button(text,()=>{for(const other of tabs.children)other.setAttribute('aria-selected',String(other===node));list.hidden=panel!==list;filter.hidden=panel!==list;folders.hidden=panel!==folders;ui.say('');show()});
       node.setAttribute('role','tab');node.setAttribute('aria-selected',String(panel===list));tabs.append(node);
     };
     tab('My whiteboards',list,showFiles);tab('Class folders',folders,()=>showFolders(folders,ui));
-    ui.body.append(tabs,list,folders);
+    ui.body.append(tabs,filter,list,folders);
     return showFiles();
   }
 

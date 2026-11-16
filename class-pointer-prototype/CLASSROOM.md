@@ -135,3 +135,12 @@ No new Firebase rules, Storage rules or functions.
   turned on yet, nothing is said and the picture is still on the board; if My files is full the student is told.
 - **Every saved teacher whiteboard has a picture.** Save makes a picture of the whiteboard first (made smaller if it is
   too big to store) and refuses to save without one, so any saved whiteboard can be sent from the list.
+
+## Templates and subject folders (teacher)
+
+- **Subject folders:** when a teacher saves a whiteboard they can type a folder (for example Chumash). **My files** lists
+  the teacher's whiteboards by folder, A to Z. The folder is just a name written on the file (Storage custom metadata),
+  so there are no new rules or data paths. A folder exists while it has a whiteboard in it. **Move to folder** changes it.
+- **Templates:** tick *Keep as a template* when saving, or press **Make template** on a saved whiteboard. **Use template**
+  puts a fresh copy on the whiteboard that is not tied to the file: Save can only make a new file, never save over the
+  template. **Show templates only** filters the list. Templates and folders are the teacher's own; students never see them.
