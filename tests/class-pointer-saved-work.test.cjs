@@ -249,3 +249,26 @@ test('a saved whiteboard keeps bold words',()=>{
   assert.equal(opened.strokes[0].bold,true);
   assert.equal('bold' in opened.strokes[1],false);
 });
+
+test('Hebrew numbers for days of the month',()=>{
+  const want={1:'א׳',10:'י׳',15:'ט״ו',16:'ט״ז',20:'כ׳',25:'כ״ה',29:'כ״ט',30:'ל׳'};
+  for(const [n,text] of Object.entries(want))assert.equal(Core.hebrewNumber(n),text,String(n));
+});
+
+test('Automatic name: Hebrew weekday, day and month, lesson first, (2) and (3) for the same day',()=>{
+  // Monday 25 Cheshvan 5787 is 2026-11-16 in the Gregorian calendar? Use a date whose Hebrew date is known: 2026-10-20 is Tuesday 9 Cheshvan.
+  const day=Core.hebrewDay(new Date('2026-10-20T12:00:00'));
+  assert.equal(day,'יום ג׳ ט׳ חשון');
+  assert.equal(Core.hebrewDay(new Date('2026-11-16T12:00:00')),'יום ב׳ ו׳ כסלו');
+  const date=new Date('2026-10-20T12:00:00');
+  assert.equal(Core.autoName({date,lesson:'',existing:[]}),day);
+  assert.equal(Core.autoName({date,lesson:'חומש',existing:[]}),'חומש · '+day);
+  assert.equal(Core.autoName({date,lesson:'חומש',existing:['חומש · '+day]}),'חומש · '+day+' (2)');
+  assert.equal(Core.autoName({date,lesson:'חומש',existing:['חומש · '+day,'חומש · '+day+' (2)']}),'חומש · '+day+' (3)');
+  assert.equal(Core.autoName({date,lesson:'',existing:['x']}),day,'another file does not change the name');
+  // The date always survives a very long lesson name, and the whole name fits.
+  const long=Core.autoName({date,lesson:'א'.repeat(100),existing:[]});
+  assert.ok(long.endsWith(day)&&long.length<=Core.LIMITS.fileName);
+  // A browser without the Hebrew calendar still gets a usable name.
+  assert.ok(Core.autoName({date,lesson:'',existing:[]}).length>0);
+});

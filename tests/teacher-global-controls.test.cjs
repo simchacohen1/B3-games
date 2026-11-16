@@ -73,8 +73,21 @@ test('a button press is never silent: with no class chosen it asks which class (
 });
 
 test('pages fetch the fixed toolbar, not a cached older copy', () => {
-  const version = /teacher-global-controls\.js\?v=20261110-buttons1/;
+  const version = /teacher-global-controls\.js\?v=20261116-quickbar1/;
   assert.match(read('gallery-share.js'), version);
   assert.match(read('teacher-global-bootstrap.js'), version);
   assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);
+});
+
+test('quick buttons: inside the Class Pointer top bar there, movable and remembered everywhere else', () => {
+  const s = read('teacher-global-controls.js');
+  // Docked into the dark top bar of the Class Pointer page (never floating over its buttons).
+  assert.match(s, /document\.querySelector\('\.cp-topbar'\)/);
+  assert.match(s, /bar\.classList\.add\('docked'\)/);
+  assert.match(s, /#fttTeacherQuickBar\.docked\{position:static/);
+  // Elsewhere: a grip moves them, the spot is remembered, and they stay on the screen.
+  assert.match(s, /fttTeacherQuickBarPos/);
+  assert.match(s, /ftt-quick-grip/);
+  assert.match(s, /Math\.min\(Math\.max\(0, window\.innerWidth - r\.width\), x\)/);
+  assert.match(s, /e\.key === 'Home'/);
 });

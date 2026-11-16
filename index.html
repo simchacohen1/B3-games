@@ -30,6 +30,15 @@
   .student-saved-files{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:7px 12px;border:1px solid #c7d2fe;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;text-decoration:none}
   .student-saved-files:hover{background:#e0e7ff}
   .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
+  /* Student and teacher sign-in side by side; stacked (student first) on phones. */
+  .sign-in-cards{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;align-items:stretch;max-width:1060px;margin:24px auto;padding:0 12px;box-sizing:border-box}
+  .sign-in-cards>.login-card{flex:1 1 320px;max-width:520px;margin:0;box-sizing:border-box}
+  /* The teacher card follows the student card and disappears whenever the student card does (signed in, checking, picking a class, still loading). */
+  #loginCard.hidden~#teacherSignInCard,#loginCard.checking~#teacherSignInCard,#loginCard.picking~#teacherSignInCard{display:none!important}
+  html.b3-home-auth-pending #teacherSignInCard{display:none!important}
+  .teacher-signin-card button{background:#fff!important;color:#26364a!important;border:1px solid #cbd5e1!important}
+  .teacher-signin-card .login-msg{min-height:20px}
+  @media (max-width:700px){.sign-in-cards{flex-direction:column;flex-wrap:nowrap;align-items:stretch}.sign-in-cards>.login-card{flex:0 0 auto;max-width:none;width:100%}}
   .login-card h2,.locked-card h2{margin:0 0 8px;color:#26364a}.login-card p,.locked-card p{color:#64748b;line-height:1.45}
   .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-card button:disabled{opacity:.6;cursor:wait}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
   .lock-icon{font-size:54px;text-align:center}.locked-card{text-align:center}
@@ -439,6 +448,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" class="hidden" style="display:none!important" aria-hidden="true" tabindex="-1">👆 Class Pointer</a>
   </div>
 
+  <div id="signInCards" class="sign-in-cards">
   <div id="loginCard" class="login-card">
     <h2>Student Sign In</h2>
     <p id="studentLoginHelp">Use your student name and passcode.</p>
@@ -449,6 +459,13 @@ document.addEventListener("DOMContentLoaded",function(){
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
     <div id="classPick" role="group" aria-label="Choose your class"></div>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+  </div>
+  <div id="teacherSignInCard" class="login-card teacher-signin-card">
+    <h2>Teacher Sign In</h2>
+    <p>Teachers: sign in with your Google account.</p>
+    <button id="teacherGoogleSignInBtn" type="button">Sign in with Google</button>
+    <div id="teacherSignInMsg" class="login-msg" aria-live="polite"></div>
+  </div>
   </div>
 
   <div id="lockedCard" class="locked-card hidden">
@@ -2445,6 +2462,34 @@ document.addEventListener("DOMContentLoaded",function(){
     window.location.href=isAuthorizedTeacher?"admin.html":"teacher-home.html?signin=1";
   });
 
+  // Teacher Sign In card: Google sign-in right on the front page, then straight to teacher home
+  // (the same place the Teacher Tools button leads).
+  const TEACHER_CARD_FLAG="b3TeacherCardSignIn";
+  function goToTeacherHome(){
+    try{sessionStorage.removeItem(TEACHER_CARD_FLAG);}catch(e){}
+    window.location.href="teacher-home.html";
+  }
+  el("teacherGoogleSignInBtn").addEventListener("click",async()=>{
+    const btn=el("teacherGoogleSignInBtn"),msg=el("teacherSignInMsg");
+    btn.disabled=true;msg.textContent="Signing in…";msg.style.color="#475569";
+    // If the browser has to use a redirect instead of a popup, this page reloads; the flag lets us finish the trip.
+    try{sessionStorage.setItem(TEACHER_CARD_FLAG,"1");}catch(e){}
+    try{
+      await settingsApi.signInWithGoogle();
+    }catch(e){
+      try{sessionStorage.removeItem(TEACHER_CARD_FLAG);}catch(_){}
+      const code=e&&e.code;
+      msg.style.color="#b91c1c";
+      msg.textContent=code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"?"Sign-in was cancelled. Please try again.":((e&&e.message)||"Could not sign in. Please try again.");
+      console.error(e);
+      btn.disabled=false;
+      return;
+    }
+    // Signed in. The sign-in listener below sends an authorized teacher to teacher home; wait for it.
+    msg.textContent="Signed in. Opening teacher home…";
+    setTimeout(()=>{if(document.visibilityState==="visible"){btn.disabled=false;if(isAuthorizedTeacher)goToTeacherHome();}},4000);
+  });
+
   el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
@@ -2639,6 +2684,8 @@ document.addEventListener("DOMContentLoaded",function(){
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     testLinkAuthKnown=true;
+    // Finish a Teacher Sign In card login that came back through a redirect.
+    try{if(isAuthorizedTeacher&&sessionStorage.getItem("b3TeacherCardSignIn")==="1"){sessionStorage.removeItem("b3TeacherCardSignIn");window.location.href="teacher-home.html";return;}}catch(e){}
     renderStudentAccess();renderAdminPanel();
     startTestLinkSignIn();
     if(authorized){
@@ -2656,7 +2703,7 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 },{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261101-switch1"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261116-sendboard1"></script>
 </body>
 </html>
 

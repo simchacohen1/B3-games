@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://fun-torah-tools-staging.web.app",
+      "https://fun-torah-tools-staging.firebaseapp.com"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type", "Content-Length"],
+    "maxAgeSeconds": 3600
+  }
+]

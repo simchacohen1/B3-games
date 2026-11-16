@@ -98,7 +98,7 @@ test('student-boards sends only after the teacher confirms, through the existing
 
 test('More menu offers Send whiteboard to students beside Save and My files; the classroom loads the new scripts',()=>{
   assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}\);/);
-  for(const name of ['student-boards.js','saved-work.js','classroom-annotate.js'])assert.match(html,new RegExp(name.replace('.','[.]')+'[?]v=20261115-sendboard1'));
+  for(const name of ['student-boards.js','saved-work.js','classroom-annotate.js'])assert.match(html,new RegExp(name.replace('.','[.]')+'[?]v=20261116-sendboard1'));
 });
 
 test('no rules, storage or function files are touched by this feature',()=>{

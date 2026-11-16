@@ -196,12 +196,84 @@
     if (homeFollow) homeFollow.setAttribute('aria-expanded', String(which === 'follow'));
     if (lock) lock.setAttribute('aria-expanded', String(which === 'access'));
   }
+  // ---- Where the quick buttons sit ----
+  // On the Class Pointer page they live inside its dark top bar (never floating over the lesson, the staging note or the
+  // sharing button). Everywhere else they float, but the grip lets the teacher drag them aside and the page remembers.
+  var POS_KEY = 'fttTeacherQuickBarPos';
+  function readPos() {
+    try { var p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); return p && isFinite(p.x) && isFinite(p.y) ? p : null; } catch (e) { return null; }
+  }
+  function savePos(p) { try { if (p) localStorage.setItem(POS_KEY, JSON.stringify(p)); else localStorage.removeItem(POS_KEY); } catch (e) {} }
+  function placeBar(x, y) {
+    var r = bar.getBoundingClientRect();
+    x = Math.max(0, Math.min(Math.max(0, window.innerWidth - r.width), x));
+    y = Math.max(0, Math.min(Math.max(0, window.innerHeight - r.height), y));
+    bar.style.transform = 'none'; bar.style.left = Math.round(x) + 'px'; bar.style.top = Math.round(y) + 'px';
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+  function applyPos() {
+    if (!bar || bar.classList.contains('docked')) return;
+    var p = readPos();
+    if (!p) { bar.style.left = ''; bar.style.top = ''; bar.style.transform = ''; return; }
+    placeBar(p.x, p.y);
+  }
+  function setupMove(grip) {
+    var drag = null;
+    grip.addEventListener('pointerdown', function (e) {
+      if (e.button) return;
+      var r = bar.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId };
+      try { grip.setPointerCapture(e.pointerId); } catch (x) {}
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      placeBar(e.clientX - drag.dx, e.clientY - drag.dy);
+    });
+    function end(e) {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      drag = null;
+      var r = bar.getBoundingClientRect(); savePos({ x: Math.round(r.left), y: Math.round(r.top) });
+    }
+    grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+    grip.addEventListener('dblclick', function () { savePos(null); applyPos(); });
+    grip.addEventListener('keydown', function (e) {
+      var step = e.shiftKey ? 40 : 10, r = bar.getBoundingClientRect(), x = r.left, y = r.top;
+      if (e.key === 'Home') { savePos(null); applyPos(); e.preventDefault(); return; }
+      if (e.key === 'ArrowLeft') x -= step; else if (e.key === 'ArrowRight') x += step; else if (e.key === 'ArrowUp') y -= step; else if (e.key === 'ArrowDown') y += step; else return;
+      e.preventDefault(); savePos(placeBar(x, y));
+    });
+    window.addEventListener('resize', applyPos);
+    applyPos();
+  }
+  function dock() {
+    if (!bar || location.pathname.slice(-38)!=='class-pointer-prototype/classroom.html') return;
+    var top = document.querySelector('.cp-topbar');
+    if (!top) return;
+    if (bar.parentNode !== top) {
+      var spacer = top.querySelector('.cp-topbar-spacer');
+      top.insertBefore(bar, spacer || top.children[1] || null);
+      bar.classList.add('docked'); document.body.classList.add('ftt-quick-docked'); bar.style.left = ''; bar.style.top = ''; bar.style.transform = '';
+    }
+  }
   function setupUi() {
     if (bar) return;
     var style = el('style');
     style.textContent = [
-      '#fttTeacherQuickBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:0;padding:5px 6px 5px 14px;border-radius:999px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
+      '#fttTeacherQuickBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99980;display:flex;align-items:center;gap:6px;background:#fff;border:0;padding:5px 6px 5px 10px;border-radius:999px;box-shadow:0 7px 22px #0f172a29;font:700 14px Arial,sans-serif;color:#1e293b;max-width:calc(100vw - 20px)}',
       '#fttTeacherQuickBar[hidden],#fttTeacherQuickModal[hidden]{display:none!important}',
+      // The grip on the left moves the buttons (they remember where they were put); on the Class Pointer page they sit inside its dark top bar instead.
+      '#fttTeacherQuickBar .ftt-quick-grip{cursor:grab;color:#94a3b8;font:800 14px Arial;letter-spacing:-2px;padding:6px 4px 6px 0;user-select:none;touch-action:none;align-self:stretch;display:inline-flex;align-items:center}',
+      '#fttTeacherQuickBar .ftt-quick-grip:focus-visible{outline:3px solid #2563eb;border-radius:6px}',
+      '#fttTeacherQuickBar.docked{position:static;transform:none;left:auto;top:auto;z-index:auto;background:transparent;box-shadow:none;padding:0;gap:6px;max-width:none;flex:none}',
+      '#fttTeacherQuickBar.docked .ftt-quick-grip{display:none}',
+      '#fttTeacherQuickBar.docked{gap:4px}#fttTeacherQuickBar.docked button{width:30px;height:30px;font-size:16px}',
+      'body.teacher-view.ftt-quick-docked .cp-topbar.cp-topbar{gap:4px}body.ftt-quick-docked .cp-topbar .cp-topbar-btn,body.ftt-quick-docked .cp-topbar .cp-share-state{padding-left:10px;padding-right:10px}',
+      // The picker's word "Class" is spelled out by its aria-label; hiding it gives the three buttons their room in the bar.
+      'body.ftt-quick-docked .cp-topbar .pointer-class-picker{font-size:0;gap:0}body.ftt-quick-docked .cp-topbar .pointer-class-picker select{font-size:14px}',
+      '#fttTeacherQuickBar.docked button{background:#ffffff26;color:#fff}',
+      '#fttTeacherQuickBar.docked #fttTeacherQuickLock{background:#1f2937;box-shadow:0 0 0 1px #ffffff66}',
+      '#fttTeacherQuickBar.docked button[aria-expanded=true],#fttTeacherQuickBar.docked button[aria-current=page]{background:#dbeafe;color:#1e3a8a}',
       '#fttTeacherQuickBar label{font-size:13px;font-weight:800}',
       '#fttTeacherQuickBar select{max-width:170px;min-width:130px;border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;color:#1e293b;background:#fff;font:700 14px Arial}',
       '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:999px;width:34px;height:34px;padding:0;background:#f0ebff;color:#5c4592;font:800 18px Arial;cursor:pointer;white-space:nowrap;display:inline-grid;place-items:center}',
@@ -237,8 +309,13 @@
     follow = el('button', '', '👣'); follow.setAttribute('aria-label','Open or close Follow the Teacher'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
     pointer = el('button', '', '👆'); pointer.id = 'fttTeacherQuickPointer'; pointer.type = 'button';
     pointer.setAttribute('aria-label','Open Class Pointer for the selected class'); pointer.title = 'Open Class Pointer for the selected class';
-    bar.append(lock, follow, pointer);
+    var grip = el('span', 'ftt-quick-grip', '⋮⋮'); grip.setAttribute('role','button'); grip.tabIndex = 0;
+    grip.title = 'Drag to move these buttons. Double-click to put them back.';
+    grip.setAttribute('aria-label','Move the teacher buttons. Use the arrow keys, or drag. Press Home to put them back.');
+    bar.append(grip, lock, follow, pointer);
     document.body.appendChild(bar);
+    setupMove(grip);
+    setInterval(dock, 500); dock();
     select.addEventListener('change', function () { updatePanelClass(select.value); });
     lock.addEventListener('click', function(){ act('access'); });
     follow.addEventListener('click', function(){ act('follow'); });

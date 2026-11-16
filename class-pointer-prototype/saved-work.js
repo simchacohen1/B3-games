@@ -163,7 +163,7 @@
   // ---------- Small building blocks for the windows ----------
   function h(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
   function button(text,onClick,cls){const node=h('button',cls,text);node.type='button';node.addEventListener('click',onClick);return node}
-  const style=h('style',null,'.ftt-saved-dialog{width:min(640px,94vw);max-height:86vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff;font:16px system-ui,sans-serif}.ftt-saved-dialog::backdrop{background:#101d3888}.ftt-saved-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.ftt-saved-head h2{margin:0;font-size:22px}.ftt-saved button{cursor:pointer;min-height:40px;padding:6px 12px;border-radius:10px;border:1px solid #b8c6dc;background:#f4f7fc;color:#172d49;font:600 15px system-ui,sans-serif}.ftt-saved button.main{background:#1d5cb2;border-color:#1d5cb2;color:#fff}.ftt-saved button.danger{color:#b4232f}.ftt-saved button:disabled{opacity:.55;cursor:default}.ftt-saved input[type=text],.ftt-saved select{min-height:40px;padding:6px 10px;border:1px solid #9fb0c9;border-radius:10px;font:16px system-ui,sans-serif;max-width:100%;box-sizing:border-box}.ftt-saved label{display:block;margin:12px 0 4px;font-weight:700}.ftt-saved-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #e4e9f1}.ftt-saved-row.sub{padding-left:26px}.ftt-saved-name{flex:1;min-width:150px;overflow-wrap:anywhere;font-weight:700}.ftt-saved-name small{display:block;font-weight:400;color:#51627a}.ftt-saved-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.ftt-saved-group{margin:16px 0 0;font-size:17px;color:#234ea8}.ftt-saved-note{margin:10px 0;color:#3d4f68}.ftt-saved-hint{margin:10px 0;padding:8px 12px;border-radius:10px;background:#fff7dc;border:1px solid #f1d27a}.ftt-saved-status{min-height:22px;margin:12px 0 0;font-weight:700;color:#234ea8}.ftt-saved-tabs{display:flex;gap:8px;margin:14px 0 4px}.ftt-saved-tabs button[aria-selected=true]{background:#234ea8;border-color:#234ea8;color:#fff}');
+  const style=h('style',null,'.ftt-saved-dialog{width:min(640px,94vw);max-height:86vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff;font:16px system-ui,sans-serif}.ftt-saved-dialog::backdrop{background:#101d3888}.ftt-saved-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.ftt-saved-head h2{margin:0;font-size:22px}.ftt-saved button{cursor:pointer;min-height:40px;padding:6px 12px;border-radius:10px;border:1px solid #b8c6dc;background:#f4f7fc;color:#172d49;font:600 15px system-ui,sans-serif}.ftt-saved button.main{background:#1d5cb2;border-color:#1d5cb2;color:#fff}.ftt-saved button.danger{color:#b4232f}.ftt-saved button:disabled{opacity:.55;cursor:default}.ftt-saved input[type=text],.ftt-saved select{min-height:40px;padding:6px 10px;border:1px solid #9fb0c9;border-radius:10px;font:16px system-ui,sans-serif;max-width:100%;box-sizing:border-box}.ftt-saved label{display:block;margin:12px 0 4px;font-weight:700}.ftt-saved-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #e4e9f1}.ftt-saved-row.sub{padding-left:26px}.ftt-saved-thumb{flex:none;width:72px;height:48px;display:flex;align-items:center;justify-content:center;border:1px solid #d3dcea;border-radius:8px;background:#f4f7fc;overflow:hidden;font-size:20px}.ftt-saved-thumb.pdf{font:800 14px system-ui,sans-serif;color:#b4232f;background:#fdecee;border-color:#f0b9be}.ftt-saved-thumb img{width:100%;height:100%;object-fit:contain;background:#fff}.ftt-saved-name{flex:1;min-width:150px;overflow-wrap:anywhere;font-weight:700}.ftt-saved-name small{display:block;font-weight:400;color:#51627a}.ftt-saved-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.ftt-saved-group{margin:16px 0 0;font-size:17px;color:#234ea8}.ftt-saved-note{margin:10px 0;color:#3d4f68}.ftt-saved-hint{margin:10px 0;padding:8px 12px;border-radius:10px;background:#fff7dc;border:1px solid #f1d27a}.ftt-saved-status{min-height:22px;margin:12px 0 0;font-weight:700;color:#234ea8}.ftt-saved-tabs{display:flex;gap:8px;margin:14px 0 4px}.ftt-saved-tabs button[aria-selected=true]{background:#234ea8;border-color:#234ea8;color:#fff}');
   document.head.append(style);
 
   function openDialog(title){
@@ -195,11 +195,39 @@
     for(const group of groups){
       if(groups.length>1||group.folderId)container.append(h('h3','ftt-saved-group','📁 '+group.label));
       for(const file of group.files){
-        const row=h('div','ftt-saved-row'),name=h('span','ftt-saved-name',(file.kind==='pdf'?'📄 ':'📝 ')+file.name);
-        if(file.savedAt)name.append(h('small',null,'Saved '+new Date(file.savedAt).toLocaleDateString()));
-        row.append(name,...actions(file));container.append(row);
+        const row=h('div','ftt-saved-row'),name=h('span','ftt-saved-name',file.name);
+        if(file.savedAt)name.append(h('small',null,'Saved '+savedText(file.savedAt)));
+        row.append(thumb(file),name,...actions(file));container.append(row);
       }
     }
+  }
+  // "11/16/2026, 2:23 AM" in the viewer's own language and time zone.
+  function savedText(time){
+    const date=new Date(time);
+    try{return date.toLocaleString(undefined,{year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(_){return date.toLocaleDateString()}
+  }
+  // The small picture on the left of a row: the board's saved picture, or a PDF icon. Pictures load one at a time
+  // after the list is shown; a missing picture just leaves the icon.
+  const thumbQueue=[];let thumbBusy=false;
+  function thumb(file){
+    const box=h('span','ftt-saved-thumb',file.kind==='pdf'?'PDF':'📝');
+    box.setAttribute('aria-hidden','true');
+    if(file.kind==='pdf')box.classList.add('pdf');
+    else{thumbQueue.push({file,box});setTimeout(pumpThumbs,0)}
+    return box;
+  }
+  async function pumpThumbs(){
+    if(thumbBusy)return;thumbBusy=true;
+    while(thumbQueue.length){
+      const{file,box}=thumbQueue.shift();
+      if(!box.isConnected)continue;
+      const blob=await store.picture(file);
+      if(!blob||!box.isConnected)continue;
+      const img=document.createElement('img');img.alt='';img.src=URL.createObjectURL(blob);
+      img.addEventListener('load',()=>URL.revokeObjectURL(img.src));
+      box.replaceChildren(img);
+    }
+    thumbBusy=false;
   }
   // Rename and Delete buttons, the same wherever a file is listed. refresh() runs after a change.
   function manageButtons(file,ui,refresh){
@@ -229,6 +257,13 @@
   // The saved file this whiteboard came from or was last saved as, so Save can offer to save over it.
   let current=null;
 
+  // The lesson's name, taken from the activity page's title ("Chumash | Fun Torah Tools" gives "Chumash").
+  // The site's own names and the home page are not lesson names, so they give ''.
+  function lessonName(){
+    const first=Core.cleanName(String(document.title||'').split(/\s[|·–—-]\s/)[0],30);
+    return /^(class pointer|fun torah tools|shluchim online school|sols tools|home|student home|my files)/i.test(first)?'':first;
+  }
+
   async function saveCurrent(){
     const ui=openDialog(teacherPage?'Save whiteboard':'Save my whiteboard');
     ui.say('Getting ready…');
@@ -237,6 +272,16 @@
       const data=api.canSave?await api.read():null;
       if(!data)throw Core.plain(api.canSave?'Open your whiteboard first, then press Save.':'Saving is not ready on this page yet.');
       const state=me.teacher?NO_FOLDERS:await store.folders().catch(()=>NO_FOLDERS);
+      // A student saves with one click: no typing. The name is the lesson (when the page has one) and the Hebrew day;
+      // it can be changed later in My files.
+      if(!me.teacher){
+        ui.say('Saving…');
+        const existing=(await store.list()).map(file=>file.name);
+        const title=Core.autoName({date:new Date(),lesson:lessonName(),existing});
+        await store.saveBoard({name:title,folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await api.picture()});
+        ui.say('Saved as "'+title+'".');setTimeout(()=>ui.dialog.close(),1800);
+        return;
+      }
       const name=h('input');name.type='text';name.maxLength=Core.LIMITS.fileName;name.id='fttSavedName';name.value=current?.name||'';name.placeholder='For example: Chumash notes';
       const label=h('label',null,'Name');label.htmlFor=name.id;
       ui.body.append(label,name);

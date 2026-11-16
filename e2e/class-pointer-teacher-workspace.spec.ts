@@ -645,8 +645,9 @@ test('teacher points and draws on an enlarged student screen; only that student 
   await expect(tools).toBeHidden();
   await tile.locator('video').click();
   await expect(tools).toBeVisible();
-  // It starts on Hand: nothing is sent until the teacher picks a tool.
-  await expect(tools.getByRole('button', { name: 'Hand', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  // The same tools as the main whiteboard, with no Hand (there is no page to use here): it starts on Pointer.
+  await expect(tools.getByRole('button', { name: 'Hand', exact: true })).toHaveCount(0);
+  await expect(tools.getByRole('button', { name: 'Pointer', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // Point: the student gets the moving pointer.
   await tools.getByRole('button', { name: 'Pointer', exact: true }).click();
   const ink = tile.locator('canvas.cp-screen-ink'); const box = (await ink.boundingBox())!;
