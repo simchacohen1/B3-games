@@ -89,6 +89,8 @@
   }
 
   // ---------- What is written beside each file ----------
+  // The student's own settings (their folders and stars) live in one small saved file with this name.
+  const PREFS_ID='ftt-prefs';
   function fileMetadata(file){
     return{
       displayName:cleanName(file.name)||'My work',
@@ -99,6 +101,9 @@
       // A filled-in worksheet (pages = how many page pictures it has) and a student's PDF copy of a class worksheet.
       ...(file.worksheet?{worksheet:'1',pages:String(Math.min(60,Math.max(1,Math.floor(Number(file.pages))||1)))}:{}),
       ...(validId(file.sheetId)?{sheetId:file.sheetId}:{}),
+      // A copy the teacher sent (a board or a worksheet), and whether the teacher marked it important (it arrives starred).
+      ...(file.fromTeacher?{fromTeacher:'1'}:{}),
+      ...(file.important?{important:'1'}:{}),
       lastPage:String(Math.max(1,Math.floor(Number(file.lastPage))||1)),
       zoom:String(cleanZoom(file.zoom)),
       savedAt:String(Math.floor(Number(file.savedAt))||0)
@@ -107,7 +112,8 @@
   // Turns what Firebase Storage lists into one file row. Preview pictures and strange names are skipped.
   function fileFromMetadata(meta){
     const parsed=parseObjectName(meta?.name);
-    if(!parsed||parsed.ext==='png')return null;
+    // The small file of a student's own settings (folders, stars) is not one of their files.
+    if(!parsed||parsed.ext==='png'||parsed.id===PREFS_ID)return null;
     const custom=meta.customMetadata||{},kind=parsed.ext==='pdf'?'pdf':'whiteboard';
     return{
       id:parsed.id,ext:parsed.ext,kind,
@@ -118,6 +124,8 @@
       worksheet:custom.worksheet==='1', // a filled-in PDF worksheet
       pages:Math.min(60,Math.max(1,Math.floor(Number(custom.pages))||1)),
       sheetId:validId(custom.sheetId)?custom.sheetId:'', // set on a student's PDF copy of a class worksheet
+      fromTeacher:custom.fromTeacher==='1'||/^From your teacher/.test(cleanName(custom.displayName)), // sent by the teacher
+      important:custom.important==='1', // the teacher marked it important
       lastPage:Math.max(1,Math.floor(Number(custom.lastPage))||1),
       zoom:cleanZoom(custom.zoom),
       savedAt:Math.floor(Number(custom.savedAt))||Date.parse(meta.updated||'')||0,
@@ -267,7 +275,7 @@
   // An error whose words are already safe and plain enough to show.
   function plain(message){const error=Error(message);error.plain=true;return error}
 
-  const api={LIMITS,EXTENSIONS,NOT_ON,validId,newId,cleanName,hebrewNumber,hebrewDay,autoName,studentPrefix,teacherPrefix,foldersPath,objectName,parseObjectName,sizeProblem,
+  const api={PREFS_ID,LIMITS,EXTENSIONS,NOT_ON,validId,newId,cleanName,hebrewNumber,hebrewDay,autoName,studentPrefix,teacherPrefix,foldersPath,objectName,parseObjectName,sizeProblem,
     fileMetadata,fileFromMetadata,parseBoard,cleanFolders,folderTree,folderLabel,folderOptions,addFolder,renameFolder,removeFolder,setSaveTarget,groupFiles,groupBySubject,subjectsOf,
     fingerprint,cleanPosition,readPosition,savePosition,errorText,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FTTSavedWorkCore=api;

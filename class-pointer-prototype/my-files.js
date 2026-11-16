@@ -1,32 +1,232 @@
 'use strict';
-// My files (student page): a student's own saved whiteboards and PDFs, by class folder.
-// Whiteboards show as a picture here (to draw on one again, open it from 📂 My files on the whiteboard).
-// PDFs open in a small reader that remembers the page and zoom for each PDF.
-// Storage, sign-in checks and the shared list come from saved-work.js.
+// My files (student page): everything a student has saved, in a grid of picture tiles or a list.
+//   • Grouped by date (Today, Yesterday, Earlier this week, Last week, Older), or sorted by name, type or subject.
+//   • The student's own folders (drag a file onto a folder, or use Move to folder), All files, and Starred.
+//   • One Open button for every kind of file. A worksheet is ONE item: the teacher's PDF, the student's copy and their
+//     filled-in pictures are merged, and Open continues where they left off.
+//   • "From my teacher" marks what the teacher sent; a subject marks what came from a subject folder.
+// The rules (items, groups, sorting, folders, stars) are in my-files-core.js. Storage, sign-in checks and the saved
+// files come from saved-work.js. PDFs open in a small reader that remembers the page and zoom for each PDF.
 (function(){
-  const Core=window.FTTSavedWorkCore,Saved=window.FTTSavedWork;
-  if(!Core||!Saved)return;
+  const Core=window.FTTSavedWorkCore,Saved=window.FTTSavedWork,M=window.FTTMyFilesCore;
+  if(!Core||!Saved||!M)return;
   const {store,ui}=Saved,$=id=>document.getElementById(id);
   const FA=window.FTTAnnotate;
   // A worksheet being filled in: this student's own PDF copy and their marks per page ({1:[mark,...],2:[...]}).
-  let fill=null,allFiles=[];
+  let fill=null,allFiles=[],allSheets=[];
   const page={say(text){$('filesStatus').textContent=text||''},fail(error){$('filesStatus').textContent=Core.errorText(error)}};
-  let state={folders:{},saveTarget:null};
+  let state={folders:{},saveTarget:null};   // the teacher's class folders
+  let prefs=M.emptyPrefs(),items=[],view={type:'all'};
+
+  // The view (grid or list) and the sort are remembered in this browser, for the student who is signed in.
+  const who=()=>{try{return sessionStorage.getItem('b3Games_studentId')||'device'}catch(_){return 'device'}};
+  const remembered=(name,fallback,allowed)=>{try{const value=localStorage.getItem('fttMyFiles:'+who()+':'+name);return allowed.includes(value)?value:fallback}catch(_){return fallback}};
+  const remember=(name,value)=>{try{localStorage.setItem('fttMyFiles:'+who()+':'+name,value)}catch(_){}};
+  let mode=remembered('view','grid',['grid','list']),sort=remembered('sort','date',['date','name','type','subject']);
 
   async function refresh(){
     page.say('Loading…');
     try{
-      const [files,folders,sheets]=await Promise.all([store.list(),store.folders().catch(()=>state),Saved.worksheets.list().catch(()=>[])]);
-      state=folders;allFiles=files;
-      showSheets(sheets);
-      ui.fileList($('filesList'),files,state,file=>file.worksheet?[
-        ui.button('Continue',()=>openFilled(file),'main'),ui.button('See pictures',()=>showPicture(file)),...ui.manageButtons(file,page,refresh)]
-        :file.kind==='pdf'&&file.sheetId?[ui.button('Fill in',()=>fillCopy(file),'main'),...ui.manageButtons(file,page,refresh)]
-        :[ui.button(file.kind==='pdf'?'Open':'See picture',()=>file.kind==='pdf'?openPdf(file):showPicture(file),'main'),
-        ...ui.manageButtons(file,page,refresh)]);
-      $('addPdf').hidden=false;page.say('');
+      const [files,folders,sheets,raw]=await Promise.all([store.list(),store.folders().catch(()=>state),Saved.worksheets.list().catch(()=>[]),store.prefs().catch(()=>null)]);
+      state=folders;allFiles=files;allSheets=sheets;prefs=M.cleanPrefs(raw);
+      $('addPdf').hidden=false;$('newFolder').hidden=false;page.say('');
+      render();
     }catch(error){$('filesList').replaceChildren();page.fail(error)}
   }
+
+  // ---------- Settings (folders and stars): shown at once, saved a moment later ----------
+  let saveChain=Promise.resolve();
+  function changePrefs(result){
+    if(result.error){page.say(result.error);return false}
+    prefs=result.prefs;render();
+    const snapshot=M.prune(prefs,items);
+    saveChain=saveChain.then(()=>store.savePrefs(snapshot)).catch(error=>page.fail(error));
+    return true;
+  }
+  const moveItem=(item,folderId)=>changePrefs(M.moveItem(prefs,item.key,folderId));
+  const toggleStar=item=>changePrefs(M.setStar(prefs,item.key,!item.starred));
+
+  // ---------- Drawing the page ----------
+  function render(){
+    items=M.buildItems(allFiles,allSheets,prefs);
+    if(view.type==='folder'&&!prefs.folders.some(folder=>folder.id===view.id))view={type:'all'};
+    if(view.type==='class'&&!state.folders[view.id])view={type:'all'};
+    for(const [id,value] of [['viewGrid','grid'],['viewList','list']])$(id).setAttribute('aria-pressed',String(mode===value));
+    $('sortBy').value=sort;
+    renderNav();renderList();
+  }
+  const dateText=time=>{try{return new Date(time).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(_){return ''}};
+  const countIn=filter=>M.filterItems(items,filter).length;
+  const same=(a,b)=>a.type===b.type&&(a.id||'')===(b.id||'');
+
+  function navButton(label,count,target){
+    const active=same(view,target),button=ui.h('button','mf-nav-item'+(active?' active':''));
+    button.type='button';button.setAttribute('aria-current',String(active));
+    button.append(ui.h('span','mf-nav-name',label),ui.h('span','mf-nav-count',String(count)));
+    button.addEventListener('click',()=>{view=target;render()});
+    return button;
+  }
+  // A folder button is also a place to drop a file.
+  function dropTarget(node,folderId,hint){
+    node.title=hint;
+    node.addEventListener('dragover',event=>{event.preventDefault();node.classList.add('over')});
+    node.addEventListener('dragleave',()=>node.classList.remove('over'));
+    node.addEventListener('drop',event=>{
+      event.preventDefault();node.classList.remove('over');
+      const item=items.find(entry=>entry.key===event.dataTransfer.getData('text/plain'));
+      if(item)moveItem(item,folderId);
+    });
+  }
+  function renderNav(){
+    const nav=$('mfNav');nav.replaceChildren();
+    const all=navButton('All files',items.length,{type:'all'});
+    dropTarget(all,'','Drop a file here to take it out of its folder');
+    nav.append(all,navButton('⭐ Starred',countIn({type:'starred'}),{type:'starred'}));
+    if(prefs.folders.length)nav.append(ui.h('h3','mf-nav-title','My folders'));
+    for(const folder of prefs.folders){
+      const row=ui.h('div','mf-folder'),open=navButton('📁 '+folder.name,countIn({type:'folder',id:folder.id}),{type:'folder',id:folder.id});
+      dropTarget(open,folder.id,'Drop a file here to put it in "'+folder.name+'"');
+      const rename=ui.button('✎',()=>renameFolder(folder),'mf-mini');rename.title='Rename this folder';rename.setAttribute('aria-label','Rename folder '+folder.name);
+      const remove=ui.button('🗑',()=>deleteFolder(folder),'mf-mini');remove.title='Delete this folder (its files are kept)';remove.setAttribute('aria-label','Delete folder '+folder.name);
+      row.append(open,rename,remove);nav.append(row);
+    }
+    const classFolders=Core.folderOptions(state);
+    if(classFolders.length){
+      nav.append(ui.h('h3','mf-nav-title','Class folders'));
+      for(const option of classFolders)nav.append(navButton('📁 '+option.label,countIn({type:'class',id:option.id}),{type:'class',id:option.id}));
+    }
+  }
+  function viewTitle(){
+    if(view.type==='starred')return '⭐ Starred';
+    if(view.type==='folder')return '📁 '+(prefs.folders.find(folder=>folder.id===view.id)?.name||'');
+    if(view.type==='class')return '📁 '+Core.folderLabel(state,view.id);
+    return 'All files';
+  }
+  function emptyText(){
+    if(view.type==='starred')return 'Nothing is starred yet. Press ☆ on a file to star it.';
+    if(view.type==='folder')return 'This folder is empty. Drag a file here, or press ⋯ then Move to folder.';
+    if(view.type==='class')return 'Nothing is in this class folder.';
+    return 'Nothing saved yet.';
+  }
+  function renderList(){
+    const box=$('filesList');box.replaceChildren();
+    $('viewTitle').textContent=viewTitle();
+    const groups=M.arrange(M.filterItems(items,view),{sort,pin:view.type!=='starred'});
+    if(!groups.length){box.append(ui.h('p','ftt-saved-note',emptyText()));return}
+    for(const group of groups){
+      if(group.label)box.append(ui.h('h3','mf-group',group.label));
+      const wrap=ui.h('div','mf-items mf-'+mode);
+      for(const item of group.items)wrap.append(itemNode(item));
+      box.append(wrap);
+    }
+  }
+  const thumbs=new Map();let thumbChain=Promise.resolve();
+  // Small pictures load one at a time after the page is shown; a missing picture just leaves the icon.
+  function loadThumb(file,box){
+    const put=blob=>{const image=document.createElement('img');image.alt='';image.src=URL.createObjectURL(blob);image.addEventListener('load',()=>URL.revokeObjectURL(image.src));box.replaceChildren(image)};
+    if(thumbs.has(file.id)){put(thumbs.get(file.id));return}
+    thumbChain=thumbChain.then(async()=>{
+      const blob=await store.picture(file);
+      if(!blob)return;
+      thumbs.set(file.id,blob);
+      if(box.isConnected)put(blob);
+    }).catch(()=>{});
+  }
+  function itemNode(item){
+    const node=ui.h('article','mf-item mf-'+item.kind);node.draggable=true;node.dataset.key=item.key;
+    node.addEventListener('dragstart',event=>{event.dataTransfer.setData('text/plain',item.key);event.dataTransfer.effectAllowed='move';node.classList.add('dragging')});
+    node.addEventListener('dragend',()=>node.classList.remove('dragging'));
+    const thumb=ui.h('div','mf-thumb',item.kind==='worksheet'?'📋':item.kind==='pdf'?'📄':'📝');thumb.setAttribute('aria-hidden','true');
+    if(item.picture)loadThumb(item.picture,thumb);
+    const meta=ui.h('div','mf-meta'),tags=ui.h('div','mf-tags');
+    if(item.fromTeacher)tags.append(ui.h('span','mf-badge','From my teacher'));
+    if(item.subject)tags.append(ui.h('span','mf-subject',item.subject));
+    tags.append(ui.h('span','mf-type',M.typeLabel(item.kind)));
+    if(item.status)tags.append(ui.h('span','mf-status'+(item.status==='New'?' new':''),item.status));
+    meta.append(ui.h('strong','mf-name',item.name),tags,ui.h('small','mf-date',item.time?dateText(item.time):''));
+    const actions=ui.h('div','mf-actions');
+    const star=ui.button(item.starred?'★':'☆',()=>toggleStar(item),'mf-star'+(item.starred?' on':''));
+    star.setAttribute('aria-pressed',String(item.starred));star.title=item.starred?'Starred. Press to unstar.':'Press to star';star.setAttribute('aria-label',(item.starred?'Unstar ':'Star ')+item.name);
+    const more=document.createElement('details');more.className='mf-more';
+    const summary=document.createElement('summary');summary.textContent='⋯';summary.title='More';summary.setAttribute('aria-label','More for '+item.name);
+    const menu=ui.h('div','mf-menu');
+    const entry=(label,run,cls)=>{const button=ui.button(label,()=>{more.open=false;run()},cls);menu.append(button)};
+    entry('📂 Move to folder',()=>chooseFolder(item));
+    if(item.kind!=='worksheet')entry('✎ Rename',()=>renameItem(item));
+    if(item.files.length)entry('🗑 Delete',()=>deleteItem(item),'danger');
+    more.append(summary,menu);
+    actions.append(ui.button('Open',()=>openItem(item),'main'),star,more);
+    node.append(thumb,meta,actions);
+    return node;
+  }
+
+  // ---------- One Open button for every kind of file ----------
+  function openItem(item){
+    if(item.kind==='worksheet'){
+      if(item.filled)return openFilled(item.filled);
+      if(item.copy)return openPdf(item.copy,{sheetName:item.name});
+      if(item.sheet)return startWorksheet(item.sheet);
+      return undefined;
+    }
+    if(item.kind==='pdf')return openPdf(item.files[0]);
+    return showPicture(item.files[0]);
+  }
+
+  // ---------- Folders, rename, delete ----------
+  function askName(title,initial,buttonText){
+    return new Promise(resolve=>{
+      const box=ui.openDialog(title);let done=false;
+      const finish=value=>{if(done)return;done=true;box.dialog.close();resolve(value)};
+      const label=ui.h('label',null,'Name'),input=ui.h('input');
+      input.type='text';input.id='mfName';input.maxLength=Core.LIMITS.folderName;input.value=initial||'';input.placeholder='For example: Chumash';label.htmlFor='mfName';
+      const go=ui.button(buttonText||'Save',()=>{const value=Core.cleanName(input.value,Core.LIMITS.folderName);if(!value){box.say('Type a name first.');input.focus();return}finish(value)},'main');
+      input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();go.click()}});
+      const actions=ui.h('div','ftt-saved-actions');actions.append(go,ui.button('Cancel',()=>finish(null)));
+      box.body.append(label,input,actions);box.dialog.addEventListener('close',()=>finish(null));input.focus();
+    });
+  }
+  async function createFolder(){
+    const name=await askName('New folder','','Create folder');
+    if(name==null)return null;
+    const result=M.addFolder(prefs,name);
+    if(result.error){page.say(result.error);return null}
+    changePrefs(result);return result.id;
+  }
+  async function renameFolder(folder){
+    const name=await askName('Rename folder',folder.name,'Rename');
+    if(name!=null)changePrefs(M.renameFolder(prefs,folder.id,name));
+  }
+  function deleteFolder(folder){
+    if(!confirm('Delete the folder "'+folder.name+'"? Your files are not deleted: they go back to All files.'))return;
+    changePrefs(M.removeFolder(prefs,folder.id));
+  }
+  function chooseFolder(item){
+    const box=ui.openDialog('Move "'+item.name+'" to…');
+    const choice=(label,folderId)=>{
+      const button=ui.button(label,()=>{box.dialog.close();moveItem(item,folderId)},item.folder===folderId?'main':'');
+      button.style.cssText='display:block;margin:6px 0;width:100%;text-align:left';box.body.append(button);
+    };
+    choice('📂 No folder',''); for(const folder of prefs.folders)choice('📁 '+folder.name,folder.id);
+    const add=ui.button('＋ New folder…',async()=>{box.dialog.close();const id=await createFolder();if(id)moveItem(item,id)});
+    add.style.cssText='display:block;margin:10px 0 0';box.body.append(add);
+  }
+  async function renameItem(item){
+    const name=await askName('Rename',item.name,'Rename');
+    if(name==null||name===item.name)return;
+    try{await store.rename(item.files[0],name);await refresh()}catch(error){page.fail(error)}
+  }
+  async function deleteItem(item){
+    const text=item.kind==='worksheet'
+      ?'Delete your copy and your work on "'+item.name+'"? You cannot get them back. The worksheet stays in My files as new, so you can start again.'
+      :'Delete "'+item.name+'"? You cannot get it back.';
+    if(!confirm(text))return;
+    try{for(const file of item.files)await store.remove(file);await refresh()}catch(error){page.fail(error)}
+  }
+
+  $('viewGrid').addEventListener('click',()=>{mode='grid';remember('view',mode);render()});
+  $('viewList').addEventListener('click',()=>{mode='list';remember('view',mode);render()});
+  $('sortBy').addEventListener('change',()=>{sort=$('sortBy').value;remember('sort',sort);render()});
+  $('newFolder').addEventListener('click',async()=>{const id=await createFolder();if(id){view={type:'folder',id};render()}});
 
   // ---------- A saved whiteboard, as a picture ----------
   async function showPicture(file){
@@ -75,16 +275,6 @@
   });
 
   // ---------- Worksheets from the teacher: fill in (write, type, highlight on every page) and save ----------
-  function showSheets(sheets){
-    const box=$('sheetList');box.replaceChildren();
-    $('sheets').hidden=!sheets.length;
-    for(const sheet of sheets){
-      const row=ui.h('div','ftt-saved-row'),name=ui.h('span','ftt-saved-name',sheet.name);
-      const filled=allFiles.find(file=>file.worksheet&&file.sheetId===sheet.id);
-      if(sheet.sentAt)name.append(ui.h('small',null,'Sent '+new Date(sheet.sentAt).toLocaleDateString()+(filled?' · you saved your work':'')));
-      row.append(name,ui.button(filled?'Continue':'Fill in',()=>startWorksheet(sheet),'main'));box.append(row);
-    }
-  }
   const validTarget=()=>state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'';
   // First time: this student's own copy of the PDF is saved in My files, then opened. Later: their saved work, or the copy.
   async function startWorksheet(sheet){
@@ -95,16 +285,12 @@
       let copy=allFiles.find(file=>file.kind==='pdf'&&file.sheetId===sheet.id);
       if(!copy){
         const blob=await Saved.worksheets.read(sheet.id);
-        const id=await store.savePdf(new File([blob],sheet.name+'.pdf',{type:'application/pdf'}),{name:sheet.name,folderId:validTarget(),sheetId:sheet.id});
+        const id=await store.savePdf(new File([blob],sheet.name+'.pdf',{type:'application/pdf'}),{name:sheet.name,folderId:validTarget(),sheetId:sheet.id,subject:sheet.subject||'',fromTeacher:true,important:sheet.important===true});
         await refresh();copy=allFiles.find(file=>file.id===id);
-        if(!copy)throw Core.plain('Your copy was saved, but it could not be opened. Press Fill in again.');
+        if(!copy)throw Core.plain('Your copy was saved, but it could not be opened. Press Open again.');
       }
       await openPdf(copy,{sheetName:sheet.name});
     }catch(error){page.fail(error)}
-  }
-  function fillCopy(copy){
-    const filled=allFiles.find(file=>file.worksheet&&file.sheetId===copy.sheetId);
-    return filled?openFilled(filled):openPdf(copy,{sheetName:copy.name});
   }
   async function openFilled(file){
     page.say('Opening…');
@@ -162,7 +348,7 @@
       const marks={};
       for(const [number,list] of Object.entries(fill.marks))if(list.length)marks[number]=list;
       const data={version:1,kind:'worksheet',pdfId:fill.copy.id,sheetId:fill.copy.sheetId||'',sheetName:fill.sheetName,marks};
-      const id=await store.saveWorksheet({id:fill.filled?.id,name,folderId:validTarget(),data,pictures,sheetId:fill.copy.sheetId});
+      const id=await store.saveWorksheet({id:fill.filled?.id,name,folderId:validTarget(),data,pictures,sheetId:fill.copy.sheetId,subject:fill.copy.subject||''});
       fill.filled={id,name};fill.dirty=false;
       page.say('Saved as "'+name+'" in My files.');button.textContent='✓ Saved';
     }catch(error){page.fail(error)}finally{button.disabled=false}

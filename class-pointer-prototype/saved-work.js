@@ -69,7 +69,7 @@
   // Firebase rules cannot count files, so the limit on how many files one person keeps is checked here.
   async function checkRoom(me){
     const limit=me.teacher?Core.LIMITS.teacherBoards:Core.LIMITS.studentFiles;
-    const items=(await firebase.storage().ref(me.prefix).listAll()).items.filter(ref=>!ref.name.endsWith('.png'));
+    const items=(await firebase.storage().ref(me.prefix).listAll()).items.filter(ref=>!ref.name.endsWith('.png')&&ref.name!==Core.PREFS_ID+'.json');
     if(items.length>=limit)throw Core.plain('You already have '+limit+' saved files. Delete one, then save again.');
   }
   async function patch(file,changes){
@@ -124,7 +124,7 @@
       await firebase.database().ref(Core.foldersPath(me.classId)).update(changes);
     },
     // Saves a whiteboard. With an id it replaces that saved file; without one it makes a new file.
-    async saveBoard({id,name,folderId,data,picture,subject,template}){
+    async saveBoard({id,name,folderId,data,picture,subject,template,fromTeacher,important}){
       const me=await who(),blob=new Blob([JSON.stringify(data)],{type:'application/json'});
       const problem=Core.sizeProblem('whiteboard',blob.size,me.teacher);
       if(problem)throw Core.plain(problem);
@@ -137,19 +137,19 @@
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
       if(me.teacher)await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'});
-      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,savedAt:Date.now()})});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,fromTeacher,important,savedAt:Date.now()})});
       // A student's small picture is only for looking at the file later. The save counts without it.
       if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;
     },
-    async savePdf(file,{name,folderId,sheetId},onProgress){
+    async savePdf(file,{name,folderId,sheetId,subject,fromTeacher,important},onProgress){
       const me=await who();
       if(file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Core.plain('Please choose a PDF file.');
       const problem=Core.sizeProblem('pdf',file.size);
       if(problem)throw Core.plain(problem);
       await checkRoom(me);
       const id=Core.newId();
-      const task=firebase.storage().ref(me.prefix+Core.objectName(id,'pdf')).put(file,{contentType:'application/pdf',customMetadata:Core.fileMetadata({name,kind:'pdf',folderId,sheetId,savedAt:Date.now()})});
+      const task=firebase.storage().ref(me.prefix+Core.objectName(id,'pdf')).put(file,{contentType:'application/pdf',customMetadata:Core.fileMetadata({name,kind:'pdf',folderId,sheetId,subject,fromTeacher,important,savedAt:Date.now()})});
       await new Promise((resolve,reject)=>task.on('state_changed',step=>onProgress?.(step.totalBytes?Math.floor(step.bytesTransferred*100/step.totalBytes):0),reject,resolve));
       return id;
     },
@@ -164,6 +164,18 @@
     // The picture of a saved whiteboard, or null when there is none.
     // (page 2 and up exist only for a filled-in worksheet: id-p2.png, id-p3.png ...)
     async picture(file,page=1){try{return await download(page>1?file.id+'-p'+Math.floor(page)+'.png':Core.objectName(file.id,'png'),Core.LIMITS.pngBytes)}catch(_){return null}},
+    // The student's own settings (folders, stars): one small saved file. null when they have none yet.
+    async prefs(){
+      try{return JSON.parse(await (await download(Core.objectName(Core.PREFS_ID,'json'),200*1024)).text())}
+      catch(error){if(error?.code==='storage/object-not-found'||error instanceof SyntaxError)return null;throw error}
+    },
+    async savePrefs(data){
+      const me=await who();
+      if(me.teacher)throw Core.plain('Only a student has My files settings.');
+      const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+      if(blob.size>200*1024)throw Core.plain('There are too many folders or stars to save. Delete some, then try again.');
+      await firebase.storage().ref(me.prefix).child(Core.objectName(Core.PREFS_ID,'json')).put(blob,{contentType:'application/json',customMetadata:{kind:'prefs',displayName:'My files settings',savedAt:String(Date.now())}});
+    },
     async rename(file,name){return patch(file,{displayName:Core.cleanName(name)||file.name})},
     async remember(file,place){return patch(file,{lastPage:String(place.page),zoom:String(place.zoom),placeAt:String(place.at)})},
     async remove(file){
@@ -178,7 +190,7 @@
     },
     // A student's filled-in PDF worksheet: the marks (data), one picture per page (pictures[0] is page 1), and a name.
     // With an id it saves over that file; without one it makes a new file. Page pictures are made small enough first.
-    async saveWorksheet({id,name,folderId,data,pictures,sheetId}){
+    async saveWorksheet({id,name,folderId,data,pictures,sheetId,subject}){
       const me=await who();
       if(me.teacher)throw Core.plain('Only a student fills in a worksheet.');
       const blob=new Blob([JSON.stringify(data)],{type:'application/json'}),problem=Core.sizeProblem('whiteboard',blob.size,false);
@@ -189,7 +201,7 @@
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
       for(let index=0;index<fitted.length;index+=1)await folder.child(index?id+'-p'+(index+1)+'.png':Core.objectName(id,'png')).put(fitted[index],{contentType:'image/png'});
-      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,worksheet:true,pages:fitted.length,sheetId,savedAt:Date.now()})});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,worksheet:true,pages:fitted.length,sheetId,subject,fromTeacher:true,savedAt:Date.now()})});
       return id;
     }
   };
@@ -216,7 +228,8 @@
       if(blob.size>Core.LIMITS.pdfBytes)throw Core.plain('This worksheet is too big to open.');
       return new Blob([blob],{type:'application/pdf'});
     },
-    async send(pdfId,name){return worksheetCall({action:'send',pdfId,name})},
+    // options: {subject, important}. A subject marks each student's copy; important makes it arrive starred.
+    async send(pdfId,name,options={}){return worksheetCall({action:'send',pdfId,name,subject:options.subject||'',important:options.important===true})},
     async remove(id){return worksheetCall({action:'remove',id})}
   };
 
@@ -416,7 +429,7 @@
     let picture;
     try{picture=await pdf.exportPng()}catch(_){picture=null}
     if(!picture){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note','Open the whiteboard on the lesson first, then press Send whiteboard to students.'));return false}
-    return boards.sendPictureToAll(picture,'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.');
+    return boards.sendPictureToAll(picture,'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
   }
   // A whiteboard saved earlier. Its small picture was saved with it.
   async function sendFile(file,ui){
@@ -427,7 +440,7 @@
       const picture=await store.picture(file);
       if(!picture)throw Core.plain('This saved whiteboard has no picture to send. Open it first, then use More, then Send whiteboard to students.');
       ui.dialog.close();
-      await boards.sendPictureToAll(picture,'Saved whiteboard: '+file.name+'. Every student gets their own copy to draw on. What they draw stays on their own board.');
+      await boards.sendPictureToAll(picture,'Saved whiteboard: '+file.name+'. Every student gets their own copy to draw on. What they draw stays on their own board.',{subject:file.subject||''});
     }catch(error){ui.fail(error)}
   }
 
@@ -631,7 +644,8 @@
       if(!Array.isArray(seen)||seen.includes(key))return false;
       const state=await store.folders().catch(()=>NO_FOLDERS);
       const data={version:1,kind:'student-board',strokes:[],images:[],text:null,activity:{kind:'image',data:activity.data}};
-      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await copyPicture(activity.data)});
+      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await copyPicture(activity.data),
+        subject:Core.cleanName(activity.subject,Core.LIMITS.folderName),fromTeacher:true,important:activity.important===true});
       kept.add(key);seen.push(key);try{localStorage.setItem(memory,JSON.stringify(seen.slice(-30)))}catch(_){}
       toast('Your teacher sent a whiteboard. Your own copy is saved in 📂 My files.');
       return true;

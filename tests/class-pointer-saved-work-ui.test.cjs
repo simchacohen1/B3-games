@@ -319,6 +319,6 @@ test('when saving is off or My files is full the copy is not kept; a full My fil
 
 test('student whiteboards ask for the copy when a teacher picture arrives, and bring the picture back when a copy is opened',()=>{
   const boards=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/student-boards.js'),'utf8');
-  assert.match(boards,/if\(activity\?\.kind==='image'&&on&&mode==='boards'&&!blocked\)window\.FTTSavedWork\?\.keepTeacherCopy\?\.\(\{kind:'image',data:activity\.data\}\);/);
+  assert.match(boards,/if\(activity\?\.kind==='image'&&on&&mode==='boards'&&!blocked\)window\.FTTSavedWork\?\.keepTeacherCopy\?\.\(\{kind:'image',data:activity\.data,subject:activity\.subject,important:activity\.important\}\);/);
   assert.match(boards,/const picture=cleanActivity\(data\.activity\);\s*if\(picture\?\.kind==='image'&&!activity\)chooseActivity\(picture,redraw\);/);
 });
