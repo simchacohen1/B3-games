@@ -228,7 +228,7 @@ test('My files: a student reopens a saved whiteboard onto the open board; names 
   const h=harness({existing:{'studentFiles/et/stu1/w1.json':{customMetadata:{displayName:'<img src=x onerror=alert(1)>',savedAt:'5'}},'studentFiles/et/stu1/p1.pdf':{customMetadata:{displayName:'Sheet',kind:'pdf'}}}});
   await h.api.open();
   const dialog=h.body.children[0],all=walk(dialog);
-  assert.ok(all.some(node=>node.textContent==='📝 <img src=x onerror=alert(1)>'),'the name is plain text');
+  assert.ok(all.some(node=>node.textContent==='<img src=x onerror=alert(1)>'),'the name is plain text');
   assert.ok(all.every(node=>node.innerHTML===undefined),'innerHTML is never used');
   assert.ok(!texts(dialog).some(text=>text.includes('Sheet')),'PDFs are opened from the My files page');
   h.responses.push({ok:true,status:200,blob:async()=>new Blob([JSON.stringify({version:1,kind:'student-board',strokes:[]})])});
