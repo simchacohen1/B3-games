@@ -4,8 +4,8 @@
    Browser screen capture always requires an explicit student click. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
-  // Classroom Pointer sessions are not deployed to staging; keep their auth and APIs off that site.
-  if(window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging')return;
+  // Staging runs this like live: classPointerShareAuth and the session rules are deployed to the staging project,
+  // and the staging build already points the endpoints below at it.
   window.__classPointerActivityShareLoaded=true;
   // The student classroom already has its working central share control in Screens mode.
   // Do not cover it with a second floating share prompt.
