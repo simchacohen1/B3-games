@@ -34,6 +34,13 @@ If GitHub is unavailable, say that the overlap check could not be completed.
   needed from the owner. Verify the result after an approved live deployment.
 - A development request or issue comment is not explicit approval to merge or deploy.
 
+## Staging
+
+- Before deploying anything to staging for the owner to test, first update the
+  branch with current main, so staging always matches live plus the new change.
+  Never deploy an old branch to staging.
+- Keep staging-only settings (Storage rules, CORS, test accounts) in place.
+
 ## Workspace and disk space
 
 - Reuse the current checkout where safe; avoid unnecessary project copies and
