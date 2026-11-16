@@ -482,7 +482,7 @@
     }
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
-    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
+    colorBox.hidden=!drawing&&!isDelegate(s)&&st.tool!=='select';sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
     sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{
         // Select: the size goes to the picked mark (thicker line, bigger words) and the tool stays Select.
