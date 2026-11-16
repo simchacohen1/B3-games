@@ -24,6 +24,8 @@ import { readdirSync, readFileSync, writeFileSync, rmSync, copyFileSync, existsS
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import authDomain from './auth-domain.cjs';
+
 const HOST = 'sols.tools';
 const NAME = 'Shluchim Online School';
 const TAG = '<script src="/sols-brand.js"></script>';
@@ -126,6 +128,10 @@ function* htmlFiles(dir) {
     }
   }
 }
+
+// Production SOLS cutover; auth-domain.json also provides the legacy-domain rollback.
+const authSettings = JSON.parse(readFileSync(join(here, 'auth-domain.json'), 'utf8'));
+authDomain.applyAuthDomain(target, authSettings);
 
 rmSync(join(target, '.github'), { recursive: true, force: true });
 writeFileSync(join(target, 'CNAME'), HOST + '\n');

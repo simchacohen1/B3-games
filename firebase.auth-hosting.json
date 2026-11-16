@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "site": "b3-games",
+    "public": "auth-hosting",
+    "ignore": ["**/.*", "**/node_modules/**"]
+  }
+}
