@@ -122,7 +122,11 @@
     }catch(error){page.fail(error)}
   }
   // The marks go on a layer over the page that is on the screen: the same drawing toolbar as a whiteboard.
+  // The same toolbar as the whiteboards: Select (the mouse icon), Highlight, Text, Shapes, Eraser, Pen. No Hand and no Pointer,
+  // and only the tools that work are shown, so the buttons are the normal size.
   const sheetSurface=FA&&{id:'worksheet',label:'Worksheet',idPrefix:'s',defaultTool:'pen',autoOpen:true,
+    tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
+    toolLabels:{select:['🖱️','Select','Click any of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     rect:()=>{const canvas=fill&&$('viewerPage').querySelector('canvas');if(!canvas)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
     getItems:()=>fill?.marks[pageNumber]||[],
     setItems(list){if(!fill)return;fill.marks[pageNumber]=list;fill.dirty=true;$('viewerSave').textContent='💾 Save my worksheet'}};
@@ -164,6 +168,12 @@
     }catch(error){page.fail(error)}finally{button.disabled=false}
   }
   $('viewerSave').addEventListener('click',saveFilled);
+  // A drawing tool covers the page, so the mouse wheel over it scrolls the page (when it is zoomed in).
+  document.addEventListener('wheel',event=>{
+    if(!fill||!event.target.closest)return;
+    if(!event.target.closest('#fttAnnotate')||event.target.closest('.fa-bar,.fa-fly'))return;
+    const holder=$('viewerPage');holder.scrollTop+=event.deltaY;holder.scrollLeft+=event.deltaX;
+  },{passive:true});
 
   // ---------- PDF reader ----------
   let pdf=null,current=null,pageNumber=1,zoom=1,drawing=null,drawToken=0,saveTimer=0,unsaved=false;
@@ -192,7 +202,10 @@
     const sheet=await pdf.getPage(pageNumber);
     if(token!==drawToken)return;
     const holder=$('viewerPage'),base=sheet.getViewport({scale:1}),sharp=Math.min(window.devicePixelRatio||1,2);
-    const shown=Math.max(200,holder.clientWidth-24)*zoom;
+    // While filling in a worksheet, the whole page fits the screen at first (a drawing tool is on, so the page is not scrolled by dragging).
+    const roomWidth=Math.max(200,holder.clientWidth-24);
+    const fitted=fill?Math.min(roomWidth,Math.max(200,holder.clientHeight-24)*base.width/base.height):roomWidth;
+    const shown=fitted*zoom;
     let scale=shown*sharp/base.width;
     const pixels=base.width*scale*base.height*scale;if(pixels>14e6)scale*=Math.sqrt(14e6/pixels);
     const viewport=sheet.getViewport({scale}),canvas=document.createElement('canvas');

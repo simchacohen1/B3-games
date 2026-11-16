@@ -71,11 +71,10 @@
   }
 
   var rootBase = new URL("./", scriptEl.src);
-  // One free, opt-in audio switch shared by student activities.
-  // Audio Mode never makes a paid synthesis request.
+  // Free browser speech for the Listen buttons inside activities (no site-wide Audio button, nothing spoken by itself).
   if (!document.querySelector('script[data-ftt-audio-mode]')) {
     var audioScript = document.createElement("script");
-    audioScript.src = new URL("audio-mode.js?v=20261012-game-show-choices", rootBase).href;
+    audioScript.src = new URL("audio-mode.js?v=20261116-no-audio-button", rootBase).href;
     audioScript.defer = true;
     audioScript.setAttribute("data-ftt-audio-mode", "1");
     (document.head || document.documentElement).appendChild(audioScript);
