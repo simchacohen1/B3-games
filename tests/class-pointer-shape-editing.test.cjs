@@ -129,8 +129,9 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- for(const file of ['classroom-core','classroom','pdf-mode'])
+ for(const file of ['classroom-core','classroom'])
   assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes27"'),file);
+ assert.match(html,/"pdf-mode\.js\?v=20261116-pdfflow1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{

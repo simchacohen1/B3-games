@@ -140,7 +140,7 @@
   FA.setRole('teacher');
   const live=()=>hasClass('cp-is-live');
   const stopLabel=()=>$('cpStopBtn')?.textContent.trim()||'Stop';
-  const SOURCES=[['shareScreen','🖥','Share my screen'],['openWhiteboard','📝','Whiteboard'],['openPdf','📄','PDF from this computer'],['pointerPdfLibrary','📚','My PDF library'],['openWebpage','🌐','Webpage'],['openBrowserTab','📷','Still picture of a tab']];
+  const SOURCES=[['shareScreen','🖥','Share my screen'],['openBrowserTab','📷','Share a still picture instead'],['openWhiteboard','📝','Whiteboard'],['pointerPdfLibrary','📄','PDF (my library, or upload)'],['openWebpage','🌐','Webpage']];
   // While a screen is shared, viewport.js adds these buttons (kept hidden in #tbViewSlot).
   const VIEW=[['viewChooseArea','✂️','Choose the part to share'],['viewShareFull','🖥','Share the whole screen'],['viewZoomIn','➕','Zoom in',true],['viewZoomOut','➖','Zoom out',true],['viewMove','✋','Move the zoomed view',true]];
   function lessonItems(){

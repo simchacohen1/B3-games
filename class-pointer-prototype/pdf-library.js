@@ -28,12 +28,13 @@
   }
   const MAX_PDF_BYTES=500*1024*1024;
   const dialog=document.createElement('dialog');dialog.id='pointerPdfLibraryDialog';dialog.className='pointer-library-dialog';
-  dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">Save current PDF</button><span id="pointerLibraryStatus" role="status"></span></div><div class="pointer-library-upload-meter"><progress id="pointerLibraryProgress" value="0" max="100" aria-label="PDF upload progress" hidden></progress><span id="pointerLibraryProgressLabel" aria-live="polite" hidden></span></div><div id="pointerLibraryItems"></div>';
+  dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it or send it as a worksheet.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">⬆ Upload from computer</button><input id="pointerLibraryFile" type="file" accept="application/pdf,.pdf" hidden><span id="pointerLibraryStatus" role="status"></span></div><div class="pointer-library-upload-meter"><progress id="pointerLibraryProgress" value="0" max="100" aria-label="PDF upload progress" hidden></progress><span id="pointerLibraryProgressLabel" aria-live="polite" hidden></span></div><div id="pointerLibraryItems"></div>';
   document.body.append(dialog);
   const close=dialog.querySelector('#pointerLibraryClose'),save=dialog.querySelector('#pointerLibrarySave'),status=dialog.querySelector('#pointerLibraryStatus'),items=dialog.querySelector('#pointerLibraryItems');
   const progress=dialog.querySelector('#pointerLibraryProgress'),progressLabel=dialog.querySelector('#pointerLibraryProgressLabel');
   const style=document.createElement('style');style.textContent='.pointer-library-dialog{max-width:min(660px,94vw);width:660px;max-height:82vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff}.pointer-library-dialog::backdrop{background:#101d3888}.pointer-library-header,.pointer-library-row,.pointer-library-actions{display:flex;align-items:center;gap:12px;justify-content:space-between}.pointer-library-row{border-top:1px solid #e4e9f1;padding:12px 0;flex-wrap:wrap}.pointer-library-row strong{overflow-wrap:anywhere;flex:1;min-width:160px}.pointer-library-row button{white-space:nowrap}.pointer-library-actions{justify-content:flex-start;flex-wrap:wrap;margin:14px 0}.pointer-library-dialog button{cursor:pointer}.pointer-library-upload-meter{display:flex;align-items:center;gap:10px;margin:6px 0}.pointer-library-upload-meter progress{width:min(260px,55vw);height:14px;accent-color:#1d5cb2}.pointer-library-upload-meter [hidden]{display:none}';document.head.append(style);
   // Worksheets already sent to this class (the server keeps them; students read them from My files).
+  const fileInput=dialog.querySelector('#pointerLibraryFile');
   const sentBox=document.createElement('div');items.after(sentBox);
   async function refreshSent(){
     sentBox.replaceChildren();
@@ -122,7 +123,7 @@
             if(savedLayout.spread?(!now.spread||now.rtl!==savedLayout.rtl||now.shift!==savedLayout.shift):now.spread)window.ClassPointerPdf.setLayout(savedLayout);
           }
           // Only start remembering once the saved layout is back, so opening never saves "page 1".
-          activeId=meta.name;openedPage=resumePage;
+          activeId=meta.name;openedPage=resumePage;notify();
           window.ClassPointerPdf.goToPage(resumePage-1);dialog.close();
         }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
         const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
@@ -145,28 +146,57 @@
   trigger.onclick=()=>{dialog.showModal();refresh();refreshSent()};
   close.onclick=()=>dialog.close();
   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
-  save.onclick=async()=>{
-    if(!currentFile){setStatus('Open a PDF from your computer first.');return}
-    const displayName=(prompt('Save as:',currentFile.name.replace(/\.pdf$/i,''))||'').trim();
-    if(!displayName)return;
-    if(currentFile.size>MAX_PDF_BYTES){setStatus('The library supports PDFs up to 500 MB. You can still present larger PDFs without saving.');return}
-    save.disabled=true;
+  // ---- Save the open PDF into the library: one click from the PDF view, nothing to type ----
+  let saving=false;
+  function notify(){try{document.dispatchEvent(new CustomEvent('pointer-pdf-library-state',{detail:{open:!!currentFile||!!activeId,saved:!!activeId&&!saving,saving}}))}catch(_){/* the Save button on the PDF view just keeps its last state */}}
+  function toast(text){
+    try{
+      document.querySelector('.pointer-library-toast')?.remove();
+      const node=document.createElement('div');node.className='pointer-library-toast';node.setAttribute('role','status');node.textContent=text;
+      node.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483600;max-width:min(92vw,520px);padding:10px 16px;border-radius:12px;background:#143a73;color:#fff;font:600 15px system-ui,sans-serif;box-shadow:0 8px 30px #0006';
+      document.body.append(node);setTimeout(()=>node.remove(),4500);
+    }catch(_){}
+  }
+  // The message shows in the library window when it is open, and as a small notice when it is not.
+  const say=text=>{setStatus(text);if(!dialog.open&&text)toast(text)};
+  async function saveCurrentPdf(){
+    if(saving)return false;
+    if(!currentFile){say('Open a PDF first, then save it.');return false}
+    if(activeId){say('This PDF is already in your library.');return true}
+    const file=currentFile;
+    if(file.size>MAX_PDF_BYTES){say('The library supports PDFs up to 500 MB. You can still present larger PDFs without saving.');return false}
+    const displayName=(file.name.replace(/\.pdf$/i,'').trim()||'PDF').slice(0,100);
+    saving=true;notify();
     progress.hidden=false;progressLabel.hidden=false;progress.value=0;
-    progressLabel.textContent='0%';setStatus('Uploading PDF…');
+    progressLabel.textContent='0%';say('Saving to your library…');
     try{
       const id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)) + '.pdf';
       const ref=(await teacherPrefix()).child(id);
-      const upload=ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1)),layout:JSON.stringify(window.ClassPointerPdf.getLayout())}});
+      const upload=ref.put(file,{contentType:'application/pdf',customMetadata:{displayName,lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1)),layout:JSON.stringify(window.ClassPointerPdf.getLayout())}});
       await new Promise((resolve,reject)=>upload.on('state_changed',snapshot=>{
-        const total=snapshot.totalBytes||currentFile.size;
+        const total=snapshot.totalBytes||file.size;
         const percent=total?Math.min(100,Math.floor(snapshot.bytesTransferred*100/total)):0;
         progress.value=percent;
         progressLabel.textContent=percent+'% ('+(snapshot.bytesTransferred/1048576).toFixed(1)+' of '+(total/1048576).toFixed(1)+' MB)';
-        setStatus('Uploading PDF… '+percent+'%');
+        setStatus('Saving to your library… '+percent+'%');
       },reject,resolve));
       progress.value=100;progressLabel.textContent='100% — upload complete';
-      activeId=id;await refresh('Saved privately.');
-    }catch(e){setStatus(errorText(e));progressLabel.textContent='Upload not completed';}finally{save.disabled=false}
+      if(currentFile===file)activeId=id;
+      saving=false;notify();
+      say('Saved to your PDF library as "'+displayName+'".');
+      if(dialog.open)await refresh('Saved privately.');
+      return true;
+    }catch(e){say(errorText(e));progressLabel.textContent='Upload not completed';return false}
+    finally{saving=false;notify()}
+  }
+  // "Upload from computer": choose a PDF, it opens for teaching and is saved in the library at the same time.
+  save.onclick=()=>fileInput.click();
+  fileInput.onchange=async()=>{
+    const file=fileInput.files[0];fileInput.value='';
+    if(!file)return;
+    if(!window.ClassPointerPdf?.openFile){setStatus('The PDF viewer is not ready yet. Try again in a moment.');return}
+    dialog.close();
+    if(await window.ClassPointerPdf.openFile(file))await saveCurrentPdf();
   };
   let pageTimer,pendingSave=null;
   // Remember where the teacher is (page) and how it is laid out (one or two pages) for the next time.
@@ -189,8 +219,9 @@
     })();
   }
   window.PointerPdfLibrary={
-    onOpened(file){flushSave();currentFile=file;activeId=null},
-    onClosed(){flushSave();currentFile=null;activeId=null},
+    onOpened(file){flushSave();currentFile=file;activeId=null;notify()},
+    onClosed(){flushSave();currentFile=null;activeId=null;notify()},
+    saveCurrent:saveCurrentPdf,
     onPageChanged(page){openedPage=page;scheduleSave(page)},
     onLayoutChanged(){scheduleSave(window.ClassPointerPdf.currentPage()+1)}
   };
