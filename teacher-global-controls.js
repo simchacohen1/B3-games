@@ -268,7 +268,9 @@
       '#fttTeacherQuickBar.docked{position:static;transform:none;left:auto;top:auto;z-index:auto;background:transparent;box-shadow:none;padding:0;gap:6px;max-width:none;flex:none}',
       '#fttTeacherQuickBar.docked .ftt-quick-grip{display:none}',
       '#fttTeacherQuickBar.docked{gap:4px}#fttTeacherQuickBar.docked button{width:30px;height:30px;font-size:16px}',
-      'body.ftt-quick-docked .cp-topbar{gap:8px}',
+      'body.ftt-quick-docked .cp-topbar{gap:6px}body.ftt-quick-docked .cp-topbar-btn{padding:0 10px}',
+      // The picker's word "Class" is spelled out by its aria-label; hiding it gives the three buttons their room in the bar.
+      'body.ftt-quick-docked .cp-topbar .pointer-class-picker{font-size:0;gap:0}body.ftt-quick-docked .cp-topbar .pointer-class-picker select{font-size:14px}',
       '#fttTeacherQuickBar.docked button{background:#ffffff26;color:#fff}',
       '#fttTeacherQuickBar.docked #fttTeacherQuickLock{background:#1f2937;box-shadow:0 0 0 1px #ffffff66}',
       '#fttTeacherQuickBar.docked button[aria-expanded=true],#fttTeacherQuickBar.docked button[aria-current=page]{background:#dbeafe;color:#1e3a8a}',
