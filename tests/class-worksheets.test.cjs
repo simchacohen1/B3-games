@@ -132,7 +132,7 @@ test('the pages: teacher button, student list, one-click save with a Hebrew-date
   assert.match(mine,/Leave without saving\?/);
   assert.match(saved,/fileId:number>1\?file\.id\+'-p'\+number:file\.id/,'the teacher sees every page');
   assert.match(saved,/const WORKSHEETS_URL='https:\/\/us-central1-b3-games\.cloudfunctions\.net\/classWorksheets'/);
-  assert.match(read('class-pointer-prototype/my-files.html'),/annotation-toolbar\.js\?v=20261116-worksheets1/);
+  assert.match(read('class-pointer-prototype/my-files.html'),/annotation-toolbar\.js\?v=20261116-sheettools1/);
 });
 
 test('student activity pages load the worksheet-aware saved-work code; the small pop-up sends a worksheet to My files and deleting removes its pages',()=>{
