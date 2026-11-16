@@ -94,6 +94,8 @@
       displayName:cleanName(file.name)||'My work',
       kind:file.kind==='pdf'?'pdf':'whiteboard',
       folderId:validId(file.folderId)?file.folderId:'',
+      ...(cleanName(file.subject,LIMITS.folderName)?{subject:cleanName(file.subject,LIMITS.folderName)}:{}),
+      ...(file.template?{template:'1'}:{}),
       lastPage:String(Math.max(1,Math.floor(Number(file.lastPage))||1)),
       zoom:String(cleanZoom(file.zoom)),
       savedAt:String(Math.floor(Number(file.savedAt))||0)
@@ -108,6 +110,8 @@
       id:parsed.id,ext:parsed.ext,kind,
       name:cleanName(custom.displayName)||(kind==='pdf'?'PDF':'Whiteboard'),
       folderId:validId(custom.folderId)?custom.folderId:null,
+      subject:cleanName(custom.subject,LIMITS.folderName)||'', // a teacher's own subject folder (Chumash, Mishnayos...)
+      template:custom.template==='1', // a template: opening it always gives a fresh copy
       lastPage:Math.max(1,Math.floor(Number(custom.lastPage))||1),
       zoom:cleanZoom(custom.zoom),
       savedAt:Math.floor(Number(custom.savedAt))||Date.parse(meta.updated||'')||0,
@@ -205,6 +209,18 @@
     return groups;
   }
 
+  // A teacher's saved whiteboards by subject folder (A to Z, files newest first). A subject is just a name written on
+  // the file, so a folder exists while it has a whiteboard in it. Files with no subject go last in "Other".
+  function groupBySubject(files){
+    const newest=(a,b)=>b.savedAt-a.savedAt,by=new Map();
+    for(const file of files){const key=file.subject||'';if(!by.has(key))by.set(key,[]);by.get(key).push(file)}
+    const named=[...by.keys()].filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+    const groups=named.map(subject=>({subject,label:subject,files:by.get(subject).sort(newest)}));
+    if(by.has(''))groups.push({subject:'',label:groups.length?'Other':'My whiteboards',files:by.get('').sort(newest)});
+    return groups;
+  }
+  function subjectsOf(files){return[...new Set(files.map(file=>file.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}))}
+
   // ---------- "Where was I" memory for PDFs, kept in this browser ----------
   // A cheap way to know a PDF opened from the computer again: its name, size and date.
   function fingerprint(file){
@@ -246,7 +262,7 @@
   function plain(message){const error=Error(message);error.plain=true;return error}
 
   const api={LIMITS,EXTENSIONS,NOT_ON,validId,newId,cleanName,hebrewNumber,hebrewDay,autoName,studentPrefix,teacherPrefix,foldersPath,objectName,parseObjectName,sizeProblem,
-    fileMetadata,fileFromMetadata,parseBoard,cleanFolders,folderTree,folderLabel,folderOptions,addFolder,renameFolder,removeFolder,setSaveTarget,groupFiles,
+    fileMetadata,fileFromMetadata,parseBoard,cleanFolders,folderTree,folderLabel,folderOptions,addFolder,renameFolder,removeFolder,setSaveTarget,groupFiles,groupBySubject,subjectsOf,
     fingerprint,cleanPosition,readPosition,savePosition,errorText,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FTTSavedWorkCore=api;
 })(typeof window==='undefined'?globalThis:window);
