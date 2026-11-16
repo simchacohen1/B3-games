@@ -36,7 +36,15 @@ function database(rows) {
 
 test('staging storage rules are the hardened rules with the staging owner', () => {
   const hardened = read('storage-rules.hardened.rules');
-  assert.equal(read('staging/storage.rules'), hardened.replace('simcha5770@gmail.com', 'owner@funtorahtools-staging.test'));
+  // Staging is the hardened rules with the staging owner, plus the teacher's private PDF library rule (the same block as
+  // security/pointer-pdf-library-merged-storage.rules) so the PDF Library and Send to class can be tested on staging.
+  const staging = read('staging/storage.rules').replace(/\r/g, '');
+  const start = staging.indexOf('    // Each authenticated teacher owns a private PDF folder by Firebase UID');
+  const end = staging.indexOf('    // Teacher lesson whiteboards follow');
+  assert.ok(start > 0 && end > start, 'the staging library rule block is present');
+  const libraryBlock = staging.slice(start, end);
+  assert.match(libraryBlock, /match \/pointerPdfLibrary\/\{teacherUid\}\/\{fileId\}/);
+  assert.equal(staging.slice(0, start) + staging.slice(end), hardened.replace(/\r/g, '').replace('simcha5770@gmail.com', 'owner@funtorahtools-staging.test'));
   assert.doesNotMatch(read('staging/storage.rules'), /simcha5770|b3-games/);
   assert.equal(JSON.parse(read('firebase.staging.json')).storage.rules, 'staging/storage.rules');
 });
