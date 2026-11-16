@@ -7,3 +7,4 @@ exports.studentRewardsAutoAward = require('./student-rewards-auto-award').studen
 exports.multiplayerGameAction = require('./multiplayer-games').multiplayerGameAction;
 exports.privateMediaUrl = require('./private-media-url').privateMediaUrl;
 exports.teacherStudentFiles = require('./teacher-student-files').teacherStudentFiles;
+exports.classWorksheets = require('./class-worksheets').classWorksheets;

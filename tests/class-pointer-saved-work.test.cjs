@@ -53,7 +53,7 @@ test('file details survive a round trip through Storage metadata; previews and o
   assert.deepEqual(custom,{displayName:'Perek 1',kind:'pdf',folderId:'f1',lastPage:'7',zoom:'1.5',savedAt:'1700'});
   for(const value of Object.values(custom))assert.equal(typeof value,'string');
   const file=Core.fileFromMetadata({name:'abc.pdf',size:10,customMetadata:{...custom,placeAt:'99'}});
-  assert.deepEqual(file,{id:'abc',ext:'pdf',kind:'pdf',name:'Perek 1',folderId:'f1',subject:'',template:false,lastPage:7,zoom:1.5,savedAt:1700,placeAt:99,size:10});
+  assert.deepEqual(file,{id:'abc',ext:'pdf',kind:'pdf',name:'Perek 1',folderId:'f1',subject:'',template:false,worksheet:false,pages:1,sheetId:'',lastPage:7,zoom:1.5,savedAt:1700,placeAt:99,size:10});
   assert.equal(Core.fileFromMetadata({name:'abc.png'}),null);
   assert.equal(Core.fileFromMetadata({name:'notes.txt'}),null);
   const bare=Core.fileFromMetadata({name:'w1.json',customMetadata:{folderId:'../x',lastPage:'-4',zoom:'900'}});

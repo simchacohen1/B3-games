@@ -63,7 +63,7 @@ async function listFiles({bucket,classId,studentId}){
     const custom=file.metadata?.metadata||{};
     if(custom.kind&&custom.kind!=='whiteboard')continue;
     const label=clean(custom.displayName,60)||'Whiteboard';
-    boards.push({id:match[1],name:label,savedAt:Math.floor(Number(custom.savedAt))||Date.parse(file.metadata?.updated||'')||0,fromTeacher:/^From your teacher/.test(label)});
+    boards.push({id:match[1],name:label,savedAt:Math.floor(Number(custom.savedAt))||Date.parse(file.metadata?.updated||'')||0,fromTeacher:/^From your teacher/.test(label),pages:Math.min(60,Math.max(1,Math.floor(Number(custom.pages))||1)),worksheet:custom.worksheet==='1'});
   }
   boards.sort((a,b)=>b.savedAt-a.savedAt);
   return boards.slice(0,MAX_FILES).map(board=>({...board,hasPicture:pictures.has(board.id)}));
