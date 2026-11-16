@@ -81,8 +81,8 @@
         }
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-gridtools1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-gridtools1',root).href);
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-sendboard2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-sendboard2',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-savedwork3',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-savedwork3',root).href).catch(()=>{});

@@ -15,7 +15,7 @@ const STUDENT={b3StudentRole:'student',b3StudentId:'stu1',b3ClassId:'et'};
 const DENIED={code:'storage/unauthorized',message:'Firebase Storage: User does not have permission to access this object.'};
 
 class El{
-  constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.textContent='';this.className='';this.hidden=false;this.value=''}
+  constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.textContent='';this.className='';this.hidden=false;this.value='';this.style={}}
   append(...nodes){this.children.push(...nodes)}
   appendChild(node){this.children.push(node);if(node.tag==='script')queueMicrotask(()=>node.onload?.())}
   before(...nodes){this.placedBefore=nodes}
@@ -162,8 +162,9 @@ test('rename and delete change only that student\'s own file; delete also remove
 
 test('teacher: whiteboards go to the teacher\'s own folder; class folders are written to this class only',async()=>{
   const h=harness({teacher:true});
-  const id=await h.api.store.saveBoard({name:'Lesson 1',data:{version:1,kind:'lesson-whiteboard'}});
-  assert.equal(h.puts[0].path,'pointerWhiteboards/teacherA/'+id+'.json');
+  const id=await h.api.store.saveBoard({name:'Lesson 1',data:{version:1,kind:'lesson-whiteboard'},picture:new Blob(['png'],{type:'image/png'})});
+  // The picture is saved first, then the file: a saved whiteboard always has a picture to send.
+  assert.deepEqual(h.puts.map(put=>put.path),['pointerWhiteboards/teacherA/'+id+'.png','pointerWhiteboards/teacherA/'+id+'.json']);
   await h.api.store.changeFolders({'folders/f1':{name:'Chumash',order:1,createdAt:1}});
   assert.deepEqual(plain(h.dbWrites),[{path:'b3Games/workspaces/b3-2026/classes/et/pointerFileFolders',changes:{'folders/f1':{name:'Chumash',order:1,createdAt:1}}}]);
   const denied=harness({teacher:true,deny:true});
@@ -254,4 +255,70 @@ test('My files (teacher): Class folders tab makes a folder, points students to i
   await buttonNamed(dialog,'Delete').click();await tick();
   assert.deepEqual(plain(h.dbWrites[2].changes),{[key]:null,saveTarget:null});
   assert.equal(h.deleted.length,0,'no file is deleted with a folder');
+});
+
+// ---------- #836: every saved whiteboard has a picture; each student keeps their own copy of what the teacher sent ----------
+test('a teacher whiteboard is never saved without its picture',async()=>{
+  const h=harness({teacher:true});
+  assert.match(await fails(h.api.store.saveBoard({name:'No picture',data:{version:1,kind:'lesson-whiteboard'}})),/picture of the whiteboard could not be made/);
+  assert.equal(h.puts.length,0,'nothing was written');
+  // A picture that is too big to store and cannot be made smaller here is refused the same way, not saved without it.
+  const big=new Blob([new Uint8Array(Core.LIMITS.pngBytes+10)],{type:'image/png'});
+  assert.match(await fails(h.api.store.saveBoard({name:'Huge',data:{version:1,kind:'lesson-whiteboard'},picture:big})),/picture of the whiteboard could not be made/);
+  assert.equal(h.puts.length,0);
+  // Students are unchanged: their picture is optional.
+  const student=harness();
+  await student.api.store.saveBoard({name:'Mine',data:{version:1,kind:'student-board'}});
+  assert.equal(student.puts.length,1);
+});
+
+const PICTURE={kind:'image',data:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ'};
+
+test('a picture the teacher sends is saved once in the student\'s own My files, with a notice',async()=>{
+  const h=harness();
+  assert.equal(await h.api.keepTeacherCopy(PICTURE),true);
+  assert.equal(h.puts.length,1);
+  assert.match(h.puts[0].path,/^studentFiles\/et\/stu1\/[A-Za-z0-9_-]+\.json$/);
+  assert.match(h.puts[0].metadata.customMetadata.displayName,/^From your teacher /);
+  const saved=JSON.parse(await h.puts[0].blob.text());
+  assert.equal(saved.kind,'student-board');
+  assert.deepEqual(plain(saved.activity),PICTURE);
+  assert.deepEqual(plain(saved.strokes),[]);
+  assert.ok(texts(h.body).some(text=>/own copy is saved in/.test(text)),'the student is told');
+  // The same picture again (the teacher's page repeats it) is not saved twice.
+  assert.equal(await h.api.keepTeacherCopy(PICTURE),false);
+  assert.equal(h.puts.length,1);
+  // A different picture is another copy.
+  assert.equal(await h.api.keepTeacherCopy({kind:'image',data:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ-different-picture'}),true);
+  assert.equal(h.puts.length,2);
+});
+
+test('only a signed-in student keeps a copy, and only of a real picture',async()=>{
+  const teacher=harness({teacher:true});
+  assert.equal(await teacher.api.keepTeacherCopy(PICTURE),false);
+  assert.equal(teacher.puts.length,0);
+  const h=harness();
+  for(const bad of [null,{kind:'word',text:'x'},{kind:'image'},{kind:'image',data:'x'.repeat(420001)}])assert.equal(await h.api.keepTeacherCopy(bad),false);
+  assert.equal(h.puts.length,0);
+  const out=harness({signedIn:false});
+  assert.equal(await out.api.keepTeacherCopy(PICTURE),false);
+  assert.equal(out.puts.length,0);
+});
+
+test('when saving is off or My files is full the copy is not kept; a full My files is explained',async()=>{
+  const off=harness({deny:true});
+  assert.equal(await off.api.keepTeacherCopy(PICTURE),false);
+  assert.equal(texts(off.body).length,0,'no confusing message when saving is not turned on');
+  const existing={};
+  for(let i=0;i<50;i++)existing['studentFiles/et/stu1/f'+i+'.json']={customMetadata:{displayName:'Board '+i}};
+  const full=harness({existing});
+  assert.equal(await full.api.keepTeacherCopy(PICTURE),false);
+  assert.ok(texts(full.body).some(text=>/My files is full/.test(text)));
+  assert.equal(full.puts.length,0);
+});
+
+test('student whiteboards ask for the copy when a teacher picture arrives, and bring the picture back when a copy is opened',()=>{
+  const boards=fs.readFileSync(path.resolve(__dirname,'../class-pointer-prototype/student-boards.js'),'utf8');
+  assert.match(boards,/if\(activity\?\.kind==='image'&&on&&mode==='boards'&&!blocked\)window\.FTTSavedWork\?\.keepTeacherCopy\?\.\(\{kind:'image',data:activity\.data\}\);/);
+  assert.match(boards,/const picture=cleanActivity\(data\.activity\);\s*if\(picture\?\.kind==='image'&&!activity\)chooseActivity\(picture,redraw\);/);
 });

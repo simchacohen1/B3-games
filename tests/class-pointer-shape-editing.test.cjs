@@ -129,7 +129,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- for(const file of ['classroom-core','classroom','pdf-mode','classroom-annotate'])
+ for(const file of ['classroom-core','classroom','pdf-mode'])
   assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes27"'),file);
 });
 

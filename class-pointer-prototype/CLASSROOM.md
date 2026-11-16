@@ -113,3 +113,25 @@ How it travels: positions are 0..1 across and down the captured screen. `screen-
 - **Safety on open:** a saved whiteboard must parse as JSON, be `version: 1`, be the right `kind` and fit the size limit before it is handed to the whiteboard code, which checks every mark again. PDFs are only ever given to pdf.js. Names are always written as text.
 - **Limits:** student whiteboard 3 MB, teacher whiteboard 10 MB, picture 2 MB, PDF 25 MB (rules and page agree); 50 files per student and 200 whiteboards per teacher (page only, rules cannot count); 60 folders per class, names up to 40 letters.
 - **Tests:** `tests/class-pointer-saved-work.test.cjs`, `-ui.test.cjs`, `tests/class-pointer-home-saved-files.test.cjs`; rules in `tests/storage-rules-emulator.test.cjs` (needs the Firebase emulator).
+
+## Send a whiteboard to every student (issue #835)
+
+The teacher can send the current lesson whiteboard, or a saved whiteboard, to the whole class:
+
+- **Current whiteboard:** classroom toolbar, More, Saved work, **Send whiteboard to students**.
+- **A saved whiteboard:** More, My files, My whiteboards, **Send to students** on the file.
+
+Both turn the whiteboard into a picture and open the usual "Send to every whiteboard?" preview in `student-boards.js`.
+Nothing is sent until the teacher presses **Send to all boards**. Each student then has the picture locked on their own
+whiteboard, with a private drawing layer of their own on top, so everyone gets their own copy to draw on. A student's
+marks stay on their own board (the teacher sees them live). The same limits as before apply (a picture the size of one
+class picture, and a confirmation if students already have marks).
+
+No new Firebase rules, Storage rules or functions.
+
+- **Each student keeps their own copy.** When the picture arrives, it is saved once in that student's own 📂 My files
+  (private, like every file there) as "From your teacher <date time>", and the student sees a short notice. Opening it
+  later puts the picture back as the locked background, with the student's own drawing layer on top. If saving is not
+  turned on yet, nothing is said and the picture is still on the board; if My files is full the student is told.
+- **Every saved teacher whiteboard has a picture.** Save makes a picture of the whiteboard first (made smaller if it is
+  too big to store) and refuses to save without one, so any saved whiteboard can be sent from the list.
