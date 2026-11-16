@@ -425,7 +425,6 @@ function init(){
   syncHint();
   syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
-  syncLibrary();
  }
  if(stage)new MutationObserver(syncLive).observe(stage,{attributes:true,attributeFilter:['class']});
  if(stopScreen)new MutationObserver(syncLive).observe(stopScreen,{attributes:true,attributeFilter:['disabled']});

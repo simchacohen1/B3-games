@@ -247,4 +247,7 @@ test('one click on the PDF view saves the open PDF; the library window only uplo
   assert.match(lib,/<button id="pointerLibrarySave" type="button">⬆ Upload from computer<\/button>/);
   assert.match(lib,/window\.ClassPointerPdf\.openFile\(file\)\)await saveCurrentPdf\(\)/,'upload opens the PDF and saves it');
   assert.doesNotMatch(lib,/prompt\('Save as:'/,'nothing to type when saving');
+  const dash=fs.readFileSync(path.join(base,'class-pointer-prototype/teacher-dashboard.js'),'utf8');
+  assert.doesNotMatch(dash,/syncLibrary|Open my PDF library|Capture a still picture/,'the start screen has one PDF card and no leftover calls');
+  assert.match(dash,/id==='openPdf'&&\$\('pointerPdfLibrary'\)/,'the PDF card opens the library');
 });
