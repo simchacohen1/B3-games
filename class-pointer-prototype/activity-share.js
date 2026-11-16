@@ -4,8 +4,8 @@
    Browser screen capture always requires an explicit student click. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
-  // Classroom Pointer sessions are not deployed to staging; keep their auth and APIs off that site.
-  if(window.B3_STAGING_FIREBASE_CONFIG?.projectId==='fun-torah-tools-staging')return;
+  // Staging runs this like live: classPointerShareAuth and the session rules are deployed to the staging project,
+  // and the staging build already points the endpoints below at it.
   window.__classPointerActivityShareLoaded=true;
   // The student classroom already has its working central share control in Screens mode.
   // Do not cover it with a second floating share prompt.
@@ -83,6 +83,9 @@
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261109-annotate1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261109-annotate1',root).href);
+    // Save and My files for the student's own whiteboard.
+    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-savedwork3',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-savedwork3',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');

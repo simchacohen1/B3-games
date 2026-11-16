@@ -306,11 +306,18 @@ test('teacher: Students, Stop, Lesson and More carry the lesson-level actions',(
   c.flyRow('Full screen').click();assert.equal(c.clicks.at(-1),'fullScreenLesson');
 });
 
-test('teacher: the More menu has no Save or My files rows (saved work is not part of the one-toolbar change)',()=>{
-  const c=classroom();
+test('teacher: Save and My files show only when saved work is loaded, and call it',()=>{
+  const c=classroom(),calls=[];
   c.action('more').click();
   assert.equal(c.flyRow('Save'),undefined);assert.equal(c.flyRow('My files'),undefined);
-  assert.doesNotMatch(adapterSrc,/FTTSavedWork/);
+  c.action('more').click();
+  // The saved-work script loads later.
+  c.win.FTTSavedWork={saveCurrent:()=>calls.push('save'),open:()=>calls.push('open')};
+  c.action('more').click();
+  c.flyRow('Save').click();
+  c.action('more').click();
+  c.flyRow('My files').click();
+  assert.deepEqual(calls,['save','open']);
 });
 
 test('teacher: the toolbar has its own strip, so the lesson is never covered; it shrinks to the pencil when the lesson ends',()=>{

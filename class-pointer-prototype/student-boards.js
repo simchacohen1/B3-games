@@ -211,7 +211,7 @@
     for(const s of board.strokes)strokeOn(ctx,s,w,h);
     for(const s of drafts)if(s)strokeOn(ctx,s,w,h);
   }
-  // A PNG picture of a whole board (for Copy board).
+  // A PNG picture of a whole board (for Copy board and for saving).
   function boardPng(board){
     const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=900;
     paintOn(canvas.getContext('2d'),canvas.width,canvas.height,board,[]);
@@ -667,7 +667,29 @@
       redraw();return true;
     }
     new ResizeObserver(redraw).observe(stage);document.addEventListener('fullscreenchange',redraw);
-    window.ClassPointerBoards={fromTeacher,clearScreenMarks,reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false);syncAnnotate()}};
+    // ---------- Save and restore (used by "Save whiteboard") ----------
+    // Everything on my board, in drawing order. A pasted picture is a mark with an `image`; `images` lists their ids.
+    function exportBoard(){
+      if(!boardOpen())return null;
+      return{version:1,kind:'student-board',strokes:board.strokes.map(s=>({...s,points:s.points.map(p=>({x:p.x,y:p.y}))})),
+        images:board.strokes.filter(s=>s.image).map(s=>s.id),text:board.text?{...board.text}:null,activity:activity?{...activity}:null};
+    }
+    // Replaces my own marks with the saved ones. Saved data is checked like anything from the network, sent to the
+    // teacher as normal board changes (so every limit holds), and the teacher's marks and activity are left alone.
+    function importBoard(data){
+      if(!boardOpen()||!data||data.version!==1||data.kind!=='student-board'||!Array.isArray(data.strokes))return false;
+      act({type:'board-clear'});
+      for(const raw of data.strokes.slice(0,MAX_STROKES)){
+        if(!raw||raw.by==='teacher')continue;
+        const stroke=cleanStroke({...raw,id:newId('s')});
+        if(stroke)act({type:'board-add',stroke});
+      }
+      const word=cleanWord(data.text);
+      if(word&&activity?.kind==='word'&&board.text)act({type:'board-text',text:word});
+      return true;
+    }
+    const exportPng=()=>boardOpen()?boardPng(board):Promise.reject(Error('Your whiteboard is not open.'));
+    window.ClassPointerBoards={fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false);syncAnnotate()}};
     return;
   }
 
@@ -1210,6 +1232,8 @@
   window.ClassPointerBoards={
     // What the teacher is looking at, for the tabs above the lesson: null (My screen), 'screens' or 'boards'.
     workspace:()=>on&&!suspended&&!view.hidden?mode:null,
+    // A PNG picture of the student board that is open large.
+    exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},
     navigateWorkspace(destination){
       if(destination==='teach'){hideWorkspace();return true}
       if(destination!=='screens'&&destination!=='whiteboards')return false;

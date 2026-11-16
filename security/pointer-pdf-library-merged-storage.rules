@@ -36,5 +36,46 @@ service firebase.storage {
         && resource.md5Hash == request.resource.md5Hash
         && request.resource.contentType == 'application/pdf';
     }
+
+    // Class Pointer student files are private to the matching student and class.
+    match /studentFiles/{classId}/{studentId}/{fileId} {
+      function ownsStudentPath() {
+        return request.auth != null
+          && 'b3StudentRole' in request.auth.token
+          && request.auth.token.b3StudentRole == 'student'
+          && request.auth.token.b3StudentId == studentId
+          && request.auth.token.b3ClassId == classId;
+      }
+      allow get, list, delete: if ownsStudentPath();
+      allow create, update: if ownsStudentPath() && (
+        (fileId.matches('[-A-Za-z0-9_]{1,64}[.]json')
+          && request.resource.contentType == 'application/json'
+          && request.resource.size <= 3 * 1024 * 1024)
+        || (fileId.matches('[-A-Za-z0-9_]{1,64}[.]png')
+          && request.resource.contentType == 'image/png'
+          && request.resource.size <= 2 * 1024 * 1024)
+        || (fileId.matches('[-A-Za-z0-9_]{1,64}[.]pdf')
+          && request.resource.contentType == 'application/pdf'
+          && request.resource.size <= 25 * 1024 * 1024)
+      );
+    }
+
+    // Teacher lesson whiteboards follow the owner-only shape of pointerPdfLibrary.
+    match /pointerWhiteboards/{teacherUid}/{fileId} {
+      function ownsTeacherPath() {
+        return request.auth != null
+          && request.auth.uid == teacherUid
+          && !('b3StudentRole' in request.auth.token);
+      }
+      allow get, list, delete: if ownsTeacherPath();
+      allow create, update: if ownsTeacherPath() && (
+        (fileId.matches('[-A-Za-z0-9_]{1,64}[.]json')
+          && request.resource.contentType == 'application/json'
+          && request.resource.size <= 10 * 1024 * 1024)
+        || (fileId.matches('[-A-Za-z0-9_]{1,64}[.]png')
+          && request.resource.contentType == 'image/png'
+          && request.resource.size <= 2 * 1024 * 1024)
+      );
+    }
   }
 }

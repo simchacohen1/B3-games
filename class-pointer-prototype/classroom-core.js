@@ -38,6 +38,11 @@
       const made=next.map(s=>({...s,owner,id:'h'+(++this.sequence)}));
       kept.splice(at,0,...made);this.strokes=kept;return made.map(s=>s.id)}
     reset(){this.strokes=[]}
+    // Put saved marks back (a saved whiteboard). Every mark is checked again. The teacher's marks are the
+    // teacher's again; all others become "saved" marks that no student owns. At most 400 marks, as always.
+    restore(list){this.strokes=[];
+      for(const value of Array.isArray(list)?list:[]){if(this.strokes.length>=400)break;const stroke=cleanStroke(value);if(stroke)this.strokes.push({...stroke,owner:value.owner==='teacher'?'teacher':'saved',id:'h'+(++this.sequence)})}
+      return this.strokes.length}
   }
   function pointStyle(point){return{tool:tools.includes(point?.tool)?point.tool:'target',color:[...colors,...inkColors,'#ffcc00'].includes(point?.color)?point.color:null}}
   function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,32):''}
