@@ -201,6 +201,31 @@
       lastContent=current[0];speak(current[1]);
     }else if(!current)lastContent="";
   }
+  const POS_KEY="fttAudioModePos";
+  function makeMovable(wrap,grip){
+    const read=()=>{try{const p=JSON.parse(localStorage.getItem(POS_KEY)||"null");return p&&isFinite(p.x)&&isFinite(p.y)?p:null}catch(e){return null}};
+    const save=p=>{try{if(p)localStorage.setItem(POS_KEY,JSON.stringify(p));else localStorage.removeItem(POS_KEY)}catch(e){}};
+    const place=(x,y)=>{
+      const r=wrap.getBoundingClientRect();
+      x=Math.max(0,Math.min(Math.max(0,innerWidth-r.width),x));y=Math.max(0,Math.min(Math.max(0,innerHeight-r.height),y));
+      wrap.style.right="auto";wrap.style.bottom="auto";wrap.style.left=Math.round(x)+"px";wrap.style.top=Math.round(y)+"px";
+      return{x:Math.round(x),y:Math.round(y)};
+    };
+    const apply=()=>{const p=read();if(!p){wrap.style.left="";wrap.style.top="";wrap.style.right="10px";wrap.style.bottom="10px";return}place(p.x,p.y)};
+    let drag=null;
+    grip.addEventListener("pointerdown",e=>{if(e.button)return;const r=wrap.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top,id:e.pointerId};try{grip.setPointerCapture(e.pointerId)}catch(x){}e.preventDefault()});
+    grip.addEventListener("pointermove",e=>{if(drag&&e.pointerId===drag.id)place(e.clientX-drag.dx,e.clientY-drag.dy)});
+    const end=e=>{if(!drag||(e&&e.pointerId!==drag.id))return;drag=null;const r=wrap.getBoundingClientRect();save({x:Math.round(r.left),y:Math.round(r.top)})};
+    grip.addEventListener("pointerup",end);grip.addEventListener("pointercancel",end);
+    grip.addEventListener("dblclick",()=>{save(null);apply()});
+    grip.addEventListener("keydown",e=>{
+      const step=e.shiftKey?40:10,r=wrap.getBoundingClientRect();let x=r.left,y=r.top;
+      if(e.key==="Home"){save(null);apply();e.preventDefault();return}
+      if(e.key==="ArrowLeft")x-=step;else if(e.key==="ArrowRight")x+=step;else if(e.key==="ArrowUp")y-=step;else if(e.key==="ArrowDown")y+=step;else return;
+      e.preventDefault();save(place(x,y));
+    });
+    addEventListener("resize",apply);apply();
+  }
   function init(){
     if(document.getElementById("ftt-audio-mode"))return;
     const wrap=document.createElement("div");
@@ -217,8 +242,14 @@
     replayButton.title="Hear instructions again";
     replayButton.style.cssText="border:2px solid #fff;background:#fff;color:#1f2937;border-radius:999px;width:44px;height:44px;font-size:24px;font-weight:bold;cursor:pointer;box-shadow:0 3px 12px #0005";
     replayButton.addEventListener("click",replay);
-    wrap.append(replayButton,button);
+    // A small grip lets the teacher or student drag the Audio buttons off whatever they cover; the spot is remembered.
+    const grip=document.createElement("span");
+    grip.textContent="⋮";grip.title="Drag to move. Double-click to put back.";grip.setAttribute("role","button");grip.tabIndex=0;
+    grip.setAttribute("aria-label","Move the Audio buttons. Use the arrow keys, or drag. Press Home to put them back.");
+    grip.style.cssText="cursor:grab;color:#fff;background:#0008;border-radius:999px;width:18px;height:44px;display:inline-flex;align-items:center;justify-content:center;font:800 18px Arial;user-select:none;touch-action:none";
+    wrap.append(grip,replayButton,button);
     document.body.appendChild(wrap);
+    makeMovable(wrap,grip);
     refreshButton();
     root.addEventListener("storage",e=>{if(e.key&&e.key.startsWith(ID_KEY)){refreshButton();if(!enabled())stop();}});
     root.addEventListener("pagehide",stop);

@@ -133,7 +133,7 @@ test('Student whiteboards: the teacher\'s marks are sent to that student and kep
   assert.deepEqual(Array.from(removed.message.ids),['t1']);
   // A student's own marks are never touched by the teacher's toolbar.
   f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-add',stroke:stroke('s1')});
-  assert.deepEqual(ids(surface.getItems()),['t2']);
+  assert.deepEqual(ids(surface.getItems()),['t2','s1'],"his mark stays on the board, untouched by the teacher's other edits");
 });
 
 test('Student whiteboards: the line being drawn is shown live on the student\'s board',async()=>{
@@ -189,4 +189,62 @@ test('Student screen: the teacher\'s toolbar there has the same tools as the mai
   sent.length=0;
   window.ClassPointerScreenMarks.resend(member);
   assert.deepEqual(ids(sent.filter(message=>message.type==='board-screen-marks')[0].strokes),['t5']);
+});
+
+// ---------- Select works on every mark of a student's board ----------
+test('Student whiteboards: the teacher\'s Select sees the student\'s marks and can move, recolor, delete them',async()=>{
+  const f=await boardFixture();
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-add',stroke:stroke('s1')});
+  f.tile.click();
+  const surface=f.toolbar.stack.find(s=>s.id==='student-board');
+  assert.deepEqual(ids(surface.getItems()),['s1'],'the student\'s own mark is on the toolbar\'s list');
+  // Select, then move or recolor: the toolbar swaps the mark for a new one (new id, same kind).
+  f.sent.length=0;
+  surface.setItems([stroke('t7',{points:[{x:.2,y:.2},{x:.5,y:.4}]})]);
+  const put=f.sent.find(entry=>entry.message.type==='board-put');
+  assert.ok(put,'the student is sent the changed mark');
+  assert.equal(put.message.replaces,'s1');
+  assert.equal(put.message.owner,'student','it stays the student\'s mark');
+  assert.equal(put.connection,f.member.connection);
+  assert.ok(!f.sent.some(entry=>entry.message.type==='board-add'||entry.message.type==='board-remove'),'one change, not a remove plus an add');
+  assert.deepEqual(ids(surface.getItems()),['t7'],'on the teacher\'s own copy too');
+  // The student can still change or erase it himself.
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-remove',ids:['t7']});
+  assert.deepEqual(ids(surface.getItems()),[],'the mark the teacher moved is still the student\'s to erase');
+});
+
+test('Student whiteboards: the teacher can delete a student\'s mark, and Clear leaves the student\'s work',async()=>{
+  const f=await boardFixture();
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-add',stroke:stroke('s1')});
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-add',stroke:stroke('s2')});
+  f.tile.click();
+  const surface=f.toolbar.stack.find(s=>s.id==='student-board');
+  surface.setItems(surface.getItems().concat([stroke('t1'),stroke('t2')]));
+  f.sent.length=0;
+  // Select + Delete on one student mark
+  surface.setItems(surface.getItems().filter(item=>item.id!=='s1'));
+  const removed=f.sent.find(entry=>entry.message.type==='board-remove');
+  assert.deepEqual(Array.from(removed.message.ids),['s1']);
+  assert.equal(removed.message.any,true,'the teacher may remove a student\'s mark');
+  assert.deepEqual(ids(surface.getItems()),['s2','t1','t2']);
+  // Clear (the toolbar hands over an empty list): only the teacher's own marks go.
+  f.sent.length=0;
+  surface.setItems([]);
+  assert.deepEqual(ids(surface.getItems()),['s2'],'the student\'s work is still there');
+  assert.deepEqual(Array.from(f.sent.find(entry=>entry.message.type==='board-remove').message.ids).sort(),['t1','t2']);
+  assert.ok(!f.sent.some(entry=>entry.message.any===true),'no student mark was removed');
+});
+
+test('Student whiteboards: a student can never change or remove the teacher\'s marks',async()=>{
+  const f=await boardFixture();
+  f.tile.click();
+  const surface=f.toolbar.stack.find(s=>s.id==='student-board');
+  surface.setItems([stroke('t1')]);
+  // From the student's connection: remove (even asking for any), put and move are refused.
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-remove',ids:['t1'],any:true});
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-remove',ids:['t1']});
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-put',stroke:stroke('s5'),owner:'teacher'});
+  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-move',id:'t1',points:[{x:.5,y:.5},{x:.6,y:.6}]});
+  assert.deepEqual(ids(surface.getItems()),['t1'],'the teacher\'s mark is untouched and nothing was put on the board');
+  assert.deepEqual(JSON.parse(JSON.stringify(surface.getItems()[0].points)),[{x:.1,y:.1},{x:.4,y:.3}]);
 });

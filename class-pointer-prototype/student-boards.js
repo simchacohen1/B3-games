@@ -146,7 +146,21 @@
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
       const ids=new Set(op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string')),before=board.strokes.length;
-      board.strokes=board.strokes.filter(s=>!(s.by===by&&ids.has(s.id)));return board.strokes.length!==before;
+      // Only the teacher may also remove a student's mark (op.any); a student can never remove the teacher's.
+      const anyOwner=by==='teacher'&&op.any===true;
+      board.strokes=board.strokes.filter(s=>!((anyOwner||s.by===by)&&ids.has(s.id)));return board.strokes.length!==before;
+    }
+    // Teacher only: put a mark on the board that is owned by the student (the teacher moved, resized or recolored the
+    // student's own mark, or undid that). It may take the place of the mark it replaces. The student can still change it.
+    if(op.type==='board-put'){
+      if(by!=='teacher')return false;
+      const s=cleanStroke(op.stroke);if(!s)return false;
+      const at=typeof op.replaces==='string'?board.strokes.findIndex(item=>item.id===op.replaces):-1;
+      if(board.strokes.some((item,i)=>i!==at&&item.id===s.id)||(at<0&&board.strokes.length>=MAX_STROKES))return false;
+      if(s.image&&pictureCount(board)-(at>=0&&board.strokes[at].image?1:0)>=MAX_IMAGES)return false;
+      s.by=op.owner==='student'?'student':'teacher';
+      if(at>=0)board.strokes[at]=s;else board.strokes.push(s);
+      return true;
     }
     if(op.type==='board-clear'){
       board.strokes=op.all===true&&by==='teacher'?[]:board.strokes.filter(s=>s.by!==by);board.drafts={student:null,teacher:null};return true;
@@ -168,6 +182,25 @@
     const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
     if(removed.length)act({type:'board-remove',ids:removed});
     for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by:_by,...stroke}=item;act({type:'board-add',stroke})}
+  }
+  // The teacher's toolbar sees every mark on a student's board. A change to the student's own mark (move, resize,
+  // recolor, nudge, delete, or undo of those) keeps it the student's, and only the teacher can make it. The toolbar's
+  // Clear gives an empty list: that clears the teacher's own marks only, never the student's work.
+  function syncTeacherBoardItems(board,list,act){
+    const owner=new Map(board.strokes.map(item=>[item.id,item.by])),keep=new Set(list.map(item=>item.id));
+    const gone=board.strokes.filter(item=>!keep.has(item.id)),fresh=list.filter(item=>!owner.has(item.id));
+    const strip=item=>{const {by:_by,...stroke}=item;return stroke};
+    const same=(a,b)=>(a.tool||'pen')===(b.tool||'pen')&&(a.text||'')===(b.text||'')&&a.points.length===b.points.length&&(a.image||'')===(b.image||'');
+    if(gone.length===1&&fresh.length===1&&gone[0].by==='student'&&same(gone[0],fresh[0])){
+      act({type:'board-put',stroke:strip(fresh[0]),replaces:gone[0].id,owner:'student'});return;
+    }
+    const clearing=!list.length&&gone.length>1;
+    const theirs=clearing?[]:gone.filter(item=>item.by==='student').map(item=>item.id);
+    if(theirs.length)act({type:'board-remove',ids:theirs,any:true});
+    // Marks that are the teacher's own: added, removed or moved as before. (A student's mark that came back is put back as his.)
+    const mine=list.filter(item=>item.id[0]==='t'&&(!owner.has(item.id)||owner.get(item.id)==='teacher'));
+    syncBoardItems(board,'teacher',mine,act);
+    for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
   }
   function boardFromMessage(list,rawText){
     const board=emptyBoard();
@@ -1221,13 +1254,14 @@
   const boardOpen=()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!focus.hidden&&!!m&&!isBlocked(m)};
   const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
     tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
-    toolLabels:{select:['🖱️','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
+    toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
     historyKey:()=>'board:'+(focusMember()?.studentId||focusId||''),
     label:()=>{const m=focusMember();return m?'You are writing on '+m.name+'’s board. They see it live.':''},
     rect:()=>{if(!boardOpen())return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-    getItems:()=>focusBoard()?.strokes.filter(item=>item.by==='teacher')||[],
-    setItems(list){if(boardOpen())syncBoardItems(focusBoard(),'teacher',list,act)},
+    // Every mark on the board: the student's too, so Select, move, resize, recolor, nudge and delete work on them.
+    getItems:()=>focusBoard()?.strokes.slice()||[],
+    setItems(list){if(boardOpen())syncTeacherBoardItems(focusBoard(),list,act)},
     live(draft){
       const m=focusMember();if(!m||!boardOpen())return;
       const op={type:'board-draft',stroke:draft||null};
