@@ -95,7 +95,13 @@ function headBlock(title, description, urlPath) {
 
 const findAnchor = text => text.match(/<head\b[^>]*>/i) || text.match(/<html\b[^>]*>/i) || text.match(/<!doctype\b[^>]*>/i);
 
+// sols.tools only shows Class Pointer, so its home page subtitle says so.
+// funtorahtools.com is built from the same index.html and keeps its own text.
+const HOME_SUBTITLE = /(<div class="subtitle">)Learning games and practice tools(<\/div>)/;
+const SOLS_SUBTITLE = 'Class Pointer and whiteboard';
+
 export function brandHtml(html, urlPath = '/') {
+  if (urlPath === '/') html = html.replace(HOME_SUBTITLE, '$1' + SOLS_SUBTITLE + '$2');
   let out = html.replace(/<title\b([^>]*)>([\s\S]*?)<\/title>/i, (all, attrs, text) =>
     '<title' + attrs + '>' + esc(solsTitle(unesc(text))) + '</title>');
   if (out.includes('/sols-brand.js')) return out;
