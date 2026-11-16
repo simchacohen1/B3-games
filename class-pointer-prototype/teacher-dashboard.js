@@ -148,15 +148,25 @@ function init(){
  /* Everyone: one level for the whole class. */
  const everyone=el('div','cp-everyone');
  everyone.append(el('strong',null,'Everyone'));
- const everyoneLabel=el('label','cp-everyone-row');
+ const everyoneLabel=el('div','cp-everyone-row');
  everyoneLabel.append(el('span',null,'Can use on my screen'));
  const LEVEL_LONG=[['none','Nothing'],['point','Pointer'],['highlight','Pointer + highlight'],['pen','Pointer + highlight + pen']];
  const LEVEL_SHORT=[['none','Nothing'],['point','Pointer'],['highlight','+ Highlight'],['pen','+ Pen']];
- const everyoneSelect=el('select');everyoneSelect.id='cpEveryoneLevel';
- for(const [v,t] of LEVEL_LONG){const o=el('option',null,t);o.value=v;everyoneSelect.append(o)}
- everyoneLabel.append(everyoneSelect);
+ // One button per level. A drop-down only reports a CHANGE, so choosing the level that was already selected did nothing and left
+ // students set one by one on their own level. Every press of a button sets every student to that level, even the selected one.
+ const everyoneGroup=el('div','cp-everyone-seg');everyoneGroup.id='cpEveryoneLevel';everyoneGroup.setAttribute('role','group');everyoneGroup.setAttribute('aria-label','Level for everyone');
+ const everyoneButtons=new Map();
+ function showEveryone(level){everyoneGroup.dataset.level=level;for(const [v,b] of everyoneButtons)b.setAttribute('aria-pressed',String(v===level))}
+ for(const [v,t] of LEVEL_SHORT){
+  const b=el('button','cp-everyone-opt',t);b.type='button';b.dataset.level=v;b.title=LEVEL_LONG.find(row=>row[0]===v)[1];b.setAttribute('aria-pressed','false');
+  b.addEventListener('click',()=>{showEveryone(v);window.ClassPointerRoster?.setAll(v)});
+  everyoneButtons.set(v,b);everyoneGroup.append(b);
+ }
+ everyoneLabel.append(everyoneGroup);
+ const everyoneStyle=document.createElement('style');
+ everyoneStyle.textContent='.cp-everyone-seg{display:flex;flex-wrap:wrap;gap:4px}.cp-everyone-opt{min-height:36px;padding:4px 10px;border:1px solid #b8c6dc;border-radius:8px;background:#f4f7fc;color:#172d49;font:700 13px system-ui,sans-serif;cursor:pointer}.cp-everyone-opt[aria-pressed=true]{background:#234ea8;border-color:#234ea8;color:#fff}';
+ document.head.append(everyoneStyle);
  everyone.append(everyoneLabel,el('span','cp-everyone-help','Nothing = watch only. Pointer, + Highlight and + Pen let students mark your lesson. Change one student below if needed.'));
- everyoneSelect.addEventListener('change',()=>{everyoneSelect.dataset.level=everyoneSelect.value;window.ClassPointerRoster?.setAll(everyoneSelect.value)});
  sidebar.append(everyone);
 
  /* One table: name, level on my screen, screen sharing, whiteboard. */
@@ -245,7 +255,7 @@ function init(){
   const list=rows();
   const focused=document.activeElement&&tableBody.contains(document.activeElement)?document.activeElement.dataset.key:null;
   tableBody.replaceChildren();
-  if(R())everyoneSelect.value=R().everyone();everyoneSelect.dataset.level=everyoneSelect.value;
+  if(R())showEveryone(R().everyone());
   if(!list.length){
    const empty=el('p','cp-student-empty',$('endClass')?.disabled?'Start a class to see your students here.':'No students yet. Use Invite students to send the join link.');
    tableBody.append(empty);
