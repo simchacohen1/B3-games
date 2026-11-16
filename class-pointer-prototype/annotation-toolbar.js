@@ -205,8 +205,9 @@
   const viewport={id:'viewport',idPrefix:'a',items:[],
     // A teacher's page keeps every tool. A student gets only the tools their level allows, and no greyed-out buttons.
     get defaultTool(){return role==='teacher'?'hand':'pointer'},
-    get tools(){return role==='teacher'?undefined:LEVEL_TOOLS[studentLevel]},
-    get hideUnused(){return role!=='teacher'},
+    // (On the student's own whiteboard the whiteboard's own surface is on top; if it is ever not, they still have every tool.)
+    get tools(){return role==='teacher'||ownDrawing()?undefined:LEVEL_TOOLS[studentLevel]},
+    get hideUnused(){return role!=='teacher'&&!ownDrawing()},
     label:()=>role==='teacher'?'Drawing on your screen.':'Drawing on your screen. Your teacher sees it while you share.',
     rect:()=>({left:0,top:0,width:window.innerWidth,height:window.innerHeight}),
     getItems(){return this.items},setItems(list){this.items=list}};
@@ -227,10 +228,12 @@
   function colorsOf(s){return s.colors||PALETTE}
   function sizesOf(s,tool){return s.sizes?.(tool)||SIZE_SETS[tool==='shape'?'shape':tool==='text'?'text':tool==='highlight'?'highlight':'pen']}
   function currentSize(s){const list=sizesOf(s,st.tool);return list[Math.min(st.sizeIndex,list.length-1)]}
-  // The teacher: always. A student: on their own whiteboard (any reason except sharing), or while sharing only when the teacher allowed drawing.
+  // A student's own whiteboard or worksheet is on (any reason except sharing).
+  function ownDrawing(){for(const name of reasons)if(name!=='sharing')return true;return false}
+  // The teacher: always. A student: on their own whiteboard, or while sharing only when the teacher allowed drawing.
   function visible(){
     if(role==='teacher')return true;
-    for(const name of reasons)if(name!=='sharing')return true;
+    if(ownDrawing())return true;
     return reasons.has('sharing')&&studentLevel!=='none';
   }
 

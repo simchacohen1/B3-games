@@ -16,7 +16,8 @@ const toolbar=read('class-pointer-prototype/annotation-toolbar.js');
 
 test('the toolbar is hidden while a student shares unless the teacher allowed drawing; the whiteboard is always on',()=>{
   assert.match(toolbar,/let studentLevel='none';/,'the default is Nothing');
-  assert.match(toolbar,/function visible\(\)\{\s*if\(role==='teacher'\)return true;\s*for\(const name of reasons\)if\(name!=='sharing'\)return true;\s*return reasons\.has\('sharing'\)&&studentLevel!=='none';\s*\}/);
+  assert.match(toolbar,/function ownDrawing\(\)\{for\(const name of reasons\)if\(name!=='sharing'\)return true;return false\}/);
+  assert.match(toolbar,/function visible\(\)\{\s*if\(role==='teacher'\)return true;\s*if\(ownDrawing\(\)\)return true;\s*return reasons\.has\('sharing'\)&&studentLevel!=='none';\s*\}/);
   // setReason('sharing',true) alone no longer opens anything: openBar refuses when not visible.
   assert.match(toolbar,/function openBar\(auto\)\{\s*if\(!visible\(\)\)return;/);
   assert.match(toolbar,/if\(!visible\(\)\)return hideAll\(\);/);
@@ -33,8 +34,8 @@ test('each level gives a student only its tools, with no greyed-out buttons (Not
   assert.equal(table.point.includes('pen')||table.highlight.includes('pen'),false,'pointing or highlighting never gives the pen');
   assert.equal(JSON.stringify(Object.values(table).flat()).includes('hand'),false,'no Hand tool');
   // The student's own screen only gets those tools; a teacher's page keeps all of them.
-  assert.match(toolbar,/get tools\(\)\{return role==='teacher'\?undefined:LEVEL_TOOLS\[studentLevel\]\}/);
-  assert.match(toolbar,/get hideUnused\(\)\{return role!=='teacher'\}/);
+  assert.match(toolbar,/get tools\(\)\{return role==='teacher'\|\|ownDrawing\(\)\?undefined:LEVEL_TOOLS\[studentLevel\]\}/);
+  assert.match(toolbar,/get hideUnused\(\)\{return role!=='teacher'&&!ownDrawing\(\)\}/);
   assert.match(toolbar,/get defaultTool\(\)\{return role==='teacher'\?'hand':'pointer'\}/);
   // Unknown levels fall back to Nothing.
   assert.match(toolbar,/Object\.prototype\.hasOwnProperty\.call\(LEVEL_TOOLS,next\)\?next:'none'/);
