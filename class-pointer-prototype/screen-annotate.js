@@ -66,7 +66,11 @@
     let draft=null,pid=null,livePoint=null,liveTimer=0,lastLive=0,frame=0,lastTarget=null,pushed=false;
     function current(){const t=getTarget();return t&&t.id&&video.srcObject&&video.videoWidth?t:null}
     // The student's screen as a surface for the shared toolbar. It opens by itself when the screen is shown large.
-    const surface=FA&&{id:'screen',idPrefix:'t',autoOpen:true,renders:true,drawsPoint:true,defaultTool:'hand',
+    const surface=FA&&{id:'screen',idPrefix:'t',autoOpen:true,renders:true,drawsPoint:true,defaultTool:'pointer',
+      // The same tools, in the same order, as the toolbar on the main whiteboard.
+      tools:['select','pointer','highlight','text','shape','eraser','pen'],hideUnused:true,
+      toolLabels:{select:['🖱️','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
+      keys:{p:{tool:'pointer'},h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
       maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       historyKey:()=>'screen:'+(current()?.id||''),
       label:()=>{const t=current();return t?'You are drawing on '+t.name+'’s screen. They see it live.':''},
