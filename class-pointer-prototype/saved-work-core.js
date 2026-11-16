@@ -96,6 +96,9 @@
       folderId:validId(file.folderId)?file.folderId:'',
       ...(cleanName(file.subject,LIMITS.folderName)?{subject:cleanName(file.subject,LIMITS.folderName)}:{}),
       ...(file.template?{template:'1'}:{}),
+      // A filled-in worksheet (pages = how many page pictures it has) and a student's PDF copy of a class worksheet.
+      ...(file.worksheet?{worksheet:'1',pages:String(Math.min(60,Math.max(1,Math.floor(Number(file.pages))||1)))}:{}),
+      ...(validId(file.sheetId)?{sheetId:file.sheetId}:{}),
       lastPage:String(Math.max(1,Math.floor(Number(file.lastPage))||1)),
       zoom:String(cleanZoom(file.zoom)),
       savedAt:String(Math.floor(Number(file.savedAt))||0)
@@ -112,6 +115,9 @@
       folderId:validId(custom.folderId)?custom.folderId:null,
       subject:cleanName(custom.subject,LIMITS.folderName)||'', // a teacher's own subject folder (Chumash, Mishnayos...)
       template:custom.template==='1', // a template: opening it always gives a fresh copy
+      worksheet:custom.worksheet==='1', // a filled-in PDF worksheet
+      pages:Math.min(60,Math.max(1,Math.floor(Number(custom.pages))||1)),
+      sheetId:validId(custom.sheetId)?custom.sheetId:'', // set on a student's PDF copy of a class worksheet
       lastPage:Math.max(1,Math.floor(Number(custom.lastPage))||1),
       zoom:cleanZoom(custom.zoom),
       savedAt:Math.floor(Number(custom.savedAt))||Date.parse(meta.updated||'')||0,

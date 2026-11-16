@@ -367,7 +367,7 @@ function init(){
  const tiles=[
   ['shareScreen','screen','#2563EB','Share my screen','A tab, window or full screen'],
   ['openWhiteboard','board','#C2410C','Whiteboard','A blank page to write on'],
-  ['openPdf','pdf','#15803D','PDF','Upload one or pick from your library'],
+  ['openPdf','pdf','#15803D','PDF','Your library, or upload from your computer'],
   ['openWebpage','web','#7C3AED','Webpage','Paste a link or open an HTML file']
  ];
  const tileButtons=[];
@@ -376,28 +376,18 @@ function init(){
   const b=el('button','cp-source-tile');b.type='button';b.dataset.source=id;
   const i=el('span','cp-source-icon');i.append(icon(ic,32,color));
   b.append(i,el('span','cp-source-name',name),el('span','cp-source-desc',desc));
-  b.addEventListener('click',()=>{if(!original.disabled)original.click()});
+  // The PDF card opens the library (Upload from computer is inside it); the old direct upload is the fallback.
+  b.addEventListener('click',()=>{if(id==='openPdf'&&$('pointerPdfLibrary')){$('pointerPdfLibrary').click();return}if(!original.disabled)original.click()});
   grid.append(b);tileButtons.push([b,original]);
  }
  pickerCard.append(grid);
- const foot=el('p','cp-source-foot');
- const library=el('button','cp-source-link','Open my PDF library');library.type='button';library.dataset.source='pointerPdfLibrary';
- library.addEventListener('click',()=>$('pointerPdfLibrary')?.click());
- foot.append(library);
- const capture=$('openBrowserTab');
- if(capture){
-  const link=el('button','cp-source-link','Capture a still picture of a tab or window');link.type='button';link.dataset.source='openBrowserTab';
-  link.addEventListener('click',()=>{if(!capture.disabled)capture.click()});
-  foot.append(el('span','cp-source-sep','·'),link);tileButtons.push([link,capture]);
- }
- pickerCard.append(foot,el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
+ // The still picture of a tab or window is not a start-screen choice any more: it is in the Lesson menu, right under Share my screen.
+ pickerCard.append(el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
  stage?.append(pickerCard);
  for(const [b,original] of tileButtons){
   const sync=()=>{b.disabled=original.disabled};
   new MutationObserver(sync).observe(original,{attributes:true,attributeFilter:['disabled']});sync();
  }
- function syncLibrary(){library.hidden=!$('pointerPdfLibrary')}
- syncLibrary();setTimeout(syncLibrary,1500);
 
  /* ---------- Reminder: whiteboard still on while nobody is using it ---------- */
  const IDLE_MS=5*60*1000,AWAY_MS=30*1000;
@@ -435,7 +425,6 @@ function init(){
   syncHint();
   syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
   if(!isLive)openSwitch(false);
-  syncLibrary();
  }
  if(stage)new MutationObserver(syncLive).observe(stage,{attributes:true,attributeFilter:['class']});
  if(stopScreen)new MutationObserver(syncLive).observe(stopScreen,{attributes:true,attributeFilter:['disabled']});

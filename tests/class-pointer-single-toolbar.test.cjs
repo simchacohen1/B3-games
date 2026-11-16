@@ -283,13 +283,13 @@ test('teacher: Students, Stop, Lesson and More carry the lesson-level actions',(
   c.action('stop').click();assert.equal(c.clicks.at(-1),'cpStopBtn');
   // Lesson: switch what students see.
   c.action('lesson').click();
-  assert.deepEqual(c.flyRows().map(b=>b.textContent),['🖥Share my screen','📝Whiteboard','📄PDF from this computer','🌐Webpage','📷Still picture of a tab','⏹Stop PDF']);
+  assert.deepEqual(c.flyRows().map(b=>b.textContent),['🖥Share my screen','📷Share a still picture instead','📝Whiteboard','🌐Webpage','⏹Stop PDF']);
   c.flyRow('Whiteboard').click();assert.equal(c.clicks.at(-1),'openWhiteboard');
   // The PDF library and the share-view buttons appear once those scripts have added their buttons.
   c.add('button','pointerPdfLibrary').addEventListener('click',()=>c.clicks.push('library'));
   for(const id of ['viewChooseArea','viewShareFull','viewZoomIn','viewZoomOut','viewMove'])c.add('button',id).addEventListener('click',()=>c.clicks.push(id));
   c.action('lesson').click();
-  c.flyRow('My PDF library').click();assert.equal(c.clicks.at(-1),'library');
+  c.flyRow('PDF (my library, or upload)').click();assert.equal(c.clicks.at(-1),'library');
   c.action('lesson').click();
   c.flyRow('Zoom in').click();assert.equal(c.clicks.at(-1),'viewZoomIn');
   assert.equal(c.fly.hidden,false,'zooming keeps the menu open');

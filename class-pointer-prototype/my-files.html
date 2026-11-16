@@ -20,6 +20,7 @@ main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-r
 #viewerName{flex:1;min-width:120px;overflow-wrap:anywhere}
 #viewerPage{flex:1;overflow:auto;padding:12px;text-align:center}
 #viewerPage canvas{background:#fff;box-shadow:0 2px 12px #17203340}
+.ftt-sheets-title{margin:4px 0 8px;font-size:20px}#sheets{margin:0 0 18px;padding-bottom:6px;border-bottom:2px solid #e4e9f1}#sheets[hidden]{display:none}#viewerSave[hidden]{display:none}#viewerSave{background:#1d5cb2;border:1px solid #1d5cb2;color:#fff;border-radius:10px;min-height:40px;padding:6px 14px;font:700 15px system-ui,sans-serif;cursor:pointer}#viewerSave:disabled{opacity:.6}
 .ftt-picture{display:block;max-width:100%;margin:12px auto;border:1px solid #c9d4e4;border-radius:10px}
 </style>
 <script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
@@ -28,15 +29,17 @@ main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-r
 <script defer src="https://www.gstatic.com/firebasejs/12.15.0/firebase-storage-compat.js"></script>
 <script defer src="../firebase-config.js"></script>
 <script defer src="vendor/pdf.min.js?v=3.11.174"></script>
-<script defer src="saved-work-core.js?v=20261116-savedwork3"></script>
-<script defer src="saved-work.js?v=20261116-savedwork3"></script>
-<script defer src="my-files.js?v=20261116-savedwork3"></script>
+<script defer src="annotation-toolbar.js?v=20261116-worksheets1"></script>
+<script defer src="saved-work-core.js?v=20261116-worksheets1"></script>
+<script defer src="saved-work.js?v=20261116-worksheets1"></script>
+<script defer src="my-files.js?v=20261116-worksheets1"></script>
 </head>
 <body class="ftt-saved">
 <header><h1>📂 My files</h1><a href="../index.html">Back to Fun Torah Tools</a></header>
 <main>
 <p class="ftt-saved-note">Your saved whiteboards and PDFs. Only you can see them.</p>
 <div class="ftt-saved-actions"><button id="addPdf" type="button" class="main" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden></div>
+<section id="sheets" hidden><h2 class="ftt-sheets-title">📄 Worksheets from your teacher</h2><div id="sheetList"></div></section>
 <p id="filesStatus" class="ftt-saved-status" role="status">Loading…</p>
 <div id="filesList"></div>
 </main>
@@ -47,6 +50,7 @@ main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-r
 <button id="viewerPrevious" type="button">◀ Previous</button>
 <span id="viewerCount" aria-live="polite"></span>
 <button id="viewerNext" type="button">Next ▶</button>
+<button id="viewerSave" type="button" class="main" hidden>💾 Save my worksheet</button>
 <button id="viewerZoomOut" type="button" aria-label="Make smaller">－</button>
 <span id="viewerZoom"></span>
 <button id="viewerZoomIn" type="button" aria-label="Make bigger">＋</button>

@@ -173,21 +173,21 @@ test('500 MB library accepts a 263 MB PDF and reports upload progress',async()=>
   const h=harness({promptName:'Children Chumash Vayeira'});
   const size=263*1024*1024;
   h.w.PointerPdfLibrary.onOpened({name:'Children Chumash Vayeira.pdf',size});
-  await h.elements['#pointerLibrarySave'].onclick();
+  await h.w.PointerPdfLibrary.saveCurrent();
   assert.equal(h.uploads.length,1);
   assert.equal(h.uploads[0].file.size,size);
   assert.equal(h.uploads[0].metadata.contentType,'application/pdf');
   assert.equal(h.elements['#pointerLibraryProgress'].value,100);
   assert.equal(h.elements['#pointerLibraryProgress'].hidden,false);
   assert.match(h.elements['#pointerLibraryProgressLabel'].textContent,/100%/);
-  assert.equal(h.elements['#pointerLibraryStatus'].textContent,'Saved privately.');
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Saved to your PDF library as "Children Chumash Vayeira"/);
   assert.equal(h.elements['#pointerLibrarySave'].disabled,false);
 });
 
 test('oversized PDF is refused and cannot start an upload',async()=>{
   const h=harness({promptName:'Too big'});
   h.w.PointerPdfLibrary.onOpened({name:'Giant.pdf',size:500*1024*1024+1});
-  await h.elements['#pointerLibrarySave'].onclick();
+  await h.w.PointerPdfLibrary.saveCurrent();
   assert.equal(h.uploads.length,0);
   assert.match(h.elements['#pointerLibraryStatus'].textContent,/500 MB/);
 });
@@ -195,7 +195,7 @@ test('oversized PDF is refused and cannot start an upload',async()=>{
 test('failed upload does not display success or leave Save disabled',async()=>{
   const h=harness({promptName:'Failed upload',uploadFails:true});
   h.w.PointerPdfLibrary.onOpened({name:'Worksheet.pdf',size:10*1024*1024});
-  await h.elements['#pointerLibrarySave'].onclick();
+  await h.w.PointerPdfLibrary.saveCurrent();
   assert.equal(h.uploads.length,1);
   assert.match(h.elements['#pointerLibraryStatus'].textContent,/Upload failed/);
   assert.equal(h.elements['#pointerLibraryProgressLabel'].textContent,'Upload not completed');
@@ -237,4 +237,17 @@ test('proposed merged Storage rules preserve user-confirmed existing paths and n
   assert.ok(!pdf.includes('if true'),'New private PDF rule must never allow public access');
   assert.equal((candidate.match(/match \/pointerPdfLibrary/g)||[]).length,1);
   assert.ok(!candidate.includes('{allPaths=**}'),'No public recursive wildcard should cover saved PDFs');
+});
+
+test('one click on the PDF view saves the open PDF; the library window only uploads from the computer',()=>{
+  const lib=source,mode=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-mode.js'),'utf8');
+  assert.match(mode,/button\('💾 Save to my library'/);
+  assert.match(mode,/window\.PointerPdfLibrary\?\.saveCurrent\?\.\(\)/);
+  assert.match(mode,/pointer-pdf-library-state/);
+  assert.match(lib,/<button id="pointerLibrarySave" type="button">⬆ Upload from computer<\/button>/);
+  assert.match(lib,/window\.ClassPointerPdf\.openFile\(file\)\)await saveCurrentPdf\(\)/,'upload opens the PDF and saves it');
+  assert.doesNotMatch(lib,/prompt\('Save as:'/,'nothing to type when saving');
+  const dash=fs.readFileSync(path.join(base,'class-pointer-prototype/teacher-dashboard.js'),'utf8');
+  assert.doesNotMatch(dash,/syncLibrary|Open my PDF library|Capture a still picture/,'the start screen has one PDF card and no leftover calls');
+  assert.match(dash,/id==='openPdf'&&\$\('pointerPdfLibrary'\)/,'the PDF card opens the library');
 });

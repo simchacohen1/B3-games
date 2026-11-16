@@ -330,6 +330,13 @@
   if(isTeacher){
     nav=el('div','pdfNav');nav.hidden=true;nav.dataset.stageUi='true';nav.setAttribute('role','toolbar');nav.setAttribute('aria-label','PDF controls');
     const button=(label,title,onClick,cls)=>{const b=el('button',null,cls||'pdf-btn',label);b.type='button';b.title=title;b.addEventListener('click',onClick);nav.appendChild(b);return b};
+    // One click saves the open PDF in the teacher's private library (pdf-library.js does the saving).
+    const saveBtn=button('💾 Save to my library','Save this PDF in your private library so you can open it again next time',()=>{void window.PointerPdfLibrary?.saveCurrent?.()},'pdf-btn pdf-save-btn');saveBtn.hidden=true;
+    document.addEventListener('pointer-pdf-library-state',event=>{
+      const state=event.detail||{};
+      saveBtn.hidden=!state.open;saveBtn.disabled=!!state.saving||!!state.saved;
+      saveBtn.textContent=state.saving?'Saving…':state.saved?'✓ In my library':'💾 Save to my library';
+    });
     button('◀ Previous','Previous page',()=>goToPage(currentPage()-1));
     pageInput=el('input',null,'pdf-page-input');pageInput.type='number';pageInput.min='1';pageInput.step='1';pageInput.inputMode='numeric';pageInput.setAttribute('aria-label','Page number');
     pageInput.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Enter'){goToPage(Number(pageInput.value)-1);pageInput.blur()}});

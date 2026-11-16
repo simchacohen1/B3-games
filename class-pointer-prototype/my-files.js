@@ -7,16 +7,22 @@
   const Core=window.FTTSavedWorkCore,Saved=window.FTTSavedWork;
   if(!Core||!Saved)return;
   const {store,ui}=Saved,$=id=>document.getElementById(id);
+  const FA=window.FTTAnnotate;
+  // A worksheet being filled in: this student's own PDF copy and their marks per page ({1:[mark,...],2:[...]}).
+  let fill=null,allFiles=[];
   const page={say(text){$('filesStatus').textContent=text||''},fail(error){$('filesStatus').textContent=Core.errorText(error)}};
   let state={folders:{},saveTarget:null};
 
   async function refresh(){
     page.say('Loading…');
     try{
-      const [files,folders]=await Promise.all([store.list(),store.folders().catch(()=>state)]);
-      state=folders;
-      ui.fileList($('filesList'),files,state,file=>[
-        ui.button(file.kind==='pdf'?'Open':'See picture',()=>file.kind==='pdf'?openPdf(file):showPicture(file),'main'),
+      const [files,folders,sheets]=await Promise.all([store.list(),store.folders().catch(()=>state),Saved.worksheets.list().catch(()=>[])]);
+      state=folders;allFiles=files;
+      showSheets(sheets);
+      ui.fileList($('filesList'),files,state,file=>file.worksheet?[
+        ui.button('Continue',()=>openFilled(file),'main'),ui.button('See pictures',()=>showPicture(file)),...ui.manageButtons(file,page,refresh)]
+        :file.kind==='pdf'&&file.sheetId?[ui.button('Fill in',()=>fillCopy(file),'main'),...ui.manageButtons(file,page,refresh)]
+        :[ui.button(file.kind==='pdf'?'Open':'See picture',()=>file.kind==='pdf'?openPdf(file):showPicture(file),'main'),
         ...ui.manageButtons(file,page,refresh)]);
       $('addPdf').hidden=false;page.say('');
     }catch(error){$('filesList').replaceChildren();page.fail(error)}
@@ -26,14 +32,17 @@
   async function showPicture(file){
     const box=ui.openDialog(file.name);
     box.say('Opening…');
-    const picture=await store.picture(file);
-    if(picture){
+    const pages=file.worksheet?file.pages:1;let shown=0;
+    for(let number=1;number<=pages;number+=1){
+      const picture=await store.picture(file,number);
+      if(!picture)continue;
       const image=ui.h('img','ftt-picture'),url=URL.createObjectURL(picture);
-      image.alt='Picture of the whiteboard '+file.name;image.src=url;
+      image.alt=(file.worksheet?'Page '+number+' of the worksheet ':'Picture of the whiteboard ')+file.name;image.src=url;
       box.dialog.addEventListener('close',()=>URL.revokeObjectURL(url));
-      box.body.append(image);
-    }else box.body.append(ui.h('p','ftt-saved-note','There is no picture of this whiteboard.'));
-    box.body.append(ui.h('p','ftt-saved-note','To draw on it again, open your whiteboard and press 📂 My files.'));
+      box.body.append(image);shown+=1;
+    }
+    if(!shown)box.body.append(ui.h('p','ftt-saved-note','There is no picture of this file.'));
+    box.body.append(ui.h('p','ftt-saved-note',file.worksheet?'To keep writing on it, press Continue.':'To draw on it again, open your whiteboard and press 📂 My files.'));
     box.say('');
   }
 
@@ -65,10 +74,101 @@
     box.body.append(actions,meter);
   });
 
+  // ---------- Worksheets from the teacher: fill in (write, type, highlight on every page) and save ----------
+  function showSheets(sheets){
+    const box=$('sheetList');box.replaceChildren();
+    $('sheets').hidden=!sheets.length;
+    for(const sheet of sheets){
+      const row=ui.h('div','ftt-saved-row'),name=ui.h('span','ftt-saved-name',sheet.name);
+      const filled=allFiles.find(file=>file.worksheet&&file.sheetId===sheet.id);
+      if(sheet.sentAt)name.append(ui.h('small',null,'Sent '+new Date(sheet.sentAt).toLocaleDateString()+(filled?' · you saved your work':'')));
+      row.append(name,ui.button(filled?'Continue':'Fill in',()=>startWorksheet(sheet),'main'));box.append(row);
+    }
+  }
+  const validTarget=()=>state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'';
+  // First time: this student's own copy of the PDF is saved in My files, then opened. Later: their saved work, or the copy.
+  async function startWorksheet(sheet){
+    page.say('Opening the worksheet…');
+    try{
+      const filled=allFiles.find(file=>file.worksheet&&file.sheetId===sheet.id);
+      if(filled)return openFilled(filled);
+      let copy=allFiles.find(file=>file.kind==='pdf'&&file.sheetId===sheet.id);
+      if(!copy){
+        const blob=await Saved.worksheets.read(sheet.id);
+        const id=await store.savePdf(new File([blob],sheet.name+'.pdf',{type:'application/pdf'}),{name:sheet.name,folderId:validTarget(),sheetId:sheet.id});
+        await refresh();copy=allFiles.find(file=>file.id===id);
+        if(!copy)throw Core.plain('Your copy was saved, but it could not be opened. Press Fill in again.');
+      }
+      await openPdf(copy,{sheetName:sheet.name});
+    }catch(error){page.fail(error)}
+  }
+  function fillCopy(copy){
+    const filled=allFiles.find(file=>file.worksheet&&file.sheetId===copy.sheetId);
+    return filled?openFilled(filled):openPdf(copy,{sheetName:copy.name});
+  }
+  async function openFilled(file){
+    page.say('Opening…');
+    try{
+      const data=await store.readBoard(file,'worksheet');
+      const copy=allFiles.find(item=>item.kind==='pdf'&&item.id===data.pdfId);
+      if(!copy)throw Core.plain('The worksheet copy this was made from is not in My files any more. Fill in the worksheet again from the top of this page.');
+      const marks={};
+      for(const [key,list] of Object.entries(data.marks&&typeof data.marks==='object'?data.marks:{})){
+        const number=Number(key);
+        if(!Number.isInteger(number)||number<1||number>60||!Array.isArray(list))continue;
+        marks[number]=list.slice(0,300).map(raw=>FA?.cleanItem(raw,{idPrefix:'s',maxPoints:400})).filter(Boolean);
+      }
+      await openPdf(copy,{marks,filled:{id:file.id,name:file.name},sheetName:Core.cleanName(data.sheetName)||copy.name});
+    }catch(error){page.fail(error)}
+  }
+  // The marks go on a layer over the page that is on the screen: the same drawing toolbar as a whiteboard.
+  const sheetSurface=FA&&{id:'worksheet',label:'Worksheet',idPrefix:'s',defaultTool:'pen',autoOpen:true,
+    rect:()=>{const canvas=fill&&$('viewerPage').querySelector('canvas');if(!canvas)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
+    getItems:()=>fill?.marks[pageNumber]||[],
+    setItems(list){if(!fill)return;fill.marks[pageNumber]=list;fill.dirty=true;$('viewerSave').textContent='💾 Save my worksheet'}};
+  function startFiller(copy,options){
+    fill={copy,marks:options.marks||{},filled:options.filled||null,sheetName:options.sheetName||copy.name,dirty:false};
+    if(!FA||!sheetSurface){page.say('The drawing tools could not load. Refresh the page and try again.');return}
+    $('viewerSave').hidden=false;$('viewerSave').disabled=false;$('viewerSave').textContent='💾 Save my worksheet';
+    FA.setRole('student');FA.push(sheetSurface);FA.setReason('whiteboard',true);
+  }
+  function stopFiller(){
+    if(!fill)return;
+    fill=null;$('viewerSave').hidden=true;
+    if(FA&&sheetSurface){FA.release(sheetSurface);FA.setReason('whiteboard',false)}
+  }
+  // A picture of one page with the student's marks on it (this is what the teacher sees).
+  async function pagePicture(number){
+    const sheet=await pdf.getPage(number),base=sheet.getViewport({scale:1}),viewport=sheet.getViewport({scale:1100/base.width});
+    const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    const ctx=canvas.getContext('2d',{alpha:false});
+    await sheet.render({canvasContext:ctx,viewport}).promise;
+    const W=canvas.width,H=canvas.height;
+    for(const item of fill.marks[number]||[])FA.drawItem(ctx,item,p=>[p.x*W,p.y*H],W);
+    return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Core.plain('Could not make a picture of a page.')),'image/png'));
+  }
+  // One click: the first save makes a new file named from the worksheet and the Hebrew date; later saves replace it.
+  async function saveFilled(){
+    if(!fill||!pdf)return;
+    const button=$('viewerSave');button.disabled=true;page.say('Saving…');
+    try{
+      const pictures=[];
+      for(let number=1;number<=pdf.numPages;number+=1)pictures.push(await pagePicture(number));
+      const name=fill.filled?.name||Core.autoName({date:new Date(),lesson:fill.sheetName,existing:(await store.list()).map(file=>file.name)});
+      const marks={};
+      for(const [number,list] of Object.entries(fill.marks))if(list.length)marks[number]=list;
+      const data={version:1,kind:'worksheet',pdfId:fill.copy.id,sheetId:fill.copy.sheetId||'',sheetName:fill.sheetName,marks};
+      const id=await store.saveWorksheet({id:fill.filled?.id,name,folderId:validTarget(),data,pictures,sheetId:fill.copy.sheetId});
+      fill.filled={id,name};fill.dirty=false;
+      page.say('Saved as "'+name+'" in My files.');button.textContent='✓ Saved';
+    }catch(error){page.fail(error)}finally{button.disabled=false}
+  }
+  $('viewerSave').addEventListener('click',saveFilled);
+
   // ---------- PDF reader ----------
   let pdf=null,current=null,pageNumber=1,zoom=1,drawing=null,drawToken=0,saveTimer=0,unsaved=false;
   const placeKey=file=>'saved:'+file.id;
-  async function openPdf(file){
+  async function openPdf(file,fillOptions){
     page.say('Opening…');
     try{
       const reader=window.pdfjsLib;
@@ -77,6 +177,7 @@
       const data=new Uint8Array(await (await store.readPdf(file)).arrayBuffer());
       const loaded=await reader.getDocument({data,isEvalSupported:false,enableXfa:false}).promise.catch(()=>{throw Core.plain('This PDF could not be opened.')});
       closePdf();pdf=loaded;current=file;
+      if(fillOptions)startFiller(file,fillOptions);
       // Use whichever is newer: the place kept in this browser, or the place saved with the file.
       let local=null;try{local=Core.readPosition(localStorage,placeKey(file))}catch(_){}
       const resume=local&&local.at>=file.placeAt?local:{page:file.lastPage,zoom:file.zoom};
@@ -100,6 +201,7 @@
     try{await drawing.promise}catch(_){return}
     if(token!==drawToken)return;
     holder.replaceChildren(canvas);
+    FA?.refresh();
     $('viewerCount').textContent='Page '+pageNumber+' of '+pdf.numPages;$('viewerZoom').textContent=Math.round(zoom*100)+'%';
     $('viewerPrevious').disabled=pageNumber<=1;$('viewerNext').disabled=pageNumber>=pdf.numPages;
   }
@@ -122,9 +224,13 @@
   function closePdf(){
     savePlace();drawToken++;drawing?.cancel();drawing=null;
     try{pdf?.destroy()}catch(_){}
+    stopFiller();
     pdf=null;current=null;$('viewer').hidden=true;$('viewerPage').replaceChildren();
   }
-  $('viewerBack').addEventListener('click',()=>{closePdf();refresh()});
+  $('viewerBack').addEventListener('click',()=>{
+    if(fill?.dirty&&!confirm('You have not saved your worksheet yet. Leave without saving?'))return;
+    closePdf();refresh();
+  });
   $('viewerPrevious').addEventListener('click',()=>move(pageNumber-1,zoom));
   $('viewerNext').addEventListener('click',()=>move(pageNumber+1,zoom));
   $('viewerZoomOut').addEventListener('click',()=>move(pageNumber,zoom/1.25));

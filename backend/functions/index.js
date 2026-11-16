@@ -2756,6 +2756,7 @@ exports.classGalleryVersionLegacy=require('./class-gallery-version').classGaller
 exports.classGalleryVersionWorkspace=require('./class-gallery-version').classGalleryVersionWorkspace;
 exports.privateMediaUrl=require('./private-media-url').privateMediaUrl;
 exports.teacherStudentFiles=require('./teacher-student-files').teacherStudentFiles;
+exports.classWorksheets=require('./class-worksheets').classWorksheets;
 // Student Rewards for every teacher (class-scoped, server-checked).
 exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeacher;
 

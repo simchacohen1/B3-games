@@ -142,14 +142,14 @@
       if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;
     },
-    async savePdf(file,{name,folderId},onProgress){
+    async savePdf(file,{name,folderId,sheetId},onProgress){
       const me=await who();
       if(file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Core.plain('Please choose a PDF file.');
       const problem=Core.sizeProblem('pdf',file.size);
       if(problem)throw Core.plain(problem);
       await checkRoom(me);
       const id=Core.newId();
-      const task=firebase.storage().ref(me.prefix+Core.objectName(id,'pdf')).put(file,{contentType:'application/pdf',customMetadata:Core.fileMetadata({name,kind:'pdf',folderId,savedAt:Date.now()})});
+      const task=firebase.storage().ref(me.prefix+Core.objectName(id,'pdf')).put(file,{contentType:'application/pdf',customMetadata:Core.fileMetadata({name,kind:'pdf',folderId,sheetId,savedAt:Date.now()})});
       await new Promise((resolve,reject)=>task.on('state_changed',step=>onProgress?.(step.totalBytes?Math.floor(step.bytesTransferred*100/step.totalBytes):0),reject,resolve));
       return id;
     },
@@ -162,14 +162,62 @@
     },
     async readPdf(file){return download(Core.objectName(file.id,'pdf'),Core.LIMITS.pdfBytes)},
     // The picture of a saved whiteboard, or null when there is none.
-    async picture(file){try{return await download(Core.objectName(file.id,'png'),Core.LIMITS.pngBytes)}catch(_){return null}},
+    // (page 2 and up exist only for a filled-in worksheet: id-p2.png, id-p3.png ...)
+    async picture(file,page=1){try{return await download(page>1?file.id+'-p'+Math.floor(page)+'.png':Core.objectName(file.id,'png'),Core.LIMITS.pngBytes)}catch(_){return null}},
     async rename(file,name){return patch(file,{displayName:Core.cleanName(name)||file.name})},
     async remember(file,place){return patch(file,{lastPage:String(place.page),zoom:String(place.zoom),placeAt:String(place.at)})},
     async remove(file){
       const me=await who(),folder=firebase.storage().ref(me.prefix);
       await folder.child(Core.objectName(file.id,file.ext)).delete();
       if(file.kind==='whiteboard')await folder.child(Core.objectName(file.id,'png')).delete().catch(()=>{});
+      // The other page pictures of a filled-in worksheet.
+      if(file.worksheet){
+        const found=await folder.listAll().catch(()=>({items:[]}));
+        await Promise.all(found.items.filter(ref=>ref.name.startsWith(file.id+'-p')&&ref.name.endsWith('.png')).map(ref=>ref.delete().catch(()=>{})));
+      }
+    },
+    // A student's filled-in PDF worksheet: the marks (data), one picture per page (pictures[0] is page 1), and a name.
+    // With an id it saves over that file; without one it makes a new file. Page pictures are made small enough first.
+    async saveWorksheet({id,name,folderId,data,pictures,sheetId}){
+      const me=await who();
+      if(me.teacher)throw Core.plain('Only a student fills in a worksheet.');
+      const blob=new Blob([JSON.stringify(data)],{type:'application/json'}),problem=Core.sizeProblem('whiteboard',blob.size,false);
+      if(problem)throw Core.plain(problem);
+      if(!pictures?.length||pictures.length>60)throw Core.plain('The worksheet pictures could not be made, so it was not saved. Try again.');
+      const fitted=[];
+      for(const picture of pictures){const small=await fitPicture(picture);if(!small)throw Core.plain('A page picture could not be made small enough, so the worksheet was not saved.');fitted.push(small)}
+      if(!id){await checkRoom(me);id=Core.newId()}
+      const folder=firebase.storage().ref(me.prefix);
+      for(let index=0;index<fitted.length;index+=1)await folder.child(index?id+'-p'+(index+1)+'.png':Core.objectName(id,'png')).put(fitted[index],{contentType:'image/png'});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,worksheet:true,pages:fitted.length,sheetId,savedAt:Date.now()})});
+      return id;
     }
+  };
+
+  // ---------- PDF worksheets (server function: the teacher sends one, the class reads it) ----------
+  // Storage rules give browsers no access to classWorksheets/. The server checks the teacher or the student's class.
+  const WORKSHEETS_URL='https://us-central1-b3-games.cloudfunctions.net/classWorksheets';
+  async function worksheetCall(body){
+    const me=await who();
+    let response;
+    try{response=await fetch(WORKSHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await me.user.getIdToken()},body:JSON.stringify(me.teacher?{...body,classId:me.classId}:body),cache:'no-store'})}catch(_){throw Core.plain(OFFLINE)}
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Core.plain(data.error||'Worksheets could not be opened.');
+    return data;
+  }
+  const worksheets={
+    async list(){return(await worksheetCall({action:'list'})).worksheets||[]},
+    // The worksheet itself, as a PDF blob (checked: a real PDF, not too big).
+    async read(id){
+      const{url}=await worksheetCall({action:'url',id});
+      let response;try{response=await fetch(url,{cache:'no-store'})}catch(_){throw Core.plain(OFFLINE)}
+      if(!response.ok)throw Core.plain('This worksheet could not be opened.');
+      const blob=await response.blob();
+      if(blob.size>Core.LIMITS.pdfBytes)throw Core.plain('This worksheet is too big to open.');
+      return new Blob([blob],{type:'application/pdf'});
+    },
+    async send(pdfId,name){return worksheetCall({action:'send',pdfId,name})},
+    async remove(id){return worksheetCall({action:'remove',id})}
   };
 
   // ---------- Small building blocks for the windows ----------
@@ -409,7 +457,9 @@
         const [files,state]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS)]);
         const boards=files.filter(file=>file.kind==='whiteboard'&&(!(teacherPage&&onlyTemplates)||file.template));
         boards.templatesOnly=teacherPage&&onlyTemplates;
-        fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
+        fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):file.worksheet
+          ?[button('Continue in My files',()=>window.open(new URL('my-files.html',scriptUrl).href,'_blank'),'main'),...manageButtons(file,ui,showFiles)]
+          :[button('Open',()=>openBoard(file,ui),'main'),...manageButtons(file,ui,showFiles)]);
         ui.say('');
       }catch(error){list.replaceChildren();ui.fail(error)}
     };
@@ -440,7 +490,7 @@
     const row=h('div','ftt-saved-row'),box=h('span','ftt-saved-thumb',file.hasPicture?'…':'📝');
     box.setAttribute('aria-hidden','true');
     const name=h('span','ftt-saved-name',file.name);
-    name.append(h('small',null,(file.fromTeacher?'Sent by you · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
+    name.append(h('small',null,(file.fromTeacher?'Sent by you · ':'')+(file.worksheet?'Worksheet, '+file.pages+(file.pages===1?' page':' pages')+' · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
     row.append(box,name);
     if(!file.hasPicture){name.append(h('small',null,'No picture saved for this file.'));return row}
     // One picture at a time, so a long list does not flood the server.
@@ -457,10 +507,14 @@
       const view=openDialog(file.name+' · '+studentName);
       view.say('Loading…');
       try{
-        const img=document.createElement('img');img.alt='Saved whiteboard of '+studentName;img.style.cssText='max-width:100%;height:auto;border:1px solid #d3dcea;border-radius:8px;background:#fff';
-        img.src=(await studentFilesCall({action:'picture',studentId,fileId:file.id})).url;
-        await new Promise(resolve=>{img.onload=resolve;img.onerror=resolve});
-        view.body.append(img);view.say('');
+        // A filled-in worksheet has one picture per page (id, id-p2, id-p3 ...); everything else has one.
+        const pages=file.worksheet?Math.max(1,Math.min(60,file.pages||1)):1;
+        for(let number=1;number<=pages;number+=1){
+          const img=document.createElement('img');img.alt=(file.worksheet?'Page '+number+' of the worksheet of ':'Saved whiteboard of ')+studentName;img.style.cssText='display:block;max-width:100%;height:auto;margin:0 0 10px;border:1px solid #d3dcea;border-radius:8px;background:#fff';
+          img.src=(await studentFilesCall({action:'picture',studentId,fileId:number>1?file.id+'-p'+number:file.id})).url;
+          await new Promise(resolve=>{img.onload=resolve;img.onerror=resolve});
+          view.body.append(img);view.say(number<pages?'Loading page '+(number+1)+' of '+pages+'…':'');
+        }
       }catch(error){view.fail(error)}
     },'main'));
     return row;
@@ -590,5 +644,5 @@
     }finally{copying.delete(key)}
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,worksheets,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();
