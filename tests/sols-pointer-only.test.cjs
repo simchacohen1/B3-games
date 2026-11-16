@@ -62,9 +62,10 @@ test('the sols.tools build puts the rule first in the one script every page load
  try{
   fs.cpSync(path.join(root,'sols-site'),path.join(dir,'sols-site'),{recursive:true});
   fs.copyFileSync(path.join(root,'firebase-config.js'),path.join(dir,'firebase-config.js'));
-  fs.writeFileSync(path.join(dir,'index.html'),'<!doctype html><html><head><title>Fun Torah Tools</title></head><body><h1>Fun Torah Tools</h1></body></html>');
+  const subtitle='<div class="subtitle">Learning games and practice tools</div>';
+  fs.writeFileSync(path.join(dir,'index.html'),'<!doctype html><html><head><title>Fun Torah Tools</title></head><body><h1>Fun Torah Tools</h1>'+subtitle+'</body></html>');
   fs.mkdirSync(path.join(dir,'halacha'));
-  fs.writeFileSync(path.join(dir,'halacha','index.html'),'<!doctype html><html><head><title>Halacha | Fun Torah Tools</title></head><body></body></html>');
+  fs.writeFileSync(path.join(dir,'halacha','index.html'),'<!doctype html><html><head><title>Halacha | Fun Torah Tools</title></head><body>'+subtitle+'</body></html>');
   execFileSync(process.execPath,[path.join(dir,'sols-site','build.mjs'),dir],{stdio:'pipe'});
   const built=fs.readFileSync(path.join(dir,'sols-brand.js'),'utf8');
   assert.ok(built.indexOf('solsFullSite')>0&&built.indexOf('__solsBrand')>0,'both parts are in the file');
@@ -75,6 +76,10 @@ test('the sols.tools build puts the rule first in the one script every page load
    assert.ok(html.indexOf('/sols-brand.js')<html.indexOf('</head>'),'loaded in the head, before the page');
   }
   assert.equal(fs.readFileSync(path.join(dir,'CNAME'),'utf8').trim(),'sols.tools');
+  // Only the sols.tools home page gets the Class Pointer subtitle; the source and other pages keep theirs.
+  assert.match(fs.readFileSync(path.join(dir,'index.html'),'utf8'),/<div class="subtitle">Class Pointer and whiteboard<\/div>/);
+  assert.match(fs.readFileSync(path.join(dir,'halacha','index.html'),'utf8'),/Learning games and practice tools/);
+  assert.match(fs.readFileSync(path.join(root,'index.html'),'utf8'),/<div class="subtitle">Learning games and practice tools<\/div>/);
   // The built script still parses.
   execFileSync(process.execPath,['--check',path.join(dir,'sols-brand.js')],{stdio:'pipe'});
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
