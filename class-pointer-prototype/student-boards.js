@@ -146,7 +146,21 @@
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
       const ids=new Set(op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string')),before=board.strokes.length;
-      board.strokes=board.strokes.filter(s=>!(s.by===by&&ids.has(s.id)));return board.strokes.length!==before;
+      // Only the teacher may also remove a student's mark (op.any); a student can never remove the teacher's.
+      const anyOwner=by==='teacher'&&op.any===true;
+      board.strokes=board.strokes.filter(s=>!((anyOwner||s.by===by)&&ids.has(s.id)));return board.strokes.length!==before;
+    }
+    // Teacher only: put a mark on the board that is owned by the student (the teacher moved, resized or recolored the
+    // student's own mark, or undid that). It may take the place of the mark it replaces. The student can still change it.
+    if(op.type==='board-put'){
+      if(by!=='teacher')return false;
+      const s=cleanStroke(op.stroke);if(!s)return false;
+      const at=typeof op.replaces==='string'?board.strokes.findIndex(item=>item.id===op.replaces):-1;
+      if(board.strokes.some((item,i)=>i!==at&&item.id===s.id)||(at<0&&board.strokes.length>=MAX_STROKES))return false;
+      if(s.image&&pictureCount(board)-(at>=0&&board.strokes[at].image?1:0)>=MAX_IMAGES)return false;
+      s.by=op.owner==='student'?'student':'teacher';
+      if(at>=0)board.strokes[at]=s;else board.strokes.push(s);
+      return true;
     }
     if(op.type==='board-clear'){
       board.strokes=op.all===true&&by==='teacher'?[]:board.strokes.filter(s=>s.by!==by);board.drafts={student:null,teacher:null};return true;
@@ -155,6 +169,38 @@
       const s=op.stroke?cleanStroke(op.stroke):null;board.drafts[by]=s&&s.id[0]===by[0]?s:null;return true;
     }
     return false;
+  }
+  // The shared drawing toolbar hands over the whole list of one side's marks; turn the difference into board changes.
+  // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
+  function syncBoardItems(board,by,list,act){
+    const mine=board.strokes.filter(item=>item.by===by),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
+    const gone=mine.filter(item=>!keep.has(item.id)),moved=new Set();
+    for(const item of list){
+      const from=!had.has(item.id)&&item.image?gone.find(old=>old.image===item.image&&!moved.has(old.id)):null;
+      if(from){moved.add(from.id);moved.add(item.id);act({type:'board-move',id:from.id,newId:item.id,points:item.points})}
+    }
+    const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
+    if(removed.length)act({type:'board-remove',ids:removed});
+    for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by:_by,...stroke}=item;act({type:'board-add',stroke})}
+  }
+  // The teacher's toolbar sees every mark on a student's board. A change to the student's own mark (move, resize,
+  // recolor, nudge, delete, or undo of those) keeps it the student's, and only the teacher can make it. The toolbar's
+  // Clear gives an empty list: that clears the teacher's own marks only, never the student's work.
+  function syncTeacherBoardItems(board,list,act){
+    const owner=new Map(board.strokes.map(item=>[item.id,item.by])),keep=new Set(list.map(item=>item.id));
+    const gone=board.strokes.filter(item=>!keep.has(item.id)),fresh=list.filter(item=>!owner.has(item.id));
+    const strip=item=>{const {by:_by,...stroke}=item;return stroke};
+    const same=(a,b)=>(a.tool||'pen')===(b.tool||'pen')&&(a.text||'')===(b.text||'')&&a.points.length===b.points.length&&(a.image||'')===(b.image||'');
+    if(gone.length===1&&fresh.length===1&&gone[0].by==='student'&&same(gone[0],fresh[0])){
+      act({type:'board-put',stroke:strip(fresh[0]),replaces:gone[0].id,owner:'student'});return;
+    }
+    const clearing=!list.length&&gone.length>1;
+    const theirs=clearing?[]:gone.filter(item=>item.by==='student').map(item=>item.id);
+    if(theirs.length)act({type:'board-remove',ids:theirs,any:true});
+    // Marks that are the teacher's own: added, removed or moved as before. (A student's mark that came back is put back as his.)
+    const mine=list.filter(item=>item.id[0]==='t'&&(!owner.has(item.id)||owner.get(item.id)==='teacher'));
+    syncBoardItems(board,'teacher',mine,act);
+    for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
   }
   function boardFromMessage(list,rawText){
     const board=emptyBoard();
@@ -518,18 +564,7 @@
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
       getItems:()=>board.strokes.filter(item=>item.by==='student'),
-      setItems(list){
-        const mine=board.strokes.filter(item=>item.by==='student'),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
-        const gone=mine.filter(item=>!keep.has(item.id)),moved=new Set();
-        // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
-        for(const item of list){
-          const from=!had.has(item.id)&&item.image?gone.find(old=>old.image===item.image&&!moved.has(old.id)):null;
-          if(from){moved.add(from.id);moved.add(item.id);act({type:'board-move',id:from.id,newId:item.id,points:item.points})}
-        }
-        const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
-        if(removed.length)act({type:'board-remove',ids:removed});
-        for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by,...stroke}=item;act({type:'board-add',stroke})}
-      },
+      setItems(list){syncBoardItems(board,'student',list,act)},
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
@@ -1110,13 +1145,14 @@
     if(!m)setVideo(screenVideo,null);
     screenInk?.refresh();
     controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
+    syncAnnotate();
   }
   function setOn(next){
     if(next&&!B.started())return;
     on=next;suspended=false;if(!next)++workspaceRevision;drawer?.cancel();focusId=null;gridSize='';
     screenPermissionEnabled=next?(screenPermissionEnabled||mode==='screens'):false;
     for(const m of admitted())sendMode(m);
-    view.hidden=!on;screenInk?.refresh();
+    view.hidden=!on;screenInk?.refresh();syncAnnotate();
     if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student screens':'🖥 Student Screens'}
     // Only an explicit close disables capture; selecting Whiteboards must not.
     if(!on||mode==='screens')window.ClassPointerDashboard?.setStudentScreenSharing(screenPermissionEnabled).catch(error=>B.status('Could not update screen sharing permission: '+error.message));
@@ -1188,7 +1224,7 @@
   function hideWorkspace(){
     ++workspaceRevision;
     if(!on||suspended)return;
-    suspended=true;view.hidden=true;focusId=null;gridSize='';
+    suspended=true;view.hidden=true;focusId=null;gridSize='';syncAnnotate();
     setVideo(screenVideo,null);screenInk?.refresh();
     for(const tile of tiles.values())setVideo(tile.video,null);
     // Hide student whiteboards so My Screen can appear, without revoking any
@@ -1199,7 +1235,7 @@
   }
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
-    drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);
+    drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);syncAnnotate();
     // A student sharing from Shorashim or another activity is not joined to Pointer, so hiding his video is not enough:
     // record the pause as a screen-sharing permission so his browser stops capturing and the teacher stops receiving.
     if(mode==='screens'){const person=personId(m);if(person)updatePermission(person,'screens',!blocked.has(key))}
@@ -1207,15 +1243,48 @@
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
   function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;if(applyOp(boardFor(m),op,'teacher'))B.send(m.connection,op);dirty(m.id)}
-  drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)},board:()=>focusBoard()||emptyBoard(),apply:act,
+  drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)&&(!window.FTTAnnotate||tools.tool==='move')},board:()=>focusBoard()||emptyBoard(),apply:act,
     send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,op)},redraw:()=>{if(focusId)dirty(focusId)}});
+
+  // ---------- The shared drawing toolbar on the student board that is open large ----------
+  // This is the same toolbar as on my main whiteboard (annotation-toolbar.js). Its marks become ordinary board lines
+  // ("t" ids, by the teacher), so the student sees them live on his own whiteboard and they come back after he
+  // refreshes. A shared screen gets the same tools from screen-annotate.js.
+  const FA=window.FTTAnnotate;
+  const boardOpen=()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!focus.hidden&&!!m&&!isBlocked(m)};
+  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+    tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
+    toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
+    keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
+    historyKey:()=>'board:'+(focusMember()?.studentId||focusId||''),
+    label:()=>{const m=focusMember();return m?'You are writing on '+m.name+'’s board. They see it live.':''},
+    rect:()=>{if(!boardOpen())return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
+    // Every mark on the board: the student's too, so Select, move, resize, recolor, nudge and delete work on them.
+    getItems:()=>focusBoard()?.strokes.slice()||[],
+    setItems(list){if(boardOpen())syncTeacherBoardItems(focusBoard(),list,act)},
+    live(draft){
+      const m=focusMember();if(!m||!boardOpen())return;
+      const op={type:'board-draft',stroke:draft||null};
+      applyOp(boardFor(m),op,'teacher');B.send(m.connection,op);dirty(m.id);
+    }};
+  // The grid of all the boards: nothing can be drawn there, so the toolbar and the drawing layer step aside
+  // (a click always opens the board, whatever tool was picked) and the full toolbar comes back inside one board.
+  const gridOpen=()=>on&&!suspended&&!view.hidden&&!focusId&&!grid.hidden;
+  const gridSurface=FA&&{id:'student-grid',bare:true,rect:()=>{if(!gridOpen())return null;const r=grid.getBoundingClientRect();return r.width&&r.height?r:null},getItems:()=>[],setItems(){}};
+  function syncAnnotate(){
+    if(!boardInk)return;
+    if(boardOpen())FA.push(boardInk);else FA.release(boardInk);
+    if(gridOpen())FA.push(gridSurface);else FA.release(gridSurface);
+  }
+  // The old pen, eraser, color and size buttons are replaced by that toolbar (the Move button for a word stays).
+  if(FA)for(const node of Array.from(drawGroup.children))if(!node.classList.contains('danger')&&!node.classList.contains('boards-spacer'))node.style.display='none';
 
   document.addEventListener('classpointer:send-to-whiteboards',()=>void sendEveryone('boards'));
   document.addEventListener('classpointer:send-to-screens',()=>void sendEveryone('screens'));
   // A boy sharing from Shorashim (or another activity) connected, changed or stopped: refresh the tiles and the large viewer.
   document.addEventListener('classpointer:activity-screens',()=>{if(on){syncTiles();dirtyAll()}});
   toggle?.addEventListener('click',()=>setOn(!on));
-  setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
+  setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles();syncAnnotate()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
   controls();renderPermissions();void loadPermissionsRoster();
 

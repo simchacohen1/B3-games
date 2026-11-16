@@ -28,7 +28,7 @@ test('students see nothing unless sharing or a whiteboard is open; teachers alwa
 test('minimized or Hand/Pointer: the overlay catches no clicks',()=>{
   assert.match(toolbar,/#fttAnnotate\{position:fixed;inset:0;z-index:\$\{Z\};pointer-events:none;/);
   assert.match(toolbar,/const CAPTURES=new Set\(\['select','highlight','text','shape','eraser','pen'\]\);/);
-  assert.match(toolbar,/const on=mode==='open'&&!isDelegate\(s\)&&CAPTURES\.has\(st\.tool\)&&!!r;/);
+  assert.match(toolbar,/const on=mode==='open'&&!s\.bare&&!isDelegate\(s\)&&CAPTURES\.has\(st\.tool\)&&!!r;/);
   // The pointer dot follows the mouse with a passive listener, never a click-catching layer.
   assert.match(toolbar,/document\.addEventListener\('pointermove',e=>\{\s*if\(mode!=='open'\|\|st\.tool!=='pointer'\)return;/);
 });
@@ -61,7 +61,7 @@ test('screen sharing turns the student toolbar on and off',()=>{
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);
   assert.match(share,/if\(window\.FTTAnnotate\?\.owns\?\.\(target\)\)return true;/);
-  assert.match(share,/annotation-toolbar\.js\?v=20261109-annotate1/);
+  assert.match(share,/annotation-toolbar\.js\?v=20261116-gridtools1/);
   const boards=read('class-pointer-prototype/student-boards.js');
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);

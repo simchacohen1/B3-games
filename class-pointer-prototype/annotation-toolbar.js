@@ -444,14 +444,14 @@
     }
     // A tool or a kind that is not allowed here (any more) gives way to one that is.
     let changed=false;
-    if(!supports(s,st.tool)){st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';changed=true}
+    if(!s.bare&&!supports(s,st.tool)){st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';changed=true}
     for(const [tool] of toolButtons){
       const kinds=variantsOf(s,tool);
       if(kinds&&!kinds.some(k=>k[0]===variantOf(tool))){setVariant(tool,kinds[0][0]);if(tool===st.tool)changed=true}
     }
     if(changed||fresh)applyDelegate();
     const open=mode==='open';
-    bar.hidden=!open;pencil.hidden=open;if(!open){closeFly();tip.hidden=true}
+    bar.hidden=!open||!!s.bare;pencil.hidden=open||!!s.bare;if(!open||s.bare){closeFly();tip.hidden=true}
     for(const [tool,b] of toolButtons){
       const kinds=variantsOf(s,tool),kind=kinds&&kinds.find(k=>k[0]===variantOf(tool));
       b.disabled=!supports(s,tool);b.setAttribute('aria-pressed',String(tool===st.tool));
@@ -482,7 +482,7 @@
     }
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
-    colorBox.hidden=!drawing&&!isDelegate(s);sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
+    colorBox.hidden=!drawing&&!isDelegate(s)&&st.tool!=='select';sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
     sizeBox.replaceChildren(...sizes.map((v,i)=>{const b=btn('fa-size','<i></i>',['Small','Medium','Large'][i]||'Size',()=>{
         // Select: the size goes to the picked mark (thicker line, bigger words) and the tool stays Select.
@@ -506,7 +506,7 @@
   }
   function layoutCapture(){
     const s=surface(),r=s.rect?.();
-    const on=mode==='open'&&!isDelegate(s)&&CAPTURES.has(st.tool)&&!!r;
+    const on=mode==='open'&&!s.bare&&!isDelegate(s)&&CAPTURES.has(st.tool)&&!!r;
     capture.hidden=!on;capture.dataset.tool=st.tool;
     if(on){
       const key=[r.left,r.top,r.width,r.height].map(Math.round).join();
@@ -748,7 +748,7 @@
 
   // Keyboard: Delete removes the selected mark, Ctrl+Z undoes, Escape lets go.
   document.addEventListener('keydown',e=>{
-    if(mode==='hidden'||root.hidden)return;
+    if(mode==='hidden'||root.hidden||surface().bare)return;
     if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
     // One-letter shortcuts a surface asks for (the lesson: P, H, B, D, E, U). They also work while shrunk to the pencil.
     const s=surface(),hot=!e.ctrlKey&&!e.metaKey&&!e.altKey&&s.keys?s.keys[String(e.key).toLowerCase()]:null;
@@ -907,7 +907,7 @@
       sync();
     },
     // A surface: {id, label, rect(), getItems(), setItems(list), live?(draft,point), idPrefix, renders?, drawsPoint?,
-    //   defaultTool?, tools?, colors?, defaultColor?, sizes?(tool), maxItems?, maxPoints?, autoOpen?, delegate?,
+    //   bare? (no toolbar, no drawing layer: the page underneath stays clickable), defaultTool?, tools?, colors?, defaultColor?, sizes?(tool), maxItems?, maxPoints?, autoOpen?, delegate?,
     //   variants?: {tool: [[id, icon, name], ...]}, keys?: {letter: 'undo' | {tool, variant?}}}
     // delegate: {apply({tool, shape, variant, color, size, open}), minimized?(), undo?(), clear?(), clearMenu?: items}
     push(s){
