@@ -134,7 +134,7 @@ test('the page: one Open button, grid and list, remembered choices, folders with
   assert.match(js,/item\.starred\?'★':'☆'/);
   assert.match(js,/navButton\('All files'/);assert.match(js,/navButton\('⭐ Starred'/);
   assert.doesNotMatch(html,/Worksheets from your teacher/,'worksheets are listed with everything else');
-  assert.match(html,/my-files-core\.js\?v=20261116-myfiles2/);
+  assert.match(html,/my-files-core\.js\?v=20261116-myfiles3/);
 });
 
 test('the teacher\'s send: "Mark as important" on boards and worksheets, subject travels with it',()=>{
