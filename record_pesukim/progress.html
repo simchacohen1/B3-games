@@ -200,6 +200,12 @@
   .review-tile{ width:auto !important; height:auto !important; min-height:64px; padding:8px; text-decoration:none; }
   .review-tile .tile-num{ font-size:.9rem !important; font-family:'Quicksand',sans-serif !important; }
   .review-tile .tile-score{ font-size:.72rem !important; line-height:1.3; }
+  .earlier-title{ margin:22px 2px 8px; font-size:1.15rem; color:var(--ink); }
+  .posuk-tile.tile-both{ background:#E3ECF8; color:#1d3557; }
+  .posuk-tile .tile-score.pair{ display:flex; flex-direction:column; gap:2px; align-items:stretch; opacity:1; }
+  .posuk-tile .tile-score .sc{ display:block; padding:1px 4px; border-radius:6px; font-size:.62rem; font-weight:700; white-space:nowrap; text-align:center; }
+  .posuk-tile .sc.high{ background:#C9E4A6; color:#33511E; } .posuk-tile .sc.mid{ background:var(--gold-light); color:var(--ink); } .posuk-tile .sc.low{ background:#EFC1C1; color:#7A2626; }
+  .posuk-tile .tile-flag{ position:absolute; top:2px; right:4px; font-size:.8rem; }
 
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.9rem; margin-top:14px; }
   .hidden{ display:none !important; }
@@ -214,7 +220,7 @@
 
   <header class="top">
     <h1>📊 My Progress</h1>
-    <p>Your recordings: gold standard, waiting for your teacher, and ones to try again</p>
+    <p>Your recordings: gold standard, waiting for your teacher, and ones to try again. Below: your earlier results.</p>
   </header>
 
   <!-- Shown if no student is signed in on this browser -->
@@ -230,16 +236,17 @@
       <a href="student.html" class="btn small gold">← Back to Practice</a>
     </div>
 
-    <!-- Issue #694: three groups from the teacher's grades. The old
-         per-skill AI score tabs are kept hidden (no longer used). -->
-    <div class="tabs hidden">
-      <button class="tab-btn active" id="comprehensionTabBtn">🧠 Comprehension</button>
-      <button class="tab-btn" id="readingTabBtn">🎙️ Reading</button>
-      <button class="tab-btn" id="translateTabBtn">🌐 Translate</button>
-    </div>
+    <!-- Issue #694: three groups from the teacher's grades (one recording, read + translate together). -->
     <div id="reviewGroups"></div>
 
-    <div id="perekList" class="hidden"></div>
+    <!-- Earlier results, from before reading and translating became one recording. Reading and translation are shown side
+         by side for each posuk, never averaged. Comprehension now belongs to the Understand tool (Chumash חידון). -->
+    <h2 class="earlier-title" id="earlierTitle">📚 Your earlier results</h2>
+    <div class="tabs" id="progressTabs">
+      <button class="tab-btn active" id="readTranslateTabBtn">📖🌐 Read &amp; Translate</button>
+      <button class="tab-btn" id="comprehensionTabBtn">🧠 Comprehension</button>
+    </div>
+    <div id="perekList"></div>
     <div class="msg" id="statusMsg">Loading your progress…</div>
   </div>
 
@@ -444,7 +451,8 @@ async function getPerekRange(perekNum,sefer){
 let studentId = sessionStorage.getItem('posukPractice_studentId');
 let studentName = sessionStorage.getItem('posukPractice_studentName');
 
-let activeTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate'
+let activeTab = 'readtranslate'; // 'readtranslate' | 'comprehension'
+let reviewRows = {}; // posukKey -> the teacher's grade for that posuk (gold / pending / retry)
 let perekData = {}; // perekNum -> { posukNum -> {attempts,latest} }
 let rangeData = {}; // perekNum -> [{start,end,key,attempts,latest}] for multi-posuk practice
 let expandedState = {}; // perekNum -> bool
@@ -456,7 +464,7 @@ window.addEventListener('load', () => {
   }
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('studentNameLabel').textContent = studentName;
-  loadReviewProgress();
+  loadReviewProgress().then(loadProgress);
 });
 
 /* ---------- Teacher-graded groups (Issue #694) ---------- */
@@ -483,6 +491,7 @@ async function loadReviewProgress(){
   try{
     await waitForStudentAuth();
     const snap = await db.ref('posukPractice/reviews/' + studentId).once('value');
+    reviewRows = snap.val() || {};
     const rows = Object.entries(snap.val() || {}).map(([key, r]) => ({ key, ...(r || {}), ref: parseReviewKey(key) })).filter(r => r.ref);
     const order = (a, b) => SEFER_ORDER.indexOf(a.ref.sefer) - SEFER_ORDER.indexOf(b.ref.sefer) || a.ref.perek - b.ref.perek || a.ref.posuk - b.ref.posuk;
     const groups = [
@@ -506,22 +515,20 @@ async function loadReviewProgress(){
       return '<div class="perek-section expanded review-group"><div class="perek-header"><span>' + g.title + '</span><span class="summary">' + g.rows.length + '</span></div>' +
         '<div class="perek-body">' + (tiles ? '<div class="review-grid">' + tiles + '</div>' : '<div class="msg">' + g.empty + '</div>') + '</div></div>';
     }).join('');
-    statusMsg.textContent = rows.length ? '' : "You haven't sent any recordings to your teacher yet — go practice and come back!";
+    statusMsg.textContent = '';
   }catch(err){
     console.error(err);
     statusMsg.textContent = 'Could not load your progress — check your internet connection.';
   }
 }
 
+document.getElementById('readTranslateTabBtn').onclick = () => switchTab('readtranslate');
 document.getElementById('comprehensionTabBtn').onclick = () => switchTab('comprehension');
-document.getElementById('readingTabBtn').onclick = () => switchTab('reading');
-document.getElementById('translateTabBtn').onclick = () => switchTab('translate');
 
 function switchTab(tab){
   activeTab = tab;
+  document.getElementById('readTranslateTabBtn').classList.toggle('active', tab === 'readtranslate');
   document.getElementById('comprehensionTabBtn').classList.toggle('active', tab === 'comprehension');
-  document.getElementById('readingTabBtn').classList.toggle('active', tab === 'reading');
-  document.getElementById('translateTabBtn').classList.toggle('active', tab === 'translate');
   renderPerekList();
 }
 
@@ -532,7 +539,8 @@ async function loadProgress(){
     const snap = await db.ref('posukPractice/attempts/' + studentId).once('value');
     const val = snap.val();
     if(!val){
-      statusMsg.textContent = "You haven't recorded any pesukim yet — go practice and come back!";
+      document.getElementById('progressTabs').classList.add('hidden');document.getElementById('earlierTitle').classList.add('hidden');
+      statusMsg.textContent = Object.keys(reviewRows).length ? '' : "You haven't recorded any pesukim yet — go practice and come back!";
       return;
     }
 
@@ -694,6 +702,28 @@ function bestComprehensionDisplay(attempts){
     : null;
 }
 
+/* Old reading and translation results sit side by side for each posuk, never averaged. The tile has no one colour:
+   each score has its own colour chip. Returns null when this posuk has neither an old reading nor an old translation score. */
+function readTranslateCell(attempts){
+  const read = bestNumeric(attempts, effHebrewScore), translate = bestNumeric(attempts, effTranslationScore);
+  const chips = [];
+  if(typeof read === 'number') chips.push('<span class="sc ' + pctTier(read) + '">📖 Read ' + read + '%</span>');
+  if(typeof translate === 'number') chips.push('<span class="sc ' + pctTier(translate) + '">🌐 Translate ' + translate + '%</span>');
+  return chips.length ? { read, translate, html: chips.join('') } : null;
+}
+// The teacher's grade for a posuk (the new one-recording way), as a small mark on its tile.
+function reviewFlag(row){ return !row ? '' : row.status === 'gold' ? '🏅' : row.status === 'pending' ? '⏳' : row.status === 'retry' ? '🔁' : ''; }
+function slugKeyFor(sefer, perek, posuk){
+  const slug = Object.keys(PARSHA_TO_SEFER).find(s => PARSHA_TO_SEFER[s] === sefer && reviewRows[s + '_' + perek + '_' + posuk]);
+  return slug ? slug + '_' + perek + '_' + posuk : '';
+}
+// Comprehension opens in the Understand tool (Chumash חידון); read & translate opens the practice page.
+function tileHref(sefer, perek, posuk, endPosuk){
+  const end = endPosuk ? '&endPosuk=' + endPosuk : '';
+  return (activeTab === 'comprehension' ? 'student.html?tool=test-me&tab=comprehension&' : 'student.html?') +
+    'sefer=' + encodeURIComponent(sefer) + '&perek=' + perek + '&posuk=' + posuk + end;
+}
+
 function buildPerekSection(perekNum, sefer, range){
   const chapterKey=bookChapterId(sefer,perekNum);
   const posukScores = perekData[chapterKey] || {};
@@ -723,21 +753,11 @@ function buildPerekSection(perekNum, sefer, range){
     const attempts = bundle ? bundle.attempts : [];
 
     let tier = null;
-    let label = '—';
-    if(activeTab === 'reading'){
-      const score = bestNumeric(attempts, effHebrewScore);
-      if(typeof score === 'number'){
-        tier = pctTier(score);
-        label = score + '%';
-        doneCount++;
-      }
-    }else if(activeTab === 'translate'){
-      const score = bestNumeric(attempts, effTranslationScore);
-      if(typeof score === 'number'){
-        tier = pctTier(score);
-        label = score + '%';
-        doneCount++;
-      }
+    let label = '—', pair = false, flag = '';
+    if(activeTab === 'readtranslate'){
+      const cell = readTranslateCell(attempts);
+      if(cell){ tier = 'both'; label = cell.html; pair = true; doneCount++; }
+      flag = reviewFlag(reviewRows[slugKeyFor(sefer, perekNum, posukNum)]);
     }else{
       const info = bestComprehensionDisplay(attempts);
       if(info){
@@ -751,9 +771,10 @@ function buildPerekSection(perekNum, sefer, range){
     // recording page itself, as if they'd picked it from the dropdowns —
     // their existing recording/history is right there ready to review.
     const tile = document.createElement('a');
-    tile.href = `student.html?sefer=${encodeURIComponent(sefer)}&perek=${perekNum}&posuk=${posukNum}&tab=${activeTab}`;
+    tile.href = tileHref(sefer, perekNum, posukNum, null);
     tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
-    tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${label}</span>`;
+    tile.style.position = 'relative';
+    tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score${pair ? ' pair' : ''}">${label}</span>${flag ? '<span class="tile-flag" title="Your teacher grade">' + flag + '</span>' : ''}`;
     grid.appendChild(tile);
   }
 
@@ -768,25 +789,22 @@ function buildPerekSection(perekNum, sefer, range){
     rangeWrap.innerHTML = '<div style="font-weight:800;color:var(--ink-soft);margin-bottom:8px;">Several פסוקים together</div>';
     ranges.forEach(r => {
       const attempts = r.attempts || [];
-      let tier = null, label = '—';
-      if(activeTab === 'reading'){
-        const score = bestNumeric(attempts, effHebrewScore);
-        if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
-      }else if(activeTab === 'translate'){
-        const score = bestNumeric(attempts, effTranslationScore);
-        if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
+      let tier = null, label = '—', pair = false;
+      if(activeTab === 'readtranslate'){
+        const cell = readTranslateCell(attempts);
+        if(cell){ tier = 'both'; label = cell.html; pair = true; }
       }else{
         const info = bestComprehensionDisplay(attempts);
         if(info){ tier = info.tier; label = info.label; }
       }
       const a = document.createElement('a');
-      a.href = `student.html?sefer=${encodeURIComponent(sefer)}&perek=${perekNum}&posuk=${r.start}&endPosuk=${r.end}&tab=${activeTab}`;
+      a.href = tileHref(sefer, perekNum, r.start, r.end);
       a.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
       a.style.display = 'inline-flex';
       a.style.width = 'auto';
       a.style.minWidth = '118px';
       a.style.margin = '0 8px 8px 0';
-      a.innerHTML = `<span class="tile-num">${hebrewNumeral(r.start)}–${hebrewNumeral(r.end)}</span><span class="tile-score">${label}</span>`;
+      a.innerHTML = `<span class="tile-num">${hebrewNumeral(r.start)}–${hebrewNumeral(r.end)}</span><span class="tile-score${pair ? ' pair' : ''}">${label}</span>`;
       rangeWrap.appendChild(a);
     });
     body.appendChild(rangeWrap);
