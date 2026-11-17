@@ -668,7 +668,7 @@
       // A handle of the mark that is already picked comes first: drag it to resize.
       const picked=selected&&itemsOf(s).find(i=>i.id===selected),handle=picked&&handleAt(picked,p.px,p.py,p.w,p.h);
       if(handle){drag={start:p,item:picked,resize:handle.id,points:picked.points,moved:false};scheduleRender();return}
-      const hit=topHit(s,p,true);selected=hit?hit.id:null;
+      const hit=topHit(s,p,true);selected=hit?hit.id:null;sync();
       drag=hit?{start:p,item:hit,moved:false}:null;scheduleRender();return;
     }
     if(st.tool==='eraser'){drag={erased:new Set(),before:itemsOf(s)};eraseAt(s,p);return}
@@ -771,7 +771,7 @@
   function deleteSelected(){
     const s=surface();if(!selected||isDelegate(s))return false;
     const items=itemsOf(s),next=items.filter(i=>i.id!==selected);selected=null;
-    if(next.length!==items.length){commit(s,next);return true}
+    if(next.length!==items.length){commit(s,next);sync();return true}
     return false;
   }
 
@@ -838,7 +838,7 @@
     else if(selected&&ARROW_STEP[e.key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){if(nudgeSelected(ARROW_STEP[e.key],e.shiftKey?10:1)){e.preventDefault();e.stopPropagation()}}
     // Escape closes an open little menu first (and nothing else, so a full-screen lesson stays open).
     else if(e.key==='Escape'&&flyOpen){e.stopPropagation();closeFly()}
-    else if(e.key==='Escape'&&selected){selected=null;scheduleRender()}
+    else if(e.key==='Escape'&&selected){selected=null;scheduleRender();sync()}
     else if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'&&CAPTURES.has(st.tool)){e.preventDefault();e.stopPropagation();undo()}
   },true);
 

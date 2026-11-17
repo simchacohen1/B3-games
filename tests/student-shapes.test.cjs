@@ -69,6 +69,10 @@ test('the toolbar makes filled shapes, and a picked shape gets an Outline / Fill
   assert.match(toolbar,/changeItem\(now,item,\{fill:filled\?true:undefined\}\)/);
   // Clicking a filled shape anywhere inside picks it.
   assert.match(toolbar,/if\(inside\|\|s\.fill===true\)return true;/);
+  // The Outline / Filled choice follows what is picked: the bar is redrawn when a mark is picked, put down or deleted.
+  assert.match(toolbar,/const hit=topHit\(s,p,true\);selected=hit\?hit\.id:null;sync\(\);/);
+  assert.match(toolbar,/commit\(s,next\);sync\(\);return true/);
+  assert.match(toolbar,/e\.key==='Escape'&&selected\)\{selected=null;scheduleRender\(\);sync\(\)\}/);
   assert.match(toolbar,/\['rect','ellipse','triangle','line','arrow'\]\.includes\(d\.tool\)/,'a tiny triangle is dropped like any tiny shape');
 });
 
@@ -89,9 +93,9 @@ test('a student\'s whiteboard keeps the fill and the triangle; the worksheet and
 test('student pages load the new toolbar and board scripts (new versions)',()=>{
   const share=read('activity-share.js');
   const toolbarToken=share.match(/annotation-toolbar\.js\?v=([^'"]+)/)[1],boardsToken=share.match(/student-boards\.js\?v=([^'"]+)/)[1];
-  assert.match(toolbarToken,/shapes1$/);assert.match(boardsToken,/shapes1$/);
+  assert.match(toolbarToken,/shapes2$/);assert.match(boardsToken,/shapes1$/);
   for(const page of ['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html','index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261116-shapes1/,page);
-  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=20261116-shapes1/);
-  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261116-shapes1/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261116-shapes1/);
+    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261116-shapes2/,page);
+  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);
+  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261116-shapes1/);
 });
