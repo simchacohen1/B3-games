@@ -131,7 +131,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261116-wbplus1"'),'classroom-core');
  assert.match(html,/"classroom\.js\?v=20261116-drawperm1"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261116-wbplus1"/,'pdf-mode');
+ assert.match(html,/"pdf-mode\.js\?v=20261116-wbplus3"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -140,7 +140,7 @@ test('pasted words can be recolored and resized: a size click in Select goes to 
  assert.match(toolbar,/if\(st\.tool==='select'&&\(isDelegate\(now\)\?now\.delegate\.resize\?\.\(v\):resizeSelected\(now,v\)\)\)\{st\.sizeIndex=i;sync\(\);return\}/);
  assert.match(annotate,/resize:size=>!!window\.ClassPointerPdf\?\.resizeSelected\?\.\(size\)/);
  assert.match(pdf,/function resizeSelected\(size\)\{/);
- assert.match(pdf,/activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShapeFilled,/);
+ assert.match(pdf,/activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShape,/);
  // The lesson accepts only its three sizes, so a text mark changed this way stays valid for every student page.
  const store=new C.HighlightStore();
  store.add('teacher',{tool:'text',color:'#1f2937',size:.016,points:[{x:.3,y:.3},{x:.5,y:.34}],text:'שלום'});

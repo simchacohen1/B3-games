@@ -109,23 +109,50 @@ test('colors: a full set with white, plus a custom picker that goes to the class
   assert.match(toolbar,/customInput\.addEventListener\('input',\(\)=>pickColor\(customInput\.value\.toLowerCase\(\)\)\)/);
   assert.match(toolbar,/\.\.\.\(s\.customColor\?\[customBtn\]:\[\]\)/);
   assert.match(toolbar,/!\(s\.customColor&&\/\^#\[0-9a-f\]\{6\}\$\/i\.test\(st\.color\)\)/,'a custom color is not reset to a palette color');
-  assert.match(annotate,/customColor:teacher,fill:teacher,/);
+  assert.match(annotate,/customColor:teacher,\r?\n/);
   assert.match(annotate,/function setColor\(color\)\{/);
   assert.match(annotate,/if\(tool!=='hand'&&tool!=='eraser'&&tool!=='select'\)\{setColor\(color\);set\(sizeSel,size\)\}/);
   // Select + a color still recolors the picked mark (fill and font stay).
   assert.match(pdf,/changeMarks\(textBlock\(stroke\)\.map\(item=>\[item\.id,\{\.\.\.item,color:color\.toLowerCase\(\)\}\]\)\)/);
 });
 
-test('shapes: a Fill switch on the toolbar for new shapes and for a picked shape',()=>{
-  assert.match(toolbar,/fillBtn\.hidden=!\(s\.fill&&\(st\.tool==='shape'\|\|st\.tool==='select'\)\)/);
-  assert.match(toolbar,/fill:st\.fill,open:mode==='open'/);
-  assert.match(annotate,/window\.ClassPointerPdf\?\.setFill\?\.\(tool==='shape'&&fill===true\)/);
-  assert.match(annotate,/fill:on=>!!window\.ClassPointerPdf\?\.fillSelected\?\.\(on\)/);
-  assert.match(annotate,/fillState:\(\)=>window\.ClassPointerPdf\?\.pickedShapeFilled\?\.\(\)\?\?null/);
-  assert.match(toolbar,/now\.delegate\.fill\?\.\(!now\.delegate\.fillState\?\.\(\)\)/,'with Select the switch fills the picked shape or empties it');
+test('shapes: each closed shape comes twice in the Shapes menu (outline and filled); no Fill switch',()=>{
+  // The menu, in order, from the adapter's own list.
+  const list=annotate.match(/const SHAPES=\[(.*)\];\r?\n/)[1];
+  const kinds=[...list.matchAll(/\['([a-z]+)','([^']+)','([^']+)','([a-z-]+)'(,true)?\]/g)].map(m=>({id:m[1],icon:m[2],name:m[3],tool:m[4],filled:!!m[5]}));
+  assert.deepEqual(kinds.map(k=>k.name),['Rectangle','Filled rectangle','Circle','Filled circle','Triangle','Filled triangle','Line','Arrow']);
+  assert.deepEqual(kinds.filter(k=>k.filled).map(k=>k.tool),['rectangle','ellipse','triangle'],'a filled one for each closed shape; the line and the arrow stay as they were');
+  for(const tool of ['rectangle','ellipse','triangle']){
+    const pair=kinds.filter(k=>k.tool===tool);assert.equal(pair.length,2,tool);
+    assert.notEqual(pair[0].icon,pair[1].icon,'two different icons: an outline and a filled one');
+  }
+  assert.deepEqual(kinds.filter(k=>['line','pen-arrow'].includes(k.tool)).map(k=>k.filled),[false,false]);
+  // Choosing a filled kind draws filled shapes; any other kind draws outlines.
+  assert.match(annotate,/window\.ClassPointerPdf\?\.setFill\?\.\(tool==='shape'&&SHAPES\.find\(kind=>kind\[0\]===variant\)\?\.\[4\]===true\)/);
   assert.match(pdf,/\.\.\.\(shapeFill&&C\.FILLABLE\.includes\(tool\)\?\{fill:true\}:\{\}\)/);
+  // The Fill switch is gone from the toolbar, and nothing else refers to it.
+  assert.doesNotMatch(toolbar,/fillBtn|fa-fill|st\.fill|Fill shapes/);
+  assert.doesNotMatch(annotate,/fillState|fill:teacher|fill===true\);/);
+  // The chosen kind is highlighted in the menu (the toolbar's own variant menu marks the chosen one).
+  assert.match(toolbar,/pressed:id===variantOf\(tool\)/);
+  // A change to the lesson's tool menu keeps the filled kind that is chosen (outline and filled share one tool value).
+  assert.match(annotate,/variant=current&&valueOf\(current\)===v\?current\[0\]:SHAPES\.find\(kind=>valueOf\(kind\)===v\)\[0\]/);
+});
+
+test('a picked shape: a clear Outline / Filled choice with the same two icons, highlighting the one it has now',()=>{
+  // toolbar
+  assert.match(toolbar,/styleBox\.hidden=!shapeInfo/);
+  assert.match(toolbar,/const shapeInfo=st\.tool==='select'&&isDelegate\(s\)\?s\.delegate\.shapeStyle\?\.\(\):null/);
+  assert.match(toolbar,/outlineBtn\.querySelector\('\.fa-ai'\)\.textContent=shapeInfo\.outline;filledBtn\.querySelector\('\.fa-ai'\)\.textContent=shapeInfo\.filled/);
+  assert.match(toolbar,/outlineBtn\.setAttribute\('aria-pressed',String\(!shapeInfo\.filledNow\)\);filledBtn\.setAttribute\('aria-pressed',String\(!!shapeInfo\.filledNow\)\)/);
+  assert.match(toolbar,/'Outline: only the line',\(\)=>setPickedShape\(false\)/);assert.match(toolbar,/'Filled with its color',\(\)=>setPickedShape\(true\)/);
+  assert.match(toolbar,/\.fa-style\[aria-pressed=true\]/);
+  // adapter and board: the picked shape and its icons come from the same list as the menu
+  assert.match(annotate,/shapeStyle:\(\)=>\{const p=window\.ClassPointerPdf\?\.pickedShape\?\.\(\);if\(!p\)return null;return\{outline:shapeNamed\(p\.tool,false\)\?\.\[1\]\|\|'▭',filled:shapeNamed\(p\.tool,true\)\?\.\[1\]\|\|'▬',filledNow:p\.filled\}\}/);
+  assert.match(annotate,/setShapeStyle:filled=>!!window\.ClassPointerPdf\?\.fillSelected\?\.\(filled\)/);
+  assert.match(annotate,/JSON\.stringify\(window\.ClassPointerPdf\?\.pickedShape\?\.\(\)\|\|null\),B\.lessonKind/,'the toolbar is redrawn when another shape is picked');
+  assert.match(pdf,/const pickedShape=\(\)=>\{const stroke=selecting\(\)\?selectedStroke\(\):null;return !!stroke&&C\.FILLABLE\.includes\(stroke\.tool\)\?\{tool:stroke\.tool,filled:stroke\.fill===true\}:null\};/);
   assert.match(pdf,/function fillSelected\(on\)\{/);
-  assert.match(pdf,/setFill,fillSelected,pickedShapeFilled,/);
 });
 
 test('Save, My files and Send to class are right on the toolbar, and still under More',()=>{

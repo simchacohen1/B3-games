@@ -193,7 +193,7 @@
   const stack=[];                // surfaces pushed by other scripts (top = last)
   let mode='hidden';             // hidden | mini | open
   let autoOpened=false;
-  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1,fill:false};
+  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1};
   const TOOL_ICON=Object.fromEntries(TOOLS.map(t=>[t[0],t[1]]));
   let actionsFn=null;            // page buttons under the tools (setActions)
   const toolColors={pen:PALETTE[1][0],highlight:PALETTE[6][0],shape:PALETTE[1][0],text:PALETTE[1][0]};
@@ -270,7 +270,8 @@
 #fttAnnotate .fa-custom{position:relative;box-sizing:border-box;display:block;overflow:hidden;background:conic-gradient(#f44336,#ffeb3b,#4caf50,#00bcd4,#3f51b5,#e91e63,#f44336)}
 #fttAnnotate .fa-custom[data-active=true]{background:var(--c)}
 #fttAnnotate .fa-custom input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);opacity:0;cursor:pointer;padding:0;border:0}
-#fttAnnotate .fa-fill[aria-pressed=true]{background:#dbe7ff;border-color:#2563eb}
+#fttAnnotate .fa-shapestyle{display:flex;flex-direction:column;gap:3px}
+#fttAnnotate .fa-style[aria-pressed=true]{background:#dbe7ff;border-color:#2563eb}
 #fttAnnotate .fa-color[aria-pressed="true"]{outline:3px solid #3b82f6;outline-offset:1px}
 #fttAnnotate .fa-sizes{display:flex;gap:2px}
 #fttAnnotate .fa-size{width:17px;height:24px;border:0;border-radius:6px;background:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
@@ -361,14 +362,13 @@
   const pair=document.createElement('div');pair.className='fa-pair';pair.append(undoBtn,clearBtn);
   const actionBox=document.createElement('div');actionBox.className='fa-actions';actionBox.hidden=true;
   const minBtn=btn('fa-small fa-min','➖ Hide','Shrink the toolbar to a pencil button. Clicks go to the page.',()=>minimize());
-  // Shapes: Fill (the shape is colored in, for diagrams).
-  const fillBtn=btn('fa-small fa-fill','<span class="fa-ai">▣</span><span class="fa-al">Fill</span>','Fill shapes with the chosen color',()=>{
-    const now=surface();
-    // Select: the picked shape is filled, or emptied again if it was filled (nothing happens when no shape is picked).
-    if(st.tool==='select'&&isDelegate(now)){now.delegate.fill?.(!now.delegate.fillState?.());sync();return}
-    st.fill=!st.fill;applyDelegate();sync();
-  });fillBtn.hidden=true;
-  bar.append(sep1,colorBox,sizeBox,fillBtn,sep2,pair,actionBox,minBtn);
+  // A picked shape: outline or filled (shown only with Select while a shape is picked).
+  const styleBox=document.createElement('div');styleBox.className='fa-shapestyle';styleBox.setAttribute('role','group');styleBox.setAttribute('aria-label','The picked shape: outline or filled');styleBox.hidden=true;
+  function setPickedShape(filled){const now=surface();if(isDelegate(now))now.delegate.setShapeStyle?.(filled);sync()}
+  const outlineBtn=btn('fa-small fa-style','<span class="fa-ai"></span><span class="fa-al">Outline</span>','Outline: only the line',()=>setPickedShape(false));
+  const filledBtn=btn('fa-small fa-style','<span class="fa-ai"></span><span class="fa-al">Filled</span>','Filled with its color',()=>setPickedShape(true));
+  styleBox.append(outlineBtn,filledBtn);
+  bar.append(sep1,colorBox,sizeBox,styleBox,sep2,pair,actionBox,minBtn);
   root.append(ink,capture,fly,bar,pencil,tip);
   pencil.addEventListener('click',()=>openBar());
   // Clicks and mouse moves on the toolbar never reach the page or the lesson underneath.
@@ -470,7 +470,7 @@
   }
   function applyDelegate(){
     const s=surface();if(!isDelegate(s))return;
-    try{s.delegate.apply({tool:st.tool,shape:st.shape,variant:variantOf(st.tool),color:st.color,size:currentSize(s),fill:st.fill,open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
+    try{s.delegate.apply({tool:st.tool,shape:st.shape,variant:variantOf(st.tool),color:st.color,size:currentSize(s),open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
   }
   function sync(){
     mount();
@@ -523,8 +523,13 @@
     // The custom color shows as the chosen swatch while the color is not one of the palette's.
     if(s.customColor){const custom=!colors.some(c=>c[0]===st.color)&&/^#[0-9a-f]{6}$/i.test(st.color);customBtn.dataset.active=String(custom);if(custom){customBtn.dataset.color=st.color;customBtn.style.setProperty('--c',st.color)}else customBtn.dataset.color='custom'}
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
-    // Fill: new shapes are filled with the chosen color; with Select it fills or empties the picked shape.
-    fillBtn.hidden=!(s.fill&&(st.tool==='shape'||st.tool==='select'));fillBtn.setAttribute('aria-pressed',String(st.tool==='select'&&isDelegate(s)?s.delegate.fillState?.()===true:!!st.fill));
+    // Select with a shape picked: a clear choice between outline and filled, with the same two icons as the Shapes menu.
+    const shapeInfo=st.tool==='select'&&isDelegate(s)?s.delegate.shapeStyle?.():null;
+    styleBox.hidden=!shapeInfo;
+    if(shapeInfo){
+      outlineBtn.querySelector('.fa-ai').textContent=shapeInfo.outline;filledBtn.querySelector('.fa-ai').textContent=shapeInfo.filled;
+      outlineBtn.setAttribute('aria-pressed',String(!shapeInfo.filledNow));filledBtn.setAttribute('aria-pressed',String(!!shapeInfo.filledNow));
+    }
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
     colorBox.hidden=!drawing&&!isDelegate(s)&&st.tool!=='select';sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);

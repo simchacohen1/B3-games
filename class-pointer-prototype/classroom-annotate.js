@@ -29,7 +29,11 @@
   // [toolbar kind, icon, name, value in the lesson's tool menu (when it differs)]
   const POINTERS=[['target','◎','Target'],['arrow','➤','Arrow'],['star','★','Star'],['heart','♥','Heart'],['paw','🐾','Paw print'],['sparkle','✦','Sparkle']];
   const HIGHLIGHTS=[['highlight','🖍','Highlighter'],['box','▧','Highlight box']];
-  const SHAPES=[['rect','▭','Rectangle','rectangle'],['ellipse','◯','Circle','ellipse'],['line','━','Line','line'],['arrow','➜','Arrow','pen-arrow'],['triangle','△','Triangle','triangle']];
+  // Each closed shape comes twice: an outline and a filled one (the filled one is the same tool, drawn filled with its color).
+  // [toolbar kind, icon, name, value in the lesson's tool menu, filled?]
+  const SHAPES=[['rect','▭','Rectangle','rectangle'],['rectf','▬','Filled rectangle','rectangle',true],['ellipse','◯','Circle','ellipse'],['ellipsef','⬤','Filled circle','ellipse',true],['triangle','△','Triangle','triangle'],['trianglef','▲','Filled triangle','triangle',true],['line','━','Line','line'],['arrow','➜','Arrow','pen-arrow']];
+  let shapeVariant='rect';
+  const shapeNamed=(value,filled)=>SHAPES.find(kind=>valueOf(kind)===value&&(kind[4]===true)===filled);
   const valueOf=kind=>kind[3]||kind[0];
   // The teacher's choices show up as disabled options in the student's tool menu.
   const allowed=value=>{if(toolSel.disabled)return false;const o=Array.from(toolSel.options).find(o=>o.value===value);return !!o&&!o.disabled};
@@ -82,7 +86,7 @@
     // Only the tools this lesson has are shown; words have their own size control under the lesson.
     hideUnused:true,ownTextSize:true,
     // A color of your own, and Fill for shapes (the teacher's whiteboard, PDF and webpage marks).
-    customColor:teacher,fill:teacher,
+    customColor:teacher,
     keys:{p:{tool:'pointer'},h:{tool:'highlight',variant:'highlight'},b:{tool:'highlight',variant:'box'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
     get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. The arrow picks your marks and works as your mouse.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
     rect:()=>lessonOn()&&inFront()?stage.getBoundingClientRect():null,
@@ -90,25 +94,24 @@
     defaultColor:teacher?undefined:'',
     sizes:()=>sizes.length?sizes:undefined,
     delegate:{
-      apply({tool,variant,color,size,fill,open}){
+      apply({tool,variant,color,size,open}){
         if(fromLesson)return;
         B.setNavigation?.(arrow(tool)&&open);
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
-        else if(tool==='shape')set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]));
+        else if(tool==='shape'){shapeVariant=variant;set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]))}
         else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
         if(tool!=='hand'&&tool!=='eraser'&&tool!=='select'){setColor(color);set(sizeSel,size)}
-        // New shapes are filled with their color when the Fill switch is on.
-        window.ClassPointerPdf?.setFill?.(tool==='shape'&&fill===true);
+        // A filled kind of shape draws filled with its color.
+        window.ClassPointerPdf?.setFill?.(tool==='shape'&&SHAPES.find(kind=>kind[0]===variant)?.[4]===true);
       },
       minimized(){B.setNavigation?.(false)},
       // Select: a color click recolors the picked mark (true = handled, the tool stays Select).
       recolor:color=>!!window.ClassPointerPdf?.recolorSelected?.(color),
       // Select: a size click makes the picked mark (words too) smaller or bigger.
       resize:size=>!!window.ClassPointerPdf?.resizeSelected?.(size),
-      // Select: the Fill switch fills the picked shape with its color, or empties it again.
-      fill:on=>!!window.ClassPointerPdf?.fillSelected?.(on),
-      // Select: is the picked shape filled? (true / false, or null when no shape is picked)
-      fillState:()=>window.ClassPointerPdf?.pickedShapeFilled?.()??null,
+      // Select: a picked shape can be an outline or filled (the same two icons as in the Shapes menu). null when no shape is picked.
+      shapeStyle:()=>{const p=window.ClassPointerPdf?.pickedShape?.();if(!p)return null;return{outline:shapeNamed(p.tool,false)?.[1]||'▭',filled:shapeNamed(p.tool,true)?.[1]||'▬',filledNow:p.filled}},
+      setShapeStyle:filled=>!!window.ClassPointerPdf?.fillSelected?.(filled),
       undo(){click(teacher?'undoTeacherHighlight':'undoStudentHighlight')},
       // A student can only clear his own drawings. The teacher gets the four choices.
       clear:teacher?undefined:()=>click('clearStudentHighlights'),
@@ -126,7 +129,7 @@
     const v=toolSel.value;let tool=null,variant;
     if(POINTERS.some(kind=>kind[0]===v)){tool='pointer';variant=v}
     else if(HIGHLIGHTS.some(kind=>kind[0]===v)){tool='highlight';variant=v}
-    else if(SHAPES.some(kind=>valueOf(kind)===v)){tool='shape';variant=SHAPES.find(kind=>valueOf(kind)===v)[0]}
+    else if(SHAPES.some(kind=>valueOf(kind)===v)){tool='shape';const current=SHAPES.find(kind=>kind[0]===shapeVariant);variant=current&&valueOf(current)===v?current[0]:SHAPES.find(kind=>valueOf(kind)===v)[0]}
     else if(['pen','text','eraser','select'].includes(v))tool=v;
     if(!tool||FA.state().surface!=='classroom')return;
     fromLesson=true;try{FA.select(tool,{variant})}finally{fromLesson=false}
@@ -198,7 +201,7 @@
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,
+    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 

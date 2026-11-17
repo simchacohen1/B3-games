@@ -750,7 +750,8 @@
     if(stroke.color!==color.toLowerCase()&&!changeMarks(textBlock(stroke).map(item=>[item.id,{...item,color:color.toLowerCase()}])))B.status('That color cannot be used for this mark.');
     return true;
   }
-  // Fill for new shapes (the toolbar's Fill switch), and for a picked shape: filled with its own color, or open again.
+  // New shapes are drawn filled when the filled kind of shape is chosen on the toolbar; a picked shape can be switched between
+  // outline and filled (filled with its own color).
   function setFill(on){shapeFill=!!on}
   function fillSelected(on){
     if(!selecting())return false;const stroke=selectedStroke();
@@ -758,7 +759,8 @@
     if((stroke.fill===true)!==!!on&&!changeMarks([[stroke.id,{...stroke,fill:!!on}]]))B.status('That shape could not be changed.');
     return true;
   }
-  const pickedShapeFilled=()=>{const stroke=selecting()?selectedStroke():null;return !!stroke&&C.FILLABLE.includes(stroke.tool)?stroke.fill===true:null};
+  // The picked shape, or null: {tool:'rectangle'|'ellipse'|'triangle', filled:boolean}.
+  const pickedShape=()=>{const stroke=selecting()?selectedStroke():null;return !!stroke&&C.FILLABLE.includes(stroke.tool)?{tool:stroke.tool,filled:stroke.fill===true}:null};
   // A size click on the toolbar while Select is chosen: a thicker or thinner line, or bigger or smaller words.
   // True = handled. Words keep their top line and their starting edge; the lines are spaced again for the new size.
   function resizeSelected(size){
@@ -1584,7 +1586,7 @@
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
-    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityTextScale,activityBoardBox,activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShapeFilled,
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityTextScale,activityBoardBox,activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShape,
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),
