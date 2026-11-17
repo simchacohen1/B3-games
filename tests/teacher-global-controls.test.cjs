@@ -73,7 +73,7 @@ test('a button press is never silent: with no class chosen it asks which class (
 });
 
 test('pages fetch the fixed toolbar, not a cached older copy', () => {
-  const version = /teacher-global-controls\.js\?v=20261116-quickbar1/;
+  const version = /teacher-global-controls\.js\?v=20261116-shapes2/;
   assert.match(read('gallery-share.js'), version);
   assert.match(read('teacher-global-bootstrap.js'), version);
   assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);

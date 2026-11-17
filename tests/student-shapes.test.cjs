@@ -99,3 +99,9 @@ test('student pages load the new toolbar and board scripts (new versions)',()=>{
   assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);
   assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261116-shapes1/);
 });
+
+test('the teacher pencil on regular activity pages loads the current toolbar (new shapes)', () => {
+  const g = read('teacher-global-controls.js');
+  assert.match(g, /annotation-toolbar\.js\?v=20261116-shapes2/);
+  assert.doesNotMatch(g, /annotate1/);
+});
