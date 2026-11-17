@@ -223,8 +223,8 @@
     setTimeout(()=>window.dispatchEvent(new Event('resize')),60);
   }
 
-  // Back on My screen the toolbar starts on the Pointer.
-  document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select('pointer')});
+  // Back on My screen: a whiteboard goes back to the pen (a drawing there must draw), anything else to the pointer.
+  document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select(teacher&&B.lessonKind?.()==='whiteboard'?'pen':'pointer')});
 
   // While a lesson is open the message line sits in the free room of the tabs row (one line; hover shows all of
   // it), so the lesson gets its row. Without a lesson it goes back to where it was.

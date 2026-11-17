@@ -303,7 +303,9 @@ function init(){
   const live=R()?.list()||[];
   const inClass=live.filter(m=>m.admitted).length,waiting=live.length-inClass;
   const total=(S()?.loaded?.()?list.length:0);
-  joined.textContent=(total?inClass+' of '+total+' joined':inClass?inClass+' joined':'No students yet')+(waiting?' · '+waiting+' waiting':'');
+  // "Joined" only counts who is connected. Say so when nothing is being shown, because then they see no lesson.
+  let idle=false;try{idle=!!stage&&!docOpen()&&!sharingScreen()&&!document.body.classList.contains('boards-on')}catch{}
+  joined.textContent=(total?inClass+' of '+total+' joined':inClass?inClass+' joined':'No students yet')+(waiting?' · '+waiting+' waiting':'')+(idle&&inClass?' · nothing shown':'');
   joined.classList.toggle('cp-joined-alert',waiting>0);
  }
  document.addEventListener('classpointer:roster',queueRender);
@@ -424,8 +426,13 @@ function init(){
   else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
  });
 
+ let wasLive=false;
  function syncLive(){
   const isLive=docOpen()||sharingScreen();
+  // Leaving the whiteboard (or a PDF, webpage or screen share): the old "Whiteboard open for everyone…" line must go.
+  if(wasLive&&!isLive){const line=$('connectionStatus');if(line)line.textContent='Nothing is shown to students right now. Pick what to teach from.'}
+  const changed=wasLive!==isLive;wasLive=isLive;
+  if(changed){try{syncJoined()}catch{}}
   const boards=document.body.classList.contains('boards-on');
   document.body.classList.toggle('cp-is-live',isLive);
   pickerCard.hidden=isLive||boards||panel.hidden;

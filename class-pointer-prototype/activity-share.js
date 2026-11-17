@@ -86,13 +86,13 @@
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-shapes2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-shapes1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261117-send1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -560,7 +560,10 @@
       const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
     }
     function retryLesson(){
-      if(!admitted||!lessonActive||!presenceConn?.open||lessonRetryTimer||lessonRetries>=6)return;
+      if(!admitted||!lessonActive||!presenceConn?.open||lessonRetryTimer)return;
+      // The picture stopped and did not come back (the teacher stopped showing it, or the connection is poor). Do not sit on
+      // "Reconnecting…" forever: say what is going on and let the student go back to work.
+      if(lessonRetries>=6){lessonStatus.textContent='Waiting for your teacher… Nothing is showing right now. Press Back to Activity to keep working; the lesson comes back by itself.';return}
       lessonStatus.textContent='Reconnecting to your teacher…';
       lessonRetryTimer=later(()=>{lessonRetryTimer=null;if(admitted&&lessonActive&&presenceConn?.open){lessonRetries++;presenceConn.send({type:'lesson-retry',id:lessonId});lessonReceiveTimer=later(retryLesson,15000)}},1500);
     }

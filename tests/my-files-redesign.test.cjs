@@ -141,7 +141,7 @@ test('the teacher\'s send: "Mark as important" on boards and worksheets, subject
   const boards=read('class-pointer-prototype/student-boards.js'),lib=read('class-pointer-prototype/pdf-library.js'),saved=read('class-pointer-prototype/saved-work.js');
   assert.match(boards,/box\.id='boardsImportant'/);assert.match(boards,/Mark as important/);
   assert.match(boards,/raw\.important===true\?\{important:true\}/);
-  assert.match(boards,/keepTeacherCopy\?\.\(\{kind:'image',data:activity\.data,subject:activity\.subject,important:activity\.important\}\)/);
+  assert.match(boards,/keepTeacherCopy\?\.\(\{kind:'image',data:activity\.data,id:activity\.id,subject:activity\.subject,important:activity\.important\}\)/);
   assert.match(lib,/Mark as important/);assert.match(lib,/function askSend\(title\)/);
   assert.match(saved,/\{subject:file\.subject\|\|''\}/,'a board sent from a subject folder carries the subject');
   assert.match(saved,/subject:Core\.cleanName\(activity\.subject,Core\.LIMITS\.folderName\),fromTeacher:true,important:activity\.important===true/);

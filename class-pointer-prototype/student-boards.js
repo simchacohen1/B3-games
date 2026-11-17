@@ -86,7 +86,10 @@
       // The teacher's subject folder (when it came from one) and the "Mark as important" tick travel with the picture, so
       // each student's saved copy is marked with the subject and arrives starred.
       const subject=String(raw.subject||'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
-      return{kind:'image',data:raw.data,...(subject?{subject}:{}),...(raw.important===true?{important:true}:{})};
+      // Each send has its own id: a student keeps a copy for every send, but not twice when the same send is delivered again
+      // (a reconnect, or a student joining late).
+      const id=/^[A-Za-z0-9_-]{8,48}$/.test(String(raw.id||''))?String(raw.id):'';
+      return{kind:'image',data:raw.data,...(id?{id}:{}),...(subject?{subject}:{}),...(raw.important===true?{important:true}:{})};
     }
     return null;
   }
@@ -698,7 +701,7 @@
         if(!on||mode!=='screens'||blocked)stopShare(false);
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
-        if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,subject:activity.subject,important:activity.important});
+        if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,id:activity.id,subject:activity.subject,important:activity.important});
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text):emptyBoard();
         // In embedded mode, screens are shared via the existing activity button;
         // never cover Shorashim with the old Pointer screen-sharing panel.
@@ -880,7 +883,7 @@
   const previewTitle=el('h3',null,'Send to every whiteboard?'),previewBody=el('div','boards-paste-content');
   previewBody.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;margin:12px 0';
   const confirmPaste=button('✓ Send to all boards','Replace the common background on every student board',()=>void commitPaste());
-  const cancelPaste=button('Cancel','Close the paste preview',()=>closePreview());
+  const cancelPaste=button('Cancel','Close the paste preview',()=>{closePreview();B.status('Nothing was sent.')});
   previewPanel.append(previewTitle,previewBody,confirmPaste,cancelPaste);pastePreview.append(previewPanel);stage.appendChild(pastePreview);
   let pendingPaste=null;
   function closePreview(){pendingPaste=null;pastePreview.hidden=true;pastePreview.style.display='none';previewBody.replaceChildren()}
@@ -899,6 +902,8 @@
     }
     if(value.note)previewBody.append(el('p',null,value.note));
     pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
+    // Nothing goes to the students until the teacher presses the green button, so the status line says so.
+    B.status('Not sent yet. Press ✓ Send to all boards to send this to every student.');
   }
   async function commitPaste(){
     const item=pendingPaste;if(!item)return;
@@ -925,13 +930,14 @@
     const file=imageFile.files?.[0];imageFile.value='';
     if(file)await sendImageFile(file);
   });
+  const newSendId=()=>{try{return crypto.randomUUID()}catch(_){return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,10)}};
   async function sendImageFile(file,extra={}){
     if(!/^image\/(jpeg|png|webp|gif|bmp)$/.test(file.type)||file.size>8*1024*1024){B.fail('Please choose a JPG, PNG, WebP or GIF smaller than 8 MB.');return}
     sendImage.disabled=true;activityLabel.textContent='Preparing picture…';
     try{
       const data=await pictureData(file);
       if(!data)throw Error('Picture is too large to send to the class. Try a simpler or smaller image.');
-      sendActivity({kind:'image',data,subject:extra.subject,important:extra.important===true});
+      sendActivity({kind:'image',data,id:newSendId(),subject:extra.subject,important:extra.important===true});
     }catch(e){B.fail(e.message||'Could not load that picture.')}
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
@@ -1156,7 +1162,11 @@
     boards.clear();chooseActivity(item,dirtyAll);
     for(const m of admitted())sendMode(m);
     dirtyAll();updateActivityLabel();
-    B.status(item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every student\'s board. Watch them color in real time.':'All boards are blank.');
+    if(item?.kind==='image'){
+      // How many boards got it, and who did not (a paused or turned-off whiteboard gets nothing).
+      const here=admitted(),skipped=here.filter(m=>excluded(m,'boards')||isBlocked(m)),got=here.length-skipped.length;
+      B.status('Sent to '+got+' of '+here.length+' student'+(here.length===1?'':'s')+'. '+(skipped.length?'Not sent to '+skipped.slice(0,5).map(m=>m.name).join(', ')+(skipped.length>5?' and more':'')+' (their whiteboard is paused or off).':'Each student gets their own copy in My files.'));
+    }else B.status(item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':'All boards are blank.');
   }
   function setFocus(id){
     drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();

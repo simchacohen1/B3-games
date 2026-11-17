@@ -37,6 +37,8 @@ const pointerIcons={
   sparkle:'<path d="M16 1L19.5 12.5L31 16L19.5 19.5L16 31L12.5 19.5L1 16L12.5 12.5Z" fill="currentColor"/><path d="M26 1L27.5 5.5L32 7L27.5 8.5L26 13L24.5 8.5L20 7L24.5 5.5Z" fill="currentColor"/>'
 };
 function status(text){$('connectionStatus').textContent=text}
+// A student who is in the class but sees nothing yet is told so plainly (the teacher never sees this text).
+if(!isTeacher){const waiting=$('placeholder');if(waiting)waiting.textContent='Waiting for your teacher… What your teacher shows will appear here by itself. You do not need to do anything.'}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
 // A student on an activity page draws on a picture of the part of the teacher's screen that shows, but the teacher
@@ -650,7 +652,7 @@ function joinClass(event){
     if(call.peer!==room||!teacherConnection?.open){call.close();return}
     mediaCall?.close();mediaCall=call;call.answer();
     call.on('stream',incoming=>{if(mediaCall!==call)return;$('lesson').srcObject=incoming;$('placeholder').hidden=true;$('lesson').play().catch(error=>{if(mediaCall===call&&error.name!=='AbortError')fail('Click the lesson to resume video playback.')});send(teacherConnection,{type:'video-ready'});status('Live teaching screen received.');drawPointers()});
-    call.on('close',()=>{if(mediaCall===call){mediaCall=null;$('lesson').srcObject=null;$('placeholder').hidden=false;status('Teaching screen paused.');drawPointers()}});
+    call.on('close',()=>{if(mediaCall===call){mediaCall=null;$('lesson').srcObject=null;$('placeholder').hidden=false;status('Waiting for your teacher…');drawPointers()}});
     call.on('error',()=>fail('Could not receive the teaching screen. Leave and rejoin, or try another network.'));
   });
   peer.on('connection',connection=>connection.close());
