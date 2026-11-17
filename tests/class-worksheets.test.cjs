@@ -132,14 +132,14 @@ test('the pages: teacher button, student list, one-click save with a Hebrew-date
   assert.match(mine,/Leave without saving\?/);
   assert.match(saved,/fileId:number>1\?file\.id\+'-p'\+number:file\.id/,'the teacher sees every page');
   assert.match(saved,/const WORKSHEETS_URL='https:\/\/us-central1-b3-games\.cloudfunctions\.net\/classWorksheets'/);
-  assert.match(read('class-pointer-prototype/my-files.html'),/annotation-toolbar\.js\?v=20261116-drawperm2/);
+  assert.match(read('class-pointer-prototype/my-files.html'),/annotation-toolbar\.js\?v=20261116-wbplus4/);
 });
 
 test('student activity pages load the worksheet-aware saved-work code; the small pop-up sends a worksheet to My files and deleting removes its pages',()=>{
   const share=read('class-pointer-prototype/activity-share.js');
   assert.match(share,/saved-work-core\.js\?v=20261116-myfiles2/);assert.match(share,/saved-work\.js\?v=20261116-myfiles2/);
   const pages=['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html'];
-  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261116-myfiles2/,page);
+  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261116-wbplus4/,page);
   const saved=read('class-pointer-prototype/saved-work.js');
   assert.match(saved,/file\.worksheet\n?\s*\?\[button\('Continue in My files'/);
   assert.match(saved,/if\(file\.worksheet\)\{[\s\S]*?startsWith\(file\.id\+'-p'\)[\s\S]*?\.delete\(\)/,'page pictures are removed with the worksheet');

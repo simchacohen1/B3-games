@@ -100,7 +100,7 @@ test('student-boards sends only after the teacher confirms, through the existing
 test('More menu offers Send whiteboard to students beside Save and My files; the classroom loads the new scripts',()=>{
   assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}\);/);
   assert.match(html,/student-boards[.]js[?]v=20261116-myfiles2/);
-  assert.match(html,/classroom-annotate[.]js[?]v=20261116-pdfflow1/);
+  assert.match(html,/classroom-annotate[.]js[?]v=20261116-wbplus3/);
   assert.match(html,/saved-work[.]js[?]v=20261116-myfiles2/);
 });
 
