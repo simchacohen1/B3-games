@@ -273,7 +273,7 @@
     const groups=new Map();
     for(const stroke of all){
       if(!stroke.points?.length)continue;
-      const kind=penTools.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight');
+      const kind=C.isHighlightShape(stroke.tool)?'highlight-shape':penTools.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight');
       const key=(stroke.owner||'')+'|'+kind;
       if(!groups.has(key))groups.set(key,{kind,list:[]});
       groups.get(key).list.push(stroke);
@@ -292,8 +292,9 @@
           (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(4,stroke.size*W*2.4)*1.25));continue;
         }
         const x1=first.x*W,y1=first.y*H,x2=last.x*W,y2=last.y*H,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1);
-        if(stroke.tool==='rectangle'){if(stroke.fill)lc.fillRect(x,y,sw,sh);lc.strokeRect(x,y,sw,sh);continue}
-        if(stroke.tool==='ellipse'){lc.beginPath();lc.ellipse(x+sw/2,y+sh/2,sw/2,sh/2,0,0,Math.PI*2);if(stroke.fill)lc.fill();lc.stroke();continue}
+        const shape=C.shapeTool(stroke.tool),highlightShape=C.isHighlightShape(stroke.tool);
+        if(shape==='rectangle'){if(highlightShape){lc.fillRect(x,y,sw,sh);continue}if(stroke.fill)lc.fillRect(x,y,sw,sh);lc.strokeRect(x,y,sw,sh);continue}
+        if(shape==='ellipse'){lc.beginPath();lc.ellipse(x+sw/2,y+sh/2,sw/2,sh/2,0,0,Math.PI*2);if(stroke.fill||highlightShape)lc.fill();if(!highlightShape)lc.stroke();continue}
         if(stroke.tool==='triangle'){lc.beginPath();lc.moveTo(x+sw/2,y);lc.lineTo(x+sw,y+sh);lc.lineTo(x,y+sh);lc.closePath();if(stroke.fill)lc.fill();lc.stroke();continue}
         if(stroke.tool==='pen-arrow'){
           lc.beginPath();lc.moveTo(x1,y1);lc.lineTo(x2,y2);lc.stroke();const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(lc.lineWidth*4,10);
@@ -303,7 +304,7 @@
         lc.beginPath();pts.forEach((point,index)=>{lc[index?'lineTo':'moveTo'](point.x*W,point.y*H)});lc.stroke();
       }
       ctx.save();ctx.setTransform(1,0,0,1,0,0);
-      ctx.globalAlpha=kind==='pen'?1:kind==='pencil'?0.94:kind==='crayon'?0.78:0.32;
+      ctx.globalAlpha=kind==='highlight-shape'?.35:kind==='pen'?1:kind==='pencil'?0.94:kind==='crayon'?0.78:0.32;
       ctx.drawImage(layer,0,0);ctx.restore();
     }
     ctx.globalAlpha=1;
@@ -547,8 +548,10 @@
     const lineWidth=stroke.size*W*(['pen','line','pen-arrow','rectangle','ellipse','triangle'].includes(stroke.tool)?0.45:1);
     const lineAttrs={fill:stroke.fill===true&&C.FILLABLE.includes(stroke.tool)?color:'none',stroke:color,'stroke-width':lineWidth,'stroke-linecap':'round','stroke-linejoin':'round'};
     if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...lineAttrs});
-    if(stroke.tool==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...lineAttrs});
-    if(stroke.tool==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...lineAttrs});
+    if(C.isHighlightShape(stroke.tool))Object.assign(lineAttrs,{fill:color,stroke:'none'});
+    const shape=C.shapeTool(stroke.tool);
+    if(shape==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...lineAttrs});
+    if(shape==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...lineAttrs});
     if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...lineAttrs});
     if(stroke.tool==='pen-arrow'){
       const group=svg('g'),angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(lineWidth*4,10);
@@ -567,9 +570,9 @@
     else if(edit?.moved)shown=strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke);
     const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
     for(const stroke of all){
-      const kind=PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
+      const kind=C.isHighlightShape(stroke.tool)?'highlight-shape':PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=groups.get(key);
-      if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
+      if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='highlight-shape'?'0.35':kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
       const mark=inkPath(stroke,stroke.color);mark.dataset.strokeTool=stroke.tool;if(stroke.id)mark.dataset.strokeId=stroke.id;group.appendChild(mark);
     }
     drawSelection(shown);syncTextSize();
@@ -578,10 +581,10 @@
 
   // ---------- Select (teacher): pick one of my marks, then move, resize, recolor or delete it ----------
   const geometry=()=>window.FTTAnnotate?.geometry||null;
-  const selecting=()=>isTeacher&&$('teacherTool')?.value==='select';
+  const selecting=()=>$(isTeacher?'teacherTool':'studentTool')?.value==='select'&&B.writingAllowed('select');
   function selectedStroke(){
     const stroke=selectedId?strokes.find(item=>item.id===selectedId):null;
-    if(!stroke)selectedId=null;return stroke||null;
+    if(!stroke||(!isTeacher&&(stroke.owner!==B.owner()||!C.isHighlightShape(stroke.tool)))){selectedId=null;return null}return stroke;
   }
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
   function drawSelection(list){
@@ -634,11 +637,12 @@
   // Is p on this mark? inside: anywhere inside a closed shape counts (Select); otherwise only its outline (Eraser).
   function markHits(stroke,p,inside){
     if(!stroke.points?.length)return false;
-    if(!['rectangle','ellipse','triangle','box'].includes(stroke.tool))return inkHits(stroke,p);
+    const shape=C.shapeTool(stroke.tool);
+    if(!['rectangle','ellipse','triangle','box'].includes(shape))return inkHits(stroke,p);
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1],t=Math.max(0.008,(stroke.size||0.016)*0.6),ty=t*W/Math.max(1,H);
     const x1=Math.min(first.x,last.x),x2=Math.max(first.x,last.x),y1=Math.min(first.y,last.y),y2=Math.max(first.y,last.y);
     if(p.x<x1-t||p.x>x2+t||p.y<y1-ty||p.y>y2+ty)return false;
-    if(inside||stroke.tool==='box')return true;
+    if(inside||stroke.tool==='box'||C.isHighlightShape(stroke.tool))return true;
     if(stroke.tool==='rectangle')return nearLine(p,[{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2},{x:x1,y:y1}],t);
     if(stroke.tool==='triangle')return nearLine(p,[{x:(x1+x2)/2,y:y1},{x:x2,y:y2},{x:x1,y:y2},{x:(x1+x2)/2,y:y1}],t);
     const rx=Math.max(t,(x2-x1)/2),ry=Math.max(ty,(y2-y1)/2),d=Math.hypot((p.x-(x1+x2)/2)/rx,(p.y-(y1+y2)/2)/ry);
@@ -692,7 +696,7 @@
     }
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
-    const hit=teacherMarkAt(event,p,true,true);
+    const hit=isTeacher?teacherMarkAt(event,p,true,true):[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&markHits(mark,p,true));
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
@@ -791,8 +795,8 @@
     if(!dx&&!dy)return true;
     return changeMarks(group.map(item=>[item.id,{...item,points:item.points.map(q=>({x:q.x+dx,y:q.y+dy}))}]));
   }
-  if(isTeacher){
-    $('teacherTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false);syncTextSize()});
+  if(isTeacher||$('studentTool')){
+    $(isTeacher?'teacherTool':'studentTool')?.addEventListener('change',()=>{erasePid=null;finishInline(true);if(!selecting())selectedId=null;endSelect(false);syncTextSize()});
     // Delete removes the picked mark; Escape lets go of it. The arrow keys move it 1 pixel (Shift: 10 pixels) and
     // the class sees each step. Nothing happens while typing in a box, and the page does not scroll while a mark is picked.
     document.addEventListener('keydown',event=>{
@@ -881,8 +885,8 @@
     // A click on the board while words are being typed keeps what was typed and closes the box. That click does
     // nothing else (with the Text tool it would otherwise open a new box right away).
     if(inlineEdit){finishInline(true);event.preventDefault();event.stopPropagation();return}
-    if(isTeacher&&event.button===0){
-      const tool=$(toolId).value,p=normalized(event),usable=!notReady()&&B.live()&&B.writingAllowed(),ready=usable&&!B.navigating();
+    if(event.button===0&&(isTeacher||selecting())){
+      const tool=$(toolId).value,p=normalized(event),usable=!notReady()&&B.live()&&B.writingAllowed(tool),ready=usable&&!B.navigating();
       // Select: pick, drag, resize. Eraser: rub out my marks. Text: click my words to change them, or an empty
       // spot for new words. Every other tool draws, also on top of words.
       // The arrow: a click on one of my marks picks it; a click on nothing is a plain mouse click (the page is
@@ -903,10 +907,10 @@
       }
     }
     const tool=$(toolId).value;
-    if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed())return;
+    if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed(tool))return;
     const p=normalized(event);if(!p)return;
     event.preventDefault();dragId=event.pointerId;
-    draft={tool,color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p],...(shapeFill&&C.FILLABLE.includes(tool)?{fill:true}:{})};
+    draft={tool,color:$(colorId).value||(C.isHighlightShape(tool)?'#ffcc00':B.ownColor()),size:Number($(sizeId).value),points:[p,p],...(shapeFill&&C.FILLABLE.includes(tool)?{fill:true}:{})};
     content.setPointerCapture(dragId);drawInk();
   });
   function extend(event){
@@ -918,12 +922,12 @@
   content.addEventListener('pointermove',event=>{
     if(edit&&event.pointerId===edit.pid){moveSelect(event);return}
     if(erasePid===event.pointerId){eraseUnder(event);return}
-    if(!draft)return;if(!B.writingAllowed()){cancelDraft();return}extend(event);drawInk()});
+    if(!draft)return;if(!B.writingAllowed(draft.tool)){cancelDraft();return}extend(event);drawInk()});
   content.addEventListener('pointerup',event=>{
     if(edit&&event.pointerId===edit.pid){endSelect(true);return}
     if(erasePid===event.pointerId){erasePid=null;if(content.hasPointerCapture?.(event.pointerId))content.releasePointerCapture(event.pointerId);return}
     if(!draft||event.pointerId!==dragId)return;extend(event);
-    const stroke=draft,may=B.writingAllowed()&&B.live();cancelDraft();
+    const stroke=draft,may=B.writingAllowed(stroke.tool)&&B.live();cancelDraft();
     if(may&&C.cleanStroke(stroke))B.submitStroke(stroke);
   });
   content.addEventListener('pointercancel',()=>{erasePid=null;endSelect(false);cancelDraft()});content.addEventListener('lostpointercapture',()=>{erasePid=null;if(edit)endSelect(false);if(draft)cancelDraft()});

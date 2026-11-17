@@ -93,15 +93,15 @@ test('a student\'s whiteboard keeps the fill and the triangle; the worksheet and
 test('student pages load the new toolbar and board scripts (new versions)',()=>{
   const share=read('activity-share.js');
   const toolbarToken=share.match(/annotation-toolbar\.js\?v=([^'"]+)/)[1],boardsToken=share.match(/student-boards\.js\?v=([^'"]+)/)[1];
-  assert.match(toolbarToken,/shapes2$/);assert.match(boardsToken,/send1$/);
+  assert.match(toolbarToken,/hlshapes1$/);assert.match(boardsToken,/send1$/);
   for(const page of ['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html','index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261117-send4/,page);
-  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);
-  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261116-shapes2/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261117-send1/);
+    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=combo2/,page);
+  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=hlshapes1/);
+  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=hlshapes1/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261117-send1/);
 });
 
 test('the teacher pencil on regular activity pages loads the current toolbar (new shapes)', () => {
   const g = fs.readFileSync(path.join(__dirname,'../teacher-global-controls.js'),'utf8');
-  assert.match(g, /annotation-toolbar\.js\?v=20261116-shapes2/);
+  assert.match(g, /annotation-toolbar\.js\?v=hlshapes1/);
   assert.doesNotMatch(g, /annotate1/);
 });
