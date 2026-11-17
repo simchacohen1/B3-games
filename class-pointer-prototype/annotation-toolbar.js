@@ -365,8 +365,8 @@
   // A picked shape: outline or filled (shown only with Select while a shape is picked).
   const styleBox=document.createElement('div');styleBox.className='fa-shapestyle';styleBox.setAttribute('role','group');styleBox.setAttribute('aria-label','The picked shape: outline or filled');styleBox.hidden=true;
   function setPickedShape(filled){const now=surface();if(isDelegate(now))now.delegate.setShapeStyle?.(filled);sync()}
-  const outlineBtn=btn('fa-small fa-style','<span class="fa-ai"></span><span class="fa-al">Outline</span>','Outline: only the line',()=>setPickedShape(false));
-  const filledBtn=btn('fa-small fa-style','<span class="fa-ai"></span><span class="fa-al">Filled</span>','Filled with its color',()=>setPickedShape(true));
+  const outlineBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Outline</span>','Outline: only the line',()=>setPickedShape(false));
+  const filledBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Filled</span>','Filled with its color',()=>setPickedShape(true));
   styleBox.append(outlineBtn,filledBtn);
   bar.append(sep1,colorBox,sizeBox,styleBox,sep2,pair,actionBox,minBtn);
   root.append(ink,capture,fly,bar,pencil,tip);
