@@ -21,13 +21,13 @@ window.createClassHighlighter=function(options){
   function path(stroke,w,h,color){
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1],width=stroke.size*w*(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?0.45:1);
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*w,y:Math.min(first.y,last.y)*h,width:Math.abs(last.x-first.x)*w,height:Math.abs(last.y-first.y)*h,fill:color});
-    const x1=first.x*w,y1=first.y*h,x2=last.x*w,y2=last.y*h,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1),ink={'stroke':color,'stroke-width':width,'fill':'none','stroke-linecap':'round','stroke-linejoin':'round'};
+    const x1=first.x*w,y1=first.y*h,x2=last.x*w,y2=last.y*h,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1),ink={'stroke':color,'stroke-width':width,'fill':stroke.fill===true&&['rectangle','ellipse','triangle'].includes(stroke.tool)?color:'none','stroke-linecap':'round','stroke-linejoin':'round'};
     if(stroke.tool==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...ink});
     if(stroke.tool==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...ink});
     if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...ink});
     if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...ink});
     if(stroke.tool==='pen-arrow'){const g=svg('g');g.appendChild(svg('line',{x1,y1,x2,y2,...ink}));const a=Math.atan2(y2-y1,x2-x1),r=Math.max(width*4,10);g.appendChild(svg('path',{d:`M${x2-r*Math.cos(a-0.5)} ${y2-r*Math.sin(a-0.5)} L${x2} ${y2} L${x2-r*Math.cos(a+0.5)} ${y2-r*Math.sin(a+0.5)}`,...ink}));return g;}
-    if(stroke.tool==='text'){const t=svg('text',{x:x1,y:y1,'font-size':Math.max(4,stroke.size*w*2.4),...(stroke.bold?{'font-weight':'700'}:{}),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text)?'rtl':'ltr'});t.textContent=stroke.text||'';return t;}
+    if(stroke.tool==='text'){const t=svg('text',{x:x1,y:y1,'font-family':window.ClassPointerCore?.fontStack?.(stroke.font)||'sans-serif','font-size':Math.max(4,stroke.size*w*2.4),...(stroke.bold?{'font-weight':'700'}:{}),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text)?'rtl':'ltr'});t.textContent=stroke.text||'';return t;}
     const points=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
     return svg('path',{d:points.map((p,i)=>(i?'L':'M')+p.x*w+' '+p.y*h).join(' '),fill:'none',stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round'});
   }

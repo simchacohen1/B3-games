@@ -149,6 +149,7 @@
       if(opts.block)out.block=opts.block;
       if(line.soft)out.soft=true;
       if(opts.bold)out.bold=true;
+      if(opts.font&&opts.font!=='sans')out.font=opts.font;
       if(boxW)out.boxW=round(width);
       return out;
     });

@@ -193,7 +193,7 @@
   const stack=[];                // surfaces pushed by other scripts (top = last)
   let mode='hidden';             // hidden | mini | open
   let autoOpened=false;
-  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1};
+  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1,fill:false};
   const TOOL_ICON=Object.fromEntries(TOOLS.map(t=>[t[0],t[1]]));
   let actionsFn=null;            // page buttons under the tools (setActions)
   const toolColors={pen:PALETTE[1][0],highlight:PALETTE[6][0],shape:PALETTE[1][0],text:PALETTE[1][0]};
@@ -265,6 +265,12 @@
 #fttAnnotate .fa-sep{width:40px;height:1px;background:#e2e8f0;margin:3px 0;flex:none}
 #fttAnnotate .fa-colors{display:grid;grid-template-columns:repeat(2,22px);gap:5px;padding:2px 0}
 #fttAnnotate .fa-color{width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;background:var(--c);padding:0;cursor:pointer}
+#fttAnnotate .fa-colors.fa-many{grid-template-columns:repeat(3,19px);gap:4px}
+#fttAnnotate .fa-colors.fa-many .fa-color{width:19px;height:19px}
+#fttAnnotate .fa-custom{position:relative;box-sizing:border-box;display:block;overflow:hidden;background:conic-gradient(#f44336,#ffeb3b,#4caf50,#00bcd4,#3f51b5,#e91e63,#f44336)}
+#fttAnnotate .fa-custom[data-active=true]{background:var(--c)}
+#fttAnnotate .fa-custom input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);opacity:0;cursor:pointer;padding:0;border:0}
+#fttAnnotate .fa-fill[aria-pressed=true]{background:#dbe7ff;border-color:#2563eb}
 #fttAnnotate .fa-color[aria-pressed="true"]{outline:3px solid #3b82f6;outline-offset:1px}
 #fttAnnotate .fa-sizes{display:flex;gap:2px}
 #fttAnnotate .fa-size{width:17px;height:24px;border:0;border-radius:6px;background:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
@@ -343,6 +349,11 @@
   }
   const sep1=document.createElement('div');sep1.className='fa-sep';
   const colorBox=document.createElement('div');colorBox.className='fa-colors';colorBox.setAttribute('role','group');colorBox.setAttribute('aria-label','Color');
+  // A color of your own: a small button that opens the browser's color picker.
+  const customBtn=document.createElement('label');customBtn.className='fa-color fa-custom';customBtn.title='Custom color';customBtn.setAttribute('aria-label','Custom color');customBtn.dataset.color='custom';
+  const customInput=document.createElement('input');customInput.type='color';customInput.value='#e91e63';customInput.setAttribute('aria-label','Pick a custom color');
+  customBtn.append(customInput);
+  customInput.addEventListener('input',()=>pickColor(customInput.value.toLowerCase()));
   const sizeBox=document.createElement('div');sizeBox.className='fa-sizes';sizeBox.setAttribute('role','group');sizeBox.setAttribute('aria-label','Size');
   const sep2=document.createElement('div');sep2.className='fa-sep';
   const undoBtn=itemButton({icon:'↶',label:'Undo',title:'Undo my last change'},'fa-small fa-half',()=>undo());
@@ -350,7 +361,14 @@
   const pair=document.createElement('div');pair.className='fa-pair';pair.append(undoBtn,clearBtn);
   const actionBox=document.createElement('div');actionBox.className='fa-actions';actionBox.hidden=true;
   const minBtn=btn('fa-small fa-min','➖ Hide','Shrink the toolbar to a pencil button. Clicks go to the page.',()=>minimize());
-  bar.append(sep1,colorBox,sizeBox,sep2,pair,actionBox,minBtn);
+  // Shapes: Fill (the shape is colored in, for diagrams).
+  const fillBtn=btn('fa-small fa-fill','<span class="fa-ai">▣</span><span class="fa-al">Fill</span>','Fill shapes with the chosen color',()=>{
+    const now=surface();
+    // Select: the picked shape is filled, or emptied again if it was filled (nothing happens when no shape is picked).
+    if(st.tool==='select'&&isDelegate(now)){now.delegate.fill?.(!now.delegate.fillState?.());sync();return}
+    st.fill=!st.fill;applyDelegate();sync();
+  });fillBtn.hidden=true;
+  bar.append(sep1,colorBox,sizeBox,fillBtn,sep2,pair,actionBox,minBtn);
   root.append(ink,capture,fly,bar,pencil,tip);
   pencil.addEventListener('click',()=>openBar());
   // Clicks and mouse moves on the toolbar never reach the page or the lesson underneath.
@@ -442,9 +460,17 @@
     if(tool==='shape'&&fromClick)openVariants(tool);
     sync();
   }
+  // Choosing a color (a swatch or the custom picker). Select: the color goes to the picked mark and the tool stays Select.
+  function pickColor(c){
+    const now=surface();
+    if(st.tool==='select'&&(isDelegate(now)?now.delegate.recolor?.(c):recolorSelected(now,c))){st.color=c;sync();return}
+    // Picking a color while no drawing tool is chosen starts the pen. A lesson's pointer has a color of its own.
+    if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(now,'pen')&&!(st.tool==='pointer'&&isDelegate(now)))st.tool='pen';
+    st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync();
+  }
   function applyDelegate(){
     const s=surface();if(!isDelegate(s))return;
-    try{s.delegate.apply({tool:st.tool,shape:st.shape,variant:variantOf(st.tool),color:st.color,size:currentSize(s),open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
+    try{s.delegate.apply({tool:st.tool,shape:st.shape,variant:variantOf(st.tool),color:st.color,size:currentSize(s),fill:st.fill,open:mode==='open'})}catch(e){console.warn('Drawing tools:',e)}
   }
   function sync(){
     mount();
@@ -485,19 +511,20 @@
     }
     // Colors and sizes for this surface. A color of '' means "the page's own color" (shown as ↺).
     const colors=colorsOf(s);
-    if(!colors.some(c=>c[0]===st.color))st.color=s.defaultColor!=null&&colors.some(c=>c[0]===s.defaultColor)?s.defaultColor:colors[Math.min(1,colors.length-1)][0];
-    const colorKey=colors.map(c=>c[0]).join();
+    if(!colors.some(c=>c[0]===st.color)&&!(s.customColor&&/^#[0-9a-f]{6}$/i.test(st.color)))st.color=s.defaultColor!=null&&colors.some(c=>c[0]===s.defaultColor)?s.defaultColor:colors[Math.min(1,colors.length-1)][0];
+    const colorKey=colors.map(c=>c[0]).join()+(s.customColor?'+custom':'');
     if(colorBox.dataset.key!==colorKey){
-      colorBox.dataset.key=colorKey;colorBox.replaceChildren(...colors.map(([c,name])=>{const b=btn('fa-color',null,name,()=>{
-        // Picking a color while no drawing tool is chosen starts the pen. A lesson's pointer has a color of its own.
-        const now=surface();
-        // Select: the color goes to the picked mark and the tool stays Select.
-        if(st.tool==='select'&&(isDelegate(now)?now.delegate.recolor?.(c):recolorSelected(now,c))){st.color=c;sync();return}
-        if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(now,'pen')&&!(st.tool==='pointer'&&isDelegate(now)))st.tool='pen';
-        st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync()});
-        b.dataset.color=c;b.style.setProperty('--c',c||'#fff');if(!c)b.textContent='↺';return b}));
+      colorBox.dataset.key=colorKey;
+      // A long palette is laid out three across with smaller swatches.
+      colorBox.classList.toggle('fa-many',colors.length>12);
+      colorBox.replaceChildren(...colors.map(([c,name])=>{const b=btn('fa-color',null,name,()=>pickColor(c));
+        b.dataset.color=c;b.style.setProperty('--c',c||'#fff');if(!c)b.textContent='↺';return b}),...(s.customColor?[customBtn]:[]));
     }
+    // The custom color shows as the chosen swatch while the color is not one of the palette's.
+    if(s.customColor){const custom=!colors.some(c=>c[0]===st.color)&&/^#[0-9a-f]{6}$/i.test(st.color);customBtn.dataset.active=String(custom);if(custom){customBtn.dataset.color=st.color;customBtn.style.setProperty('--c',st.color)}else customBtn.dataset.color='custom'}
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
+    // Fill: new shapes are filled with the chosen color; with Select it fills or empties the picked shape.
+    fillBtn.hidden=!(s.fill&&(st.tool==='shape'||st.tool==='select'));fillBtn.setAttribute('aria-pressed',String(st.tool==='select'&&isDelegate(s)?s.delegate.fillState?.()===true:!!st.fill));
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
     colorBox.hidden=!drawing&&!isDelegate(s)&&st.tool!=='select';sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);

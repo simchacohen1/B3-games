@@ -57,6 +57,11 @@
     const option=Array.from(select.options).find(o=>o.value===value);if(!option||option.disabled)return;
     select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));
   }
+  // A color the teacher picked with the custom picker becomes a choice of the lesson's own color menu, so everything goes to the class as before.
+  function setColor(color){
+    if(teacher&&/^#[0-9a-f]{6}$/i.test(color||'')&&!Array.from(colorSel.options).some(o=>o.value.toLowerCase()===color.toLowerCase())){const o=document.createElement('option');o.value=color.toLowerCase();o.textContent='Custom '+color;colorSel.append(o)}
+    set(colorSel,color);
+  }
   // '' in the student's color menu is the class color the teacher gave him.
   const colors=Array.from(colorSel.options).filter(o=>!o.value||/^#[0-9a-f]{6}$/i.test(o.value)).map(o=>[o.value.toLowerCase(),o.textContent.trim()]);
   const sizes=Array.from(sizeSel.options).map(o=>Number(o.value)).filter(Number.isFinite);
@@ -76,6 +81,8 @@
       select:['🖱️','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them. Everything else works like a normal mouse: scroll, drag the page, click a link to open it for the class.',-1]},
     // Only the tools this lesson has are shown; words have their own size control under the lesson.
     hideUnused:true,ownTextSize:true,
+    // A color of your own, and Fill for shapes (the teacher's whiteboard, PDF and webpage marks).
+    customColor:teacher,fill:teacher,
     keys:{p:{tool:'pointer'},h:{tool:'highlight',variant:'highlight'},b:{tool:'highlight',variant:'box'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
     get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. The arrow picks your marks and works as your mouse.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
     rect:()=>lessonOn()&&inFront()?stage.getBoundingClientRect():null,
@@ -83,19 +90,25 @@
     defaultColor:teacher?undefined:'',
     sizes:()=>sizes.length?sizes:undefined,
     delegate:{
-      apply({tool,variant,color,size,open}){
+      apply({tool,variant,color,size,fill,open}){
         if(fromLesson)return;
         B.setNavigation?.(arrow(tool)&&open);
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
         else if(tool==='shape')set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]));
         else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
-        if(tool!=='hand'&&tool!=='eraser'&&tool!=='select'){set(colorSel,color);set(sizeSel,size)}
+        if(tool!=='hand'&&tool!=='eraser'&&tool!=='select'){setColor(color);set(sizeSel,size)}
+        // New shapes are filled with their color when the Fill switch is on.
+        window.ClassPointerPdf?.setFill?.(tool==='shape'&&fill===true);
       },
       minimized(){B.setNavigation?.(false)},
       // Select: a color click recolors the picked mark (true = handled, the tool stays Select).
       recolor:color=>!!window.ClassPointerPdf?.recolorSelected?.(color),
       // Select: a size click makes the picked mark (words too) smaller or bigger.
       resize:size=>!!window.ClassPointerPdf?.resizeSelected?.(size),
+      // Select: the Fill switch fills the picked shape with its color, or empties it again.
+      fill:on=>!!window.ClassPointerPdf?.fillSelected?.(on),
+      // Select: is the picked shape filled? (true / false, or null when no shape is picked)
+      fillState:()=>window.ClassPointerPdf?.pickedShapeFilled?.()??null,
       undo(){click(teacher?'undoTeacherHighlight':'undoStudentHighlight')},
       // A student can only clear his own drawings. The teacher gets the four choices.
       clear:teacher?undefined:()=>click('clearStudentHighlights'),
@@ -172,6 +185,11 @@
         title:'Students: choose who can point and draw'+(waiting?' ('+waiting+' waiting to join)':''),onClick:()=>panel.toggle()},
       // Outside full screen the red Stop button is right above the lesson.
       {id:'stop',icon:'⏹',label:'Stop',danger:true,hidden:!(expanded()&&live()),title:stopLabel(),onClick:()=>click('cpStopBtn')},
+      // Saved work, right on the toolbar (also under More): Save this whiteboard, open My files, send the whiteboard to the class
+      // (every student gets their own editable copy).
+      {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
+      {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
+      {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy of this whiteboard to draw on',hidden:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()},
       {id:'lesson',icon:'🖥',label:'Lesson',title:'Lesson: change what students see',items:lessonItems},
       {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight'+(window.FTTSavedWork?', save':''),items:moreItems}
     ];
