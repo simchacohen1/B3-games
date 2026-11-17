@@ -490,7 +490,7 @@ function pointsDashboard(){
   const selectedRows=selectedStudent?ledger.filter(row=>row.sid===selectedStudent.id&&row.counts):[];
   const reasonGroups=[
     {id:"daily",label:"Daily Points",icon:"✓",hint:"Saved daily class points"},
-    {id:"posuk",label:"Posuk Practice",icon:"📖",hint:"Reading, translation & understanding"},
+    {id:"posuk",label:"Posuk Practice",icon:"📖",hint:"Read & Translate (teacher grade)"},
     {id:"chazara",label:"Chazara",icon:"↻",hint:"Regular and recorded Chazara"},
     {id:"teacher",label:"Teacher adjustments",icon:"±",hint:"Manual additions or deductions"},
     {id:"store",label:"Personal Rewards",icon:"🎁",hint:"Points spent or returned on personal rewards"},

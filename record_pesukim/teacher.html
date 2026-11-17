@@ -754,10 +754,16 @@ function questionResultValues(results){
 // graded correct/incorrect separately), so its percentage is derived here
 // from the saved per-chunk results — same math as the "X% correct" badge
 // shown on the Translate tab itself in student.html.
+function legacyTranslationScore(record){
+  // Older results (and a posuk whose piece-by-piece list was later trimmed) keep only the total, as a number or "75%".
+  const v = record && record.translationScore;
+  const n = typeof v === 'number' ? v : (typeof v === 'string' ? parseFloat(v.replace('%','').trim()) : NaN);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+}
 function effTranslationScore(record){
   if(!record) return null;
   const entries = translationChunkEntries(record.translationChunkResults);
-  if(!entries.length) return null;
+  if(!entries.length) return legacyTranslationScore(record);
   const maxIndex = Math.max(...entries.map(([idx,c]) => Number.isInteger(c.chunkIndex) ? c.chunkIndex : idx)) + 1;
   const total = Math.max(Number(record.translationTotal) || 0, maxIndex, entries.length);
   // Once a teacher finalizes a disputed chunk, that decision is the
@@ -1223,6 +1229,7 @@ function collectPendingDisputes(allAttempts){
   return out;
 }
 function openStudentAt(sid, posukKey, tab){
+  if(tab === 'reading' || tab === 'translate') tab = 'readtranslate';   // one result now; its older parts are on that tab
   if(tab) studentActiveTab = tab;
   const rowEl = document.querySelector(`.student-item[data-id="${sid}"]`);
   selectStudent(sid, studentsMap[sid], rowEl || document.createElement('div'), posukKey || null);
@@ -1247,32 +1254,44 @@ async function loadOverview(){
     const stale = ids.filter(id => { const d = daysSince(stats[id].last); return d === null || d >= STALE_DAYS; })
       .sort((a,b) => (stats[a].last||0) - (stats[b].last||0));
     const mean = arr => { const v = arr.filter(x => typeof x === 'number'); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null; };
+    // Read & Translate is one teacher-graded recording; the older reading / translation averages stay side by side, never mixed.
     const classReading = mean(ids.map(id => stats[id].avg));
     const classTranslate = mean(ids.map(id => stats[id].avgTranslation));
     const classComp = mean(ids.map(id => stats[id].avgComprehension));
+    const totalGold = ids.reduce((n, id) => n + stats[id].gold, 0), totalPending = ids.reduce((n, id) => n + stats[id].pending, 0);
     const support = ids.filter(id => {
       const s = stats[id];
-      return [s.avg, s.avgTranslation, s.avgComprehension].some(v => typeof v === 'number' && v < 50);
+      return [s.avg, s.avgTranslation, s.avgComprehension].some(v => typeof v === 'number' && v < 50) || (s.retry > 0 && s.gold === 0);
     }).sort((a,b) => {
-      const lo = s => Math.min(...[s.avg, s.avgTranslation, s.avgComprehension].filter(v => typeof v === 'number'));
+      const lo = s => Math.min(...[s.avg, s.avgTranslation, s.avgComprehension].filter(v => typeof v === 'number'), 101);
       return lo(stats[a]) - lo(stats[b]);
     });
 
-    // Latest 12 attempts across the class
-    const recent = [];
-    ids.forEach(sid => Object.entries(all[sid] || {}).forEach(([posukKey, m]) => Object.values(m || {}).forEach(a => {
-      if(a && a.timestamp) recent.push({ sid, posukKey, a });
-    })));
-    recent.sort((x,y) => y.a.timestamp - x.a.timestamp);
+    // The latest results: Read & Translate (a grade, or an older result with a score) and, separately, Chumash חידון.
+    // A recording that has no result and no grade yet is not activity, so it is not listed.
+    const recentRT = [], recentComp = [];
+    ids.forEach(sid => {
+      Object.entries(all[sid] || {}).forEach(([posukKey, m]) => Object.values(m || {}).forEach(a => {
+        if(!a || !a.timestamp) return;
+        const r = effHebrewScore(a), t = effTranslationScore(a);
+        if(typeof r === 'number' || typeof t === 'number') recentRT.push({ sid, posukKey, when: a.timestamp, read: r, trans: t });
+        const c = effComprehensionScore(a), v = effComprehensionVerdict(a);
+        if(typeof c === 'number' || v) recentComp.push({ sid, posukKey, when: a.timestamp, score: c, verdict: v });
+      }));
+      Object.entries((allReviewsCache && allReviewsCache[sid]) || {}).forEach(([posukKey, rv]) => { const when = reviewTime(rv); if(when) recentRT.push({ sid, posukKey, when, review: rv }); });
+    });
+    recentRT.sort((x,y) => y.when - x.when);
+    recentComp.sort((x,y) => y.when - x.when);
 
     const pctOrDash = v => typeof v === 'number' ? Math.round(v) + '%' : '—';
     let html = `<div class="ov-cards">
       <div class="ov-card ${disputes.length ? 'alert clickable' : 'good'}" id="ovCardDisputes"><div class="num">${disputes.length}</div><div class="lbl">Disputes waiting</div></div>
       <div class="ov-card"><div class="num">${activeToday}<span class="muted"> / ${ids.length}</span></div><div class="lbl">Practiced today</div></div>
       <div class="ov-card ${stale.length ? 'warn' : 'good'}"><div class="num">${stale.length}</div><div class="lbl">Inactive ${STALE_DAYS}+ days</div></div>
-      <div class="ov-card"><div class="num">${pctOrDash(classReading)}</div><div class="lbl">Class avg · Reading</div></div>
-      <div class="ov-card"><div class="num">${pctOrDash(classTranslate)}</div><div class="lbl">Class avg · Translate</div></div>
-      <div class="ov-card"><div class="num">${pctOrDash(classComp)}</div><div class="lbl">Class avg · Comprehension</div></div>
+      <div class="ov-card good"><div class="num">${totalGold}</div><div class="lbl">Gold standard · Read &amp; Translate</div></div>
+      <div class="ov-card ${totalPending ? 'warn clickable' : 'good'}" id="ovCardGrade"><div class="num">${totalPending}</div><div class="lbl">Waiting for your grade</div></div>
+      <div class="ov-card"><div class="num">${pctOrDash(classComp)}</div><div class="lbl">Class avg · Comprehension (Chumash חידון)</div></div>
+      <div class="ov-card"><div class="num" style="font-size:1.05rem;">Read ${pctOrDash(classReading)} · Translate ${pctOrDash(classTranslate)}</div><div class="lbl">Older results (before one recording)</div></div>
     </div><div class="ov-grid">`;
 
     // Disputes
@@ -1304,30 +1323,40 @@ async function loadOverview(){
     html += '</div>';
 
     // Needs support
-    html += `<div class="ov-box"><h3>📉 Needs support <small>any skill average under 50%</small></h3>`;
-    if(!support.length) html += '<div class="ov-empty">No one is averaging under 50% in any skill.</div>';
+    html += `<div class="ov-box"><h3>📉 Needs support <small>not gold yet, or an older / comprehension average under 50%</small></h3>`;
+    if(!support.length) html += '<div class="ov-empty">No one needs extra support right now.</div>';
     else{
-      html += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>Student</th><th>Read</th><th>Transl.</th><th>Comp.</th></tr></thead><tbody>';
+      html += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>Student</th><th>Read &amp; Translate</th><th>Comp.</th></tr></thead><tbody>';
       support.forEach(id => {
-        const s = stats[id];
-        html += `<tr class="click" data-student="${id}"><td><strong>${escapeHtml(studentsMap[id])}</strong></td>
-          <td>${pctPill(s.avg)}</td><td>${pctPill(s.avgTranslation)}</td><td>${pctPill(s.avgComprehension)}</td></tr>`;
+        const s = stats[id], older = [typeof s.avg === 'number' ? 'Read ' + Math.round(s.avg) + '%' : '', typeof s.avgTranslation === 'number' ? 'Translate ' + Math.round(s.avgTranslation) + '%' : ''].filter(Boolean).join(' · ');
+        html += `<tr class="click" data-student="${id}" data-tab="readtranslate"><td><strong>${escapeHtml(studentsMap[id])}</strong></td>
+          <td>${s.gold} gold · ${s.retry} not gold${older ? ' · older: ' + older : ''}</td><td>${pctPill(s.avgComprehension)}</td></tr>`;
       });
       html += '</tbody></table></div>';
     }
     html += '</div>';
 
     // Recent activity
-    html += `<div class="ov-box wide"><h3>🕒 Latest activity <small>most recent recordings across the class</small></h3>`;
-    if(!recent.length) html += '<div class="ov-empty">No recordings yet.</div>';
+    const whenText = ts => new Date(ts).toLocaleString([], { month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit' });
+    html += `<div class="ov-box wide"><h3>🕒 Latest Read &amp; Translate <small>teacher grades and older results, newest first</small></h3>`;
+    if(!recentRT.length) html += '<div class="ov-empty">Nothing graded or scored yet.</div>';
     else{
-      html += '<table class="ov-table"><thead><tr><th>Student</th><th>Posuk</th><th>Read</th><th>Transl.</th><th>Comp.</th><th>When</th></tr></thead><tbody>';
-      recent.slice(0, 12).forEach(r => {
-        const comp = effComprehensionScore(r.a);
-        html += `<tr class="click" data-student="${r.sid}" data-posuk="${escapeHtml(r.posukKey)}"><td><strong>${escapeHtml(studentsMap[r.sid])}</strong></td>
-          <td>${escapeHtml(formatRefLabel(r.posukKey))}</td>
-          <td>${pctPill(effHebrewScore(r.a))}</td><td>${pctPill(effTranslationScore(r.a))}</td><td>${pctPill(comp)}</td>
-          <td class="muted">${new Date(r.a.timestamp).toLocaleString([], { month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit' })}</td></tr>`;
+      html += '<table class="ov-table"><thead><tr><th>Student</th><th>Posuk</th><th>Read &amp; Translate</th><th>When</th></tr></thead><tbody>';
+      recentRT.slice(0, 12).forEach(r => {
+        const what = r.review ? gradeBadge(r.review) : 'older: Reading ' + pctPill(r.read) + ' Translation ' + pctPill(r.trans);
+        html += `<tr class="click" data-student="${r.sid}" data-posuk="${escapeHtml(r.posukKey)}" data-tab="readtranslate"><td><strong>${escapeHtml(studentsMap[r.sid])}</strong></td>
+          <td>${escapeHtml(formatRefLabel(r.posukKey))}</td><td>${what}</td><td class="muted">${whenText(r.when)}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+    html += `<div class="ov-box wide"><h3>🧠 Latest Chumash חידון <small>comprehension results</small></h3>`;
+    if(!recentComp.length) html += '<div class="ov-empty">No comprehension results yet.</div>';
+    else{
+      html += '<table class="ov-table"><thead><tr><th>Student</th><th>Posuk</th><th>Comprehension</th><th>When</th></tr></thead><tbody>';
+      recentComp.slice(0, 8).forEach(r => {
+        html += `<tr class="click" data-student="${r.sid}" data-posuk="${escapeHtml(r.posukKey)}" data-tab="comprehension"><td><strong>${escapeHtml(studentsMap[r.sid])}</strong></td>
+          <td>${escapeHtml(formatRefLabel(r.posukKey))}</td><td>${typeof r.score === 'number' ? pctPill(r.score) : verdictLabelWithScore(r.verdict, null)}</td><td class="muted">${whenText(r.when)}</td></tr>`;
       });
       html += '</tbody></table>';
     }
@@ -1338,8 +1367,10 @@ async function loadOverview(){
       tr.onclick = () => { const d = disputes[Number(tr.dataset.dispute)]; openStudentAt(d.sid, d.posukKey, d.tab); };
     });
     mainEl.querySelectorAll('tr[data-student]').forEach(tr => {
-      tr.onclick = () => openStudentAt(tr.dataset.student, tr.dataset.posuk || null);
+      tr.onclick = () => openStudentAt(tr.dataset.student, tr.dataset.posuk || null, tr.dataset.tab || null);
     });
+    const gradeCard = document.getElementById('ovCardGrade');
+    if(gradeCard && totalPending) gradeCard.onclick = () => { const b = document.getElementById('gradeTabBtn'); if(b) b.click(); };
     const card = document.getElementById('ovCardDisputes');
     if(card && disputes.length) card.onclick = () => document.getElementById('ovDisputes').scrollIntoView({ behavior:'smooth' });
   }catch(err){
@@ -1526,7 +1557,7 @@ async function markStudentsWithPendingDisputes(){
           const rowEl = document.querySelector(`.student-item[data-id="${id}"]`);
           const name = studentsMap[id];
           if(target){
-            studentActiveTab = target.tab;
+            studentActiveTab = tabForDispute(target.tab);
           }
           // Pass the target posuk straight into selectStudent (instead of
           // just setting the global here) so it survives selectStudent's
@@ -1637,10 +1668,12 @@ function computeStudentStats(posukMap, reviewMap){
     if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)) verdictCounts[cVerdict]++;
   });
   Object.keys(reviewMap || {}).forEach(key => { if(!counted.has(key)) posukCount++; });
+  let gold = 0, pending = 0, retry = 0;
+  Object.values(reviewMap || {}).forEach(r => { if(!r) return; if(r.status === 'gold') gold++; else if(r.status === 'pending') pending++; else if(r.status === 'retry') retry++; });
   const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
   const avgTranslation = translationScores.length ? translationScores.reduce((a,b) => a+b, 0) / translationScores.length : null;
   const avgComprehension = comprehensionScores.length ? comprehensionScores.reduce((a,b) => a+b, 0) / comprehensionScores.length : null;
-  return { posukCount, avg, avgTranslation, avgComprehension, verdictCounts };
+  return { posukCount, avg, avgTranslation, avgComprehension, verdictCounts, gold, pending, retry };
 }
 
 /* ---------- Chazara Recordings ---------- */
@@ -1735,7 +1768,7 @@ async function loadRoster(){
       <div class="muted" style="margin-bottom:10px;">Click any column header to sort · click a row to open that student. Lowest reading average is on top by default.</div>
       <div style="overflow-x:auto;"><table class="roster-table">
         <thead><tr>
-          <th>Student</th><th>Pesukim</th><th class="col-reading">Reading</th><th class="col-translation">Translation</th><th class="col-comprehension">Comprehension</th><th>Disputes</th><th>Last active</th>
+          <th>Student</th><th>Pesukim</th><th>Read &amp; Translate</th><th class="col-comprehension">Comprehension (Chumash חידון)</th><th>Disputes</th><th>Last active</th>
         </tr></thead><tbody>`;
     rows.forEach(r => {
       const last = studentLastActive(r.id);
@@ -1751,8 +1784,7 @@ async function loadRoster(){
       html += `<tr class="roster-row" data-id="${r.id}">
         <td class="rname">${r.name}</td>
         <td data-sort="${r.posukCount}">${r.posukCount}</td>
-        <td data-sort="${r.avg ?? ''}">${pctPill(r.avg)}</td>
-        <td data-sort="${r.avgTranslation ?? ''}">${pctPill(r.avgTranslation)}</td>
+        <td data-sort="${r.gold}">${r.gold} gold · ${r.pending} waiting · ${r.retry} not gold<br><span class="muted">older: ${pctPill(r.avg)} read · ${pctPill(r.avgTranslation)} translate</span></td>
         <td data-sort="${r.avgComprehension ?? ''}">${pctPill(r.avgComprehension)} <span class="muted" title="Best verdict per posuk">${verdictParts.join(' ')}</span></td>
         <td data-sort="${dc}">${dc ? `<span class="status-pill low">⚠️ ${dc}</span>` : '<span class="muted">—</span>'}</td>
         <td data-sort="${last || 0}"><span class="days-pill ${dCls}">${relDayLabel(last)}</span></td>
@@ -1863,6 +1895,16 @@ function buildReportRows(allAttempts, reviews){
     // A graded posuk with no attempt of its own under that key (a graded range is graded posuk by posuk).
     Object.entries(reviewMap).forEach(([posukKey, review]) => { if(!used.has(posukKey)) pushRow(id, name, posukKey, [], review); });
   });
+  // A range practiced together (pesukim 5-7) also gives its scores to each single posuk in it that has none of its own.
+  const ranges = rows.filter(r => r.isRange);
+  if(ranges.length) rows.forEach(r => {
+    if(r.isRange) return;
+    ranges.forEach(g => {
+      if(g.studentId !== r.studentId || g.parshaName !== r.parshaName || g.perekNum !== r.perekNum || r.posukNum < g.rangeStart || r.posukNum > g.rangeEnd) return;
+      if(typeof r.translationScore !== 'number' && typeof g.translationScore === 'number'){ r.translationScore = g.translationScore; r.translationFromRange = g.posukLabel; }
+      if(typeof r.hebrewScore !== 'number' && typeof g.hebrewScore === 'number'){ r.hebrewScore = g.hebrewScore; r.hebrewFromRange = g.posukLabel; }
+    });
+  });
   return rows;
 }
 
@@ -1896,8 +1938,9 @@ async function buildPosukGridData(perekNum, posukNums, studentIds, allAttempts, 
       const attempts = attemptMap ? Object.values(attemptMap).sort((a,b) => (b.timestamp||0) - (a.timestamp||0)) : [];
       const grade = (reviews && reviews[id] && reviews[id][posukKey]) || null;
       const latest = attempts.find(attemptHasResult) || null;   // a recording with no result yet is not activity
-      const reading = bestNumericScore(attempts, effHebrewScore);
-      const translation = bestNumericScore(attempts, effTranslationScore);
+      const ranged = rangeAttemptsFor(allAttempts[id], slug, perekNum, posukNum).filter(attemptHasResult);
+      const reading = bestNumericScore(attempts, effHebrewScore) ?? bestNumericScore(ranged, effHebrewScore);
+      const translation = bestNumericScore(attempts, effTranslationScore) ?? bestNumericScore(ranged, effTranslationScore);
       const comprehension = bestNumericScore(attempts, effComprehensionScore);
       return {
         id, name: studentsMap[id],
@@ -1919,6 +1962,7 @@ function renderPosukGroupHtml(group){
   const translationScores = group.students.map(s => s.translation).filter(v => typeof v === 'number');
   const comprehensionScores = group.students.map(s => s.comprehension).filter(v => typeof v === 'number');
   const avgReading = avg(readingScores), avgTranslation = avg(translationScores), avgComprehension = avg(comprehensionScores);
+  const gold = group.students.filter(s => s.grade && s.grade.status === 'gold').length, pending = group.students.filter(s => s.grade && s.grade.status === 'pending').length, retry = group.students.filter(s => s.grade && s.grade.status === 'retry').length;
 
   let rows = group.students.slice();
 
@@ -1927,9 +1971,10 @@ function renderPosukGroupHtml(group){
     <h3>${refLabel}</h3>
     <div class="summary-meta" style="margin-bottom:10px;">${total} student${total===1?'':'s'} in class</div>
     <div class="avg-bars" style="margin-bottom:12px;">
-      <div class="avg-bar"><div class="row"><span class="label">Avg Reading</span><span>${avgReading===null?'—':avgReading+'%'}</span></div><div class="summary-meta">${readingScores.length} of ${total} attempted</div></div>
-      <div class="avg-bar"><div class="row"><span class="label">Avg Translation</span><span>${avgTranslation===null?'—':avgTranslation+'%'}</span></div><div class="summary-meta">${translationScores.length} of ${total} attempted</div></div>
-      <div class="avg-bar"><div class="row"><span class="label">Avg Comprehension</span><span>${avgComprehension===null?'—':avgComprehension+'%'}</span></div><div class="summary-meta">${comprehensionScores.length} of ${total} attempted</div></div>
+      <div class="avg-bar"><div class="row"><span class="label">Gold standard</span><span>${gold}</span></div><div class="summary-meta">${pending} waiting for your grade · ${retry} not gold yet</div></div>
+      <div class="avg-bar"><div class="row"><span class="label">Older · Avg Reading</span><span>${avgReading===null?'—':avgReading+'%'}</span></div><div class="summary-meta">${readingScores.length} of ${total} attempted</div></div>
+      <div class="avg-bar"><div class="row"><span class="label">Older · Avg Translation</span><span>${avgTranslation===null?'—':avgTranslation+'%'}</span></div><div class="summary-meta">${translationScores.length} of ${total} attempted</div></div>
+      <div class="avg-bar"><div class="row"><span class="label">Avg Comprehension (Chumash חידון)</span><span>${avgComprehension===null?'—':avgComprehension+'%'}</span></div><div class="summary-meta">${comprehensionScores.length} of ${total} attempted</div></div>
     </div>`;
 
   if(rows.length === 0){
@@ -1937,11 +1982,11 @@ function renderPosukGroupHtml(group){
   }else{
     rows.sort((a,b) => a.name.localeCompare(b.name));
     html += `<table class="roster-table"><thead><tr>
-      <th>Student</th><th class="col-reading">Reading</th><th class="col-translation">Translation</th><th class="col-grade">Teacher grade</th><th class="col-comprehension">Comprehension</th><th class="col-date">Last Activity</th>
+      <th>Student</th><th class="col-reading">Older reading</th><th class="col-translation">Older translation</th><th class="col-grade">Teacher grade</th><th class="col-comprehension">Comprehension (Chumash חידון)</th><th class="col-date">Last Activity</th>
     </tr></thead><tbody>`;
     rows.forEach(s => {
       const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-      const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+      const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
       const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
       const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
       html += `<tr>
@@ -1956,7 +2001,7 @@ function renderPosukGroupHtml(group){
     html += `</tbody></table>`;
   }
   html += `</div>`;
-  return { html, refLabel, total, avgReading, avgTranslation, avgComprehension,
+  return { html, refLabel, total, avgReading, avgTranslation, avgComprehension, gold, pending, retry,
     readingAttempted: readingScores.length, translationAttempted: translationScores.length, comprehensionAttempted: comprehensionScores.length,
     rows };
 }
@@ -2502,8 +2547,8 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
 
   let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
   displayRows.forEach(r => {
-    const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
+    const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
+    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
     let cells = '';
     if(showStudentCol) cells += `<td>${r.studentName}</td>`;
@@ -2518,6 +2563,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
     html += `<tr>${cells}</tr>`;
   });
   html += '</tbody></table>';
+  if(displayRows.some(r => r.translationFromRange || r.hebrewFromRange)) html += '<div class="summary-meta" style="margin-top:6px;">↗ = practiced together with other pesukim; that score counts for each posuk in the range.</div>';
   resultsEl.innerHTML = html;
 }
 
@@ -2630,8 +2676,8 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
       headerCells += '<th class="col-date">Date</th>';
       html += `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
       g.rows.forEach(r => {
-        const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-        const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
+        const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
+        const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
         const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
         let cells = `<td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td>`;
         if(showReadingCol) cells += `<td>${scoreBadge('reading', scoreLabel, r.hebrewScore)}</td>`;
@@ -2662,13 +2708,14 @@ function downloadReportCsv(){
       if(i > 0) lines.push('');
       lines.push([`"Posuk ${i+1}"`].join(','));
       lines.push(['Students in class', g.total].join(','));
-      lines.push(['Average Reading', g.avgReading === null ? '' : g.avgReading + '%', `${g.readingAttempted} of ${g.total} attempted`].join(','));
-      lines.push(['Average Translation', g.avgTranslation === null ? '' : g.avgTranslation + '%', `${g.translationAttempted} of ${g.total} attempted`].join(','));
-      lines.push(['Average Comprehension', g.avgComprehension === null ? '' : g.avgComprehension + '%', `${g.comprehensionAttempted} of ${g.total} attempted`].join(','));
+      lines.push(['Gold standard', g.gold, `${g.pending} waiting · ${g.retry} not gold yet`].join(','));
+      lines.push(['Older: Average Reading', g.avgReading === null ? '' : g.avgReading + '%', `${g.readingAttempted} of ${g.total} attempted`].join(','));
+      lines.push(['Older: Average Translation', g.avgTranslation === null ? '' : g.avgTranslation + '%', `${g.translationAttempted} of ${g.total} attempted`].join(','));
+      lines.push(['Average Comprehension (Chumash חידון)', g.avgComprehension === null ? '' : g.avgComprehension + '%', `${g.comprehensionAttempted} of ${g.total} attempted`].join(','));
       lines.push(['Student','Reading','Translation','Teacher grade','Comprehension','Last Activity'].join(','));
       g.rows.forEach(s => {
         const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '';
         lines.push([`"${s.name}"`, readingLabel, translationLabel, `"${gradePlain(s.grade)}"`, comprehensionLabel, lastActivityLabel].join(','));
@@ -2753,7 +2800,7 @@ function printReport(){
     bodyHtml = reportExportGroups.map(g => {
       const rowsHtml = g.rows.map(s => {
         const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
         return `<tr><td>${s.name}</td><td>${readingLabel}</td><td>${translationLabel}</td><td>${gradePlain(s.grade) || '—'}</td><td>${comprehensionLabel}</td><td>${lastActivityLabel}</td></tr>`;
@@ -2761,9 +2808,10 @@ function printReport(){
       return `<h2>${g.refLabel}</h2>
         <table class="summary-table"><tbody>
           <tr><td>Students in class</td><td>${g.total}</td></tr>
-          <tr><td>Average Reading</td><td>${g.avgReading===null?'—':g.avgReading+'%'} (${g.readingAttempted} of ${g.total} attempted)</td></tr>
-          <tr><td>Average Translation</td><td>${g.avgTranslation===null?'—':g.avgTranslation+'%'} (${g.translationAttempted} of ${g.total} attempted)</td></tr>
-          <tr><td>Average Comprehension</td><td>${g.avgComprehension===null?'—':g.avgComprehension+'%'} (${g.comprehensionAttempted} of ${g.total} attempted)</td></tr>
+          <tr><td>Gold standard</td><td>${g.gold} (${g.pending} waiting · ${g.retry} not gold yet)</td></tr>
+          <tr><td>Older: Average Reading</td><td>${g.avgReading===null?'—':g.avgReading+'%'} (${g.readingAttempted} of ${g.total} attempted)</td></tr>
+          <tr><td>Older: Average Translation</td><td>${g.avgTranslation===null?'—':g.avgTranslation+'%'} (${g.translationAttempted} of ${g.total} attempted)</td></tr>
+          <tr><td>Average Comprehension (Chumash חידון)</td><td>${g.avgComprehension===null?'—':g.avgComprehension+'%'} (${g.comprehensionAttempted} of ${g.total} attempted)</td></tr>
         </tbody></table>
         <table><thead><tr><th>Student</th><th>Reading</th><th>Translation</th><th>Teacher grade</th><th>Comprehension</th><th>Last Activity</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>`;
@@ -2776,8 +2824,8 @@ function printReport(){
         inner = `<div class="meta">${g.hadAnyMatch ? 'No results match these filters for this student.' : 'No activity matching these filters.'}</div>`;
       }else{
         const rowsHtml = g.rows.map(r => {
-          const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-          const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
+          const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
+          const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
           const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
           return `<tr><td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td><td>${scoreLabel}</td><td>${translationLabel}</td><td>${gradePlain(r.review) || '—'}</td><td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td><td>${dateLabel}</td></tr>`;
         }).join('');
@@ -2804,8 +2852,8 @@ function printReport(){
     }
 
     const rowsHtml = reportRows.map(r => {
-      const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-      const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
+      const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
+      const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
       const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
       return `<tr>
         <td>${r.studentName}</td>
@@ -3211,7 +3259,8 @@ async function loadLegacyAccessTab(){
   }
 }
 
-let studentActiveTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate', for the currently-viewed student
+let studentActiveTab = 'readtranslate'; // 'readtranslate' | 'comprehension', for the currently-viewed student (the older reading and translation parts are shown together inside Read & Translate)
+const tabForDispute = tab => tab === 'comprehension' ? 'comprehension' : 'readtranslate';
 let studentPosukData = {}; // posukKey -> { attempts, latest } for the currently-viewed student
 let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currently-viewed student
 let studentRangeData = []; // comprehension-range attempts (posuk grid can't show these as single tiles)
@@ -3334,7 +3383,7 @@ async function selectStudent(id, name, el, forcedPosukKey){
     });
     studentRangeData.sort((a,b) => (b.latest ? b.latest.timestamp : 0) - (a.latest ? a.latest.timestamp : 0));
 
-    const sStats = computeStudentStats(val);
+    const sStats = computeStudentStats(val, allReviewsCache && allReviewsCache[id]);
     const sDisputes = countPendingDisputesForStudent();
     let sLast = (studentsInfo[id] && studentsInfo[id].lastActive) || 0;
     Object.values(studentPosukData).forEach(p => { if(p.latest && p.latest.timestamp > sLast) sLast = p.latest.timestamp; });
@@ -3343,17 +3392,18 @@ async function selectStudent(id, name, el, forcedPosukKey){
       <div class="student-head">
         <h2>${name}</h2>
         <div class="mini-tabs">
-          <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
-          <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
-          <button class="mini-tab-btn ${studentActiveTab==='translate'?'active':''}" id="studentTranslateBtn">🌐 Translate</button>
+          <button class="mini-tab-btn ${studentActiveTab==='readtranslate'?'active':''}" id="studentReadTranslateBtn">📖🌐 Read &amp; Translate</button>
+          <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension (Chumash חידון)</button>
         </div>
       </div>
       <div class="student-summary">
         ${sDisputes ? `<div class="chip alert" id="studentReviewDisputesChip"><b>⚠️ ${sDisputes}</b>Dispute${sDisputes===1?'':'s'} — review →</div>` : ''}
         <div class="chip"><b>${sStats.posukCount}</b>Pesukim recorded</div>
-        <div class="chip"><b>${pctTxt(sStats.avg)}</b>Avg reading</div>
-        <div class="chip"><b>${pctTxt(sStats.avgTranslation)}</b>Avg translation</div>
-        <div class="chip"><b>${pctTxt(sStats.avgComprehension)}</b>Avg comprehension</div>
+        <div class="chip"><b>${sStats.gold}</b>Gold standard</div>
+        <div class="chip"><b>${sStats.pending}</b>Waiting for your grade</div>
+        <div class="chip"><b>${sStats.retry}</b>Not gold yet</div>
+        <div class="chip"><b>${pctTxt(sStats.avg)} · ${pctTxt(sStats.avgTranslation)}</b>Older reading · translation</div>
+        <div class="chip"><b>${pctTxt(sStats.avgComprehension)}</b>Comprehension (Chumash חידון)</div>
         <div class="chip"><b>${sLast ? relDayLabel(sLast) : 'Never'}</b>Last active</div>
       </div>
       <div class="muted" style="margin-bottom:4px;">Tap a posuk to hear the recording and see details. Colors: green ≥80%, yellow 50–79%, red &lt;50%, ⚠️ = dispute.</div>
@@ -3369,7 +3419,7 @@ async function selectStudent(id, name, el, forcedPosukKey){
     if(reviewChip) reviewChip.onclick = async () => {
       const target = nextPendingDisputeTarget();
       if(!target) return;
-      studentActiveTab = target.tab;
+      studentActiveTab = tabForDispute(target.tab);
       selectedPosukKey = target.posukKey;
       await renderStudentGrid();
       renderPosukDetail(target.posukKey);
@@ -3381,13 +3431,8 @@ async function selectStudent(id, name, el, forcedPosukKey){
       await renderStudentGrid();
       if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
     };
-    document.getElementById('studentReadingBtn').onclick = async () => {
-      studentActiveTab = 'reading';
-      await renderStudentGrid();
-      if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
-    };
-    document.getElementById('studentTranslateBtn').onclick = async () => {
-      studentActiveTab = 'translate';
+    document.getElementById('studentReadTranslateBtn').onclick = async () => {
+      studentActiveTab = 'readtranslate';
       await renderStudentGrid();
       if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
     };
@@ -3459,7 +3504,7 @@ async function removeStudentEntirely(id, name){
 
 async function renderStudentGrid(){
   document.querySelectorAll('.mini-tab-btn').forEach(b => b.classList.remove('active'));
-  const btnId = studentActiveTab === 'comprehension' ? 'studentComprehensionBtn' : (studentActiveTab === 'reading' ? 'studentReadingBtn' : 'studentTranslateBtn');
+  const btnId = studentActiveTab === 'comprehension' ? 'studentComprehensionBtn' : 'studentReadTranslateBtn';
   const btn = document.getElementById(btnId);
   if(btn) btn.classList.add('active');
 
@@ -3488,11 +3533,15 @@ async function renderStudentGrid(){
     for(let posukNum = range.min; posukNum <= range.max; posukNum++){
       const posukKey = posuksThisPerek[posukNum];
       const attemptsForTile = posukKey ? studentPosukData[posukKey].attempts : [];
-      const record = bestAttemptForSkill(attemptsForTile, studentActiveTab);
+      const record = studentActiveTab === 'readtranslate' ? null : bestAttemptForSkill(attemptsForTile, studentActiveTab);
 
       let tier = null;
       let tileLabel = '—';
-      if(studentActiveTab === 'reading'){
+      if(studentActiveTab === 'readtranslate'){
+        const slugOf = posukKey ? posukKey.replace(/_\d+_\d+$/, '') : resolveParshaSlug(perekNum, posukNum);
+        const cell = readTranslateCell((attemptsForTile || []).concat(slugOf ? rangeAttemptsFor(allAttemptsCache && allAttemptsCache[activeStudentId], slugOf, perekNum, posukNum) : []), posukKey ? reviewOf(activeStudentId, posukKey) : null);
+        if(cell){ tier = cell.tier; tileLabel = readTranslateTileLabel(cell); doneCount++; }
+      }else if(studentActiveTab === 'reading'){
         const score = record ? effHebrewScore(record) : null;
         if(typeof score === 'number'){
           tier = pctTier(score);
@@ -3559,8 +3608,11 @@ async function renderStudentGrid(){
       let rangeTier = null;
       let rangeLabel = '—';
       const rangeAttempts = studentPosukData[r.posukKey].attempts || [];
-      const bestRange = bestAttemptForSkill(rangeAttempts, studentActiveTab);
-      if(studentActiveTab === 'reading'){
+      const bestRange = studentActiveTab === 'readtranslate' ? null : bestAttemptForSkill(rangeAttempts, studentActiveTab);
+      if(studentActiveTab === 'readtranslate'){
+        const cell = readTranslateCell(rangeAttempts, reviewOf(activeStudentId, r.posukKey.replace(/_\d+-\d+$/, '_' + r.rangeStart)));
+        if(cell){ rangeTier = cell.tier; rangeLabel = readTranslateTileLabel(cell); }
+      }else if(studentActiveTab === 'reading'){
         const score = bestRange ? effHebrewScore(bestRange) : null;
         if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
       }else if(studentActiveTab === 'translate'){
@@ -3631,7 +3683,7 @@ function wireNextDisputeButtons(){
     btn.onclick = async () => {
       const target = nextPendingDisputeTarget();
       if(!target) return;
-      studentActiveTab = target.tab;
+      studentActiveTab = tabForDispute(target.tab);
       selectedPosukKey = target.posukKey;
       await renderStudentGrid();
       renderPosukDetail(target.posukKey);
@@ -3641,40 +3693,39 @@ function wireNextDisputeButtons(){
   });
 }
 
-function renderPosukDetail(posukKey){
-  const detailEl = document.getElementById('posukDetail');
+function renderPosukDetailFor(posukKey, tab, detailEl){
   if(!detailEl || !studentPosukData[posukKey]) return;
 
   const { attempts, latest } = studentPosukData[posukKey];
   const refLabel = formatRefLabel(posukKey);
-  const skillTitle = studentActiveTab === 'reading'
-    ? '🎙️ Reading'
-    : (studentActiveTab === 'translate' ? '🌐 Translation' : '🧠 Comprehension');
+  const skillTitle = tab === 'reading'
+    ? '🎙️ Older reading'
+    : (tab === 'translate' ? '🌐 Older translation' : '🧠 Comprehension (Chumash חידון)');
 
   // Only include attempts that actually contain data for the skill the
   // teacher selected in the pill/grid above. One database attempt can hold
   // multiple skills, but the teacher detail view should never mix them.
   const relevantAttempts = attempts.filter(a => {
-    if(studentActiveTab === 'reading'){
+    if(tab === 'reading'){
       // A pending/resolved hebrew dispute must always surface here even if
       // this attempt is missing hebrewAudioURL/hebrewScore — otherwise a
       // disputed attempt with thin data silently disappears from every tab
       // with no way for the teacher to ever find or resolve it.
       return !!(a.hebrewAudioURL || a.hebrewAudioStoragePath) || typeof effHebrewScore(a) === 'number' || !!a.hebrewDisputeStatus;
     }
-    if(studentActiveTab === 'translate'){
+    if(tab === 'translate'){
       return translationChunkEntries(a.translationChunkResults).length > 0;
     }
     return questionResultEntries(a.questionResults).length > 0 || !!(a.comprehensionAudioURL || a.comprehensionAudioStoragePath);
   });
 
   let html = `<div class="posuk-group">
-    <button class="btn small" id="backToTileBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-bottom:10px;">⬆️ Back to grid</button>
+    <button class="btn small back-to-tile" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-bottom:10px;">⬆️ Back to grid</button>
     <h3>${refLabel} · ${skillTitle}</h3>
     <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
 
   if(!relevantAttempts.length){
-    html += `<div class="empty-msg" style="padding:22px 0;">No ${studentActiveTab === 'reading' ? 'reading' : studentActiveTab === 'translate' ? 'translation' : 'comprehension'} activity saved for this posuk yet.</div>`;
+    html += `<div class="empty-msg" style="padding:22px 0;">No ${tab === 'reading' ? 'reading' : tab === 'translate' ? 'translation' : 'comprehension'} activity saved for this posuk yet.</div>`;
   }
 
   relevantAttempts.forEach(a => {
@@ -3683,7 +3734,7 @@ function renderPosukDetail(posukKey){
     });
     let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
 
-    if(studentActiveTab === 'reading'){
+    if(tab === 'reading'){
       const hScore = effHebrewScore(a);
       const hTier = (typeof hScore === 'number')
         ? (hScore >= 80 ? 'correct' : (hScore >= 50 ? 'partial' : 'incorrect'))
@@ -3720,7 +3771,7 @@ function renderPosukDetail(posukKey){
       lines += renderDisputeSection(a, posukKey, 'hebrew');
     }
 
-    if(studentActiveTab === 'translate'){
+    if(tab === 'translate'){
       const tScore = effTranslationScore(a);
       lines += `<div class="top-line"><span>Overall translation</span><span class="score-pill">${tScore === null ? '—' : tScore + '%'}</span></div>`;
       translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
@@ -3734,7 +3785,7 @@ function renderPosukDetail(posukKey){
       });
     }
 
-    if(studentActiveTab === 'comprehension'){
+    if(tab === 'comprehension'){
       const questionEntries = questionResultEntries(a.questionResults);
       if(questionEntries.length){
         const qScore = effQuestionScore(a);
@@ -3781,7 +3832,7 @@ function renderPosukDetail(posukKey){
   html += `</div>`;
   detailEl.innerHTML = html;
 
-  const backBtn = document.getElementById('backToTileBtn');
+  const backBtn = detailEl.querySelector('.back-to-tile');
   if(backBtn){
     backBtn.onclick = () => {
       const tileEl = document.getElementById('tile_' + posukKey);
@@ -3796,16 +3847,16 @@ function renderPosukDetail(posukKey){
 
   // Only wire controls that are actually visible for the selected skill.
   relevantAttempts.forEach(a => {
-    if(studentActiveTab === 'reading' && hasReviewableHebrewDispute(a)){
+    if(tab === 'reading' && hasReviewableHebrewDispute(a)){
       wireFinalizeHebrew(a, posukKey);
     }
-    if(studentActiveTab === 'comprehension'){
+    if(tab === 'comprehension'){
       questionResultEntries(a.questionResults).forEach(([questionIdx, q]) => {
         if(hasReviewableQuestionDispute(q)) wireFinalizeQuestion(a, posukKey, questionIdx, q);
       });
       if(hasReviewableComprehensionDispute(a)) wireFinalizeComprehension(a, posukKey);
     }
-    if(studentActiveTab === 'translate'){
+    if(tab === 'translate'){
       translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
         if(hasReviewableTranslationDispute(c)){
           wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
@@ -3813,6 +3864,25 @@ function renderPosukDetail(posukKey){
       });
     }
   });
+}
+
+function renderPosukDetail(posukKey){
+  const detailEl = document.getElementById('posukDetail');
+  if(!detailEl || !studentPosukData[posukKey]) return;
+  if(studentActiveTab !== 'readtranslate'){ renderPosukDetailFor(posukKey, studentActiveTab, detailEl); return; }
+  const review = reviewOf(activeStudentId, posukKey);
+  const note = !review ? 'No teacher grade yet.'
+    : review.status === 'pending' ? 'Sent ' + (review.submittedAt ? new Date(Number(review.submittedAt)).toLocaleDateString() : '') + ' — waiting for your grade (open the To Grade tab).'
+    : 'Graded ' + (review.gradedAt ? new Date(Number(review.gradedAt)).toLocaleDateString() : '') + (Number(review.pointsAwarded) ? ' · ' + review.pointsAwarded + ' points' : '') + (Number(review.bonus) ? ' · ' + review.bonus + ' bonus' : '') + (review.lockedUntil && Number(review.lockedUntil) > Date.now() ? ' · locked until ' + new Date(Number(review.lockedUntil)).toLocaleDateString() : '');
+  detailEl.innerHTML = '<div class="posuk-group"><button class="btn small back-to-tile" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-bottom:10px;">⬆️ Back to grid</button>' +
+    '<h3>' + formatRefLabel(posukKey) + ' · 📖🌐 Read &amp; Translate</h3>' +
+    '<div class="attempt-row"><div class="top-line"><strong>Teacher grade</strong><span>' + gradeBadge(review) + '</span></div><div class="summary-meta">' + note + '</div></div>' +
+    '<div class="summary-meta" style="margin:10px 0 2px;">Older results (before one recording): reading and translation side by side.</div>' +
+    '<div id="posukDetailRead"></div><div id="posukDetailTranslate"></div></div>';
+  renderPosukDetailFor(posukKey, 'reading', document.getElementById('posukDetailRead'));
+  renderPosukDetailFor(posukKey, 'translate', document.getElementById('posukDetailTranslate'));
+  const back = detailEl.querySelector('.back-to-tile');
+  if(back) back.onclick = () => { const tileEl = document.getElementById('tile_' + posukKey); (tileEl || detailEl).scrollIntoView({ behavior: 'smooth', block: tileEl ? 'center' : 'start' }); };
 }
 
 /* Builds the little banner/finalize block for one skill on one attempt.
@@ -4092,8 +4162,42 @@ function sortPosukKeys(keys){
   });
 }
 
+/* ---------- Read & Translate as ONE result ----------
+   A student sends one recording that the teacher grades (gold / not gold / waiting). Older results have a reading score and a
+   translation score: they are shown side by side, never averaged. A range practiced together (pesukim 5-7) also counts for
+   each posuk in it. Comprehension is its own thing (Chumash חידון). */
+function reviewOf(studentId, posukKey){ return (allReviewsCache && allReviewsCache[studentId] && allReviewsCache[studentId][posukKey]) || null; }
+function rangeAttemptsFor(studentAttempts, slug, perek, posuk){
+  const out = [], prefix = slug + '_' + perek + '_';
+  Object.entries(studentAttempts || {}).forEach(([key, map]) => {
+    if(key.indexOf(prefix) !== 0) return;
+    const m = /^(\d+)-(\d+)$/.exec(key.slice(prefix.length));
+    if(m && posuk >= Number(m[1]) && posuk <= Number(m[2])) Object.values(map || {}).forEach(a => out.push(a));
+  });
+  return out;
+}
+// The label on a small tile: the grade mark, then the older scores side by side (R = reading, T = translation).
+function readTranslateTileLabel(cell){
+  const mark = cell.review ? ({ gold: '🏅', pending: '⏳', retry: '🔁' }[cell.review.status] || '') : '';
+  const parts = [];
+  if(typeof cell.read === 'number') parts.push('R ' + Math.round(cell.read));
+  if(typeof cell.translate === 'number') parts.push('T ' + Math.round(cell.translate));
+  return (mark + ' ' + parts.join(' · ')).trim() || '—';
+}
+function readTranslateCell(attempts, review){
+  const scored = (attempts || []).filter(attemptHasResult);
+  const read = bestNumericScore(scored, effHebrewScore), translate = bestNumericScore(scored, effTranslationScore);
+  if(typeof read !== 'number' && typeof translate !== 'number' && !review) return null;
+  let tier;
+  if(review && review.status === 'gold') tier = 'high';
+  else if(review && review.status === 'retry') tier = 'low';
+  else if(review && review.status === 'pending') tier = 'mid';
+  else tier = pctTier(Math.min(...[read, translate].filter(v => typeof v === 'number')));   // the weaker of the two, never an average
+  return { read, translate, review, tier };
+}
+
 /* ---------- Class Summary ---------- */
-let classActiveSkill = 'comprehension'; // 'comprehension' | 'reading' | 'translate' -- one global toggle for the whole tab
+let classActiveSkill = 'readtranslate'; // 'readtranslate' | 'comprehension' -- one global toggle for the whole tab
 let expandedPerekNum = undefined; // only one perek open (accordion) at a time; null = all collapsed, undefined = auto-pick most recent
 let classShowAllPerakim = false;
 let lastAttemptsVal = null; // cached attempts tree so toggling skill/expand doesn't need a re-fetch
@@ -4111,16 +4215,14 @@ async function loadClassSummary(){
 
     let html = '<h2>Class results by posuk</h2>';
     html += `<div class="mini-tabs" style="margin-bottom:6px;">
-      <button class="mini-tab-btn ${classActiveSkill==='comprehension'?'active':''}" id="classComprehensionBtn">🧠 Comprehension</button>
-      <button class="mini-tab-btn ${classActiveSkill==='reading'?'active':''}" id="classReadingBtn">🎙️ Reading</button>
-      <button class="mini-tab-btn ${classActiveSkill==='translate'?'active':''}" id="classTranslateBtn">🌐 Translate</button>
+      <button class="mini-tab-btn ${classActiveSkill==='readtranslate'?'active':''}" id="classReadTranslateBtn">📖🌐 Read &amp; Translate</button>
+      <button class="mini-tab-btn ${classActiveSkill==='comprehension'?'active':''}" id="classComprehensionBtn">🧠 Comprehension (Chumash חידון)</button>
     </div>`;
     html += `<div id="classPosukGridWrap"></div>`;
     mainEl.innerHTML = html;
 
     document.getElementById('classComprehensionBtn').onclick = () => { classActiveSkill = 'comprehension'; renderClassPosukGrid(lastAttemptsVal); };
-    document.getElementById('classReadingBtn').onclick = () => { classActiveSkill = 'reading'; renderClassPosukGrid(lastAttemptsVal); };
-    document.getElementById('classTranslateBtn').onclick = () => { classActiveSkill = 'translate'; renderClassPosukGrid(lastAttemptsVal); };
+    document.getElementById('classReadTranslateBtn').onclick = () => { classActiveSkill = 'readtranslate'; renderClassPosukGrid(lastAttemptsVal); };
 
     await renderClassPosukGrid(val);
   }catch(err){
@@ -4139,8 +4241,8 @@ let selectedClassPosukKey = null;
 function skillInfo(record, skill){
   if(!record) return null;
   if(skill === 'reading'){
-    if(typeof record.hebrewScore !== 'number') return null;
-    const score = effHebrewScore(record);
+    const score = effHebrewScore(record);   // a teacher's final score counts, even when there is no original score
+    if(typeof score !== 'number') return null;
     return { tier: pctTier(score), label: score + '%' };
   }
   if(skill === 'translate'){
@@ -4235,8 +4337,17 @@ async function renderClassPosukGrid(val){
         let posukText = '';
         Object.entries(studentsMap).forEach(([studentId, name]) => {
           const attemptMap = val[studentId] && val[studentId][posukKey];
-          if(attemptMap){
-            const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+          const attempts = attemptMap ? Object.values(attemptMap).sort((a,b) => (b.timestamp||0) - (a.timestamp||0)) : [];
+          if(classActiveSkill === 'readtranslate'){
+            const cell = readTranslateCell(attempts.concat(rangeAttemptsFor(val[studentId], slug, perekNum, posukNum)), reviewOf(studentId, posukKey));
+            if(cell){
+              doneList.push({ studentId, name, cell, latest: attempts[0] || null });
+              const text = (attempts.find(a => a && a.posukText) || {}).posukText;
+              if(!posukText && text) posukText = text;
+            }
+            return;
+          }
+          if(attempts.length){
             const latest = bestAttemptForSkill(attempts, classActiveSkill);
             if(latest){
               doneList.push({ studentId, name, latest });
@@ -4251,7 +4362,8 @@ async function renderClassPosukGrid(val){
 
         if(doneList.length) perekStarted++;
 
-        const tiers = doneList.map(d => skillInfo(d.latest, classActiveSkill).tier);
+        // A tile never fails on a record the picker accepted: no tier, no vote.
+        const tiers = doneList.map(d => classActiveSkill === 'readtranslate' ? d.cell.tier : (skillInfo(d.latest, classActiveSkill) || {}).tier).filter(Boolean);
         const overallTier = majorityTier(tiers);
 
         classPosukData[posukKey] = { doneList, notDoneList, posukText };
@@ -4278,6 +4390,7 @@ async function renderClassPosukGrid(val){
         const posukKey = `${slug}_${perekNum}_${posukNum}`;
         const started = Object.keys(studentsMap).some(studentId => {
           const attemptMap = val[studentId] && val[studentId][posukKey];
+          if(classActiveSkill === 'readtranslate') return !!readTranslateCell(Object.values(attemptMap || {}).concat(rangeAttemptsFor(val[studentId], slug, perekNum, posukNum)), reviewOf(studentId, posukKey));
           return attemptMap && Object.values(attemptMap).some(a => skillInfo(a, classActiveSkill));
         });
         if(started) perekStarted++;
@@ -4306,8 +4419,8 @@ function renderClassPosukDetail(posukKey, bodyEl){
   const doneCount = data.doneList.length;
   const notDoneCount = total - doneCount;
   const refLabel = formatRefLabel(posukKey);
-  const isTranslate = classActiveSkill === 'translate';
-  const skillLabel = classActiveSkill === 'reading' ? '🎙️ Reading' : (isTranslate ? '🌐 Translate' : '🧠 Comprehension');
+  const isRT = classActiveSkill === 'readtranslate', isTranslate = false;
+  const skillLabel = isRT ? '📖🌐 Read & Translate' : '🧠 Comprehension (Chumash חידון)';
   // Translation doesn't have one single audio clip per attempt (it's one
   // clip per chunk piece), so it needs its own rendering branch below
   // rather than the single-audioField pattern reading/comprehension share.
@@ -4321,6 +4434,15 @@ function renderClassPosukDetail(posukKey, bodyEl){
 
   if(doneCount === 0){
     html += `<div class="empty-msg">No one has recorded this posuk yet.</div>`;
+  }else if(isRT){
+    // One line per student: the teacher's grade first, then the older reading and translation scores side by side.
+    [...data.doneList].sort((a,b) => a.name.localeCompare(b.name)).forEach(entry => {
+      const c = entry.cell, pct = v => typeof v === 'number' ? Math.round(v) + '%' : '—';
+      let line = '<div class="top-line"><strong>' + entry.name + '</strong><span>' + (c.review ? gradeBadge(c.review) + ' ' : '');
+      if(typeof c.read === 'number' || typeof c.translate === 'number') line += 'older: ' + scoreBadge('reading', 'Reading ' + pct(c.read), c.read) + ' ' + scoreBadge('translation', 'Translation ' + pct(c.translate), c.translate);
+      line += '</span></div>';
+      html += '<div class="attempt-row">' + line + '</div>';
+    });
   }else if(isTranslate){
     [...data.doneList].sort((a,b) => a.name.localeCompare(b.name)).forEach(entry => {
       const a = entry.latest;

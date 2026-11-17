@@ -300,7 +300,7 @@ function cell(k,s){
  switch(k){
   case'name':return '<td><button class="name" data-id="'+esc(s.id)+'">'+esc(s.name)+'</button><span class="m">'+s.toolsUsed+' of '+s.toolsTotal+' tools used</span></td>';
   case'last':return '<td><span class="dot '+dotFor(s.last)+'"></span>'+esc(ago(s.last))+'</td>';
-  case'posuk':return t.posuk?'<td>'+t.posuk.mastered+' of '+t.posuk.pesukim+' pesukim at 100%<span class="m">'+t.posuk.tries+' tries '+esc(pl)+'</span></td>':none;
+  case'posuk':return t.posuk?'<td>'+t.posuk.mastered+' of '+t.posuk.pesukim+' pesukim read at 100% (older results)<span class="m">'+t.posuk.tries+' tries '+esc(pl)+'</span></td>':none;
   case'chazara':return t.chazara?'<td>'+t.chazara.inPeriod+' chazaras <span class="m">'+esc(pl)+' · '+t.chazara.reviewed+' pesukim reviewed</span></td>':none;
   case'shorashim':return t.shorashim?'<td>'+t.shorashim.cards+' cards<span class="m">+'+t.shorashim.recent+' '+esc(pl)+' · '+Math.round(t.shorashim.secs/60)+' min</span></td>':none;
   case'rashi':return t.rashi?'<td>Unit '+t.rashi.unit+' / '+t.rashi.of+'<span class="m '+tone(t.rashi.acc)+'">'+(t.rashi.acc===null?'—':t.rashi.acc+'% correct')+'</span></td>':none;
@@ -344,7 +344,7 @@ function attention(s){
  if(t.gematria&&t.gematria.tricky.length&&t.gematria.acc!==null&&t.gematria.acc<80)a.push('Gematria: often misses <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>.');
  if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg<70)a.push('Weekly Quiz average (completed quizzes) is '+t.quiz.avg+'%.');
  if(t.quiz&&t.quiz.notStarted+t.quiz.inProgress)a.push('Weekly Quiz: '+[t.quiz.notStarted?t.quiz.notStarted+' not started':'',t.quiz.inProgress?t.quiz.inProgress+' not finished':''].filter(Boolean).join(', ')+'. See All Quizzes below.');
- if(t.posuk&&t.posuk.mastered)g.push(t.posuk.mastered+(t.posuk.mastered===1?' posuk':' pesukim')+' read at 100%.');
+ if(t.posuk&&t.posuk.mastered)g.push(t.posuk.mastered+(t.posuk.mastered===1?' posuk':' pesukim')+' read at 100% (older results).');
  if(t.chazara&&t.chazara.atGoal)g.push(t.chazara.atGoal+(t.chazara.atGoal===1?' posuk':' pesukim')+' reached the chazara goal ('+t.chazara.goal+'×).');
  if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg>=85)g.push('Strong Weekly Quiz average: '+t.quiz.avg+'%.');
  if(t.shorashim&&t.shorashim.cards>=10)g.push(t.shorashim.cards+' Shorashim cards learned.');
@@ -363,7 +363,7 @@ function openReport(id,silent){
  if(a.length)h+='<div class="attn" style="margin-top:16px"><h3>⚠️ Needs attention</h3><ul>'+a.map(li).join('')+'</ul></div>';
  if(g.length)h+='<div class="good" style="margin-top:10px"><h3>✅ Going well</h3><ul>'+g.map(li).join('')+'</ul></div>';
  h+='<div class="rgrid">';
- h+=box('📜 Posuk Practice',t.posuk,t.posuk?'<ul>'+li('<b>'+t.posuk.mastered+'</b> of '+t.posuk.pesukim+' pesukim read at 100%')+li(t.posuk.trans100+' translated at 100% · '+t.posuk.comp100+' questions at 100%')+li('Average best reading score: '+(t.posuk.avgRead===null?'—':t.posuk.avgRead+'%'))+li(t.posuk.tries+' tries '+esc(pl))+'</ul>':'');
+ h+=box('📜 Posuk Practice',t.posuk,t.posuk?'<ul>'+li('<b>'+t.posuk.mastered+'</b> of '+t.posuk.pesukim+' pesukim read at 100% (older results, before one recording)')+li(t.posuk.trans100+' translated at 100% (older) · '+t.posuk.comp100+' comprehension questions at 100%')+li('Average best reading score: '+(t.posuk.avgRead===null?'—':t.posuk.avgRead+'%'))+li(t.posuk.tries+' tries '+esc(pl))+'</ul>':'');
  h+=box('🔁 Chazara',t.chazara,t.chazara?'<ul>'+li('<b>'+t.chazara.inPeriod+'</b> chazaras '+esc(pl)+(+$('period').value?' ('+t.chazara.total+' all time)':''))+li(t.chazara.reviewed+' pesukim reviewed · '+t.chazara.atGoal+' at goal')+li(t.chazara.due?t.chazara.due+' due for review':'Nothing overdue')+'</ul>':'');
  h+=box('🌳 Shorashim',t.shorashim,t.shorashim?'<ul>'+li('<b>'+t.shorashim.cards+'</b> cards learned'+(+$('period').value?' (+'+t.shorashim.recent+' '+esc(pl)+')':''))+li(t.shorashim.games+' games played')+li(Math.round(t.shorashim.secs/60)+' minutes of study')+'</ul>':'');
  h+=box('<span class="he">אב</span> Rashi Letters',t.rashi,t.rashi?'<ul>'+li('On unit <b>'+t.rashi.unit+'</b> of '+t.rashi.of)+li('Accuracy: <span class="'+tone(t.rashi.acc)+'">'+(t.rashi.acc===null?'—':t.rashi.acc+'%')+'</span> over '+t.rashi.attempts+' answers')+(t.rashi.weak.length?li('Tricky: <span class="he">'+esc(t.rashi.weak.join(' '))+'</span>'):'')+'</ul>':'');
