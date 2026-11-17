@@ -82,8 +82,8 @@
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
-    await load(new URL('class-pointer-prototype/classroom-core.js?v=20261116-wbplus1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-shapes2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/classroom-core.js?v=hlshapes2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=hlshapes1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261117-send1',root).href);
@@ -155,7 +155,9 @@
     // The embedded activity presence view must have its own tools: the retired Pointer page is never opened.
     const drawTools=document.createElement('div');drawTools.id='fttLessonDrawTools';
     drawTools.style.cssText='display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;max-width:100%';
-    const lessonModes=[['select','🖱️','Select'],['point','☝','Pointer'],['highlight','🖍','Highlight'],['box','▧','Highlight box'],['pen','✎','Pen'],['line','━','Line'],['pen-arrow','➜','Arrow'],['rectangle','▭','Rectangle'],['ellipse','◯','Oval'],['triangle','△','Triangle'],['text','T','Text']];
+    const highlightShapes=[['highlight-rectangle','▧','Highlight rectangle'],['highlight-ellipse','◉','Highlight ellipse']];
+    const isHighlightShape=tool=>highlightShapes.some(([id])=>id===tool);
+    const lessonModes=[['select','🖱️','Select'],['point','☝','Pointer'],['highlight','🖍','Highlight'],['box','▧','Highlight box'],['pen','✎','Pen'],['line','━','Line'],['pen-arrow','➜','Arrow'],['rectangle','▭','Rectangle'],['ellipse','◯','Oval'],...highlightShapes,['triangle','△','Triangle'],['text','T','Text']];
     const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonColor='#57b8ff',lessonSize=.016,lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
     let selIds=[],selDrag=null,selPreview=new Map(),selSendAt=0;
     const lessonStage=document.createElement('div');
@@ -170,7 +172,7 @@
     hitLayer.style.cssText='position:absolute;cursor:crosshair;touch-action:none';
     const viewOnly=document.createElement('span');viewOnly.textContent='View only';viewOnly.style.cssText='font-size:13px;opacity:.85';
     const undo=document.createElement('button');undo.type='button';undo.textContent='↶ Undo';undo.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer';
-    const allowedMode=mode=>mode==='point'?lessonLevel!=='none':lessonLevel==='pen'||lessonLevel==='highlight'&&['highlight','box'].includes(mode);
+    const allowedMode=mode=>mode==='point'?lessonLevel!=='none':lessonLevel==='pen'||lessonLevel==='highlight'&&(['select','highlight','box'].includes(mode)||isHighlightShape(mode));
     function redrawToolbar(){
       // The same permission also decides whether the drawing toolbar shows while this student shares their screen.
       window.FTTAnnotate?.setStudentLevel?.(lessonLevel);
@@ -191,14 +193,15 @@
       const caption=document.createElement('span');caption.textContent=name.replace('Highlight box','Box');caption.setAttribute('aria-hidden','true');caption.style.cssText='display:block;margin-top:2px;font:700 10px/1.1 system-ui;white-space:nowrap';
       button.append(icon,caption);
       button.style.cssText='min-width:52px;height:50px;padding:3px 5px;border-radius:12px;border:3px solid #86a6df;background:#193b6c;color:white;cursor:pointer;line-height:1;touch-action:manipulation';
-      button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
+      button.addEventListener('click',()=>{const enteringHighlightShape=isHighlightShape(mode)&&!isHighlightShape(lessonTool);lessonTool=mode;if(enteringHighlightShape)selectColor(highlightColor);redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
     const colors=[['#57b8ff','Sky blue'],['#ffcc00','Yellow'],['#ff7979','Coral'],['#75df9a','Green'],['#dca0ff','Purple'],['#ffa65c','Orange'],['#7ce4dc','Teal'],['#1f2937','Black'],['#1d4ed8','Blue ink']];
     const colorSelect=document.createElement('div');colorSelect.setAttribute('role','group');colorSelect.setAttribute('aria-label','Choose drawing color');
     colorSelect.style.cssText='display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:center';
     const colorButtons=[];
-    const selectColor=color=>{lessonColor=color;if(lessonTool==='select')recolorSelection(color);for(const b of colorButtons){const on=b.dataset.color===color;b.setAttribute('aria-pressed',String(on));b.style.border=on?'4px solid #fff':'3px solid #55739c';b.style.outline=on?'3px solid #facc15':'none';b.style.transform=on?'scale(1.09)':'none'}};
+    let highlightColor='#ffcc00';
+    const selectColor=color=>{lessonColor=color;if(isHighlightShape(lessonTool))highlightColor=color;if(lessonTool==='select')recolorSelection(color);for(const b of colorButtons){const on=b.dataset.color===color;b.setAttribute('aria-pressed',String(on));b.style.border=on?'4px solid #fff':'3px solid #55739c';b.style.outline=on?'3px solid #facc15':'none';b.style.transform=on?'scale(1.09)':'none'}};
     for(const [color,name] of colors){const b=document.createElement('button');b.type='button';b.dataset.color=color;b.title=name;b.setAttribute('aria-label',name);b.style.cssText='width:39px;height:39px;border-radius:50%;background:'+color+';cursor:pointer;touch-action:manipulation;flex:none';b.addEventListener('click',()=>selectColor(color));colorButtons.push(b);colorSelect.append(b)}
     const sizeSelect=document.createElement('div');sizeSelect.setAttribute('role','group');sizeSelect.setAttribute('aria-label','Choose line thickness');sizeSelect.style.cssText='display:flex;gap:6px;align-items:center';
     const sizeButtons=[];
@@ -377,7 +380,7 @@
 
     // The student's own marks are the ones the teacher's page filed under this page's connection (see classroom.js).
     const myOwner=()=>presencePeer?.id?'presence:'+presencePeer.id:null;
-    const ownMarks=()=>{const me=myOwner();return me?(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]).filter(m=>m&&m.owner===me&&typeof m.id==='string'&&Array.isArray(m.points)&&m.points.length):[]};
+    const ownMarks=()=>{const me=myOwner();return me?(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]).filter(m=>m&&m.owner===me&&(lessonLevel==='pen'||isHighlightShape(m.tool))&&typeof m.id==='string'&&Array.isArray(m.points)&&m.points.length):[]};
     const previewed=mark=>{const next=selPreview.get(mark.id);return next?{...mark,...next}:mark};
     const NUDGE={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     // Picked marks: words move and change together, every line of the block.
@@ -472,14 +475,17 @@
         const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&Math.abs(p.x)<=8&&Math.abs(p.y)<=8);
         if(!points.length)continue;
         const color=/^#[0-9a-fA-F]{6}$/.test(stroke.color)?stroke.color:'#57b8ff';
-        const alpha=['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
+        const highlightShape=isHighlightShape(stroke.tool);
+        if(highlightShape&&lessonMarks.marksInVideo===true&&stroke!==lessonDraft&&!selPreview.has(stroke.id))continue;
+        const alpha=highlightShape?.35:['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
         const a=points[0],b=points[points.length-1],x1=a.x*1000,y1=a.y*1000,x2=b.x*1000,y2=b.y*1000;
         const x=Math.min(x1,x2),y=Math.min(y1,y2),w=Math.abs(x2-x1),h=Math.abs(y2-y1);
         const attrs={stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:stroke.fill===true&&['rectangle','ellipse','triangle'].includes(stroke.tool)?color:'none',opacity:alpha};
+        if(highlightShape)Object.assign(attrs,{fill:color,stroke:'none'});
         let mark;
         if(stroke.tool==='box')mark=svg('rect',{x,y,width:w,height:h,fill:color,opacity:alpha});
-        else if(stroke.tool==='rectangle')mark=svg('rect',{x,y,width:w,height:h,...attrs});
-        else if(stroke.tool==='ellipse')mark=svg('ellipse',{cx:x+w/2,cy:y+h/2,rx:w/2,ry:h/2,...attrs});
+        else if(stroke.tool==='rectangle'||stroke.tool==='highlight-rectangle')mark=svg('rect',{x,y,width:w,height:h,...attrs});
+        else if(stroke.tool==='ellipse'||stroke.tool==='highlight-ellipse')mark=svg('ellipse',{cx:x+w/2,cy:y+h/2,rx:w/2,ry:h/2,...attrs});
         else if(stroke.tool==='triangle')mark=svg('polygon',{points:`${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}`,...attrs});
         else if(stroke.tool==='line')mark=svg('line',{x1,y1,x2,y2,...attrs});
         else if(stroke.tool==='pen-arrow'){mark=svg('g',{});mark.append(svg('line',{x1,y1,x2,y2,...attrs}));const angle=Math.atan2(y2-y1,x2-x1),radius=Math.max(width*3,10);mark.append(svg('path',{d:`M${x2-radius*Math.cos(angle-.5)} ${y2-radius*Math.sin(angle-.5)} L${x2} ${y2} L${x2-radius*Math.cos(angle+.5)} ${y2-radius*Math.sin(angle+.5)}`,...attrs}));}

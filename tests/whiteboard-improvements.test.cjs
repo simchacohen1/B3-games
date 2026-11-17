@@ -74,7 +74,7 @@ test('the font and Fill reach every place a mark is drawn: the board picture, th
   // students
   assert.match(share,/fill:stroke\.fill===true&&\['rectangle','ellipse','triangle'\]\.includes\(stroke\.tool\)\?color:'none'/);
   assert.match(share,/'font-family':window\.ClassPointerCore\?\.fontStack\?\.\(stroke\.font\)\|\|'sans-serif'/);
-  assert.match(share,/classroom-core\.js\?v=20261116-wbplus1/,'student activity pages load the fonts');
+  assert.match(share,/classroom-core\.js\?v=hlshapes2/,'student activity pages load the fonts');
   assert.match(highlighting,/'font-family':window\.ClassPointerCore\?\.fontStack\?\.\(stroke\.font\)\|\|'sans-serif'/);
   assert.match(highlighting,/'fill':stroke\.fill===true&&\['rectangle','ellipse','triangle'\]\.includes\(stroke\.tool\)\?color:'none'/);
   // saving a whiteboard keeps them

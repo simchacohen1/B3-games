@@ -206,11 +206,12 @@ test('real full screen: the toolbar moves into the full-screen element and back'
 
 // ---------- The classroom page ----------
 const TOOL_OPTIONS=['target','arrow','star','heart','paw','sparkle','highlight','box','pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
-function classroom({teacher=true,kind='pdf'}={}){
+function classroom({teacher=true,kind='pdf',highlightShapes=false}={}){
   const t=withToolbar(),clicks=[];
   const select=(id,values)=>{const s=t.add('select',id);s.options=values.map(v=>({value:v,textContent:v==='#1f2937'?'Black':v||'Class color',disabled:false}));s.value=values[0];return s};
   const who=teacher?'teacher':'student';
-  const toolSel=select(who+'Tool',teacher?[...TOOL_OPTIONS,'eraser']:TOOL_OPTIONS);
+  const variants=highlightShapes?['highlight-rectangle','highlight-ellipse']:[];
+  const toolSel=select(who+'Tool',[...TOOL_OPTIONS,...variants,...(teacher?['eraser']:[])]);
   const colorSel=select(who+'Color',teacher?['#ffcc00','#1f2937']:['','#ffcc00','#1f2937']);
   select(who+'Size',['0.008','0.016','0.028']);
   const main=t.add('main','main'),stage=t.add('section','stage',main);
@@ -398,4 +399,22 @@ test('Students button: big, yellow, says what it is for, with a pulse and a one-
   assert.match(toolbarSrc,/\.fa-act\.fa-primary\{[^}]*background:#ffd60a;color:#17233b/);
   // The guide tells the teacher where the button and the tools are.
   assert.match(dash,/Click the big yellow Students button \(top bar, or on the white toolbar in full screen\)/);
+});
+
+
+test('the whiteboard and PDF offer both highlight shapes, starting yellow and sharing the current highlight color',()=>{
+  for(const kind of ['whiteboard','pdf']){
+    const c=classroom({kind,highlightShapes:true});
+    c.tool('shape').click();
+    assert.deepEqual(c.flyRows().map(b=>b.title).slice(0,6),
+      ['Rectangle','Filled rectangle','Highlight rectangle','Circle','Filled circle','Highlight ellipse']);
+    c.flyRow('Highlight rectangle').click();
+    assert.equal(c.toolSel.value,'highlight-rectangle');
+    assert.equal(c.colorSel.value,'#ffcc00');
+    c.root.querySelectorAll('.fa-color').find(b=>b.dataset.color==='#1f2937').click();
+    c.tool('shape').click();
+    c.flyRow('Highlight ellipse').click();
+    assert.equal(c.toolSel.value,'highlight-ellipse');
+    assert.equal(c.colorSel.value,'#1f2937');
+  }
 });

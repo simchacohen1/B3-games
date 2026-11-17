@@ -253,7 +253,7 @@
   const current = document.currentScript;
   if (!current || !current.src) return;
   const script = document.createElement('script');
-  script.src = new URL('teacher-global-controls.js?v=20261116-shapes2', current.src).href;
+  script.src = new URL('teacher-global-controls.js?v=combo2', current.src).href;
   script.async = true;
   (document.head || document.documentElement).appendChild(script);
 })();

@@ -87,18 +87,18 @@ test('the lesson changes one of my own marks in place',()=>{
  assert.deepEqual(store.strokes[0].points,[{x:.3,y:.3},{x:.9,y:.9}]);
 });
 
-test('only the teacher page can change or erase lesson marks, and the whole list is sent again',()=>{
- assert.match(classroom,/eraseMark\(id\)\{if\(!isTeacher\)return false;/);
- assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\|\|!highlightStore\.replace\(markOwner\(id\),id,stroke\)\)return false;publishHighlights\(\);return true\}/);
- // Students still may only add, undo and clear: no new message type reaches the teacher.
+test('the bridge sends student highlight-shape edits through the teacher',()=>{
+ assert.match(classroom,/eraseMark\(id\)\{if\(!isTeacher\)return editOwnHighlightShape\(id\);/);
+ assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\)return editOwnHighlightShape\(id,stroke\);if\(!highlightStore\.group\('teacher',\(\)=>highlightStore\.replace\(markOwner\(id\),id,stroke\)\)\)return false;publishHighlights\(\);return true\}/);
+ // Both drawing and Select edits reuse the existing message types.
  assert.match(classroom,/\['point','pointer-hide','highlight','edit-highlights'\]\.includes\(message\.type\)/);
  assert.match(classroom,/\['undo','clear'\]\.includes\(message\.action\)/);
 });
 
-test('Select is offered on the teacher whiteboard, PDF and webpage, not on a shared screen or to students',()=>{
+test('Select is offered on the teacher whiteboard, PDF and webpage, and to students editing highlight shapes',()=>{
  assert.match(html,/<option value="eraser">Eraser<\/option><option value="select">Select<\/option>/);
- assert.equal((html.match(/value="select"/g)||[]).length,1,'only in the teacher tool menu');
- assert.match(annotate,/const canSelect=\(\)=>teacher&&allowed\('select'\)&&\['whiteboard','pdf','webpage'\]\.includes\(B\.lessonKind\?\.\(\)\);/);
+ assert.equal((html.match(/value="select"/g)||[]).length,2,'both classroom tool menus');
+ assert.match(annotate,/const canSelect=\(\)=>allowed\('select'\)&&\(teacher\?\['whiteboard','pdf','webpage'\]\.includes\(B\.lessonKind\?\.\(\)\):highlightShapes\(\)\.length>0\);/);
  assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/,'one arrow button: Select where it works, the plain Mouse elsewhere');
  assert.match(annotate,/recolor:color=>!!window\.ClassPointerPdf\?\.recolorSelected\?\.\(color\)/);
  // Select never moves the teacher's pointer for the class.
@@ -112,9 +112,9 @@ test('a color click recolors the picked mark and keeps the Select tool',()=>{
  assert.match(pdf,/function recolorSelected\(color\)\{\s*if\(!selecting\(\)\|\|typeof color!=='string'\)return false;const stroke=selectedStroke\(\);if\(!stroke\)return false;/);
 });
 
-test('shapes are solid for the teacher too, not see-through like a highlighter',()=>{
+test('pen shapes keep their solid rendering',()=>{
  assert.match(pdf,/const PEN_TOOLS=\['pen','line','pen-arrow','rectangle','ellipse','triangle','text'\];/);
- assert.match(pdf,/const kind=PEN_TOOLS\.includes\(stroke\.tool\)\?'pen':/);
+ assert.match(pdf,/highlight-shape':PEN_TOOLS\.includes\(stroke\.tool\)\?'pen':/);
  assert.ok(!pdf.includes("const kind=['pen','text'].includes(stroke.tool)?'pen':"));
 });
 
@@ -129,9 +129,9 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261116-wbplus1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261117-send2"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261116-wbplus3"/,'pdf-mode');
+ assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes2"'),'classroom-core');
+ assert.match(html,/"classroom\.js\?v=combo2"/,'classroom');
+ assert.match(html,/"pdf-mode\.js\?v=hlshapes1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -161,7 +161,7 @@ test('the lines of one pasted text are picked, moved, recolored and resized toge
  assert.match(pdf,/upper\.color===lower\.color&&upper\.size===lower\.size&&Math\.abs\(lower\.points\[0\]\.y-upper\.points\[0\]\.y-lineStep\(upper\.size\)\)<\.004/);
  assert.match(pdf,/group:textBlock\(hit\)/);
  assert.match(pdf,/changeMarks\(textBlock\(stroke\)\.map\(item=>\[item\.id,\{\.\.\.item,color:color\.toLowerCase\(\)\}\]\)\)/);
- assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed;if\(changed\)publishHighlights\(\);return changed\}/);
+ assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;highlightStore\.group\('teacher',\(\)=>\{for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed\}\);if\(changed\)publishHighlights\(\);return changed\}/);
 });
 
 test('after a paste the teacher is pointed at Select, which is always on screen',()=>{
@@ -282,7 +282,7 @@ test('on the teacher board words have corner handles for size and side handles f
  assert.match(pdf,/made=reflow\(edit\.group,\{boxW:Math\.max\(\.08,h==='e'\?at\.x-f\.left:f\.right-at\.x\),fixX:h==='e'\?'left':'right'\}\);/);
  assert.match(pdf,/made=reflow\(edit\.group,\{size,boxW:f\.boxW\?Math\.min\(1,f\.boxW\*size\/f\.size\):0,fixX:h\[1\]==='w'\?'right':'left',fixY:h\[0\]==='n'\?'bottom':'top'\}\);/);
  assert.match(pdf,/const ids=B\.swapMarks\?\.\(done\.swap\.ids,done\.swap\.strokes\);if\(ids\)selectedId=ids\[0\];/);
- assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\|\|!ids\.length\)return null;const owner=markOwner\(ids\[0\]\);if\(!owner\|\|ids\.some\(id=>markOwner\(id\)!==owner\)\)return null;const made=highlightStore\.swap\(owner,ids,strokes\);if\(made\)publishHighlights\(\);return made\}/);
+ assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\|\|!ids\.length\)return null;const owner=markOwner\(ids\[0\]\);if\(!owner\|\|ids\.some\(id=>markOwner\(id\)!==owner\)\)return null;const made=highlightStore\.group\('teacher',\(\)=>highlightStore\.swap\(owner,ids,strokes\)\);if\(made\)publishHighlights\(\);return made\}/);
 });
 
 test('a paste picks the biggest size at which the words fit on one line',()=>{
@@ -321,7 +321,7 @@ test('the arrow picks a drawing that is clicked; a click on nothing is a plain m
  // The lesson's own click handler does not swallow a click that picked nothing, so a PDF can still be dragged.
  assert.match(pdf,/drawInk\(\);return !!hit;/);
  // Picking works while the lesson is in mouse mode (the eraser and the text tool still need it off).
- assert.match(pdf,/usable=!notReady\(\)&&B\.live\(\)&&B\.writingAllowed\(\),ready=usable&&!B\.navigating\(\);/);
+ assert.match(pdf,/usable=!notReady\(\)&&B\.live\(\)&&B\.writingAllowed\(tool\),ready=usable&&!B\.navigating\(\);/);
  // A normal arrow cursor, not a grabbing hand.
  assert.match(read('class-pointer-prototype/classroom.css'),/#stage\.mouse-navigation #pdfView,#stage\.mouse-navigation #pdfContent\{cursor:default\}/);
 });
@@ -387,7 +387,7 @@ test('closing the text box keeps the change in place; Escape drops it; empty wor
  assert.match(body,/for\(const type of \['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'\]\)box\.addEventListener\(type,event=>event\.stopPropagation\(\)\);/);
  assert.match(body,/box\.addEventListener\('keydown',event=>\{\s*event\.stopPropagation\(\);/);
  // A click elsewhere on the board, another tool, or the lesson closing all close the box.
- assert.match(pdf,/if\(inlineEdit\)\{finishInline\(true\);event\.preventDefault\(\);event\.stopPropagation\(\);return\}\s*if\(isTeacher&&event\.button===0\)\{/,'that click only closes the box');
+ assert.match(pdf,/if\(inlineEdit\)\{finishInline\(true\);event\.preventDefault\(\);event\.stopPropagation\(\);return\}\s*if\(event\.button===0&&\(isTeacher\|\|selecting\(\)\)\)\{/,'that click only closes the box');
  assert.match(pdf,/addEventListener\('change',\(\)=>\{erasePid=null;finishInline\(true\);/);
  assert.match(pdf,/function unload\(hide\)\{\s*finishInline\(false\);/);
  // The changed words go back as the same block: same color, size and chosen width, and they stay picked.
@@ -594,7 +594,7 @@ test('students are told when the whiteboard picture already has the marks, and t
 // ---------- Arrow keys on a picked mark or picture ----------
 // pdf-mode.js: the nudge helpers are taken out of the file and run on their own with a fake board 1000 x 500 pixels.
 function nudgeHarness(picked,{width=1000,height=500}={}){
- const from=pdf.indexOf('const NUDGE={'),to=pdf.indexOf("if(isTeacher){",from);
+ const from=pdf.indexOf('const NUDGE={'),to=pdf.indexOf("if(isTeacher||$('studentTool')){",from);
  assert.ok(from>0&&to>from,'the nudge helpers are in pdf-mode.js');
  const changes=[];
  const sandbox={content:{getBoundingClientRect:()=>({width,height})},selectedStroke:()=>picked,geometry:()=>G,textBlock:s=>s.block?picked.group:[s],
@@ -1024,10 +1024,10 @@ test('student Select moves a pick as one piece and never off the picture; resizi
 });
 
 test('the teacher keeps a student\'s changes to that student\'s marks only',()=>{
- const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function eraseStudentMarks(member,ids)')+';({replaceStudentMarks,eraseStudentMarks})';
+ const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function eraseStudentMarks(member,ids)')+';({replaceStudentMarks,eraseStudentMarks})';
  const store=new C.HighlightStore();
- const api=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array});
- const A={id:'presence:a'},B={id:'presence:b'};
+ const api=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array,toolAllowed:()=>true,writingAllowed:()=>true});
+ const A={id:'presence:a',presence:true},B={id:'presence:b',presence:true};
  const rect=(x1,y1,x2,y2)=>({tool:'rectangle',color:'#1d4ed8',size:.016,points:[{x:x1,y:y1},{x:x2,y:y2}]});
  store.add('teacher',rect(.1,.1,.2,.2));store.add(A.id,rect(.3,.3,.5,.5));store.add(B.id,rect(.6,.6,.8,.8));store.add(A.id,{tool:'text',color:'#1f2937',size:.0078,text:'mine',block:'bk1',points:[{x:.1,y:.7},{x:.3,y:.75}]});
  const [teacherMark,aMark,bMark,aText]=store.strokes.map(s=>({...s}));
@@ -1058,23 +1058,23 @@ test('the teacher keeps a student\'s changes to that student\'s marks only',()=>
  assert.equal(api.eraseStudentMarks(A,'x'),false);
 });
 
-test('the teacher page accepts student Select messages only from a student with pen permission',()=>{
+test('the teacher page checks permissions and ownership on student Select messages',()=>{
  const room=read('class-pointer-prototype/classroom.js');
- assert.match(room,/else if\(member\.presence&&selected\(member\)&&memberTools\(member\)\?\.pen===true\)\{\s*if\(message\.action==='replace'&&replaceStudentMarks\(member,message\.changes\)\)publishHighlights\(\);\s*else if\(message\.action==='erase'&&eraseStudentMarks\(member,message\.ids\)\)publishHighlights\(\);/);
- assert.match(room,/const converted=studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke;\s*if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
+ assert.match(room,/else if\(live\(\)&&writingAllowed\('select',member\)\)\{\s*if\(message\.action==='replace'&&replaceStudentMarks\(member,message\.changes\)\)publishHighlights\(\);\s*else if\(message\.action==='erase'&&eraseStudentMarks\(member,message\.ids\)\)publishHighlights\(\);/);
+ assert.match(room,/const converted=member\.presence\?studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke:change\.stroke;\s*if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
  assert.doesNotMatch(room,/replace\(change\.owner|replace\(message\.owner/);
 });
 
-test('the student toolbar offers Select (mouse icon) only with pen permission, and wires drag, handles, recolor, delete and arrow keys',()=>{
+test('the student toolbar offers Select with Highlight or Pen permission, and wires drag, handles, recolor, delete and arrow keys',()=>{
  assert.match(shareSource,/const lessonModes=\[\['select','🖱️','Select'\],\['point','☝','Pointer'\]/);
- assert.match(shareSource,/const allowedMode=mode=>mode==='point'\?lessonLevel!=='none':lessonLevel==='pen'\|\|lessonLevel==='highlight'&&\['highlight','box'\]\.includes\(mode\);/,'the pen level, and only that, has Select');
+ assert.match(shareSource,/const allowedMode=mode=>mode==='point'\?lessonLevel!=='none':lessonLevel==='pen'\|\|lessonLevel==='highlight'&&\(\['select','highlight','box'\]\.includes\(mode\)\|\|isHighlightShape\(mode\)\);/);
  // Only marks filed under this page's own connection can be picked.
  assert.match(shareSource,/const myOwner=\(\)=>presencePeer\?\.id\?'presence:'\+presencePeer\.id:null;/);
- assert.match(shareSource,/\.filter\(m=>m&&m\.owner===me&&typeof m\.id==='string'/);
+ assert.match(shareSource,/\.filter\(m=>m&&m\.owner===me&&\(lessonLevel==='pen'\|\|isHighlightShape\(m\.tool\)\)&&typeof m\.id==='string'/);
  assert.match(shareSource,/if\(lessonTool==='select'\)\{startSelect\(e,p\);return\}/);
  assert.match(shareSource,/if\(lessonTool==='select'\)\{moveSelect\(e\);return\}/);
  assert.match(shareSource,/if\(lessonTool==='select'\)\{endSelect\(true\);return\}/);
- assert.match(shareSource,/const selectColor=color=>\{lessonColor=color;if\(lessonTool==='select'\)recolorSelection\(color\);/);
+ assert.match(shareSource,/const selectColor=color=>\{lessonColor=color;if\(isHighlightShape\(lessonTool\)\)highlightColor=color;if\(lessonTool==='select'\)recolorSelection\(color\);/);
  // Live to the teacher while dragging, and once more on release.
  assert.match(shareSource,/const now=Date\.now\(\);if\(now-selSendAt>=90\)\{selSendAt=now;sendChanges\(selPreview\)\}/);
  assert.match(shareSource,/if\(drag&&commit&&drag\.moved\)sendChanges\(selPreview\)/);
@@ -1096,7 +1096,7 @@ function selectRoom(marks,{level='pen',claims}={}){
  const fakeEl=()=>({style:{},children:[],appendChild(node){kids.push(node)}});
  const sandbox={Math,Map,Number,Array,Date,
   presencePeer:{id:'peerA'},admitted:true,lessonActive:true,lessonTool:'select',lessonMarks:{strokes:marks},
-  allowedMode:mode=>mode==='select'&&level==='pen',
+  lessonLevel:level,isHighlightShape:C.isHighlightShape,allowedMode:mode=>mode==='select'&&['pen','highlight'].includes(level),
   presenceConn:{open:true,send:message=>sent.push(JSON.parse(JSON.stringify(message)))},
   picture:()=>({left:0,top:0,width:1000,height:500}),
   hitLayer:{getBoundingClientRect:()=>({left:0,top:0,width:1000,height:500}),setPointerCapture(){}},
@@ -1130,11 +1130,11 @@ test('a student picks and drags their own mark; the teacher\'s page applies it t
  // The teacher's real handlers, with the real store, apply it.
  const store=new C.HighlightStore();
  for(const mark of marks)store.add(mark.owner==='teacher'?'teacher':mark.owner,{tool:mark.tool,color:mark.color,size:mark.size,points:mark.points});
- const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';replaceStudentMarks';
- const apply=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array});
+ const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';replaceStudentMarks';
+ const apply=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array,toolAllowed:()=>true,writingAllowed:()=>true});
  const ids=new Map(store.strokes.map((s,i)=>[marks[i].id,s.id]));
  const wire=room.sent[1].changes.map(change=>({id:ids.get(change.id),stroke:change.stroke}));
- assert.equal(apply({id:'presence:peerA'},wire),true);
+ assert.equal(apply({id:'presence:peerA',presence:true},wire),true);
  assert.deepEqual(plain(store.strokes[2].points.map(p=>[Math.round(p.x*1e4)/1e4,Math.round(p.y*1e4)/1e4])),[[.4,.35],[.6,.55]]);
  assert.deepEqual(plain(store.strokes[0].points),plain(marks[0].points),'the teacher\'s mark is untouched');
  assert.deepEqual(plain(store.strokes[1].points),plain(marks[1].points),'the other student\'s mark is untouched');
@@ -1179,12 +1179,12 @@ test('student Select: corner resize, recolor, arrow keys, Delete, and no keys wh
  assert.deepEqual(plain(room.api.state().selIds),[]);
 });
 
-test('student Select does nothing without pen permission, and words move and resize with every line',()=>{
+test('Highlight permission leaves text alone, and Pen permission moves every line of a text block',()=>{
  const own=(id,points,extra={})=>({id,owner:'presence:peerA',tool:'text',color:'#1f2937',size:.0078,text:id,block:'bk1',points,...extra});
  const marks=[own('l1',[{x:.1,y:.1},{x:.3,y:.14}]),own('l2',[{x:.1,y:.15},{x:.35,y:.19}])];
  const off=selectRoom(marks,{level:'highlight'});
  off.api.startSelect(pointer(.2,.12),{x:.2,y:.12});off.api.moveSelect(pointer(.3,.2));off.api.endSelect(true);
- assert.equal(off.sent.length,0,'no pen permission: nothing is sent');
+ assert.equal(off.sent.length,0,'Highlight permission does not edit text');
  const room=selectRoom(marks);
  room.api.startSelect(pointer(.2,.12),{x:.2,y:.12});
  assert.deepEqual(plain(room.api.state().selIds),['l1','l2'],'picking one line picks the whole block');
@@ -1200,7 +1200,7 @@ function teacherMarkApi({isTeacher=true}={}){
  const method=name=>{const line=lines.find(text=>text.startsWith('  '+name+'('));assert.ok(line,name+' is in classroom.js');return line.replace(/,\s*$/,'')};
  const store=new C.HighlightStore(),published=[];
  const code=grabFunction(room,'function markOwner(id)')+';({'+['eraseMark','eraseMarks','swapMarks','replaceMark','replaceMarks'].map(method).join(',')+'})';
- const api=vm.runInNewContext(code,{isTeacher,highlightStore:store,publishHighlights:()=>published.push(1),Array,Number});
+ const api=vm.runInNewContext(code,{isTeacher,editOwnHighlightShape:()=>false,highlightStore:store,publishHighlights:()=>published.push(1),Array,Number});
  return{api,store,published};
 }
 
@@ -1258,11 +1258,51 @@ test('Select picks anyone\'s mark; the eraser and the Text tool still reach only
  assert.match(pdf,/function teacherMarkAt\(event,p,inside,anyOwner\)\{/);
  assert.match(pdf,/\(anyOwner\|\|item\.owner==='teacher'\)&&markHits\(item,p,inside\)/);
  assert.match(pdf,/return !!teacherMarkAt\(event,point,true,true\)\|\|!!pictureAt\(point\);/,'the arrow cursor and a pick use any owner');
- assert.match(pdf,/const hit=teacherMarkAt\(event,p,true,true\);\s*\/\/ Words that were already picked/);
+ assert.match(pdf,/const hit=isTeacher\?teacherMarkAt\(event,p,true,true\):/);
  assert.match(pdf,/function eraseUnder\(event\)\{const p=normalized\(event\),hit=p&&teacherMarkAt\(event,p,false\);/,'the eraser stays on the teacher\'s own marks');
  assert.match(pdf,/const words=teacherMarkAt\(event,p,true\);\s*if\(words\?\.tool==='text'\)\{editInline\(words\);return\}/,'the Text tool stays on the teacher\'s own words');
  // Students are untouched: a student's message still reaches only that student's marks.
  const room=read('class-pointer-prototype/classroom.js');
  assert.match(room,/if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/);
  assert.match(room,/mark\.owner===member\.id&&mark\.id===id/);
+});
+
+test('Highlight permission lets a student move, resize, and delete their own highlight ellipse',()=>{
+ const shape={id:'h1',tool:'highlight-ellipse',owner:'presence:peerA',color:'#ffcc00',size:.016,points:[{x:.2,y:.2},{x:.4,y:.4}]};
+ const other={...shape,id:'h2',owner:'presence:peerB'};
+ const room=selectRoom([shape,other],{level:'highlight'});
+ room.api.startSelect(pointer(.3,.3),{x:.3,y:.3});
+ room.api.moveSelect(pointer(.35,.35));room.api.endSelect(true);
+ const moved=room.sent.at(-1).changes[0];
+ assert.equal(moved.id,'h1');
+ assert.equal(moved.stroke.tool,'highlight-ellipse');
+ assert.ok(Math.abs(moved.stroke.points[0].x-.25)<1e-8);
+
+ const next=selectRoom([{...shape,...moved.stroke},other],{level:'highlight'});
+ next.api.startSelect(pointer(.35,.35),{x:.35,y:.35});next.api.endSelect(false);
+ next.api.startSelect(pointer(.45,.45),{x:.45,y:.45});
+ next.api.moveSelect(pointer(.55,.55));next.api.endSelect(true);
+ assert.ok(Math.abs(next.sent.at(-1).changes[0].stroke.points[1].x-.55)<1e-8);
+ next.api.eraseSelection();
+ assert.deepEqual(next.sent.at(-1),{type:'edit-highlights',action:'erase',ids:['h1']});
+});
+
+test('the lesson store preserves highlight shapes through edits and undo',()=>{
+ const store=new C.HighlightStore(),student='student:fixture';
+ const points=[{x:.1,y:.2},{x:.4,y:.3}];
+ for(const tool of ['highlight-rectangle','highlight-ellipse']){
+  assert.ok(store.add(student,{tool,color:'#ffcc00',points,size:.016,fill:true}));
+  const saved=store.strokes.at(-1);
+  assert.equal(saved.tool,tool);
+  assert.equal(saved.fill,undefined);
+  assert.ok(store.replace(student,saved.id,{...saved,color:'#c62828',points:[{x:.2,y:.3},{x:.5,y:.4}]}));
+  assert.equal(store.strokes.at(-1).tool,tool);
+  assert.equal(store.strokes.at(-1).color,'#c62828');
+ }
+ // Undo takes back the LAST thing done, exactly: first the move and recolor of the ellipse (the shape stays), then the shape.
+ store.edit(student,'undo');
+ assert.deepEqual(store.strokes.map(s=>s.tool),['highlight-rectangle','highlight-ellipse']);
+ assert.equal(store.strokes.at(-1).color,'#ffcc00');
+ store.edit(student,'undo');
+ assert.deepEqual(store.strokes.map(s=>s.tool),['highlight-rectangle']);
 });
