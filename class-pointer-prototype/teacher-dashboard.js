@@ -250,6 +250,13 @@ function init(){
   return out;
  }
  let renderQueued=false;
+ // lost: no heartbeat for 20 seconds. weak: the student reports a bad link, or answers take over 1.5 seconds.
+ function linkState(m){
+  if(!m?.lastPing)return '';
+  if(Date.now()-m.lastPing>20000)return 'lost';
+  return m.weak||m.rtt>1500?'weak':'';
+ }
+ setInterval(()=>{if((R()?.list()||[]).some(m=>m.lastPing))queueRender()},6000);
  function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;renderTable()})}
  function renderTable(){
   const list=rows();
@@ -267,6 +274,11 @@ function init(){
    dot.setAttribute('role','img');dot.setAttribute('aria-label',m?.admitted?'Joined':m?'Waiting':'Not joined');
    const name=el('span','cp-name-text',row.name);name.title=row.name;
    nameCell.append(dot,name);
+   // A weak or lost connection: an orange or red dot beside the name (only for students whose page sends a heartbeat).
+   const link=m?.admitted?linkState(m):'';
+   if(link){const weak=el('span','cp-weak cp-weak-'+link);weak.setAttribute('role','img');
+    weak.setAttribute('aria-label',link==='lost'?row.name+': no signal, probably reconnecting':row.name+': weak connection');
+    weak.title=link==='lost'?'No signal from '+row.name+' for a while. Their connection may have dropped.':row.name+' has a weak connection. Their picture may be slow.';nameCell.append(weak)}
    // Connected from another Fun Torah Tools page: joined, working in that activity.
    if(m?.presence){const where=el('span','cp-where',m.activity?'in '+m.activity:'in an activity');where.style.cssText=WHERE;where.title=row.name+' is connected from '+(m.activity||'another activity');nameCell.append(where);dot.setAttribute('aria-label','Joined from '+(m.activity||'another activity'))}
    const wasRemoved=!m&&!!row.id&&(R()?.removedIds?.()||[]).includes(row.id);

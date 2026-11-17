@@ -55,8 +55,52 @@ test('session: a student sees a clear "Waiting for your teacher" screen, and is 
 
 test('versions: the changed scripts have new cache versions', () => {
   const html = read('classroom.html');
-  for (const f of ['student-boards', 'saved-work', 'classroom-annotate', 'classroom', 'teacher-dashboard', 'activity-share'])
-    assert.match(html, new RegExp(f + '\\.js\\?v=20261117-send1'), f);
+  const want = { 'student-boards': 'send1', 'saved-work': 'send1', 'classroom-annotate': 'send1', classroom: 'send2', 'teacher-dashboard': 'send2', 'activity-share': 'send2' };
+  for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=20261117-' + v), f);
+  assert.match(html, /teacher-dashboard\.css\?v=20261117-send2/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send1/, page);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send2/, page);
+});
+
+// ---------- black / blue screen and the connection signs ----------
+const css = read('teacher-dashboard.css');
+
+test('black screen: the lesson window shows "Waiting for your teacher…" whenever there is no live picture', () => {
+  assert.match(share, /lessonStage\.append\(lessonVideo,lessonWait,markLayer,pointerLayer,hitLayer\)/);
+  assert.match(share, /function liveVideo\(\)\{[\s\S]*?track\.readyState==='live'&&lessonVideo\.readyState>=2&&!lessonVideo\.paused/);
+  assert.match(share, /lessonWaitTitle\.textContent=lost\?'Reconnecting…':'Waiting for your teacher…'/);
+  assert.match(share, /lessonOverlay\.style\.display='flex';watchWaiting\(\);/, 'a lesson announced: the panel is up until the picture arrives');
+  assert.match(share, /lessonVideo\.srcObject=null;syncWaiting\(\)\}/, 'a closed picture brings the panel back at once');
+  assert.match(share, /waitTimer=later\(\(\)=>\{waitTimer=null;if\(lessonOverlay\.style\.display!=='none'\)watchWaiting\(\)\},1000\)/, 'checked every second while the window is open');
+});
+
+test('connection: the student pings every 4 seconds and shows Reconnecting… or Weak connection', () => {
+  assert.match(share, /conn\.send\(\{type:'ping',t:Date\.now\(\),rtt,weak:connState!=='ok'\}\)/);
+  assert.match(share, /if\(!conn\.open\|\|age>12000\)showConn\('reconnecting'\);\s*else if\(rtt>2000\|\|age>7000\)showConn\('weak'\)/);
+  assert.match(share, /connPill\.textContent=state==='reconnecting'\?'Reconnecting…':'Weak connection'/);
+  assert.match(share, /if\(message\.type==='pong'\)\{if\(Number\.isFinite\(message\.t\)\)\{rtt=Math\.max\(0,Date\.now\(\)-message\.t\);lastPong=Date\.now\(\)\}return\}/);
+  assert.match(share, /window\.addEventListener\('offline',\(\)=>\{if\(latestSession\)showConn\('reconnecting'\)\}\)/);
+  assert.match(share, /window\.addEventListener\('online',\(\)=>\{if\(latestSession&&!presenceConn&&!presenceTimer\)\{presenceDelay=0;schedulePresence\(300\)\}\}\)/);
+  assert.doesNotMatch(share, /if\(\+\+presenceFailures>6\)return/, 'a poor connection no longer gives up for good');
+});
+
+test('connection: the teacher answers the ping and the roster carries it to the weak-connection dot', () => {
+  assert.match(room, /if\(message\.type==='ping'\)\{[\s\S]*?member\.lastPing=Date\.now\(\);[\s\S]*?connection\.send\(\{type:'pong',t:message\.t\}\)/);
+  assert.match(room, /lastPing:m\.lastPing\|\|0,rtt:m\.rtt\|\|0,weak:m\.weak===true/);
+  assert.match(room, /lastPing:p\.lastPing\|\|0,rtt:p\.rtt\|\|0,weak:p\.weak===true/);
+  assert.match(dash, /const link=m\?\.admitted\?linkState\(m\):'';/);
+  assert.match(dash, /el\('span','cp-weak cp-weak-'\+link\)/);
+  assert.match(css, /\.cp-weak-weak\{background:#f59e0b/);
+  assert.match(css, /\.cp-weak-lost\{background:#dc2626/);
+});
+
+test('connection: the dot is orange for a weak link, red for no signal, and absent for pages that send no heartbeat', () => {
+  const src = dash.slice(dash.indexOf('function linkState(m){'), dash.indexOf('setInterval(()=>{if((R()'));
+  const linkState = new Function(src + '\nreturn linkState;')();
+  const now = Date.now();
+  assert.equal(linkState({}), '', 'an older student page sends no heartbeat: no dot');
+  assert.equal(linkState({ lastPing: now - 3000, rtt: 200, weak: false }), '');
+  assert.equal(linkState({ lastPing: now - 3000, rtt: 2200, weak: false }), 'weak', 'slow answers');
+  assert.equal(linkState({ lastPing: now - 3000, rtt: 0, weak: true }), 'weak', 'the student reports a bad link');
+  assert.equal(linkState({ lastPing: now - 25000, rtt: 100, weak: false }), 'lost', 'nothing for 25 seconds');
 });
