@@ -493,7 +493,8 @@
     if(!teacherPage){
       ui.body.append(h('p','ftt-saved-note','Your saved whiteboards. Only you can see them.'),sheetBox,list,
         button('📂 See all my files and PDFs',()=>window.open(new URL('my-files.html',scriptUrl).href,'_blank')));
-      const stop=watch(snap=>{if(snap.sig===popSig)return;const first=popSig===null;popSig=snap.sig;if(!first)return showFiles(true)});
+      snapshot().then(snap=>{if(popSig===null)popSig=snap.sig},()=>{});   // what is here when the pop-up opens
+      const stop=watch(snap=>{if(popSig===null||snap.sig===popSig){if(popSig===null)popSig=snap.sig;return}popSig=snap.sig;return showFiles(true)});
       const again=()=>showFiles(true);window.addEventListener?.('ftt-myfiles-changed',again);
       ui.dialog.addEventListener('close',()=>{stop();window.removeEventListener?.('ftt-myfiles-changed',again)});
       return showFiles();
