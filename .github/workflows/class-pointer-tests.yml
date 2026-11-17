@@ -8,6 +8,7 @@ on:
       - 'tests/class-pointer*.test.cjs'
       - 'e2e/class-pointer-activities.spec.ts'
       - 'e2e/class-pointer-auth-startup.spec.ts'
+      - 'e2e/class-pointer-poll.spec.cjs'
       - '.github/workflows/class-pointer-tests.yml'
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - 'tests/class-pointer*.test.cjs'
       - 'e2e/class-pointer-activities.spec.ts'
       - 'e2e/class-pointer-auth-startup.spec.ts'
+      - 'e2e/class-pointer-poll.spec.cjs'
       - '.github/workflows/class-pointer-tests.yml'
 # Newer runs on the same PR/branch cancel superseded ones (including main,
 # where only the latest commit is what gets deployed).
@@ -37,6 +39,8 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax
         run: |
+          node --check class-pointer-prototype/poll-core.js
+          node --check class-pointer-prototype/poll.js
           node --check class-pointer-prototype/activity-share.js
           node --check class-pointer-prototype/activity-screen-teacher.js
           node --check class-pointer-prototype/classroom.js
@@ -48,7 +52,7 @@ jobs:
       - name: Install browser test dependencies
         run: npm ci
       - name: Classroom Pointer browser regression
-        run: npx playwright test e2e/class-pointer-activities.spec.ts e2e/class-pointer-auth-startup.spec.ts --workers=1
+        run: npx playwright test e2e/class-pointer-activities.spec.ts e2e/class-pointer-auth-startup.spec.ts e2e/class-pointer-poll.spec.cjs --workers=1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

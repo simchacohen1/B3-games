@@ -84,6 +84,8 @@
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
     await load(new URL('class-pointer-prototype/classroom-core.js?v=20261116-wbplus1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-shapes2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
+    await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-shapes1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
@@ -590,6 +592,7 @@
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
+      window.ClassPointerPoll?.reset();
       window.ClassPointerBoards?.reset?.();
       clearLesson();cancelLater(presenceTimer);presenceTimer=null;
       const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
@@ -631,6 +634,7 @@
         conn.on('open',()=>{if(presenceConn===conn)conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName})});
         conn.on('data',message=>{
           if(presenceConn!==conn||!sameStudent()||!message||typeof message!=='object')return;
+          if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
