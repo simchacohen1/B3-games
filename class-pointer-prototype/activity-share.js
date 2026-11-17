@@ -81,8 +81,13 @@
         }
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-drawperm2',root).href).catch(()=>{});
+    // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
+    await load(new URL('class-pointer-prototype/classroom-core.js?v=20261116-wbplus1',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-wbplus4',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-myfiles2',root).href);
+    // Save and My files for the student's own whiteboard.
+    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-myfiles2',root).href).catch(()=>{});
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-myfiles2',root).href).catch(()=>{});
@@ -468,7 +473,7 @@
         const alpha=['highlight','box'].includes(stroke.tool)?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
         const a=points[0],b=points[points.length-1],x1=a.x*1000,y1=a.y*1000,x2=b.x*1000,y2=b.y*1000;
         const x=Math.min(x1,x2),y=Math.min(y1,y2),w=Math.abs(x2-x1),h=Math.abs(y2-y1);
-        const attrs={stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',opacity:alpha};
+        const attrs={stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:stroke.fill===true&&['rectangle','ellipse','triangle'].includes(stroke.tool)?color:'none',opacity:alpha};
         let mark;
         if(stroke.tool==='box')mark=svg('rect',{x,y,width:w,height:h,fill:color,opacity:alpha});
         else if(stroke.tool==='rectangle')mark=svg('rect',{x,y,width:w,height:h,...attrs});
@@ -479,7 +484,7 @@
         // Words are drawn at the teacher's size: 2.4 times the mark size, as a fraction of the board width.
         // This layer is 1000 x 1000 stretched over the picture, so the text is scaled back up by the
         // picture's width/height to keep its letters undistorted.
-        else if(stroke.tool==='text'){mark=svg('text',{x:0,y:0,'font-family':'sans-serif',...(stroke.bold?{'font-weight':'700'}:{}),transform:`translate(${x1} ${y1}) scale(1 ${textRatio})`,'font-size':Math.max(4,(Number(stroke.size)||.016)*1000*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
+        else if(stroke.tool==='text'){mark=svg('text',{x:0,y:0,'font-family':window.ClassPointerCore?.fontStack?.(stroke.font)||'sans-serif',...(stroke.bold?{'font-weight':'700'}:{}),transform:`translate(${x1} ${y1}) scale(1 ${textRatio})`,'font-size':Math.max(4,(Number(stroke.size)||.016)*1000*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
         else {const drawn=stroke.tool==='underline'?[a,{x:b.x,y:a.y}]:points;mark=svg('path',{d:drawn.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' '),...attrs})}
         markLayer.appendChild(mark);
       }

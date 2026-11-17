@@ -242,7 +242,7 @@ test('teacher: every old dock tool is on the one toolbar and drives the lessonâ€
   c.tool('highlight').click();c.flyRow('Highlight box').click();assert.equal(c.toolSel.value,'box');
   // Shapes, with the triangle.
   c.tool('shape').click();
-  assert.deepEqual(c.flyRows().map(b=>b.title),['Rectangle','Circle','Line','Arrow','Triangle']);
+  assert.deepEqual(c.flyRows().map(b=>b.title),['Rectangle','Filled rectangle','Circle','Filled circle','Triangle','Filled triangle','Line','Arrow']);
   c.flyRow('Triangle').click();assert.equal(c.toolSel.value,'triangle');
   c.tool('shape').click();c.flyRow('Arrow').click();assert.equal(c.toolSel.value,'pen-arrow');
   for(const [name,value] of [['pen','pen'],['text','text'],['eraser','eraser']]){c.tool(name).click();assert.equal(c.toolSel.value,value)}

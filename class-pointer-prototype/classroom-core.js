@@ -6,14 +6,31 @@
   // Dark ink colors read well on the whiteboard. They are allowed for pointers and marks, but are not class colors.
   const inkColors=['#1f2937','#1d4ed8','#777777','#ffffff','#29b6f6','#4dd0e1','#009688','#c62828','#ff7043','#ef6c00','#ffc107','#fff176','#cddc39','#8bc34a','#2e7d32','#a5d6a7','#7b1fa2','#ab47bc','#b39ddb','#ec407a','#f48fb1','#795548','#bcaaa4','#ffd1a9'];
   const TEXT_MIN=.003,TEXT_MAX=.08;
+  // Fonts for the words on the whiteboard. 'sans' is the plain sans-serif the whiteboard has always used. The others fall back
+  // to a similar font on a device that does not have them; the Hebrew ones cover Hebrew letters. [name shown, CSS font stack]
+  const FONTS={
+    sans:['Standard','sans-serif'],
+    david:['David (Hebrew)','"David", "David CLM", "Times New Roman", serif'],
+    frank:['Frank Ruehl (Hebrew)','"FrankRuehl", "Frank Ruehl CLM", "David", "Times New Roman", serif'],
+    miriam:['Miriam (Hebrew)','"Miriam", "Miriam Libre", "Arial Hebrew", Arial, sans-serif'],
+    serif:['Times','"Times New Roman", Times, serif'],
+    mono:['Typewriter','"Courier New", "Miriam Fixed", monospace'],
+    comic:['Handwriting','"Comic Sans MS", "Chalkboard SE", "Comic Neue", cursive']
+  };
+  const fontStack=key=>(Object.prototype.hasOwnProperty.call(FONTS,key)?FONTS[key]:FONTS.sans)[1];
+  const FILLABLE=['rectangle','ellipse','triangle'];
+  // Marks may be any #rrggbb (the custom color picker); pointers keep their own short list.
+  const strokeColor=value=>/^#[0-9a-f]{6}$/i.test(value?.color)?value.color.toLowerCase():(pointStyle(value).color||'#ffcc00');
   function cleanStroke(value){
     if(!value||!highlightTools.includes(value.tool)||!Array.isArray(value.points)||value.points.length<2||value.points.length>256||!value.points.every(validPoint))return null;
     const text=value.tool==='text'?String(value.text||'').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,240):'';if(value.tool==='text'&&!text.trim())return null;
     // Lines keep the three sizes. Words can be any size between TEXT_MIN and TEXT_MAX (the teacher drags a corner).
     const size=value.tool==='text'&&Number.isFinite(value.size)&&value.size>=TEXT_MIN&&value.size<=TEXT_MAX?Math.round(value.size*1e4)/1e4:[0.008,0.016,0.028].includes(value.size)?value.size:0.016;
     // The lines of one block of words share a block id; a wrapped line is marked soft; boxW is a width the teacher chose.
-    const extra=value.tool!=='text'?{}:{text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(value.bold===true?{bold:true}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{})};
-    return{tool:value.tool,color:pointStyle(value).color||'#ffcc00',size,points:value.points.map(({x,y})=>({x,y})),...extra};
+    const extra=value.tool!=='text'?{}:{text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(value.bold===true?{bold:true}:{}),...(Object.prototype.hasOwnProperty.call(FONTS,value.font)&&value.font!=='sans'?{font:value.font}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{})};
+    // A shape can be filled with its own color (rectangle, circle, triangle).
+    const fill=value.fill===true&&FILLABLE.includes(value.tool)?{fill:true}:{};
+    return{tool:value.tool,color:strokeColor(value),size,points:value.points.map(({x,y})=>({x,y})),...extra,...fill};
   }
   class HighlightStore{
     constructor(){this.strokes=[];this.sequence=0}
@@ -54,6 +71,6 @@
     const scale=Math.min(width/videoWidth,height/videoHeight),w=videoWidth*scale,h=videoHeight*scale;
     return{w,h,left:(width-w)/2,top:(height-h)/2};
   }
-  const api={TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
+  const api={FONTS,fontStack,FILLABLE,TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ClassPointerCore=api;
 })(typeof window==='undefined'?{}:window);

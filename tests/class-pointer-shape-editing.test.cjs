@@ -106,7 +106,7 @@ test('Select is offered on the teacher whiteboard, PDF and webpage, not on a sha
 });
 
 test('a color click recolors the picked mark and keeps the Select tool',()=>{
- const click=toolbar.slice(toolbar.indexOf('// Select: the color goes to the picked mark'),toolbar.indexOf("b.dataset.color=c;"));
+ const click=toolbar.slice(toolbar.indexOf('// Choosing a color (a swatch or the custom picker).'),toolbar.indexOf('function applyDelegate(){'));
  assert.match(click,/if\(st\.tool==='select'&&\(isDelegate\(now\)\?now\.delegate\.recolor\?\.\(c\):recolorSelected\(now,c\)\)\)\{st\.color=c;sync\(\);return\}/);
  assert.ok(click.indexOf("st.tool==='select'&&")<click.indexOf("st.tool='pen'"),'checked before the old switch to the pen');
  assert.match(pdf,/function recolorSelected\(color\)\{\s*if\(!selecting\(\)\|\|typeof color!=='string'\)return false;const stroke=selectedStroke\(\);if\(!stroke\)return false;/);
@@ -129,9 +129,9 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261115-shapes27"'),'classroom-core');
+ assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261116-wbplus1"'),'classroom-core');
  assert.match(html,/"classroom\.js\?v=20261116-drawperm1"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261116-pdfflow1"/,'pdf-mode');
+ assert.match(html,/"pdf-mode\.js\?v=20261116-wbplus3"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -140,7 +140,7 @@ test('pasted words can be recolored and resized: a size click in Select goes to 
  assert.match(toolbar,/if\(st\.tool==='select'&&\(isDelegate\(now\)\?now\.delegate\.resize\?\.\(v\):resizeSelected\(now,v\)\)\)\{st\.sizeIndex=i;sync\(\);return\}/);
  assert.match(annotate,/resize:size=>!!window\.ClassPointerPdf\?\.resizeSelected\?\.\(size\)/);
  assert.match(pdf,/function resizeSelected\(size\)\{/);
- assert.match(pdf,/activityMarks,recolorSelected,resizeSelected,/);
+ assert.match(pdf,/activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShape,/);
  // The lesson accepts only its three sizes, so a text mark changed this way stays valid for every student page.
  const store=new C.HighlightStore();
  store.add('teacher',{tool:'text',color:'#1f2937',size:.016,points:[{x:.3,y:.3},{x:.5,y:.34}],text:'שלום'});
@@ -180,15 +180,15 @@ test('lines of words on the teacher whiteboard are spaced for the real size of t
  assert.ok(Math.abs(step(roomy)-.016*1.25*2.4*16/9)<1e-6);
  // Student boards (no scale) are laid out exactly as before.
  assert.deepEqual(Clip.textStrokes('one\ntwo',width100,{...opts,scale:1}).strokes,tight);
- assert.match(pdf,/clip\.flowText\(text,opts&&opts\.bold\?width100Bold:width100,\{aspect:W\/Math\.max\(1,H\),scale:TEXT_SCALE,block:newBlockId\(\),\.\.\.opts\}\)/);
+ assert.match(pdf,/clip\.flowText\(text,widthFor\(opts&&opts\.font,opts&&opts\.bold\),\{aspect:W\/Math\.max\(1,H\),scale:TEXT_SCALE,block:newBlockId\(\),\.\.\.opts\}\)/);
  assert.match(pdf,/const lineStep=size=>size\*1\.25\*TEXT_SCALE\*W\/Math\.max\(1,H\);/);
 });
 
 test('a block of words is edited and removed as one piece',()=>{
  // The edit box opens with every line of the block, and saving replaces the whole block.
  assert.match(pdf,/block=textBlock\(target,B\.highlights\?\.\(\)\|\|strokes\);const f=blockFrame\(block\);/);
- assert.match(pdf,/size=f\.size;bold=f\.bold;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
- assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text,size,bold\}\);/);
+ assert.match(pdf,/size=f\.size;bold=f\.bold;font=f\.font;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
+ assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text,size,bold,font\}\);/);
  // Delete and the Eraser take every line.
  assert.match(pdf,/function eraseBlock\(stroke\)\{const ids=textBlock\(stroke\)\.map\(item=>item\.id\);return ids\.length>1\?B\.eraseMarks\?\.\(ids\):B\.eraseMark\?\.\(ids\[0\]\)\}/);
  assert.match(classroom,/eraseMarks\(ids\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\)return false;/);
@@ -197,13 +197,13 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261115-shapes27/);
+ assert.match(html,/classroom\.css\?v=20261116-wbplus1/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
  // Wrapping measures with "100px sans-serif" and the class picture paints with "px sans-serif".
  assert.match(pdf,/ctx\.font='100px sans-serif'/);
- assert.match(pdf,/svg\('text',\{x:first\.x\*W,y:first\.y\*H,'font-family':'sans-serif','font-size':/);
+ assert.match(pdf,/svg\('text',\{x:first\.x\*W,y:first\.y\*H,'font-family':C\.fontStack\(stroke\.font\),'font-size':/);
 });
 
 
@@ -367,7 +367,7 @@ test('a second click on picked words opens a text box in place, not a popup',()=
 test('the text box sits on the block: same place, color, size and width, and the block is not drawn under it',()=>{
  const body=pdf.slice(pdf.indexOf('function editInline(target){'),pdf.indexOf('function addTextStroke('));
  assert.match(body,/block=textBlock\(target,B\.highlights\?\.\(\)\|\|strokes\);const f=blockFrame\(block\);/);
- assert.match(body,/size=f\.size;bold=f\.bold;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
+ assert.match(body,/size=f\.size;bold=f\.bold;font=f\.font;color=block\[0\]\.color;value=f\.text;rtl=f\.rtl;top=f\.top;/);
  assert.match(body,/Object\.assign\(box\.style,\{left:left\*100\+'%',top:top\*100\+'%',width:\(right-left\)\*100\+'%',color\}\);/);
  assert.match(body,/left=f\.boxW\?f\.left:/,'a chosen width is kept');
  assert.match(body,/box\.value=value;/);assert.match(body,/box\.dir=fresh\?'auto':rtl\?'rtl':'ltr';/);
@@ -381,7 +381,7 @@ test('closing the text box keeps the change in place; Escape drops it; empty wor
  const body=pdf.slice(pdf.indexOf('function editInline(target){'),pdf.indexOf('function addTextStroke('));
  assert.match(body,/box\.addEventListener\('blur',event=>\{if\(event\.relatedTarget&&textSizeBox\?\.contains\(event\.relatedTarget\)\)return;finishInline\(true\)\}\);/);
  assert.match(body,/if\(event\.key==='Escape'\)\{event\.preventDefault\(\);finishInline\(false\)\}/);
- assert.match(body,/else if\(save&&\(text!==open\.before\|\|open\.size!==open\.sizeBefore\|\|open\.bold!==open\.boldBefore\)\)replaceTextStroke\(open\.stroke,text,open\.size,open\.bold\);/);
+ assert.match(body,/else if\(save&&\(text!==open\.before\|\|open\.size!==open\.sizeBefore\|\|open\.bold!==open\.boldBefore\|\|open\.font!==open\.fontBefore\)\)replaceTextStroke\(open\.stroke,text,open\.size,open\.bold,open\.font\);/);
  assert.match(body,/if\(save&&!text\.trim\(\)\)B\.status\(/);
  // Typing never reaches the lesson's shortcuts, the Delete key or the drawing tools.
  assert.match(body,/for\(const type of \['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'\]\)box\.addEventListener\(type,event=>event\.stopPropagation\(\)\);/);
@@ -391,7 +391,7 @@ test('closing the text box keeps the change in place; Escape drops it; empty wor
  assert.match(pdf,/addEventListener\('change',\(\)=>\{erasePid=null;finishInline\(true\);/);
  assert.match(pdf,/function unload\(hide\)\{\s*finishInline\(false\);/);
  // The changed words go back as the same block: same color, size and chosen width, and they stay picked.
- assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text,size,bold\}\);/);
+ assert.match(pdf,/const block=stroke\.block\?\.length\?stroke\.block:\[stroke\],made=reflow\(block,\{text,size,bold,font\}\);/);
  assert.match(pdf,/selectedId=selecting\(\)\?ids\[0\]:null;/);
 });
 
@@ -430,8 +430,8 @@ test('there is no popup at all: new words and Edit latest text use the text box 
  // New words: the box is centered on the clicked spot, and the words land where the box was.
  assert.match(pdf,/editInline\(\{point:p,color:\$\(colorId\)\.value\|\|B\.ownColor\(\),size:textSize\}\);return;/);
  assert.match(pdf,/const half=Math\.max\(\.1,Math\.min\(target\.point\.x-margin,1-margin-target\.point\.x\)\);/);
- assert.match(pdf,/if\(open\.create\)\{if\(save&&text\.trim\(\)\)addTextStroke\(\{\.\.\.open\.create,bold:open\.bold\},text\)\}/);
- assert.match(pdf,/const made=flow\(text,\{size:spot\.size,color:spot\.color,bold:spot\.bold===true,center:spot\.point,top:spot\.top\}\);/);
+ assert.match(pdf,/if\(open\.create\)\{if\(save&&text\.trim\(\)\)addTextStroke\(\{\.\.\.open\.create,bold:open\.bold,font:open\.font\},text\)\}/);
+ assert.match(pdf,/const made=flow\(text,\{size:spot\.size,color:spot\.color,bold:spot\.bold===true,font:spot\.font,center:spot\.point,top:spot\.top\}\);/);
  const made=Clip.flowText('one\ntwo',letters,{size:.02,center:{x:.3,y:.5},top:.4});
  assert.ok(Math.abs(made.strokes[0].points[0].y-.4)<1e-3,'the first line is where the typing box was');
  assert.ok(Math.abs((made.frame.left+made.frame.width/2)-.3)<1e-9,'centered on the clicked spot');
@@ -507,10 +507,10 @@ test('words have a size control (A- number A+) and new words start smaller',()=>
  assert.equal(C.cleanStroke({tool:'text',color:'#1f2937',size:.0039,points:[{x:.1,y:.1},{x:.2,y:.2}],text:'a'}).size,.0039);
  // The control is in the bar under the lesson and shows only while there are words to size.
  assert.match(pdf,/const smaller=button\('A−','Smaller letters',\(\)=>stepTextSize\(-1\),'pdf-btn pdf-textsize-btn'\),bigger=button\('A\+','Bigger letters',\(\)=>stepTextSize\(1\),'pdf-btn pdf-textsize-btn'\);/);
- assert.match(pdf,/textSizeBox\.hidden=!target;if\(target\)\{if\(document\.activeElement!==textSizeValue\)textSizeValue\.value=String\(labelOfSize\(target\.size\)\);boldBtn\?\.setAttribute\('aria-pressed',String\(target\.bold===true\)\)\}/);
- assert.match(pdf,/if\(inlineEdit\)return\{kind:'typing',size:inlineEdit\.size,bold:inlineEdit\.bold===true\};/);
- assert.match(pdf,/if\(picked\?\.tool==='text'\)return\{kind:'picked',size:picked\.size,bold:picked\.bold===true\};/);
- assert.match(pdf,/return \$\('teacherTool'\)\?\.value==='text'\?\{kind:'new',size:textSize,bold:textBold\}:null;/);
+ assert.match(pdf,/textSizeBox\.hidden=!target;if\(target\)\{if\(document\.activeElement!==textSizeValue\)textSizeValue\.value=String\(labelOfSize\(target\.size\)\);boldBtn\?\.setAttribute\('aria-pressed',String\(target\.bold===true\)\);if\(fontSelect\)fontSelect\.value=target\.font\|\|'sans'\}/);
+ assert.match(pdf,/if\(inlineEdit\)return\{kind:'typing',size:inlineEdit\.size,bold:inlineEdit\.bold===true,font:inlineEdit\.font\|\|'sans'\};/);
+ assert.match(pdf,/if\(picked\?\.tool==='text'\)return\{kind:'picked',size:picked\.size,bold:picked\.bold===true,font:picked\.font\|\|'sans'\};/);
+ assert.match(pdf,/return \$\('teacherTool'\)\?\.value==='text'\?\{kind:'new',size:textSize,bold:textBold,font:textFont\}:null;/);
  // Pressing A- or A+ does not take the typing cursor out of the words.
  assert.match(pdf,/for\(const b of \[smaller,bigger,boldBtn\]\)for\(const type of \['pointerdown','mousedown'\]\)b\.addEventListener\(type,event=>event\.preventDefault\(\)\);/);
  // One step from an in-between size (after a corner drag) goes to the next size on the list.
@@ -806,7 +806,7 @@ test('the B button, Ctrl+B and the drawing of bold words are wired everywhere wo
  const highlighting=read('class-pointer-prototype/highlighting.js'),share=read('class-pointer-prototype/activity-share.js');
  // The button sits in the text size group, so it shows with the Text tool, picked words or typing, and shows its state.
  assert.match(pdf,/boldBtn=button\('B','Bold \(Ctrl\+B\)',\(\)=>toggleTextBold\(\),'pdf-btn pdf-textsize-btn pdf-bold-btn'\);/);
- assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn\);/);
+ assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect\);/);
  assert.match(pdf,/boldBtn\?\.setAttribute\('aria-pressed',String\(target\.bold===true\)\)/);
  assert.match(pdf,/for\(const b of \[smaller,bigger,boldBtn\]\)for\(const type of \['pointerdown','mousedown'\]\)b\.addEventListener\(type,event=>event\.preventDefault\(\)\);/,'pressing B keeps the typing cursor');
  // Ctrl+B: while typing, with picked words, and with the Text tool chosen. Never inside another input.
@@ -815,16 +815,16 @@ test('the B button, Ctrl+B and the drawing of bold words are wired everywhere wo
  assert.match(pdf,/textTarget\(\)\?\.kind!=='new'\)return;\s*event\.preventDefault\(\);toggleTextBold\(\);/);
  // Typing shows bold, and the result keeps it.
  assert.match(pdf,/open\.box\.style\.fontWeight=open\.bold\?'700':'400';/);
- assert.match(pdf,/addTextStroke\(\{\.\.\.open\.create,bold:open\.bold\},text\)/);
- assert.match(pdf,/open\.bold!==open\.boldBefore\)\)replaceTextStroke\(open\.stroke,text,open\.size,open\.bold\)/);
+ assert.match(pdf,/addTextStroke\(\{\.\.\.open\.create,bold:open\.bold,font:open\.font\},text\)/);
+ assert.match(pdf,/open\.font!==open\.fontBefore\)\)replaceTextStroke\(open\.stroke,text,open\.size,open\.bold,open\.font\)/);
  // Bold words are measured bold, so they wrap and get a box that fits.
  assert.match(pdf,/measurerBold\.font='bold 100px sans-serif'/);
- assert.match(pdf,/opts&&opts\.bold\?width100Bold:width100/);
+ assert.match(pdf,/widthFor\(opts&&opts\.font,opts&&opts\.bold\)/);
  // Drawn bold on the teacher's whiteboard (screen and the picture of it), in the class's copy, and on class pages.
  assert.match(pdf,/'font-size':Math\.max\(4,stroke\.size\*W\*2\.4\),\.\.\.\(stroke\.bold\?\{'font-weight':'700'\}:\{\}\),fill:color,/);
- assert.match(pdf,/lc\.font=`\$\{stroke\.bold\?'bold ':''\}\$\{Math\.max\(4,stroke\.size\*W\*2\.4\)\}px sans-serif`;/);
+ assert.match(pdf,/lc\.font=`\$\{stroke\.bold\?'bold ':''\}\$\{Math\.max\(4,stroke\.size\*W\*2\.4\)\}px \$\{C\.fontStack\(stroke\.font\)\}`;/);
  assert.match(highlighting,/\.\.\.\(stroke\.bold\?\{'font-weight':'700'\}:\{\}\),fill:color,/);
- assert.match(share,/'font-family':'sans-serif',\.\.\.\(stroke\.bold\?\{'font-weight':'700'\}:\{\}\),transform:/);
+ assert.match(share,/'font-family':window\.ClassPointerCore\?\.fontStack\?\.\(stroke\.font\)\|\|'sans-serif',\.\.\.\(stroke\.bold\?\{'font-weight':'700'\}:\{\}\),transform:/);
  // The mark itself keeps the flag in the class's store.
  assert.match(read('class-pointer-prototype/classroom-core.js'),/\.\.\.\(value\.bold===true\?\{bold:true\}:\{\}\),/);
 });
