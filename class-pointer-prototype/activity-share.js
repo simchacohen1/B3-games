@@ -563,6 +563,8 @@
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null;syncWaiting()}
     // ---------- What the student sees when there is no picture, and the connection sign ----------
     let connState='ok',rtt=0,lastPong=0,pingTimer=null,waitTimer=null,connPill=null;
+    // Read only, for checking the sign from a test or the console.
+    window.FTTConnectionSign={state:()=>({sign:connState,rtt,sinceLastAnswerMs:Date.now()-lastPong})};
     function liveVideo(){
       const stream=lessonVideo.srcObject,track=stream&&stream.getVideoTracks?stream.getVideoTracks()[0]:null;
       return !!track&&track.readyState==='live'&&lessonVideo.readyState>=2&&!lessonVideo.paused;

@@ -55,11 +55,11 @@ test('session: a student sees a clear "Waiting for your teacher" screen, and is 
 
 test('versions: the changed scripts have new cache versions', () => {
   const html = read('classroom.html');
-  const want = { 'student-boards': 'send1', 'saved-work': 'send1', 'classroom-annotate': 'send1', classroom: 'send2', 'teacher-dashboard': 'send2', 'activity-share': 'send2' };
+  const want = { 'student-boards': 'send1', 'saved-work': 'send1', 'classroom-annotate': 'send1', classroom: 'send2', 'teacher-dashboard': 'send2', 'activity-share': 'send3' };
   for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=20261117-' + v), f);
   assert.match(html, /teacher-dashboard\.css\?v=20261117-send2/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send2/, page);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send3/, page);
 });
 
 // ---------- black / blue screen and the connection signs ----------
