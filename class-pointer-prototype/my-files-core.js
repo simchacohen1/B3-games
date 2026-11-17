@@ -166,8 +166,16 @@
   const ZOOM_MAX=4,ZOOM_DEFAULT=2;
   const cleanZoom=value=>{const n=typeof value==='number'?value:typeof value==='string'&&/^[0-9]$/.test(value)?Number(value):NaN;return Number.isInteger(n)&&n>=0&&n<=ZOOM_MAX?n:ZOOM_DEFAULT};
   const stepZoom=(level,delta)=>Math.max(0,Math.min(ZOOM_MAX,cleanZoom(level)+(delta>0?1:delta<0?-1:0)));
+  // What just arrived from the teacher: items that were not there before and came from the teacher. The first time the
+  // page loads (before is null) nothing is "new".
+  function arrivals(before,after){
+    if(!Array.isArray(before))return[];
+    const known=new Set(before.map(item=>item.key));
+    return after.filter(item=>item.fromTeacher&&!known.has(item.key));
+  }
+  const arrivalText=list=>!list.length?'':list.length===1?'New from your teacher: '+list[0].name:'New from your teacher: '+list.length+' new files ('+list.slice(0,2).map(item=>item.name).join(', ')+(list.length>2?', …':'')+')';
   const typeLabel=kind=>kind==='worksheet'?'Worksheet':kind==='pdf'?'PDF':'Whiteboard';
 
-  const api={DAY_GROUPS,dateGroup,emptyPrefs,cleanPrefs,addFolder,renameFolder,removeFolder,moveItem,setStar,prune,buildItems,filterItems,arrange,typeLabel,MAX_FOLDERS,ZOOM_MAX,ZOOM_DEFAULT,cleanZoom,stepZoom};
+  const api={DAY_GROUPS,dateGroup,emptyPrefs,cleanPrefs,addFolder,renameFolder,removeFolder,moveItem,setStar,prune,buildItems,filterItems,arrange,typeLabel,arrivals,arrivalText,MAX_FOLDERS,ZOOM_MAX,ZOOM_DEFAULT,cleanZoom,stepZoom};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FTTMyFilesCore=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -26,15 +26,28 @@
   // The size of the tiles (− and ＋), remembered like the view. It works in the grid and in the list.
   let tileZoom=M.cleanZoom(remembered('zoom',String(M.ZOOM_DEFAULT),['0','1','2','3','4']));
 
-  async function refresh(){
-    page.say('Loading…');
+  // quiet: a refresh the student did not ask for (something new arrived): no "Loading…", and the list is not emptied if it fails.
+  let knownSig=null,lastKeys=null,noticeTimer=0;
+  async function refresh(quiet){
+    if(quiet!==true)page.say('Loading…');
     try{
-      const [files,folders,sheets,raw]=await Promise.all([store.list(),store.folders().catch(()=>state),Saved.worksheets.list().catch(()=>[]),store.prefs().catch(()=>null)]);
-      state=folders;allFiles=files;allSheets=sheets;prefs=M.cleanPrefs(raw);
-      $('addPdf').hidden=false;$('newFolder').hidden=false;page.say('');
+      const [files,folders,sheets,raw,snap]=await Promise.all([store.list(),store.folders().catch(()=>state),Saved.worksheets.list().catch(()=>[]),store.prefs().catch(()=>null),Saved.snapshot().catch(()=>null)]);
+      state=folders;allFiles=files;allSheets=sheets;prefs=M.cleanPrefs(raw);knownSig=snap?snap.sig:null;
+      $('addPdf').hidden=false;$('newFolder').hidden=false;if(quiet!==true)page.say('');
       render();
-    }catch(error){$('filesList').replaceChildren();page.fail(error)}
+      announce(M.arrivals(lastKeys,items));lastKeys=items.map(item=>({key:item.key}));
+    }catch(error){if(quiet!==true){$('filesList').replaceChildren();page.fail(error)}}
   }
+  // A short notice when the teacher sends something while this page is open.
+  function announce(list){
+    const text=M.arrivalText(list);if(!text)return;
+    const box=$('mfNotice');box.textContent='🔔 '+text;box.hidden=false;
+    clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{box.hidden=true},12000);
+  }
+  $('mfNotice').addEventListener('click',()=>{$('mfNotice').hidden=true});
+  // Every 30 seconds while the page is showing (and when the student comes back to it): if a file or worksheet was added
+  // or removed, the list updates by itself. One cheap look: no file is downloaded unless something changed.
+  Saved.watch(snap=>{if(knownSig===null){knownSig=snap.sig;return}if(snap.sig!==knownSig){knownSig=snap.sig;return refresh(true)}});
 
   // ---------- Settings (folders and stars): shown at once, saved a moment later ----------
   let saveChain=Promise.resolve();
@@ -136,12 +149,46 @@
       if(box.isConnected)put(blob);
     }).catch(()=>{});
   }
+  // A worksheet that is not filled in yet, and a PDF, show a small picture of page 1 instead of an icon. A picture is made
+  // only when its tile is on the screen (or about to be), one at a time, and kept for the rest of the visit.
+  const pdfThumbs=new Map();let pdfChain=Promise.resolve(),seeNode=null;
+  const pdfSource=item=>item.kind==='pdf'?()=>store.readPdf(item.files[0]):item.copy?()=>store.readPdf(item.copy):item.sheet?()=>Saved.worksheets.read(item.sheet.id):null;
+  async function firstPagePicture(blob){
+    const reader=window.pdfjsLib;if(!reader)return null;
+    reader.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=3.11.174';
+    const doc=await reader.getDocument({data:new Uint8Array(await blob.arrayBuffer()),isEvalSupported:false,enableXfa:false}).promise;
+    try{
+      const first=await doc.getPage(1),base=first.getViewport({scale:1}),viewport=first.getViewport({scale:Math.min(2,360/base.width)});
+      const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(viewport.width));canvas.height=Math.max(1,Math.round(viewport.height));
+      await first.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+      return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.8));
+    }finally{doc.destroy()}
+  }
+  function lazyPdfThumb(item,box){
+    const source=pdfSource(item);if(!source)return;
+    const key=item.key+':'+(item.copy?.id||item.files[0]?.id||'');
+    const put=blob=>{const image=document.createElement('img');image.alt='';image.src=URL.createObjectURL(blob);image.addEventListener('load',()=>URL.revokeObjectURL(image.src));box.replaceChildren(image)};
+    if(pdfThumbs.has(key)){if(pdfThumbs.get(key))put(pdfThumbs.get(key));return}
+    const start=()=>{
+      pdfChain=pdfChain.then(async()=>{
+        if(!box.isConnected)return;
+        if(pdfThumbs.has(key)){if(pdfThumbs.get(key))put(pdfThumbs.get(key));return}
+        const blob=await firstPagePicture(await source());
+        pdfThumbs.set(key,blob||null);
+        if(blob&&box.isConnected)put(blob);
+      }).catch(()=>{/* the icon stays */});
+    };
+    if(!('IntersectionObserver' in window)){start();return}
+    if(!seeNode)seeNode=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){seeNode.unobserve(entry.target);entry.target.__start?.();entry.target.__start=null}},{rootMargin:'200px'});
+    box.__start=start;seeNode.observe(box);
+  }
   function itemNode(item){
     const node=ui.h('article','mf-item mf-'+item.kind);node.draggable=true;node.dataset.key=item.key;
     node.addEventListener('dragstart',event=>{event.dataTransfer.setData('text/plain',item.key);event.dataTransfer.effectAllowed='move';node.classList.add('dragging')});
     node.addEventListener('dragend',()=>node.classList.remove('dragging'));
     const thumb=ui.h('div','mf-thumb',item.kind==='worksheet'?'📋':item.kind==='pdf'?'📄':'📝');thumb.setAttribute('aria-hidden','true');
     if(item.picture)loadThumb(item.picture,thumb);
+    else lazyPdfThumb(item,thumb);
     const meta=ui.h('div','mf-meta'),tags=ui.h('div','mf-tags');
     if(item.fromTeacher)tags.append(ui.h('span','mf-badge','From my teacher'));
     if(item.subject)tags.append(ui.h('span','mf-subject',item.subject));
