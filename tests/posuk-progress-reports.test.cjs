@@ -36,7 +36,7 @@ function load(html, targets, globals) {
   return context.api;
 }
 
-const T = (extra = {}) => load(teacherHtml, ['buildReportRows', 'computeStudentStats', 'scoreShows', 'gradeBadge', 'gradePlain', 'attemptHasResult'], {
+const T = (extra = {}) => load(teacherHtml, ['rowHasResult', 'buildReportRows', 'computeStudentStats', 'scoreShows', 'gradeBadge', 'gradePlain', 'attemptHasResult'], {
   studentsMap: { ann: 'Ann', ben: 'Ben' },
   inTeacherSefer: () => true,
   parshaDisplayName: slug => slug,
@@ -165,4 +165,14 @@ test('My Progress: the teacher\'s grade is marked on the posuk, and comprehensio
   assert.doesNotMatch(progressHtml, /readingTabBtn|translateTabBtn/);
   // old results are still read, never changed
   assert.match(progressHtml, /db\.ref\('posukPractice\/attempts\/' \+ studentId\)\.once\('value'\)/);
+});
+
+test('teacher report: each tab lists only the posukim that have something for it', () => {
+  const api = T();
+  const rows = api.buildReportRows({ ann: { Bereishis_1_1: { a: oldAttempt }, Bereishis_1_3: { a: comprehensionAttempt } } }, { ann: { Bereishis_1_4: { status: 'retry', mistakes: 1, gradedAt: 5 } } });
+  const keep = type => Array.from(rows.filter(r => api.rowHasResult(r, type)).map(r => r.posukNum));
+  assert.deepEqual(keep('readtranslate'), [1, 4]);
+  assert.deepEqual(keep('comprehension'), [3]);
+  assert.deepEqual(keep('all'), [1, 3, 4]);
+  assert.equal(teacherHtml.split('rows = rows.filter(r => rowHasResult(r, scoreType));').length - 1, 2, 'the flat list and by-student views');
 });

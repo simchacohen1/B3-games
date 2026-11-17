@@ -1584,6 +1584,17 @@ function attemptHasResult(a){
     typeof effComprehensionScore(a) === 'number' || !!effComprehensionVerdict(a));
 }
 function reviewTime(review){ return review ? (Number(review.gradedAt) || Number(review.submittedAt) || null) : null; }
+// Does a report row have anything for the chosen tab? Read & Translate: an older reading or translation score, or the teacher's
+// grade. Comprehension: a comprehension result. (Otherwise the row would be a line of dashes.)
+function rowHasResult(r, scoreType){
+  const readTranslate = typeof r.hebrewScore === 'number' || typeof r.translationScore === 'number' || !!r.review;
+  const comprehension = typeof r.comprehensionScore === 'number' || !!r.comprehensionVerdict;
+  if(scoreType === 'readtranslate') return readTranslate;
+  if(scoreType === 'comprehension') return comprehension;
+  if(scoreType === 'reading') return typeof r.hebrewScore === 'number';
+  if(scoreType === 'translation') return typeof r.translationScore === 'number';
+  return readTranslate || comprehension;
+}
 // Which score columns a report view shows. 'readtranslate' = the older reading and translation scores side by side.
 function scoreShows(scoreType, column){
   return scoreType === 'all' || scoreType === column || (scoreType === 'readtranslate' && (column === 'reading' || column === 'translation'));
@@ -2438,6 +2449,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
     : posukNums.includes(r.posukNum));
   if(dateFrom !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp >= dateFrom);
   if(dateTo !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp <= dateTo);
+  rows = rows.filter(r => rowHasResult(r, scoreType));   // a tab lists only the posukim that have something for it
 
   // Which selected students (if any) have zero activity anywhere in this
   // filtered set — computed BEFORE the completion/needs-review filters so
@@ -2571,6 +2583,7 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
     : posukNums.includes(r.posukNum));
   if(dateFrom !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp >= dateFrom);
   if(dateTo !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp <= dateTo);
+  rows = rows.filter(r => rowHasResult(r, scoreType));   // a tab lists only the posukim that have something for it
 
   const ids = (studentIds && studentIds.length ? studentIds : Object.keys(studentsMap))
     .slice().sort((a,b) => studentsMap[a].localeCompare(studentsMap[b]));
