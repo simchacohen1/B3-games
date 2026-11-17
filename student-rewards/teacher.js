@@ -255,7 +255,7 @@ function renderClassSelect(){
   el.innerHTML=rows.map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("");
   el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
 }
-const OWNER_ROOT_PATHS=["classes","students","categories","rewards","classRewardCatalog","settings","dailyRatings","dailyAwards","dailyAttendance","commentsByStudent","redemptionsByStudent","enrollments","pointAdjustments","audit","pointRequests","classRewardContributionsByStudent","refundRequests","classRewardRounds"];
+const OWNER_ROOT_PATHS=["classes","students","categories","rewards","classRewardCatalog","settings","dailyRatings","dailyAwards","dailyAttendance","commentsByStudent","redemptionsByStudent","enrollments","pointAdjustments","audit","pointRequests","classRewardContributionsByStudent","refundRequests","classRewardRounds","dailyAwardLog"];
 async function loadRoot(){
   if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
   else{
@@ -435,6 +435,7 @@ function allPointLedger(includeGaps=true){
       if(gap)add({id:`gap:${s.id}`,sid:s.id,amount:gap,when:0,source:"history-gap",sourceGroup:"gap",sourceLabel:"History gap",reason:"Balance not linked to a saved history record",detail:`Current balance ${current} ★ · saved ledger ${accounted} ★`,status:"needs-review",counts:true,isGap:true});
     }
   }
+  decorateLedger(rows);
   // Calculate a running balance for each student. History gaps are treated as the
   // older opening balance, so the newest calculated balance lands on the live total.
   for(const s of r){
@@ -443,6 +444,89 @@ function allPointLedger(includeGaps=true){
     for(const row of posted){running+=Number(row.amount||0);row.runningBalance=running}
   }
   return rows.sort((a,b)=>(b.when||0)-(a.when||0)||String(a.studentName).localeCompare(String(b.studentName)));
+}
+// ---------- Undo (the history shows who did each change; Undo reverses it exactly and adds its own entry; nothing is deleted) ----------
+// Adds "who", the undo choice and "undone" marks to the ledger rows, and one informational row for every Daily Points undo.
+function decorateLedger(rows){
+  const root=state.root||{};
+  const byDay=new Map();
+  for(const [sid,logs] of Object.entries(root.dailyAwardLog||{}))for(const log of Object.values(logs||{})){
+    if(!log||!log.classId||!log.date)continue;
+    const k=sid+"|"+log.classId+"|"+log.date;(byDay.get(k)||byDay.set(k,[]).get(k)).push(log);
+  }
+  for(const list of byDay.values())list.sort((a,b)=>String(a.savedAt).localeCompare(String(b.savedAt))||String(a.id).localeCompare(String(b.id)));
+  const batchSize=(batchId,classId)=>{let n=0;for(const [sid,logs] of Object.entries(root.dailyAwardLog||{}))if(Object.values(logs||{}).some(l=>l&&l.batchId===batchId&&l.classId===classId&&l.kind==="save"&&!l.undoneAt))n++;return n};
+  for(const row of rows){
+    const id=String(row.id||"");
+    if(id.startsWith("adjust:")){
+      const key=id.slice(7),item=root.pointAdjustments?.[key]||{};
+      row.by=item.teacherEmail||"";
+      if(item.action==="undo"){row.sourceLabel="Undo";row.status="undo";row.sourceGroup="teacher"}
+      else if(item.undoneBy){row.status="undone"}
+      else if(Number(item.amount)) row.undo={kind:"adjust",id:key};
+    }else if(id.startsWith("request:")){
+      const key=id.slice(8),item=root.pointRequests?.[key]||{};
+      row.by=item.reviewedBy?(/^Automatic/i.test(item.reviewedBy)?"Automatic":item.reviewedBy):(item.status==="approved"?"Automatic":"");
+      if(item.undoneBy)row.status="undone";
+      else if(item.status==="approved"&&Number(item.actualAmount??item.amount))row.undo={kind:"request",id:key};
+    }else if(id.startsWith("redeem:")){
+      const [,sid,key,part]=id.split(":"),item=root.redemptionsByStudent?.[sid]?.[key]||{};
+      if(part==="request"){
+        row.by="Student";
+        if(!["declined","canceled","refunded"].includes(String(item.status||"")))row.undo={kind:"purchase",studentId:sid,key};
+      }else row.by=item.refundedBy||item.reviewedBy||"Student";
+    }else if(id.startsWith("class-contribution:")){
+      row.undoHint="To give these back, use a refund request";
+    }else if(id.startsWith("daily:")){
+      const [,sid,cid,date]=id.split(":"),award=root.dailyAwards?.[sid]?.[cid]?.[date];
+      row.by=award?.teacherEmail||"";
+      const list=byDay.get(sid+"|"+cid+"|"+date)||[],latest=list[list.length-1];
+      if(latest&&latest.kind==="save"&&!latest.undoneAt&&Number(award?.points||0)===Number(latest.after?.points||0)){
+        row.undo={kind:"daily",classId:cid,studentId:sid,date};
+        const n=latest.batchId?batchSize(latest.batchId,cid):0;
+        if(n>1)row.batch={kind:"batch",classId:cid,batchId:latest.batchId,count:n};
+      }else if(!list.length)row.undoHint="Saved before Undo existed: edit the day instead";
+    }
+  }
+  // Every Daily Points undo is shown, so the history never hides that something was undone.
+  const known=new Set(rows.map(r=>r.sid));
+  for(const [sid,logs] of Object.entries(root.dailyAwardLog||{})){
+    if(!known.has(sid))continue;
+    for(const log of Object.values(logs||{})){
+      if(!log||log.kind!=="undo")continue;
+      const s=rows.find(r=>r.sid===sid);if(!s)continue;
+      rows.push({id:`dailyundo:${sid}:${log.id}`,sid,amount:Number(log.appliedDelta)||0,when:pointTime(log.savedAt),source:"undo",sourceGroup:"daily",sourceLabel:"Undo",
+        reason:`Undo — Daily Points ${C.formatDate(log.date)}`,detail:"The day was put back the way it was (already included in the Daily Points lines)",status:"logged",counts:false,classId:log.classId||"",by:log.teacherEmail||"",
+        studentName:s.studentName,studentInitials:s.studentInitials,studentColor:s.studentColor});
+    }
+  }
+}
+function whoLabel(row){return row.isGap?"—":row.by||"—"}
+function undoCell(row){
+  if(row.status==="undone")return `<small class="points-undone">Undone</small>`;
+  const out=[];
+  if(row.undo)out.push(`<button type="button" class="points-undo" data-undo="${esc(JSON.stringify(row.undo))}" title="Reverse exactly this entry. The undo is added to the history.">↩ Undo</button>`);
+  if(row.batch)out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"batch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole Daily Points save for ${row.batch.count} students">↩ Undo whole save (${row.batch.count})</button>`);
+  if(!out.length&&row.undoHint)out.push(`<small class="points-undone">${esc(row.undoHint)}</small>`);
+  return out.join(" ");
+}
+async function runUndo(spec){
+  const whole=spec.kind==="batch";
+  if(!confirm(whole?"Undo this whole Daily Points save for the class? Each student's day goes back to how it was before. The undo is added to the history; nothing is deleted.":"Undo this entry? It is reversed exactly, and the undo is added to the history. Nothing is deleted."))return;
+  try{
+    const result=await teacherApi("undo",spec);
+    const skipped=(result.skipped||[]).map(x=>{const s=(state.root?.students||{})[x.studentId];return `${s?.name||x.studentId}: ${x.reason}`});
+    toast(whole?`Undone for ${result.undone} student${result.undone===1?"":"s"}${skipped.length?` · skipped ${skipped.length}: ${skipped.join("; ")}`:""}`:"Undone. The history shows the undo.");
+  }catch(err){toast(err.message,"error")}
+  await loadRoot();render();
+}
+document.addEventListener("click",event=>{const button=event.target.closest&&event.target.closest("[data-undo]");if(!button)return;event.preventDefault();let spec=null;try{spec=JSON.parse(button.dataset.undo)}catch{}if(spec)runUndo(spec)});
+// One student's own history, on the Students page.
+function studentPointsPanel(s){
+  const previous=state.pointClassId;state.pointClassId="all";
+  let rows=[];try{rows=allPointLedger(true).filter(row=>row.sid===s.id)}finally{state.pointClassId=previous}
+  const body=rows.length?rows.map(row=>`<tr><td class="points-date">${esc(formatPointWhen(row))}</td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b></td><td>${esc(whoLabel(row))}</td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td class="points-actions">${undoCell(row)}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty"><p>No saved point activity yet.</p></div></td></tr>`;
+  return `<section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Points history</h2><p>Every change to ${esc(s.name)}'s points: who did it, and Undo (nothing is ever deleted)</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Change</th><th>Reason</th><th>Who</th><th>Status</th><th></th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 function pointRangeStart(){
   if(state.pointRange==="all")return 0;
@@ -547,7 +631,7 @@ function pointsDashboard(){
         <label><span>Status</span><select id="pointsStatus">${statusOptions.map(([v,l])=>`<option value="${v}" ${state.pointStatus===v?"selected":""}>${l}</option>`).join("")}</select></label>
         <label class="points-search"><span>Search reason</span><input id="pointsSearch" value="${esc(state.pointSearch)}" placeholder="e.g. Chazara, Reading, Gimkit..."></label>
       </div>
-      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
+      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th><th>Who</th><th></th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td><td class="points-who">${esc(whoLabel(row))}</td><td class="points-actions">${undoCell(row)}</td></tr>`).join(""):`<tr><td colspan="9"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
     </section>
   </section>`;
 }
@@ -644,6 +728,7 @@ function students(){
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">STUDENT PROGRESS</p><h1>Students</h1><p>Review growth, balances, and daily history.</p></div><select id="studentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>
     <div class="studenthero"><em class="huge" style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><div><h2>${esc(s.name)}</h2><p>${scoreFor(s)}% overall progress</p></div><button class="balance" id="adjustPoints"><span>CURRENT POINT BALANCE</span><b>${Number(s.rewardBalance)||0} ★</b><small>Click to adjust points</small></button></div>
     <div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div>
+    ${studentPointsPanel(s)}
     <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Daily History</h2><p>Saved points and attendance</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${studentHistory(s).map(x=>`<tr><td>${esc(C.formatDate(x.date))}</td><td>${esc(x.status)}</td><td>${x.points} ★</td></tr>`).join("")||`<tr><td colspan="3">No saved days yet.</td></tr>`}</tbody></table></div></section>
   </section>`;
 }

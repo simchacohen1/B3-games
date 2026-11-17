@@ -84,11 +84,11 @@ async function loadRoot(store,scope){
   pointRequests:Object.fromEntries(Object.entries(requests||{}).filter(([,r])=>ids.has(String(r?.rewardStudentId||'')))),
   pointAdjustments:Object.fromEntries(Object.entries(adjustments||{}).filter(([,r])=>ids.has(String(r?.studentId||'')))),
   classRewardRounds:pick(rounds||{},rewardClassIds),
-  dailyRatings:{},dailyAwards:{},dailyAttendance:{},commentsByStudent:{},redemptionsByStudent:{},classRewardContributionsByStudent:{}
+  dailyRatings:{},dailyAwards:{},dailyAttendance:{},commentsByStudent:{},redemptionsByStudent:{},classRewardContributionsByStudent:{},dailyAwardLog:{}
  };
  const ownRewards=new Set(Object.keys(root.rewards));
  await Promise.all(studentIds.map(async sid=>{
-  for(const p of ['dailyRatings','dailyAwards','dailyAttendance','commentsByStudent','redemptionsByStudent','classRewardContributionsByStudent']){
+  for(const p of ['dailyRatings','dailyAwards','dailyAttendance','commentsByStudent','redemptionsByStudent','classRewardContributionsByStudent','dailyAwardLog']){
    let v=await store.get(SR+'/'+p+'/'+sid);
    if(v&&p==='redemptionsByStudent')v=Object.fromEntries(Object.entries(v).filter(([,r])=>ownRewards.has(String(r?.rewardId||''))));
    if(v&&Object.keys(v).length)root[p][sid]=v;
@@ -216,6 +216,107 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
  return {ok:true,status};
 }
 
+// ---------- Undo (nothing is ever deleted: an undo is a new history entry, and the original is marked "undone") ----------
+const TAKEN_BACK='This student\'s balance is too low to take these points back (they may have spent them). Nothing was changed.';
+// Takes points away only if the student still has them, so an undo is exact and never leaves a negative balance.
+async function exactChange(store,studentId,amount){
+ if(amount<0){
+  const have=Number(await store.get(SR+'/students/'+studentId+'/rewardBalance')||0);
+  if(have+amount<0)fail(409,TAKEN_BACK);
+ }
+ const {applied,balance}=await addToBalance(store,studentId,amount);
+ if(applied!==amount)fail(409,'The balance changed while undoing. Check the history, then try again.');
+ return {applied,balance};
+}
+function requireInScope(scope,studentId){if(!key(String(studentId||''))||!scope.studentIds.includes(String(studentId)))fail(403,'This student is not in your class.');}
+// A teacher adjustment or an approved activity award: put back exactly what was applied.
+async function undoAmount(store,scope,email,kind,id,nowMs,now){
+ if(!key(id))fail(400,'Invalid entry.');
+ const path=SR+(kind==='request'?'/pointRequests/':'/pointAdjustments/')+id,item=await store.get(path);
+ if(!item)fail(404,'That entry no longer exists.');
+ if(kind==='adjust'&&item.action==='undo')fail(400,'An undo cannot be undone. Make a new adjustment instead.');
+ if(kind==='request'&&item.status!=='approved')fail(409,'Only points that were actually given can be undone.');
+ const sid=String(kind==='request'?item.rewardStudentId:item.studentId||'');
+ requireInScope(scope,sid);
+ const original=Number(kind==='request'?(item.actualAmount??item.amount):item.amount);
+ if(!Number.isInteger(original)||original===0)fail(409,'This entry changed no points, so there is nothing to undo.');
+ const claim=await store.tx(path+'/undoneBy',cur=>cur?undefined:'processing');
+ if(!claim?.committed)fail(409,'This entry was already undone.');
+ try{
+  const {balance}=await exactChange(store,sid,-original);
+  const undoId='undo_'+nowMs+'_'+sha(sid+id+Math.random()).slice(0,8);
+  await store.update({
+   [SR+'/pointAdjustments/'+undoId]:{id:undoId,studentId:sid,classId:item.classId||null,amount:-original,action:'undo',undoOf:(kind==='request'?'request:':'adjust:')+id,reason:'Undo: '+String(item.reason||'earlier change').slice(0,160),teacherEmail:email,createdAt:now,balanceAfter:balance},
+   [path+'/undoneBy']:undoId,[path+'/undoneAt']:now,[path+'/undoneByEmail']:email});
+  return {ok:true,undone:1,applied:-original,balance};
+ }catch(error){await store.update({[path+'/undoneBy']:null}).catch(()=>{});throw error}
+}
+// A purchase: give the points back through the same refund the teacher already uses.
+async function undoPurchase(store,scope,email,studentId,keyId,now,owner){
+ requireInScope(scope,studentId);if(!key(keyId))fail(400,'Invalid entry.');
+ const path=SR+'/redemptionsByStudent/'+studentId+'/'+keyId,item=await store.get(path);
+ if(!item)fail(404,'That purchase no longer exists.');
+ const reward=await store.get(SR+'/rewards/'+item.rewardId);
+ if(!reward||!(scope.rewardClassIds.includes(reward.ownerClassId)||(owner&&!reward.ownerClassId)))fail(403,'This purchase is not from your class store.');
+ const before=String(item.status||'pending');
+ const claim=await store.tx(path+'/status',cur=>['declined','canceled','refunded'].includes(String(cur||'pending'))?undefined:'refunded');
+ if(!claim?.committed)fail(409,'These points were already returned.');
+ try{
+  const cost=Number(item.cost||0);
+  if(cost>0)await addToBalance(store,studentId,cost);
+  await store.update({[path+'/refundedAt']:now,[path+'/refundedBy']:email,[path+'/statusBeforeRefund']:before});
+  const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
+  if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
+  return {ok:true,undone:1,applied:cost};
+ }catch(error){await store.update({[path+'/status']:before}).catch(()=>{});throw error}
+}
+// One student's day on the Daily Points page: put the day back the way it was before the latest save.
+async function undoDaily(store,scope,email,classId,studentId,date,nowMs,now,expectLogId){
+ requireStudent(scope,classId,studentId);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))fail(400,'Choose a valid date.');
+ const logs=Object.values(await store.get(SR+'/dailyAwardLog/'+studentId)||{}).filter(l=>l&&l.classId===classId&&l.date===date)
+  .sort((a,b)=>String(a.savedAt).localeCompare(String(b.savedAt))||String(a.id).localeCompare(String(b.id)));
+ const latest=logs[logs.length-1];
+ // A batch undo names the exact save it means: if a newer save replaced it, that day is left alone.
+ if(latest&&expectLogId&&latest.id!==expectLogId)fail(409,'This day was changed after that save. Undo the newest change first.');
+ if(!latest)fail(404,'This day was saved before Undo existed. Fix it on the Daily Points page instead.');
+ if(latest.kind==='undo'||latest.undoneAt)fail(409,'This day was already undone. Save the day again if you want to change it.');
+ const dayPath=studentId+'/'+classId+'/'+date;
+ const [award,ratings,attendance]=await Promise.all([store.get(SR+'/dailyAwards/'+dayPath),store.get(SR+'/dailyRatings/'+dayPath),store.get(SR+'/dailyAttendance/'+dayPath)]);
+ if(Number(award?.points||0)!==Number(latest.after?.points||0)||String(award?.savedAt||'')!==String(latest.after?.savedAt||''))fail(409,'This day was changed after that save. Undo the newest change first.');
+ const restored=Number(latest.before?.award?.points||0),delta=restored-Number(award?.points||0);
+ const applied=delta?(await exactChange(store,studentId,delta)).applied:0;
+ const undoId='dl_'+nowMs+'_'+sha(studentId+date+Math.random()).slice(0,8);
+ await store.update({
+  [SR+'/dailyAwards/'+dayPath]:latest.before?.award||null,[SR+'/dailyRatings/'+dayPath]:latest.before?.ratings||null,[SR+'/dailyAttendance/'+dayPath]:latest.before?.attendance||null,
+  [SR+'/dailyAwardLog/'+studentId+'/'+latest.id+'/undoneAt']:now,[SR+'/dailyAwardLog/'+studentId+'/'+latest.id+'/undoneBy']:email,
+  [SR+'/dailyAwardLog/'+studentId+'/'+undoId]:{id:undoId,classId,date,batchId:latest.batchId||null,kind:'undo',undoOf:latest.id,teacherEmail:email,savedAt:now,before:{award:award||null,ratings:ratings||null,attendance:attendance||null},after:{points:restored,savedAt:latest.before?.award?.savedAt||null},appliedDelta:applied}
+ });
+ return {ok:true,undone:1,applied};
+}
+// A whole class-wide Daily Points save: every student in it whose day was not changed since.
+async function undoBatch(store,scope,email,classId,batchId,nowMs,now){
+ requireClass(scope,classId);if(!key(String(batchId||'')))fail(400,'Invalid batch.');
+ const undone=[],skipped=[];
+ for(const sid of Object.keys(scope.enrollments[classId]||{}).filter(id=>scope.enrollments[classId][id]===true)){
+  const entries=Object.values(await store.get(SR+'/dailyAwardLog/'+sid)||{}).filter(l=>l&&l.batchId===batchId&&l.classId===classId&&l.kind==='save'&&!l.undoneAt);
+  for(const entry of entries){
+   try{await undoDaily(store,scope,email,classId,sid,entry.date,nowMs,now,entry.id);undone.push(sid)}
+   catch(error){skipped.push({studentId:sid,reason:String(error?.message||error)})}
+  }
+ }
+ if(!undone.length&&!skipped.length)fail(404,'Nothing in that save can be undone.');
+ return {ok:true,undone:undone.length,skipped};
+}
+async function undoAction(store,scope,email,body,nowMs,now,owner){
+ const kind=String(body.kind||'');
+ if(kind==='adjust'||kind==='request')return undoAmount(store,scope,email,kind,String(body.id||''),nowMs,now);
+ if(kind==='purchase')return undoPurchase(store,scope,email,String(body.studentId||''),String(body.key||''),now,owner);
+ if(kind==='daily')return undoDaily(store,scope,email,String(body.classId||''),String(body.studentId||''),String(body.date||''),nowMs,now);
+ if(kind==='batch')return undoBatch(store,scope,email,String(body.classId||''),String(body.batchId||''),nowMs,now);
+ fail(400,'This kind of entry cannot be undone here.');
+}
+
 async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
  const now=new Date(nowMs).toISOString();
  const access=await teacherAccess(store,identity);
@@ -226,7 +327,8 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   const classId=String(body.classId||''),date=String(body.date||'');requireClass(scope,classId);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))fail(400,'Choose a valid date.');
   const rows=Array.isArray(body.rows)?body.rows:[];if(!rows.length||rows.length>200)fail(400,'No students to save.');
-  const updates={},deltas=[];
+  // Every save is one batch, so a class-wide save can be undone in one click (and one student at a time).
+  const batchId='b_'+nowMs+'_'+sha(email+nowMs+Math.random()).slice(0,8),updates={},deltas=[],logs=[];
   for(const row of rows){
    const sid=String(row?.studentId||'');requireStudent(scope,classId,sid);
    const absent=row.absent===true,ratings={},byCategory={};let award=0;
@@ -236,15 +338,25 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
     ratings[key]={category,rating,points:PROGRESS[rating],teacherEmail:email,savedAt:now};
     byCategory[key]={category,rating,points:pts};award+=pts;
    }
-   const old=Number((await store.get(SR+'/dailyAwards/'+sid+'/'+classId+'/'+date))?.points||0);
-   updates[SR+'/dailyRatings/'+sid+'/'+classId+'/'+date]=absent?null:ratings;
-   updates[SR+'/dailyAwards/'+sid+'/'+classId+'/'+date]={points:award,...(absent?{}:{byCategory}),teacherEmail:email,savedAt:now};
-   updates[SR+'/dailyAttendance/'+sid+'/'+classId+'/'+date]={status:absent?'absent':'present',teacherEmail:email,savedAt:now};
-   if(award!==old)deltas.push([sid,award-old]);
+   const dayPath=sid+'/'+classId+'/'+date;
+   const [oldAward,oldRatings,oldAttendance]=await Promise.all([store.get(SR+'/dailyAwards/'+dayPath),store.get(SR+'/dailyRatings/'+dayPath),store.get(SR+'/dailyAttendance/'+dayPath)]);
+   const old=Number(oldAward?.points||0);
+   const newAward={points:award,...(absent?{}:{byCategory}),teacherEmail:email,savedAt:now},newAttendance={status:absent?'absent':'present',teacherEmail:email,savedAt:now};
+   const unchanged=oldAward&&old===award&&JSON.stringify(oldAward.byCategory||null)===JSON.stringify(newAward.byCategory||null)&&String(oldAttendance?.status||'present')===newAttendance.status;
+   if(!unchanged){
+    updates[SR+'/dailyRatings/'+dayPath]=absent?null:ratings;
+    updates[SR+'/dailyAwards/'+dayPath]=newAward;
+    updates[SR+'/dailyAttendance/'+dayPath]=newAttendance;
+    if(award!==old)deltas.push([sid,award-old]);
+    const id='dl_'+nowMs+'_'+sha(sid+classId+date+Math.random()).slice(0,8);
+    logs.push([sid,id,{id,classId,date,batchId,kind:'save',teacherEmail:email,savedAt:now,before:{award:oldAward||null,ratings:oldRatings||null,attendance:oldAttendance||null},after:{points:award,savedAt:now},appliedDelta:0}]);
+   }
   }
   await store.update(updates);
-  for(const [sid,delta] of deltas)await addToBalance(store,sid,delta);
-  return {ok:true,saved:rows.length};
+  const appliedBy={};
+  for(const [sid,delta] of deltas)appliedBy[sid]=(await addToBalance(store,sid,delta)).applied;
+  if(logs.length)await store.update(Object.fromEntries(logs.map(([sid,id,entry])=>[SR+'/dailyAwardLog/'+sid+'/'+id,{...entry,appliedDelta:appliedBy[sid]??0}])));
+  return {ok:true,saved:rows.length,batchId};
  }
  if(action==='adjust'){
   const classId=String(body.classId||''),sid=String(body.studentId||'');requireStudent(scope,classId,sid);
@@ -255,6 +367,7 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   await store.update({[SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now}});
   return {ok:true,applied,balance};
  }
+ if(action==='undo')return undoAction(store,scope,email,body,nowMs,now,access.owner);
  if(action==='comment'){
   const classId=String(body.classId||''),sid=String(body.studentId||'');requireStudent(scope,classId,sid);
   const text=String(body.body||'').trim();if(!text||text.length>2000)fail(400,'Write a comment (up to 2000 characters).');
