@@ -89,7 +89,7 @@ test('the lesson changes one of my own marks in place',()=>{
 
 test('the bridge sends student highlight-shape edits through the teacher',()=>{
  assert.match(classroom,/eraseMark\(id\)\{if\(!isTeacher\)return editOwnHighlightShape\(id\);/);
- assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\)return editOwnHighlightShape\(id,stroke\);if\(!highlightStore\.replace\(markOwner\(id\),id,stroke\)\)return false;publishHighlights\(\);return true\}/);
+ assert.match(classroom,/replaceMark\(id,stroke\)\{if\(!isTeacher\)return editOwnHighlightShape\(id,stroke\);if\(!highlightStore\.group\('teacher',\(\)=>highlightStore\.replace\(markOwner\(id\),id,stroke\)\)\)return false;publishHighlights\(\);return true\}/);
  // Both drawing and Select edits reuse the existing message types.
  assert.match(classroom,/\['point','pointer-hide','highlight','edit-highlights'\]\.includes\(message\.type\)/);
  assert.match(classroom,/\['undo','clear'\]\.includes\(message\.action\)/);
@@ -129,8 +129,8 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=hlshapes1"/,'classroom');
+ assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes2"'),'classroom-core');
+ assert.match(html,/"classroom\.js\?v=hlshapes2"/,'classroom');
  assert.match(html,/"pdf-mode\.js\?v=hlshapes1"/,'pdf-mode');
 });
 
@@ -161,7 +161,7 @@ test('the lines of one pasted text are picked, moved, recolored and resized toge
  assert.match(pdf,/upper\.color===lower\.color&&upper\.size===lower\.size&&Math\.abs\(lower\.points\[0\]\.y-upper\.points\[0\]\.y-lineStep\(upper\.size\)\)<\.004/);
  assert.match(pdf,/group:textBlock\(hit\)/);
  assert.match(pdf,/changeMarks\(textBlock\(stroke\)\.map\(item=>\[item\.id,\{\.\.\.item,color:color\.toLowerCase\(\)\}\]\)\)/);
- assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed;if\(changed\)publishHighlights\(\);return changed\}/);
+ assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;highlightStore\.group\('teacher',\(\)=>\{for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed\}\);if\(changed\)publishHighlights\(\);return changed\}/);
 });
 
 test('after a paste the teacher is pointed at Select, which is always on screen',()=>{
@@ -282,7 +282,7 @@ test('on the teacher board words have corner handles for size and side handles f
  assert.match(pdf,/made=reflow\(edit\.group,\{boxW:Math\.max\(\.08,h==='e'\?at\.x-f\.left:f\.right-at\.x\),fixX:h==='e'\?'left':'right'\}\);/);
  assert.match(pdf,/made=reflow\(edit\.group,\{size,boxW:f\.boxW\?Math\.min\(1,f\.boxW\*size\/f\.size\):0,fixX:h\[1\]==='w'\?'right':'left',fixY:h\[0\]==='n'\?'bottom':'top'\}\);/);
  assert.match(pdf,/const ids=B\.swapMarks\?\.\(done\.swap\.ids,done\.swap\.strokes\);if\(ids\)selectedId=ids\[0\];/);
- assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\|\|!ids\.length\)return null;const owner=markOwner\(ids\[0\]\);if\(!owner\|\|ids\.some\(id=>markOwner\(id\)!==owner\)\)return null;const made=highlightStore\.swap\(owner,ids,strokes\);if\(made\)publishHighlights\(\);return made\}/);
+ assert.match(classroom,/swapMarks\(ids,strokes\)\{if\(!isTeacher\|\|!Array\.isArray\(ids\)\|\|!ids\.length\)return null;const owner=markOwner\(ids\[0\]\);if\(!owner\|\|ids\.some\(id=>markOwner\(id\)!==owner\)\)return null;const made=highlightStore\.group\('teacher',\(\)=>highlightStore\.swap\(owner,ids,strokes\)\);if\(made\)publishHighlights\(\);return made\}/);
 });
 
 test('a paste picks the biggest size at which the words fit on one line',()=>{
@@ -1299,6 +1299,10 @@ test('the lesson store preserves highlight shapes through edits and undo',()=>{
   assert.equal(store.strokes.at(-1).tool,tool);
   assert.equal(store.strokes.at(-1).color,'#c62828');
  }
+ // Undo takes back the LAST thing done, exactly: first the move and recolor of the ellipse (the shape stays), then the shape.
+ store.edit(student,'undo');
+ assert.deepEqual(store.strokes.map(s=>s.tool),['highlight-rectangle','highlight-ellipse']);
+ assert.equal(store.strokes.at(-1).color,'#ffcc00');
  store.edit(student,'undo');
  assert.deepEqual(store.strokes.map(s=>s.tool),['highlight-rectangle']);
 });

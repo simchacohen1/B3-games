@@ -66,18 +66,23 @@ function replaceStudentMarks(member,changes){
   if(!Array.isArray(changes))return false;
   const editable=id=>highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark));
   let changed=false;
-  for(const change of changes.slice(0,60)){
-    if(!change||typeof change.id!=='string'||!editable(change.id)||!change.stroke||!C.cleanStroke(change.stroke))continue;
-    const converted=member.presence?studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke:change.stroke;
-    if(highlightStore.replace(member.id,change.id,converted))changed=true;
-  }
+  // A move of several marks is one step for the student's Undo.
+  highlightStore.group(member.id,()=>{
+    for(const change of changes.slice(0,60)){
+      if(!change||typeof change.id!=='string'||!editable(change.id)||!change.stroke||!C.cleanStroke(change.stroke))continue;
+      const converted=member.presence?studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke:change.stroke;
+      if(highlightStore.replace(member.id,change.id,converted))changed=true;
+    }
+  });
   return changed;
 }
 function canEditStudentMark(member,mark){return C.isHighlightShape(mark.tool)?writingAllowed(mark.tool,member):member.presence&&toolAllowed('pen',member)}
 function eraseStudentMarks(member,ids){
   if(!Array.isArray(ids))return false;
   let changed=false;
-  for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark))){highlightStore.edit(member.id,'erase',id);changed=true}
+  highlightStore.group(member.id,()=>{
+    for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark))){highlightStore.edit(member.id,'erase',id);changed=true}
+  });
   return changed;
 }
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
@@ -766,7 +771,7 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
-  edit(action,id){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action,id);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
+  edit(action,id){if(isTeacher){if(action==='all')highlightStore.clearAll('teacher');else highlightStore.group('teacher',()=>highlightStore.edit('teacher',action,id));publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 function editOwnHighlightShape(id,stroke){
@@ -787,14 +792,14 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   highlights:()=>highlightStore.strokes,
   // The teacher can edit any mark. A student can request an edit to their own highlight shape.
   // The whole mark list is sent again, exactly as after a new mark, so student pages need nothing new.
-  eraseMark(id){if(!isTeacher)return editOwnHighlightShape(id);const before=highlightStore.strokes.length;highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMark(id){if(!isTeacher)return editOwnHighlightShape(id);const before=highlightStore.strokes.length;highlightStore.group('teacher',()=>highlightStore.edit(markOwner(id),'erase',id));if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
-  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;highlightStore.group('teacher',()=>{for(const id of ids)highlightStore.edit(markOwner(id),'erase',id)});if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
-  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.swap(owner,ids,strokes);if(made)publishHighlights();return made},
-  replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.replace(markOwner(id),id,stroke))return false;publishHighlights();return true},
+  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.group('teacher',()=>highlightStore.swap(owner,ids,strokes));if(made)publishHighlights();return made},
+  replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.group('teacher',()=>highlightStore.replace(markOwner(id),id,stroke)))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
-  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed;if(changed)publishHighlights();return changed},
+  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
