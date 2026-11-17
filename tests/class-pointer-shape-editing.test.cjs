@@ -129,8 +129,8 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- for(const file of ['classroom-core','classroom'])
-  assert.match(html,new RegExp('"'+file+'\\.js\\?v=20261115-shapes27"'),file);
+ assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261115-shapes27"'),'classroom-core');
+ assert.match(html,/"classroom\.js\?v=20261116-drawperm1"/,'classroom');
  assert.match(html,/"pdf-mode\.js\?v=20261116-pdfflow1"/,'pdf-mode');
 });
 
