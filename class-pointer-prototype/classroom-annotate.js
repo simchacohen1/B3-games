@@ -32,24 +32,26 @@
   // Each closed shape comes twice: an outline and a filled one (the filled one is the same tool, drawn filled with its color).
   // [toolbar kind, icon, name, value in the lesson's tool menu, filled?]
   const SHAPES=[['rect','▭','Rectangle','rectangle'],['rectf','▬','Filled rectangle','rectangle',true],['ellipse','◯','Circle','ellipse'],['ellipsef','⬤','Filled circle','ellipse',true],['triangle','△','Triangle','triangle'],['trianglef','▲','Filled triangle','triangle',true],['line','━','Line','line'],['arrow','➜','Arrow','pen-arrow']];
+  const HIGHLIGHT_SHAPES=[['highlight-rectangle','▧','Highlight rectangle'],['highlight-ellipse','◉','Highlight ellipse']];
+  const highlightShapes=()=>['pdf','whiteboard'].includes(B.lessonKind?.())?HIGHLIGHT_SHAPES:[];
+  const lessonShapes=()=>[...SHAPES.slice(0,2),...highlightShapes().slice(0,1),...SHAPES.slice(2,4),...highlightShapes().slice(1),...SHAPES.slice(4)];
   let shapeVariant='rect';
   const shapeNamed=(value,filled)=>SHAPES.find(kind=>valueOf(kind)===value&&(kind[4]===true)===filled);
   const valueOf=kind=>kind[3]||kind[0];
   // The teacher's choices show up as disabled options in the student's tool menu.
   const allowed=value=>{if(toolSel.disabled)return false;const o=Array.from(toolSel.options).find(o=>o.value===value);return !!o&&!o.disabled};
   const kinds=list=>list.filter(kind=>allowed(valueOf(kind))).map(kind=>kind.slice(0,3));
-  // Select (move, resize, recolor, delete a mark) works on the teacher's whiteboard, PDF and webpage marks.
-  // A shared screen keeps the old tools only.
-  const canSelect=()=>teacher&&allowed('select')&&['whiteboard','pdf','webpage'].includes(B.lessonKind?.());
+  // Students can select their own highlight shapes on the whiteboard and PDF.
+  const canSelect=()=>allowed('select')&&(teacher?['whiteboard','pdf','webpage'].includes(B.lessonKind?.()):highlightShapes().length>0);
   // The arrow: where Select works it is also the mouse (scroll, drag the page, click a link), so there is one
-  // button for both. A shared screen and students keep the plain Mouse.
+  // button for both. A shared screen keeps the plain Mouse.
   const arrow=tool=>tool==='hand'||tool==='select';
   function tools(){
     const out=[canSelect()?'select':'hand'];
     if(kinds(POINTERS).length)out.push('pointer');
     if(kinds(HIGHLIGHTS).length)out.push('highlight');
     if(allowed('text'))out.push('text');
-    if(kinds(SHAPES).length)out.push('shape');
+    if(kinds(lessonShapes()).length)out.push('shape');
     if(allowed('eraser'))out.push('eraser');
     if(allowed('pen'))out.push('pen');
     return out;
@@ -78,7 +80,7 @@
   const lesson={id:'classroom',
     get defaultTool(){return teacher&&B.lessonKind?.()==='whiteboard'?'pen':'pointer'},
     get tools(){return tools()},
-    get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(SHAPES)}},
+    get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(lessonShapes())}},
     // On the lesson the Hand is the Mouse: no pointing, no drawing, the page is used as a page.
     toolLabels:{hand:['🖱','Mouse',teacher?'Stop pointing and drawing, and move the shared screen.':'Stop pointing and drawing, and scroll the page.'],
       // One button, a computer mouse, first on the toolbar.
@@ -91,6 +93,7 @@
     get label(){return !teacher?'Your tools for the lesson. Your teacher chooses which ones you can use.':canSelect()?'Drawing on your lesson. Students see it. The arrow picks your marks and works as your mouse.':'Drawing on your lesson. Students see it. (Select is not available on a shared screen.)'},
     rect:()=>lessonOn()&&inFront()?stage.getBoundingClientRect():null,
     colors:colors.length?colors:undefined,
+    variantColor:(tool,variant)=>tool==='shape'&&HIGHLIGHT_SHAPES.some(kind=>kind[0]===variant)?{key:'highlightShape',defaultColor:'#ffcc00'}:null,
     defaultColor:teacher?undefined:'',
     sizes:()=>sizes.length?sizes:undefined,
     delegate:{
@@ -98,7 +101,7 @@
         if(fromLesson)return;
         B.setNavigation?.(arrow(tool)&&open);
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
-        else if(tool==='shape'){shapeVariant=variant;set(toolSel,valueOf(SHAPES.find(kind=>kind[0]===variant)||[]))}
+        else if(tool==='shape'){shapeVariant=variant;set(toolSel,valueOf(lessonShapes().find(kind=>kind[0]===variant)||[]))}
         else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
         if(tool!=='hand'&&tool!=='eraser'&&tool!=='select'){setColor(color);set(sizeSel,size)}
         // A filled kind of shape draws filled with its color.
@@ -129,6 +132,7 @@
     const v=toolSel.value;let tool=null,variant;
     if(POINTERS.some(kind=>kind[0]===v)){tool='pointer';variant=v}
     else if(HIGHLIGHTS.some(kind=>kind[0]===v)){tool='highlight';variant=v}
+    else if(HIGHLIGHT_SHAPES.some(kind=>kind[0]===v)){tool='shape';variant=v}
     else if(SHAPES.some(kind=>valueOf(kind)===v)){tool='shape';const current=SHAPES.find(kind=>kind[0]===shapeVariant);variant=current&&valueOf(current)===v?current[0]:SHAPES.find(kind=>valueOf(kind)===v)[0]}
     else if(['pen','text','eraser','select'].includes(v))tool=v;
     if(!tool||FA.state().surface!=='classroom')return;
@@ -143,7 +147,7 @@
       if(on&&!pushed){pushed=true;FA.push(lesson)}
       else if(!on&&pushed){pushed=false;FA.release(lesson)}
       FA.setReason('lesson',on);
-      const sig=on?tools().join()+'|'+[POINTERS,HIGHLIGHTS,SHAPES].map(list=>kinds(list).length).join():'';
+      const sig=on?tools().join()+'|'+[POINTERS,HIGHLIGHTS,lessonShapes()].map(list=>kinds(list).length).join():'';
       if(sig!==lastSig){lastSig=sig;FA.refresh()}
       const s=FA.state();
       if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true);

@@ -22,8 +22,10 @@ window.createClassHighlighter=function(options){
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1],width=stroke.size*w*(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?0.45:1);
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*w,y:Math.min(first.y,last.y)*h,width:Math.abs(last.x-first.x)*w,height:Math.abs(last.y-first.y)*h,fill:color});
     const x1=first.x*w,y1=first.y*h,x2=last.x*w,y2=last.y*h,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1),ink={'stroke':color,'stroke-width':width,'fill':stroke.fill===true&&['rectangle','ellipse','triangle'].includes(stroke.tool)?color:'none','stroke-linecap':'round','stroke-linejoin':'round'};
-    if(stroke.tool==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...ink});
-    if(stroke.tool==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...ink});
+    if(C.isHighlightShape(stroke.tool))Object.assign(ink,{fill:color,stroke:'none'});
+    const shape=C.shapeTool(stroke.tool);
+    if(shape==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...ink});
+    if(shape==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...ink});
     if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...ink});
     if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...ink});
     if(stroke.tool==='pen-arrow'){const g=svg('g');g.appendChild(svg('line',{x1,y1,x2,y2,...ink}));const a=Math.atan2(y2-y1,x2-x1),r=Math.max(width*4,10);g.appendChild(svg('path',{d:`M${x2-r*Math.cos(a-0.5)} ${y2-r*Math.sin(a-0.5)} L${x2} ${y2} L${x2-r*Math.cos(a+0.5)} ${y2-r*Math.sin(a+0.5)}`,...ink}));return g;}
@@ -42,8 +44,8 @@ window.createClassHighlighter=function(options){
       const older=entries.slice(0,index).filter(s=>s.owner!==stroke.owner);
       let mask=null;if(older.length){mask='mask-'+stroke.id;const m=svg('mask',{id:mask,maskUnits:'userSpaceOnUse',x:0,y:0,width:b.width,height:b.height});m.appendChild(svg('rect',{width:b.width,height:b.height,fill:'white'}));older.forEach(s=>m.appendChild(path(s,b.width,b.height,'black')));defs.appendChild(m)}
       // Transparency is applied once per owner group, so a person's overlapping marks stay one flat layer instead of darkening.
-      const kind=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
-      let group=owners.get(key);if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});owners.set(key,group);layer.appendChild(group)}
+      const kind=C.isHighlightShape(stroke.tool)?'highlight-shape':['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
+      let group=owners.get(key);if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='highlight-shape'?'0.35':kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});owners.set(key,group);layer.appendChild(group)}
       const mark=path(stroke,b.width,b.height,stroke.color);mark.dataset.strokeTool=stroke.tool;mark.dataset.stroke=stroke.id;if(mask)mark.setAttribute('mask','url(#'+mask+')');group.appendChild(mark);
     });
   }
@@ -59,7 +61,7 @@ window.createClassHighlighter=function(options){
       const stroke={tool:'text',color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,{x:Math.min(1,p.x+0.2),y:Math.min(1,p.y+0.06)}],text};if(C.cleanStroke(stroke))options.submit(stroke);return;
     }
     if(erasing()){event.preventDefault();hideOwner();const hit=[...strokes].reverse().find(s=>s.owner===options.owner()&&hits(s,p));if(hit)options.edit('erase',hit.id);return;}
-    event.preventDefault();dragId=event.pointerId;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
+    event.preventDefault();dragId=event.pointerId;const color=$(options.teacher?'teacherColor':'studentColor').value||(C.isHighlightShape(tool())?'#ffcc00':options.color());
     draft={tool:tool(),color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,p]};$('stage').setPointerCapture(dragId);render();
   });
   $('stage').addEventListener('pointermove',event=>{if(!draft){if(event.pointerType!=='touch')showOwner(event);return}hideOwner();if(!options.allowed()){cancel();return}append(event);render()});

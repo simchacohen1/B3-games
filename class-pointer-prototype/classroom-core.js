@@ -2,7 +2,10 @@
   'use strict';
   const colors=['#57b8ff','#ff7979','#75df9a','#dca0ff','#ffa65c','#7ce4dc'];
   const tools=['target','arrow','star','heart','paw','sparkle'];
-  const highlightTools=['highlight','pencil','crayon','underline','box','pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
+  const highlightShapes=['highlight-rectangle','highlight-ellipse'];
+  const isHighlightShape=tool=>highlightShapes.includes(tool);
+  const shapeTool=tool=>isHighlightShape(tool)?tool.slice('highlight-'.length):tool;
+  const highlightTools=['highlight','pencil','crayon','underline','box','pen','line','pen-arrow','rectangle','ellipse','triangle','text',...highlightShapes];
   // Dark ink colors read well on the whiteboard. They are allowed for pointers and marks, but are not class colors.
   const inkColors=['#1f2937','#1d4ed8','#777777','#ffffff','#29b6f6','#4dd0e1','#009688','#c62828','#ff7043','#ef6c00','#ffc107','#fff176','#cddc39','#8bc34a','#2e7d32','#a5d6a7','#7b1fa2','#ab47bc','#b39ddb','#ec407a','#f48fb1','#795548','#bcaaa4','#ffd1a9'];
   const TEXT_MIN=.003,TEXT_MAX=.08;
@@ -71,6 +74,6 @@
     const scale=Math.min(width/videoWidth,height/videoHeight),w=videoWidth*scale,h=videoHeight*scale;
     return{w,h,left:(width-w)/2,top:(height-h)/2};
   }
-  const api={FONTS,fontStack,FILLABLE,TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
+  const api={isHighlightShape,shapeTool,FONTS,fontStack,FILLABLE,TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ClassPointerCore=api;
 })(typeof window==='undefined'?{}:window);
