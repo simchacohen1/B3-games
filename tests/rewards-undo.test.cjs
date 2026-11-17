@@ -243,3 +243,15 @@ test('the staging copy of the teacher rewards function uses the same core as the
   const html = fs.readFileSync(path.join(__dirname, '../student-rewards/teacher.html'), 'utf8');
   assert.match(html, /brightpath\.css\?v=20261117-undo1/); assert.match(html, /teacher\.js\?v=20261117-undo1/);
 });
+
+test('an undo claim left behind by a crash can be taken again after 2 minutes, but not while it is fresh', async () => {
+  const { d, moshe, bal } = await ready();
+  await adjust(d, moshe, 6);
+  const id = adjId(d), item = () => d.tree.studentRewards.pointAdjustments[id];
+  item().undoneBy = 'processing:' + clock;                       // another undo is running right now
+  await assert.rejects(call(d, T, { action: 'undo', kind: 'adjust', id }), { code: 409 });
+  assert.equal(bal(moshe), 6);
+  item().undoneBy = 'processing:' + (clock - 200000);            // it crashed a few minutes ago
+  await call(d, T, { action: 'undo', kind: 'adjust', id });
+  assert.equal(bal(moshe), 0); assert.match(item().undoneBy, /^undo_/);
+});

@@ -240,7 +240,11 @@ async function undoAmount(store,scope,email,kind,id,nowMs,now){
  requireInScope(scope,sid);
  const original=Number(kind==='request'?(item.actualAmount??item.amount):item.amount);
  if(!Number.isInteger(original)||original===0)fail(409,'This entry changed no points, so there is nothing to undo.');
- const claim=await store.tx(path+'/undoneBy',cur=>cur?undefined:'processing');
+ // The claim marks the entry while the balance changes. A claim older than 2 minutes means a crash, so it can be taken again.
+ const claim=await store.tx(path+'/undoneBy',cur=>{
+  const stale=typeof cur==='string'&&cur.startsWith('processing:')&&nowMs-Number(cur.slice(11))>120000;
+  return cur&&!stale?undefined:'processing:'+nowMs;
+ });
  if(!claim?.committed)fail(409,'This entry was already undone.');
  try{
   const {balance}=await exactChange(store,sid,-original);
