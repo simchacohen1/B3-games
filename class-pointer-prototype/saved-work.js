@@ -632,12 +632,12 @@
   const COPIES='fttTeacherCopies:';
   const copying=new Set(),kept=new Set();
   function copyKey(data){let hash=2166136261;for(let i=0;i<data.length;i+=7){hash^=data.charCodeAt(i);hash=Math.imul(hash,16777619)}return data.length.toString(36)+'-'+(hash>>>0).toString(36)}
-  function toast(text){
+  function toast(text,ms){
     // A notice that cannot be shown must never undo a copy that was saved.
     try{
       const node=h('div','ftt-saved ftt-saved-toast',text);node.setAttribute('role','status');
       node.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483600;max-width:min(92vw,520px);padding:10px 16px;border-radius:12px;background:#143a73;color:#fff;font:600 15px system-ui,sans-serif;box-shadow:0 8px 30px #0006';
-      document.body.append(node);setTimeout(()=>node.remove(),5000);
+      document.body.append(node);setTimeout(()=>node.remove(),ms||5000);
     }catch(_){}
   }
   // A small PNG of the teacher's picture, so the copy has a thumbnail in My files like any other board. Never required:
@@ -653,7 +653,8 @@
   }
   async function keepTeacherCopy(activity){
     if(teacherPage||activity?.kind!=='image'||typeof activity.data!=='string'||activity.data.length>420000)return false;
-    const key=copyKey(activity.data);
+    // One copy for each send (its id). Older teacher pages send no id: then the picture itself decides.
+    const key=/^[A-Za-z0-9_-]{8,48}$/.test(String(activity.id||''))?'id:'+activity.id:copyKey(activity.data);
     if(copying.has(key)||kept.has(key))return false;
     copying.add(key);
     try{
@@ -672,7 +673,7 @@
       // Saving may be off or the student may be signed out: the picture is still on their board, so say nothing,
       // except when the only problem is a full My files.
       const text=Core.errorText(error);
-      if(/already have \d+ saved files/.test(text))toast('Your teacher sent a whiteboard, but My files is full, so it was not saved. Delete a file to make room.');
+      if(/already have \d+ saved files/.test(text))toast('Your teacher sent a whiteboard, but My files is full ('+Core.LIMITS.studentFiles+' files), so your copy was NOT saved. Delete a file in 📂 My files, then ask your teacher to send it again.',15000);
       return false;
     }finally{copying.delete(key)}
   }
