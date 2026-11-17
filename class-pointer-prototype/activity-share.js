@@ -81,11 +81,11 @@
         }
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-worksheets1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-worksheets1',root).href);
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-drawperm2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-drawperm1',root).href);
     // Save and My files for the student's own whiteboard.
-    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-worksheets1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-worksheets1',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-drawperm1',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-drawperm1',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -165,6 +165,8 @@
     const undo=document.createElement('button');undo.type='button';undo.textContent='↶ Undo';undo.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer';
     const allowedMode=mode=>mode==='point'?lessonLevel!=='none':lessonLevel==='pen'||lessonLevel==='highlight'&&['highlight','box'].includes(mode);
     function redrawToolbar(){
+      // The same permission also decides whether the drawing toolbar shows while this student shares their screen.
+      window.FTTAnnotate?.setStudentLevel?.(lessonLevel);
       if(!allowedMode(lessonTool))lessonTool=lessonLevel==='none'?'point':lessonLevel==='highlight'?'highlight':lessonLevel==='pen'?'pen':'point';
       for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool));button.style.background=mode===lessonTool?'#fef08a':'#193b6c';button.style.color=mode===lessonTool?'#102748':'white';button.style.borderColor=mode===lessonTool?'#facc15':'#86a6df'}
       viewOnly.textContent=lessonLevel==='none'?'👀 Watch only':lessonLevel==='point'?'You may point':lessonLevel==='highlight'?'You may point and highlight':'You may point, highlight and write';

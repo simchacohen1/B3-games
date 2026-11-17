@@ -15,7 +15,8 @@ test('toolbar offers the eight Kami-style tools',()=>{
 });
 
 test('students see nothing unless sharing or a whiteboard is open; teachers always have the pencil',()=>{
-  assert.match(toolbar,/function visible\(\)\{return role==='teacher'\|\|reasons\.size>0\}/);
+  // A student: on their own whiteboard (any reason but sharing), or while sharing only when the teacher allowed drawing.
+  assert.match(toolbar,/function visible\(\)\{\s*if\(role==='teacher'\)return true;\s*if\(ownDrawing\(\)\)return true;\s*return reasons\.has\('sharing'\)&&studentLevel!=='none';\s*\}/);
   // open() refuses when not visible, so a student has no other way in.
   assert.match(toolbar,/function openBar\(auto\)\{\s*if\(!visible\(\)\)return;/);
   // When the last reason ends the toolbar is removed and a student's marks go with it.
@@ -61,7 +62,7 @@ test('screen sharing turns the student toolbar on and off',()=>{
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);
   assert.match(share,/if\(window\.FTTAnnotate\?\.owns\?\.\(target\)\)return true;/);
-  assert.match(share,/annotation-toolbar\.js\?v=20261116-worksheets1/);
+  assert.match(share,/annotation-toolbar\.js\?v=20261116-drawperm2/);
   const boards=read('class-pointer-prototype/student-boards.js');
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);
