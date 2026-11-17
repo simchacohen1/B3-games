@@ -162,9 +162,9 @@ test('Save, My files and Send to class are right on the toolbar, and still under
   assert.match(actions,/id:'quick-files'[^\n]*window\.FTTSavedWork\?\.open\?\.\(\)/);
   assert.match(actions,/id:'quick-send'[^\n]*Every student gets their own copy|id:'quick-send'[^\n]*every student gets their own copy/i);
   assert.match(actions,/id:'quick-send'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)/);
-  // The order: Students, Stop, Save, My files, Send, Lesson, More.
+  // The order: Students, Stop, Save, My files, Send, Poll, Lesson, More.
   const order=[...actions.matchAll(/\{id:'([a-z-]+)'/g)].map(m=>m[1]);
-  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-send','lesson','more']);
+  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-send','poll','lesson','more']);
   // Still under More.
   assert.match(annotate,/\{id:'save',icon:'💾',label:'Save'/);assert.match(annotate,/\{id:'files',icon:'📂',label:'My files'/);assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'/);
 });
