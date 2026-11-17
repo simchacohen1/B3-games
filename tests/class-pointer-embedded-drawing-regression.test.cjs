@@ -13,7 +13,7 @@ test('embedded student teacher lesson offers drawing controls in the existing ov
  assert.match(s,/lessonModes=\[\['select','🖱️','Select'\],\['point'/);
  assert.match(s,/\['highlight'/);
  assert.match(s,/\['pen'/);
- assert.match(s,/lessonStage\.append\(lessonVideo,markLayer,pointerLayer,hitLayer\)/);
+ assert.match(s,/lessonStage\.append\(lessonVideo,lessonWait,markLayer,pointerLayer,hitLayer\)/);
  assert.doesNotMatch(s,/location\.assign\([^)]*classroom/);
 });
 test('student buttons are permission gated and permission revocation clears in-flight draft',()=>{
