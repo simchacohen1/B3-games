@@ -1986,7 +1986,7 @@ function renderPosukGroupHtml(group){
     </tr></thead><tbody>`;
     rows.forEach(s => {
       const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-      const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+      const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
       const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
       const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
       html += `<tr>
@@ -2548,7 +2548,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
   let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
   displayRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
-    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : '—';
+    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
     let cells = '';
     if(showStudentCol) cells += `<td>${r.studentName}</td>`;
@@ -2677,7 +2677,7 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
       html += `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
       g.rows.forEach(r => {
         const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
-        const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : '—';
+        const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
         const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
         let cells = `<td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td>`;
         if(showReadingCol) cells += `<td>${scoreBadge('reading', scoreLabel, r.hebrewScore)}</td>`;
@@ -2715,7 +2715,7 @@ function downloadReportCsv(){
       lines.push(['Student','Reading','Translation','Teacher grade','Comprehension','Last Activity'].join(','));
       g.rows.forEach(s => {
         const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '';
         lines.push([`"${s.name}"`, readingLabel, translationLabel, `"${gradePlain(s.grade)}"`, comprehensionLabel, lastActivityLabel].join(','));
@@ -2800,7 +2800,7 @@ function printReport(){
     bodyHtml = reportExportGroups.map(g => {
       const rowsHtml = g.rows.map(s => {
         const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
-        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
+        const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'not done';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
         return `<tr><td>${s.name}</td><td>${readingLabel}</td><td>${translationLabel}</td><td>${gradePlain(s.grade) || '—'}</td><td>${comprehensionLabel}</td><td>${lastActivityLabel}</td></tr>`;
@@ -2825,7 +2825,7 @@ function printReport(){
       }else{
         const rowsHtml = g.rows.map(r => {
           const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
-          const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : '—';
+          const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
           const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
           return `<tr><td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td><td>${scoreLabel}</td><td>${translationLabel}</td><td>${gradePlain(r.review) || '—'}</td><td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td><td>${dateLabel}</td></tr>`;
         }).join('');
@@ -2853,7 +2853,7 @@ function printReport(){
 
     const rowsHtml = reportRows.map(r => {
       const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' + (r.hebrewFromRange ? ' ↗' : '') : '—';
-      const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : '—';
+      const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' + (r.translationFromRange ? ' ↗' : '') : 'not done';
       const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
       return `<tr>
         <td>${r.studentName}</td>
