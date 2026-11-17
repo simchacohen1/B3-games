@@ -123,8 +123,8 @@ test('the filled-in copy is an ordinary saved file with a picture per page; mark
 
 test('the pages: teacher button, student list, one-click save with a Hebrew-date name, teacher view of every page',()=>{
   const lib=read('class-pointer-prototype/pdf-library.js'),mine=read('class-pointer-prototype/my-files.js'),saved=read('class-pointer-prototype/saved-work.js');
-  assert.match(lib,/send\.textContent='📤 Send to class'/);assert.match(lib,/api\.send\(meta\.name,name\.textContent\)/);
-  assert.match(lib,/confirm\('Send "'/,'sending asks first');
+  assert.match(lib,/send\.textContent='📤 Send to class'/);assert.match(lib,/api\.send\(meta\.name,name\.textContent,choice\)/);
+  assert.match(lib,/askSend\(name\.textContent\)/,'sending asks first (subject and important)');
   assert.match(mine,/Core\.autoName\(\{date:new Date\(\),lesson:fill\.sheetName/,'Hebrew-date name');
   assert.match(mine,/for\(let number=1;number<=pdf\.numPages;number\+=1\)pictures\.push/,'every page');
   assert.match(mine,/FA\.push\(sheetSurface\);FA\.setReason\('whiteboard',true\)/,'same drawing toolbar: pen, text, highlight');
@@ -137,9 +137,9 @@ test('the pages: teacher button, student list, one-click save with a Hebrew-date
 
 test('student activity pages load the worksheet-aware saved-work code; the small pop-up sends a worksheet to My files and deleting removes its pages',()=>{
   const share=read('class-pointer-prototype/activity-share.js');
-  assert.match(share,/saved-work-core\.js\?v=20261116-drawperm1/);assert.match(share,/saved-work\.js\?v=20261116-drawperm1/);
+  assert.match(share,/saved-work-core\.js\?v=20261116-myfiles2/);assert.match(share,/saved-work\.js\?v=20261116-myfiles2/);
   const pages=['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html'];
-  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261116-drawperm1/,page);
+  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261116-myfiles2/,page);
   const saved=read('class-pointer-prototype/saved-work.js');
   assert.match(saved,/file\.worksheet\n?\s*\?\[button\('Continue in My files'/);
   assert.match(saved,/if\(file\.worksheet\)\{[\s\S]*?startsWith\(file\.id\+'-p'\)[\s\S]*?\.delete\(\)/,'page pictures are removed with the worksheet');

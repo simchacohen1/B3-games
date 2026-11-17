@@ -13,9 +13,47 @@ body{margin:0;background:#eef3fb;color:#172d49;font:16px system-ui,sans-serif}
 header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:#234ea8;color:#fff}
 header h1{margin:0;font-size:26px}
 header a{color:#fff;font-weight:700}
-main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-radius:16px;box-shadow:0 4px 18px #1720331f}
+main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-radius:16px;box-shadow:0 4px 18px #1720331f}
+.mf-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 14px}
+.mf-tools label{display:flex;align-items:center;gap:6px;font-weight:700}
+.mf-switch{display:inline-flex;border:1px solid #b8c6dc;border-radius:10px;overflow:hidden}
+.mf-switch button{border:0;border-radius:0;min-height:40px;padding:6px 14px;background:#f4f7fc;color:#172d49;font:700 15px system-ui,sans-serif;cursor:pointer}
+.mf-switch button[aria-pressed=true]{background:#234ea8;color:#fff}
+.mf-layout{display:grid;grid-template-columns:230px 1fr;gap:18px;align-items:start}
+#mfNav{display:flex;flex-direction:column;gap:4px;position:sticky;top:8px}
+.mf-nav-title{margin:12px 0 2px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#51627a}
+.mf-nav-item{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:40px;padding:6px 10px;border:1px solid transparent;border-radius:10px;background:transparent;color:#172d49;font:600 15px system-ui,sans-serif;text-align:left;cursor:pointer}
+.mf-nav-item:hover{background:#eef3fb}.mf-nav-item.active{background:#dbe7ff;border-color:#9db7ee}
+.mf-nav-item.over,.mf-items .over{outline:3px dashed #234ea8;background:#e8f0ff}
+.mf-nav-count{font-size:13px;color:#51627a}
+.mf-folder{display:flex;align-items:center;gap:2px}.mf-folder .mf-nav-item{flex:1;min-width:0}
+.mf-mini{min-height:32px;padding:2px 7px;border:1px solid #d3dcea;border-radius:8px;background:#fff;cursor:pointer}
+#viewTitle{margin:0 0 6px;font-size:22px}
+.mf-group{margin:18px 0 8px;font-size:15px;color:#234ea8;text-transform:none}
+.mf-items.mf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.mf-items.mf-list{display:flex;flex-direction:column;gap:6px}
+.mf-item{position:relative;display:flex;gap:10px;border:1px solid #d3dcea;border-radius:12px;background:#fff;padding:10px}
+.mf-item.dragging{opacity:.5}
+.mf-grid .mf-item{flex-direction:column}
+.mf-list .mf-item{flex-direction:row;align-items:center}
+.mf-thumb{flex:none;display:flex;align-items:center;justify-content:center;background:#f4f7fc;border:1px solid #e1e8f3;border-radius:8px;overflow:hidden;font-size:34px}
+.mf-grid .mf-thumb{width:100%;height:120px}.mf-list .mf-thumb{width:72px;height:48px;font-size:22px}
+.mf-thumb img{width:100%;height:100%;object-fit:contain;background:#fff}
+.mf-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.mf-name{overflow-wrap:anywhere}
+.mf-tags{display:flex;flex-wrap:wrap;gap:4px}
+.mf-tags span{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:#eef1f6;color:#3d4f68}
+.mf-tags .mf-badge{background:#fff1c9;color:#7a4b00}.mf-tags .mf-subject{background:#dff3e4;color:#14532d}.mf-tags .mf-status.new{background:#ffe0e0;color:#8a1c1c}
+.mf-date{color:#51627a}
+.mf-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mf-star{font-size:20px;min-width:40px;padding:2px 8px;background:#fff}.mf-star.on{color:#e0a100;border-color:#e0a100}
+.mf-more{position:relative}.mf-more summary{list-style:none;cursor:pointer;min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #b8c6dc;border-radius:10px;background:#f4f7fc;font-weight:800}
+.mf-more summary::-webkit-details-marker{display:none}
+.mf-menu{position:absolute;right:0;top:44px;z-index:5;display:flex;flex-direction:column;gap:4px;min-width:170px;padding:8px;background:#fff;border:1px solid #c9d4e4;border-radius:12px;box-shadow:0 10px 30px #10223a40}
+.mf-menu button{text-align:left}
+@media (max-width:760px){.mf-layout{grid-template-columns:1fr}#mfNav{flex-direction:row;flex-wrap:wrap;position:static}.mf-nav-title{width:100%}.mf-folder{flex:0 0 auto}.mf-nav-item{width:auto}}
 #viewer{position:fixed;inset:0;display:flex;flex-direction:column;background:#dfe6f1}
-#viewer[hidden],#addPdf[hidden]{display:none}
+#viewer[hidden],#addPdf[hidden],#newFolder[hidden]{display:none}
 #viewerBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;background:#fff;box-shadow:0 2px 8px #1720331a}
 #viewerName{flex:1;min-width:120px;overflow-wrap:anywhere}
 #viewerPage{flex:1;overflow:auto;padding:12px;text-align:center}
@@ -30,18 +68,26 @@ main{max-width:760px;margin:20px auto;padding:18px 20px;background:#fff;border-r
 <script defer src="../firebase-config.js"></script>
 <script defer src="vendor/pdf.min.js?v=3.11.174"></script>
 <script defer src="annotation-toolbar.js?v=20261116-drawperm2"></script>
-<script defer src="saved-work-core.js?v=20261116-drawperm1"></script>
-<script defer src="saved-work.js?v=20261116-drawperm1"></script>
-<script defer src="my-files.js?v=20261116-drawperm1"></script>
+<script defer src="saved-work-core.js?v=20261116-myfiles2"></script>
+<script defer src="saved-work.js?v=20261116-myfiles2"></script>
+<script defer src="my-files-core.js?v=20261116-myfiles2"></script>
+<script defer src="my-files.js?v=20261116-myfiles2"></script>
 </head>
 <body class="ftt-saved">
 <header><h1>📂 My files</h1><a href="../index.html">Back to Fun Torah Tools</a></header>
 <main>
-<p class="ftt-saved-note">Your saved whiteboards and PDFs. Only you can see them.</p>
-<div class="ftt-saved-actions"><button id="addPdf" type="button" class="main" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden></div>
-<section id="sheets" hidden><h2 class="ftt-sheets-title">📄 Worksheets from your teacher</h2><div id="sheetList"></div></section>
+<p class="ftt-saved-note">Your saved whiteboards, PDFs and worksheets. Only you can see them.</p>
+<div class="mf-tools">
+<div class="mf-switch" role="group" aria-label="View"><button id="viewGrid" type="button" aria-pressed="true">▦ Grid</button><button id="viewList" type="button" aria-pressed="false">☰ List</button></div>
+<label>Sort by <select id="sortBy"><option value="date">Date</option><option value="name">Name</option><option value="type">Type</option><option value="subject">Subject</option></select></label>
+<button id="newFolder" type="button" class="main" hidden>＋ New folder</button>
+<button id="addPdf" type="button" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden>
+</div>
 <p id="filesStatus" class="ftt-saved-status" role="status">Loading…</p>
-<div id="filesList"></div>
+<div class="mf-layout">
+<nav id="mfNav" aria-label="Folders and views"></nav>
+<section aria-label="Files"><h2 id="viewTitle"></h2><div id="filesList"></div></section>
+</div>
 </main>
 <section id="viewer" aria-label="PDF" hidden>
 <div id="viewerBar" role="toolbar" aria-label="PDF controls">

@@ -80,7 +80,12 @@
       if(text)return{kind:'word',text,instruction};
     }
     if(raw.kind==='image'&&typeof raw.data==='string'&&raw.data.length<=MAX_ACTIVITY_IMAGE&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(raw.data))
-      return{kind:'image',data:raw.data};
+    {
+      // The teacher's subject folder (when it came from one) and the "Mark as important" tick travel with the picture, so
+      // each student's saved copy is marked with the subject and arrives starred.
+      const subject=String(raw.subject||'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
+      return{kind:'image',data:raw.data,...(subject?{subject}:{}),...(raw.important===true?{important:true}:{})};
+    }
     return null;
   }
   function chooseActivity(next,done){
@@ -691,7 +696,7 @@
         if(!on||mode!=='screens'||blocked)stopShare(false);
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
-        if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data});
+        if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,subject:activity.subject,important:activity.important});
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text):emptyBoard();
         // In embedded mode, screens are shared via the existing activity button;
         // never cover Shorashim with the old Pointer screen-sharing panel.
@@ -884,14 +889,20 @@
       const img=el('img');img.src=URL.createObjectURL(value.file);img.alt='Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
       img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
       previewBody.append(img);
+      // Each student's copy is saved in their My files; if ticked it arrives already starred (they can unstar it).
+      const tick=el('label',null),box=el('input');box.type='checkbox';box.id='boardsImportant';
+      tick.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700';
+      tick.append(box,el('span',null,'⭐ Mark as important (every student\'s copy arrives starred)'));
+      previewBody.append(tick);
     }
     if(value.note)previewBody.append(el('p',null,value.note));
     pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
   }
   async function commitPaste(){
     const item=pendingPaste;if(!item)return;
+    const important=!!previewBody.querySelector('#boardsImportant')?.checked;
     closePreview();
-    if(item.kind==='image')await sendImageFile(item.file);
+    if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important});
     else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
   }
   // The gallery of all boards: Ctrl+V and the 📋 Paste to All Boards button both end in the same preview, and
@@ -912,13 +923,13 @@
     const file=imageFile.files?.[0];imageFile.value='';
     if(file)await sendImageFile(file);
   });
-  async function sendImageFile(file){
+  async function sendImageFile(file,extra={}){
     if(!/^image\/(jpeg|png|webp|gif|bmp)$/.test(file.type)||file.size>8*1024*1024){B.fail('Please choose a JPG, PNG, WebP or GIF smaller than 8 MB.');return}
     sendImage.disabled=true;activityLabel.textContent='Preparing picture…';
     try{
       const data=await pictureData(file);
       if(!data)throw Error('Picture is too large to send to the class. Try a simpler or smaller image.');
-      sendActivity({kind:'image',data});
+      sendActivity({kind:'image',data,subject:extra.subject,important:extra.important===true});
     }catch(e){B.fail(e.message||'Could not load that picture.')}
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
@@ -1312,12 +1323,12 @@
     // Teacher: offer a picture (a PNG of a whiteboard) to every student whiteboard. It opens the usual
     // "Send to every whiteboard?" preview and sends nothing until the teacher confirms. Each student then has the
     // picture locked on their own board, with a private drawing layer of their own on top, so everyone gets a copy.
-    async sendPictureToAll(blob,note){
+    async sendPictureToAll(blob,note,options={}){
       if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return false}
       if(!blob||!/^image\/(png|jpeg|webp)$/.test(blob.type||'')){B.fail('There is no whiteboard picture to send.');return false}
       if(!on||mode!=='boards'||suspended||view.hidden)await sendEveryone('boards');
       if(!on||mode!=='boards')return false;
-      showPaste({kind:'image',file:blob,note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
+      showPaste({kind:'image',file:blob,subject:options.subject||'',note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
       return true;
     },
     navigateWorkspace(destination){
