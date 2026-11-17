@@ -142,7 +142,7 @@ test('shapes: each closed shape comes twice in the Shapes menu (outline and fill
 test('a picked shape: a clear Outline / Filled choice with the same two icons, highlighting the one it has now',()=>{
   // toolbar
   assert.match(toolbar,/styleBox\.hidden=!shapeInfo/);
-  assert.match(toolbar,/const shapeInfo=st\.tool==='select'&&isDelegate\(s\)\?s\.delegate\.shapeStyle\?\.\(\):null/);
+  assert.match(toolbar,/const shapeInfo=st\.tool==='select'\?\(isDelegate\(s\)\?s\.delegate\.shapeStyle\?\.\(\):pickedItemShape\(s\)\):null/);
   assert.match(toolbar,/outlineBtn\.querySelector\('\.fa-ai'\)\.textContent=shapeInfo\.outline;filledBtn\.querySelector\('\.fa-ai'\)\.textContent=shapeInfo\.filled/);
   assert.match(toolbar,/outlineBtn\.setAttribute\('aria-pressed',String\(!shapeInfo\.filledNow\)\);filledBtn\.setAttribute\('aria-pressed',String\(!!shapeInfo\.filledNow\)\)/);
   assert.match(toolbar,/'Outline: only the line',\(\)=>setPickedShape\(false\)/);assert.match(toolbar,/'Filled with its color',\(\)=>setPickedShape\(true\)/);

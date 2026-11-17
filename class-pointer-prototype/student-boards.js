@@ -47,7 +47,7 @@
   // ---------- Board data ----------
   const validPoint=p=>!!p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1;
   // Lines from the shared drawing toolbar (annotation-toolbar.js) may also be a highlight, a shape or a text box.
-  const ITEM_TOOLS=['highlight','rect','ellipse','line','arrow','text'],ITEM_SIZES=SIZE_VALUES.concat([0.02,0.045]);
+  const ITEM_TOOLS=['highlight','rect','ellipse','triangle','line','arrow','text'],ITEM_SIZES=SIZE_VALUES.concat([0.02,0.045]);
   function cleanStroke(s){
     if(!s||typeof s.id!=='string'||!/^[a-z0-9-]{2,40}$/i.test(s.id)||!COLORS.includes(s.color)||!Array.isArray(s.points)||!s.points.length||s.points.length>MAX_POINTS||!s.points.every(validPoint))return null;
     const tool=s.tool==null||s.tool==='pen'?null:s.tool;
@@ -58,6 +58,8 @@
       if(tool==='text'){if(typeof s.text!=='string'||!s.text.trim()||s.text.length>200||out.points.length!==1)return null;out.text=s.text}
       else if(tool!=='highlight'&&out.points.length!==2)return null;
       out.tool=tool;
+      // A closed shape may be filled with its own color (a picture, which is also a rectangle, never is).
+      if(s.fill===true&&['rect','ellipse','triangle'].includes(tool)&&s.image==null)out.fill=true;
     }
     if(s.image!=null){
       // A picture: small, a real picture data: URL, and its corners are top-left then bottom-right.

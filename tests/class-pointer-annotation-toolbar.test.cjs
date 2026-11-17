@@ -53,7 +53,7 @@ test('student whiteboard is a toolbar surface whose marks are ordinary board lin
   const s=read('class-pointer-prototype/student-boards.js');
   assert.match(s,/const boardSurface=\{id:'board',idPrefix:'s',defaultTool:'pen'/);
   assert.match(s,/FA\.setReason\('whiteboard',boardOpen\(\)\)/);
-  assert.match(s,/const ITEM_TOOLS=\['highlight','rect','ellipse','line','arrow','text'\]/);
+  assert.match(s,/const ITEM_TOOLS=\['highlight','rect','ellipse','triangle','line','arrow','text'\]/);
   assert.match(s,/act\(\{type:'board-add',stroke\}\)/);
 });
 
@@ -62,7 +62,7 @@ test('screen sharing turns the student toolbar on and off',()=>{
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(share,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);
   assert.match(share,/if\(window\.FTTAnnotate\?\.owns\?\.\(target\)\)return true;/);
-  assert.match(share,/annotation-toolbar\.js\?v=20261116-wbplus4/);
+  assert.match(share,/annotation-toolbar\.js\?v=20261116-shapes2/);
   const boards=read('class-pointer-prototype/student-boards.js');
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',true\)/);
   assert.match(boards,/window\.FTTAnnotate\?\.setReason\('sharing',false\)/);

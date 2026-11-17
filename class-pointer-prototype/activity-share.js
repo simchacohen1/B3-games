@@ -83,8 +83,8 @@
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
     await load(new URL('class-pointer-prototype/classroom-core.js?v=20261116-wbplus1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-wbplus4',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-myfiles2',root).href);
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-shapes2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-shapes1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-myfiles2',root).href).catch(()=>{});

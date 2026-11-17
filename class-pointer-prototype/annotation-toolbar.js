@@ -39,8 +39,13 @@
   if(window.FTTAnnotate)return;
   const PALETTE=[['#1f2937','Black'],['#c62828','Red'],['#1d4ed8','Blue'],['#2e7d32','Green'],['#ef6c00','Orange'],['#7b1fa2','Purple'],['#fff176','Yellow'],['#ffffff','White']];
   const SIZE_SETS={pen:[.003,.006,.012],highlight:[.012,.02,.03],shape:[.003,.006,.012],text:[.02,.03,.045]};
-  const KINDS=['pen','highlight','rect','ellipse','line','arrow','text'];
-  const SHAPES=[['rect','▭','Rectangle'],['ellipse','◯','Circle'],['line','━','Line'],['arrow','➜','Arrow']];
+  const KINDS=['pen','highlight','rect','ellipse','triangle','line','arrow','text'];
+  // The Shapes menu: each closed shape twice, an outline and a filled one (the same menu the teacher's lesson has), then the line and the
+  // arrow. A filled kind is the same shape drawn with fill:true.
+  const SHAPES=[['rect','▭','Rectangle'],['rectf','▬','Filled rectangle'],['ellipse','◯','Circle'],['ellipsef','⬤','Filled circle'],['triangle','△','Triangle'],['trianglef','▲','Filled triangle'],['line','━','Line'],['arrow','➜','Arrow']];
+  const CLOSED=['rect','ellipse','triangle'];
+  // A menu choice as a mark: {tool, fill}.
+  const shapeKind=id=>{const filled=/f$/.test(id)&&id!=='arrow';const tool=filled?id.slice(0,-1):id;return{tool:KINDS.includes(tool)?tool:'rect',fill:filled&&CLOSED.includes(tool)}};
   const TOOLS=[
     ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
     ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
@@ -70,7 +75,9 @@
     const max=opts.maxPoints||MAX_POINTS_DEFAULT;
     if(!Array.isArray(raw.points)||!raw.points.length||raw.points.length>max||!raw.points.every(validPoint))return null;
     const out={id:raw.id,tool,color:raw.color.toLowerCase(),size:raw.size,points:raw.points.map(p=>({x:round(p.x),y:round(p.y)}))};
-    if(['rect','ellipse','line','arrow'].includes(out.tool)){if(out.points.length!==2)return null}
+    if(['rect','ellipse','triangle','line','arrow'].includes(out.tool)){if(out.points.length!==2)return null}
+    // A closed shape may be filled with its own color.
+    if(raw.fill===true&&CLOSED.includes(out.tool))out.fill=true;
     if(tool==='text'){
       if(typeof raw.text!=='string'||!raw.text.trim()||raw.text.length>MAX_TEXT||out.points.length!==1)return null;
       out.text=raw.text;
@@ -88,10 +95,11 @@
       const [x,y]=at(pts[0]),fs=Math.max(9,s.size*w);
       ctx.font='600 '+fs+'px Arial, "Segoe UI", sans-serif';ctx.textBaseline='top';ctx.textAlign='left';
       String(s.text||'').split('\n').slice(0,8).forEach((line,i)=>ctx.fillText(line,x,y+i*fs*1.25));
-    }else if(tool==='rect'||tool==='ellipse'||tool==='line'||tool==='arrow'){
+    }else if(tool==='rect'||tool==='ellipse'||tool==='triangle'||tool==='line'||tool==='arrow'){
       const [x1,y1]=at(pts[0]),[x2,y2]=at(pts[pts.length-1]);ctx.beginPath();
       if(tool==='rect')ctx.rect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
       else if(tool==='ellipse')ctx.ellipse((x1+x2)/2,(y1+y2)/2,Math.abs(x2-x1)/2,Math.abs(y2-y1)/2,0,0,Math.PI*2);
+      else if(tool==='triangle'){const left=Math.min(x1,x2),right=Math.max(x1,x2),top=Math.min(y1,y2),bottom=Math.max(y1,y2);ctx.moveTo((left+right)/2,top);ctx.lineTo(right,bottom);ctx.lineTo(left,bottom);ctx.closePath()}
       else{
         ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
         if(tool==='arrow'){
@@ -100,6 +108,7 @@
           ctx.moveTo(x2,y2);ctx.lineTo(x2-head*Math.cos(a+.45),y2-head*Math.sin(a+.45));
         }
       }
+      if(s.fill===true&&CLOSED.includes(tool))ctx.fill();
       ctx.stroke();
     }else{
       const xy=pts.map(at);
@@ -135,9 +144,13 @@
     if(px<b.x1-reach||px>b.x2+reach||py<b.y1-reach||py>b.y2+reach)return false;
     if(tool==='text')return true;
     const pts=s.points.map(p=>[p.x*w,p.y*h]);
-    if(tool==='rect'||tool==='ellipse'){
-      if(inside)return true;
+    if(tool==='rect'||tool==='ellipse'||tool==='triangle'){
+      if(inside||s.fill===true)return true;
       const [a,c]=[pts[0],pts[1]];
+      if(tool==='triangle'){
+        const x1=Math.min(a[0],c[0]),x2=Math.max(a[0],c[0]),y1=Math.min(a[1],c[1]),y2=Math.max(a[1],c[1]),mid=(x1+x2)/2;
+        return [[mid,y1,x2,y2],[x2,y2,x1,y2],[x1,y2,mid,y1]].some(e=>segDist(px,py,...e)<=reach);
+      }
       if(tool==='rect'){
         const x1=Math.min(a[0],c[0]),x2=Math.max(a[0],c[0]),y1=Math.min(a[1],c[1]),y2=Math.max(a[1],c[1]);
         return [[x1,y1,x2,y1],[x2,y1,x2,y2],[x2,y2,x1,y2],[x1,y2,x1,y1]].some(e=>segDist(px,py,...e)<=reach);
@@ -364,7 +377,20 @@
   const minBtn=btn('fa-small fa-min','➖ Hide','Shrink the toolbar to a pencil button. Clicks go to the page.',()=>minimize());
   // A picked shape: outline or filled (shown only with Select while a shape is picked).
   const styleBox=document.createElement('div');styleBox.className='fa-shapestyle';styleBox.setAttribute('role','group');styleBox.setAttribute('aria-label','The picked shape: outline or filled');styleBox.hidden=true;
-  function setPickedShape(filled){const now=surface();if(isDelegate(now))now.delegate.setShapeStyle?.(filled);sync()}
+  // A picked shape of the toolbar's own marks (a whiteboard, a worksheet): its two icons and whether it is filled now. A picture is not a shape.
+  function pickedItemShape(s){
+    const item=selected&&itemsOf(s).find(i=>i.id===selected);
+    if(!item||!CLOSED.includes(item.tool)||item.image)return null;
+    const pair={rect:['▭','▬'],ellipse:['◯','⬤'],triangle:['△','▲']}[item.tool];
+    return{outline:pair[0],filled:pair[1],filledNow:item.fill===true};
+  }
+  function setPickedShape(filled){
+    const now=surface();
+    if(isDelegate(now)){now.delegate.setShapeStyle?.(filled);sync();return}
+    const item=selected&&itemsOf(now).find(i=>i.id===selected);
+    if(item&&CLOSED.includes(item.tool)&&!item.image&&(item.fill===true)!==!!filled)changeItem(now,item,{fill:filled?true:undefined})
+    sync();
+  }
   const outlineBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Outline</span>','Outline: only the line',()=>setPickedShape(false));
   const filledBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Filled</span>','Filled with its color',()=>setPickedShape(true));
   styleBox.append(outlineBtn,filledBtn);
@@ -524,7 +550,7 @@
     if(s.customColor){const custom=!colors.some(c=>c[0]===st.color)&&/^#[0-9a-f]{6}$/i.test(st.color);customBtn.dataset.active=String(custom);if(custom){customBtn.dataset.color=st.color;customBtn.style.setProperty('--c',st.color)}else customBtn.dataset.color='custom'}
     for(const b of colorBox.children)b.setAttribute('aria-pressed',String(b.dataset.color===st.color));
     // Select with a shape picked: a clear choice between outline and filled, with the same two icons as the Shapes menu.
-    const shapeInfo=st.tool==='select'&&isDelegate(s)?s.delegate.shapeStyle?.():null;
+    const shapeInfo=st.tool==='select'?(isDelegate(s)?s.delegate.shapeStyle?.():pickedItemShape(s)):null;
     styleBox.hidden=!shapeInfo;
     if(shapeInfo){
       outlineBtn.querySelector('.fa-ai').textContent=shapeInfo.outline;filledBtn.querySelector('.fa-ai').textContent=shapeInfo.filled;
@@ -642,14 +668,14 @@
       // A handle of the mark that is already picked comes first: drag it to resize.
       const picked=selected&&itemsOf(s).find(i=>i.id===selected),handle=picked&&handleAt(picked,p.px,p.py,p.w,p.h);
       if(handle){drag={start:p,item:picked,resize:handle.id,points:picked.points,moved:false};scheduleRender();return}
-      const hit=topHit(s,p,true);selected=hit?hit.id:null;
+      const hit=topHit(s,p,true);selected=hit?hit.id:null;sync();
       drag=hit?{start:p,item:hit,moved:false}:null;scheduleRender();return;
     }
     if(st.tool==='eraser'){drag={erased:new Set(),before:itemsOf(s)};eraseAt(s,p);return}
     const max=s.maxItems||MAX_ITEMS_DEFAULT;
     if(itemsOf(s).length>=max){showTip('That is a lot of marks. Use 🗑 Clear or the eraser first.');pid=null;return}
-    const tool=st.tool==='shape'?st.shape:st.tool;
-    draft={id:newId(s.idPrefix),tool,color:st.color,size:currentSize(s),points:tool==='pen'||tool==='highlight'?[{x:p.x,y:p.y}]:[{x:p.x,y:p.y},{x:p.x,y:p.y}]};
+    const kind=st.tool==='shape'?shapeKind(st.shape):{tool:st.tool,fill:false},tool=kind.tool;
+    draft={id:newId(s.idPrefix),tool,color:st.color,size:currentSize(s),points:tool==='pen'||tool==='highlight'?[{x:p.x,y:p.y}]:[{x:p.x,y:p.y},{x:p.x,y:p.y}],...(kind.fill?{fill:true}:{})};
     sendLive();scheduleRender();
   });
   capture.addEventListener('pointermove',e=>{
@@ -688,7 +714,7 @@
     }
     const d=draft;draft=null;
     if(d&&!cancel){
-      const tiny=d.points.length===2&&['rect','ellipse','line','arrow'].includes(d.tool)&&Math.hypot(d.points[0].x-d.points[1].x,d.points[0].y-d.points[1].y)<.004;
+      const tiny=d.points.length===2&&['rect','ellipse','triangle','line','arrow'].includes(d.tool)&&Math.hypot(d.points[0].x-d.points[1].x,d.points[0].y-d.points[1].y)<.004;
       if(!tiny)commit(s,itemsOf(s).concat(d));
     }
     sendLive(true);scheduleRender();
@@ -745,7 +771,7 @@
   function deleteSelected(){
     const s=surface();if(!selected||isDelegate(s))return false;
     const items=itemsOf(s),next=items.filter(i=>i.id!==selected);selected=null;
-    if(next.length!==items.length){commit(s,next);return true}
+    if(next.length!==items.length){commit(s,next);sync();return true}
     return false;
   }
 
@@ -812,7 +838,7 @@
     else if(selected&&ARROW_STEP[e.key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){if(nudgeSelected(ARROW_STEP[e.key],e.shiftKey?10:1)){e.preventDefault();e.stopPropagation()}}
     // Escape closes an open little menu first (and nothing else, so a full-screen lesson stays open).
     else if(e.key==='Escape'&&flyOpen){e.stopPropagation();closeFly()}
-    else if(e.key==='Escape'&&selected){selected=null;scheduleRender()}
+    else if(e.key==='Escape'&&selected){selected=null;scheduleRender();sync()}
     else if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'&&CAPTURES.has(st.tool)){e.preventDefault();e.stopPropagation();undo()}
   },true);
 
