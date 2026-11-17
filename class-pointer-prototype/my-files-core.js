@@ -162,8 +162,12 @@
     }
     return groups;
   }
+  // How big the tiles are: five sizes, 0 (smallest, most files on the screen) to 4 (biggest). The page starts on 2.
+  const ZOOM_MAX=4,ZOOM_DEFAULT=2;
+  const cleanZoom=value=>{const n=typeof value==='number'?value:typeof value==='string'&&/^[0-9]$/.test(value)?Number(value):NaN;return Number.isInteger(n)&&n>=0&&n<=ZOOM_MAX?n:ZOOM_DEFAULT};
+  const stepZoom=(level,delta)=>Math.max(0,Math.min(ZOOM_MAX,cleanZoom(level)+(delta>0?1:delta<0?-1:0)));
   const typeLabel=kind=>kind==='worksheet'?'Worksheet':kind==='pdf'?'PDF':'Whiteboard';
 
-  const api={DAY_GROUPS,dateGroup,emptyPrefs,cleanPrefs,addFolder,renameFolder,removeFolder,moveItem,setStar,prune,buildItems,filterItems,arrange,typeLabel,MAX_FOLDERS};
+  const api={DAY_GROUPS,dateGroup,emptyPrefs,cleanPrefs,addFolder,renameFolder,removeFolder,moveItem,setStar,prune,buildItems,filterItems,arrange,typeLabel,MAX_FOLDERS,ZOOM_MAX,ZOOM_DEFAULT,cleanZoom,stepZoom};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FTTMyFilesCore=api;
 })(typeof window==='undefined'?globalThis:window);

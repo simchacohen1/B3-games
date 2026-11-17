@@ -23,6 +23,8 @@
   const remembered=(name,fallback,allowed)=>{try{const value=localStorage.getItem('fttMyFiles:'+who()+':'+name);return allowed.includes(value)?value:fallback}catch(_){return fallback}};
   const remember=(name,value)=>{try{localStorage.setItem('fttMyFiles:'+who()+':'+name,value)}catch(_){}};
   let mode=remembered('view','grid',['grid','list']),sort=remembered('sort','date',['date','name','type','subject']);
+  // The size of the tiles (− and ＋), remembered like the view. It works in the grid and in the list.
+  let tileZoom=M.cleanZoom(remembered('zoom',String(M.ZOOM_DEFAULT),['0','1','2','3','4']));
 
   async function refresh(){
     page.say('Loading…');
@@ -53,6 +55,8 @@
     if(view.type==='class'&&!state.folders[view.id])view={type:'all'};
     for(const [id,value] of [['viewGrid','grid'],['viewList','list']])$(id).setAttribute('aria-pressed',String(mode===value));
     $('sortBy').value=sort;
+    $('zoomOut').disabled=tileZoom<=0;$('zoomIn').disabled=tileZoom>=M.ZOOM_MAX;
+    $('filesList').className='mf-z'+tileZoom;
     renderNav();renderList();
   }
   const dateText=time=>{try{return new Date(time).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(_){return ''}};
@@ -225,6 +229,9 @@
 
   $('viewGrid').addEventListener('click',()=>{mode='grid';remember('view',mode);render()});
   $('viewList').addEventListener('click',()=>{mode='list';remember('view',mode);render()});
+  function setTileZoom(next){if(next===tileZoom)return;tileZoom=next;remember('zoom',String(tileZoom));render()}
+  $('zoomOut').addEventListener('click',()=>setTileZoom(M.stepZoom(tileZoom,-1)));
+  $('zoomIn').addEventListener('click',()=>setTileZoom(M.stepZoom(tileZoom,1)));
   $('sortBy').addEventListener('change',()=>{sort=$('sortBy').value;remember('sort',sort);render()});
   $('newFolder').addEventListener('click',async()=>{const id=await createFolder();if(id){view={type:'folder',id};render()}});
 

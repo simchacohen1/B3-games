@@ -15,6 +15,7 @@ header h1{margin:0;font-size:26px}
 header a{color:#fff;font-weight:700}
 main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-radius:16px;box-shadow:0 4px 18px #1720331f}
 .mf-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 14px}
+.mf-switch button:disabled{opacity:.4;cursor:default}
 .mf-tools label{display:flex;align-items:center;gap:6px;font-weight:700}
 .mf-switch{display:inline-flex;border:1px solid #b8c6dc;border-radius:10px;overflow:hidden}
 .mf-switch button{border:0;border-radius:0;min-height:40px;padding:6px 14px;background:#f4f7fc;color:#172d49;font:700 15px system-ui,sans-serif;cursor:pointer}
@@ -30,14 +31,27 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 .mf-mini{min-height:32px;padding:2px 7px;border:1px solid #d3dcea;border-radius:8px;background:#fff;cursor:pointer}
 #viewTitle{margin:0 0 6px;font-size:22px}
 .mf-group{margin:18px 0 8px;font-size:15px;color:#234ea8;text-transform:none}
-.mf-items.mf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.mf-items.mf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--mf-tile,190px),1fr));gap:12px}
 .mf-items.mf-list{display:flex;flex-direction:column;gap:6px}
 .mf-item{position:relative;display:flex;gap:10px;border:1px solid #d3dcea;border-radius:12px;background:#fff;padding:10px}
 .mf-item.dragging{opacity:.5}
 .mf-grid .mf-item{flex-direction:column}
 .mf-list .mf-item{flex-direction:row;align-items:center}
 .mf-thumb{flex:none;display:flex;align-items:center;justify-content:center;background:#f4f7fc;border:1px solid #e1e8f3;border-radius:8px;overflow:hidden;font-size:34px}
-.mf-grid .mf-thumb{width:100%;height:120px}.mf-list .mf-thumb{width:72px;height:48px;font-size:22px}
+.mf-grid .mf-thumb{width:100%;height:var(--mf-thumb-h,120px)}.mf-list .mf-thumb{width:var(--mf-row-w,72px);height:var(--mf-row-h,48px);font-size:22px}
+#filesList{--mf-tile:190px;--mf-thumb-h:120px;--mf-row-w:72px;--mf-row-h:48px;--mf-font:16px}
+#filesList.mf-z0{--mf-tile:110px;--mf-thumb-h:62px;--mf-row-w:40px;--mf-row-h:28px;--mf-font:12px}
+#filesList.mf-z1{--mf-tile:145px;--mf-thumb-h:90px;--mf-row-w:56px;--mf-row-h:38px;--mf-font:14px}
+#filesList.mf-z3{--mf-tile:250px;--mf-thumb-h:165px;--mf-row-w:100px;--mf-row-h:66px;--mf-font:18px}
+#filesList.mf-z4{--mf-tile:330px;--mf-thumb-h:230px;--mf-row-w:140px;--mf-row-h:92px;--mf-font:20px}
+#filesList .mf-item{font-size:var(--mf-font)}
+#filesList.mf-z0 .mf-item,#filesList.mf-z1 .mf-item{padding:6px;gap:6px}
+#filesList.mf-z0 .mf-type,#filesList.mf-z0 .mf-date,#filesList.mf-z0 .mf-status{display:none}
+#filesList.mf-z0 .mf-tags span,#filesList.mf-z1 .mf-tags span{font-size:10px;padding:0 6px}
+#filesList.mf-z0 .mf-actions button,#filesList.mf-z0 .mf-more summary{min-height:30px;min-width:30px;padding:2px 6px;font-size:13px}
+#filesList.mf-z1 .mf-actions button,#filesList.mf-z1 .mf-more summary{min-height:34px;min-width:34px;padding:3px 8px;font-size:14px}
+#filesList.mf-z3 .mf-actions button,#filesList.mf-z4 .mf-actions button{font-size:inherit}
+#filesList.mf-z3 .mf-thumb,#filesList.mf-z4 .mf-thumb{font-size:48px}
 .mf-thumb img{width:100%;height:100%;object-fit:contain;background:#fff}
 .mf-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .mf-name{overflow-wrap:anywhere}
@@ -70,8 +84,8 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 <script defer src="annotation-toolbar.js?v=20261116-wbplus4"></script>
 <script defer src="saved-work-core.js?v=20261116-myfiles2"></script>
 <script defer src="saved-work.js?v=20261116-myfiles2"></script>
-<script defer src="my-files-core.js?v=20261116-myfiles2"></script>
-<script defer src="my-files.js?v=20261116-myfiles2"></script>
+<script defer src="my-files-core.js?v=20261116-myfiles3"></script>
+<script defer src="my-files.js?v=20261116-myfiles3"></script>
 </head>
 <body class="ftt-saved">
 <header><h1>📂 My files</h1><a href="../index.html">Back to Fun Torah Tools</a></header>
@@ -79,6 +93,7 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 <p class="ftt-saved-note">Your saved whiteboards, PDFs and worksheets. Only you can see them.</p>
 <div class="mf-tools">
 <div class="mf-switch" role="group" aria-label="View"><button id="viewGrid" type="button" aria-pressed="true">▦ Grid</button><button id="viewList" type="button" aria-pressed="false">☰ List</button></div>
+<div class="mf-switch" role="group" aria-label="Size of the files"><button id="zoomOut" type="button" aria-label="Smaller files: see more at once" title="Smaller files: see more at once">−</button><button id="zoomIn" type="button" aria-label="Bigger files" title="Bigger files">＋</button></div>
 <label>Sort by <select id="sortBy"><option value="date">Date</option><option value="name">Name</option><option value="type">Type</option><option value="subject">Subject</option></select></label>
 <button id="newFolder" type="button" class="main" hidden>＋ New folder</button>
 <button id="addPdf" type="button" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden>
