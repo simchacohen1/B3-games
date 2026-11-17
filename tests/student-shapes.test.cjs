@@ -101,7 +101,7 @@ test('student pages load the new toolbar and board scripts (new versions)',()=>{
 });
 
 test('the teacher pencil on regular activity pages loads the current toolbar (new shapes)', () => {
-  const g = read('teacher-global-controls.js');
+  const g = fs.readFileSync(path.join(__dirname,'../teacher-global-controls.js'),'utf8');
   assert.match(g, /annotation-toolbar\.js\?v=20261116-shapes2/);
   assert.doesNotMatch(g, /annotate1/);
 });
