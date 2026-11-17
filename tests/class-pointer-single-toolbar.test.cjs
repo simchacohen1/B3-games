@@ -114,7 +114,7 @@ test('a tool can have kinds: clicking the chosen tool again opens them, and the 
   assert.equal(t.tool('pointer').querySelector('.fa-ico').textContent,'★','the button shows the chosen kind');
   // Shapes keep opening on the first click, as before.
   t.tool('shape').click();
-  assert.deepEqual(t.flyRows().map(b=>b.title),['Rectangle','Circle','Line','Arrow']);
+  assert.deepEqual(t.flyRows().map(b=>b.title),['Rectangle','Filled rectangle','Circle','Filled circle','Triangle','Filled triangle','Line','Arrow']);
 });
 
 test('Clear clears right away, or opens a menu of choices when the lesson offers one',()=>{
