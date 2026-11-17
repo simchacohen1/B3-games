@@ -119,7 +119,7 @@
     return blob;
   }
   const errorText=e=>e?.code==='storage/unauthorized'?'Library access was denied. Please sign in as your teacher account.':(e?.message||'Library unavailable. Check Firebase Storage and its security rules.');
-  let currentFile=null,activeId=null,openedPage=1;
+  let currentFile=null,activeId=null,openedPage=1,sendOnly=false;
   const setStatus=s=>{status.textContent=s};
   async function refresh(successMessage=''){
     items.replaceChildren();setStatus('Loading…');
@@ -164,12 +164,19 @@
           send.disabled=true;setStatus('Sending…');
           try{const sent=await api.send(meta.name,name.textContent,choice);setStatus('Sent "'+sent.name+'" to the class.');await refreshSent()}catch(e){setStatus(errorText(e))}finally{send.disabled=false}
         };
-        row.append(name,open,send,rename,remove);items.append(row);
+        if(sendOnly)row.append(name,send);else row.append(name,open,send,rename,remove);
+        items.append(row);
       }
       setStatus(successMessage);
     }catch(e){setStatus(errorText(e))}
   }
-  trigger.onclick=()=>{dialog.showModal();refresh();refreshSent()};
+  function openLibrary(forSend=false){
+    sendOnly=forSend;
+    dialog.querySelector('h2').textContent=forSend?'Send a PDF from my library':'My PDF Library';
+    save.hidden=forSend;progress.hidden=true;progressLabel.hidden=true;
+    dialog.showModal();refresh();refreshSent();
+  }
+  trigger.onclick=()=>openLibrary();
   close.onclick=()=>dialog.close();
   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
   // ---- Save the open PDF into the library: one click from the PDF view, nothing to type ----
@@ -245,6 +252,7 @@
     })();
   }
   window.PointerPdfLibrary={
+    openForSend:()=>openLibrary(true),
     onOpened(file){flushSave();currentFile=file;activeId=null;notify()},
     onClosed(){flushSave();currentFile=null;activeId=null;notify()},
     saveCurrent:saveCurrentPdf,
