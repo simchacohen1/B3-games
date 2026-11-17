@@ -86,13 +86,13 @@
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261116-shapes2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-shapes1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261117-send1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
@@ -536,7 +536,14 @@
     lessonVideo.addEventListener('loadedmetadata',renderLessonMarks);
     if(typeof ResizeObserver==='function')new ResizeObserver(renderLessonMarks).observe(lessonStage);
     lessonToolbar.append(lessonStatus,drawTools,back);
-    lessonStage.append(lessonVideo,markLayer,pointerLayer,hitLayer);
+    // A plain dark window is what students called "a black or blue screen": the window was open but there was no picture in it
+    // (the teacher stopped, switched or closed, or the picture never arrived). Whenever there is no live picture this panel says so.
+    const lessonWait=document.createElement('div');lessonWait.id='fttLessonWaiting';lessonWait.setAttribute('role','status');
+    lessonWait.style.cssText='position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#071426;color:white;pointer-events:none';
+    const lessonWaitTitle=document.createElement('strong');lessonWaitTitle.style.cssText='font:800 30px system-ui,sans-serif';
+    const lessonWaitNote=document.createElement('span');lessonWaitNote.style.cssText='font:600 17px/1.4 system-ui,sans-serif;opacity:.88;max-width:460px';
+    lessonWait.append(lessonWaitTitle,lessonWaitNote);
+    lessonStage.append(lessonVideo,lessonWait,markLayer,pointerLayer,hitLayer);
     lessonOverlay.append(lessonToolbar,lessonStage);document.body.appendChild(lessonOverlay);document.body.appendChild(reopen);
     redrawToolbar();
     function followingPresentation(){return presentationView && !!window.FTTFollowStudent?.activityPolicy('class-pointer');}
@@ -550,17 +557,97 @@
     back.addEventListener('click',event=>{
       if(followingPresentation()){event.preventDefault();return}
       if(presentationView)return;
-      lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
+      userClosed=true;lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
     });
-    reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
-    function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null}
+    reopen.addEventListener('click',()=>{if(lessonActive){userClosed=false;lessonOverlay.style.display='flex';reopen.style.display='none';watchWaiting();lessonVideo.play?.().catch(()=>{})}});
+    function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null;syncWaiting()}
+    // ---------- What the student sees when there is no picture, and the connection sign ----------
+    let connState='ok',rtt=0,lastPong=0,pingTimer=null,waitTimer=null,connPill=null;
+    let overlayShownAt=0,playBlocked=false,userClosed=false;   // userClosed: the student pressed Back to Activity himself
+    // Read only, for checking the sign from a test or the console.
+    window.FTTConnectionSign={state:()=>({sign:connState,rtt,sinceLastAnswerMs:Date.now()-lastPong})};
+    function liveVideo(){
+      const stream=lessonVideo.srcObject,track=stream&&stream.getVideoTracks?stream.getVideoTracks()[0]:null;
+      return !!track&&track.readyState==='live'&&lessonVideo.readyState>=2&&!lessonVideo.paused;
+    }
+    // The lesson window is shown only while there is a picture to show. It never sits there dark and empty with only the other
+    // students' pointer dots: with no picture the dots are hidden too, and after a few seconds the window closes completely, so the
+    // student sees their own page. When a picture arrives it opens again by itself.
+    const NO_PICTURE_CLOSE_MS=8000;
+    function showLayers(on){const v=on?'':'none';markLayer.style.display=v;pointerLayer.style.display=v;hitLayer.style.display=v}
+    function tryPlay(){
+      try{const p=lessonVideo.play&&lessonVideo.play();if(p&&p.catch)p.catch(error=>{if(error&&error.name==='NotAllowedError'){playBlocked=true;syncWaiting()}/* anything else: a newer picture replaced this one, which plays by itself */})}catch(_){}
+    }
+    function syncWaiting(){
+      if(lessonOverlay.style.display==='none'){overlayShownAt=0;return}
+      if(!overlayShownAt)overlayShownAt=Date.now();
+      if(liveVideo()){lessonWait.style.display='none';lessonWait.style.pointerEvents='none';showLayers(true);return}
+      showLayers(false);
+      lessonWait.style.display='flex';
+      // The browser refused to start the picture by itself (rare): one tap anywhere starts it, and the whole screen says so.
+      if(lessonVideo.srcObject&&playBlocked&&lessonVideo.paused){
+        lessonWait.style.pointerEvents='auto';
+        lessonWaitTitle.textContent='Tap to show your teacher’s lesson';
+        lessonWaitNote.textContent='Your browser needs one tap to start the picture. Tap anywhere on this screen.';
+        return;
+      }
+      lessonWait.style.pointerEvents='none';
+      const lost=connState==='reconnecting';
+      lessonWaitTitle.textContent=lost?'Reconnecting…':presentationView?'Waiting for your teacher…':'Connecting to your teacher…';
+      lessonWaitNote.textContent=lost?'Your connection dropped for a moment. The lesson comes back by itself.':'It will appear here by itself.';
+      if(!presentationView&&Date.now()-overlayShownAt>NO_PICTURE_CLOSE_MS){lessonOverlay.style.display='none';reopen.style.display='none';overlayShownAt=0}
+    }
+    function tickWaiting(){
+      if(lessonOverlay.style.display==='none'){waitTimer=null;overlayShownAt=0;return}
+      if(lessonVideo.srcObject&&lessonVideo.paused)tryPlay();   // start it for the student; a blocked start is shown by syncWaiting
+      syncWaiting();
+      waitTimer=later(tickWaiting,1000);
+    }
+    function watchWaiting(){if(!waitTimer){overlayShownAt=Date.now();waitTimer=later(tickWaiting,1000)}syncWaiting()}
+    if(typeof lessonVideo.addEventListener==='function')lessonVideo.addEventListener('playing',()=>{playBlocked=false;syncWaiting()});
+    if(typeof lessonWait.addEventListener==='function')lessonWait.addEventListener('click',tryPlay);
+    // The first tap or key press anywhere starts a picture the browser would not start by itself.
+    if(typeof document.addEventListener==='function')for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,()=>{if(lessonVideo.srcObject&&lessonVideo.paused)tryPlay()},true);
+    // The sign for a weak or lost connection: on any page, as long as this student is meant to be connected to a lesson.
+    function showConn(state){
+      if(!connPill){
+        connPill=document.createElement('div');connPill.id='fttConnectionSign';connPill.setAttribute('role','status');
+        connPill.style.cssText='display:none;position:fixed;left:14px;bottom:14px;z-index:2147483639;padding:9px 14px;border-radius:999px;font:800 15px system-ui,sans-serif;color:white;box-shadow:0 6px 22px #0005;pointer-events:none';
+        document.body.appendChild(connPill);
+      }
+      connState=state;
+      connPill.style.display=state==='ok'?'none':'block';
+      connPill.style.background=state==='reconnecting'?'#b91c1c':'#b45309';
+      connPill.textContent=state==='reconnecting'?'Reconnecting…':'Weak connection';
+      syncWaiting();
+    }
+    // Every 4 seconds the student pings the teacher's page. No answer for 12 seconds, or a closed connection, is "Reconnecting…";
+    // a slow answer (over 2 seconds) is a "Weak connection". The teacher sees the same as a dot next to the student's name.
+    function stopHeartbeat(){cancelLater(pingTimer);pingTimer=null}
+    function startHeartbeat(conn){
+      stopHeartbeat();lastPong=Date.now();rtt=0;
+      const tick=()=>{
+        pingTimer=null;
+        if(presenceConn!==conn)return;
+        const age=Date.now()-lastPong;
+        if(!conn.open||age>12000)showConn('reconnecting');
+        else if(rtt>2000||age>7000)showConn('weak');
+        else showConn('ok');
+        try{if(conn.open)conn.send({type:'ping',t:Date.now(),rtt,weak:connState!=='ok'})}catch{}
+        pingTimer=later(tick,4000);
+      };
+      tick();
+    }
     function clearLesson(){
       lessonLevel='none';lessonDraft=null;lessonMarks={points:{},strokes:[],members:[]};redrawToolbar();renderLessonMarks();
       admitted=false;lessonActive=false;lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
       const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
     }
     function retryLesson(){
-      if(!admitted||!lessonActive||!presenceConn?.open||lessonRetryTimer||lessonRetries>=6)return;
+      if(!admitted||!lessonActive||!presenceConn?.open||lessonRetryTimer)return;
+      // The picture stopped and did not come back (the teacher stopped showing it, or the connection is poor). Do not sit on
+      // "Reconnecting…" forever: say what is going on and let the student go back to work.
+      if(lessonRetries>=6){lessonStatus.textContent='Waiting for your teacher… Nothing is showing right now. Press Back to Activity to keep working; the lesson comes back by itself.';return}
       lessonStatus.textContent='Reconnecting to your teacher…';
       lessonRetryTimer=later(()=>{lessonRetryTimer=null;if(admitted&&lessonActive&&presenceConn?.open){lessonRetries++;presenceConn.send({type:'lesson-retry',id:lessonId});lessonReceiveTimer=later(retryLesson,15000)}},1500);
     }
@@ -569,7 +656,11 @@
       cancelLater(lessonRetryTimer);lessonRetryTimer=null;closeLessonCall();lessonCall=incoming;
       incoming.on('stream',media=>{
         if(lessonCall!==incoming)return;cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;
-        lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';lessonVideo.play?.().catch(()=>{lessonStatus.textContent='Press Show Lesson to view your teacher';reopen.style.display='block'});
+        lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';tryPlay();
+        // A picture is here: the lesson shows by itself (no button to press), unless the student chose Back to Activity.
+        if(admitted&&lessonActive&&!userClosed){lessonOverlay.style.display='flex';reopen.style.display='none'}
+        for(const type of ['pause','emptied','waiting','stalled'])lessonVideo.addEventListener(type,syncWaiting,{once:true});
+        watchWaiting();
         media.getVideoTracks?.().forEach(track=>track.addEventListener('ended',()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}},{once:true}));
       });
       const lost=()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}};
@@ -588,7 +679,7 @@
       refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
       if(!message.active){if(message.id===lessonId){lessonActive=false;cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
-      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';reopen.style.display='none'}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
@@ -597,10 +688,16 @@
       clearLesson();cancelLater(presenceTimer);presenceTimer=null;
       const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
       const old=presencePeer;presencePeer=null;try{old?.destroy()}catch{}
+      stopHeartbeat();
+      // Lost while the lesson is still on: say so. A lesson that really ended (no session) clears the sign.
+      showConn(latestSession?'reconnecting':'ok');
     }
     function schedulePresence(ms){cancelLater(presenceTimer);presenceTimer=later(connectPresence,ms)}
     // Give up after repeated failures until the teacher's lesson changes; never retry in a tight loop.
-    function retryPresence(){if(!latestSession)return;stopPresence();if(++presenceFailures>6)return;presenceDelay=Math.min(60000,(presenceDelay||2000)*2);schedulePresence(presenceDelay)}
+    // Never retry in a tight loop, and never give up for good: a poor connection keeps trying, slowly, while the lesson is on.
+    function retryPresence(){if(!latestSession)return;stopPresence();presenceFailures++;presenceDelay=Math.min(presenceFailures>6?30000:60000,(presenceDelay||2000)*2);schedulePresence(presenceDelay)}
+    window.addEventListener('online',()=>{if(latestSession&&!presenceConn&&!presenceTimer){presenceDelay=0;schedulePresence(300)}});
+    window.addEventListener('offline',()=>{if(latestSession)showConn('reconnecting')});
     function showRemovedNotice(){
       const note=document.createElement('div');note.setAttribute('role','status');
       note.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483641;padding:12px 18px;border-radius:12px;background:#fff2ef;color:#8a2119;border:1px solid #e4a69e;font:700 15px system-ui,sans-serif;box-shadow:0 6px 24px #0003';
@@ -631,9 +728,10 @@
         // Not in this class or signed out: stop quietly. Server trouble: try again later.
         if(!response.ok||!ticket.ok){if(response.status>=400&&response.status<500){stopPresence();return}throw Error('ticket')}
         const conn=own.connect(room,{reliable:true});presenceConn=conn;
-        conn.on('open',()=>{if(presenceConn===conn)conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName})});
+        conn.on('open',()=>{if(presenceConn===conn){conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName});startHeartbeat(conn)}});
         conn.on('data',message=>{
           if(presenceConn!==conn||!sameStudent()||!message||typeof message!=='object')return;
+          if(message.type==='pong'){if(Number.isFinite(message.t)){rtt=Math.max(0,Date.now()-message.t);lastPong=Date.now()}return}
           if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){

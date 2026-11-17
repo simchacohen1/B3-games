@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261116-wbplus1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261116-drawperm1"/,'classroom');
+ assert.match(html,/"classroom\.js\?v=20261117-send2"/,'classroom');
  assert.match(html,/"pdf-mode\.js\?v=20261116-wbplus3"/,'pdf-mode');
 });
 
@@ -350,7 +350,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261115-shapes27/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261117-send2/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------
