@@ -66,5 +66,5 @@ test('the worksheet page uses the whiteboard toolbar: Select with the mouse icon
   // The same tool list as the teacher's view of a student whiteboard.
   assert.match(read('class-pointer-prototype/student-boards.js'),/tools:\['select','highlight','text','shape','eraser','pen'\],hideUnused:true/);
   assert.match(mine,/addEventListener\('wheel'/,'the wheel still scrolls a zoomed page');
-  assert.match(read('class-pointer-prototype/my-files.html'),/my-files\.js\?v=20261116-myfiles3/);
+  assert.match(read('class-pointer-prototype/my-files.html'),/my-files\.js\?v=20261116-live2/);
 });

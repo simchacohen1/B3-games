@@ -464,10 +464,24 @@
   async function open(){
     const ui=openDialog('My files'),list=h('div');
     let onlyTemplates=false;
-    const showFiles=async()=>{
-      ui.say('Loading…');
+    // Student pop-up: it follows what the teacher sends while it is open (see watch above).
+    let seenIds=null,popSig=null;const sheetBox=h('div');
+    const showFiles=async(quiet)=>{
+      if(quiet!==true)ui.say('Loading…');
       try{
-        const [files,state]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS)]);
+        const [files,state,sheets]=await Promise.all([store.list(),teacherPage?NO_FOLDERS:store.folders().catch(()=>NO_FOLDERS),teacherPage?[]:worksheets.list().catch(()=>[])]);
+        if(!teacherPage){
+          const sheetIds=new Set(files.map(file=>file.sheetId).filter(Boolean)),waiting=sheets.filter(sheet=>!sheetIds.has(sheet.id));
+          const fresh=[...files.filter(file=>file.fromTeacher&&seenIds&&!seenIds.has(file.id)),...waiting.filter(sheet=>seenIds&&!seenIds.has('sheet-'+sheet.id))];
+          seenIds=new Set([...files.map(file=>file.id),...waiting.map(sheet=>'sheet-'+sheet.id)]);
+          sheetBox.replaceChildren();
+          for(const sheet of waiting){
+            const row=h('div','ftt-saved-row'),icon=h('span','ftt-saved-thumb','📋');icon.setAttribute('aria-hidden','true');
+            const name=h('span','ftt-saved-name',sheet.name);name.append(h('small',null,'Worksheet from your teacher · New'));
+            row.append(icon,name,button('Open in My files',()=>window.open(new URL('my-files.html',scriptUrl).href,'_blank'),'main'));sheetBox.append(row);
+          }
+          if(fresh.length)setTimeout(()=>ui.say('New from your teacher: '+(fresh.length===1?(fresh[0].name):fresh.length+' new files')),0);
+        }
         const boards=files.filter(file=>file.kind==='whiteboard'&&(!(teacherPage&&onlyTemplates)||file.template));
         boards.templatesOnly=teacherPage&&onlyTemplates;
         fileList(list,boards,state,file=>teacherPage?teacherButtons(file,ui,showFiles):file.worksheet
@@ -477,8 +491,12 @@
       }catch(error){list.replaceChildren();ui.fail(error)}
     };
     if(!teacherPage){
-      ui.body.append(h('p','ftt-saved-note','Your saved whiteboards. Only you can see them.'),list,
+      ui.body.append(h('p','ftt-saved-note','Your saved whiteboards. Only you can see them.'),sheetBox,list,
         button('📂 See all my files and PDFs',()=>window.open(new URL('my-files.html',scriptUrl).href,'_blank')));
+      snapshot().then(snap=>{if(popSig===null)popSig=snap.sig},()=>{});   // what is here when the pop-up opens
+      const stop=watch(snap=>{if(popSig===null||snap.sig===popSig){if(popSig===null)popSig=snap.sig;return}popSig=snap.sig;return showFiles(true)});
+      const again=()=>showFiles(true);window.addEventListener?.('ftt-myfiles-changed',again);
+      ui.dialog.addEventListener('close',()=>{stop();window.removeEventListener?.('ftt-myfiles-changed',again)});
       return showFiles();
     }
     const folders=h('div');folders.hidden=true;
@@ -648,6 +666,7 @@
         subject:Core.cleanName(activity.subject,Core.LIMITS.folderName),fromTeacher:true,important:activity.important===true});
       kept.add(key);seen.push(key);try{localStorage.setItem(memory,JSON.stringify(seen.slice(-30)))}catch(_){}
       toast('Your teacher sent a whiteboard. Your own copy is saved in 📂 My files.');
+      try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'teacher'}}))}catch(_){}
       return true;
     }catch(error){
       // Saving may be off or the student may be signed out: the picture is still on their board, so say nothing,
@@ -658,5 +677,24 @@
     }finally{copying.delete(key)}
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,worksheets,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  // ---------- Live update (student) ----------
+  // A cheap look at what is there: the names of the saved files (one list, no downloads) and the ids of the worksheets the
+  // teacher sent. sig changes when something is added or removed. watch() calls onTick(snapshot) every 30 seconds while
+  // the page is showing, and at once when the student comes back to it. It never runs on a teacher page.
+  async function snapshot(){
+    const me=await who();
+    const [found,sheets]=await Promise.all([firebase.storage().ref(me.prefix).listAll(),worksheets.list().catch(()=>null)]);
+    const names=found.items.map(ref=>ref.name).filter(name=>!name.endsWith('.png')&&name!==Core.PREFS_ID+'.json').sort();
+    return{sig:names.join(',')+'|'+(sheets?sheets.map(sheet=>sheet.id).sort().join(','):'-'),sheets:sheets||[]};
+  }
+  function watch(onTick,every=30000){
+    if(teacherPage||typeof setInterval!=='function'||typeof document.addEventListener!=='function')return()=>{};
+    let busy=false;
+    const tick=async()=>{if(busy||document.hidden)return;busy=true;try{await onTick(await snapshot())}catch(_){/* a failed look is tried again later */}finally{busy=false}};
+    const timer=setInterval(tick,every),back=()=>{if(!document.hidden)tick()};
+    document.addEventListener('visibilitychange',back);
+    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back)};
+  }
+
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();

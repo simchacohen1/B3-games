@@ -87,10 +87,10 @@
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261116-shapes1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-myfiles2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-myfiles2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261116-live2',root).href).catch(()=>{});
     }
     let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');

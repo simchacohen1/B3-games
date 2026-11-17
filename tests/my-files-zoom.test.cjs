@@ -37,5 +37,5 @@ test('the page has the − and ＋ buttons, remembers the size, and applies it t
   assert.match(html,/#filesList\{--mf-tile:190px;--mf-thumb-h:120px;--mf-row-w:72px;--mf-row-h:48px;--mf-font:16px\}/);
   const px=level=>Number(html.match(new RegExp('#filesList\\.mf-z'+level+'\\{--mf-tile:(\\d+)px'))[1]);
   assert.ok(px(0)<px(1)&&px(1)<190&&190<px(3)&&px(3)<px(4),'five sizes, smallest to biggest');
-  assert.match(html,/my-files-core\.js\?v=20261116-myfiles3/);assert.match(html,/my-files\.js\?v=20261116-myfiles3/);
+  assert.match(html,/my-files-core\.js\?v=20261116-live2/);assert.match(html,/my-files\.js\?v=20261116-live2/);
 });

@@ -59,6 +59,7 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 .mf-tags span{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:#eef1f6;color:#3d4f68}
 .mf-tags .mf-badge{background:#fff1c9;color:#7a4b00}.mf-tags .mf-subject{background:#dff3e4;color:#14532d}.mf-tags .mf-status.new{background:#ffe0e0;color:#8a1c1c}
 .mf-date{color:#51627a}
+.mf-notice{margin:8px 0;padding:10px 14px;border-radius:12px;background:#143a73;color:#fff;font-weight:700;cursor:pointer}.mf-notice[hidden]{display:none}
 .mf-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .mf-star{font-size:20px;min-width:40px;padding:2px 8px;background:#fff}.mf-star.on{color:#e0a100;border-color:#e0a100}
 .mf-more{position:relative}.mf-more summary{list-style:none;cursor:pointer;min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #b8c6dc;border-radius:10px;background:#f4f7fc;font-weight:800}
@@ -83,9 +84,9 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 <script defer src="vendor/pdf.min.js?v=3.11.174"></script>
 <script defer src="annotation-toolbar.js?v=20261116-shapes2"></script>
 <script defer src="saved-work-core.js?v=20261116-myfiles2"></script>
-<script defer src="saved-work.js?v=20261116-myfiles2"></script>
-<script defer src="my-files-core.js?v=20261116-myfiles3"></script>
-<script defer src="my-files.js?v=20261116-myfiles3"></script>
+<script defer src="saved-work.js?v=20261116-live2"></script>
+<script defer src="my-files-core.js?v=20261116-live2"></script>
+<script defer src="my-files.js?v=20261116-live2"></script>
 </head>
 <body class="ftt-saved">
 <header><h1>📂 My files</h1><a href="../index.html">Back to Fun Torah Tools</a></header>
@@ -99,6 +100,7 @@ main{max-width:1100px;margin:20px auto;padding:18px 20px;background:#fff;border-
 <button id="addPdf" type="button" hidden>＋ Add a PDF from this computer</button><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden>
 </div>
 <p id="filesStatus" class="ftt-saved-status" role="status">Loading…</p>
+<p id="mfNotice" class="mf-notice" role="status" title="Press to hide" hidden></p>
 <div class="mf-layout">
 <nav id="mfNav" aria-label="Folders and views"></nav>
 <section aria-label="Files"><h2 id="viewTitle"></h2><div id="filesList"></div></section>

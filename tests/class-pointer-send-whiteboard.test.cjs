@@ -101,7 +101,7 @@ test('More menu offers Send whiteboard to students beside Save and My files; the
   assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}\);/);
   assert.match(html,/student-boards[.]js[?]v=20261116-shapes1/);
   assert.match(html,/classroom-annotate[.]js[?]v=20261116-wbplus3/);
-  assert.match(html,/saved-work[.]js[?]v=20261116-myfiles2/);
+  assert.match(html,/saved-work[.]js[?]v=20261116-live2/);
 });
 
 test('no rules, storage or function files are touched by this feature',()=>{
