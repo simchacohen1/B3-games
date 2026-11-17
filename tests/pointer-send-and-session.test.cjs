@@ -55,23 +55,35 @@ test('session: a student sees a clear "Waiting for your teacher" screen, and is 
 
 test('versions: the changed scripts have new cache versions', () => {
   const html = read('classroom.html');
-  const want = { 'student-boards': 'send1', 'saved-work': 'send1', 'classroom-annotate': 'send1', classroom: 'send2', 'teacher-dashboard': 'send2', 'activity-share': 'send3' };
+  const want = { 'student-boards': 'send1', 'saved-work': 'send1', 'classroom-annotate': 'send1', classroom: 'send2', 'teacher-dashboard': 'send2', 'activity-share': 'send4' };
   for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=20261117-' + v), f);
   assert.match(html, /teacher-dashboard\.css\?v=20261117-send2/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send3/, page);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261117-send4/, page);
 });
 
 // ---------- black / blue screen and the connection signs ----------
 const css = read('teacher-dashboard.css');
 
-test('black screen: the lesson window shows "Waiting for your teacher…" whenever there is no live picture', () => {
-  assert.match(share, /lessonStage\.append\(lessonVideo,lessonWait,markLayer,pointerLayer,hitLayer\)/);
-  assert.match(share, /function liveVideo\(\)\{[\s\S]*?track\.readyState==='live'&&lessonVideo\.readyState>=2&&!lessonVideo\.paused/);
-  assert.match(share, /lessonWaitTitle\.textContent=lost\?'Reconnecting…':'Waiting for your teacher…'/);
-  assert.match(share, /lessonOverlay\.style\.display='flex';watchWaiting\(\);/, 'a lesson announced: the panel is up until the picture arrives');
-  assert.match(share, /lessonVideo\.srcObject=null;syncWaiting\(\)\}/, 'a closed picture brings the panel back at once');
-  assert.match(share, /waitTimer=later\(\(\)=>\{waitTimer=null;if\(lessonOverlay\.style\.display!=='none'\)watchWaiting\(\)\},1000\)/, 'checked every second while the window is open');
+test('black screen: the lesson shows by itself; with no picture the window never sits dark and empty (it closes), and never shows only dots', () => {
+  const has = (text, why) => assert.ok(share.includes(text), why || text);
+  has('lessonStage.append(lessonVideo,lessonWait,markLayer,pointerLayer,hitLayer)');
+  has("track.readyState==='live'&&lessonVideo.readyState>=2&&!lessonVideo.paused", 'a picture counts only when it is really playing');
+  // 1. no Show Lesson button to press: the picture is started for the student
+  has("lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';tryPlay();");
+  assert.ok(!share.includes('Press Show Lesson to view your teacher'));
+  has("if(admitted&&lessonActive&&!userClosed){lessonOverlay.style.display='flex'", 'a picture arrives: the window opens by itself, unless the student chose Back to Activity');
+  has('if(lessonVideo.srcObject&&lessonVideo.paused)tryPlay();', 'retried every second');
+  has("error.name==='NotAllowedError'", 'only a real refusal counts; a replaced picture is ignored');
+  has('Tap to show your teacher’s lesson', 'if a browser really refuses, the whole screen says what to do');
+  has("for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type", 'the first tap anywhere starts it');
+  // 2. nothing to show: the window closes completely
+  has('const NO_PICTURE_CLOSE_MS=8000;');
+  has("if(!presentationView&&Date.now()-overlayShownAt>NO_PICTURE_CLOSE_MS){lessonOverlay.style.display='none';reopen.style.display='none';overlayShownAt=0}");
+  // 3. never a dark screen with only dots
+  has('showLayers(false);');
+  has("function showLayers(on){const v=on?'':'none';markLayer.style.display=v;pointerLayer.style.display=v;hitLayer.style.display=v}");
+  has("userClosed=true;lessonOverlay.style.display='none'", 'the student chose Back to Activity');
 });
 
 test('connection: the student pings every 4 seconds and shows Reconnecting… or Weak connection', () => {

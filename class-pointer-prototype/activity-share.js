@@ -557,27 +557,57 @@
     back.addEventListener('click',event=>{
       if(followingPresentation()){event.preventDefault();return}
       if(presentationView)return;
-      lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
+      userClosed=true;lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
     });
-    reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
+    reopen.addEventListener('click',()=>{if(lessonActive){userClosed=false;lessonOverlay.style.display='flex';reopen.style.display='none';watchWaiting();lessonVideo.play?.().catch(()=>{})}});
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null;syncWaiting()}
     // ---------- What the student sees when there is no picture, and the connection sign ----------
     let connState='ok',rtt=0,lastPong=0,pingTimer=null,waitTimer=null,connPill=null;
+    let overlayShownAt=0,playBlocked=false,userClosed=false;   // userClosed: the student pressed Back to Activity himself
     // Read only, for checking the sign from a test or the console.
     window.FTTConnectionSign={state:()=>({sign:connState,rtt,sinceLastAnswerMs:Date.now()-lastPong})};
     function liveVideo(){
       const stream=lessonVideo.srcObject,track=stream&&stream.getVideoTracks?stream.getVideoTracks()[0]:null;
       return !!track&&track.readyState==='live'&&lessonVideo.readyState>=2&&!lessonVideo.paused;
     }
-    function syncWaiting(){
-      if(lessonOverlay.style.display==='none')return;
-      const live=liveVideo();lessonWait.style.display=live?'none':'flex';
-      if(live)return;
-      const lost=connState==='reconnecting';
-      lessonWaitTitle.textContent=lost?'Reconnecting…':'Waiting for your teacher…';
-      lessonWaitNote.textContent=lost?'Your connection dropped for a moment. The lesson comes back by itself.':'Your teacher is not showing anything right now. It will appear here by itself. You can press Back to Activity and keep working.';
+    // The lesson window is shown only while there is a picture to show. It never sits there dark and empty with only the other
+    // students' pointer dots: with no picture the dots are hidden too, and after a few seconds the window closes completely, so the
+    // student sees their own page. When a picture arrives it opens again by itself.
+    const NO_PICTURE_CLOSE_MS=8000;
+    function showLayers(on){const v=on?'':'none';markLayer.style.display=v;pointerLayer.style.display=v;hitLayer.style.display=v}
+    function tryPlay(){
+      try{const p=lessonVideo.play&&lessonVideo.play();if(p&&p.catch)p.catch(error=>{if(error&&error.name==='NotAllowedError'){playBlocked=true;syncWaiting()}/* anything else: a newer picture replaced this one, which plays by itself */})}catch(_){}
     }
-    function watchWaiting(){cancelLater(waitTimer);syncWaiting();waitTimer=later(()=>{waitTimer=null;if(lessonOverlay.style.display!=='none')watchWaiting()},1000)}
+    function syncWaiting(){
+      if(lessonOverlay.style.display==='none'){overlayShownAt=0;return}
+      if(!overlayShownAt)overlayShownAt=Date.now();
+      if(liveVideo()){lessonWait.style.display='none';lessonWait.style.pointerEvents='none';showLayers(true);return}
+      showLayers(false);
+      lessonWait.style.display='flex';
+      // The browser refused to start the picture by itself (rare): one tap anywhere starts it, and the whole screen says so.
+      if(lessonVideo.srcObject&&playBlocked&&lessonVideo.paused){
+        lessonWait.style.pointerEvents='auto';
+        lessonWaitTitle.textContent='Tap to show your teacher’s lesson';
+        lessonWaitNote.textContent='Your browser needs one tap to start the picture. Tap anywhere on this screen.';
+        return;
+      }
+      lessonWait.style.pointerEvents='none';
+      const lost=connState==='reconnecting';
+      lessonWaitTitle.textContent=lost?'Reconnecting…':presentationView?'Waiting for your teacher…':'Connecting to your teacher…';
+      lessonWaitNote.textContent=lost?'Your connection dropped for a moment. The lesson comes back by itself.':'It will appear here by itself.';
+      if(!presentationView&&Date.now()-overlayShownAt>NO_PICTURE_CLOSE_MS){lessonOverlay.style.display='none';reopen.style.display='none';overlayShownAt=0}
+    }
+    function tickWaiting(){
+      if(lessonOverlay.style.display==='none'){waitTimer=null;overlayShownAt=0;return}
+      if(lessonVideo.srcObject&&lessonVideo.paused)tryPlay();   // start it for the student; a blocked start is shown by syncWaiting
+      syncWaiting();
+      waitTimer=later(tickWaiting,1000);
+    }
+    function watchWaiting(){if(!waitTimer){overlayShownAt=Date.now();waitTimer=later(tickWaiting,1000)}syncWaiting()}
+    if(typeof lessonVideo.addEventListener==='function')lessonVideo.addEventListener('playing',()=>{playBlocked=false;syncWaiting()});
+    if(typeof lessonWait.addEventListener==='function')lessonWait.addEventListener('click',tryPlay);
+    // The first tap or key press anywhere starts a picture the browser would not start by itself.
+    if(typeof document.addEventListener==='function')for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,()=>{if(lessonVideo.srcObject&&lessonVideo.paused)tryPlay()},true);
     // The sign for a weak or lost connection: on any page, as long as this student is meant to be connected to a lesson.
     function showConn(state){
       if(!connPill){
@@ -626,8 +656,10 @@
       cancelLater(lessonRetryTimer);lessonRetryTimer=null;closeLessonCall();lessonCall=incoming;
       incoming.on('stream',media=>{
         if(lessonCall!==incoming)return;cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;
-        lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';lessonVideo.play?.().catch(()=>{lessonStatus.textContent='Press Show Lesson to view your teacher';reopen.style.display='block'});
-        for(const type of ['playing','pause','emptied','waiting','stalled'])lessonVideo.addEventListener(type,syncWaiting,{once:true});
+        lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';tryPlay();
+        // A picture is here: the lesson shows by itself (no button to press), unless the student chose Back to Activity.
+        if(admitted&&lessonActive&&!userClosed){lessonOverlay.style.display='flex';reopen.style.display='none'}
+        for(const type of ['pause','emptied','waiting','stalled'])lessonVideo.addEventListener(type,syncWaiting,{once:true});
         watchWaiting();
         media.getVideoTracks?.().forEach(track=>track.addEventListener('ended',()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}},{once:true}));
       });
@@ -647,7 +679,7 @@
       refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
       if(!message.active){if(message.id===lessonId){lessonActive=false;cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
-      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
