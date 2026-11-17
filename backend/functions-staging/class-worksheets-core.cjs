@@ -36,7 +36,8 @@ async function listWorksheets({bucket,classId}){
     const match=/^([-A-Za-z0-9_]{1,64})\.pdf$/.exec(String(file.name||'').slice(prefix(classId).length));
     if(!match)continue;
     const custom=file.metadata?.metadata||{};
-    rows.push({id:match[1],name:clean(custom.displayName,100)||'Worksheet',sentAt:Math.floor(Number(custom.sentAt))||Date.parse(file.metadata?.updated||'')||0,size:Number(file.metadata?.size)||0});
+    // subject: the teacher's subject (Chumash...); important: the teacher ticked "Mark as important" (it arrives starred).
+    rows.push({id:match[1],name:clean(custom.displayName,100)||'Worksheet',sentAt:Math.floor(Number(custom.sentAt))||Date.parse(file.metadata?.updated||'')||0,size:Number(file.metadata?.size)||0,subject:clean(custom.subject,40),important:custom.important==='1'});
   }
   return rows.sort((a,b)=>b.sentAt-a.sentAt).slice(0,MAX_WORKSHEETS);
 }
@@ -76,8 +77,9 @@ async function handle({body,identity,get,bucket,ownerEmail,stagingPassword,log,n
   const id=crypto.randomBytes(12).toString('hex'),dest=bucket.file(`${prefix(classId)}${id}.pdf`);
   await source.copy(dest);
   const name=clean(body?.name,100)||clean(meta.metadata?.displayName,100)||'Worksheet';
-  await dest.setMetadata({contentType:'application/pdf',metadata:{displayName:name,sentAt:String(now()),sentBy:identity.uid}});
-  return{id,name};
+  const subject=clean(body?.subject,40),important=body?.important===true;
+  await dest.setMetadata({contentType:'application/pdf',metadata:{displayName:name,sentAt:String(now()),sentBy:identity.uid,...(subject?{subject}:{}),...(important?{important:'1'}:{})}});
+  return{id,name,subject,important};
 }
 
 module.exports={authorizeStudent,listWorksheets,handle,MAX_BYTES,MAX_WORKSHEETS};

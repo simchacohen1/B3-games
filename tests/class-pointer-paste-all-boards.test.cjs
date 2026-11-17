@@ -7,7 +7,7 @@ test('Paste to All Boards offers a preview and an explicit send',()=>{
   assert.match(s,/Paste to All Boards/);
   assert.match(s,/Preview paste to all whiteboards/);
   assert.match(s,/pendingPaste=value/);
-  assert.match(s,/if\(item.kind==='image'\)await sendImageFile\(item.file\)/);
+  assert.match(s,/if\(item.kind==='image'\)await sendImageFile\(item.file,\{subject:item.subject,important\}\)/);
   assert.match(s,/sendActivity\(\{kind:'word',text:item.text/);
 });
 // Reading the clipboard now lives in one shared place (board-clipboard.js) for every whiteboard.
