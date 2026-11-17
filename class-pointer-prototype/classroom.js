@@ -261,6 +261,7 @@ function receiveStudent(connection){
       if(presence.get(member.id)!==member)return;
       if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}
       if(message.type==='where'){member.activity=cleanActivity(message.activity);roster()}
+      if(message.type==='poll-vote'){window.ClassPointerPoll?.fromStudent(member,message);return}
       if(typeof message.type==='string'&&message.type.startsWith('board-')){window.ClassPointerBoards?.fromStudent(member,message);return}
       // The same authenticated, permission-checked drawing pipeline serves embedded students.
       if(!['point','pointer-hide','highlight','edit-highlights'].includes(message.type))return;
@@ -288,6 +289,7 @@ function receiveStudent(connection){
       return;
     }
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
+    if(message.type==='poll-vote'){window.ClassPointerPoll?.fromStudent(member,message);return}
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
@@ -534,6 +536,7 @@ async function shareScreen(preferTab=false){
   }
 }
 function endClass(){
+  window.ClassPointerPoll?.reset();
   if(!isTeacher||closingClass)return endPromise;
   closingClass=true;
   window.ClassPointerActivityShares?.closeAll();
@@ -568,7 +571,7 @@ function endClass(){
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
-  window.ClassPointerBoards?.reset();window.ClassPointerPdf?.reset();cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
+  window.ClassPointerPoll?.reset();window.ClassPointerBoards?.reset();window.ClassPointerPdf?.reset();cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
   state={sharing:false,mode:'selected',tools:{pointer:false,highlight:false,pen:false},members:[],points:{}};$('joinForm').hidden=autoJoin;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent=autoJoin?'Connecting to your class.':'Enter your name to join your class.';status(autoJoin?'Connecting to your class…':'Not connected.');
 }
 function joinSucceeded(){
@@ -618,6 +621,7 @@ function joinClass(event){
       if(teacherConnection!==connection)return;send(connection,{type:'join',name,studentId,ticket})});
     connection.on('data',message=>{
       if(teacherConnection!==connection||!message)return;
+      if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
       if(window.ClassPointerBoards?.fromTeacher(message))return;
       if(window.ClassPointerPdf?.handleMessage(message))return;
       if(message.type==='highlights'){highlighter?.receive(message.strokes);return}

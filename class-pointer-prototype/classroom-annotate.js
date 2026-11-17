@@ -193,6 +193,7 @@
       {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
       {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
       {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy of this whiteboard to draw on',hidden:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()},
+      {id:'poll',icon:'📊',label:'Poll',title:'Ask the class a poll',onClick:()=>window.ClassPointerPoll?.open()},
       {id:'lesson',icon:'🖥',label:'Lesson',title:'Lesson: change what students see',items:lessonItems},
       {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight'+(window.FTTSavedWork?', save':''),items:moreItems}
     ];
