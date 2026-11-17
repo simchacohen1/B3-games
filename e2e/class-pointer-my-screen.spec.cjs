@@ -143,8 +143,8 @@ test('dedicated presentation view follows surface changes, hides exit only while
   await expect(usableTools).toHaveCount(0);
   await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeVisible();
   await page.evaluate(()=>window.connection.emit('data',{type:'lesson-tools',level:'pen'}));
-  // Pen permission: 11 drawing modes (Select first) + 9 colours + 3 thicknesses + Undo + Clear.
-  await expect(usableTools).toHaveCount(25);
+  // Pen permission: 13 drawing modes (Select first; the two Highlight shapes are new) + 9 colours + 3 thicknesses + Undo + Clear.
+  await expect(usableTools).toHaveCount(27);
   await expect(page.locator('#fttLessonDrawTools').getByText('👀 Watch only',{exact:true})).toBeHidden();
   // Select (the mouse) is the first drawing mode, only with pen permission.
   await expect(page.locator('#fttLessonDrawTools button[aria-label="Select"]')).toBeVisible();
@@ -162,7 +162,7 @@ test('dedicated presentation view follows surface changes, hides exit only while
   expect(await page.evaluate(()=>window.__ordinaryClicks)).toBe(0);
   await page.getByRole('button',{name:'Pen',exact:true}).click();
   await expect(page.getByRole('button',{name:'Pen',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(usableTools).toHaveCount(25);
+  await expect(usableTools).toHaveCount(27);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#fttLessonDrawTools button')))).toBe(true);
   expect(await page.evaluate(()=>window.B3PointerAssignedUI.allowsEvent(document.querySelector('#answer')))).toBe(false);
   await page.evaluate(()=>{window.__locked=false;window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed'))});
