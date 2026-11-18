@@ -11,6 +11,7 @@
 *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}
 header{background:#173b62;color:#fff;padding:16px 22px}header h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#c9d8e8;font-size:13px}
 main{max-width:1200px;margin:0 auto;padding:16px}
+.bar[hidden]{display:none}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid #d5e0ea;border-radius:12px;padding:12px;margin-bottom:14px}
 .bar label{font-weight:700;font-size:13px;color:#4a5b6c}
 input,select,button{font:inherit}
@@ -49,6 +50,8 @@ td.b{color:#9aa8b6}
 <script src="../class-confirm-gate.js"></script>
 <script src="../owner-classes.js?v=20261118"></script>
 <script src="common.js"></script>
+<script src="../sync-to-nigri/nigri-auth.js"></script>
+<script src="mashpia-sync.js"></script>
 </head><body>
 <header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
 <main>
@@ -61,7 +64,16 @@ td.b{color:#9aa8b6}
       <button class="alt" id="next" type="button">Next →</button>
       <button class="alt" id="today" type="button">Today</button>
       <button class="alt" id="refresh" type="button">Refresh</button>
+      <button id="mashpiaSync" type="button">Sync to Mashpia</button>
+      <span id="mashpiaMsg" class="muted" role="status" aria-live="polite"></span>
     </div>
+    <form id="mashpiaLogin" class="bar" hidden autocomplete="off">
+      <span class="muted" id="mashpiaWhy">Enter your Mashpia login once. It is kept locked and never asked again.</span>
+      <input id="mashpiaUser" placeholder="Mashpia username" maxlength="200" autocomplete="off">
+      <input id="mashpiaPass" type="password" placeholder="Mashpia password" maxlength="200" autocomplete="off">
+      <button type="submit">Save and sync</button>
+      <button type="button" class="alt" id="mashpiaCancel">Cancel</button>
+    </form>
 
     <div class="panel">
       <p class="sum" id="summary"></p>
@@ -282,6 +294,37 @@ $("saveItems").onclick=async function(){
   }catch(e){console.error(e);$("editMsg").textContent="Could not save: "+(e.message||e)}
   $("saveItems").disabled=false;
 };
+
+/* ---------- Sync to Mashpia (one press; login asked once) ---------- */
+(function(){
+  var M=window.B3MashpiaSync,A=window.NigriAuth;
+  if(!M||!A){$("mashpiaSync").hidden=true;return}
+  var env={
+    base:M.serverBase(window.MASHPIA_SYNC_SERVER||window.NIGRI_LOGIN_SERVER,A.BASE),
+    getToken:A.getToken,fetch:function(){return window.fetch.apply(window,arguments)},
+    askLogin:function(why){return new Promise(function(resolve){
+      var f=$("mashpiaLogin"),u=$("mashpiaUser"),p=$("mashpiaPass");
+      $("mashpiaWhy").textContent=why||"Enter your Mashpia login once. It is kept locked and never asked again.";
+      f.hidden=false;u.focus();
+      function done(v){f.hidden=true;p.value="";f.onsubmit=null;$("mashpiaCancel").onclick=null;resolve(v)}
+      f.onsubmit=function(e){e.preventDefault();var un=u.value.trim(),pw=p.value;if(!un||!pw)return;u.value="";done({username:un,password:pw})};
+      $("mashpiaCancel").onclick=function(){u.value="";done(null)};
+    })}
+  };
+  $("mashpiaSync").onclick=async function(){
+    var btn=$("mashpiaSync"),msg=$("mashpiaMsg");
+    if(!classId)return;
+    btn.disabled=true;msg.textContent="Syncing…";
+    try{
+      var d=$("day").value;
+      var answers=await loadDay(d,true);
+      var res=await M.run(env,d,M.buildStudents(answers,roster));
+      msg.textContent=res.message;
+    }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
+    btn.disabled=false;
+  };
+  $("day").addEventListener("change",function(){$("mashpiaMsg").textContent=""});
+})();
 
 /* ---------- navigation ---------- */
 function shift(n){var p=$("day").value.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]+n);
