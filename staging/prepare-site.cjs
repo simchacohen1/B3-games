@@ -90,6 +90,9 @@ function stageSource(siteRoot, env = process.env) {
   // stays disabled even when an endpoint is supplied. Move its auth behind a
   // server function before enabling any staging sync service.
   const syncOrigin = 'https://staging-disabled.invalid';
+  // Daily Checklist "Sync to Mashpia": the one sync that may run on staging, and only against a separate staging copy of
+  // NigriSync (never the live service). Nothing is injected unless an HTTPS staging endpoint is supplied.
+  const mashpiaOrigin = env.B3_STAGING_MASHPIA_SYNC_URL ? requiredStagingUrl(env.B3_STAGING_MASHPIA_SYNC_URL, 'B3_STAGING_MASHPIA_SYNC_URL', 'nigrisync.onrender.com') : '';
   const configPath = path.join(root, 'firebase-config.js');
   if (!fs.existsSync(configPath)) throw new Error('Staging source is missing root firebase-config.js.');
   const productionConfig = fs.readFileSync(configPath, 'utf8');
@@ -123,6 +126,11 @@ function stageSource(siteRoot, env = process.env) {
     if (relative === 'weekly-quiz/nigri-sync.js') {
       content = "window.B3_STAGING_DISABLED_INTEGRATIONS = window.B3_STAGING_DISABLED_INTEGRATIONS || [];\n" +
         "window.B3_STAGING_DISABLED_INTEGRATIONS.push('nigri-sync');\n";
+    }
+    if (relative === 'daily-checklist/teacher.html' && mashpiaOrigin) {
+      const marker = '<script src="mashpia-sync.js"></script>';
+      if (!content.includes(marker)) throw new Error('Cannot find the Mashpia sync script in daily-checklist/teacher.html.');
+      content = content.replace(marker, '<script>window.MASHPIA_SYNC_SERVER=' + JSON.stringify(mashpiaOrigin) + ';</script>' + marker);
     }
     if (relative === 'paid-api.js') {
       // The allowlist is a regex, so its host is written with escaped dots and
