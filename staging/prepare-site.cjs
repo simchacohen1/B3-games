@@ -238,6 +238,9 @@ function stageSource(siteRoot, env = process.env) {
       "if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') window.B3_STAGING_TEST_FIXTURES = true;\n";
   }
   fs.writeFileSync(path.join(stageDir, 'staging-config.js'), stagingRuntimeConfig, 'utf8');
+  // A small page to sign in to the staging test accounts (owner, teachers) with email and password. Staging builds only:
+  // the source is a .template file so the live site never serves it as a page.
+  fs.copyFileSync(path.join(__dirname, 'owner-signin.template'), path.join(stageDir, 'owner-signin.html'));
 
   const outputFiles = listFiles(root);
   const violations = [];
