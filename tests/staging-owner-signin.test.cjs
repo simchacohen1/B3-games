@@ -59,3 +59,10 @@ test('on staging, Owner Admin says which account it refused (and whether its ema
   assert.match(prepare, /This account is not the staging owner\. This browser is signed in as /);
   assert.match(prepare, /email verified: /);
 });
+
+test('staging revalidates scripts and styles on every load, so a test window never runs yesterday\'s code', () => {
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, 'firebase.staging.json'), 'utf8'));
+  const rule = cfg.hosting.headers.find(h => /\*\.@\(js\|mjs\|css\|json\|webmanifest\)$/.test(h.source));
+  assert.ok(rule, 'a rule for scripts and styles');
+  assert.match(rule.headers.find(h => h.key === 'Cache-Control').value, /no-cache/);
+});
