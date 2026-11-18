@@ -47,6 +47,7 @@ td.b{color:#9aa8b6}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../class-confirm-gate.js"></script>
+<script src="../owner-classes.js?v=20261118"></script>
 <script src="common.js"></script>
 </head><body>
 <header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
@@ -315,19 +316,27 @@ async function loadAllowedClasses(){
   if(requested&&!SAFE_ID.test(requested))throw new Error("Invalid class selection.");
   var ids=[];
   if(session.access.role==="admin"){
-    // Owner/admin: the class in the link, plus any classes assigned to teacher accounts (owner can read those invites).
-    if(requested)ids.push(requested);
-    try{
-      var inv=(await db.ref("b3Games/workspaces/"+ws+"/teacherInvites").once("value")).val()||{};
-      Object.keys(inv).forEach(function(k){var cids=(inv[k]&&inv[k].classIds)||{};Object.keys(cids).forEach(function(c){if(cids[c]===true&&c!=="*"&&ids.indexOf(c)<0)ids.push(c)})});
-    }catch(e){console.warn("Teacher assignments are not readable by this account; using the class in the link only.",e)}
+    // Owner/admin. A class in the link is all that is needed, so nothing else is read (no teacher-assignment lookup, no warning).
+    // Without one, look for classes in teacher invitations and in classes this browser has opened before.
+    var OC=window.B3OwnerClasses;
+    if(requested){ids=[requested];if(OC)OC.remember(ws,requested)}
+    else{
+      var found=OC?OC.remembered(ws):[];
+      try{
+        var inv=(await db.ref("b3Games/workspaces/"+ws+"/teacherInvites").once("value")).val()||{};
+        found=found.concat(OC?OC.idsFromInvites(inv):[]);
+      }catch(e){console.info("Teacher assignments are not readable by this account, so only classes opened before are listed.",e&&e.code||"")}
+      ids=OC?OC.unique(found):found;
+    }
   }else{
     ids=(session.access.classIds||[]).filter(function(id){return SAFE_ID.test(id)});
     if(requested&&ids.indexOf(requested)<0)throw new Error("This class is not assigned to your teacher account.");
     if(requested)ids=[requested];
   }
   ids=ids.filter(function(id){return SAFE_ID.test(id)});
-  if(!ids.length)throw new Error("No class selected. Open this tool from Teacher Home so a class is chosen.");
+  if(!ids.length)throw new Error(session.access.role==="admin"
+    ?"No class to show yet. Open this page with a class in the link, for example daily-checklist/teacher.html?class=YOUR-CLASS-ID. Classes you open this way are remembered on this browser."
+    :"No class selected. Open this tool from Teacher Home so a class is chosen.");
   var rows=await Promise.all(ids.map(async function(id){
     var cls;
     try{cls=(await db.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value")).val()}catch(e){console.warn("Class not readable",id,e);return null}

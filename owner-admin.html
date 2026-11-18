@@ -14,6 +14,7 @@
 <script src="school-scope.js?v=20261107"></script>
 <script src="owner-teacher-view.js?v=20261109-726"></script>
 <script src="student-scope.js?v=20261108"></script>
+<script src="owner-classes.js?v=20261118"></script>
 <script src="bulk-roster.js?v=20261109-706"></script>
 <script src="owner-export.js?v=20261109-724"></script>
 <style>
@@ -339,9 +340,15 @@ function renderPrincipalAssignments(){
    }catch(error){console.error(error);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not update principal. Try again.";}
  });
 }
+async function readClasses(ids){const r=await B3OwnerClasses.readClasses(db,WS,ids);if(r.unreadable.length)console.warn("Some classes could not be read and are skipped:",r.unreadable);return r.classes}
+const freshClasses=()=>readClasses(Object.keys(classData));   // re-read the known classes one by one (never the whole classes node)
 // Reads everything once, then draws only the view that is open (see render()).
 async function load(){
- const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value");teacherData=ts.val()||{};
+ // Classes are read one at a time (the rules do not allow reading the whole classes node): classes assigned to teachers, plus
+ // classes this browser has seen. A class with no teacher and never seen here appears once a teacher is assigned.
+ classData=await readClasses(B3OwnerClasses.idsFromInvites(teacherData).concat(B3OwnerClasses.remembered(WS),nav.classId?[nav.classId]:[]));
+ B3OwnerClasses.remember(WS,Object.keys(classData));
  // Teachers and classes are what every view needs. Schools, principal links and the student directory are extras: if this account
  // cannot read one of them (the staging owner account), show the page with what is readable instead of an empty page.
  let schoolsRaw=null;
@@ -387,7 +394,7 @@ async function deletePrincipal(id){
  }
  await db.ref().update(updates);q("status").textContent="Principal removed.";await load();
 }
-q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=nav.school;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});q("className").value="";q("status").textContent="Class added ✓";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=nav.school;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});B3OwnerClasses.remember(WS,id);q("className").value="";q("status").textContent="Class added ✓";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=nav.classId;if(!t||!classData[c]){q("status").textContent="Choose a teacher.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Schools (owner only). One school per teacher, stored on the invitation. See school-scope.js. ----
 const SCHOOLS_PATH=()=>"b3Games/workspaces/"+WS+"/schools";
@@ -434,7 +441,7 @@ async function deleteSchool(id){
  const sc=schoolData[id];if(!sc)return;
  const n=B3SchoolScope.countBySchool((await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value")).val()||{})[id]||0;
  if(n){alert(sc.name+" still has "+n+" "+(n===1?"person":"people")+". Move them to another school first.");return}
- const use=B3StudentScope.countSchoolUse(id,(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{},await B3StudentScope.loadRecords(db,WS));
+ const use=B3StudentScope.countSchoolUse(id,await freshClasses(),await B3StudentScope.loadRecords(db,WS));
  if(use.classes||use.students){alert(sc.name+" still has "+use.classes+" "+(use.classes===1?"class":"classes")+" and "+use.students+" "+(use.students===1?"student":"students")+". Move them to another school first.");return}
  if(!confirm("Delete the school "+sc.name+"?"))return;
  await db.ref(SCHOOLS_PATH()+"/"+id).remove();q("status").textContent="School deleted.";await load();
@@ -937,7 +944,7 @@ function renderClassSchoolMove(){
 // Re-reads the classes first so a school chosen meanwhile is never overwritten.
 async function moveClassesWithoutSchool(){
  const to=q("classSchoolMoveTo").value;if(!schoolData[to]){q("status").textContent="Choose a school first.";return}
- const ids=B3StudentScope.classesWithoutSchool((await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{});
+ const ids=B3StudentScope.classesWithoutSchool(await freshClasses());
  if(!ids.length){await load();return}
  if(!confirm("Put "+ids.length+" "+(ids.length===1?"class":"classes")+" in "+schoolData[to].name+"?"))return;
  const updates={};ids.forEach(id=>{updates["b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId"]=to});
@@ -1001,7 +1008,7 @@ function filterStudents(){const t=q("studentSearch").value.trim().toLowerCase();
 q("studentSearch").addEventListener("input",filterStudents);
 // Re-reads records first so the import never overwrites a record saved meanwhile. Writes only the new path, and only for students in the open school's classes.
 async function importStudents(){
- const school=nav.school,records=await B3StudentScope.loadRecords(db,WS),classes=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
+ const school=nav.school,records=await B3StudentScope.loadRecords(db,WS),classes=await freshClasses();
  const roster=B3StudentScope.rosterStudents(classes),plan=B3StudentScope.planImport(roster,records,classes,firebase.database.ServerValue.TIMESTAMP);
  const mine=plan.created.filter(sid=>Object.keys(roster[sid].classIds).some(c=>classes[c]&&classes[c].schoolId===school));
  if(!mine.length){await load();return}
