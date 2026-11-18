@@ -189,6 +189,12 @@ function stageSource(siteRoot, env = process.env) {
       content = content.replace(sheetPattern, "const CSV_URL = 'https://staging-disabled.invalid/student-comments.csv';");
     }
     content = content.replace(/(\b(?:SYNC_KEY|API_KEY)\s*=\s*)['"][^'"]*['"]/g, '$1""');
+    if (relative === 'owner-admin.html') {
+      // Staging only: when Owner Admin refuses an account, say WHICH account this browser is signed in as and whether its email is verified.
+      const refusal = 'q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":';
+      if (!content.includes(refusal)) throw new Error('Cannot find the Owner Admin refusal message to extend for staging.');
+      content = content.replace(refusal, 'q("gateMsg").textContent=user?"This account is not the staging owner. This browser is signed in as "+(user.email||"(no email)")+", email verified: "+(user.emailVerified?"yes":"NO")+". The staging owner is owner@funtorahtools-staging.test: sign in at /staging/owner-signin.html.":');
+    }
     if (relative === 'guest-mode.js') {
       // The Guest Mode sample gradebook is keyed by real student names (Last First). Staging gets generic names.
       let n = 0;
@@ -238,6 +244,9 @@ function stageSource(siteRoot, env = process.env) {
       "if (window.B3_STAGING_FIREBASE_CONFIG?.projectId === 'fun-torah-tools-staging') window.B3_STAGING_TEST_FIXTURES = true;\n";
   }
   fs.writeFileSync(path.join(stageDir, 'staging-config.js'), stagingRuntimeConfig, 'utf8');
+  // A small page to sign in to the staging test accounts (owner, teachers) with email and password. Staging builds only:
+  // the source is a .template file so the live site never serves it as a page.
+  fs.copyFileSync(path.join(__dirname, 'owner-signin.template'), path.join(stageDir, 'owner-signin.html'));
 
   const outputFiles = listFiles(root);
   const violations = [];
