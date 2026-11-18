@@ -286,9 +286,14 @@ function renderPrincipalAssignments(){
 }
 // Reads everything once, then draws only the view that is open (see render()).
 async function load(){
- const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};schoolData=B3SchoolScope.normalizeSchools((await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val());
- await reconcilePrincipals(teacherData,classData);
- await loadStudentData();
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
+ // Teachers and classes are what every view needs. Schools, principal links and the student directory are extras: if this account
+ // cannot read one of them (the staging owner account), show the page with what is readable instead of an empty page.
+ let schoolsRaw=null;
+ try{schoolsRaw=(await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val();}catch(error){console.warn("Schools are not readable by this account.",error);}
+ schoolData=B3SchoolScope.normalizeSchools(schoolsRaw);
+ try{await reconcilePrincipals(teacherData,classData);}catch(error){console.warn("Principal links could not be checked.",error);}
+ try{await loadStudentData();}catch(error){console.warn("The student directory is not readable by this account.",error);studentRecords={};rosterData=B3StudentScope.rosterStudents(classData);}
  applyNav();
 }
 // Owner as a teacher (#726): the owner's own classes come from an ordinary teacher
