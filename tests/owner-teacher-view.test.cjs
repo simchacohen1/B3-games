@@ -188,8 +188,8 @@ test('Owner Admin has the switch and uses the shared logic', () => {
   assert.match(html, /id="teacherViewGo"[^>]*disabled/, 'the switch starts disabled until classes are known');
   assert.match(html, /B3OwnerTeacherView\.teachingClassIds\(teacherData\[key\(OWNER\)\]\)/);
   assert.match(html, /B3OwnerTeacherView\.toTeacherView\(\)/);
-  // The owner check of Owner Admin itself is the same email check as before.
-  assert.match(html, /const owner=user&&String\(user\.email\|\|""\)\.toLowerCase\(\)===OWNER;/);
+  assert.match(html, /function isOwner\(user\)\{return user\?\.emailVerified===true&&String\(user\.email\|\|""\)\.toLowerCase\(\)===OWNER;/);
+  assert.match(html, /auth\.onAuthStateChanged\(async user=>\{\s*if\(isOwner\(user\)\)/);
 });
 
 test('Homework teacher page narrows classes and messages only in Teacher view', () => {
