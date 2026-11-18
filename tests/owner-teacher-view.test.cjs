@@ -188,8 +188,8 @@ test('Owner Admin has the switch and uses the shared logic', () => {
   assert.match(html, /id="teacherViewGo"[^>]*disabled/, 'the switch starts disabled until classes are known');
   assert.match(html, /B3OwnerTeacherView\.teachingClassIds\(teacherData\[key\(OWNER\)\]\)/);
   assert.match(html, /B3OwnerTeacherView\.toTeacherView\(\)/);
-  // The owner check of Owner Admin itself is the same email check as before.
-  assert.match(html, /const owner=user&&String\(user\.email\|\|""\)\.toLowerCase\(\)===OWNER;/);
+  assert.match(html, /function isOwner\(user\)\{return user\?\.emailVerified===true&&String\(user\.email\|\|""\)\.toLowerCase\(\)===OWNER;/);
+  assert.match(html, /auth\.onAuthStateChanged\(async user=>\{\s*if\(isOwner\(user\)\)/);
 });
 
 test('Homework teacher page narrows classes and messages only in Teacher view', () => {
@@ -262,4 +262,11 @@ test('switch: wired into the owner home page (site-settings) and the Admin page,
   const admin = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
   assert.match(admin, /<script src="owner-teacher-view\.js\?v=[^"]+"><\/script>/);
   assert.match(admin, /if\(owner&&window\.B3OwnerTeacherView\)B3OwnerTeacherView\.mountSwitch\(/);
+});
+
+test('Tool access overview: the Name column stays fixed when the table scrolls sideways', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'owner-admin.html'), 'utf8');
+  assert.match(html, /\.access-overview-table thead th:first-child,\.access-overview-table tbody th\{position:sticky;left:0;/);
+  assert.match(html, /\.access-overview-table tbody th\{z-index:2;background:#fff;/, 'name cells have their own background');
+  assert.match(html, /\.access-overview-table thead th:first-child\{z-index:3\}/, 'the header corner stays above the scrolling cells');
 });
