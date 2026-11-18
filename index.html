@@ -146,6 +146,7 @@
   .approval-center-x{border:0;background:#eef2f7;color:#334155;border-radius:999px;width:36px;height:36px;font-size:22px;font-weight:900;cursor:pointer;flex:0 0 auto}
   .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
   .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
+  .approval-center-item-with-classes{position:relative}.approval-center-primary{color:inherit;text-decoration:none}.approval-center-primary::after{content:"";position:absolute;inset:0}.approval-center-class-link{position:relative;color:inherit}
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
   .home-class-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 6px 5px 14px;box-shadow:0 6px 16px rgba(0,0,0,.16);font-weight:900;color:#1f2937}
   .home-class-bar.hidden{display:none}
@@ -435,6 +436,7 @@ document.addEventListener("DOMContentLoaded",function(){
 });
 </script>
 <script src="approval-queue.js?v=20261021-approvals" defer></script>
+<script src="record_pesukim/grading-queue.js" defer></script>
 <script defer src="audio-mode.js?v=20261116-no-audio-button"></script>
 </head>
 <body>
@@ -1014,6 +1016,7 @@ document.addEventListener("DOMContentLoaded",function(){
   let approvalCenterLoading=false;
   let approvalCounts={};
   let approvalClassCounts={};
+  let approvalPosukRecordings=null;
   let approvalClassNames={};
   let approvalSweepAt=0;
   const APPROVAL_POLL_MS=60000,APPROVAL_SWEEP_MIN_MS=5*60000;
@@ -1050,6 +1053,7 @@ document.addEventListener("DOMContentLoaded",function(){
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student disputes about a Read and Translate grade or a result waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"posukRecordings",render:()=>window.B3PosukGradingQueue.approvalCard(approvalPosukRecordings)},
     {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
@@ -1110,6 +1114,7 @@ document.addEventListener("DOMContentLoaded",function(){
       return 0;
     }
     list.innerHTML=active.map(function(item){
+      if(item.render)return item.render().outerHTML;
       const count=Number(approvalCounts[item.key]||0);
       const split=approvalClassSplitText(approvalClassCounts[item.key]);
       return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+(split?' '+split:'')+'</small></span><span class="approval-center-count">'+count+'</span></a>';
@@ -1150,6 +1155,7 @@ document.addEventListener("DOMContentLoaded",function(){
   // the changes. (posukPractice/attempts alone is large.)
   const APPROVAL_SOURCES=[
     ["attempts","posukPractice/attempts"],
+    ["posukRecordings",(onValue,onError)=>window.B3PosukGradingQueue.watchClassCounts(db,workspaceId,onValue,onError)],
     ["pointRequests","studentRewards/pointRequests"],
     ["shorashimRecordings","posukPractice/shorashimLearning/recordingEvents"],
     ["shorashimWords","posukPractice/shorashimLearning/catalog/shorashim"],
@@ -1162,9 +1168,12 @@ document.addEventListener("DOMContentLoaded",function(){
     if(approvalUnwatchers.length)return;
     approvalData={};approvalFailed={};
     APPROVAL_SOURCES.forEach(function(source){
-      const key=source[0],ref=db.ref(source[1]);
-      const onValue=function(snap){approvalData[key]=snap.val()||{};delete approvalFailed[key];scheduleApprovalRecompute();};
+      const [key,watch]=source;
+      const onData=function(data,error){approvalData[key]=data;if(error)approvalFailed[key]=true;else delete approvalFailed[key];scheduleApprovalRecompute();};
       const onError=function(err){console.warn("Approval source unavailable: "+key,err);delete approvalData[key];approvalFailed[key]=true;scheduleApprovalRecompute();};
+      if(typeof watch==="function"){approvalUnwatchers.push(watch(onData,onError));return;}
+      const ref=db.ref(watch);
+      const onValue=function(snap){onData(snap.val()||{});};
       ref.on("value",onValue,onError);
       approvalUnwatchers.push(function(){ref.off("value",onValue);});
     });
@@ -1186,6 +1195,7 @@ document.addEventListener("DOMContentLoaded",function(){
     approvalCenterLoading=APPROVAL_SOURCES.some(function(source){return approvalData[source[0]]===undefined&&!approvalFailed[source[0]];});
     if(approvalCenterLoading){renderApprovalCenter();return;}
     const data=approvalData;
+    approvalPosukRecordings=data.posukRecordings;
     const failed=Object.keys(approvalFailed);
     // Gallery posts live in one shared list but the gallery page shows one class at a time,
     // so link straight to the class that has the waiting projects (most pending first).
@@ -1210,6 +1220,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
+      posukRecordings:data.posukRecordings?.total||0,
       chazara:chazaraPending.length,
       rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
@@ -1247,6 +1258,7 @@ document.addEventListener("DOMContentLoaded",function(){
     closeApprovalCenter();
     approvalCounts={};
     approvalClassCounts={};
+    approvalPosukRecordings=null;
     unwatchApprovalSources();
     approvalCenterAutoShown=false;
   }

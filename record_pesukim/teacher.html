@@ -597,6 +597,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="grading-queue.js"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -823,7 +824,7 @@ function hasPendingDispute(record){
 
 document.getElementById('enterBtn').textContent='Sign in with Google';
 document.getElementById('enterBtn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(error=>document.getElementById('gateMsg').textContent=error.message);
-B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+async function handleTeacherAuth(user,authorized,access){
   teacherAccess=access||{authorized:false,role:'',classIds:[]};
   if(authorized&&!requestedTeacherClass){
     // Never start on a class (or all classes) quietly: ask, then reopen with it.
@@ -841,7 +842,7 @@ B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
     await loadStudents();
     if(new URLSearchParams(location.search).get('review')!=='disputes') setTab('grade');
   }
-});
+}
 
 let activeStudentId = null;
 let studentsMap = {}; // id -> name
@@ -4545,12 +4546,12 @@ async function loadGradeTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading recordings to grade…</div>';
   let all;
-  try{ all = (await scopedStudentData('posukPractice/submissions')).val() || {}; }
+  try{ all = (await scopedStudentData(B3PosukGradingQueue.submissionsPath)).val() || {}; }
   catch(err){ console.error(err); mainEl.innerHTML = '<div class="empty-msg">Could not load recordings to grade.</div>'; return; }
   const pending = [], graded = [];
   Object.entries(all).forEach(([sid, subs]) => Object.values(subs || {}).forEach(s => {
     if(!s || !s.id) return;
-    (s.status === 'pending' ? pending : graded).push({ sid, ...s });
+    (B3PosukGradingQueue.isPending(s) ? pending : graded).push({ sid, ...s });
   }));
   pending.sort((a, b) => (Number(a.submittedAt) || 0) - (Number(b.submittedAt) || 0));
   graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
@@ -4623,6 +4624,8 @@ function wireGradeCard(card, s){
     }
   };
 }
+// A restored session may resolve before this script is parsed.
+B3SiteSettings.onAuthStateChanged(handleTeacherAuth);
 </script>
 <script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body>
 </html>
