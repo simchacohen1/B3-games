@@ -183,7 +183,7 @@
     root.B3_STAGING_FEATURES = Object.freeze({ storage: false, posukScoring: false, nigriSync: false });
     root.document.documentElement.dataset.b3Staging = 'true';
     const featureStyle = root.document.createElement('style');
-    featureStyle.textContent = 'html[data-b3-staging="true"] .record-bar,html[data-b3-staging="true"] #shorashimRecordBtn,html[data-b3-staging="true"] #shorashimPauseBtn{display:none!important}.b3-staging-notice{margin:0 auto 10px;padding:8px 12px;background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;border-radius:10px;font:700 12px/1.4 Arial,sans-serif;text-align:center;max-width:1050px}';
+    featureStyle.textContent = 'html[data-b3-staging="true"] .record-bar,html[data-b3-staging="true"] #shorashimRecordBtn,html[data-b3-staging="true"] #shorashimPauseBtn{display:none!important}.b3-staging-notice{grid-column:1/-1;margin:0 auto 10px;padding:8px 12px;background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;border-radius:10px;font:700 12px/1.4 Arial,sans-serif;text-align:center;max-width:1050px}';
     root.document.head.appendChild(featureStyle);
     installNetworkGuards(root);
     installFirebaseGuard(root, config);

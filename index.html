@@ -436,6 +436,7 @@ document.addEventListener("DOMContentLoaded",function(){
 });
 </script>
 <script src="approval-queue.js?v=20261021-approvals" defer></script>
+<script src="student-roster-csv.js?v=20261118-roster1" defer></script>
 <script src="record_pesukim/grading-queue.js" defer></script>
 <script defer src="audio-mode.js?v=20261116-no-audio-button"></script>
 </head>
@@ -615,6 +616,10 @@ document.addEventListener("DOMContentLoaded",function(){
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
           <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
           <button id="showAddStudentButton" class="admin-action" type="button" style="margin:0">+ Add Student</button>
+          <div style="display:flex;gap:6px;align-items:end;flex-wrap:wrap">
+            <select id="rosterCsvScope" class="override-student-select" aria-label="Which students to download" style="min-width:140px"><option value="class">This class</option></select>
+            <button id="downloadRosterButton" class="admin-action secondary" type="button" style="margin:0">⬇ Download roster (CSV)</button>
+          </div>
 
         </div>
         <details id="classToolsArea" class="hidden"><summary>Passcode privacy</summary><button id="securePasscodesButton" class="admin-action secondary" type="button">Make all passcodes private</button></details>
@@ -861,7 +866,14 @@ document.addEventListener("DOMContentLoaded",function(){
     // The owner can still manage the complete B3 student directory.
     let studentIds=[];
     if(isOwner){
-      studentIds=await ownerStudentIds();
+      try{studentIds=await ownerStudentIds();}
+      catch(error){
+        // The whole student directory is not readable by this account. Use the students in the classes instead (as a teacher does).
+        console.warn("Student directory not readable; listing the students in the classes.",error);
+        const ids=new Set();
+        Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
+        studentIds=[...ids];
+      }
     }else{
       const ids=new Set();
       Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
@@ -883,6 +895,13 @@ document.addEventListener("DOMContentLoaded",function(){
     studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+escHtml(id)+'">'+escHtml(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
 
+    rosterContext={classes,students,classLabel,isOwner};
+    const scopeSel=el("rosterCsvScope");
+    if(scopeSel){
+      const wantAll=isOwner&&classIds.length>1;
+      if(wantAll&&!scopeSel.querySelector('option[value="all"]'))scopeSel.insertAdjacentHTML("beforeend",'<option value="all">All classes</option>');
+      if(!wantAll){const a=scopeSel.querySelector('option[value="all"]');if(a)a.remove();}
+    }
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
       const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
@@ -901,6 +920,36 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   // Why the last student request was refused (for example a possible duplicate).
   let lastStudentActionError=null;
+  // What the Students list last loaded, for the roster download.
+  let rosterContext=null;
+  // Download the roster as a CSV. Passcodes come from the same server request the list uses (it checks that the signed-in
+  // teacher owns the class); "All classes" is owner-only and asks for each class in turn.
+  async function downloadRoster(){
+    const status=el("classManagementStatus"),button=el("downloadRosterButton"),csv=window.B3RosterCsv,ctx=rosterContext;
+    if(!csv||!ctx){status.textContent="The student list is not loaded yet. Try again in a moment.";return;}
+    const all=el("rosterCsvScope").value==="all"&&ctx.isOwner;
+    const classIds=all?Object.keys(ctx.classes).sort((a,b)=>String(ctx.classLabel(a)).localeCompare(String(ctx.classLabel(b)))):[el("manageClassSelect").value].filter(id=>ctx.classes[id]);
+    if(!classIds.length){status.textContent="Choose a class first.";return;}
+    button.disabled=true;status.textContent="Preparing the roster…";
+    try{
+      const rows=[];
+      for(const classId of classIds){
+        const listed=await trustedStudentAction("list",{classId});
+        if(!listed)return;   // the page already shows why
+        const members=(ctx.classes[classId]&&ctx.classes[classId].members)||{};
+        Object.keys(members).sort((a,b)=>String(members[a]?.name||ctx.students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||ctx.students[b]?.profile?.name||b))).forEach(id=>{
+          const profile=ctx.students[id]?.profile||{};
+          rows.push({className:String(ctx.classLabel(classId)),name:members[id]?.name||profile.name||id,passcode:(listed.passcodes||{})[id]||"",status:csv.accessStatus(members[id],profile)});
+        });
+      }
+      const label=all?"all-classes":String(ctx.classLabel(classIds[0]));
+      const blob=new Blob([csv.rosterCsv(rows)],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download=csv.fileName(label);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      status.textContent="Roster downloaded ("+rows.length+" student"+(rows.length===1?"":"s")+"). It has passcodes: keep the file private.";
+    }catch(error){
+      status.textContent="The roster could not be prepared. Nothing was changed. ("+((error&&error.message)||"unknown error")+")";
+    }finally{button.disabled=false;}
+  }
   async function trustedStudentAction(action,data={}){
     lastStudentActionError=null;
     try{
@@ -2541,6 +2590,7 @@ document.addEventListener("DOMContentLoaded",function(){
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
 
   el("showAddStudentButton").addEventListener("click",()=>el("addStudentArea").classList.toggle("hidden"));
+  el("downloadRosterButton").addEventListener("click",downloadRoster);
 
   el("classMemberList").addEventListener("click",async e=>{
     const save=e.target.closest("[data-save-student]");
