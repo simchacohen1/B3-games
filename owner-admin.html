@@ -94,6 +94,20 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 .access-overview-table thead th:first-child{z-index:3}
 .access-overview-table tbody th{z-index:2;background:#fff;text-align:left}
 .access-overview-table tbody tr:nth-child(even) th{background:#f8fafc}
+/* Editing: a checkbox at the start of the name, a bulk bar, clickable tool cells and an Undo bar. */
+.access-overview-table tbody th label{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700}
+.access-overview-table tbody th input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
+.access-overview-table .tool-cell{width:100%;min-width:34px;min-height:30px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.access-overview-table .tool-cell:hover{background:#dbeafe}
+.access-overview-table .tool-cell:focus-visible{outline:3px solid #2563eb;outline-offset:-2px}
+.access-overview-table tbody tr.selected td,.access-overview-table tbody tr.selected th{background:#eff6ff}
+.access-overview-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc}
+.access-overview-bulk button,.access-overview-undo button{padding:8px 12px;border-radius:9px;border:1px solid #94a3b8;background:#fff;font:inherit;font-weight:700;cursor:pointer}
+.access-overview-bulk button.give{background:#166534;border-color:#166534;color:#fff}
+.access-overview-bulk button.take{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.access-overview-bulk button:disabled{opacity:.45;cursor:not-allowed}
+.access-overview-undo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #86efac;color:#14532d;font-weight:700}
+.access-overview-undo[hidden],.access-overview-bulk[hidden]{display:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head><body>
@@ -213,13 +227,22 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 
 <section class="card hidden" data-view="tool-access-overview" aria-labelledby="toolAccessHeading">
 <div class="card-head"><h2 id="toolAccessHeading">Tool access overview</h2></div>
-<p class="hint" id="toolAccessHelp">A checkmark shows that a tool is granted in at least one of the teacher’s active classes. Download CSV exports the rows shown here.</p>
+<p class="hint" id="toolAccessHelp">A checkmark shows that a tool is granted in at least one of the teacher’s active classes. Click a cell, or tick teachers and use the bar above, to give or remove a tool: tools are granted per class, so a change applies to ALL of that teacher’s active classes (and to anyone who shares those classes). You confirm first and can undo right after. Download CSV exports the rows shown here.</p>
 <div class="formrow">
   <input type="search" id="toolAccessSearch" aria-label="Search teachers" placeholder="Search teachers">
   <select id="toolAccessSchool" aria-label="Filter by school"><option value="">All schools</option></select>
   <select id="toolAccessClass" aria-label="Filter by class"><option value="">All classes</option></select>
   <button id="toolAccessDownload" type="button" disabled>Download CSV</button>
 </div>
+<div class="access-overview-bulk" id="toolAccessBulk">
+  <button type="button" id="toolAccessSelectAll">Select all shown</button>
+  <button type="button" id="toolAccessClearSel">Clear selection</button>
+  <span id="toolAccessSelCount" role="status">0 selected</span>
+  <select id="toolAccessTool" aria-label="Tool to change"><option value="">Choose a tool…</option></select>
+  <button type="button" id="toolAccessGive" class="give" disabled>Give to selected</button>
+  <button type="button" id="toolAccessRemove" class="take" disabled>Remove from selected</button>
+</div>
+<div class="access-overview-undo" id="toolAccessUndoBar" role="status" hidden><span id="toolAccessUndoText"></span><button type="button" id="toolAccessUndo">Undo</button></div>
 <p class="hint" id="toolAccessCount" role="status"></p>
 <div class="access-overview-scroll" tabindex="0" role="region" aria-labelledby="toolAccessHeading">
   <table class="access-overview-table" aria-labelledby="toolAccessHeading" aria-describedby="toolAccessHelp">
@@ -1027,6 +1050,9 @@ q("studentOrphans").addEventListener("change",onStudentChange);
 const TOOL_ACCESS_PATH="tool-access-overview/";
 const toolAccessHeaders=["Name","School","Classes",...PLATFORM_TOOLS.map(([,name])=>name)];
 let toolAccessRows=[];
+let toolAccessIds=[];                  // the teacher id of each row above (same order)
+const toolAccessSelected=new Set();    // teachers ticked in the table
+let toolAccessLastChange=null;         // {text, items:[{classId,tool,prev}]} for Undo
 q("toolAccessHeaders").innerHTML=toolAccessHeaders.map(name=>'<th scope="col">'+safe(name)+'</th>').join("");
 
 function setOverviewOptions(select,label,options){
@@ -1043,23 +1069,103 @@ function renderToolAccessOverview(){
  const classOptions=new Set(teachers.flatMap(assignedClasses));
  setOverviewOptions(q("toolAccessClass"),"All classes",[...classOptions].map(id=>[id,bulkClassName(id)]));
  const classFilter=q("toolAccessClass").value;
- toolAccessRows=teachers.flatMap(teacher=>{
+ const idOf=new Map(Object.entries(teacherData).map(([id,t])=>[t,id]));
+ const entries=teachers.flatMap(teacher=>{
   const name=teacher.name||teacher.email||"Teacher",school=schoolData[teacher.schoolId]?.name||"No school";
   const ids=assignedClasses(teacher),classes=ids.map(bulkClassName).sort(byName);
   if(classFilter&&!ids.includes(classFilter))return [];
   if(search&&![name,teacher.email||"",school,...classes].some(value=>String(value).toLowerCase().includes(search)))return [];
   const activeClasses=teacher.active===false?[]:ids.map(id=>classData[id]).filter(cls=>cls.active!==false);
   const tools=PLATFORM_TOOLS.map(([id])=>activeClasses.some(cls=>cls.toolGrants?.[id]===true)?"✓":"");
-  return [[name,school,classes.join(", "),...tools]];
- }).sort((a,b)=>byName(a[0],b[0])||byName(a[1],b[1]));
- q("toolAccessRows").innerHTML=toolAccessRows.map(([name,school,classes,...tools])=>
-  '<tr><th scope="row">'+safe(name)+'</th><td>'+safe(school)+'</td><td>'+safe(classes||"—")+'</td>'+
-  tools.map(mark=>mark?'<td><span role="img" aria-label="Granted">✓</span></td>':'<td></td>').join("")+'</tr>'
- ).join("");
+  return [{id:idOf.get(teacher),row:[name,school,classes.join(", "),...tools]}];
+ }).sort((a,b)=>byName(a.row[0],b.row[0])||byName(a.row[1],b.row[1]));
+ toolAccessRows=entries.map(e=>e.row);toolAccessIds=entries.map(e=>e.id);
+ // Only teachers that are still shown stay ticked.
+ for(const id of [...toolAccessSelected])if(!toolAccessIds.includes(id))toolAccessSelected.delete(id);
+ q("toolAccessRows").innerHTML=toolAccessRows.map(([name,school,classes,...tools],i)=>{
+  const id=toolAccessIds[i];
+  return '<tr'+(toolAccessSelected.has(id)?' class="selected"':'')+'><th scope="row"><label><input type="checkbox" data-pick="'+safe(id)+'" aria-label="Select '+safe(name)+'"'+(toolAccessSelected.has(id)?' checked':'')+'>'+safe(name)+'</label></th><td>'+safe(school)+'</td><td>'+safe(classes||"—")+'</td>'+
+   tools.map((mark,t)=>'<td><button type="button" class="tool-cell" data-teacher="'+safe(id)+'" data-tool="'+safe(PLATFORM_TOOLS[t][0])+'" aria-pressed="'+(mark?"true":"false")+'" aria-label="'+(mark?"Remove ":"Give ")+safe(PLATFORM_TOOLS[t][1])+(mark?" from ":" to ")+safe(name)+'">'+mark+'</button></td>').join("")+'</tr>';
+ }).join("");
+ updateToolAccessBulk();
  const count=toolAccessRows.length;
  q("toolAccessCount").textContent=count?count+(count===1?" teacher":" teachers"):"No teachers match.";
  q("toolAccessDownload").disabled=!count;
 }
+// ---- Editing the overview (owner only) ----
+// A tool is granted per class (classes/<id>/toolGrants/<tool>). Giving it to a teacher grants it in ALL of that teacher's active
+// classes; removing it takes it from all of them. A class shared with other teachers changes for them too, so the confirm says so.
+(function(){
+ const toolName=id=>(PLATFORM_TOOLS.find(t=>t[0]===id)||[id,id])[1];
+ const teacherName=id=>{const t=teacherData[id]||{};return t.name||t.email||"Teacher"};
+ const activeClassIds=id=>{const t=teacherData[id];if(!t||t.active===false)return [];return Object.keys(t.classIds||{}).filter(c=>t.classIds[c]===true&&classData[c]&&classData[c].active!==false)};
+ // What would change for these teachers: only the classes whose value is not already the wanted one.
+ function plan(teacherIds,tool,give){
+  const items=[],seen=new Set(),sharedWith=new Set(),teachersChanged=new Set();
+  for(const id of teacherIds)for(const c of activeClassIds(id)){
+   if(seen.has(c))continue;seen.add(c);
+   const now=classData[c].toolGrants?.[tool]===true;
+   if(now===give)continue;
+   items.push({classId:c,tool,prev:classData[c].toolGrants&&Object.hasOwn(classData[c].toolGrants,tool)?classData[c].toolGrants[tool]:null,next:give});
+   teachersChanged.add(id);
+   for(const [other,t] of Object.entries(teacherData))if(!teacherIds.includes(other)&&t&&t.active!==false&&t.classIds?.[c]===true&&!B3PrincipalScope.principal(t))sharedWith.add(other);
+  }
+  return {items,sharedWith:[...sharedWith],teachersChanged:[...teachersChanged]};
+ }
+ function describe(p,tool,give,teacherIds){
+  const word=give?"Give":"Remove",prep=give?"to":"from";
+  if(!p.items.length)return null;
+  const who=teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teacher"+(p.teachersChanged.length===1?"":"s");
+  let text=word+" "+toolName(tool)+" "+prep+" "+who+"?\n\nThis changes "+p.items.length+" class"+(p.items.length===1?"":"es")+": "+p.items.map(i=>bulkClassName(i.classId)).join(", ")+".";
+  if(p.sharedWith.length)text+="\n\nThose classes are also used by "+p.sharedWith.length+" other teacher"+(p.sharedWith.length===1?"":"s")+" ("+p.sharedWith.map(teacherName).join(", ")+"), who "+(give?"get":"lose")+" it too.";
+  return text;
+ }
+ async function apply(teacherIds,tool,give){
+  if(!isOwner(auth.currentUser)){q("status").textContent="Only the owner can change tool access.";return}
+  const p=plan(teacherIds,tool,give),message=describe(p,tool,give,teacherIds);
+  if(!message){q("status").textContent=toolName(tool)+" is already "+(give?"given":"removed")+" for "+(teacherIds.length===1?teacherName(teacherIds[0]):"the selected teachers")+".";return}
+  if(!confirm(message))return;
+  const updates={};
+  for(const i of p.items)updates["b3Games/workspaces/"+WS+"/classes/"+i.classId+"/toolGrants/"+i.tool]=i.next;
+  try{await db.ref().update(updates)}catch(error){console.error(error);q("status").textContent="Could not save. Nothing was changed.";return}
+  for(const i of p.items){classData[i.classId].toolGrants=Object.assign({},classData[i.classId].toolGrants,{[i.tool]:i.next})}
+  toolAccessLastChange={text:(give?"Gave ":"Removed ")+toolName(tool)+(give?" to ":" from ")+(teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teachers")+" ("+p.items.length+" class"+(p.items.length===1?"":"es")+").",items:p.items};
+  q("status").textContent="Saved ✓";
+  renderToolAccessOverview();
+ }
+ async function undo(){
+  const last=toolAccessLastChange;if(!last||!isOwner(auth.currentUser))return;
+  const updates={};
+  for(const i of last.items)updates["b3Games/workspaces/"+WS+"/classes/"+i.classId+"/toolGrants/"+i.tool]=i.prev;   // null removes a value that did not exist before
+  try{await db.ref().update(updates)}catch(error){console.error(error);q("status").textContent="Could not undo. Nothing was changed.";return}
+  for(const i of last.items){const g=Object.assign({},classData[i.classId].toolGrants);if(i.prev===null)delete g[i.tool];else g[i.tool]=i.prev;classData[i.classId].toolGrants=g}
+  toolAccessLastChange=null;q("status").textContent="Undone ✓";
+  renderToolAccessOverview();
+ }
+ window.updateToolAccessBulk=function(){
+  const n=toolAccessSelected.size,tool=q("toolAccessTool").value,sel=q("toolAccessTool");
+  if(sel.options.length<2)PLATFORM_TOOLS.forEach(([id,name])=>sel.add(new Option(name,id)));
+  q("toolAccessSelCount").textContent=n+(n===1?" teacher selected":" teachers selected");
+  q("toolAccessGive").disabled=!(n&&tool);q("toolAccessRemove").disabled=!(n&&tool);
+  q("toolAccessClearSel").disabled=!n;
+  const bar=q("toolAccessUndoBar");bar.hidden=!toolAccessLastChange;if(toolAccessLastChange)q("toolAccessUndoText").textContent=toolAccessLastChange.text;
+ };
+ q("toolAccessSelectAll").onclick=()=>{toolAccessIds.forEach(id=>toolAccessSelected.add(id));renderToolAccessOverview()};
+ q("toolAccessClearSel").onclick=()=>{toolAccessSelected.clear();renderToolAccessOverview()};
+ q("toolAccessTool").onchange=updateToolAccessBulk;
+ q("toolAccessGive").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,true);
+ q("toolAccessRemove").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,false);
+ q("toolAccessUndo").onclick=undo;
+ q("toolAccessRows").addEventListener("change",e=>{
+  const box=e.target.closest("[data-pick]");if(!box)return;
+  if(box.checked)toolAccessSelected.add(box.dataset.pick);else toolAccessSelected.delete(box.dataset.pick);
+  renderToolAccessOverview();
+ });
+ q("toolAccessRows").addEventListener("click",e=>{
+  const cell=e.target.closest(".tool-cell");if(!cell)return;
+  apply([cell.dataset.teacher],cell.dataset.tool,cell.getAttribute("aria-pressed")!=="true");
+ });
+})();
 q("toolAccessSearch").addEventListener("input",renderToolAccessOverview);
 q("toolAccessSchool").addEventListener("change",renderToolAccessOverview);
 q("toolAccessClass").addEventListener("change",renderToolAccessOverview);
