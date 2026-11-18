@@ -47,7 +47,7 @@ function main() {
       console.error('Usage: --name "Test Student" --passcode 1234 [--site URL]  or  --from credentials.json [--bat out.bat]');
       process.exit(2);
     }
-    rows = [{ name, url: linkTools.link(site || 'https://funtorahtools.com/', name, passcode) }];
+    rows = [{ name, url: linkTools.link(site || 'https://sols.tools/', name, passcode) }];
   }
   const bat = arg('bat');
   if (bat) {

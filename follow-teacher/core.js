@@ -58,7 +58,7 @@
 
   function canonicalPath(currentUrl) {
     try {
-      const url = new URL(currentUrl, 'https://funtorahtools.com');
+      const url = new URL(currentUrl, 'https://sols.tools');
       let path = url.pathname.replace(/\/index\.html$/i, '/');
       if (!path.endsWith('/')) path += '/';
       return path;
@@ -105,7 +105,7 @@
     if (!destination || !path || c.allowedTools?.[state.destination] !== true) return none('not-permitted');
     const applyKey = [state.workspaceId, state.classId, state.revision, c.studentId].join(':');
     const section = c.currentSection !== undefined ? c.currentSection :
-      new URL(c.currentUrl || '/', 'https://funtorahtools.com').searchParams.get('section');
+      new URL(c.currentUrl || '/', 'https://sols.tools').searchParams.get('section');
     const alreadyThere = canonicalPath(c.currentUrl) === canonicalPath(destination.path) &&
       (!state.subdestination || section === state.subdestination);
     if (state.mode === MODES.FREE) {

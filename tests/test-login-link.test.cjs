@@ -7,7 +7,7 @@ const links = require('../test-login-link.js');
 const { batFile } = require('../scripts/make-test-login-link.cjs');
 
 test('link round-trips name and passcode through the # part only', () => {
-  const url = links.link('https://funtorahtools.com/', 'Monitor Testbot', '4821');
+  const url = links.link('https://sols.tools/', 'Monitor Testbot', '4821');
   const u = new URL(url);
   assert.equal(u.search, '');
   assert.match(u.hash, /^#ftt-test=[A-Za-z0-9_-]+$/);

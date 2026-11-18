@@ -1,6 +1,6 @@
 # sols.tools (Shluchim Online School)
 
-The same website is served at two addresses from the same live Firebase project:
+**sols.tools is the only address the site runs on.** funtorahtools.com only redirects, permanently (301), to the same path on sols.tools (a Cloudflare redirect rule; `domain-redirect.js`, loaded first in every page, and `404.html` are the fallback for anything that still reaches the old GitHub Pages copy). The site is built from one source and published at two addresses:
 
 | Address | Repository | Branding |
 | --- | --- | --- |
