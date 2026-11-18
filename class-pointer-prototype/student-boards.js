@@ -599,14 +599,25 @@
       // My own marks, and (while my board is open to me, i.e. I am not paused) the teacher's pictures that are not locked.
       getItems:()=>board.strokes.filter(item=>item.by==='student'||(boardOpen()&&item.by==='teacher'&&item.image&&!item.locked)),
       setItems(list){
-        // A teacher's picture (its name starts with "t") can only be moved or resized. Taking it out of the list (Delete, Eraser)
-        // changes nothing: the picture stays, and a student can never remove it.
-        const theirs=list.filter(item=>item.id[0]==='t'),own=list.filter(item=>item.id[0]!=='t');
-        syncBoardItems(board,'student',own,act);
-        for(const item of theirs){
-          const old=board.strokes.find(s=>s.by==='teacher'&&s.image&&!s.locked&&s.id===item.id);
-          if(old&&JSON.stringify(old.points)!==JSON.stringify(item.points))act({type:'board-move',id:item.id,points:item.points});
+        // A teacher's picture (its name starts with "t") can only be moved or resized, never removed: Delete, Eraser and Clear
+        // leave it where it is. The drawing toolbar gives a moved or resized picture a NEW name (it is the student's "copy"):
+        // that is turned back into a move of the teacher's own picture, so there is never a second picture.
+        const movable=board.strokes.filter(s=>s.by==='teacher'&&s.image&&!s.locked);
+        const missing=movable.filter(s=>!list.some(item=>item.id===s.id));      // teacher pictures that are no longer in the list
+        const own=[],moves=[];
+        for(const item of list){
+          if(item.id[0]==='t'){
+            const old=movable.find(s=>s.id===item.id);
+            if(old&&JSON.stringify(old.points)!==JSON.stringify(item.points))moves.push({id:item.id,points:item.points});
+            continue;
+          }
+          const fresh=item.image&&!board.strokes.some(s=>s.id===item.id);
+          const from=fresh?missing.find(s=>s.image===item.image):null;
+          if(from){missing.splice(missing.indexOf(from),1);moves.push({id:from.id,points:item.points});continue}
+          own.push(item);
         }
+        syncBoardItems(board,'student',own,act);
+        for(const move of moves)act({type:'board-move',id:move.id,points:move.points});
       },
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).

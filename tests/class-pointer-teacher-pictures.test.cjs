@@ -94,3 +94,29 @@ test('the teacher gets a Lock / Unlock button on the picked picture',()=>{
   assert.match(boardsSource,/o\.act\(\{type:'board-lock',id:s\.id,locked:s\.locked!==true\}\)/);
   assert.match(boardsSource,/lock\.textContent=s\?\.locked\?'🔓 Unlock':'🔒 Lock'/);
 });
+
+test('the drawing toolbar gives a moved picture a NEW name: that is still a move of the teacher\'s picture, never a second picture', () => {
+  const {surface,sent}=open([pic('t1-p','teacher'),mine('s1-a')]);
+  const [item]=surface().getItems().filter(i=>i.id==='t1-p');
+  const moved={...plain(item),id:'s9-newname',points:[{x:.3,y:.2},{x:.7,y:.55}]};   // what the toolbar hands over after a drag
+  delete moved.by;
+  surface().setItems([plain(surface().getItems().find(i=>i.id==='s1-a')),moved]);
+  assert.deepEqual(sent,[{type:'board-move',id:'t1-p',points:[{x:.3,y:.2},{x:.7,y:.55}]}],'one small move of the teacher\'s own picture, nothing added');
+  const pictures=plain(surface().getItems()).filter(i=>i.image);
+  assert.equal(pictures.length,1,'still one picture');
+  assert.equal(pictures[0].id,'t1-p');
+  assert.equal(pictures[0].by,'teacher');
+  assert.deepEqual(pictures[0].points,[{x:.3,y:.2},{x:.7,y:.55}]);
+});
+
+test('a moved copy of a LOCKED teacher picture is not accepted as a move, and a student\'s own new picture is still added', () => {
+  const {api,surface,sent}=open([pic('t1-p','teacher')]);
+  api.fromTeacher({type:'board-lock',id:'t1-p',locked:true});
+  const forged={...pic('s9-x','student'),points:[{x:.3,y:.2},{x:.7,y:.55}]};
+  delete forged.by;
+  surface().setItems([forged]);
+  assert.ok(sent.every(op=>op.type!=='board-move'),'no move of the locked picture');
+  assert.ok(sent.some(op=>op.type==='board-add'),'it is just the student\'s own picture');
+  const mineNow=surface().getItems();
+  assert.ok(plain(mineNow).some(i=>i.id==='s9-x'));
+});
