@@ -46,3 +46,12 @@ test('passcodes come only from the existing server list request, which checks th
   assert.doesNotMatch(block, /ref\("[^"]*passcode/i);
   assert.doesNotMatch(block, /fetch\(/);
 });
+
+test('an owner whose account cannot read the whole student directory still gets the class list (and so the roster download)', () => {
+  assert.match(index, /try\{studentIds=await ownerStudentIds\(\);\}\s*catch\(error\)\{[\s\S]{0,400}Object\.values\(classes\)\.forEach\(row=>Object\.keys\(\(row&&row\.members\)\|\|\{\}\)\.forEach\(id=>ids\.add\(id\)\)\);\s*studentIds=\[\.\.\.ids\];/);
+});
+
+test('the staging banner spans the full row, so it cannot squeeze the two-column admin page', () => {
+  const cfg = fs.readFileSync(path.join(__dirname, '..', 'staging', 'staging-config.js'), 'utf8');
+  assert.match(cfg, /\.b3-staging-notice\{grid-column:1\/-1;/);
+});
