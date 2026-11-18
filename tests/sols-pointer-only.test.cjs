@@ -1,5 +1,6 @@
 'use strict';
-// sols.tools shows only Class Pointer to teachers and students (issue #832).
+// sols.tools front door: a visitor who is not signed in sees only the home pages and Class Pointer; anyone signed in gets the
+// whole site (every page still runs its own access checks). Started as issue #832 (Class Pointer only).
 // The rule lives in sols-site/pointer-only.js, which only the sols.tools copy loads.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -8,11 +9,11 @@ const root=path.join(__dirname,'..');
 const P=require('../sols-site/pointer-only.js');
 const source=fs.readFileSync(path.join(root,'sols-site','pointer-only.js'),'utf8');
 
-test('only the home page, the teacher home page and Class Pointer pages may be opened',()=>{
- for(const ok of ['/','/index.html','/teacher-home.html','/class-pointer-prototype/classroom.html','/class-pointer-prototype/dashboard.html','/class-pointer-prototype/student-view.html'])
+test('a signed-out visitor may open the home page, the teacher sign-in page and Class Pointer pages, with or without .html',()=>{
+ for(const ok of ['/','/index.html','/index','/teacher-home.html','/teacher-home','/teacher-home/','/class-pointer-prototype/classroom.html','/class-pointer-prototype/dashboard.html','/class-pointer-prototype/student-view.html','/class-pointer-prototype','/class-pointer-prototype/'])
   assert.equal(P.allowedPath(ok),true,ok);
  for(const no of ['/halacha/index.html','/halacha/','/shorashim/teacher.html','/admin.html','/owner-admin.html','/assignment-center/student.html','/student-report/index.html',
-  '/record_pesukim/student.html','/multiplayer/index.html','/all-pages.html','/follow-teacher/teacher.html','/class-pointer-prototype','/class-pointer-prototypes/x.html','/x/class-pointer-prototype/y.html','/Index.html'])
+  '/record_pesukim/student.html','/multiplayer/index.html','/all-pages.html','/follow-teacher/teacher.html','/class-pointer-prototypes/x.html','/x/class-pointer-prototype/y.html','/Index.html'])
   assert.equal(P.allowedPath(no),false,no);
  assert.equal(P.allowedPath(''),true,'an empty path is the home page');
 });
@@ -26,19 +27,20 @@ test('on a home page only links into Class Pointer are kept',()=>{
   assert.equal(P.isPointerHref(no),false,no);
 });
 
-test('only a site administrator keeps the whole site; a teacher, a student and a visitor do not',()=>{
+test('anyone signed in gets the whole site; a visitor who is not signed in does not; nothing is decided before sign-in is checked',()=>{
  const owner={email:'owner@example.org'},teacher={email:'teacher@example.org'},student={email:null};
- assert.equal(P.viewerKind(false,null,null),'','nothing is decided before sign-in has been checked');
- assert.equal(P.viewerKind(true,null,null),'limited','signed out');
- assert.equal(P.viewerKind(true,owner,{authorized:true,role:'admin'}),'full');
- assert.equal(P.viewerKind(true,teacher,{authorized:true,role:'teacher'}),'limited');
- assert.equal(P.viewerKind(true,teacher,{authorized:true,role:'teacher',accountType:'principal'}),'limited');
- assert.equal(P.viewerKind(true,student,{authorized:false,role:''}),'limited','a student has no email address');
- // A teacher whose access is still being looked up: wait, do not flip the view.
- assert.equal(P.viewerKind(true,teacher,{authorized:false,role:''}),'');
- assert.equal(P.viewerKind(true,teacher,null),'');
- // Claiming the role without being authorized is not enough.
- assert.equal(P.viewerKind(true,teacher,{authorized:false,role:'admin'}),'');
+ assert.equal(P.viewerKind(false,null),'','nothing is decided before sign-in has been checked');
+ assert.equal(P.viewerKind(true,null),'limited','signed out');
+ assert.equal(P.viewerKind(true,owner),'full');
+ assert.equal(P.viewerKind(true,teacher),'full','a regular teacher');
+ assert.equal(P.viewerKind(true,student),'full','a student has no email address');
+});
+
+test('the rule never grants access itself: it does not read roles, and a not-signed-in visitor is still sent home',()=>{
+ assert.ok(!/\.role\b|authorized/.test(source.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'')),'no role or authorization logic');
+ assert.match(source,/if \(pendingBounce && kind === 'limited'\) \{ pendingBounce = false; root\.location\.replace\('\/'\); return; \}/);
+ // The page stays hidden until sign-in has answered, and is shown anyway if it never does (its own checks still apply).
+ assert.match(source,/root\.setTimeout\(function \(\) \{ if \(pendingBounce\) \{ pendingBounce = false; showPage\(\); \} \}, 8000\);/);
 });
 
 test('the script only changes what is shown: it reads sign-in state and writes one browser setting',()=>{
@@ -46,8 +48,8 @@ test('the script only changes what is shown: it reads sign-in state and writes o
  assert.ok(!/\.database\(|\.ref\(|\.storage\(|fetch\(|XMLHttpRequest|signOut\(|signInWith/.test(source));
  assert.match(source,/root\.localStorage\.setItem\(FULL_KEY, '1'\)/);
  assert.match(source,/fb\.auth\(\)\.onAuthStateChanged\(/);
- // Another page is left before it shows anything.
- assert.match(source,/if \(!full && !allowedPath\(root\.location\.pathname\)\) \{\s*try \{ doc\.documentElement\.style\.visibility = 'hidden'; \} catch \(e\) \{\}\s*root\.location\.replace\('\/'\);\s*return;/);
+ // Another page stays hidden until it is known whether anyone is signed in.
+ assert.match(source,/if \(!full && !allowedPath\(root\.location\.pathname\)\) \{\s*pendingBounce = true;\s*try \{ doc\.documentElement\.style\.visibility = 'hidden'; \} catch \(e\) \{\}/);
  // The student home page hides the tools, the "nothing available" note and the homework link.
  assert.match(source,/#gamesArea,#disabledMessage,#lockedCard,#homeworkStudentLink\{display:none!important\}/);
 });
