@@ -1157,6 +1157,7 @@
       shorashim:['shorashim/teacher.html','shorashim/index.html'],
       'rashi-letters':['rashi-letters/teacher.html','rashi-letters/student.html'],
       gematria:['gematria/teacher.html','gematria/index.html'],
+      'daily-checklist':['daily-checklist/teacher.html','daily-checklist/index.html'],
       halacha:['halacha/teacher.html','halacha/index.html?teacher=1'],
       'weekly-quiz':['weekly-quiz/teacher.html','weekly-quiz/index.html'],
       'game-show':['game-show/teacher.html','game-show/player.html'],

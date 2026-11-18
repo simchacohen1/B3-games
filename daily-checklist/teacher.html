@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en"><head><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Checklist — Teacher</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}
+header{background:#173b62;color:#fff;padding:16px 22px}header h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#c9d8e8;font-size:13px}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid #d5e0ea;border-radius:12px;padding:12px;margin-bottom:14px}
+.bar label{font-weight:700;font-size:13px;color:#4a5b6c}
+input,select,button{font:inherit}
+input[type=date],select,input[type=text]{border:1px solid #b9c8d6;border-radius:8px;padding:7px 9px;background:#fff}
+button{border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;background:#173b62;color:#fff}
+button.alt{background:#fff;color:#173b62;border:1px solid #b9c8d6}
+button.danger{background:#fff;color:#b42318;border:1px solid #e5b4ae}
+button[disabled]{opacity:.45;cursor:default}
+.panel{background:#fff;border:1px solid #d5e0ea;border-radius:12px;padding:14px;margin-bottom:14px}
+.panel h2{margin:0 0 8px;font-size:18px}
+.scroll{overflow:auto;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid #dbe5ee;padding:7px 8px;text-align:center}
+th{background:#f3f7fa;position:sticky;top:0;z-index:1}
+th.nm,td.nm{text-align:left;position:sticky;left:0;background:#fff;font-weight:700;min-width:140px}
+th.nm{background:#f3f7fa;z-index:2}
+td.y{color:#1a7f45;font-weight:900;font-size:18px}
+td.n{color:#c0392b;font-weight:900;font-size:18px}
+td.b{color:#9aa8b6}
+.star{color:#d92d20}
+.muted{color:#5d6b7a;font-size:13px}
+.erow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6}
+.erow input[type=text]{width:100%}
+.erow .btns{display:flex;gap:4px}
+.erow .btns button{padding:6px 10px}
+.stars{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap}
+#status{padding:12px;color:#5d6b7a}
+.sum{margin:0 0 8px;font-weight:700}
+@media(max-width:600px){.erow{grid-template-columns:1fr auto}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../class-confirm-gate.js"></script>
+<script src="../teacher-class-rosters.js?v=20261011"></script>
+<script src="common.js"></script>
+</head><body>
+<header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
+<main>
+  <div id="status">Checking teacher access…</div>
+  <div id="app" hidden>
+    <div class="bar">
+      <label>Class <select id="classSel"></select></label>
+      <label>Day <input type="date" id="day"></label>
+      <button class="alt" id="prev" type="button">← Previous</button>
+      <button class="alt" id="next" type="button">Next →</button>
+      <button class="alt" id="today" type="button">Today</button>
+      <button class="alt" id="refresh" type="button">Refresh</button>
+    </div>
+
+    <div class="panel">
+      <p class="sum" id="summary"></p>
+      <div class="scroll"><table id="grid"></table></div>
+      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Column names are shown as they were on that day.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Export CSV</h2>
+      <div class="bar" style="border:0;padding:0;margin:0">
+        <button id="exportDay" type="button">Export selected day</button>
+        <span class="muted">or a date range:</span>
+        <label>From <input type="date" id="from"></label>
+        <label>To <input type="date" id="to"></label>
+        <button id="exportRange" type="button">Export range</button>
+      </div>
+      <p class="muted">Columns: Date, Student, then one column per item with Yes / No / blank. Opens correctly in Excel, including Hebrew. A range includes only days on which at least one student answered.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Edit checklist items <span class="muted">(for this class)</span></h2>
+      <p class="muted">Add, rename, reorder or remove items, and tick ⭐ to show the red star. Changes apply from the next time a student opens the checklist. Past answers and exports are not changed.</p>
+      <div id="editor"></div>
+      <div class="bar" style="border:0;padding:8px 0 0;margin:0">
+        <button class="alt" id="addItem" type="button">+ Add item</button>
+        <button id="saveItems" type="button">Save items</button>
+        <button class="alt" id="resetItems" type="button">Discard changes</button>
+        <span class="muted" id="editMsg"></span>
+      </div>
+      <div id="removed"></div>
+    </div>
+  </div>
+</main>
+<script>
+(function(){
+"use strict";
+var C=window.B3DailyChecklist;
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
+var db=null,ws=(window.B3SiteSettings&&window.B3SiteSettings.workspaceId)||"b3-2026";
+var classes=[],classId="",roster=[];        // roster: [{id,name}]
+var configRaw=null;                           // stored config/items (or null = standard list)
+var editList=[];                              // working copy in the editor, includes removed
+var cache={};                                 // date -> answers object for the current class
+
+function base(){return C.basePath(ws,classId)}
+function fail(msg){$("status").hidden=false;$("status").textContent=msg}
+
+/* ---------- reading ---------- */
+async function loadConfig(){
+  var snap=await db.ref(base()+"/config/items").once("value");
+  configRaw=snap.val()||null;
+  editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});
+  drawEditor();
+}
+async function loadDay(d,force){
+  if(!force&&cache[d])return cache[d];
+  var snap=await db.ref(base()+"/answers/"+d).once("value");
+  cache[d]=snap.val()||{};return cache[d];
+}
+async function loadRange(from,to){
+  var snap=await db.ref(base()+"/answers").orderByKey().startAt(from).endAt(to).once("value");
+  var v=snap.val()||{};Object.keys(v).forEach(function(k){cache[k]=v[k]});
+  return v;
+}
+
+/* ---------- table model (used by both the grid and the CSV) ----------
+   Columns are item ids. The header is the name given in the most recent answer snapshot in range,
+   falling back to the current configured name. Removed items only appear if someone answered them. */
+function buildColumns(dayKeys){
+  var cfg=C.itemsFromConfig(configRaw,true),byId={};
+  cfg.forEach(function(x){byId[x.id]=x});
+  var seen={};   // id -> {name, order, date}
+  dayKeys.slice().sort().forEach(function(d){
+    var day=cache[d]||{};
+    Object.keys(day).forEach(function(sid){
+      var its=(day[sid]&&day[sid].items)||{};
+      Object.keys(its).forEach(function(id){
+        var a=its[id];if(!a||(a.v!==1&&a.v!==0))return;
+        seen[id]={name:String(a.n||id),order:Number(a.o)||0,star:!!a.s};   // later days overwrite earlier ones
+      });
+    });
+  });
+  var cols=[];
+  cfg.forEach(function(x){
+    if(x.removed&&!seen[x.id])return;
+    var s=seen[x.id];
+    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order});
+  });
+  Object.keys(seen).forEach(function(id){
+    if(byId[id])return;                                    // answered items that are no longer in the config at all
+    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order});
+  });
+  cols.sort(function(a,b){return a.order-b.order||(a.id<b.id?-1:1)});
+  return cols;
+}
+function cellValue(day,sid,id){
+  var a=day&&day[sid]&&day[sid].items&&day[sid].items[id];
+  return a&&a.v===1?1:(a&&a.v===0?0:null);
+}
+function sortedRoster(){return roster.slice().sort(function(a,b){return a.name.localeCompare(b.name)})}
+
+/* ---------- grid ---------- */
+async function drawGrid(force){
+  var d=$("day").value;if(!C.isDateKey(d))return;
+  $("summary").textContent="Loading…";
+  var day;
+  try{day=await loadDay(d,force)}catch(e){console.error(e);$("summary").textContent="Could not load answers: "+(e.message||e);return}
+  var cols=buildColumns([d]),people=sortedRoster();
+  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
+  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+  var h='<tr><th class="nm">Student</th>'+cols.map(function(c){return '<th dir="auto">'+esc(c.name)+(c.star?' <span class="star">⭐</span>':'')+'</th>'}).join("")+'</tr>';
+  var rows=people.map(function(p){
+    return '<tr><td class="nm">'+esc(p.name)+'</td>'+cols.map(function(c){var v=cellValue(day,p.id,c.id);
+      return v===1?'<td class="y" title="Yes">✓</td>':v===0?'<td class="n" title="No">✗</td>':'<td class="b"></td>'}).join("")+'</tr>';
+  }).join("");
+  $("grid").innerHTML=h+rows;
+}
+
+/* ---------- CSV ---------- */
+function csvCell(v){
+  var s=String(v==null?"":v).replace(/[\r\n]+/g," ");
+  if(/^[=+\-@\t]/.test(s))s="'"+s;                          // stop spreadsheet formula injection
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+function downloadCsv(rows,name){
+  var text="﻿"+rows.map(function(r){return r.map(csvCell).join(",")}).join("\r\n");   // UTF-8 BOM so Excel shows Hebrew
+  var blob=new Blob([text],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function className(){var c=classes.find(function(x){return x.id===classId});return (c&&c.name)||classId}
+async function exportDates(dates,label){
+  var cols=buildColumns(dates),people=sortedRoster();
+  var rows=[["Date","Student"].concat(cols.map(function(c){return c.name}))];
+  dates.forEach(function(d){
+    var day=cache[d]||{};
+    people.forEach(function(p){
+      rows.push([d,p.name].concat(cols.map(function(c){var v=cellValue(day,p.id,c.id);return v===1?"Yes":v===0?"No":""})));
+    });
+  });
+  var safe=String(className()).replace(/[^\w֐-׿-]+/g,"_");
+  downloadCsv(rows,"daily-checklist-"+safe+"-"+label+".csv");
+}
+$("exportDay").onclick=async function(){
+  var d=$("day").value;if(!C.isDateKey(d)){alert("Pick a day first.");return}
+  try{await loadDay(d,true);await exportDates([d],d)}catch(e){alert("Could not export: "+(e.message||e))}
+};
+$("exportRange").onclick=async function(){
+  var f=$("from").value,t=$("to").value;
+  if(!C.isDateKey(f)||!C.isDateKey(t)){alert("Choose both a From and a To date.");return}
+  if(f>t){var x=f;f=t;t=x}
+  try{
+    var v=await loadRange(f,t);
+    var dates=Object.keys(v).filter(function(k){return C.isDateKey(k)&&v[k]&&Object.keys(v[k]).length}).sort();
+    if(!dates.length){alert("No answers were found between "+f+" and "+t+".");return}
+    await exportDates(dates,f+"_to_"+t);
+  }catch(e){alert("Could not export: "+(e.message||e))}
+};
+
+/* ---------- item editor ---------- */
+function activeEdits(){return editList.filter(function(x){return !x.removed})}
+function drawEditor(){
+  var act=activeEdits();
+  $("editor").innerHTML=act.map(function(it,i){
+    return '<div class="erow" data-id="'+esc(it.id)+'"><input type="text" maxlength="80" dir="auto" value="'+esc(it.name)+'" aria-label="Item name">'+
+      '<label class="stars"><input type="checkbox" '+(it.star?'checked':'')+'> <span class="star">⭐</span> star</label>'+
+      '<span class="btns"><button class="alt" data-act="up" '+(i===0?'disabled':'')+' title="Move up">↑</button><button class="alt" data-act="down" '+(i===act.length-1?'disabled':'')+' title="Move down">↓</button></span>'+
+      '<button class="danger" data-act="remove">Remove</button></div>';
+  }).join("")||'<p class="muted">No items. Add one below.</p>';
+  var gone=editList.filter(function(x){return x.removed});
+  $("removed").innerHTML=gone.length?'<p class="muted" style="margin-top:12px">Removed items (still kept in past answers): '+gone.map(function(x){return '<span dir="auto">'+esc(x.name)+'</span> <button class="alt" data-restore="'+esc(x.id)+'">Restore</button>'}).join(" &nbsp; ")+'</p>':"";
+}
+function syncFromDom(){
+  document.querySelectorAll("#editor .erow").forEach(function(row){
+    var it=editList.find(function(x){return x.id===row.dataset.id});if(!it)return;
+    it.name=row.querySelector("input[type=text]").value;it.star=row.querySelector("input[type=checkbox]").checked;
+  });
+}
+$("editor").onclick=function(e){
+  var b=e.target.closest("button[data-act]");if(!b)return;
+  syncFromDom();
+  var id=b.closest(".erow").dataset.id,act=activeEdits(),i=act.findIndex(function(x){return x.id===id}),a=b.dataset.act;
+  if(a==="remove"){
+    if(!confirm('Remove "'+act[i].name+'"? Students will no longer see it. Past answers and exports are kept.'))return;
+    act[i].removed=true;
+  }else{
+    var j=a==="up"?i-1:i+1;if(j<0||j>=act.length)return;
+    var ia=editList.indexOf(act[i]),ib=editList.indexOf(act[j]);var t=editList[ia];editList[ia]=editList[ib];editList[ib]=t;
+  }
+  drawEditor();
+};
+$("removed").onclick=function(e){
+  var b=e.target.closest("button[data-restore]");if(!b)return;
+  syncFromDom();var it=editList.find(function(x){return x.id===b.dataset.restore});if(it){it.removed=false;editList.splice(editList.indexOf(it),1);editList.push(it)}drawEditor();
+};
+$("addItem").onclick=function(){syncFromDom();editList.push({id:C.newItemId(),name:"",star:false,order:editList.length,removed:false});drawEditor();
+  var ins=document.querySelectorAll("#editor .erow input[type=text]");if(ins.length)ins[ins.length-1].focus()};
+$("resetItems").onclick=function(){editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});drawEditor();$("editMsg").textContent=""};
+$("saveItems").onclick=async function(){
+  syncFromDom();
+  var names={},out={},n=0;
+  for(var i=0;i<editList.length;i++){
+    var it=editList[i];it.name=String(it.name||"").trim();
+    if(it.removed&&!it.name)continue;                              // blank, never saved: drop
+    if(!it.removed){
+      if(!it.name){alert("Every item needs a name. Fill in or remove the empty one.");return}
+      var k=it.name.toLowerCase();if(names[k]){alert('There are two items named "'+it.name+'". Please make them different.');return}names[k]=1;
+    }
+    out[it.id]={name:it.name,star:!!it.star,order:n++,removed:!!it.removed};
+  }
+  if(!Object.keys(out).some(function(id){return !out[id].removed})&&!confirm("There will be no active items, so students will see an empty checklist. Save anyway?"))return;
+  $("saveItems").disabled=true;$("editMsg").textContent="Saving…";
+  try{
+    await db.ref(base()+"/config/items").set(out);
+    configRaw=out;editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});
+    drawEditor();$("editMsg").textContent="✓ Saved";drawGrid(false);
+  }catch(e){console.error(e);$("editMsg").textContent="Could not save: "+(e.message||e)}
+  $("saveItems").disabled=false;
+};
+
+/* ---------- navigation ---------- */
+function shift(n){var p=$("day").value.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]+n);
+  $("day").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");drawGrid(false)}
+$("prev").onclick=function(){shift(-1)};$("next").onclick=function(){shift(1)};
+$("today").onclick=function(){$("day").value=C.schoolDate();drawGrid(false)};
+$("day").onchange=function(){drawGrid(false)};
+$("refresh").onclick=function(){cache={};loadConfig().then(function(){drawGrid(true)})};
+async function selectClass(id){
+  classId=id;cache={};
+  var c=classes.find(function(x){return x.id===id});
+  roster=((c&&c.studentIds)||[]).map(function(sid,i){return {id:sid,name:String((c.students&&c.students[i])||sid)}});
+  try{await loadConfig();await drawGrid(true)}catch(e){console.error(e);fail("Could not load this class: "+(e.message||e))}
+}
+$("classSel").onchange=function(){selectClass($("classSel").value)};
+
+(async function(){
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    db=firebase.database();
+    var session=await window.B3TeacherClassRosters.load();
+    classes=session.classes||[];
+    if(!classes.length){fail("No classes are assigned to this teacher.");return}
+    $("classSel").innerHTML=classes.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name||c.id)+'</option>'}).join("");
+    var first=session.selectedId&&classes.some(function(c){return c.id===session.selectedId})?session.selectedId:classes[0].id;
+    $("classSel").value=first;
+    $("day").value=C.schoolDate();
+    var t=C.schoolDate();$("from").value=t;$("to").value=t;
+    $("status").hidden=true;$("app").hidden=false;
+    await selectClass(first);
+  }catch(e){console.error(e);fail((e.message||"Could not load your class.")+" Open Teacher Center to sign in or choose an assigned class.")}
+})();
+})();
+</script>
+<script src="../back-nav.js" data-mode="inline" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body></html>

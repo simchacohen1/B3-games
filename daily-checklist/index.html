@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Checklist</title>
+<style>
+:root{--navy:#173b62;--navy2:#0f2a47;--green:#1f9d55;--greenbg:#e5f7ec;--red:#c0392b;--redbg:#fdecea;--ink:#1f2d3d;--muted:#5d6b7a;--line:#d9e4ee}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Nunito,Arial,sans-serif;background:linear-gradient(180deg,#eaf4fb 0%,#fdf7e8 100%);color:var(--ink);min-height:100vh}
+button{font:inherit;cursor:pointer}
+header{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:22px;font-weight:900}
+header .who{margin-left:auto;font-weight:800}
+.homeBtn{background:#ffffff22;color:#fff;border:0;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none}
+main{max-width:640px;margin:0 auto;padding:18px 16px 60px}
+.banner{background:#fff8e1;border:2px solid #f1d58a;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:700}
+.banner a{color:var(--navy)}
+.date{text-align:center;color:var(--muted);font-weight:800;margin:4px 0 6px}
+.progress{height:10px;background:#dbe6ef;border-radius:999px;overflow:hidden;margin:6px 0 4px}
+.progress i{display:block;height:100%;background:var(--navy);width:0;transition:width .25s}
+.count{text-align:center;color:var(--muted);font-weight:800;font-size:14px;margin-bottom:14px}
+.card{background:#fff;border:2px solid var(--line);border-radius:18px;padding:26px 16px;box-shadow:0 6px 18px #173b6214}
+.q{text-align:center;font-size:30px;font-weight:900;line-height:1.25;margin:10px 0 26px;overflow-wrap:anywhere}
+.q .star{color:#d92d20;font-size:32px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.btn{border:0;border-radius:18px;min-height:120px;font-size:34px;font-weight:900;color:#fff}
+.btn.yes{background:var(--green)}
+.btn.no{background:var(--red)}
+.btn.sel{outline:6px solid var(--navy);outline-offset:3px}
+.btn:active{transform:scale(.97)}
+.nav{display:flex;justify-content:space-between;margin-top:16px}
+.nav button{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 16px;font-weight:800;color:var(--navy)}
+.nav button[disabled]{opacity:.4;cursor:default}
+.list{display:grid;gap:10px;margin-top:6px}
+.row{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--line);border-radius:14px;padding:10px 12px}
+.row .nm{flex:1;font-weight:800;font-size:18px;overflow-wrap:anywhere}
+.row .nm .star{color:#d92d20}
+.mini{display:flex;gap:6px}
+.mini button{border:2px solid var(--line);background:#fff;border-radius:10px;min-width:64px;min-height:46px;font-weight:900;font-size:16px}
+.mini button.yes.on{background:var(--green);border-color:var(--green);color:#fff}
+.mini button.no.on{background:var(--red);border-color:var(--red);color:#fff}
+.done{text-align:center;font-size:22px;font-weight:900;margin:6px 0 12px}
+.note{font-size:13px;color:var(--muted);text-align:center;margin-top:16px;min-height:18px}
+.hidden{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="daily-checklist" data-back-href="../index.html"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<header>
+  <h1><span aria-hidden="true">☑️</span> Daily Checklist</h1>
+  <span class="who" id="whoName"></span>
+  <a class="homeBtn" href="../index.html">Home</a>
+</header>
+<main>
+  <div class="banner hidden" id="banner"></div>
+  <div class="date" id="dateLabel"></div>
+  <div id="loading" class="note">Loading…</div>
+
+  <section id="asking" class="hidden">
+    <div class="progress"><i id="bar"></i></div>
+    <div class="count" id="count"></div>
+    <div class="card">
+      <div class="q" id="question" dir="auto"></div>
+      <div class="btns">
+        <button class="btn yes" id="yes" type="button">YES</button>
+        <button class="btn no" id="no" type="button">NO</button>
+      </div>
+    </div>
+    <div class="nav">
+      <button id="back" type="button">← Back</button>
+      <button id="skip" type="button">Next →</button>
+    </div>
+  </section>
+
+  <section id="summary" class="hidden">
+    <div class="done">All done for today! 🎉</div>
+    <div class="count">You can change any answer until the end of the day.</div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <div class="note" id="note"></div>
+</main>
+<script src="../teacher-account.js?v=20261008"></script>
+<script>
+(function(){
+"use strict";
+var C=window.B3DailyChecklist;
+var $=function(id){return document.getElementById(id)};
+var isGuest=function(){return !!(window.B3Guest&&window.B3Guest.isGuest())};
+var studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
+var studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
+var items=C.DEFAULT_ITEMS.map(function(x,i){return {id:x.id,name:x.name,star:x.star,order:i}});
+var answers={};      // itemId -> 1 | 0 (today only)
+var index=0;
+var today=C.schoolDate();
+var dayRef=null;     // answers/{today}/{studentId}; null means "nothing is saved" (guest, teacher demo, no class)
+var saveFailed=false;
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
+function nameHtml(it){return esc(it.name)+(it.star?' <span class="star" aria-label="starred">⭐</span>':"")}
+function setNote(t){$("note").textContent=t||""}
+function pretty(key){var p=key.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}
+
+function show(which){["asking","summary","loading"].forEach(function(id){$(id).classList.toggle("hidden",id!==which)})}
+function firstUnanswered(){for(var i=0;i<items.length;i++)if(answers[items[i].id]==null)return i;return -1}
+
+function render(){
+  if(!items.length){show("loading");$("loading").textContent="Your teacher has not added any checklist items yet.";return}
+  if(index<0)index=0;
+  if(index>=items.length){renderSummary();return}
+  var it=items[index];
+  show("asking");
+  $("question").innerHTML=nameHtml(it);
+  $("count").textContent="Question "+(index+1)+" of "+items.length;
+  $("bar").style.width=Math.round(index/items.length*100)+"%";
+  $("yes").classList.toggle("sel",answers[it.id]===1);
+  $("no").classList.toggle("sel",answers[it.id]===0);
+  $("back").disabled=index===0;
+  $("skip").disabled=false;
+}
+function renderSummary(){
+  show("summary");
+  $("list").innerHTML=items.map(function(it,i){var a=answers[it.id];
+    return '<div class="row"><div class="nm" dir="auto">'+nameHtml(it)+'</div><div class="mini">'+
+      '<button type="button" class="yes'+(a===1?' on':'')+'" data-i="'+i+'" data-v="1">YES</button>'+
+      '<button type="button" class="no'+(a===0?' on':'')+'" data-i="'+i+'" data-v="0">NO</button></div></div>'}).join("");
+}
+function answer(v){
+  var it=items[index];if(!it)return;
+  setAnswer(it,v);
+  index++;
+  render();
+}
+function setAnswer(it,v){
+  answers[it.id]=v;
+  if(!dayRef)return;
+  var upd={name:studentName||studentId,t:firebase.database.ServerValue.TIMESTAMP};
+  upd["items/"+it.id]={v:v,n:it.name,s:it.star?1:0,o:it.order};
+  dayRef.update(upd).then(function(){saveFailed=false;setNote("✓ Saved for your teacher")}).catch(function(e){
+    console.warn("Daily Checklist save failed",e);saveFailed=true;setNote("Could not save that answer. Check your internet and tap it again.")});
+}
+
+$("yes").onclick=function(){answer(1)};
+$("no").onclick=function(){answer(0)};
+$("back").onclick=function(){if(index>0){index--;render()}};
+$("skip").onclick=function(){index++;render()};
+$("list").onclick=function(e){
+  var b=e.target.closest("button[data-i]");if(!b)return;
+  setAnswer(items[+b.dataset.i],+b.dataset.v);renderSummary();
+};
+
+async function waitForAuth(){
+  try{
+    if(!firebase.auth||firebase.auth().currentUser)return;
+    await new Promise(function(res){var off=firebase.auth().onAuthStateChanged(function(u){if(u){off();res()}});setTimeout(function(){off();res()},4000)});
+  }catch(e){}
+}
+
+async function start(){
+  $("dateLabel").textContent=pretty(today);
+  if(isGuest()){
+    $("whoName").textContent="Guest";
+    setNote("Guest preview — nothing is saved.");
+    index=0;render();return;
+  }
+  var account=await window.B3TeacherAccountReady;
+  if(account&&account.user&&account.authorized&&!(window.B3SiteSettings&&window.B3SiteSettings.getActingStudent&&window.B3SiteSettings.getActingStudent())){
+    $("whoName").textContent="Teacher demonstration";
+    setNote("Demonstration — answers are not saved.");
+    index=0;render();return;
+  }
+  $("whoName").textContent=studentName;
+  if(!studentId){
+    $("banner").innerHTML='You can look around, but your answers will not be saved. <a href="../index.html">Sign in on Fun Torah Tools</a> to save them.';
+    $("banner").classList.remove("hidden");index=0;render();return;
+  }
+  try{
+    if(!window.firebase||!window.B3_FIREBASE_CONFIG)throw new Error("Firebase not loaded");
+    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    await waitForAuth();
+    var db=firebase.database();
+    var info=await window.FunTorahStudentClass.resolve(db,studentId);
+    if(!info.classId){setNote("Ask your teacher to add you to a class to save your answers.");index=0;render();return}
+    var base=C.basePath(info.workspaceId,info.classId);
+    try{var cfg=await db.ref(base+"/config/items").once("value");if(cfg.val())items=C.itemsFromConfig(cfg.val(),false)}
+    catch(e){console.warn("Daily Checklist items unavailable, using the standard list",e)}
+    dayRef=db.ref(base+"/answers/"+today+"/"+studentId);
+    var snap=await dayRef.child("items").once("value");
+    var saved=snap.val()||{};
+    items.forEach(function(it){var s=saved[it.id];if(s&&(s.v===1||s.v===0))answers[it.id]=s.v});
+    var f=firstUnanswered();
+    index=f<0?items.length:f;
+    render();
+  }catch(e){
+    console.error(e);dayRef=null;
+    setNote("Could not connect, so answers will not be saved right now. Please refresh.");
+    index=0;render();
+  }
+}
+start();
+})();
+</script>
+</body>
+</html>
