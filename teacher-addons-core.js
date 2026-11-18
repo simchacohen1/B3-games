@@ -49,6 +49,16 @@
     return { ok: errors.length === 0, profile: profile, errors: errors };
   }
 
+  // The only addresses an add-on may be shown from (never an address that comes from a link or from a teacher).
+  var ALLOWED_HOSTS = ['https://apps.sols.tools', 'https://fun-torah-tools-staging-apps.web.app'];
+  // The viewer's sandbox. NO allow-same-origin (the add-on gets no origin, so no cookies, storage or access to our page),
+  // NO allow-top-navigation (it cannot move our page), NO allow-popups (it cannot open other sites).
+  var SANDBOX = 'allow-scripts allow-forms allow-modals';
+  function viewerFrameUrl(host, addonId) {
+    if (ALLOWED_HOSTS.indexOf(host) < 0 || !validId(addonId)) return '';
+    return host + '/a/' + addonId + '/';
+  }
+
   // Who may manage an add-on: its owner (the teacher who made it), the site owner, or an active admin.
   function canManage(ownerUid, uid, isOwnerOrAdmin) { return !!isOwnerOrAdmin || (!!uid && !!ownerUid && ownerUid === uid); }
 
@@ -56,6 +66,6 @@
   function isLive(adminRecord) { return !(adminRecord && adminRecord.disabled === true); }
   function status(adminRecord) { return isLive(adminRecord) ? 'live' : 'switched-off'; }
 
-  var api = { LIMITS: LIMITS, ID_PATTERN: ID_PATTERN, newAddonId: newAddonId, validId: validId, cleanText: cleanText, cleanProfile: cleanProfile, canManage: canManage, isLive: isLive, status: status };
+  var api = { LIMITS: LIMITS, ID_PATTERN: ID_PATTERN, newAddonId: newAddonId, validId: validId, cleanText: cleanText, cleanProfile: cleanProfile, canManage: canManage, isLive: isLive, status: status, ALLOWED_HOSTS: ALLOWED_HOSTS, SANDBOX: SANDBOX, viewerFrameUrl: viewerFrameUrl };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.B3TeacherAddons = api;
 })(typeof window !== 'undefined' ? window : this);

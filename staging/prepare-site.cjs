@@ -38,7 +38,8 @@ const PRODUCTION_STUDENT_NAMES = [
   'Arik Traxler', 'Ari Greenberg', 'Zev Rosenfeld', 'Levi Schtroks',
   'Yisroel Aryeh Simmonds', 'Leibel Vogel', 'Yisroel Arye Leib Wolf', 'Rabbi Cohen'
 ];
-const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'tests', 'e2e', 'backend', 'docs', 'staging', 'staging-build']);
+// _apps-host is the separate add-ons origin: it is deployed on its own and must never be served from the main site.
+const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'tests', 'e2e', 'backend', 'docs', 'staging', 'staging-build', '_apps-host']);
 
 function requiredStagingUrl(value, name, blockedHost) {
   let parsed;
