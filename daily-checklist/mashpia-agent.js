@@ -5,7 +5,8 @@
 (function () {
   'use strict';
   var ALLOWED = ['https://fun-torah-tools-staging.web.app', 'https://funtorahtools.com', 'https://www.funtorahtools.com',
-    'https://funtorahtools.org', 'https://www.funtorahtools.org', 'https://simchacohen1.github.io'];
+    'https://funtorahtools.org', 'https://www.funtorahtools.org', 'https://sols.tools', 'https://www.sols.tools',
+    'https://simchacohen1.github.io'];
   var Core = window.B3MashpiaCore;
   if (!Core || location.hostname !== 'mashpia.com') { alert('Open this on your Mashpia page, then click the bookmark.'); return; }
 

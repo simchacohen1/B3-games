@@ -102,6 +102,15 @@ test('agent: announces ready to B3 origins, answers ping, syncs with the teacher
   assert.deepEqual(JSON.parse(JSON.stringify([res.ok, res.id, res.result.synced, res.result.notFound])), [true, 'x1', 2, []]);
 });
 
+test('agent: accepts the live sols.tools sites', async () => {
+  for (const origin of ['https://sols.tools', 'https://www.sols.tools']) {
+    const t = mashpiaTab({ origin });
+    await t.send({ b3: 'mashpia-ping' });
+    assert.equal(t.replies[0][0].b3, 'mashpia-pong');
+    assert.ok(t.opened.some(([, o]) => o === origin), 'ready announced to ' + origin);
+  }
+});
+
 test('agent: ignores other websites', async () => {
   const t = mashpiaTab({ origin: 'https://evil.example.com' });
   await t.send({ b3: 'mashpia-sync', id: 'x', date: '2026-11-18', students: STUDENTS });
