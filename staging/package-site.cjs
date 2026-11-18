@@ -7,7 +7,9 @@ const { stageSource } = require('./prepare-site.cjs');
 const SKIP_DIRS = new Set([
   '.git', '.github', '.firebase', '.vscode', '.idea', '.claude', '.codex', '.agents', '.aws',
   'node_modules', 'backend', 'docs', 'e2e', 'tests', 'security', 'scripts', 'staging', 'staging-build',
-  'test-results', 'playwright-report'
+  'test-results', 'playwright-report',
+  // The separate add-ons origin is deployed on its own; it must never be served from the main site.
+  '_apps-host'
 ]);
 const SKIP_FILES = /^(?:firebase.*\.json|package(?:-lock)?\.json|\.env(?:\..*)?|\.firebaserc|firebase-debug(?:\..*)?\.log|.*(?:service-account|firebase-adminsdk|credentials|secret).*\.json|.*\.(?:pem|key|p12|pfx|jks|md|markdown|ps1|cjs|rules|map|log))$/i;
 

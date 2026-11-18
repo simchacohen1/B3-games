@@ -48,6 +48,7 @@ test('the add-ons folder holds only the host page and the self-test add-on, and 
 test('the add-ons folder is never published with the main sites: it starts with an underscore (not served by GitHub Pages) and is left out of the staging package', () => {
   assert.ok(fs.statSync(path.join(root, '_apps-host')).isDirectory());
   assert.match(read('staging/prepare-site.cjs'), /EXCLUDED_DIRS = new Set\(\[[^\]]*'_apps-host'\]\)/);
+  assert.match(read('staging/package-site.cjs'), /SKIP_DIRS = new Set\(\[[\s\S]*?'_apps-host'\s*\]\)/);
 });
 
 test('staging pages are told to use the staging add-ons host', () => {
