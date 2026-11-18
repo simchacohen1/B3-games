@@ -66,6 +66,8 @@
       const [a,b]=out.points;
       if(tool!=='rect'||typeof s.image!=='string'||s.image.length>MAX_IMAGE||!IMAGE_DATA.test(s.image)||b.x-a.x<.02||b.y-a.y<.02)return null;
       out.image=s.image;
+      // The teacher can lock a picture so a student cannot move or resize it (a worksheet background).
+      if(s.locked===true)out.locked=true;
     }
     return out;
   }
@@ -148,10 +150,22 @@
     }
     // Move or resize one of my own marks without sending it again (a picture stays where it is in the pile).
     if(op.type==='board-move'){
-      const old=board.strokes.find(item=>item.by===by&&item.id===op.id);if(!old)return false;
+      let old=board.strokes.find(item=>item.by===by&&item.id===op.id);
+      // A student may move or resize a picture the teacher put on the board, unless the teacher locked it. The picture stays the
+      // teacher's, keeps its name and can never be handed over or removed by the student.
+      const theirs=!old&&by==='student'&&typeof op.newId!=='string'?board.strokes.find(item=>item.by==='teacher'&&item.image&&!item.locked&&item.id===op.id):null;
+      old=old||theirs;if(!old)return false;
+      const owner=theirs?'teacher':by;
       const s=cleanStroke({...old,id:typeof op.newId==='string'?op.newId:old.id,points:op.points});
-      if(!s||s.id[0]!==by[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
-      s.by=by;board.strokes[board.strokes.indexOf(old)]=s;return true;
+      if(!s||s.id[0]!==owner[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
+      s.by=owner;board.strokes[board.strokes.indexOf(old)]=s;return true;
+    }
+    // Teacher only: lock or unlock one of the teacher's pictures. A locked picture cannot be moved or resized by the student.
+    if(op.type==='board-lock'){
+      if(by!=='teacher'||typeof op.id!=='string')return false;
+      const at=board.strokes.findIndex(item=>item.by==='teacher'&&item.image&&item.id===op.id);if(at<0)return false;
+      const s=cleanStroke({...board.strokes[at],locked:op.locked===true});if(!s)return false;
+      s.by='teacher';board.strokes[at]=s;return true;
     }
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
@@ -490,12 +504,18 @@
       if(o.by==='student'&&state?.mode==='open'&&state.surface==='board'){FA.select('select');say('Drag the picture to move it.');return}
       o.tools.setTool(o.tools.tool==='move'?'pen':'move');update();
     });
+    // Teacher only: lock the picture so the student cannot move or resize it (good for a worksheet background).
+    const lock=o.by==='teacher'?button('🔒 Lock','Lock this picture so the student cannot move or resize it',()=>{const s=mine();if(s)o.act({type:'board-lock',id:s.id,locked:s.locked!==true});update()}):null;
     pictureGroup.append(move,button('➖ Smaller','Make the picture smaller',()=>resize(.8)),button('➕ Bigger','Make the picture bigger',()=>resize(1.25)),
+      ...(lock?[lock]:[]),
       button('✕ Remove picture','Take the picture off the board',()=>{const s=mine();if(s)o.act({type:'board-remove',ids:[s.id]});update()},'danger'));
     root.append(button('📋 Paste','Put the picture or words you copied on this board. You can also press Ctrl+V.',()=>{if(Clip)void Clip.pasteInto(target)}),
       button('📄 Copy board','Copy a picture of this board, so you can paste it somewhere else',()=>{if(Clip)void Clip.copyFrom(target)}),pictureGroup,note);
     bar.append(root);
-    function update(){pictureGroup.hidden=!mine();move.setAttribute('aria-pressed',String(o.tools.tool==='move'))}
+    function update(){
+      const s=mine();pictureGroup.hidden=!s;move.setAttribute('aria-pressed',String(o.tools.tool==='move'));
+      if(lock){lock.textContent=s?.locked?'🔓 Unlock':'🔒 Lock';lock.setAttribute('aria-pressed',String(!!s?.locked))}
+    }
     clipReady.then(clip=>{if(clip)clip.register(target);else root.hidden=true});
     update();
     return{root,update,say};
@@ -576,8 +596,18 @@
     const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-      getItems:()=>board.strokes.filter(item=>item.by==='student'),
-      setItems(list){syncBoardItems(board,'student',list,act)},
+      // My own marks, and (while my board is open to me, i.e. I am not paused) the teacher's pictures that are not locked.
+      getItems:()=>board.strokes.filter(item=>item.by==='student'||(boardOpen()&&item.by==='teacher'&&item.image&&!item.locked)),
+      setItems(list){
+        // A teacher's picture (its name starts with "t") can only be moved or resized. Taking it out of the list (Delete, Eraser)
+        // changes nothing: the picture stays, and a student can never remove it.
+        const theirs=list.filter(item=>item.id[0]==='t'),own=list.filter(item=>item.id[0]!=='t');
+        syncBoardItems(board,'student',own,act);
+        for(const item of theirs){
+          const old=board.strokes.find(s=>s.by==='teacher'&&s.image&&!s.locked&&s.id===item.id);
+          if(old&&JSON.stringify(old.points)!==JSON.stringify(item.points))act({type:'board-move',id:item.id,points:item.points});
+        }
+      },
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
