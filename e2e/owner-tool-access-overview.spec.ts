@@ -37,7 +37,11 @@ async function openAdministration(page: Page, email: string, emailVerified: bool
           database: () => ({ ref: path => ({
             async once() {
               await window.recordRead(path);
-              return { val: () => fixture[path.split('/').pop()] || null };
+              // A single class (.../classes/<id>) is readable; the whole classes node is not, like the hardened rules.
+              const parts = path.split('/');
+              if (parts[parts.length - 1] === 'classes') throw new Error('permission_denied at /' + path);
+              const value = parts[parts.length - 2] === 'classes' ? fixture.classes[parts[parts.length - 1]] : fixture[parts[parts.length - 1]];
+              return { val: () => value || null };
             }
           }) })
         };
@@ -97,7 +101,9 @@ test('owner can filter and export the read-only overview', async ({ page }) => {
   await expect(page.getByText('No teachers match.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download CSV' })).toBeDisabled();
 
-  expect(reads.map(path => path.split('/').pop())).toEqual(['teacherInvites', 'classes', 'schools', 'students']);
+  // Classes are read one by one (IDs come from the teacher invitations); the whole classes node is never read.
+  expect(reads.map(path => /\/classes\/[^/]+$/.test(path) ? 'classes/' + path.split('/').pop() : path.split('/').pop()))
+    .toEqual(['teacherInvites', 'classes/alpha', 'classes/beta', 'classes/retired', 'classes/gamma', 'schools', 'students']);
   expect(errors).toEqual([]);
 });
 
