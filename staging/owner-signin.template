@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Staging sign-in (test accounts)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;font-family:system-ui,"Segoe UI",Arial,sans-serif;color:#0f172a}
+  main{width:min(440px,calc(100vw - 32px));background:#fff;border-radius:18px;padding:24px 22px;box-shadow:0 20px 60px #0006}
+  h1{margin:0 0 4px;font-size:22px}
+  .tag{display:inline-block;margin-bottom:10px;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#92400e;font-weight:800;font-size:12px}
+  p{margin:6px 0 12px;color:#475569;font-size:14px;line-height:1.45}
+  label{display:block;font-weight:700;font-size:13px;margin:10px 0 4px}
+  input{width:100%;padding:11px 12px;border:1px solid #94a3b8;border-radius:10px;font:inherit}
+  button{width:100%;margin-top:14px;padding:12px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 16px system-ui;cursor:pointer}
+  button:disabled{opacity:.6;cursor:wait}
+  #msg{min-height:1.4em;margin-top:12px;font-weight:700;font-size:14px}
+  .err{color:#b91c1c}.ok{color:#166534}
+  .small{font-size:13px;color:#475569;margin-top:14px}
+  button.plain{display:inline-block;width:auto;margin:4px 6px 0 0;padding:7px 11px;background:#e2e8f0;color:#0f172a;font:700 13px system-ui}
+  #who{margin-top:10px;font-size:13px;color:#334155}
+  nav{display:none;margin-top:10px;gap:8px;flex-wrap:wrap}
+  nav a{flex:1 1 140px;text-align:center;padding:10px;border-radius:10px;background:#e0e7ff;color:#1e3a8a;font-weight:800;text-decoration:none}
+</style>
+</head>
+<body>
+<main>
+  <span class="tag">STAGING ONLY · fictional test accounts</span>
+  <h1>Sign in to the staging site</h1>
+  <p>For the staging test accounts (owner, teachers, principal). Your real Google account is not the owner here, by design.
+     The password is in your local <code>staging/test-credentials.local.json</code> file. It is typed here and sent only to the staging sign-in service.</p>
+  <form id="form" autocomplete="off">
+    <label for="email">Email</label>
+    <input id="email" type="email" value="owner@funtorahtools-staging.test" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button id="go" type="submit">Sign in</button>
+  </form>
+  <div id="who" role="status"></div>
+  <div id="msg" role="status"></div>
+  <p class="small">Stuck, or signed in as the wrong account?
+    <button type="button" id="signout" class="plain">Sign out</button>
+    <button type="button" id="reset" class="plain">Reset sign-in on this browser</button></p>
+  <nav id="after">
+    <a href="../owner-admin.html">Owner Admin</a>
+    <a href="../admin.html">Administration</a>
+    <a href="../index.html">Teacher Tools</a>
+  </nav>
+</main>
+<script src="firebase-config.generated.js"></script>
+<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"></script>
+<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var config = window.B3_FIREBASE_CONFIG || null;
+  // Only ever for the staging project: refuse anywhere else.
+  if (!config || config.projectId !== 'fun-torah-tools-staging') {
+    document.querySelector('main').innerHTML = '<h1>Not available</h1><p>This page only works on the staging site.</p>';
+    return;
+  }
+  var app = firebase.apps.length ? firebase.app() : firebase.initializeApp(config);
+  var auth = app.auth();
+  // ?next=<a page on this site> sends you there after signing in. Anything else is ignored.
+  var next = new URLSearchParams(location.search).get('next') || '';
+  var safeNext = /^\.\.\/[A-Za-z0-9_\-\/]+\.html(\?[A-Za-z0-9_=&%\-]*)?$/.test(next) || /^\/[A-Za-z0-9_\-\/]+\.html(\?[A-Za-z0-9_=&%\-]*)?$/.test(next) ? next : '';
+
+  function say(text, cls) { var m = $('msg'); m.textContent = text; m.className = cls || ''; }
+  // Always show who this browser is signed in as, so a wrong account (for example your own Google account) is obvious.
+  function showWho(user) {
+    $('who').textContent = user ? 'This browser is signed in as ' + (user.email || 'a student/guest') + (user.email && !user.emailVerified ? ' (email NOT verified: Owner Admin will refuse it)' : '') + '.' : 'This browser is not signed in.';
+    $('after').style.display = user ? 'flex' : 'none';
+  }
+  function signedIn(user) {
+    say('Signed in as ' + user.email + '.', 'ok');
+    showWho(user);
+    if (safeNext) location.href = safeNext;
+  }
+  auth.onAuthStateChanged(function (user) { showWho(user); });
+  var slow = 0;
+  $('form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = $('go'), email = $('email').value.trim(), password = $('password').value;
+    var current = auth.currentUser;
+    // Always a fresh sign-in, even as the same account: a copy of the account saved in this browser can be out of date
+    // (for example it still says "email not verified"), and Owner Admin trusts that saved copy.
+    button.disabled = true; say('Signing in…');
+    clearTimeout(slow);
+    slow = setTimeout(function () { say('This is taking too long. Check your connection, close other tabs of this site, then press “Reset sign-in on this browser” below (or try a private window).', 'err'); button.disabled = false; }, 15000);
+    // Leave a different account first, so the new sign-in always replaces it.
+    var different = current && current.email && current.email.toLowerCase() !== email.toLowerCase();
+    (different ? auth.signOut() : Promise.resolve()).then(function () {
+      return auth.signInWithEmailAndPassword(email, password);
+    }).then(function (cred) {
+      // Refresh the saved copy from the server (verified flag, claims) before anything else reads it.
+      return cred.user.reload().then(function () { return cred.user.getIdToken(true); }).then(function () { return cred; });
+    }).then(function (cred) {
+      clearTimeout(slow); $('password').value = '';
+      if (!cred.user.emailVerified) { showWho(cred.user); say('Signed in, but this account\'s email is NOT verified, so Owner Admin will refuse it. Tell Claude: the staging owner account needs its email marked verified.', 'err'); return; }
+      signedIn(cred.user);
+    }).catch(function (error) {
+      clearTimeout(slow); $('password').value = '';
+      say(error && /wrong-password|invalid-credential|user-not-found|invalid-login/.test(String(error.code || error.message)) ? 'That email or password is not right.' : 'Could not sign in (' + String((error && error.code) || 'error').replace('auth/', '') + '). Try again.', 'err');
+    }).then(function () { button.disabled = false; });
+  });
+  $('signout').addEventListener('click', function () { auth.signOut().then(function () { say('Signed out.', 'ok'); }); });
+  // Clears this browser's saved sign-in data for the staging site (a stuck or confused sign-in), then reloads.
+  $('reset').addEventListener('click', function () {
+    var done = function () {
+      try { Object.keys(localStorage).filter(function (k) { return k.indexOf('firebase:') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      try { var req = indexedDB.deleteDatabase('firebaseLocalStorageDb'); req.onsuccess = req.onerror = req.onblocked = function () { location.reload(); }; setTimeout(function () { location.reload(); }, 1500); } catch (e) { location.reload(); }
+    };
+    Promise.resolve().then(function () { return auth.signOut(); }).then(done, done);
+  });
+})();
+</script>
+</body>
+</html>
