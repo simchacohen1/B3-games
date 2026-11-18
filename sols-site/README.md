@@ -24,19 +24,19 @@ Nothing in this folder is loaded by funtorahtools.com. `brand.js` only changes
 the visible site name and the browser-tab icon on the sols.tools copy; accounts,
 saved work and Firebase paths are identical on both addresses.
 
-## Only Class Pointer for teachers and students
+## Front door: Class Pointer for visitors, the whole site once signed in
 
-`pointer-only.js` (issue #832) is put at the start of `/sols-brand.js` on the sols.tools copy.
-For everyone except a site administrator it:
+`pointer-only.js` (issue #832, widened) is put at the start of `/sols-brand.js` on the sols.tools copy.
 
-- sends any page other than the home page, the teacher home page and the Class Pointer
-  pages (`/class-pointer-prototype/`) back to the home page;
-- hides the other tools on the student home page and the teacher home page.
+- **Not signed in:** any page other than the home page, the teacher sign-in page and the Class Pointer
+  pages (`/class-pointer-prototype/`) sends the visitor back to the home page, and the home pages show
+  Class Pointer only. Clean links work too (`/teacher-home`, `/index`, `/class-pointer-prototype`).
+- **Signed in (teacher, student or administrator):** the whole site, the same as funtorahtools.com.
+  The script never grants access: every page and the server still run their own checks (class
+  permissions, teacher assignment, owner-only pages).
 
-A site administrator who has signed in on sols.tools keeps the whole site in that browser.
-This is display only: accounts, data and rules are unchanged, and the same account still
-sees its class's tools on funtorahtools.com. To show another tool on sols.tools, add its
-folder to the allowed list in `pointer-only.js`.
+A page waits (hidden) until the site's sign-in has answered; if it never does, the page is shown and
+its own checks apply. This is display only: accounts, data and rules are unchanged.
 
 Do not edit `sols-school-site` by hand: the next update overwrites it. Change
 this repository instead.
