@@ -1,5 +1,13 @@
 /*
- * sols.tools shows only Class Pointer to teachers and students (issue #832).
+ * sols.tools front door (issue #832, widened).
+ *
+ * A visitor who is NOT signed in still sees only the home page, the teacher sign-in page and Class Pointer:
+ * any other page sends them back to the home page, and the home pages show Class Pointer only.
+ * Anyone who is SIGNED IN (teacher, student or administrator) gets the whole site, the same as funtorahtools.com.
+ * This file never grants access. Every page and the server still run their own checks (class permissions,
+ * teacher assignment, owner-only pages), so a signed-in person sees exactly what they could on funtorahtools.com.
+ *
+ * Previously (issue #832): sols.tools showed only Class Pointer to teachers and students.
  *
  * This file is NOT loaded by funtorahtools.com. sols-site/build.mjs puts it at the
  * start of /sols-brand.js, the one extra script every page of the sols.tools copy
@@ -26,12 +34,14 @@
   var POINTER_DIR = '/class-pointer-prototype/';
   var HOME_PAGES = ['/', '/index.html', '/teacher-home.html'];
 
-  // Pages a teacher or student may open on sols.tools.
+  // Pages a signed-out visitor may open on sols.tools. Clean links count too: /teacher-home, /index, /class-pointer-prototype.
   function allowedPath(pathname) {
     var path = String(pathname || '/');
     if (path.charAt(0) !== '/') path = '/' + path;
-    if (HOME_PAGES.indexOf(path) !== -1) return true;
-    return path.indexOf(POINTER_DIR) === 0;
+    var clean = path.replace(/\.html$/, '').replace(/\/index$/, '/');
+    if (clean.length > 1) clean = clean.replace(/\/+$/, '');
+    if (clean === '' || clean === '/' || clean === '/index' || clean === '/teacher-home') return true;
+    return (clean + '/').indexOf(POINTER_DIR) === 0;
   }
   // Does a link on a home page lead to Class Pointer?
   function isPointerHref(href) {
@@ -41,15 +51,10 @@
     if (path.charAt(0) !== '/') path = '/' + path.replace(/^(\.\/)+/, '');
     return path.indexOf(POINTER_DIR) === 0;
   }
-  // What the signed-in person is, from what the site already worked out:
-  // 'full' (site administrator), 'limited' (anyone else), or '' (not known yet).
-  function viewerKind(authKnown, user, access) {
+  // 'limited' (nobody signed in), 'full' (somebody is signed in: the whole site, with every page's own checks), '' (not known yet).
+  function viewerKind(authKnown, user) {
     if (!authKnown) return '';
-    if (!user) return 'limited';
-    if (access && access.authorized === true) return access.role === 'admin' ? 'full' : 'limited';
-    // A student signs in without an email address; a teacher always has one.
-    if (!user.email) return 'limited';
-    return '';
+    return user ? 'full' : 'limited';
   }
 
   var api = { FULL_KEY: FULL_KEY, allowedPath: allowedPath, isPointerHref: isPointerHref, viewerKind: viewerKind };
@@ -64,11 +69,15 @@
   var full = readFull();
   root.SOLS_POINTER_ONLY = !full;
 
-  // 1. Any other page: back to the home page, before the page shows anything.
+  // 1. Any other page, for someone who is not signed in: back to the home page. Whether anyone is signed in is not known
+  // until the site's sign-in has answered, so the page stays hidden until then. If the page has no sign-in at all (or it
+  // never answers) the page is shown: its own checks still apply.
+  var pendingBounce = false;
+  function showPage() { try { doc.documentElement.style.visibility = ''; } catch (e) {} }
   if (!full && !allowedPath(root.location.pathname)) {
+    pendingBounce = true;
     try { doc.documentElement.style.visibility = 'hidden'; } catch (e) {}
-    root.location.replace('/');
-    return;
+    root.setTimeout(function () { if (pendingBounce) { pendingBounce = false; showPage(); } }, 8000);
   }
 
   // 2 and 3. The two home pages show Class Pointer only.
@@ -154,10 +163,9 @@
   }
   function check() {
     hookAuth();
-    var access = null;
-    try { access = root.B3SiteSettings && root.B3SiteSettings.getCurrentAccess ? root.B3SiteSettings.getCurrentAccess() : null; } catch (e) {}
-    var kind = viewerKind(authKnown, user, access);
+    var kind = viewerKind(authKnown, user);
     if (!kind) return;
+    if (pendingBounce && kind === 'limited') { pendingBounce = false; root.location.replace('/'); return; }
     var wantFull = kind === 'full';
     if (wantFull === full) return;
     // The view changes: remember it and load the page again in the new view.
@@ -166,5 +174,7 @@
     root.location.reload();
   }
   root.setInterval(check, 1500);
+  // While a page is waiting to learn whether anyone is signed in, look often so it does not stay hidden.
+  var fast = root.setInterval(function () { if (!pendingBounce) { root.clearInterval(fast); return; } check(); }, 250);
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', check); else check();
 })(typeof window === 'undefined' ? null : window);

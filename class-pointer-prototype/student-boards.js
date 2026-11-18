@@ -548,7 +548,10 @@
     function ui(){
       const boardsOn=on&&mode==='boards'&&!blocked,screensOn=on&&mode==='screens'&&!blocked;
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
-      drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
+      // The left drawing toolbar carries Pen, Eraser, colors, Undo and Clear, so the old tool row is hidden (one toolbar).
+      // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
+      const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
+      drawGroup.hidden=!boardsOn||oneToolbar;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
