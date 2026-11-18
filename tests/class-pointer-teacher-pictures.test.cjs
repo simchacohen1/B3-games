@@ -120,3 +120,23 @@ test('a moved copy of a LOCKED teacher picture is not accepted as a move, and a 
   const mineNow=surface().getItems();
   assert.ok(plain(mineNow).some(i=>i.id==='s9-x'));
 });
+
+// ---------- Paste to All Boards (the gallery) ----------
+test('Paste to All Boards asks how a picture goes out: movable on every board (default, with Lock for everyone) or background', () => {
+  assert.match(boardsSource, /choice\('movable','📌 Movable picture on every board'/);
+  assert.match(boardsSource, /,true\);\s*const lockRow=/, 'movable is the default');
+  assert.match(boardsSource, /lockBox\.id='boardsLockAll'/);
+  assert.match(boardsSource, /🔒 Lock for everyone \(students cannot move it\)/);
+  assert.match(boardsSource, /choice\('background','🖼 Set as background \(worksheet\)'/);
+  assert.match(boardsSource, /if\(how==='background'\)await sendImageFile\(item\.file,\{subject:item\.subject,important\}\);\s*else await sendMovablePicture\(item\.file,\{lock\}\)/);
+});
+
+test('a picture sent to every board is an ordinary teacher picture added to each unpaused board, optionally locked, never to paused or full boards', () => {
+  const block = boardsSource.slice(boardsSource.indexOf('async function sendMovablePicture'), boardsSource.indexOf('async function commitPaste'));
+  assert.match(block, /id:newId\('t'\),tool:'rect'/, 'a teacher mark (name starts with t), like a picture pasted on one board');
+  assert.match(block, /if\(opts\.lock\)stroke\.locked=true;/);
+  assert.match(block, /if\(excluded\(m,'boards'\)\|\|isBlocked\(m\)\)\{skipped\.push\(m\);continue\}/);
+  assert.match(block, /applyOp\(boardFor\(m\),JSON\.parse\(JSON\.stringify\(op\)\),'teacher'\)\)\{B\.send\(m\.connection,op\);dirty\(m\.id\);got\+\+\}else full\.push\(m\)/);
+  assert.match(block, /Picture sent to '\+got\+' of '\+here\.length/);
+  assert.doesNotMatch(block, /sendActivity|boards\.clear/, 'it never replaces the background or erases anyone\'s drawings');
+});
