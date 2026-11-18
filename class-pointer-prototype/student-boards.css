@@ -21,6 +21,12 @@
 .boards-sizes button[aria-pressed="true"]{background:#dfe8fb;color:inherit}
 .boards-sizes i{display:block;width:var(--d);height:var(--d);border-radius:50%;background:#2a3a57}
 
+/* My board with the left drawing toolbar: the bar and the board start to the right of the floating toolbar, so it never covers
+   Save, My files, Back to Activity or the board itself. */
+.student-board.boards-annotated .boards-bar{padding-left:84px}
+.student-board.boards-annotated .boards-focus{padding-left:84px}
+@media(max-height:560px){.student-board.boards-annotated .boards-bar{padding-left:84px}}
+
 /* Teacher grid: tile sizes are set by student-boards.js so every board fits at once. */
 .boards-grid{flex:1;min-height:0;display:grid;gap:10px;padding:10px;align-content:center;justify-content:center;overflow:auto}
 .board-tile{position:relative;padding:0;border:2px solid #cfd9ea;border-radius:10px;background:#fff;overflow:hidden;cursor:zoom-in;box-shadow:0 2px 8px #17203318}
