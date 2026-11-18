@@ -89,6 +89,11 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 .access-overview-table tbody th,.access-overview-table tbody td:nth-child(2),.access-overview-table tbody td:nth-child(3){min-width:130px}
 .access-overview-table td:nth-child(n+4){text-align:center;color:#166534;font-weight:800}
 .access-overview-table tbody tr:nth-child(even){background:#f8fafc}
+/* The Name column stays in view when the table is scrolled sideways. Its cells need their own background so the columns under them do not show through. */
+.access-overview-table thead th:first-child,.access-overview-table tbody th{position:sticky;left:0;box-shadow:1px 0 0 #cbd5e1}
+.access-overview-table thead th:first-child{z-index:3}
+.access-overview-table tbody th{z-index:2;background:#fff;text-align:left}
+.access-overview-table tbody tr:nth-child(even) th{background:#f8fafc}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head><body>

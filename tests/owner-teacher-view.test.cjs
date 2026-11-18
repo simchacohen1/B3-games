@@ -263,3 +263,10 @@ test('switch: wired into the owner home page (site-settings) and the Admin page,
   assert.match(admin, /<script src="owner-teacher-view\.js\?v=[^"]+"><\/script>/);
   assert.match(admin, /if\(owner&&window\.B3OwnerTeacherView\)B3OwnerTeacherView\.mountSwitch\(/);
 });
+
+test('Tool access overview: the Name column stays fixed when the table scrolls sideways', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'owner-admin.html'), 'utf8');
+  assert.match(html, /\.access-overview-table thead th:first-child,\.access-overview-table tbody th\{position:sticky;left:0;/);
+  assert.match(html, /\.access-overview-table tbody th\{z-index:2;background:#fff;/, 'name cells have their own background');
+  assert.match(html, /\.access-overview-table thead th:first-child\{z-index:3\}/, 'the header corner stays above the scrolling cells');
+});
