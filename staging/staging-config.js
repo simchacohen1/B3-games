@@ -179,6 +179,8 @@
     const config = getConfig();
     root.B3_FIREBASE_CONFIG = config;
     root.B3_STAGING_MODE = true;
+    // Teacher add-ons are shown from their own staging address, never from this site.
+    root.B3_ADDON_HOST = 'https://fun-torah-tools-staging-apps.web.app';
     root.B3_STAGING_OWNER_EMAIL = STAGING_OWNER_EMAIL;
     root.B3_STAGING_FEATURES = Object.freeze({ storage: false, posukScoring: false, nigriSync: false });
     root.document.documentElement.dataset.b3Staging = 'true';
