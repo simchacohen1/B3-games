@@ -38,8 +38,10 @@ test('"next" can only be a page on this site, never another address', () => {
 });
 
 test('signing in again as the account you already are never leaves the page stuck, and a slow sign-in says what to do', () => {
-  assert.match(page, /current\.email\.toLowerCase\(\) === email\.toLowerCase\(\)\) \{ \$\('password'\)\.value = ''; signedIn\(current\); return; \}/);
-  assert.match(page, /\(current \? auth\.signOut\(\) : Promise\.resolve\(\)\)\.then\(function \(\) \{\s*return auth\.signInWithEmailAndPassword\(email, password\);/);
+  assert.doesNotMatch(page, /signedIn\(current\); return;/, 'never reuse the copy saved in the browser: always sign in fresh');
+  assert.match(page, /\(different \? auth\.signOut\(\) : Promise\.resolve\(\)\)\.then\(function \(\) \{\s*return auth\.signInWithEmailAndPassword\(email, password\);/);
+  assert.match(page, /cred\.user\.reload\(\)\.then\(function \(\) \{ return cred\.user\.getIdToken\(true\); \}\)/, 'the saved copy is refreshed from the server');
+  assert.match(page, /email is NOT verified, so Owner Admin will refuse it/);
   assert.match(page, /setTimeout\(function \(\) \{ say\('This is taking too long\./);
   assert.match(page, /signedIn\(cred\.user\)/, 'the success message does not depend on a later state change');
 });
@@ -50,4 +52,10 @@ test('the page always shows which account the browser is signed in as, and offer
   assert.match(page, /id="signout"/);
   assert.match(page, /id="reset"/);
   assert.match(page, /indexedDB\.deleteDatabase\('firebaseLocalStorageDb'\)/);
+});
+
+test('on staging, Owner Admin says which account it refused (and whether its email is verified)', () => {
+  assert.match(prepare, /relative === 'owner-admin\.html'/);
+  assert.match(prepare, /This account is not the staging owner\. This browser is signed in as /);
+  assert.match(prepare, /email verified: /);
 });

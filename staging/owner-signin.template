@@ -87,16 +87,22 @@
     event.preventDefault();
     var button = $('go'), email = $('email').value.trim(), password = $('password').value;
     var current = auth.currentUser;
-    // Already this account: nothing to do (signing in again changes nothing, so no state change would ever answer).
-    if (current && current.email && current.email.toLowerCase() === email.toLowerCase()) { $('password').value = ''; signedIn(current); return; }
+    // Always a fresh sign-in, even as the same account: a copy of the account saved in this browser can be out of date
+    // (for example it still says "email not verified"), and Owner Admin trusts that saved copy.
     button.disabled = true; say('Signing in…');
     clearTimeout(slow);
     slow = setTimeout(function () { say('This is taking too long. Check your connection, close other tabs of this site, then press “Reset sign-in on this browser” below (or try a private window).', 'err'); button.disabled = false; }, 15000);
     // Leave a different account first, so the new sign-in always replaces it.
-    (current ? auth.signOut() : Promise.resolve()).then(function () {
+    var different = current && current.email && current.email.toLowerCase() !== email.toLowerCase();
+    (different ? auth.signOut() : Promise.resolve()).then(function () {
       return auth.signInWithEmailAndPassword(email, password);
     }).then(function (cred) {
-      clearTimeout(slow); $('password').value = ''; signedIn(cred.user);
+      // Refresh the saved copy from the server (verified flag, claims) before anything else reads it.
+      return cred.user.reload().then(function () { return cred.user.getIdToken(true); }).then(function () { return cred; });
+    }).then(function (cred) {
+      clearTimeout(slow); $('password').value = '';
+      if (!cred.user.emailVerified) { showWho(cred.user); say('Signed in, but this account\'s email is NOT verified, so Owner Admin will refuse it. Tell Claude: the staging owner account needs its email marked verified.', 'err'); return; }
+      signedIn(cred.user);
     }).catch(function (error) {
       clearTimeout(slow); $('password').value = '';
       say(error && /wrong-password|invalid-credential|user-not-found|invalid-login/.test(String(error.code || error.message)) ? 'That email or password is not right.' : 'Could not sign in (' + String((error && error.code) || 'error').replace('auth/', '') + '). Try again.', 'err');
