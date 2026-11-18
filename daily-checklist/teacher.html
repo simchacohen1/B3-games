@@ -50,7 +50,7 @@ td.b{color:#9aa8b6}
 <script src="../class-confirm-gate.js"></script>
 <script src="../owner-classes.js?v=20261118"></script>
 <script src="common.js"></script>
-<script src="../sync-to-nigri/nigri-auth.js"></script>
+<script src="mashpia-core.js"></script>
 <script src="mashpia-sync.js"></script>
 </head><body>
 <header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
@@ -67,13 +67,13 @@ td.b{color:#9aa8b6}
       <button id="mashpiaSync" type="button">Sync to Mashpia</button>
       <span id="mashpiaMsg" class="muted" role="status" aria-live="polite"></span>
     </div>
-    <form id="mashpiaLogin" class="bar" hidden autocomplete="off">
-      <span class="muted" id="mashpiaWhy">Enter your Mashpia login once. It is kept locked and never asked again.</span>
-      <input id="mashpiaUser" placeholder="Mashpia username" maxlength="200" autocomplete="off">
-      <input id="mashpiaPass" type="password" placeholder="Mashpia password" maxlength="200" autocomplete="off">
-      <button type="submit">Save and sync</button>
-      <button type="button" class="alt" id="mashpiaCancel">Cancel</button>
-    </form>
+    <details id="mashpiaSetup" class="panel">
+      <summary><b>Sync to Mashpia: one-time setup</b> <span class="muted">(about 20 seconds, once per computer)</span></summary>
+      <p>1. Show your bookmarks bar (Chrome: press <b>Ctrl+Shift+B</b>).<br>
+         2. <b>Drag this button</b> up to your bookmarks bar: <a id="mashpiaBookmark" draggable="true" href="#" style="display:inline-block;padding:6px 12px;border-radius:8px;background:#2d6ea3;color:#fff;font-weight:700;text-decoration:none">B3 Mashpia Sync</a><br>
+         3. Press <b>Sync to Mashpia</b> above. Mashpia opens in a new tab. Log in to Mashpia there if it asks, then click the <b>B3 Mashpia Sync</b> bookmark once on that tab. The sync runs by itself.</p>
+      <p class="muted">After that, just press <b>Sync to Mashpia</b> here each time. Keep that Mashpia tab open; if you close it, repeat step 3. Your Mashpia password is never stored or sent to us.</p>
+    </details>
 
     <div class="panel">
       <p class="sum" id="summary"></p>
@@ -295,30 +295,35 @@ $("saveItems").onclick=async function(){
   $("saveItems").disabled=false;
 };
 
-/* ---------- Sync to Mashpia (one press; login asked once) ---------- */
+/* ---------- Sync to Mashpia (runs on the teacher's own Mashpia tab; no password stored) ---------- */
 (function(){
-  var M=window.B3MashpiaSync,A=window.NigriAuth;
-  if(!M||!A){$("mashpiaSync").hidden=true;return}
+  var M=window.B3MashpiaSync,Core=window.B3MashpiaCore;
+  if(!M||!Core){$("mashpiaSync").hidden=true;$("mashpiaSetup").hidden=true;return}
+  var link=$("mashpiaBookmark");
+  link.onclick=function(e){e.preventDefault();alert("Don't click it here: drag it up to your bookmarks bar.")};
+  Promise.all([fetch("mashpia-core.js",{cache:"no-store"}).then(function(r){return r.text()}),fetch("mashpia-agent.js",{cache:"no-store"}).then(function(r){return r.text()})])
+    .then(function(t){link.setAttribute("href",M.bookmarkletHref(t[0],t[1]))}).catch(function(){$("mashpiaSetup").hidden=true});
+  var pre=null;
   var env={
-    base:M.serverBase(window.MASHPIA_SYNC_SERVER||window.NIGRI_LOGIN_SERVER,A.BASE),
-    getToken:A.getToken,fetch:function(){return window.fetch.apply(window,arguments)},
-    askLogin:function(why){return new Promise(function(resolve){
-      var f=$("mashpiaLogin"),u=$("mashpiaUser"),p=$("mashpiaPass");
-      $("mashpiaWhy").textContent=why||"Enter your Mashpia login once. It is kept locked and never asked again.";
-      f.hidden=false;u.focus();
-      function done(v){f.hidden=true;p.value="";f.onsubmit=null;$("mashpiaCancel").onclick=null;resolve(v)}
-      f.onsubmit=function(e){e.preventDefault();var un=u.value.trim(),pw=p.value;if(!un||!pw)return;u.value="";done({username:un,password:pw})};
-      $("mashpiaCancel").onclick=function(){u.value="";done(null)};
-    })}
+    open:function(){return pre},
+    listen:function(fn){window.addEventListener("message",fn);return function(){window.removeEventListener("message",fn)}},
+    timer:function(fn,ms){var t=setTimeout(fn,ms);return function(){clearTimeout(t)}},
+    repeat:function(fn,ms){var t=setInterval(fn,ms);return function(){clearInterval(t)}},
+    status:function(text){$("mashpiaMsg").textContent=text},
+    needSetup:function(){$("mashpiaSetup").open=true},
+    newId:function(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
   };
   $("mashpiaSync").onclick=async function(){
     var btn=$("mashpiaSync"),msg=$("mashpiaMsg");
     if(!classId)return;
-    btn.disabled=true;msg.textContent="Syncing…";
+    btn.disabled=true;msg.textContent="Opening Mashpia…";
+    pre=window.open("","b3-mashpia");     /* opened right at the click so the browser allows it; an existing Mashpia tab is reused as is */
     try{
       var d=$("day").value;
       var answers=await loadDay(d,true);
-      var res=await M.run(env,d,M.buildStudents(answers,roster));
+      var students=Core.buildStudents(answers,roster);
+      if(!students.length){try{if(pre&&pre.location.href==="about:blank")pre.close()}catch(e){}}
+      var res=await M.run(env,d,students);
       msg.textContent=res.message;
     }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
     btn.disabled=false;

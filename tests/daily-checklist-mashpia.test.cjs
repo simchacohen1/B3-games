@@ -3,79 +3,212 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const M = require('../daily-checklist/mashpia-sync.js');
+const vm = require('node:vm');
 
-const answers = {
-  s1: { name: 'Arik', items: { a: { v: 1, n: 'Shacharis', o: 1 }, b: { v: 0, n: 'Mincha', o: 2 }, c: { v: 1, n: 'Daily Tzedaka', o: 0 } } },
-  s2: { name: 'Levi', items: { a: { v: 0, n: 'Shacharis', o: 1 } } },
-  s4: { name: 'Ghost', items: {} }
-};
-const roster = [{ id: 's1', name: 'Arik Fake' }, { id: 's2', name: 'Levi Fake' }, { id: 's3', name: 'Silent Fake' }, { id: 's4', name: 'Ghost Fake' }];
+const dir = path.join(__dirname, '..', 'daily-checklist');
+const coreText = fs.readFileSync(path.join(dir, 'mashpia-core.js'), 'utf8');
+const agentText = fs.readFileSync(path.join(dir, 'mashpia-agent.js'), 'utf8');
+const Core = require('../daily-checklist/mashpia-core.js');
+const Sync = require('../daily-checklist/mashpia-sync.js');
 
-test('sends only Yes answers, in order, for students who answered', () => {
-  assert.deepEqual(M.buildStudents(answers, roster), [
-    { name: 'Arik Fake', items: ['Daily Tzedaka', 'Shacharis'] },
-    { name: 'Levi Fake', items: [] }
-  ]);
-});
-
-test('one short line', () => {
-  assert.equal(M.summary({ synced: 10, not_found: [], greyed: [], missing_items: [] }), 'Synced 10 students');
-  assert.equal(M.summary({ synced: 9, not_found: ['Moshe Fake'], greyed: [], missing_items: [] }), "Synced 9, couldn't find: Moshe Fake");
-});
-
-function env(responses, login) {
-  const calls = [];
+/* ---------- matching (made-up names) ---------- */
+function grid() {
+  const cats = [[22001, 'Daily Tzedaka', 0], [22002, 'Shacharis', 0], [22004, 'Mincha', 0], [16006, "Rebbe's Kapitel", 0],
+    [11014, 'Listen to Parents', 1], [13002, 'נעגל וואסער', 0]];
   return {
-    calls, base: 'http://localhost:1', getToken: async () => 'tok',
-    fetch: async (url, opt) => {
-      calls.push({ url, method: opt.method, body: opt.body && JSON.parse(opt.body), auth: opt.headers.Authorization });
-      const r = responses.shift();
-      return { ok: r.status < 400, status: r.status, json: async () => r.body };
-    },
-    askLogin: async why => { calls.push({ asked: true, why }); return login; }
+    missions: cats.map(([grid_id, cat, disabled]) => ({ grid_id, cat, disabled })),
+    soldiers: [
+      { user_id: 1, name: 'Arik Fake', registered: true, absent: false, marks: {} },
+      { user_id: 2, name: 'Moshe Fake', registered: true, absent: false, marks: { 22002: { done_qty: 1 } } },
+      { user_id: 3, name: 'Chaim Fake', registered: false, absent: false, marks: {} },
+      { user_id: 4, name: 'Levi Fake', registered: true, absent: true, marks: {} },
+      { user_id: 5, name: 'Sam Twin', registered: true, absent: false, marks: {} },
+      { user_id: 6, name: 'Twin Sam', registered: true, absent: false, marks: {} }
+    ]
   };
 }
 
-test('first time: asks for login once, saves it, then syncs in the same press', async () => {
-  const e = env([{ status: 409, body: { error: 'Mashpia login needed', code: 'need_login' } }, { status: 200, body: { saved: true } },
-    { status: 200, body: { synced: 2, not_found: [], greyed: [], missing_items: [] } }], { username: 'u', password: 'p' });
-  const r = await M.run(e, '2026-11-18', [{ name: 'A', items: [] }]);
-  assert.equal(r.message, 'Synced 2 students');
-  assert.deepEqual(e.calls.map(c => c.method || 'ask'), ['POST', 'ask', 'PUT', 'POST']);
+test('julian day matches the real site', () => {
+  assert.equal(Core.julianDay('2026-11-18'), 2461363);
+  assert.equal(Core.julianDay('2026-02-30'), null);
+  assert.equal(Core.julianDay('nope'), null);
 });
 
-test('later presses never ask again', async () => {
-  const e = env([{ status: 200, body: { synced: 1, not_found: [], greyed: [], missing_items: [] } }], null);
-  const r = await M.run(e, '2026-11-18', [{ name: 'A', items: [] }]);
-  assert.equal(r.message, 'Synced 1 student');
-  assert.equal(e.calls.length, 1);
+test('matching: names by any word order, items by name, skips and never guesses', () => {
+  const p = Core.plan(grid(), [
+    { name: 'Fake Arik', items: ['Daily Tzedaka', 'shacharis', 'Rebbes Kapitel', 'נעגל וואסער', 'Homework', 'Listen to Parents'] },
+    { name: 'Moshe Fake', items: ['Shacharis', 'Mincha'] },
+    { name: 'Chaim Fake', items: ['Mincha'] }, { name: 'Levi Fake', items: ['Mincha'] },
+    { name: 'Sam Twin', items: ['Mincha'] }, { name: 'Nobody Here', items: ['Mincha'] }]);
+  assert.deepEqual(p.sends, { 22001: [1], 22002: [1], 16006: [1], 13002: [1], 22004: [2] });   /* #2 Shacharis already checked */
+  assert.deepEqual(p.greyed, ['Chaim Fake', 'Levi Fake']);
+  assert.deepEqual(p.notFound, ['Sam Twin', 'Nobody Here']);
+  assert.deepEqual(p.missingItems, ['Homework', 'Listen to Parents']);   /* disabled items never match */
 });
 
-test('cancelled login syncs nothing', async () => {
-  const e = env([{ status: 409, body: { code: 'need_login', error: 'Mashpia login needed' } }], null);
-  const r = await M.run(e, '2026-11-18', [{ name: 'A', items: [] }]);
-  assert.equal(r.ok, false);
-  assert.equal(e.calls.filter(c => c.method === 'PUT').length, 0);
+test('only Yes answers of students who answered', () => {
+  const answers = {
+    s1: { items: { a: { v: 1, n: 'Shacharis', o: 1 }, b: { v: 0, n: 'Mincha', o: 2 }, c: { v: 1, n: 'Daily Tzedaka', o: 0 } } },
+    s2: { items: { a: { v: 0, n: 'Shacharis', o: 1 } } }, s4: { items: {} }
+  };
+  const roster = [{ id: 's1', name: 'Arik Fake' }, { id: 's2', name: 'Levi Fake' }, { id: 's3', name: 'Silent' }, { id: 's4', name: 'Ghost' }];
+  assert.deepEqual(Core.buildStudents(answers, roster), [{ name: 'Arik Fake', items: ['Daily Tzedaka', 'Shacharis'] }, { name: 'Levi Fake', items: [] }]);
 });
 
-test('nothing answered: nothing sent', async () => {
-  const e = env([], null);
-  assert.equal((await M.run(e, '2026-11-18', [])).ok, false);
-  assert.equal(e.calls.length, 0);
+test('one short line', () => {
+  assert.equal(Core.summary({ synced: 10, notFound: [], greyed: [], missingItems: [] }), 'Synced 10 students');
+  assert.equal(Core.summary({ synced: 9, notFound: ['Moshe Fake'], greyed: [], missingItems: [] }), "Synced 9, couldn't find: Moshe Fake");
 });
 
-test('server address cannot be pointed at an arbitrary http host', () => {
-  assert.equal(M.serverBase('http://evil.example.com', 'https://x.example'), 'https://x.example');
-  assert.equal(M.serverBase('http://localhost:5000', 'https://x.example'), 'http://localhost:5000');
+/* ---------- the script that runs on the Mashpia tab ---------- */
+function mashpiaTab({ loggedIn = true, failIds = [], origin = 'https://fun-torah-tools-staging.web.app' } = {}) {
+  const calls = [], listeners = [], opened = [], replies = [];
+  const win = {
+    location: { hostname: 'mashpia.com' },
+    opener: { postMessage: (m, o) => opened.push([m, o]) },
+    addEventListener: (t, fn) => listeners.push(fn)
+  };
+  const el = { style: {}, appendChild() {} };
+  const ctx = vm.createContext({
+    window: win, location: win.location, alert: () => {}, setTimeout, clearTimeout, JSON, Promise, Array, String, Object, Date, Math,
+    document: { getElementById: () => el, createElement: () => el, body: { appendChild() {} } },
+    fetch: async (url, opt) => {
+      const body = JSON.parse(opt.body); calls.push({ url, body, credentials: opt.credentials });
+      if (url.includes('grid')) return { status: 200, json: async () => (loggedIn ? { success: true, data: grid() } : { success: false, error: 'Invalid Credentials' }) };
+      const data = {}; body.user_ids.forEach(i => { if (!failIds.includes(i)) data[i] = {}; });
+      return { status: 200, json: async () => ({ success: true, data }) };
+    }
+  });
+  vm.runInContext('(function(){' + coreText + '\n' + agentText + '\n})();', ctx);
+  const send = async data => {
+    const ev = { origin, data, source: { postMessage: (m, o) => replies.push([m, o]) } };
+    listeners.forEach(fn => fn(ev));
+    await new Promise(r => setTimeout(r, 20));
+  };
+  return { calls, opened, replies, send };
+}
+const STUDENTS = [{ name: 'Arik Fake', items: ['Mincha', 'Daily Tzedaka'] }, { name: 'Moshe Fake', items: ['Shacharis'] }];
+
+test('agent: announces ready to B3 origins, answers ping, syncs with the teacher session, only mark "1"', async () => {
+  const t = mashpiaTab();
+  assert.ok(t.opened.length > 0 && t.opened.every(([m]) => m.b3 === 'mashpia-ready'));
+  await t.send({ b3: 'mashpia-ping' });
+  assert.equal(t.replies[0][0].b3, 'mashpia-pong');
+  await t.send({ b3: 'mashpia-sync', id: 'x1', date: '2026-11-18', students: STUDENTS });
+  const marks = t.calls.filter(c => c.url.includes('/mark'));
+  assert.deepEqual(marks.map(c => [c.body.grid_id, c.body.user_ids, c.body.dates, c.body.mark]), [[22001, [1], [2461363], '1'], [22004, [1], [2461363], '1']]);
+  assert.ok(t.calls.every(c => c.credentials === 'same-origin'));
+  const res = t.replies.find(([m]) => m.b3 === 'mashpia-result')[0];
+  assert.deepEqual(JSON.parse(JSON.stringify([res.ok, res.id, res.result.synced, res.result.notFound])), [true, 'x1', 2, []]);
 });
 
-test('teacher page loads the helper and has the one button', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'daily-checklist', 'teacher.html'), 'utf8');
-  assert.match(html, /sync-to-nigri\/nigri-auth\.js/);
-  assert.match(html, /mashpia-sync\.js/);
+test('agent: ignores other websites', async () => {
+  const t = mashpiaTab({ origin: 'https://evil.example.com' });
+  await t.send({ b3: 'mashpia-sync', id: 'x', date: '2026-11-18', students: STUDENTS });
+  assert.equal(t.calls.length, 0);
+  assert.equal(t.replies.length, 0);
+});
+
+test('agent: not logged in to Mashpia says so and marks nothing', async () => {
+  const t = mashpiaTab({ loggedIn: false });
+  await t.send({ b3: 'mashpia-sync', id: 'x', date: '2026-11-18', students: STUDENTS });
+  const res = t.replies.find(([m]) => m.b3 === 'mashpia-result')[0];
+  assert.deepEqual([res.ok, res.code], [false, 'login']);
+  assert.equal(t.calls.filter(c => c.url.includes('/mark')).length, 0);
+});
+
+test('agent: a mark Mashpia did not accept is reported, not hidden', async () => {
+  const t = mashpiaTab({ failIds: [1] });
+  await t.send({ b3: 'mashpia-sync', id: 'x', date: '2026-11-18', students: STUDENTS });
+  const res = t.replies.find(([m]) => m.b3 === 'mashpia-result')[0].result;
+  assert.deepEqual(JSON.parse(JSON.stringify([res.synced, res.notFound])), [1, ['Arik Fake']]);
+});
+
+/* ---------- the checklist page side ---------- */
+function fakeEnv(w) {
+  const listeners = new Set(), timers = [];
+  const e = {
+    statusLog: [], setup: 0,
+    open: () => w, newId: () => 'id1',
+    listen: fn => { listeners.add(fn); return () => listeners.delete(fn); },
+    timer: (fn, ms) => { const t = { fn, ms, live: true }; timers.push(t); return () => { t.live = false; }; },
+    repeat: (fn, ms) => { const t = { fn, ms, live: true, rep: true }; timers.push(t); return () => { t.live = false; }; },
+    status(text) { e.statusLog.push(text); },
+    needSetup() { e.setup++; },
+    fire: m => listeners.forEach(fn => fn({ origin: 'https://mashpia.com', data: m })),
+    firePlain: (origin, m) => listeners.forEach(fn => fn({ origin, data: m })),
+    advance(ms) { timers.filter(t => t.live && t.ms === ms && !t.rep).forEach(t => { t.live = false; t.fn(); }); }
+  };
+  return e;
+}
+const fakeWin = () => { const sent = []; return { sent, location: { href: 'about:blank' }, postMessage: (m, o) => sent.push([m, o]) }; };
+const syncs = w => w.sent.filter(([m]) => m.b3 === 'mashpia-sync');
+
+test('page: tab already set up -> one click, result line', async () => {
+  const w = fakeWin(), e = fakeEnv(w);
+  const p = Sync.run(e, '2026-11-18', STUDENTS);
+  assert.equal(w.sent[0][0].b3, 'mashpia-ping');
+  e.fire({ b3: 'mashpia-pong' });
+  const m = syncs(w)[0];
+  assert.deepEqual([m[1], m[0].date, m[0].students.length], ['https://mashpia.com', '2026-11-18', 2]);
+  e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 2, notFound: [], greyed: [], missingItems: [] } });
+  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students' });
+  assert.equal(e.setup, 0);
+  assert.equal(w.location.href, 'about:blank');   /* an existing tab is never reloaded */
+});
+
+test('page: new tab -> opens Mashpia, shows setup, syncs once the bookmark announces ready', async () => {
+  const w = fakeWin(), e = fakeEnv(w);
+  const p = Sync.run(e, '2026-11-18', STUDENTS);
+  e.advance(1500);
+  assert.equal(w.location.href, 'https://mashpia.com/new/missions/mark');
+  assert.equal(e.setup, 1);
+  e.fire({ b3: 'mashpia-ready' });
+  e.fire({ b3: 'mashpia-ready' });   /* a second announce must not send twice */
+  assert.equal(syncs(w).length, 1);
+  e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 1, notFound: ['Moshe Fake'], greyed: [], missingItems: [] } });
+  assert.equal((await p).message, "Synced 1, couldn't find: Moshe Fake");
+});
+
+test('page: not logged in to Mashpia waits for the bookmark again, then succeeds', async () => {
+  const w = fakeWin(), e = fakeEnv(w);
+  const p = Sync.run(e, '2026-11-18', STUDENTS);
+  e.fire({ b3: 'mashpia-pong' });
+  e.fire({ b3: 'mashpia-result', id: 'id1', ok: false, code: 'login', message: 'Log in to Mashpia on this tab, then click the bookmark again.' });
+  assert.equal(e.setup, 1);
+  e.fire({ b3: 'mashpia-ready' });
+  assert.equal(syncs(w).length, 2);
+  e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 2, notFound: [], greyed: [], missingItems: [] } });
+  assert.equal((await p).ok, true);
+});
+
+test('page: ignores other sites and other runs; explains popup block; nothing to send', async () => {
+  const w = fakeWin(), e = fakeEnv(w);
+  const p = Sync.run(e, '2026-11-18', STUDENTS);
+  e.firePlain('https://evil.example.com', { b3: 'mashpia-pong' });
+  assert.equal(syncs(w).length, 0);
+  e.fire({ b3: 'mashpia-pong' });
+  e.fire({ b3: 'mashpia-result', id: 'other', ok: true, result: { synced: 9 } });
+  e.advance(90000);
+  assert.match((await p).message, /did not answer/);
+  assert.match((await Sync.run({ open: () => null }, 'd', STUDENTS)).message, /pop-ups/);
+  assert.match((await Sync.run(e, 'd', [])).message, /No student has answered/);
+});
+
+test('bookmark text is self-contained and parses', () => {
+  const href = Sync.bookmarkletHref(coreText, agentText);
+  assert.ok(href.startsWith('javascript:'));
+  assert.doesNotThrow(() => new Function(decodeURIComponent(href.slice('javascript:'.length))));
+  assert.ok(href.length < 30000, 'bookmark is ' + href.length + ' chars');
+  assert.doesNotMatch(coreText + agentText, /^\s*\/\/ /m);
+});
+
+test('teacher page: one button, one-time setup panel, no password fields, no server', () => {
+  const html = fs.readFileSync(path.join(dir, 'teacher.html'), 'utf8');
   assert.equal((html.match(/id="mashpiaSync"/g) || []).length, 1);
+  assert.match(html, /id="mashpiaSetup"/);
+  assert.match(html, /mashpia-core\.js/);
+  assert.doesNotMatch(html, /type="password"|nigri-auth|onrender\.com/);
   const inline = html.match(/<script>([\s\S]*?)<\/script>/g).map(s => s.replace(/<\/?script>/g, '')).join('\n');
   assert.doesNotThrow(() => new Function(inline));
-  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'daily-checklist', 'mashpia-sync.js'), 'utf8'), /localStorage|sessionStorage/);
 });
