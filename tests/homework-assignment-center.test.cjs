@@ -93,13 +93,13 @@ test('teacher status totals separate missing, overdue, submitted, and completed 
 });
 
 test('homework runs only on the live site with live config, or on staging; activity links never submit on open', async () => {
-  const live = { window: { location: { hostname: 'funtorahtools.com', search: '' }, B3_FIREBASE_CONFIG: { projectId: 'b3-games' } }, URL };
+  const live = { window: { location: { hostname: 'sols.tools', search: '' }, B3_FIREBASE_CONFIG: { projectId: 'b3-games' } }, URL };
   vm.runInNewContext(fs.readFileSync(__dirname + '/../assignment-center/homework-common.js', 'utf8'), live);
   assert.equal(live.window.HomeworkCommon.API, 'https://us-central1-b3-games.cloudfunctions.net/homeworkPortal');
   assert.equal(live.window.HomeworkCommon.isStagingRuntime(), false);
   assert.equal(live.window.HomeworkCommon.isAllowedRuntime(), true);
   // live config on any other host, or staging config on a live host, is refused
-  for (const [hostname, projectId] of [['evil.example.com', 'b3-games'], ['funtorahtools.com', 'fun-torah-tools-staging']]) {
+  for (const [hostname, projectId] of [['evil.example.com', 'b3-games'], ['sols.tools', 'fun-torah-tools-staging']]) {
     const context = { window: { location: { hostname, search: '' }, B3_FIREBASE_CONFIG: { projectId } }, URL };
     vm.runInNewContext(fs.readFileSync(__dirname + '/../assignment-center/homework-common.js', 'utf8'), context);
     assert.equal(context.window.HomeworkCommon.API, '');
@@ -218,11 +218,11 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   assert.match(bootstrapWrites[0], /staging\/firebase-config\.generated\.js/);
   assert.match(bootstrapWrites[1], /staging\/staging-config\.js/);
   const productionWrites = [];
-  vm.runInNewContext(bootstrapSource, { window: { location: { hostname: 'funtorahtools.com' } }, document: { write: value => productionWrites.push(value) } });
+  vm.runInNewContext(bootstrapSource, { window: { location: { hostname: 'sols.tools' } }, document: { write: value => productionWrites.push(value) } });
   assert.equal(productionWrites.length, 0);
 
   const productionDocument = { currentScript: null, write: value => proxyWrites.push(value) };
-  const productionConfig = { window: { location: { hostname: 'funtorahtools.com' }, document: productionDocument }, location: { hostname: 'funtorahtools.com' }, document: productionDocument };
+  const productionConfig = { window: { location: { hostname: 'sols.tools' }, document: productionDocument }, location: { hostname: 'sols.tools' }, document: productionDocument };
   vm.runInNewContext(configSource, productionConfig);
   assert.equal(productionConfig.window.B3_FIREBASE_CONFIG.projectId, 'b3-games');
   assert.equal(proxyWrites.length, 0);
@@ -256,7 +256,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
     assert.match(injector.inject(html), /<script src="\/staging\/preview-bootstrap\.js"><\/script>/, `${file} gets the staging guard in the preview copy`);
   }
   const fnSource = fs.readFileSync(__dirname + '/../backend/functions/homework.js', 'utf8');
-  assert.match(fnSource, /cors:\['https:\/\/funtorahtools\.com','https:\/\/sols\.tools','https:\/\/www\.sols\.tools','https:\/\/www\.funtorahtools\.com','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites (funtorahtools.com and sols.tools, #825)');
+  assert.match(fnSource, /cors:\['https:\/\/sols\.tools','https:\/\/www\.sols\.tools','https:\/\/simchacohen1\.github\.io'\]/, 'the live function answers only the live websites (sols.tools only; funtorahtools.com just redirects)');
   assert.doesNotMatch(fnSource, /fun-torah-tools-staging/, 'the live function never lists staging sites');
   for (const file of ['homework-policy.cjs', 'student-passcodes.cjs', 'auth-attempts.cjs']) {
     assert.equal(

@@ -3,7 +3,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const core = require('./vocabulary-bank-core.cjs');
 if (!admin.apps.length) admin.initializeApp();
-const cors = ['https://simchacohen1.github.io', 'https://funtorahtools.com','https://sols.tools','https://www.sols.tools', 'https://www.funtorahtools.com'];
+const cors = ['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'];
 const ROOT = 'b3Games/workspaces/b3-2026/classes';
 const STUDENT_BANK = 'studentVocabulary';
 const err = (status, message) => Object.assign(new Error(message), { status });
@@ -31,7 +31,7 @@ async function classContext(db, identity, classId, studentId, teacherRequired = 
 }
 function publicBank(bank) { return Object.fromEntries(Object.entries(bank || {}).map(([key, row]) => [row?.id || key, row])); }
 function rosterRows(cls, classId, banks) {
-  return Object.entries(cls.members || {}).filter(([, member]) => !member || member.active !== false).map(([id, member]) => {
+  return Object.entries(cls.members || {}).filter(([ member]) => !member || member.active !== false).map(([id, member]) => {
     const bank = banks[id] || {};
     return { id, name: String(member?.name || id), classId, ...core.summary(bank) };
   }).sort((a, b) => a.name.localeCompare(b.name));

@@ -1,6 +1,6 @@
 name: Live site monitor
 
-# Checks the LIVE website (https://funtorahtools.com) with Playwright.
+# Checks the LIVE website (https://sols.tools, the only address; funtorahtools.com just redirects) with Playwright.
 # No AI is involved. Read-only for visitors; see docs/SITE-MONITOR.md.
 on:
   schedule:
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SITE_URL: https://funtorahtools.com/
+      SITE_URL: https://sols.tools/
       # Optional dedicated test-only student. If these secrets are not set,
       # the signed-in check is skipped (shown as "skipped" in the report).
       FTT_TEST_STUDENT_NAME: ${{ secrets.FTT_TEST_STUDENT_NAME }}

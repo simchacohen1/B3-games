@@ -81,7 +81,7 @@ test.describe('Test student account', () => {
         const path = new URL(page.url()).pathname;
         expect(['/', '/index.html'], `${id} should stay open for a signed-in student`).not.toContain(path);
         // Pages keep a hidden "please sign in" panel; only a visible one is a problem.
-        await expect(page.getByText(/sign in on Fun Torah Tools|Please sign in again/i).filter({ visible: true })).toHaveCount(0);
+        await expect(page.getByText(/sign in on (Fun Torah Tools|Shluchim Online School)|Please sign in again/i).filter({ visible: true })).toHaveCount(0);
         opened.push(id);
         await page.goto('./');
         await expect(games).toBeVisible({ timeout: 60_000 });

@@ -1,6 +1,6 @@
 # Live site monitor
 
-Automatic Playwright checks of the **live** website, https://funtorahtools.com.
+Automatic Playwright checks of the **live** website, https://sols.tools.
 No AI is involved: GitHub runs the same fixed tests every time.
 
 ## When it runs

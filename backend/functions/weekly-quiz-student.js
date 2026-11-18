@@ -7,7 +7,7 @@ if(!admin.apps.length)admin.initializeApp();
 
 exports.weeklyQuizStudent=onRequest({
   region:'us-central1',
-  cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com'],
+  cors:['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'],
   maxInstances:10
 },async(req,res)=>{
   res.set('Cache-Control','no-store');
