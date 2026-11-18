@@ -47,7 +47,6 @@ td.b{color:#9aa8b6}
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../class-confirm-gate.js"></script>
-<script src="../teacher-class-rosters.js?v=20261011"></script>
 <script src="common.js"></script>
 </head><body>
 <header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
@@ -298,11 +297,69 @@ async function selectClass(id){
 }
 $("classSel").onchange=function(){selectClass($("classSel").value)};
 
+/* Loads only classes this account may read. Never reads the whole `classes` node: the database rules allow
+   a read of one class at a time (assigned teacher, active admin, owner) but not of the list of all classes. */
+var SAFE_ID=/^[A-Za-z0-9_-]{1,100}$/;
+async function loadAllowedClasses(){
+  var api=window.B3SiteSettings;
+  if(!api||typeof api.onAuthStateChanged!=="function")throw new Error("Teacher sign-in is unavailable. Open this tool from your Teacher Center.");
+  var session=await new Promise(function(resolve,reject){
+    var done=false;
+    api.onAuthStateChanged(function(user,authorized,access){
+      if(done)return;done=true;
+      if(!user||!authorized||!access||!access.authorized||["teacher","admin"].indexOf(access.role)<0)reject(new Error("Sign in to your authorized teacher account in Teacher Center to view your class."));
+      else resolve({user:user,access:access});
+    });
+  });
+  var requested=(new URLSearchParams(location.search).get("class")||"").trim();
+  if(requested&&!SAFE_ID.test(requested))throw new Error("Invalid class selection.");
+  var ids=[];
+  if(session.access.role==="admin"){
+    // Owner/admin: the class in the link, plus any classes assigned to teacher accounts (owner can read those invites).
+    if(requested)ids.push(requested);
+    try{
+      var inv=(await db.ref("b3Games/workspaces/"+ws+"/teacherInvites").once("value")).val()||{};
+      Object.keys(inv).forEach(function(k){var cids=(inv[k]&&inv[k].classIds)||{};Object.keys(cids).forEach(function(c){if(cids[c]===true&&c!=="*"&&ids.indexOf(c)<0)ids.push(c)})});
+    }catch(e){console.warn("Teacher assignments are not readable by this account; using the class in the link only.",e)}
+  }else{
+    ids=(session.access.classIds||[]).filter(function(id){return SAFE_ID.test(id)});
+    if(requested&&ids.indexOf(requested)<0)throw new Error("This class is not assigned to your teacher account.");
+    if(requested)ids=[requested];
+  }
+  ids=ids.filter(function(id){return SAFE_ID.test(id)});
+  if(!ids.length)throw new Error("No class selected. Open this tool from Teacher Home so a class is chosen.");
+  var rows=await Promise.all(ids.map(async function(id){
+    var cls;
+    try{cls=(await db.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value")).val()}catch(e){console.warn("Class not readable",id,e);return null}
+    if(!cls||cls.active===false)return null;
+    var entries=Object.entries(cls.members||{}).filter(function(en){return SAFE_ID.test(en[0])&&en[1]&&en[1].active!==false});
+    var checked=await Promise.all(entries.map(async function(en){
+      var sid=en[0],member=en[1],profile=null;
+      try{
+        var res=await Promise.all([db.ref("b3Games/students/"+sid+"/profile").once("value"),db.ref("b3Games/students/"+sid+"/memberships/"+ws+"_"+id).once("value")]);
+        profile=res[0].val();var m=res[1].val();
+        if(!profile||profile.active===false||!m||m.active===false||m.workspaceId!==ws||m.classId!==id)return null;
+      }catch(e){
+        if(session.access.role!=="admin")throw e;   // teachers keep the strict check; owner falls back to the class record
+        profile=null;
+      }
+      return {id:sid,name:String((profile&&profile.name)||member.name||"").trim()||sid};
+    }));
+    var active=checked.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)});
+    return {id:id,name:String(cls.name||id),students:active.map(function(r){return r.name}),studentIds:active.map(function(r){return r.id})};
+  }));
+  var list=rows.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)||a.id.localeCompare(b.id)});
+  if(!list.length)throw new Error("No active class could be loaded for this account.");
+  var names={};list.forEach(function(c){names[c.id]=c.name});
+  var selectedId=window.B3ClassGate?await window.B3ClassGate.choose({ids:list.map(function(c){return c.id}),names:names,requested:requested||"-"}):(requested||list[0].id);
+  return {classes:list,selectedId:selectedId};
+}
+
 (async function(){
   try{
     if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
     db=firebase.database();
-    var session=await window.B3TeacherClassRosters.load();
+    var session=await loadAllowedClasses();
     classes=session.classes||[];
     if(!classes.length){fail("No classes are assigned to this teacher.");return}
     $("classSel").innerHTML=classes.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name||c.id)+'</option>'}).join("");
