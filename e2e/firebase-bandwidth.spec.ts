@@ -16,7 +16,7 @@ test('Manual Interactive Bandwidth Test', async ({ page }) => {
     });
   });
 
-  await page.goto('https://funtorahtools.com');
+  await page.goto('https://sols.tools');
   
   console.log('\n>>> BROWSER IS OPEN! You have 20 seconds to click around tools/dashboards... <<<\n');
   await page.waitForTimeout(20000);
