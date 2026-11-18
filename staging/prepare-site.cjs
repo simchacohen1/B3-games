@@ -20,6 +20,17 @@ const FORBIDDEN = [
   'arik_traxler', 'simcha_cohen', 'ari_greenberg', 'zev_rosenfeld', 'levi_schtroks',
   'yisroel_aryeh_simmonds', 'leibel_vogel', 'leib_wolf'
 ];
+// The older Nigri pages write the roster as "Last First". Match that order too (the audit lower-cases the text).
+const PRODUCTION_ROSTER_MARKERS = [
+  'chaikin mayer', 'gourarie yossi', 'huebner sholom', 'lapine moshe', 'notik kehos', 'oirechman yisroel',
+  'raichman moshe', 'rosenfeld avrohom', 'rozmarin levi', 'traxler arik', 'greenberg ari', 'rosenfeld zev',
+  'schtroks levi', 'simmonds yisroel', 'vogel leibel'
+];
+// Pages that sync real students to Nigri with the shared key: never packaged for staging.
+const NIGRI_PAGES_DISABLED_IN_STAGING = new Set([
+  'sync-to-nigri/school-marks.html', 'weekly-quiz/b3schoolmarksbridge.html',
+  'sync-to-nigri/chossid-lamdan.html', 'weekly-quiz/chossid-lamdan.html'
+]);
 const PRODUCTION_STUDENT_NAMES = [
   'Mayer Chaim Chaikin', 'Chaim Chaikin', 'Yossi Gourarie', 'Sholom DovBer Huebner',
   'Sholom Huebner', 'Moshe Lapine', 'Kehos Notik', 'Yisroel Oirechman',
@@ -106,7 +117,7 @@ function stageSource(siteRoot, env = process.env) {
     for (const [from, to] of replacements) content = content.split(from).join(to);
     const relative = path.relative(root, file).replace(/\\/g, '/').toLowerCase();
     content = content.replace(/(\bprojectId\s*:\s*)(["'])b3-games\2/gi, '$1"' + config.projectId + '"');
-    if (relative === 'sync-to-nigri/school-marks.html' || relative === 'weekly-quiz/b3schoolmarksbridge.html') {
+    if (NIGRI_PAGES_DISABLED_IN_STAGING.has(relative)) {
       content = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Staging integration disabled</title></head><body><main><h1>Integration disabled in staging</h1><p>Student mark syncing is unavailable in the staging site.</p><a href="../index.html">Return to Fun Torah Tools</a></main></body></html>';
     }
     if (relative === 'weekly-quiz/nigri-sync.js') {
@@ -177,7 +188,18 @@ function stageSource(siteRoot, env = process.env) {
       }
       content = content.replace(sheetPattern, "const CSV_URL = 'https://staging-disabled.invalid/student-comments.csv';");
     }
-    content = content.replace(/(\bSYNC_KEY\s*=\s*)['"][^'"]*['"]/g, '$1""');
+    content = content.replace(/(\b(?:SYNC_KEY|API_KEY)\s*=\s*)['"][^'"]*['"]/g, '$1""');
+    if (relative === 'guest-mode.js') {
+      // The Guest Mode sample gradebook is keyed by real student names (Last First). Staging gets generic names.
+      let n = 0;
+      content = content.replace(/"([A-Za-z]+(?: [A-Za-z]+)+)"(\s*:\s*\{\s*mark\s*:)/g, (all, name, rest) => '"Test Student ' + (++n) + '"' + rest);
+    }
+    if (relative === 'sync-to-nigri/index.html') {
+      // Attendance keeps its roster in the page. Staging gets fictional classes, never the real ones.
+      const pattern = /const ROSTERS\s*=\s*\{[\s\S]*?\n\};/;
+      if (!pattern.test(content)) throw new Error('Cannot safely replace the Attendance roster in sync-to-nigri/index.html.');
+      content = content.replace(pattern, 'const ROSTERS={"Test Class Alef":["Test Student A1","Test Student A2","Test Student A3"]};');
+    }
     content = content.replace(/(\bADMIN_PASSWORD_HASH\s*=\s*)['"][a-f0-9]{64}['"]/gi, '$1"staging-disabled"');
     for (const name of PRODUCTION_STUDENT_NAMES) content = content.split(name).join('Fictional Staging Student');
     if (/\.html$/i.test(file)) {
@@ -223,6 +245,7 @@ function stageSource(siteRoot, env = process.env) {
     if (file === path.join(stageDir, 'staging-config.js')) continue;
     const content = fs.readFileSync(file, 'utf8').toLowerCase();
     for (const value of FORBIDDEN) if (content.includes(value)) violations.push(path.relative(root, file) + ' contains a production endpoint/config marker');
+    for (const value of PRODUCTION_ROSTER_MARKERS) if (content.includes(value)) violations.push(path.relative(root, file) + ' contains a real student name');
     // Regex-escaped production hosts (e.g. b3-games\.cloudfunctions\.net) slip past the plain-text check.
     if (/b3-games(?:-default-rtdb)?\\\.(?:cloudfunctions|firebaseapp|firebasestorage|firebaseio)/.test(content)) violations.push(path.relative(root, file) + ' contains an escaped production endpoint');
     // Homework's own "is this the live site?" guards compare against 'b3-games' to REFUSE live use; they never connect to it.
