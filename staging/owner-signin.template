@@ -19,6 +19,9 @@
   button:disabled{opacity:.6;cursor:wait}
   #msg{min-height:1.4em;margin-top:12px;font-weight:700;font-size:14px}
   .err{color:#b91c1c}.ok{color:#166534}
+  .small{font-size:13px;color:#475569;margin-top:14px}
+  button.plain{display:inline-block;width:auto;margin:4px 6px 0 0;padding:7px 11px;background:#e2e8f0;color:#0f172a;font:700 13px system-ui}
+  #who{margin-top:10px;font-size:13px;color:#334155}
   nav{display:none;margin-top:10px;gap:8px;flex-wrap:wrap}
   nav a{flex:1 1 140px;text-align:center;padding:10px;border-radius:10px;background:#e0e7ff;color:#1e3a8a;font-weight:800;text-decoration:none}
 </style>
@@ -36,7 +39,11 @@
     <input id="password" type="password" autocomplete="current-password" required>
     <button id="go" type="submit">Sign in</button>
   </form>
+  <div id="who" role="status"></div>
   <div id="msg" role="status"></div>
+  <p class="small">Stuck, or signed in as the wrong account?
+    <button type="button" id="signout" class="plain">Sign out</button>
+    <button type="button" id="reset" class="plain">Reset sign-in on this browser</button></p>
   <nav id="after">
     <a href="../owner-admin.html">Owner Admin</a>
     <a href="../admin.html">Administration</a>
@@ -64,22 +71,46 @@
   var safeNext = /^\.\.\/[A-Za-z0-9_\-\/]+\.html(\?[A-Za-z0-9_=&%\-]*)?$/.test(next) || /^\/[A-Za-z0-9_\-\/]+\.html(\?[A-Za-z0-9_=&%\-]*)?$/.test(next) ? next : '';
 
   function say(text, cls) { var m = $('msg'); m.textContent = text; m.className = cls || ''; }
+  // Always show who this browser is signed in as, so a wrong account (for example your own Google account) is obvious.
+  function showWho(user) {
+    $('who').textContent = user ? 'This browser is signed in as ' + (user.email || 'a student/guest') + (user.email && !user.emailVerified ? ' (email NOT verified: Owner Admin will refuse it)' : '') + '.' : 'This browser is not signed in.';
+    $('after').style.display = user ? 'flex' : 'none';
+  }
   function signedIn(user) {
     say('Signed in as ' + user.email + '.', 'ok');
-    $('after').style.display = 'flex';
+    showWho(user);
     if (safeNext) location.href = safeNext;
   }
-  auth.onAuthStateChanged(function (user) { if (user && user.email) signedIn(user); });
+  auth.onAuthStateChanged(function (user) { showWho(user); });
+  var slow = 0;
   $('form').addEventListener('submit', function (event) {
     event.preventDefault();
-    var button = $('go');
+    var button = $('go'), email = $('email').value.trim(), password = $('password').value;
+    var current = auth.currentUser;
+    // Already this account: nothing to do (signing in again changes nothing, so no state change would ever answer).
+    if (current && current.email && current.email.toLowerCase() === email.toLowerCase()) { $('password').value = ''; signedIn(current); return; }
     button.disabled = true; say('Signing in…');
-    auth.signInWithEmailAndPassword($('email').value.trim(), $('password').value).then(function () {
-      $('password').value = '';
+    clearTimeout(slow);
+    slow = setTimeout(function () { say('This is taking too long. Check your connection, close other tabs of this site, then press “Reset sign-in on this browser” below (or try a private window).', 'err'); button.disabled = false; }, 15000);
+    // Leave a different account first, so the new sign-in always replaces it.
+    (current ? auth.signOut() : Promise.resolve()).then(function () {
+      return auth.signInWithEmailAndPassword(email, password);
+    }).then(function (cred) {
+      clearTimeout(slow); $('password').value = ''; signedIn(cred.user);
     }).catch(function (error) {
-      $('password').value = '';
-      say(error && /wrong-password|invalid-credential|user-not-found|invalid-login/.test(String(error.code || error.message)) ? 'That email or password is not right.' : 'Could not sign in. Try again.', 'err');
+      clearTimeout(slow); $('password').value = '';
+      say(error && /wrong-password|invalid-credential|user-not-found|invalid-login/.test(String(error.code || error.message)) ? 'That email or password is not right.' : 'Could not sign in (' + String((error && error.code) || 'error').replace('auth/', '') + '). Try again.', 'err');
     }).then(function () { button.disabled = false; });
+  });
+  $('signout').addEventListener('click', function () { auth.signOut().then(function () { say('Signed out.', 'ok'); }); });
+  // Clears this browser's saved sign-in data for the staging site (a stuck or confused sign-in), then reloads.
+  $('reset').addEventListener('click', function () {
+    var done = function () {
+      try { Object.keys(localStorage).filter(function (k) { return k.indexOf('firebase:') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      try { var req = indexedDB.deleteDatabase('firebaseLocalStorageDb'); req.onsuccess = req.onerror = req.onblocked = function () { location.reload(); }; setTimeout(function () { location.reload(); }, 1500); } catch (e) { location.reload(); }
+    };
+    Promise.resolve().then(function () { return auth.signOut(); }).then(done, done);
   });
 })();
 </script>

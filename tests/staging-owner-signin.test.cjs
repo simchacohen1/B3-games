@@ -36,3 +36,18 @@ test('"next" can only be a page on this site, never another address', () => {
   for (const good of ['../owner-admin.html', '../admin.html?tab=students', '/owner-admin.html']) assert.ok(ok(good), good);
   for (const bad of ['https://evil.example/x.html', '//evil.example/x.html', 'javascript:alert(1)', '../../x.html', '../a.html#"><script>', 'owner-admin.html', '']) assert.ok(!ok(bad), bad);
 });
+
+test('signing in again as the account you already are never leaves the page stuck, and a slow sign-in says what to do', () => {
+  assert.match(page, /current\.email\.toLowerCase\(\) === email\.toLowerCase\(\)\) \{ \$\('password'\)\.value = ''; signedIn\(current\); return; \}/);
+  assert.match(page, /\(current \? auth\.signOut\(\) : Promise\.resolve\(\)\)\.then\(function \(\) \{\s*return auth\.signInWithEmailAndPassword\(email, password\);/);
+  assert.match(page, /setTimeout\(function \(\) \{ say\('This is taking too long\./);
+  assert.match(page, /signedIn\(cred\.user\)/, 'the success message does not depend on a later state change');
+});
+
+test('the page always shows which account the browser is signed in as, and offers Sign out and Reset', () => {
+  assert.match(page, /This browser is signed in as /);
+  assert.match(page, /email NOT verified: Owner Admin will refuse it/);
+  assert.match(page, /id="signout"/);
+  assert.match(page, /id="reset"/);
+  assert.match(page, /indexedDB\.deleteDatabase\('firebaseLocalStorageDb'\)/);
+});
