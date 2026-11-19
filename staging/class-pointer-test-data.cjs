@@ -84,7 +84,7 @@ function checkGoogleTeacher(email, user) {
 // Pure: the records that make a Google account a teacher of the fictional class. Reuses diagnose() for the teacher
 // record, class, Class Pointer setting and fictional students, and adds the invitation the site also looks up.
 // Only fills blanks. The class is always the fictional one from fictional-accounts.json; admin rights are never granted.
-function diagnoseGoogleTeacher({ workspaceId, role, email, uid, displayName, have }) {
+function diagnoseGoogleTeacher({ workspaceId, role, email, uid, displayName, have, removeAdmin = false }) {
   const mail = String(email).trim().toLowerCase();
   const me = { ...role, email: mail, displayName: displayName || 'Staging Google tester' };
   const r = diagnose({ workspaceId, role: me, uid, have });
@@ -95,6 +95,15 @@ function diagnoseGoogleTeacher({ workspaceId, role, email, uid, displayName, hav
   } else {
     if (inv.active === false) { r.problems.push('The teacher invitation for ' + mail + ' is switched off.'); r.patch[invitePath + '/active'] = true; }
     if (!inv.classIds || inv.classIds[role.classId] !== true) { r.problems.push('The teacher invitation does not list ' + role.classId + '.'); r.patch[invitePath + '/classIds/' + role.classId] = true; }
+  }
+  // A teacher login must not also be an admin. The site treats an admin as someone who may read EVERY class and
+  // reads the whole class list, which the staging rules only allow for the fictional owner: that read is refused
+  // ("permission_denied at .../classes") and the dashboard shows "Could not load your classes".
+  const adminPath = 'b3Games/admins/' + uid, adm = have.admin;
+  if (adm && adm.active !== false) {
+    r.problems.push('This account has an ADMIN record on staging (' + adminPath + '), so the site treats it as an admin and reads the whole class list, ' +
+      'which the staging rules refuse. A teacher login must not have one. Re-run with --remove-staging-admin --apply to switch it off (it is kept, set to active:false).');
+    if (removeAdmin) r.patch[adminPath + '/active'] = false;
   }
   return r;
 }
@@ -146,18 +155,27 @@ async function main() {
     have.students[s.id] = { profile: rec && rec.profile, membership: rec && rec.memberships && rec.memberships[ws + '_' + role.classId] };
     have.passcodes[s.id] = (await get('b3Private/passcodes/' + s.id + '/updatedAt')) != null;
   }
-  if (googleEmail) have.invite = await get('b3Games/workspaces/' + ws + '/teacherInvites/' + inviteIdFor(googleEmail));
+  if (googleEmail) {
+    have.invite = await get('b3Games/workspaces/' + ws + '/teacherInvites/' + inviteIdFor(googleEmail));
+    have.admin = await get('b3Games/admins/' + uid);
+  }
   const { problems, patch } = googleEmail
-    ? diagnoseGoogleTeacher({ workspaceId: ws, role, email: googleEmail, uid, displayName: user.displayName, have })
+    ? diagnoseGoogleTeacher({ workspaceId: ws, role, email: googleEmail, uid, displayName: user.displayName, have, removeAdmin: process.argv.includes('--remove-staging-admin') })
     : diagnose({ workspaceId: ws, role, uid, have });
   console.log('Staging project: ' + PROJECT + '   Teacher: ' + email + (googleEmail ? ' (your Google account)' : '') + '   Class: ' + role.classId);
+  if (googleEmail) {
+    const t = have.teacher, adm = have.admin;
+    console.log('Found for this account (uid ' + uid + '): admin record: ' + (adm ? (adm.active === false ? 'yes, switched off' : 'YES, active') : 'no') +
+      ' | teacher record: ' + (t ? 'yes, active=' + (t.active !== false) + ', classes=' + Object.keys(t.classIds || {}).join(',') : 'no') +
+      ' | invitation: ' + (have.invite ? 'yes' : 'no'));
+  }
   if (!problems.length) { console.log('OK: everything the Class Pointer dashboard needs is present.'); return; }
   problems.forEach(p => console.log(' - ' + p));
   const paths = Object.keys(patch);
   if (!apply) { console.log('\nRun again with --apply to add the ' + paths.length + ' missing item(s). Nothing was changed.'); return; }
   const res = await fetch(DB + '/.json?print=silent', { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error('Write failed: HTTP ' + res.status);
-  console.log('\nAdded: ' + paths.join(', '));
+  console.log('\nAdded/changed: ' + paths.join(', '));
 }
 
 module.exports = { diagnose, diagnoseGoogleTeacher, checkGoogleTeacher, inviteIdFor, spawnOptions, PROJECT };

@@ -95,3 +95,14 @@ test('the email is taken from the command line and is not hard-coded anywhere in
   assert.match(src, /--google-teacher=/);
   assert.doesNotMatch(src, /@gmail\.com|@googlemail\.com/i);
 });
+
+test('google teacher: a stray admin record is reported, and only switched off (never deleted) when asked', () => {
+  const h = gHave(); h.admin = { active: true, role: 'admin' };
+  const plain = gRun(h);
+  assert.ok(plain.problems.some(p => /ADMIN record/.test(p)));
+  assert.deepEqual(plain.patch, {}, 'nothing changes unless --remove-staging-admin is given');
+  const fix = diagnoseGoogleTeacher({ workspaceId: ws, role: gRole, email: 'me@gmail.com', uid: 'googleUid', displayName: 'Me', have: h, removeAdmin: true });
+  assert.deepEqual(fix.patch, { 'b3Games/admins/googleUid/active': false });
+  const none = gHave(); none.admin = null; assert.deepEqual(gRun(none).problems, []);
+  const off = gHave(); off.admin = { active: false }; assert.deepEqual(gRun(off).problems, []);
+});
