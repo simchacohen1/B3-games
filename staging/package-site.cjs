@@ -57,8 +57,15 @@ function packageSite(sourceRoot, outputRoot, env = process.env) {
 if (require.main === module) {
   const [, , source, output] = process.argv;
   if (!source || !output) throw new Error('Usage: node staging/package-site.cjs <source-checkout> <empty-output-directory>');
-  const result = packageSite(source, output);
-  console.log('Packaged ' + result.fileCount + ' text files for Firebase project ' + result.projectId + ' at ' + result.output + '.');
+  try {
+    const result = packageSite(source, output);
+    console.log('Packaged ' + result.fileCount + ' text files for Firebase project ' + result.projectId + ' at ' + result.output + '.');
+  } catch (error) {
+    // Print the cause plainly (a file-system error names the file and code, which is what matters on Windows:
+    // EBUSY/EPERM = a file is locked by another program, ENOENT = a path that is too long).
+    console.error('Staging packaging failed: ' + error.message + (error.code ? ' [' + error.code + ']' : '') + (error.path ? ' (' + error.path + ')' : ''));
+    process.exitCode = 1;
+  }
 }
 
 module.exports = { packageSite, copyTree, SKIP_DIRS, SKIP_FILES };

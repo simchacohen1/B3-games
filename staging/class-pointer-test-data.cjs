@@ -63,8 +63,16 @@ function diagnose({ workspaceId, role, uid, have }) {
   return { problems, patch };
 }
 
-function gcloudToken() {
-  const out = execFileSync('gcloud', ['auth', 'application-default', 'print-access-token'], { encoding: 'utf8' }).trim();
+// On Windows gcloud is gcloud.cmd, which Node cannot start without a shell (that is the "spawnSync gcloud ENOENT" error).
+// The arguments below are fixed strings, never user input, so using a shell there is safe.
+const spawnOptions = platform => ({ encoding: 'utf8', shell: platform === 'win32', windowsHide: true });
+function gcloudToken(platform = process.platform) {
+  let out;
+  try {
+    out = execFileSync('gcloud', ['auth', 'application-default', 'print-access-token'], spawnOptions(platform)).trim();
+  } catch (error) {
+    throw new Error('Could not run gcloud (' + (error.code || error.message) + '). Install the Google Cloud CLI and run: gcloud auth application-default login');
+  }
   if (out.length < 20) throw new Error('Google Application Default Credentials are unavailable. Run: gcloud auth application-default login');
   return out;
 }
@@ -104,5 +112,5 @@ async function main() {
   console.log('\nAdded: ' + paths.join(', '));
 }
 
-module.exports = { diagnose, PROJECT };
+module.exports = { diagnose, spawnOptions, PROJECT };
 if (require.main === module) main().catch(e => { console.error('Error: ' + e.message); process.exit(1); });

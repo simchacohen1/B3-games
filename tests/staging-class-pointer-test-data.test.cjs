@@ -1,7 +1,7 @@
 // The staging check for the Class Pointer teacher dashboard's fictional data: it must find every gap
 // and only ever fill blanks (never overwrite), and it must stay locked to the staging project.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs');
-const { diagnose, PROJECT } = require('../staging/class-pointer-test-data.cjs');
+const { diagnose, spawnOptions, PROJECT } = require('../staging/class-pointer-test-data.cjs');
 
 const ws = 'b3-2026', uid = 'uidA';
 const role = { email: 'teacher.alef@funtorahtools-staging.test', displayName: 'Test Teacher Alef', classId: 'TEST-ALEF', className: 'Test Class Alef',
@@ -43,4 +43,10 @@ test('locked to the staging project and never prints credentials', () => {
   const src = fs.readFileSync('staging/class-pointer-test-data.cjs', 'utf8');
   assert.doesNotMatch(src, /b3-games\.firebaseio|b3-games-default-rtdb|b3-games\.firebaseapp/);
   assert.doesNotMatch(src, /console\.log\([^)]*(password|passcode\b)/i);
+});
+
+test('gcloud is started through a shell on Windows only (gcloud.cmd), never on Mac/Linux', () => {
+  assert.equal(spawnOptions('win32').shell, true);
+  assert.equal(spawnOptions('linux').shell, false);
+  assert.equal(spawnOptions('darwin').shell, false);
 });
