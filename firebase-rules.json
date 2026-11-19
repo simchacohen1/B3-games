@@ -110,6 +110,9 @@
               "mishnayosPracticeLimit": {
                 ".read": "auth != null && (auth.token.b3ClassId == $classId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
                 ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
+              },
+              "locks": {
+                ".validate": true
               }
             }
           }

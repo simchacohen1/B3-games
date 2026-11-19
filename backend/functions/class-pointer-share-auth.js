@@ -5,6 +5,7 @@ const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const crypto=require('node:crypto');
 const {readPasscode,key,equal}=require('./student-passcodes.cjs');
+const {featureLockedForClass}=require('./student-locks-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const validRoom=s=>typeof s==='string'&&/^class-pointer-[a-f0-9-]{36}$/.test(s);
 const validId=s=>key(s);
@@ -22,6 +23,8 @@ exports.classPointerShareAuth=onRequest({
   const studentId=body.studentId,room=body.room,classId=body.classId,workspaceId='b3-2026';
   if(!validRoom(room)||!validId(classId))error(400,'Invalid class session.');
   const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
+  // The class locks from the teacher's Locks panel: while Class Pointer is locked a student gets no join or sharing ticket.
+  const pointerLocked=async()=>(await featureLockedForClass({get:async path=>(await db.ref(path).once('value')).val()},classId,'class-pointer',Date.now(),workspaceId)).locked;
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
   if(!cls||cls.active===false||!session||session.roomId!==room||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Class Pointer is not active for this class.');
@@ -46,6 +49,7 @@ exports.classPointerShareAuth=onRequest({
    const request=session.destinationRequest;
    if(!(request&&['screens','boards'].includes(request.mode))&&session.studentScreenSharing!==true)error(403,'There is no active student activity request.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   if(await pointerLocked())return res.json({ok:true,screenSharingDenied:true,whiteboardDenied:true,locked:true});
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
    const [profile,code]=await Promise.all([
@@ -60,6 +64,7 @@ exports.classPointerShareAuth=onRequest({
   if(action==='issue'){
    if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   if(await pointerLocked())error(403,'Class Pointer is locked by your teacher.');
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
@@ -158,6 +163,7 @@ exports.classPointerShareAuth=onRequest({
    return profile;
   };
   if(action==='joinIssue'){
+   if(await pointerLocked())error(403,'Class Pointer is locked by your teacher.');
    if(!validId(studentId)||typeof body.pin!=='string'||!body.pin||body.pin.length>100||!peerOk(body.peerId))error(400,'Invalid join request.');
    // Wrong passcodes are counted per student and per address; a correct one clears the student's count.
    const now=Date.now(),sPath='b3Private/classPointerJoinLimits/s_'+sha(studentId).slice(0,32),iPath='b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32);

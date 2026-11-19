@@ -95,7 +95,7 @@ test('student pages load the new toolbar and board scripts (new versions)',()=>{
   const toolbarToken=share.match(/annotation-toolbar\.js\?v=([^'"]+)/)[1],boardsToken=share.match(/student-boards\.js\?v=([^'"]+)/)[1];
   assert.match(toolbarToken,/hlshapes1$/);assert.match(boardsToken,/sharetab3$/);
   for(const page of ['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html','index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261120-sharetab3/,page);
+    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261120-locks1/,page);
   assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=hlshapes1/);
   assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=hlshapes1/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261120-sharetab3/);
 });

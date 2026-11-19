@@ -564,6 +564,13 @@
     }, 0);
   }
 
+  // A teacher's temporary unlock from the Locks panel (student-lock.js). It reopens this one activity despite the class
+  // lock hours or the class lock, but never the owner's emergency lock or an activity switched off for the class.
+  function teacherOverrideOpen() {
+    return Boolean(window.B3StudentLock && window.B3StudentLock.overrideOpen && window.B3StudentLock.overrideOpen(gameId));
+  }
+  window.addEventListener("b3lock:override", function () { if (lastSettings) decide(lastSettings); });
+
   function decide(settings) {
     lastSettings = settings || lastSettings || {};
 
@@ -600,7 +607,7 @@
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      if(!followActivityOpen&&!teacherOverrideOpen()&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 
@@ -659,6 +666,9 @@
       showOpen();
       return;
     }
+    // The teacher unlocked this activity for a set time from the Locks panel: the class lock hours do not apply to it.
+    // (The owner's emergency lock above is checked first and still wins.)
+    if (teacherOverrideOpen()) { showOpen(); return; }
     var info = classIsOpen(lastSettings, studentClassId);
     if (info.open) {
       showOpen();

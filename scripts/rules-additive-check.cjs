@@ -28,6 +28,11 @@ const ALLOWED_NEW = [
   // reads as posukPractice/attempts.
   ['posukPractice', 'submissions'],
   ['posukPractice', 'reviews'],
+  // Class locks (PENDING OWNER REVIEW): a class's locks, schedules and timed overrides. Written only by the studentLocks
+  // function (the node has no write rule of its own: only the class's existing owner/admin write rule applies, so a
+  // teacher or student can never write it from a browser). The student/teacher read rule is in the hardened file; the
+  // live file has none here, like its sibling `access` node.
+  ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'locks'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.

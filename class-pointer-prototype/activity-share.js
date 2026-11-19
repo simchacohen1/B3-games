@@ -934,6 +934,14 @@
       if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
+    // The teacher locked Class Pointer for this class (Locks panel): leave the lesson and stop sharing at once. When it opens
+    // again the normal follow of the lesson record starts the connection again (the server also refuses new tickets while locked).
+    window.addEventListener('b3lock:class-pointer',event=>{
+      if(event?.detail?.locked){
+        try{stopPresence()}catch{}
+        if(persistentShareWindow)studentStop();else if(stream)stop();
+      }else if(lastRows)void onSessions({val:()=>lastRows});
+    });
     // Another boy (or another class) signing in on this same page must not leave the old connection
     // running, and must not leave the new boy waiting for a refresh: drop everything that belonged to
     // the old identity, then adopt the new one in place and listen for his class's lesson.
