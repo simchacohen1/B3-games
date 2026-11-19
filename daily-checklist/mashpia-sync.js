@@ -37,7 +37,7 @@
         var d = ev.data;
         if (d.b3 === 'mashpia-pong' || d.b3 === 'mashpia-ready') { send(); return; }
         if (d.b3 !== 'mashpia-result' || d.id !== id) return;
-        if (d.ok) return done({ ok: true, message: Core.summary(d.result || { synced: 0 }), items: (d.result && d.result.items) || null });
+        if (d.ok) return done({ ok: true, message: Core.summary(d.result || { synced: 0 }), items: (d.result && d.result.items) || null, pulls: (d.result && d.result.pulls) || [] });
         if (d.code === 'login') { sent = false; env.status(d.message); env.needSetup(); return; }   /* wait for the bookmark to be clicked again */
         done({ ok: false, message: d.message || 'Could not sync right now.' });
       }));

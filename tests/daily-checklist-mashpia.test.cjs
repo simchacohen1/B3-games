@@ -46,13 +46,14 @@ test('matching: names by any word order, items by name, skips and never guesses'
   assert.deepEqual(p.missingItems, ['Homework', 'Listen to Parents']);   /* disabled items never match */
 });
 
-test('only Yes answers of students who answered', () => {
+test('roster students with Yes list, No list; blanks are left out of both', () => {
   const answers = {
     s1: { items: { a: { v: 1, n: 'Shacharis', o: 1 }, b: { v: 0, n: 'Mincha', o: 2 }, c: { v: 1, n: 'Daily Tzedaka', o: 0 } } },
     s2: { items: { a: { v: 0, n: 'Shacharis', o: 1 } } }, s4: { items: {} }
   };
   const roster = [{ id: 's1', name: 'Arik Fake' }, { id: 's2', name: 'Levi Fake' }, { id: 's3', name: 'Silent' }, { id: 's4', name: 'Ghost' }];
-  assert.deepEqual(Core.buildStudents(answers, roster), [{ name: 'Arik Fake', items: ['Daily Tzedaka', 'Shacharis'] }, { name: 'Levi Fake', items: [] }]);
+  assert.deepEqual(Core.buildStudents(answers, roster), [{ name: 'Arik Fake', items: ['Daily Tzedaka', 'Shacharis'], no: ['Mincha'] }, { name: 'Levi Fake', items: [], no: ['Shacharis'] },
+    { name: 'Silent', items: [], no: [] }, { name: 'Ghost', items: [], no: [] }]);
 });
 
 test('one short line', () => {
@@ -172,6 +173,31 @@ test('agent: a mark Mashpia did not accept is reported, not hidden', async () =>
   assert.deepEqual(JSON.parse(JSON.stringify([res.synced, res.notFound])), [1, ['Arik Fake']]);
 });
 
+/* ---------- three states: check, X, blank ---------- */
+test('X removes an existing Mashpia check; blank never changes anything; a check in Mashpia is pulled into a blank cell', () => {
+  /* Moshe has Shacharis checked in Mashpia. */
+  const none = Core.plan(grid(), [{ name: 'Moshe Fake', items: [], no: [] }]);
+  assert.deepEqual([none.sends, none.clears], [{}, {}]);                         /* blank: no change in Mashpia */
+  assert.deepEqual(JSON.parse(JSON.stringify(none.pulls)), [{ name: 'Moshe Fake', items: ['Shacharis'] }]);   /* shows on this side */
+  const x = Core.plan(grid(), [{ name: 'Moshe Fake', items: [], no: ['Shacharis'] }]);
+  assert.deepEqual(x.clears, { 22002: [2] });                                     /* X replaces the check */
+  assert.deepEqual(x.pulls, []);                                                  /* and it is not pulled back */
+  const yes = Core.plan(grid(), [{ name: 'Moshe Fake', items: ['Shacharis'], no: [] }]);
+  assert.deepEqual([yes.sends, yes.clears, yes.pulls], [{}, {}, []]);             /* already a check on both sides */
+  const xNotChecked = Core.plan(grid(), [{ name: 'Arik Fake', items: [], no: ['Mincha'] }]);
+  assert.deepEqual([xNotChecked.sends, xNotChecked.clears], [{}, {}]);            /* nothing to remove */
+});
+
+test('agent: an X sends mark "0" only for a cell Mashpia shows checked, and blank sends nothing', async () => {
+  const t = mashpiaTab();
+  await t.send({ b3: 'mashpia-sync', id: 'z1', date: '2026-11-18', students: [
+    { name: 'Moshe Fake', items: [], no: ['Shacharis'] }, { name: 'Arik Fake', items: [], no: ['Mincha'] }, { name: 'Chaim Fake', items: [], no: [] }] });
+  const marks = t.calls.filter(c => c.url.includes('/mark'));
+  assert.deepEqual(marks.map(c => [c.body.grid_id, c.body.user_ids, c.body.mark]), [[22002, [2], '0']]);
+  const res = t.replies.find(([m]) => m.b3 === 'mashpia-result')[0].result;
+  assert.equal(res.cleared, 1);
+});
+
 /* ---------- the checklist page side ---------- */
 function fakeEnv(w) {
   const listeners = new Set(), timers = [];
@@ -200,7 +226,7 @@ test('page: tab already set up -> one click, result line', async () => {
   const m = syncs(w)[0];
   assert.deepEqual([m[1], m[0].date, m[0].students.length], ['https://mashpia.com', '2026-11-18', 2]);
   e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 2, notFound: [], greyed: [], missingItems: [] } });
-  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students', items: null });   /* null = an older bookmark that sends no items */
+  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students', items: null, pulls: [] });   /* null = an older bookmark that sends no items */
   assert.equal(e.setup, 0);
   assert.equal(w.location.href, 'about:blank');   /* an existing tab is never reloaded */
 });

@@ -279,6 +279,27 @@ $("exportRange").onclick=async function(){
     await db.ref(C.basePath(ws,cls)+"/config/items").set(next);
     configRaw=next;await drawGrid(false);return true;
   }
+  /* Checks Mashpia has where this side is blank become ✓ here (saved like a teacher's mark). Cells that already hold a ✓ or ✗ are never touched. */
+  async function applyPulls(cls,d,pulls){
+    if(!pulls||!pulls.length||cls!==classId)return 0;
+    var cols=C.itemsFromConfig(configRaw,false),byName={};
+    cols.forEach(function(c){byName[Core.norm(c.name)]=c});
+    var day=await loadDay(d,true),n=0;
+    for(var i=0;i<pulls.length;i++){
+      var key=Core.nameKey(pulls[i].name),person=roster.filter(function(r){return Core.nameKey(r.name)===key})[0];
+      if(!person)continue;
+      var upd={name:person.name,t:firebase.database.ServerValue.TIMESTAMP},count=0;
+      pulls[i].items.forEach(function(nm){
+        var col=byName[Core.norm(nm)];
+        if(!col||cellValue(day,person.id,col.id)!==null)return;
+        var u=C.markUpdate(col,1,person.name,0);upd["items/"+col.id]=u["items/"+col.id];count++;
+      });
+      if(!count)continue;
+      await db.ref(base()+"/answers/"+d+"/"+person.id).update(upd);n+=count;
+    }
+    if(n){await loadDay(d,true);if($("day").value===d)await drawGrid(false)}
+    return n;
+  }
   var env={
     open:function(){return pre},
     listen:function(fn){window.addEventListener("message",fn);return function(){window.removeEventListener("message",fn)}},
@@ -301,10 +322,14 @@ $("exportRange").onclick=async function(){
       if(!res.ok){msg.textContent=res.message;btn.disabled=false;return}
       var changed=false,itemsFailed=false;
       try{changed=await applyMashpiaItems(cls,res.items)}catch(e){console.error(e);itemsFailed=true}
+      var pulled=0;
+      try{pulled=await applyPulls(cls,d,res.pulls)}catch(e){console.error(e);res.message+=" Could not copy Mashpia's checks into the checklist."}
+      if(pulled)res.message+=" Added "+pulled+" check"+(pulled===1?"":"s")+" from Mashpia.";
       var stale=!res.items;   /* an older copy of the bookmark does not send the items: ask for the new one */
       if(stale)$("mashpiaSetup").open=true;
       var extra=stale?" To get Mashpia's checklist items, drag the new B3 Mashpia Sync button to your bookmarks bar again (setup below).":itemsFailed?" Could not update the checklist items.":changed?" Checklist items updated from Mashpia.":"";
-      msg.textContent=students.length?res.message+extra:(stale||itemsFailed?extra.trim():changed?"Checklist items updated from Mashpia. No answers to send yet.":"Checklist items already match Mashpia. No answers to send yet.");
+      var anyAnswer=students.some(function(s){return s.items.length||s.no.length});
+      msg.textContent=anyAnswer||pulled?res.message+extra:(stale||itemsFailed?extra.trim():changed?"Checklist items updated from Mashpia. No answers to send yet.":"Checklist items already match Mashpia. No answers to send yet.");
     }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
     btn.disabled=false;
   };
