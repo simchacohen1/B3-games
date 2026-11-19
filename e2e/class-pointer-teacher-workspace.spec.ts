@@ -418,6 +418,8 @@ test('a permitted student can start sharing himself once the teacher enables scr
   // The click opens one dedicated sharing tab; that tab asks for the screen and holds the share,
   // so changing pages in the activity tab can never end it.
   const [tab] = await Promise.all([s.page.waitForEvent('popup'), share.click()]);
+  // The tab opens blank and is then sent to the sharing page, so wait for that page rather than the blank one.
+  await tab.waitForURL(/student-share-window\.html/, { timeout: 15000 });
   await tab.waitForLoadState();
   expect(new URL(tab.url()).pathname).toBe('/class-pointer-prototype/student-share-window.html');
   await expect.poll(() => tab.evaluate(() => (window as any).__displayMediaCalls), { timeout: 15000 }).toBe(1);
