@@ -6,16 +6,9 @@
 //
 //   submit  : −5 points (the balance may go negative). The posuk is then
 //             "pending" and cannot be submitted again until it is graded.
-//   grade   : the teacher picks 10, 8, 6, 4, 2 or 0 points, plus optional bonus.
-//             10 = gold standard: the posuk is locked for 30 days.
-//             8/6/4/2 = points, no lock: the student may re-record for gold.
-//             0 = no points; the student may try again.
-//             A re-record only pays the difference from the best score the
-//             student already earned on that posuk (6 then 10 → +4), so
-//             points cannot be farmed. The optional bonus is always paid.
-//   discard : the teacher deletes a waiting recording without grading it.
-//             The 5-point charge is always refunded, nothing is awarded,
-//             the posuk is not locked and can be submitted again.
+//   grade   : gold standard  → +10 − 1 per mistake (never below 0) + bonus.
+//                              The posuk is locked for 30 days.
+//             not gold       → no points; the student may try again.
 //
 // Students can write their own attempt records, so nothing here trusts
 // them for grades or points. Submissions, per-posuk review status and all
@@ -27,8 +20,7 @@ const LOCK_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_RANGE = 40;
 const MAX_MISTAKES = 100;
 const MAX_BONUS = 100000;
-const POINT_CHOICES = Object.freeze([10, 8, 6, 4, 2, 0]);
-const SOURCES = Object.freeze({ submit: 'posuk-submit', gold: 'posuk-gold', refund: 'posuk-refund' });
+const SOURCES = Object.freeze({ submit: 'posuk-submit', gold: 'posuk-gold' });
 
 const validKey = v => typeof v === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(v);
 const validSelectionKey = v => typeof v === 'string' && /^[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*_\d{1,3}_\d{1,3}(?:-\d{1,3})?$/.test(v) && v.length <= 120;
@@ -47,12 +39,11 @@ function posukKeysForSelection(selectionKey){
   return { prefix, perek, start, end, keys: out };
 }
 
-// Points to pay for one graded submission: only the part of the score above
-// the best the student already earned on this posuk, plus the bonus.
-function pointsForGrade({ score, prior = 0, bonus = 0 }){
-  return Math.max(0, score - prior) + bonus;
+// Points for one graded submission. Bonus is only given with gold standard.
+function pointsForGrade({ gold, mistakes, bonus }){
+  if(!gold) return 0;
+  return Math.max(0, GOLD_POINTS - mistakes) + bonus;
 }
-const statusForScore = score => score >= GOLD_POINTS ? 'gold' : score > 0 ? 'scored' : 'retry';
 
 function intInRange(v, min, max){
   const n = Number(v);
@@ -125,7 +116,7 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
         const why = blockedReason(next[key], t);
         if(why){ blocked = { key, why, lockedUntil: next[key].lockedUntil || null }; return; }
       }
-      for(const key of sel.keys) next[key] = { status: 'pending', submissionId: attemptId, selectionKey, submittedAt: t, bestPoints: Number(next[key]?.bestPoints) || 0 };
+      for(const key of sel.keys) next[key] = { status: 'pending', submissionId: attemptId, selectionKey, submittedAt: t };
       return next;
     });
     if(!tx.committed){
@@ -156,49 +147,26 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     return { ok: true, submission: { ...submission, submitCharged: !!charge.ok }, pointsCharged: charge.ok ? SUBMIT_COST : 0, balanceAfter: charge.balanceAfter ?? null };
   }
 
-  // Shared by grade and discard: the teacher must own this student and class.
-  async function loadForTeacher({ scope, studentId, submissionId }){
+  async function grade({ teacherEmail, scope, studentId, submissionId, gold, mistakes, bonus, note }){
     if(!validKey(studentId) || !validKey(submissionId)) fail('Missing submission.');
     if(scope && !scope.students?.[studentId]) fail('This student does not belong to your selected class.', 403);
+    const isGold = gold === true;
+    const m = intInRange(mistakes ?? 0, 0, MAX_MISTAKES);
+    const b = intInRange(bonus ?? 0, 0, MAX_BONUS);
+    if(m === null) fail('Mistakes must be a whole number from 0 to ' + MAX_MISTAKES + '.');
+    if(b === null) fail('Bonus must be a whole number of 0 or more.');
+    if(!isGold && b > 0) fail('Bonus points can only be given with gold standard.');
+    const points = pointsForGrade({ gold: isGold, mistakes: m, bonus: b });
+    const t = now();
     const ref = submissionRef(studentId, submissionId);
     const before = (await ref.get()).val();
     if(!before) fail('Submission not found.', 404);
     if(scope && scope.selected && before.classId && !(scope.students[studentId].classIds || [scope.students[studentId].classId]).includes(before.classId))
       fail('This submission belongs to another class.', 403);
-    return { ref, before };
-  }
-  const keysOf = sub => Array.isArray(sub.posukKeys) ? sub.posukKeys : (posukKeysForSelection(sub.selectionKey)?.keys || []);
-  const refLabel = sub => `Perek ${sub.perek} · Posuk ${sub.startPosuk}${sub.endPosuk > sub.startPosuk ? '–' + sub.endPosuk : ''}`;
 
-  // points: 10, 8, 6, 4, 2 or 0. (Old callers that send gold + mistakes still work.)
-  async function grade({ teacherEmail, scope, studentId, submissionId, points: picked, gold, mistakes, bonus, note }){
-    let score;
-    if(picked !== undefined && picked !== null){
-      score = intInRange(picked, 0, GOLD_POINTS);
-      if(score === null || !POINT_CHOICES.includes(score)) fail('Pick 10, 8, 6, 4, 2 or 0 points.');
-    }else{
-      const m = intInRange(mistakes ?? 0, 0, MAX_MISTAKES);
-      if(m === null) fail('Mistakes must be a whole number from 0 to ' + MAX_MISTAKES + '.');
-      score = gold === true ? Math.max(0, GOLD_POINTS - m) : 0;
-    }
-    const b = intInRange(bonus ?? 0, 0, MAX_BONUS);
-    if(b === null) fail('Bonus must be a whole number of 0 or more.');
-    if(score === 0 && b > 0) fail('Bonus points can only be given with points (not with 0).');
-    const t = now();
-    const { ref, before } = await loadForTeacher({ scope, studentId, submissionId });
-
-    // The best score already earned on these posuk(im). A waiting posuk keeps
-    // it in its review row (copied there when the student sent the recording).
-    const reviewRows = (await reviewsRef(studentId).get()).val() || {};
-    const prior = keysOf(before).reduce((best, key) => {
-      const row = reviewRows[key];
-      return row && row.submissionId === submissionId ? Math.max(best, Number(row.bestPoints) || 0) : best;
-    }, 0);
-    const status = statusForScore(score);
-    const points = pointsForGrade({ score, prior, bonus: b });
     const result = {
-      status, score, mistakes: 0, bonus: b, pointsAwarded: points, priorPoints: prior,
-      gradedAt: t, gradedBy: String(teacherEmail || '').slice(0, 200), lockedUntil: status === 'gold' ? t + LOCK_MS : null,
+      status: isGold ? 'gold' : 'retry', mistakes: m, bonus: b, pointsAwarded: points,
+      gradedAt: t, gradedBy: String(teacherEmail || '').slice(0, 200), lockedUntil: isGold ? t + LOCK_MS : null,
       teacherNote: String(note || '').slice(0, 500) || null
     };
     const tx = await ref.transaction(cur => {
@@ -208,7 +176,6 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     });
     if(!tx.committed){
       const live = (await ref.get()).val() || {};
-      if(live.status === 'deleted') fail('This recording was deleted.', 409);
       if(live.status && live.status !== 'pending') fail('This recording was already graded.', 409);
       fail('Could not save the grade. Please try again.', 409);
     }
@@ -216,13 +183,13 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
 
     // Update the per-posuk status, but only where this submission is still
     // the one on record.
+    const keys = Array.isArray(sub.posukKeys) ? sub.posukKeys : (posukKeysForSelection(sub.selectionKey)?.keys || []);
     await reviewsRef(studentId).transaction(cur => {
       const next = { ...(cur || {}) };
-      for(const key of keysOf(sub)){
+      for(const key of keys){
         if(next[key] && next[key].submissionId !== submissionId) continue;
-        next[key] = { status, submissionId, selectionKey: sub.selectionKey, submittedAt: sub.submittedAt || null,
-          gradedAt: t, lockedUntil: result.lockedUntil, score, bestPoints: Math.max(Number(next[key]?.bestPoints) || 0, score),
-          mistakes: 0, bonus: b, pointsAwarded: points };
+        next[key] = { status: result.status, submissionId, selectionKey: sub.selectionKey, submittedAt: sub.submittedAt || null,
+          gradedAt: t, lockedUntil: result.lockedUntil, mistakes: m, bonus: b, pointsAwarded: points };
       }
       return next;
     });
@@ -233,61 +200,16 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
       if(rewardStudentId){
         award = await postPoints({ requestId: `posukgold_${studentId}_${submissionId}`.slice(0, 220), rewardStudentId, studentId,
           source: SOURCES.gold, amount: points,
-          reason: `${status === 'gold' ? 'Gold standard' : 'Posuk Practice ' + score + '/10'}${prior ? ' (already had ' + prior + ')' : ''}${b ? ' + ' + b + ' bonus' : ''} — ${refLabel(sub)}`,
-          record: { submissionId, selectionKey: sub.selectionKey, perek: sub.perek || null, posuk: sub.startPosuk || null, bonus: b, score, priorPoints: prior } });
+          reason: `Gold standard${m ? ' (' + m + ' mistake' + (m === 1 ? '' : 's') + ')' : ''}${b ? ' + ' + b + ' bonus' : ''} — Perek ${sub.perek} · Posuk ${sub.startPosuk}${sub.endPosuk > sub.startPosuk ? '–' + sub.endPosuk : ''}`,
+          record: { submissionId, selectionKey: sub.selectionKey, perek: sub.perek || null, posuk: sub.startPosuk || null, bonus: b, mistakes: m } });
       }else award = { ok: false, error: 'No Student Rewards profile.' };
       await ref.update({ pointsPosted: !!award.ok });
     }
-    return { ok: true, submission: { ...sub, pointsPosted: points > 0 ? !!award.ok : null }, points, pointsPosted: !!award.ok, score, priorPoints: prior, status };
+    return { ok: true, submission: { ...sub, pointsPosted: points > 0 ? !!award.ok : null }, points, pointsPosted: !!award.ok };
   }
 
-  // The teacher deletes a waiting recording without grading it. The record is
-  // kept (status "deleted"), nothing is awarded, the posuk is not locked, and
-  // the 5-point submit charge is always refunded.
-  async function discard({ teacherEmail, scope, studentId, submissionId }){
-    const t = now();
-    const { ref } = await loadForTeacher({ scope, studentId, submissionId });
-    const tx = await ref.transaction(cur => {
-      if(cur === null) return null;
-      if(cur.status !== 'pending') return;
-      return { ...cur, status: 'deleted', deletedAt: t, deletedBy: String(teacherEmail || '').slice(0, 200), pointsAwarded: 0 };
-    });
-    if(!tx.committed){
-      const live = (await ref.get()).val() || {};
-      if(live.status === 'deleted') fail('This recording was already deleted.', 409);
-      if(live.status && live.status !== 'pending') fail('This recording was already graded.', 409);
-      fail('Could not delete the recording. Please try again.', 409);
-    }
-    const sub = tx.snapshot.val();
-
-    // Put each posuk back the way it was before this recording was sent.
-    await reviewsRef(studentId).transaction(cur => {
-      const next = { ...(cur || {}) };
-      for(const key of keysOf(sub)){
-        const row = next[key];
-        if(!row || row.submissionId !== submissionId) continue;
-        const best = Number(row.bestPoints) || 0;
-        if(best > 0) next[key] = { status: statusForScore(best), score: best, bestPoints: best, lockedUntil: null, mistakes: 0, pointsAwarded: 0 };
-        else delete next[key];
-      }
-      return Object.keys(next).length ? next : null;
-    });
-
-    let refund = { ok: true, amount: 0 };
-    if(sub.submitCharged === true){
-      const rewardStudentId = sub.rewardStudentId || (resolveRewardStudentId ? await resolveRewardStudentId(studentId) : null);
-      refund = rewardStudentId
-        ? await postPoints({ requestId: `posukrefund_${studentId}_${submissionId}`.slice(0, 220), rewardStudentId, studentId,
-            source: SOURCES.refund, amount: SUBMIT_COST, reason: `Posuk Practice recording deleted by teacher, 5 points refunded — ${refLabel(sub)}`,
-            record: { submissionId, selectionKey: sub.selectionKey, perek: sub.perek || null, posuk: sub.startPosuk || null } })
-        : { ok: false, error: 'No Student Rewards profile.' };
-      await ref.update({ refundPosted: !!refund.ok });
-    }
-    return { ok: true, refunded: refund.ok && sub.submitCharged === true ? SUBMIT_COST : 0, refundPosted: !!refund.ok };
-  }
-
-  return { submit, grade, discard, postPoints };
+  return { submit, grade, postPoints };
 }
 
-module.exports = { createPosukReview, posukKeysForSelection, pointsForGrade, statusForScore, blockedReason, validSelectionKey,
-  POINT_CHOICES, SUBMIT_COST, GOLD_POINTS, LOCK_MS, SOURCES };
+module.exports = { createPosukReview, posukKeysForSelection, pointsForGrade, blockedReason, validSelectionKey,
+  SUBMIT_COST, GOLD_POINTS, LOCK_MS, SOURCES };

@@ -317,29 +317,26 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(gradeCard.locator('.grade-hebrew')).toContainText('אֵלָיו');
   await expect(gradeCard.locator('audio')).toHaveCount(1);
   await expect(posukTeacherPage.locator('#gradeTabCount')).toHaveText('1');
-  // One row of points (10, 8, 6, 4, 2, 0): no separate Gold / Not gold buttons. 10 is Gold.
-  await expect(gradeCard.locator('[data-choice]')).toHaveCount(0);
-  await expect(gradeCard.locator('[data-pts]')).toHaveCount(6);
-  await expect(gradeCard.locator('[data-delete]')).toHaveCount(1);
-  await gradeCard.locator('[data-pts="10"]').click();
+  await gradeCard.locator('[data-choice="gold"]').click();
+  await gradeCard.locator('[data-pts="8"]').click();
   await gradeCard.locator('[data-field="bonus"]').fill('2');
   await gradeCard.locator('[data-field="note"]').fill('Beautiful reading');
-  await expect(gradeCard.locator('[data-field="points"]')).toContainText('12 points');
+  await expect(gradeCard.locator('[data-field="points"]')).toHaveText('= 10 points');
   await gradeCard.locator('[data-save]').click();
   await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 20000}).toBe('gold');
-  expect(await readFixture(rewardBalancePath)).toBe(10); // −2 + (10 chosen points + 2 bonus)
-  await expect(posukTeacherPage.locator('.graded-row').filter({hasText:'Ari Example'})).toContainText('Gold',{timeout:15000});
+  expect(await readFixture(rewardBalancePath)).toBe(8); // −2 + (8 chosen points + 2 bonus)
+  await expect(posukTeacherPage.locator('.graded-row').filter({hasText:'Ari Example'})).toContainText('Gold standard',{timeout:15000});
   await expect(posukTeacherPage.locator('.grade-card')).toHaveCount(0);
   expect(posukTeacherReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
   await posukTeacherContext.close();
 
   // The student sees the grade, the bonus notice and the one-month lock.
   await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1`);
-  await expect(page.locator('#combinedStateBox')).toContainText('Gold 🏅');
+  await expect(page.locator('#combinedStateBox')).toContainText('Gold standard');
   await expect(page.locator('#combinedRecordStage')).toBeHidden();
   await expect(page.locator('#bonusNotices')).toContainText('2 bonus points');
   await page.goto(`${origin}/record_pesukim/progress.html`);
-  await expect(page.locator('.review-group').filter({hasText: 'Gold'}).locator('.review-tile')).toContainText('18:1');
+  await expect(page.locator('.review-group').filter({hasText: 'Gold standard'}).locator('.review-tile')).toContainText('18:1');
   await expect(page.locator('.review-group').filter({hasText: 'Waiting for your teacher'}).locator('.review-tile')).toHaveCount(0);
   // Understand questions live in the separate Chumash חידון tile (?mode=quiz).
   await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1&mode=quiz`);
