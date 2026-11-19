@@ -92,7 +92,7 @@
     if (!modal.hidden && pending === which) { closePanel(); return; }
     closePanel();
     pending = which;
-    modalTitle.textContent = which === 'access' ? '🔒 Class Access' : which === 'follow' ? '👣 Follow the Teacher' : '👆 Class Pointer';
+    modalTitle.textContent = which === 'access' ? '🔒 Class Locks' : which === 'follow' ? '👣 Follow the Teacher' : '👆 Class Pointer';
     accessFrame.hidden = true; followFrame.hidden = true;
     popoutBtn.hidden = true;
     if (modalClassSelect) modalClassSelect.value = '';
@@ -150,9 +150,24 @@
     if (homeFollow) homeFollow.setAttribute('aria-expanded', 'false');
     if (lock) lock.setAttribute('aria-expanded', 'false');
   }
+  // Choosing a class in the bar counts as opening it: with no schedule covering right now, the teacher who most recently
+  // opened a class is the one who has it (and so can start timed unlocks). At most once every 5 minutes per class.
+  var openedPing = {};
+  function touchClass(id) {
+    var now = Date.now();
+    if (!authorized || !ID.test(id) || now - (openedPing[id] || 0) < 5 * 60 * 1000) return;
+    openedPing[id] = now;
+    try {
+      var user = firebase.auth().currentUser; if (!user) return;
+      user.getIdToken().then(function(token) {
+        return fetch('https://us-central1-b3-games.cloudfunctions.net/studentLocks', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ classId: id, action: 'opened' }) });
+      }).catch(function() { /* the Locks panel records it too */ });
+    } catch (e) { /* not signed in */ }
+  }
   function updatePanelClass(id) {
     if (!classes.some(function(row) { return row.id === id; })) return;
     remember(id);
+    touchClass(id);
     if (select) select.value = id;
     syncPointerButtons();
     if (modalClassSelect) modalClassSelect.value = id;
@@ -178,12 +193,12 @@
     if (chooser) chooser.hidden = true;
     if (popoutBtn) popoutBtn.hidden = false;
     modal.hidden = false;
-    modalTitle.textContent = which === 'access' ? '🔒 Class Access' : '👣 Follow the Teacher';
+    modalTitle.textContent = which === 'access' ? '🔒 Class Locks' : '👣 Follow the Teacher';
     if (modalClassSelect) modalClassSelect.value = id;
     accessFrame.hidden = which !== 'access';
     followFrame.hidden = which !== 'follow';
     if (which === 'access') {
-      applySource(accessFrame, classUrl('admin.html', id, {tab:'access',embed:'1'}));
+      applySource(accessFrame, classUrl('class-locks/index.html', id, {embed:'1'}));   // every feature's lock, schedules and timed unlocks
     } else {
       // Keep an already-running Follow session alive while its panel is closed.
       // Changing class is intentional: its original controller stops on unload.
@@ -305,7 +320,7 @@
     bar.setAttribute('aria-label', 'Teacher class, Follow and Class Pointer controls');
     var label = el('label', '', 'Class'); label.htmlFor = 'fttTeacherQuickClass';
     select = el('select'); select.id = 'fttTeacherQuickClass'; select.setAttribute('aria-label','Teaching class');
-    lock = el('button', '', '🔒'); lock.id='fttTeacherQuickLock'; lock.setAttribute('aria-label','Open Class Access'); lock.type = 'button'; lock.title = 'Open Class Access for the selected class'; lock.setAttribute('aria-expanded','false');
+    lock = el('button', '', '🔒'); lock.id='fttTeacherQuickLock'; lock.setAttribute('aria-label','Open Class Locks'); lock.type = 'button'; lock.title = 'Lock or unlock features for the selected class'; lock.setAttribute('aria-expanded','false');
     follow = el('button', '', '👣'); follow.setAttribute('aria-label','Open or close Follow the Teacher'); follow.type = 'button'; follow.title = 'Open or close Follow the Teacher'; follow.setAttribute('aria-expanded','false');
     pointer = el('button', '', '👆'); pointer.id = 'fttTeacherQuickPointer'; pointer.type = 'button';
     pointer.setAttribute('aria-label','Open Class Pointer for the selected class'); pointer.title = 'Open Class Pointer for the selected class';
@@ -344,7 +359,7 @@
     modal.addEventListener('click',function(e){if(e.target===modal)closePanel();});
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)closePanel();});
     popout.addEventListener('click',function(){
-      var url=activePanel==='follow'?classUrl('follow-teacher/teacher.html',currentClass()):classUrl('admin.html',currentClass(),{tab:'access'});
+      var url=activePanel==='follow'?classUrl('follow-teacher/teacher.html',currentClass()):classUrl('class-locks/index.html',currentClass());
       openWindow(url,'_blank',true);
     });
   }

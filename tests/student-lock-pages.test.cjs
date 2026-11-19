@@ -17,8 +17,9 @@ const FEATURES = new Set(core.FEATURES.map(f => f.id));
 const TAG = /<script\b[^>]*\bsrc="([^"]*student-lock\.js)(?:\?[^"]*)?"[^>]*>/gi;
 const TILE_ALIAS = { gallery: 'class-gallery', tag: 'class-gallery', rashi: 'rashi-letters' };
 
+// Tracked files and new files not yet added (but not ignored ones): a new page is caught while you are still writing it.
 function trackedHtml() {
-  return execFileSync('git', ['ls-files', '*.html'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '*.html'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
 }
 const ignored = file => manifest.IGNORED_DIRS.some(d => file.startsWith(d) || file.includes('/' + d));
 

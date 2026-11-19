@@ -52,6 +52,7 @@ const EXEMPT_PAGES = {
   "assignment-center/teacher.html": "teacher",
   "chazara/teacher.html": "teacher",
   "class-dashboard/index.html": "teacher dashboard",
+  "class-locks/index.html": "teacher Locks panel (teacher sign-in only)",
   "class-pointer-prototype/dashboard.html": "teacher dashboard",
   "comment-log/b3-comment-log.html": "teacher tool",
   "daily-checklist/teacher.html": "teacher",
