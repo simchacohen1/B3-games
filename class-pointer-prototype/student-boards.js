@@ -561,11 +561,30 @@
     }
     const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){fit(focus,surface);paint(canvas,board,drawer?.draft())}});
     pictureLoaded=redraw;clipReady.then(redraw);
+    /* share-window-open:start */
+    // Opens the sharing window by name WITHOUT ever reloading one that already exists. window.open(url, name) would
+    // navigate an existing window to url, and a page reload ends a screen capture. window.open('', name) only
+    // returns the existing window, which is then just brought to the front; a window that did not exist yet comes
+    // back blank and is sent to the sharing page once.
+    function openShareWindowOnce(win,url,name){
+      let target=null;
+      try{target=win.open('',name)}catch{}
+      if(!target)return{win:null,existing:false};
+      let existing=false;
+      try{existing=/\/student-share-window\.html$/.test(String(target.location.pathname))}catch{}
+      if(existing){try{target.focus?.()}catch{}return{win:target,existing:true}}
+      try{target.location.href=url}catch{try{target.close?.()}catch{}return{win:null,existing:false}}
+      return{win:target,existing:false};
+    }
+    /* share-window-open:end */
     function openShareWindow(){
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
-      shareWindow=window.open(url.href,'classPointerStudentShare');
-      if(shareWindow){shareNote.textContent='Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';shareWindow.focus?.();return}
+      // After this page is refreshed it no longer holds the window it opened, so it asks the browser for the window by
+      // name. An open sharing window is only brought to the front: reloading it would end the share.
+      const opened=openShareWindowOnce(window,url.href,'classPointerStudentShare');
+      shareWindow=opened.win;
+      if(shareWindow){shareNote.textContent=opened.existing?'Your sharing window is already open and keeps sharing. Click its tab to see it.':'Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';return}
       shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
       void startShare('screen');
     }
@@ -1050,6 +1069,13 @@
     const id=personId(m);
     return (id&&shares.streamFor(id))||(m.studentId&&shares.streamFor(m.studentId))||null;
   }
+  // The student's share ended by itself and he has not resumed yet: his last picture is shown, but labelled.
+  function stoppedOf(m){
+    if(m.screenStream)return false;
+    const shares=window.ClassPointerActivityShares;if(!shares?.stopped)return false;
+    const id=personId(m);
+    return !!((id&&shares.stopped(id))||(m.studentId&&shares.stopped(m.studentId)));
+  }
   function flush(){
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
@@ -1058,7 +1084,7 @@
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
-        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for their screen…':'';
+        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for their screen…':screens&&stoppedOf(m)?'⏸ Sharing stopped. Waiting for them to resume…':'';
         tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
         setVideo(tile.video,screens&&!paused?live:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
@@ -1068,7 +1094,7 @@
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
         focusClip.root.hidden=screens||paused||!Clip;focusClip.update();
-        if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share their screen…'}
+        if(screens&&!paused){const stopped=!!live&&stoppedOf(m);setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live&&!stopped;screenNote.textContent=stopped?'⏸ '+m.name+' stopped sharing. Waiting for them to resume…':'Waiting for '+m.name+' to share their screen…'}
         else setVideo(screenVideo,null);
         screenInk?.refresh();
         if(!surface.hidden){fit(focus,surface);paint(canvas,boardFor(m),drawer?.draft())}
@@ -1354,6 +1380,8 @@
       return true;
     },
     fromStudent(m,message){
+      // His own page reports that he stopped sharing from his sharing tab: take his screen tile away straight away.
+      if(m.presence&&m.studentId&&message.type==='board-screen'&&message.sharing===false&&message.from==='share-tab'){window.ClassPointerActivityShares?.studentStopped?.(m.studentId);return}
       if(!on)return;
       if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}

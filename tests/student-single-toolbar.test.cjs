@@ -25,7 +25,7 @@ test('the bar and the board start to the right of the floating toolbar so it can
 test('the new version tokens are used by both pages that load the board', () => {
   for (const f of ['classroom.html', 'activity-share.js']) {
     const text = read(f);
-    assert.match(text, /student-boards\.js\?v=20261118-onebar/, f);
+    assert.match(text, /student-boards\.js\?v=20261120-sharetab3/, f);
     assert.match(text, /student-boards\.css\?v=20261118-onebar/, f);
   }
 });
