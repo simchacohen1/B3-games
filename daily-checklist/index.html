@@ -69,25 +69,8 @@ main{max-width:640px;margin:0 auto;padding:18px 16px 60px}
   <div class="date" id="dateLabel"></div>
   <div id="loading" class="note">Loading…</div>
 
-  <section id="asking" class="hidden">
-    <div class="progress"><i id="bar"></i></div>
-    <div class="count" id="count"></div>
-    <div class="card">
-      <div class="q" id="question" dir="auto"></div>
-      <div class="btns">
-        <button class="btn yes" id="yes" type="button">YES</button>
-        <button class="btn no" id="no" type="button">NO</button>
-      </div>
-    </div>
-    <div class="nav">
-      <button id="back" type="button">← Back</button>
-      <button id="skip" type="button">Next →</button>
-    </div>
-  </section>
-
   <section id="summary" class="hidden">
-    <div class="done">All done for today! 🎉</div>
-    <div class="count">You can change any answer until the end of the day.</div>
+    <div class="done" id="doneMsg"></div>
     <div class="list" id="list"></div>
   </section>
 
@@ -104,7 +87,6 @@ var studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage
 var studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 var items=C.DEFAULT_ITEMS.map(function(x,i){return {id:x.id,name:x.name,star:x.star,order:i}});
 var answers={};      // itemId -> 1 | 0 (today only)
-var index=0;
 var today=C.schoolDate();
 var dayRef=null;     // answers/{today}/{studentId}; null means "nothing is saved" (guest, teacher demo, no class)
 var saveFailed=false;
@@ -114,35 +96,19 @@ function nameHtml(it){return esc(it.name)+(it.star?' <span class="star" aria-lab
 function setNote(t){$("note").textContent=t||""}
 function pretty(key){var p=key.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}
 
-function show(which){["asking","summary","loading"].forEach(function(id){$(id).classList.toggle("hidden",id!==which)})}
-function firstUnanswered(){for(var i=0;i<items.length;i++)if(answers[items[i].id]==null)return i;return -1}
+function show(which){["summary","loading"].forEach(function(id){$(id).classList.toggle("hidden",id!==which)})}
 
 function render(){
   if(!items.length){show("loading");$("loading").textContent="Your teacher has not added any checklist items yet.";return}
-  if(index<0)index=0;
-  if(index>=items.length){renderSummary();return}
-  var it=items[index];
-  show("asking");
-  $("question").innerHTML=nameHtml(it);
-  $("count").textContent="Question "+(index+1)+" of "+items.length;
-  $("bar").style.width=Math.round(index/items.length*100)+"%";
-  $("yes").classList.toggle("sel",answers[it.id]===1);
-  $("no").classList.toggle("sel",answers[it.id]===0);
-  $("back").disabled=index===0;
-  $("skip").disabled=false;
+  renderSummary();
 }
 function renderSummary(){
   show("summary");
+  $("doneMsg").textContent=items.every(function(it){return answers[it.id]!=null})?"All done for today! 🎉":"Tap YES or NO for each one.";
   $("list").innerHTML=items.map(function(it,i){var a=answers[it.id];
     return '<div class="row"><div class="nm" dir="auto">'+nameHtml(it)+'</div><div class="mini">'+
       '<button type="button" class="yes'+(a===1?' on':'')+'" data-i="'+i+'" data-v="1">YES</button>'+
       '<button type="button" class="no'+(a===0?' on':'')+'" data-i="'+i+'" data-v="0">NO</button></div></div>'}).join("");
-}
-function answer(v){
-  var it=items[index];if(!it)return;
-  setAnswer(it,v);
-  index++;
-  render();
 }
 function setAnswer(it,v){
   answers[it.id]=v;
@@ -153,10 +119,6 @@ function setAnswer(it,v){
     console.warn("Daily Checklist save failed",e);saveFailed=true;setNote("Could not save that answer. Check your internet and tap it again.")});
 }
 
-$("yes").onclick=function(){answer(1)};
-$("no").onclick=function(){answer(0)};
-$("back").onclick=function(){if(index>0){index--;render()}};
-$("skip").onclick=function(){index++;render()};
 $("list").onclick=function(e){
   var b=e.target.closest("button[data-i]");if(!b)return;
   setAnswer(items[+b.dataset.i],+b.dataset.v);renderSummary();
@@ -174,18 +136,18 @@ async function start(){
   if(isGuest()){
     $("whoName").textContent="Guest";
     setNote("Guest preview — nothing is saved.");
-    index=0;render();return;
+    render();return;
   }
   var account=await window.B3TeacherAccountReady;
   if(account&&account.user&&account.authorized&&!(window.B3SiteSettings&&window.B3SiteSettings.getActingStudent&&window.B3SiteSettings.getActingStudent())){
     $("whoName").textContent="Teacher demonstration";
     setNote("Demonstration — answers are not saved.");
-    index=0;render();return;
+    render();return;
   }
   $("whoName").textContent=studentName;
   if(!studentId){
     $("banner").innerHTML='You can look around, but your answers will not be saved. <a href="../index.html">Sign in on Fun Torah Tools</a> to save them.';
-    $("banner").classList.remove("hidden");index=0;render();return;
+    $("banner").classList.remove("hidden");render();return;
   }
   try{
     if(!window.firebase||!window.B3_FIREBASE_CONFIG)throw new Error("Firebase not loaded");
@@ -193,7 +155,7 @@ async function start(){
     await waitForAuth();
     var db=firebase.database();
     var info=await window.FunTorahStudentClass.resolve(db,studentId);
-    if(!info.classId){setNote("Ask your teacher to add you to a class to save your answers.");index=0;render();return}
+    if(!info.classId){setNote("Ask your teacher to add you to a class to save your answers.");render();return}
     var base=C.basePath(info.workspaceId,info.classId);
     try{var cfg=await db.ref(base+"/config/items").once("value");if(cfg.val())items=C.itemsFromConfig(cfg.val(),false)}
     catch(e){console.warn("Daily Checklist items unavailable, using the standard list",e)}
@@ -201,13 +163,11 @@ async function start(){
     var snap=await dayRef.child("items").once("value");
     var saved=snap.val()||{};
     items.forEach(function(it){var s=saved[it.id];if(s&&(s.v===1||s.v===0))answers[it.id]=s.v});
-    var f=firstUnanswered();
-    index=f<0?items.length:f;
     render();
   }catch(e){
     console.error(e);dayRef=null;
     setNote("Could not connect, so answers will not be saved right now. Please refresh.");
-    index=0;render();
+    render();
   }
 }
 start();
