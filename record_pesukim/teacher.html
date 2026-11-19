@@ -310,6 +310,7 @@
   }
   .grade-pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:.78rem; font-weight:700; white-space:nowrap; border:1px solid #d5e0e9; background:#f3f6fa; color:#33516d; }
   .grade-pill.grade-gold{ background:#fff4cf; border-color:#d9b94a; color:#6b4a00; }
+  .grade-pill.grade-scored{ background:#fffbe8; border-color:#e0cf8a; color:#5c4a00; }
   .grade-pill.grade-retry{ background:#fff0ec; border-color:#e8a797; color:#7a2a17; }
   .grade-pill.grade-pending{ background:#eef4ff; border-color:#9db8e8; color:#1f3d73; }
   .score-pill.skill-reading{ border-left-color:#3d6fb4; }
@@ -1635,6 +1636,7 @@ function gradeLabel(review){
   if(!review) return '';
   const m = Number(review.mistakes) || 0, mistakes = m ? ' · ' + m + ' mistake' + (m === 1 ? '' : 's') : '';
   if(review.status === 'gold') return '🏅 Gold' + mistakes + (Number(review.bonus) ? ' · +' + review.bonus + ' bonus' : '');
+  if(review.status === 'scored') return '⭐ ' + gradeScoreOf(review) + '/10' + (Number(review.bonus) ? ' · +' + review.bonus + ' bonus' : '');
   if(review.status === 'pending') return '⏳ Waiting for grade';
   if(review.status === 'retry') return '🔁 Not gold yet' + mistakes;
   return '';
@@ -4179,7 +4181,7 @@ function rangeAttemptsFor(studentAttempts, slug, perek, posuk){
 }
 // The label on a small tile: the grade mark, then the older scores side by side (R = reading, T = translation).
 function readTranslateTileLabel(cell){
-  const mark = cell.review ? ({ gold: '🏅', pending: '⏳', retry: '🔁' }[cell.review.status] || '') : '';
+  const mark = cell.review ? ({ gold: '🏅', scored: '⭐', pending: '⏳', retry: '🔁' }[cell.review.status] || '') : '';
   const parts = [];
   if(typeof cell.read === 'number') parts.push('R ' + Math.round(cell.read));
   if(typeof cell.translate === 'number') parts.push('T ' + Math.round(cell.translate));
@@ -4192,7 +4194,7 @@ function readTranslateCell(attempts, review){
   let tier;
   if(review && review.status === 'gold') tier = 'high';
   else if(review && review.status === 'retry') tier = 'low';
-  else if(review && review.status === 'pending') tier = 'mid';
+  else if(review && (review.status === 'pending' || review.status === 'scored')) tier = 'mid';
   else tier = pctTier(Math.min(...[read, translate].filter(v => typeof v === 'number')));   // the weaker of the two, never an average
   return { read, translate, review, tier };
 }
@@ -4512,14 +4514,15 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .grade-form label{ font-weight:700; display:inline-flex; gap:6px; align-items:center; }
   .grade-form input[type=number]{ width:70px; padding:5px 8px; border-radius:8px; border:2px solid #cfc3a6; font-weight:700; }
   .grade-form input[type=text]{ min-width:220px; flex:1; padding:6px 8px; border-radius:8px; border:2px solid #cfc3a6; }
-  .grade-choice{ display:inline-flex; gap:6px; }
-  .grade-choice button{ border:2px solid #cfc3a6; background:#fff; border-radius:999px; padding:6px 14px; font-weight:800; cursor:pointer; }
-  .grade-choice button.on.gold{ background:#fff3c4; border-color:#d4a514; }
-  .grade-choice button.on.retry{ background:#ffe4dc; border-color:#d47a5e; }
+  .grade-card-foot{ display:flex; justify-content:flex-end; margin-top:12px; padding-top:8px; border-top:1px dashed #e6dcc4; }
+  .btn-delete-sub{ background:#fff; color:#b3261e; border:1.5px solid #e0a29d; border-radius:8px; padding:3px 10px; font-size:.75rem; font-weight:700; cursor:pointer; }
+  .btn-delete-sub:hover{ background:#fdecea; border-color:#b3261e; }
+  .btn-delete-sub:disabled{ opacity:.5; cursor:not-allowed; }
   .grade-pts{ display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap; font-weight:700; }
   .grade-pts button{ border:2px solid #cfc3a6; background:#fff; border-radius:10px; min-width:44px; padding:6px 10px; font-weight:800; cursor:pointer; }
   .grade-pts button:disabled{ opacity:.45; cursor:not-allowed; }
   .grade-pts button.on{ background:#fff3c4; border-color:#d4a514; }
+  .grade-pts button.gold-btn{ border-color:#d4a514; }
   .grade-points{ font-weight:800; }
   .grade-msg{ font-size:.85rem; margin-top:6px; min-height:1.1em; }
   .graded-row{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:8px 0; border-bottom:1px solid #eee; font-size:.9rem; }
@@ -4527,23 +4530,25 @@ function renderClassPosukDetail(posukKey, bodyEl){
 <script>
 /* ---------- To Grade (Issue #694) ----------
    Students send ONE recording (reading + translation). The teacher listens
-   and grades it: gold standard (the teacher picks 10, 8, 6, 4, 2 or 0
-   points, plus any bonus; the posuk is locked for a month) or not gold (the
-   student may try again). Grades and points are saved by the server only. */
+   and picks 10, 8, 6, 4, 2 or 0 points (plus any bonus). 10 = gold standard
+   and the posuk is locked for a month; 8-2 award points with no lock; 0 lets
+   the student try again. A re-record only pays the difference from the best
+   score already earned. Delete removes a recording without grading it and
+   refunds the 5 points. Grades and points are saved by the server only. */
 const POSUK_GOLD_POINTS = 10;
 function gradeRefLabel(s){
   const perek = Number(s.perek), a = Number(s.startPosuk), b = Number(s.endPosuk || a);
   return (s.sefer ? s.sefer + ' · ' : '') + 'Perek ' + perek + ' · Posuk ' + a + (b > a ? '–' + b : '');
 }
 const POSUK_POINT_CHOICES = [10, 8, 6, 4, 2, 0];
-function gradePointsFor(gold, base, bonus){
-  if(!gold) return 0;
-  return (Number(base) || 0) + (Number(bonus) || 0);
+function gradeScoreOf(s){
+  return Number.isFinite(Number(s.score)) && s.score != null ? Number(s.score) : Math.max(0, POSUK_GOLD_POINTS - (Number(s.mistakes) || 0));
 }
 function gradeStatusText(s){
-  if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' pts' +
-    (Number(s.bonus) ? ' · ' + s.bonus + ' bonus' : '');
-  if(s.status === 'retry') return '🔁 Not gold — student may retry';
+  const pts = Number(s.pointsAwarded) || 0, bonus = Number(s.bonus) ? ' · ' + s.bonus + ' bonus' : '';
+  if(s.status === 'gold') return '🏅 Gold · +' + pts + ' pts' + bonus;
+  if(s.status === 'scored') return gradeScoreOf(s) + '/10 · +' + pts + ' pts' + bonus + ' (student may re-record)';
+  if(s.status === 'retry') return '🔁 0 points — student may retry';
   return '⏳ Waiting';
 }
 async function loadGradeTab(){
@@ -4555,13 +4560,14 @@ async function loadGradeTab(){
   const pending = [], graded = [];
   Object.entries(all).forEach(([sid, subs]) => Object.values(subs || {}).forEach(s => {
     if(!s || !s.id) return;
+    if(s.status === 'deleted') return;   // deleted without grading: gone from the queue (the record is kept)
     (B3PosukGradingQueue.isPending(s) ? pending : graded).push({ sid, ...s });
   }));
   pending.sort((a, b) => (Number(a.submittedAt) || 0) - (Number(b.submittedAt) || 0));
   graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
   document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
   let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
-    'Gold standard: click 10, 8, 6, 4, 2 or 0 points (plus any bonus) and the posuk is locked for a month. Not gold lets the student try again, with no points. The student already paid 5 points to send it.</p>';
+    'Click the points: <b>10 = Gold standard 🏅</b> (points awarded and the posuk is locked for a month); <b>8, 6, 4 or 2</b> award those points but do not lock, so the student can re-record to try for gold; <b>0</b> gives no points and the student can try again. Bonus points are optional. If a student re-records a posuk they already earned points on, they only get the difference (had 6, now 10 = +4). The student already paid 5 points to send it. <b>Delete</b> removes a recording without grading it, refunds the 5 points, and lets the student send it again.</p>';
   if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
   html += pending.map((s, i) => `<div class="grade-card" id="gradeCard_${i}">
       <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
@@ -4569,14 +4575,14 @@ async function loadGradeTab(){
       ${s.hebrewText ? '<div class="grade-hebrew">' + escapeHtml(s.hebrewText) + '</div>' : ''}
       ${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}
       <div class="grade-form">
-        <span class="grade-choice"><button type="button" class="gold" data-choice="gold">🏅 Gold standard</button><button type="button" class="retry" data-choice="retry">🔁 Not gold — try again</button></span>
-        <span class="grade-pts">Points ${POSUK_POINT_CHOICES.map(n => `<button type="button" data-pts="${n}">${n}</button>`).join('')}</span>
+        <span class="grade-pts">Points ${POSUK_POINT_CHOICES.map(n => `<button type="button" data-pts="${n}"${n === POSUK_GOLD_POINTS ? ' class="gold-btn" title="Gold standard"' : ''}>${n === POSUK_GOLD_POINTS ? '🏅 10' : n}</button>`).join('')}</span>
         <label>Bonus points <input type="number" min="0" step="1" value="0" data-field="bonus"></label>
         <input type="text" maxlength="500" placeholder="Note for the student (optional)" data-field="note">
         <span class="grade-points" data-field="points"></span>
         <button class="btn gold" type="button" data-save="1" disabled>Save grade</button>
       </div>
       <div class="grade-msg" data-field="msg"></div>
+      <div class="grade-card-foot"><button type="button" class="btn-delete-sub" data-delete="1" title="Remove without grading and refund the 5 points">Delete</button></div>
     </div>`).join('');
   if(graded.length){
     html += '<h2 style="margin-top:22px;">✔️ Recently graded</h2>' + graded.slice(0, 30).map(s =>
@@ -4585,51 +4591,70 @@ async function loadGradeTab(){
   mainEl.innerHTML = html;
   pending.forEach((s, i) => wireGradeCard(document.getElementById('gradeCard_' + i), s));
 }
+async function postGradeAction(body){
+  const user = firebase.auth().currentUser;
+  if(!user) throw new Error('Please sign in again.');
+  const idToken = await user.getIdToken();
+  const classId = /^[A-Za-z0-9_-]{1,100}$/.test(requestedTeacherClass) ? requestedTeacherClass : '';
+  const res = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
+    method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
+    body: JSON.stringify({ classId, ...body })
+  });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || !data.ok) throw new Error(data.error || ('The service returned ' + res.status));
+  return data;
+}
 function wireGradeCard(card, s){
   if(!card) return;
-  let choice = '', base = null;
+  let base = null;
   const field = n => card.querySelector('[data-field="' + n + '"]');
-  const saveBtn = card.querySelector('[data-save]');
+  const saveBtn = card.querySelector('[data-save]'), deleteBtn = card.querySelector('[data-delete]');
   const refresh = () => {
-    card.querySelectorAll('[data-choice]').forEach(b => b.classList.toggle('on', b.dataset.choice === choice));
-    const gold = choice === 'gold';
-    if(!gold) base = null;
-    field('bonus').disabled = !gold;
-    if(!gold) field('bonus').value = '0';
-    card.querySelectorAll('[data-pts]').forEach(b => { b.disabled = !gold; b.classList.toggle('on', gold && base === Number(b.dataset.pts)); });
+    card.querySelectorAll('[data-pts]').forEach(b => b.classList.toggle('on', base === Number(b.dataset.pts)));
+    // Bonus is only for a grade that earns points.
+    const canBonus = base !== null && base > 0;
+    field('bonus').disabled = !canBonus;
+    if(!canBonus) field('bonus').value = '0';
     const bonus = Math.max(0, Math.floor(Number(field('bonus').value) || 0));
-    field('points').textContent = choice === 'retry' ? '= 0 points' : (gold && base !== null ? '= ' + gradePointsFor(gold, base, bonus) + ' points' : (gold ? 'Pick the points' : ''));
-    saveBtn.disabled = !choice || (gold && base === null);
+    field('points').textContent = base === null ? 'Pick the points'
+      : base === POSUK_GOLD_POINTS ? '🏅 Gold standard · ' + (base + bonus) + ' points (posuk locked for a month)'
+      : base === 0 ? '0 points — student may try again'
+      : base + (bonus ? ' + ' + bonus + ' bonus' : '') + ' points (not locked — student may re-record)';
+    saveBtn.disabled = base === null;
   };
-  card.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => { choice = b.dataset.choice; refresh(); });
   card.querySelectorAll('[data-pts]').forEach(b => b.onclick = () => { base = Number(b.dataset.pts); refresh(); });
   field('bonus').oninput = refresh;
   refresh();
   saveBtn.onclick = async () => {
     const bonus = Number(field('bonus').value || 0);
-    if(choice === 'gold' && !POSUK_POINT_CHOICES.includes(base)) return field('msg').textContent = 'Pick 10, 8, 6, 4, 2 or 0 points.';
-    // The server still scores a gold grade as 10 minus mistakes, so send the
-    // chosen points as (10 - points) mistakes; no server change is needed.
-    const mistakes = choice === 'gold' ? POSUK_GOLD_POINTS - base : 0;
+    if(!POSUK_POINT_CHOICES.includes(base)) return field('msg').textContent = 'Pick 10, 8, 6, 4, 2 or 0 points.';
     if(!Number.isInteger(bonus) || bonus < 0) return field('msg').textContent = 'Bonus must be a whole number of 0 or more.';
-    saveBtn.disabled = true; field('msg').textContent = 'Saving…';
+    saveBtn.disabled = true; deleteBtn.disabled = true; field('msg').textContent = 'Saving…';
     try{
-      const user = firebase.auth().currentUser;
-      if(!user) throw new Error('Please sign in again.');
-      const idToken = await user.getIdToken();
-      const classId = /^[A-Za-z0-9_-]{1,100}$/.test(requestedTeacherClass) ? requestedTeacherClass : '';
-      const res = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
-        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
-        body: JSON.stringify({ action:'posuk-grade', classId, studentId:s.sid, submissionId:s.id, gold: choice === 'gold', mistakes, bonus, note: field('note').value.trim() })
-      });
-      const data = await res.json().catch(() => ({}));
-      if(!res.ok || !data.ok) throw new Error(data.error || ('The service returned ' + res.status));
-      field('msg').textContent = '✔️ Saved. ' + (data.points ? data.points + ' points' + (data.pointsPosted ? ' added.' : ' could not be added (no Student Rewards profile).') : 'No points.');
+      const data = await postGradeAction({ action:'posuk-grade', studentId:s.sid, submissionId:s.id, points: base, bonus, note: field('note').value.trim() });
+      const prior = Number(data.priorPoints) || 0;
+      field('msg').textContent = '✔️ Saved. ' + (data.points
+        ? data.points + ' points' + (prior ? ' (the difference from the ' + prior + ' already earned' + (bonus ? ', plus bonus' : '') + ')' : '') + (data.pointsPosted ? ' added.' : ' could not be added (no Student Rewards profile).')
+        : (prior && base > 0 ? 'No new points (already earned ' + prior + ').' : 'No points.'));
       setTimeout(loadGradeTab, 900);
     }catch(err){
       console.error(err);
       field('msg').textContent = '⚠️ ' + (err.message || 'Could not save the grade.');
-      saveBtn.disabled = false;
+      saveBtn.disabled = base === null; deleteBtn.disabled = false;
+    }
+  };
+  deleteBtn.onclick = async () => {
+    const who = (studentsMap[s.sid] || s.sid) + ' · ' + gradeRefLabel(s);
+    if(!confirm('Delete this recording from ' + who + ' without grading it?\n\nThe student gets their 5 points back, no points are awarded, the posuk is not locked, and they can submit it again.')) return;
+    saveBtn.disabled = true; deleteBtn.disabled = true; field('msg').textContent = 'Deleting…';
+    try{
+      const data = await postGradeAction({ action:'posuk-delete', studentId:s.sid, submissionId:s.id });
+      field('msg').textContent = '🗑️ Deleted. ' + (data.refunded ? data.refunded + ' points refunded.' : 'Nothing had been charged, so nothing to refund.') + (data.refunded && !data.refundPosted ? ' (Refund could not be posted.)' : '');
+      setTimeout(loadGradeTab, 900);
+    }catch(err){
+      console.error(err);
+      field('msg').textContent = '⚠️ ' + (err.message || 'Could not delete the recording.');
+      saveBtn.disabled = base === null; deleteBtn.disabled = false;
     }
   };
 }
