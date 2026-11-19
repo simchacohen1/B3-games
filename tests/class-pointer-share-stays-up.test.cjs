@@ -319,7 +319,7 @@ test('a connection that drops by itself keeps the tile while the student reconne
   first.emit('close');await tick(5);
   assert.equal(f.shares.count(),1,'the tile waits for the student to call again');
   assert.equal(f.shares.streamFor('student-a'),one,'showing the last picture');
-  assert.match(f.tray().children[0].children[0].children[0].textContent,/Reconnecting/);
+  assert.match(f.tray().children[0].children[0].children[0].textContent,/Sharing stopped/);
   const again=callFor('student-a',true),two=picture('two');
   await f.shares.incomingCall(again);again.emit('stream',two);
   assert.equal(f.shares.count(),1);
@@ -330,6 +330,38 @@ test('a connection that drops by itself keeps the tile while the student reconne
   assert.equal(f.shares.count(),0);
   assert.equal(again.closed,1);
   assert.equal(f.shares.streamFor('student-a'),null);
+});
+
+// A student whose sharing tab was refreshed has no share any more: the teacher must be told, never left looking at the last frame.
+test('a share that ends by itself says "stopped" on the teacher\'s tile instead of a frozen picture; his next share replaces it',async()=>{
+  const f=receiverFixture(),first=callFor(),one=picture('one');
+  await f.shares.incomingCall(first);first.emit('stream',one);
+  const card=()=>f.tray().children[0],wrap=()=>card().children[1],video=()=>wrap().children[0],notice=()=>wrap().children[1];
+  video().srcObject=one; // what the tile is showing while he is live
+  assert.equal(notice().hidden,true,'no notice while he is live');
+  assert.equal(f.shares.stopped('student-a'),false);
+  // His sharing tab is refreshed: the call ends by itself.
+  first.emit('close');await tick(5);
+  assert.equal(f.shares.stopped('student-a'),true);
+  assert.equal(notice().hidden,false,'the tile says so');
+  assert.match(notice().textContent,/stopped sharing.*resume/i);
+  assert.match(card().children[0].children[0].textContent,/Sharing stopped/);
+  assert.equal(video().srcObject,null,'the last frame is not left on the tile as if it were live');
+  // He resumes: the notice goes and the new picture is shown.
+  const again=callFor('student-a',true),two=picture('two');
+  await f.shares.incomingCall(again);
+  assert.equal(notice().hidden,false,'still stopped until the new picture actually arrives');
+  again.emit('stream',two);
+  assert.equal(notice().hidden,true);
+  assert.equal(f.shares.stopped('student-a'),false);
+  assert.equal(video().srcObject,two);
+  assert.match(card().children[0].children[0].textContent,/Live screen/);
+});
+test('the large Student Screens viewer labels the last picture as stopped, and keeps it while he reconnects',()=>{
+  const boards=read('class-pointer-prototype/student-boards.js');
+  assert.match(boards,/shares\?\.stopped/);
+  assert.match(boards,/Sharing stopped\. Waiting for them to resume/);
+  assert.match(boards,/stopped sharing\. Waiting for them to resume/);
 });
 
 test('turning sharing off or denying a student still removes a waiting tile immediately',async()=>{

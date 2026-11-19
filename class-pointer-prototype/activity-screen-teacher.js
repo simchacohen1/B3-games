@@ -111,9 +111,13 @@
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
     dismiss.onclick=()=>stopViewing(studentId);
     // Enlarged, the teacher can point or draw on this screen; the student sees it on his own screen.
-    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video);
+    // Shown over the tile while this student's share has stopped (for example he refreshed his sharing tab), so the
+    // teacher never mistakes the last picture for a live one.
+    const notice=document.createElement('div');notice.hidden=true;notice.dataset.stageUi='true';notice.setAttribute?.('role','status');
+    notice.style.cssText='position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;background:#0b1730f2;color:#fff;font:700 15px system-ui,sans-serif;pointer-events:none';
+    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video,notice);
     card.append(top,wrap,dismiss);tray.appendChild(card);
-    entry={card,video,wrap,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    entry={card,video,wrap,heading,enlarge,notice,name,calls:[]};students.set(studentId,entry);
     entry.ink=window.ClassPointerScreenMarks?.attach?.(wrap,video,()=>focused===studentId&&students.get(studentId)===entry?{id:studentId,name:entry.name}:null)||null;
     setFocus(focused);
     return entry;
@@ -134,7 +138,11 @@
       if(entry.calls.length)showLatest(entry);
       else if(deliberate===true||!entry.lastStream||typeof setTimeout!=='function')removeEntry(studentId,entry);
       else{
-        entry.heading.textContent=entry.name+' · Reconnecting…';
+        // The connection ended by itself: say so now. The tile stays a short while for the student to resume.
+        entry.stopped=true;
+        entry.heading.textContent=entry.name+' · Sharing stopped';
+        entry.notice.textContent='⏸ '+entry.name+' stopped sharing. Waiting for them to resume…';entry.notice.hidden=false;
+        if(entry.video.srcObject){try{entry.video.pause?.()}catch{}entry.video.srcObject=null}
         cancelWait(entry);
         entry.waitTimer=setTimeout(()=>{
           if(students.get(studentId)!==entry||entry.calls.length)return;
@@ -188,7 +196,7 @@
       const item={call,stream:null};entry.calls.push(item);screens.set(call,verified.studentId);
       cancelWait(entry);
       call.on('stream',stream=>{
-        if(!screens.has(call))return;item.stream=stream;entry.heading.textContent=entry.name+' · Live screen';showLatest(entry);
+        if(!screens.has(call))return;item.stream=stream;entry.stopped=false;entry.notice.hidden=true;entry.heading.textContent=entry.name+' · Live screen';showLatest(entry);
         // Re-pick the picture whenever this screen's video stops or starts again.
         for(const track of stream.getVideoTracks?.()||[])for(const type of ['mute','unmute','ended'])track.addEventListener?.(type,()=>{if(screens.has(call))showLatest(entry)});
       });
@@ -206,6 +214,9 @@
     count:()=>students.size,
     // The newest live MediaStream this verified student is sharing (null when none). The large Student Screens
     // viewer in student-boards.js uses this, because these students are not joined to Pointer.
+    // True while this student's share has ended by itself (for example he refreshed his sharing tab) and the tile is
+    // waiting for him to resume. The large viewer labels its last picture with this instead of passing it off as live.
+    stopped:studentId=>!!(typeof studentId==='string'&&students.get(studentId)?.stopped),
     streamFor:studentId=>{
       const entry=typeof studentId==='string'?students.get(studentId):null;
       return entry?pick(entry):null;

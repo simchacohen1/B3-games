@@ -44,7 +44,9 @@ test('student capture requires Entire Screen and offers a persistent share windo
  assert.match(s,/displaySurface:'monitor'/);
  assert.match(s,/surfaceSwitching:'exclude'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
- assert.match(s,/window\.open\(url\.href,'classPointerStudentShare'/);
+ // The window is looked up by name and only navigated when it is new, so an open sharing window is never reloaded.
+ assert.match(s,/openShareWindowOnce\(window,url\.href,'classPointerStudentShare'\)/);
+ assert.match(s,/win\.open\('',name\)/);
  assert.doesNotMatch(s,/Share a browser tab/);
 });
 

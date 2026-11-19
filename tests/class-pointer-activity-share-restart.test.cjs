@@ -12,7 +12,8 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
   const sessionStorageValues=initialStorage||new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
   const sessionStorage={
     getItem:k=>sessionStorageValues.get(k)||null,
-    setItem:(k,v)=>sessionStorageValues.set(k,v)
+    setItem:(k,v)=>sessionStorageValues.set(k,v),
+    removeItem:k=>sessionStorageValues.delete(k)
   };
   const element=tag=>({
     tag,style:{cssText:''},dataset:{},children:[],listeners:{},textContent:'',hidden:false,disabled:false,
@@ -76,7 +77,9 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
     }})});
   };
   return {
-    emit,shareButton,label,fallback,
+    emit,shareButton,label,fallback,holder,
+    // The lesson record is gone (the class ended).
+    gone:async()=>{await listener({val:()=>null})},
     get navigation(){return navigation},
     get captureCount(){return captureCount},
     get stopCount(){return stopCount},
@@ -96,10 +99,18 @@ function fakeBus(){
   };
 }
 const tick=(ms=20)=>new Promise(resolve=>setTimeout(resolve,ms));
+// A window as window.open('', name) returns it: a brand-new blank one, or the sharing window that is already open.
+// Every navigation of it is recorded, because a navigation reloads the page and a reload ends a screen capture.
+function fakeWindow({existing=false}={}){
+  const w={closed:false,focused:0,navigations:[],focus(){this.focused++},
+    location:{pathname:existing?'/class-pointer-prototype/student-share-window.html':'blank'}};
+  Object.defineProperty(w.location,'href',{get(){return ''},set(value){w.navigations.push(value)}});
+  return w;
+}
 
 test('screen request shows only the Share My Screen button; the click opens the sharing tab, never captures in the activity',async()=>{
-  const opened=[];
-  const a=await activityFixture({openWindow:(...args)=>{opened.push(args);return{closed:false}}});
+  const opened=[],blank=fakeWindow();
+  const a=await activityFixture({openWindow:(...args)=>{opened.push(args);return blank}});
   await a.emit('screens');
   assert.equal(a.navigation,null);
   assert.equal(a.shareButton.textContent,'🖥 Share My Screen');
@@ -109,8 +120,9 @@ test('screen request shows only the Share My Screen button; the click opens the 
   assert.equal(opened.length,0);
   await a.shareButton.listeners.click();
   assert.equal(opened.length,1,'one dedicated sharing tab opens');
-  assert.equal(opened[0][0],'https://funtorahtools.com/class-pointer-prototype/student-share-window.html?pointerShare=1');
+  assert.equal(opened[0][0],'','an existing sharing tab is looked up by name only, never navigated');
   assert.equal(opened[0][1],'classPointerStudentShare','the tab is opened by name so only one exists');
+  assert.deepEqual(blank.navigations,['https://funtorahtools.com/class-pointer-prototype/student-share-window.html?pointerShare=1'],'a new, blank tab is sent to the sharing page exactly once');
   assert.equal(a.captureCount,0,'the activity page itself never captures, so changing pages cannot end the share');
   assert.equal(a.shareButton.textContent,'✖ Cancel');
   assert.equal(a.navigation,null,'the retired student Pointer page must never open');
@@ -162,7 +174,7 @@ test('the sharing tab sends the screen to the teacher; Stop ends it and closes t
 
 test('the student keeps working in his own tab: banner follows him, Stop there closes the sharing tab',async()=>{
   const BroadcastChannel=fakeBus();
-  const page=await activityFixture({BroadcastChannel,openWindow:()=>({closed:false})});
+  const page=await activityFixture({BroadcastChannel,openWindow:()=>fakeWindow()});
   await page.emit('screens');
   await page.shareButton.listeners.click();
   const tab=await activityFixture({persistent:true,validTicket:true,BroadcastChannel});
@@ -186,6 +198,78 @@ test('the student keeps working in his own tab: banner follows him, Stop there c
   assert.equal(tab.stopCount,1,'Stop in the working tab ends the capture');
   assert.equal(tab.closed,true,'and closes the sharing tab');
   assert.equal(next.shareButton.textContent,'🖥 Share My Screen');
+});
+// ---- Case 1: the page he works in is refreshed; the sharing tab keeps going ----
+test('Share My Screen clicked again after a refresh only brings the open sharing tab to the front; it is never reloaded',async()=>{
+  const BroadcastChannel=fakeBus();
+  const tab=await activityFixture({persistent:true,validTicket:true,BroadcastChannel});
+  await tab.emit('screens');await tick(50);
+  assert.equal(tab.peerCalls.length,1,'the sharing tab is sharing');
+  // The refreshed page has not heard from the sharing tab yet (no channel here), so its button still says Share My Screen.
+  const sharing=fakeWindow({existing:true}),opened=[];
+  const page=await activityFixture({openWindow:(...args)=>{opened.push(args);return sharing}});
+  await page.emit('screens');
+  assert.equal(page.shareButton.textContent,'🖥 Share My Screen');
+  await page.shareButton.listeners.click();
+  await tick(30);
+  assert.equal(opened.length,1);assert.equal(opened[0][0],'','looked up by name, no address');
+  assert.deepEqual(sharing.navigations,[],'the sharing window is never navigated, so it is never reloaded');
+  assert.equal(sharing.focused,1,'it is brought to the front');
+  assert.equal(page.captureCount,0,'this page does not start a second share of its own');
+  assert.match(page.label.textContent,/already open/);
+  assert.equal(tab.stopCount,0,'the running share is untouched');
+  assert.equal(tab.peerCalls[0].closed,false);
+});
+
+// ---- Case 2: the sharing tab itself is refreshed; one big button to share again ----
+const okStream=()=>{const track={stop(){},addEventListener(){}};return{active:true,getTracks:()=>[track],getVideoTracks:()=>[track]}};
+const needsClick=()=>Promise.reject(Object.assign(new Error('needs a click'),{name:'InvalidStateError'}));
+test('a refreshed sharing tab shows a big Resume sharing button right away, and one click shares again',async()=>{
+  const storage=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
+  const first=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage});
+  await first.emit('screens');await tick(50);
+  assert.equal(first.peerCalls.length,1);
+  assert.equal(first.shareButton.textContent,'⏹ Stop Sharing');
+  first.pagehide(); // the sharing tab is refreshed: its capture ends with the page
+  assert.equal(first.peerClosed,true);
+  assert.equal(storage.get('fttShareTabWasSharing'),'test-boy','the tab remembers it was sharing');
+  // The page loads again. This browser will not open the picker without a click.
+  let allowed=false;
+  const second=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage,capture:()=>allowed?Promise.resolve(okStream()):needsClick()});
+  assert.equal(second.shareButton.textContent,'▶ Resume sharing','the Resume button is there before the lesson has even loaded');
+  assert.equal(second.holder.style.display,'flex');
+  assert.match(second.shareButton.style.cssText,/font:800 28px/,'and it is big');
+  await second.shareButton.listeners.click();
+  assert.match(second.label.textContent,/Almost ready/);
+  assert.equal(second.captureCount,0,'nothing is captured before the lesson is known');
+  await second.emit('screens');await tick(50);
+  assert.equal(second.shareButton.textContent,'▶ Resume sharing','a refused automatic start leaves the big button in place');
+  assert.equal(second.peerCalls.length,0);
+  allowed=true;
+  await second.shareButton.listeners.click();await tick(50);
+  assert.equal(second.peerCalls.length,1,'one click and he is sharing again');
+  assert.equal(second.shareButton.textContent,'⏹ Stop Sharing');
+  assert.equal(storage.has('fttShareTabWasSharing'),false,'Resume is no longer pending');
+});
+test('Resume is never offered after he stopped on purpose, or when the class is over',async()=>{
+  const storage=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
+  const first=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage});
+  await first.emit('screens');await tick(50);
+  await first.shareButton.listeners.click();await tick(250); // Stop Sharing
+  assert.equal(first.peerClosed,true);
+  first.pagehide();
+  const afterStop=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage,capture:needsClick});
+  assert.equal(afterStop.shareButton.textContent,'🖥 Share My Screen','a deliberate stop is not "refreshed"');
+  // Refreshed while sharing, but the class ends before the page is back.
+  const live=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage});
+  await live.emit('screens');await tick(50);
+  live.pagehide();
+  const late=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage,capture:needsClick});
+  assert.equal(late.shareButton.textContent,'▶ Resume sharing');
+  await late.gone();await tick(20);
+  assert.equal(late.shareButton.textContent,'🖥 Share My Screen','no lesson, nothing to resume');
+  assert.equal(late.holder.style.display,'none');
+  assert.equal(storage.has('fttShareTabWasSharing'),false);
 });
 test('whiteboard request stays on the learning activity for embedded delivery',async()=>{
   const a=await activityFixture();
