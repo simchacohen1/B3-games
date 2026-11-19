@@ -48,12 +48,12 @@ test('selection keys expand to every posuk', () => {
   assert.equal(core.posukKeysForSelection('Bereishis_1_9-3'), null);
 });
 
-test('points: only the part above the best already earned is paid, plus the bonus', () => {
-  assert.equal(core.pointsForGrade({ score: 10, prior: 0, bonus: 0 }), 10);
-  assert.equal(core.pointsForGrade({ score: 10, prior: 6, bonus: 0 }), 4);
-  assert.equal(core.pointsForGrade({ score: 4, prior: 6, bonus: 0 }), 0);
-  assert.equal(core.pointsForGrade({ score: 8, prior: 8, bonus: 25 }), 25);
-  assert.equal(core.statusForScore(10), 'gold'); assert.equal(core.statusForScore(6), 'scored'); assert.equal(core.statusForScore(0), 'retry');
+test('points: gold = 10 minus mistakes (not below 0) plus bonus; not gold = 0', () => {
+  assert.equal(core.pointsForGrade({ gold: true, mistakes: 0, bonus: 0 }), 10);
+  assert.equal(core.pointsForGrade({ gold: true, mistakes: 3, bonus: 0 }), 7);
+  assert.equal(core.pointsForGrade({ gold: true, mistakes: 14, bonus: 0 }), 0);
+  assert.equal(core.pointsForGrade({ gold: true, mistakes: 1, bonus: 25 }), 34);
+  assert.equal(core.pointsForGrade({ gold: false, mistakes: 0, bonus: 0 }), 0);
 });
 
 test('submit charges 5 points and the balance may go negative', async () => {
@@ -104,12 +104,12 @@ test('not gold: no points, student may retry', async () => {
   assert.equal(again.ok, true); assert.equal(s.balance(), 0);
 });
 
-test('gold (10): +10 +bonus from a negative balance, locked for a month', async () => {
+test('gold: +10 −mistakes +bonus from a negative balance, locked for a month', async () => {
   const s = setup({ balance: 0 });
   await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
   assert.equal(s.balance(), -5);
-  const g = await s.review.grade({ teacherEmail: 't@x', scope: teacherScope, studentId: SID, submissionId: 'a1', points: 10, bonus: 50 });
-  assert.equal(g.points, 60); assert.equal(s.balance(), 55);
+  const g = await s.review.grade({ teacherEmail: 't@x', scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true, mistakes: 2, bonus: 50 });
+  assert.equal(g.points, 58); assert.equal(s.balance(), 53);
   const row = s.db.root.posukPractice.reviews[SID][KEY];
   assert.equal(row.status, 'gold'); assert.equal(row.bonus, 50);
   assert.equal(row.lockedUntil, 1_000_000 + core.LOCK_MS);
@@ -123,80 +123,12 @@ test('gold (10): +10 +bonus from a negative balance, locked for a month', async 
 test('a grade is saved once; bonus only with gold; teacher must have the student', async () => {
   const s = setup({ balance: 0 });
   await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  await assert.rejects(s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: false, bonus: 5 }), /only be given with points/);
+  await assert.rejects(s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: false, bonus: 5 }), /only be given with gold/);
   await assert.rejects(s.review.grade({ scope: { students: {}, selected: 'wt' }, studentId: SID, submissionId: 'a1', gold: true }), /does not belong/);
   await assert.rejects(s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true, mistakes: -1 }), /Mistakes/);
   await s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true });
   await assert.rejects(s.review.grade({ scope: teacherScope, studentId: SID, submissionId: 'a1', gold: true }), /already graded/);
   assert.equal(s.balance(), 5);
-});
-
-const nextAttempt = (s, id) => { s.db.root.posukPractice.attempts[SID][KEY][id] = { combinedAudioStoragePath: `posukPractice/${SID}/${KEY}_combined_${id}.webm` }; };
-const gradeIt = (s, id, extra) => s.review.grade({ teacherEmail: 't@x', scope: teacherScope, studentId: SID, submissionId: id, ...extra });
-
-test('8/6/4/2 award points with no lock; the student can re-record', async () => {
-  const s = setup({ balance: 5 });
-  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  const g = await gradeIt(s, 'a1', { points: 6, bonus: 3 });
-  assert.equal(g.points, 9); assert.equal(s.balance(), 5 - 5 + 9);
-  const row = s.db.root.posukPractice.reviews[SID][KEY];
-  assert.equal(row.status, 'scored'); assert.equal(row.score, 6); assert.equal(row.lockedUntil, null);
-  nextAttempt(s, 'a2');
-  assert.equal((await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a2' })).ok, true);
-});
-
-test('re-recording pays only the difference (6 then 10 = +4); a lower score pays nothing', async () => {
-  const s = setup({ balance: 100 });
-  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  await gradeIt(s, 'a1', { points: 6 });
-  assert.equal(s.balance(), 101);
-  nextAttempt(s, 'a2'); await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a2' });
-  assert.equal(s.db.root.posukPractice.reviews[SID][KEY].bestPoints, 6);
-  const low = await gradeIt(s, 'a2', { points: 4 });
-  assert.equal(low.points, 0); assert.equal(s.balance(), 96);
-  nextAttempt(s, 'a3'); await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a3' });
-  const gold = await gradeIt(s, 'a3', { points: 10 });
-  assert.equal(gold.points, 4); assert.equal(gold.priorPoints, 6); assert.equal(s.balance(), 95);
-  const row = s.db.root.posukPractice.reviews[SID][KEY];
-  assert.equal(row.status, 'gold'); assert.equal(row.lockedUntil, 1_000_000 + core.LOCK_MS);
-});
-
-test('0 points = no points and may retry; only 10/8/6/4/2/0 are accepted', async () => {
-  const s = setup({ balance: 10 });
-  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  await assert.rejects(gradeIt(s, 'a1', { points: 7 }), /Pick 10, 8, 6, 4, 2 or 0/);
-  await assert.rejects(gradeIt(s, 'a1', { points: 0, bonus: 5 }), /only be given with points/);
-  const g = await gradeIt(s, 'a1', { points: 0 });
-  assert.equal(g.points, 0); assert.equal(s.db.root.posukPractice.reviews[SID][KEY].status, 'retry');
-});
-
-test('delete: refunds 5, awards nothing, no lock, can submit again, record is kept', async () => {
-  const s = setup({ balance: 0 });
-  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  assert.equal(s.balance(), -5);
-  const d = await s.review.discard({ teacherEmail: 't@x', scope: teacherScope, studentId: SID, submissionId: 'a1' });
-  assert.equal(d.refunded, 5); assert.equal(s.balance(), 0);
-  assert.equal(s.db.root.posukPractice.submissions[SID].a1.status, 'deleted');
-  assert.equal(s.db.root.posukPractice.reviews && s.db.root.posukPractice.reviews[SID], undefined);
-  await assert.rejects(s.review.discard({ scope: teacherScope, studentId: SID, submissionId: 'a1' }), /already deleted/);
-  await assert.rejects(gradeIt(s, 'a1', { points: 10 }), /deleted/);
-  assert.equal(s.balance(), 0);
-  nextAttempt(s, 'a2');
-  assert.equal((await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a2' })).ok, true);
-});
-
-test('delete keeps the score already earned and cannot touch graded or other-class recordings', async () => {
-  const s = setup({ balance: 50 });
-  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
-  await gradeIt(s, 'a1', { points: 6 });
-  nextAttempt(s, 'a2'); await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a2' });
-  const before = s.balance();
-  await assert.rejects(s.review.discard({ scope: { students: {}, selected: 'wt' }, studentId: SID, submissionId: 'a2' }), /does not belong/);
-  await s.review.discard({ scope: teacherScope, studentId: SID, submissionId: 'a2' });
-  assert.equal(s.balance(), before + 5);
-  const row = s.db.root.posukPractice.reviews[SID][KEY];
-  assert.equal(row.status, 'scored'); assert.equal(row.bestPoints, 6);
-  await assert.rejects(s.review.discard({ scope: teacherScope, studentId: SID, submissionId: 'a1' }), /already graded/);
 });
 
 test('rules: students and the browser can never write submissions or reviews', () => {
@@ -213,8 +145,7 @@ test('rules: students and the browser can never write submissions or reviews', (
 test('the rewards function routes the new actions with the right checks', () => {
   const src = fs.readFileSync('backend/functions/student-rewards-auto-award.js', 'utf8');
   assert.match(src, /action==="posuk-submit"[\s\S]{0,200}requirePracticeStudent/);
-  assert.match(src, /'posuk-grade','posuk-delete'\]/);
-  assert.match(src, /action==="posuk-delete"[\s\S]{0,200}posukReview\.discard/);
+  assert.match(src, /'posuk-grade'\]/);
   assert.match(src, /act\.startsWith\('posuk-'\)\?'posuk-practice-scroll'/);
   assert.equal(require('../backend/functions/student-practice-auth.cjs').toolForSource('posuk-submit'), 'posuk-practice-scroll');
 });
@@ -239,8 +170,7 @@ test('staging functions carry the same Posuk review actions and never use the pr
   const staging = norm('backend/functions-staging/student-rewards-auto-award.js');
   assert.match(staging, /action==="posuk-submit"/);
   assert.match(staging, /action==="posuk-grade"/);
-  assert.match(staging, /'teacher-set-recording-full-review','posuk-grade','posuk-delete'\]/);
-  assert.match(staging, /action==="posuk-delete"/);
+  assert.match(staging, /'teacher-set-recording-full-review','posuk-grade'\]/);
   assert.match(staging, /act\.startsWith\('posuk-'\)\?'posuk-practice-scroll'/);
   assert.doesNotMatch(staging, /b3-games\.firebasestorage\.app/);
   assert.equal(require('../backend/functions-staging/student-practice-auth.cjs').toolForSource('posuk-submit'), 'posuk-practice-scroll');

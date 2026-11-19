@@ -6715,10 +6715,9 @@ async function deleteAttempt(attempt, btnEl){
 /* ---------- Posuk Practice: one recording, graded by the teacher (Issue #694) ----------
    The student reads the Hebrew and translates it in ONE recording and sends
    it to the teacher. Sending costs 5 points. Until the teacher grades it the
-   posuk cannot be sent again. The teacher picks 10, 8, 6, 4, 2 or 0 points
-   (plus any bonus). 10 = Gold 🏅 and the posuk is locked for a month; 8-2 award
-   the points with no lock, so the student may re-record to try for gold (only
-   the difference from their best score is paid); 0 = try again. The server (studentRewardsAutoAward) enforces
+   posuk cannot be sent again. Gold standard: +10 points minus 1 per mistake
+   (plus any teacher bonus) and the posuk is locked for a month. Not gold:
+   the student may try again. The server (studentRewardsAutoAward) enforces
    all of this; the page only shows it. */
 const COMBINED_MAX_MS = 5 * 60 * 1000;
 const COMBINED_SUBMIT_COST = 5;
@@ -6882,16 +6881,12 @@ function combinedSelectionState(reviews, keys, now){
   return { kind:'open' };
 }
 
-function combinedScoreOf(s){
-  return s.score != null && Number.isFinite(Number(s.score)) ? Number(s.score) : Math.max(0, 10 - (Number(s.mistakes) || 0));
-}
-// "Gold 🏅" for a 10, the score for 8/6/4/2, "try again" for 0.
 function combinedStatusLabel(s){
-  const bonus = Number(s.bonus) ? ' · 🎉 ' + s.bonus + ' bonus' : '';
   if(s.status === 'pending') return '⏳ Waiting for your teacher';
-  if(s.status === 'gold') return 'Gold 🏅' + bonus;
-  if(s.status === 'scored') return 'Score: ' + combinedScoreOf(s) + '/10' + bonus;
-  if(s.status === 'retry') return '🔁 Score: 0 — try again';
+  if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' points' +
+    (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') +
+    (Number(s.bonus) ? ' · 🎉 ' + s.bonus + ' bonus' : '');
+  if(s.status === 'retry') return '🔁 Not gold standard yet' + (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') + ' — try again';
   return '';
 }
 
@@ -6917,7 +6912,7 @@ async function loadCombinedState(keepMessage){
   if(token !== combinedLoadToken || key !== currentPosukKey) return;
   const keys = combinedKeysFor(key), now = Date.now();
   const state = combinedSelectionState(reviews, keys, now);
-  const mine = Object.values(subs).filter(x => x && x.status !== 'deleted' && Array.isArray(x.posukKeys) && x.posukKeys.some(k => keys.includes(k)))
+  const mine = Object.values(subs).filter(x => x && Array.isArray(x.posukKeys) && x.posukKeys.some(k => keys.includes(k)))
     .sort((a, b) => (Number(b.submittedAt) || 0) - (Number(a.submittedAt) || 0));
   if(state.kind === 'pending'){
     box.className = 'combined-state pending';
@@ -6926,19 +6921,16 @@ async function loadCombinedState(keepMessage){
   }else if(state.kind === 'gold'){
     box.className = 'combined-state gold';
     const which = state.partial ? ' (Posuk ' + state.key.split('_').pop() + ')' : '';
-    box.textContent = 'Gold 🏅' + which + '! It is locked until ' + combinedDate(state.row.lockedUntil) + '. Pick a different posuk to practice.';
+    box.textContent = '🏅 Gold standard' + which + '! It is locked until ' + combinedDate(state.row.lockedUntil) + '. Pick a different posuk to practice.';
     setCombinedLocked(true);
   }else if(mine[0] && mine[0].status === 'retry' && mine[0].selectionKey === key){
     box.className = 'combined-state retry';
-    box.textContent = '🔁 Your teacher graded your last try: score 0' +
+    box.textContent = '🔁 Your teacher graded your last try: not gold standard yet' +
+      (Number(mine[0].mistakes) ? ' (' + mine[0].mistakes + ' mistake' + (Number(mine[0].mistakes) === 1 ? '' : 's') + ')' : '') +
       (mine[0].teacherNote ? ' — “' + mine[0].teacherNote + '”' : '') + '. Practice and try again!';
-  }else if(mine[0] && mine[0].status === 'scored' && mine[0].selectionKey === key){
-    box.className = 'combined-state retry';
-    box.textContent = '⭐ Your score on your last try: ' + combinedScoreOf(mine[0]) + '/10' +
-      (mine[0].teacherNote ? ' — “' + mine[0].teacherNote + '”' : '') + '. You can record again to try for Gold 🏅 (you only get the extra points).';
   }else if(mine[0] && mine[0].status === 'gold'){
     box.className = 'combined-state gold';
-    box.textContent = '🏅 You got Gold on this on ' + combinedDate(mine[0].gradedAt) + '. You may practice it again.';
+    box.textContent = '🏅 You got gold standard on this on ' + combinedDate(mine[0].gradedAt) + '. You may practice it again.';
   }else{
     box.className = 'combined-state hidden';
   }
@@ -6970,7 +6962,7 @@ async function loadBonusNotices(){
       db.ref('posukPractice/students/' + studentId + '/seenBonus').once('value')
     ]);
     const seenIds = seen.val() || {};
-    const list = Object.values(s.val() || {}).filter(x => x && (x.status === 'gold' || x.status === 'scored') && Number(x.bonus) > 0 && x.id && !seenIds[x.id])
+    const list = Object.values(s.val() || {}).filter(x => x && x.status === 'gold' && Number(x.bonus) > 0 && x.id && !seenIds[x.id])
       .sort((a, b) => (Number(a.gradedAt) || 0) - (Number(b.gradedAt) || 0));
     const wrap = combinedEl('bonusNotices');
     wrap.innerHTML = list.map(x => '<div class="bonus-notice" data-id="' + combinedEscape(x.id) + '"><span>🎉 Your teacher gave you <b>' +
