@@ -163,7 +163,7 @@ test('activity share button waits for class permission without showing a second 
   const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
   assert.ok(script.includes("const shareable=next?.studentScreenSharing===true&&permission?.screenSharingDenied!==true?next:null"));
   assert.ok(script.includes("holder.style.display=active?'flex':'none'"));
-  assert.ok(script.includes("btn.addEventListener('click',beginShare)"));
+  assert.ok(script.includes("btn.addEventListener('click',shareClick)"));
   assert.ok(script.includes('navigator.mediaDevices.getDisplayMedia'));
   for(const removed of ['fttShareRequestOverlay','Open Sharing Window','routeTeacherRequest','showPrompt'])assert.ok(!script.includes(removed));
 });
