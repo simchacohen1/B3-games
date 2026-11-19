@@ -17,7 +17,7 @@ test('whiteboards open over the student learning activity',()=>{
 test('screen requests do not add a dialog over whiteboard or activity',()=>{
   const activity=read('activity-share.js');
   for(const old of ['fttShareRequestOverlay','routeTeacherRequest','Open Sharing Window'])assert.ok(!activity.includes(old));
-  assert.ok(activity.includes("holder.style.display=active||resumeNeeded?'flex':'none'"));
+  assert.ok(activity.includes("setHolderDisplay(active||resumeNeeded?'flex':'none')"));
   assert.ok(activity.includes("btn.addEventListener('click',shareClick)"));
 });
 

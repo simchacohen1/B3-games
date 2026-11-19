@@ -13,11 +13,10 @@
 :root{font-family:system-ui,sans-serif;color:#172033;background:#f4f7fb}
 *{box-sizing:border-box}
 body{margin:0;padding:18px}
-main{max-width:530px;margin:12vh auto;padding:24px;background:#fff;border:1px solid #dce4ef;border-radius:18px;box-shadow:0 12px 35px #1720331a}
-h1{margin:0 0 10px;color:#17395b}
-p{line-height:1.55;color:#526075}
-.headline{font-size:1.2rem;font-weight:700;color:#17395b}
-.small{font-size:.9rem}
+main{max-width:520px;margin:14vh auto;padding:28px;text-align:center}
+h1{margin:0 0 6px;font-size:2.2rem;line-height:1.15;color:#17395b}
+.line{margin:0 0 22px;font-size:1.4rem;color:#526075}
+h1:empty,.line:empty{display:none}
 </style>
 <script>
 /* A new same-origin window inherits this tab's sessionStorage. The invitation
@@ -25,19 +24,29 @@ p{line-height:1.55;color:#526075}
 try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key&&key.startsWith('fttPointerShareInvite:'))sessionStorage.removeItem(key)}}catch{}
 try{if(window.opener)window.opener=null}catch{}
 </script>
-<script defer src="activity-share.js?v=20261120-sharetab2"></script>
+<script defer src="activity-share.js?v=20261120-sharetab3"></script>
 </head>
 <body>
 <main>
-<h1>Share My Screen</h1>
-<p id="fttShareHeadline" class="headline">Getting ready…</p>
-<p>Your teacher sees your screen while this tab stays open. You can visit any page in your other tab and the sharing keeps going.</p>
+<h1 id="fttShareHeadline"></h1>
+<p id="fttShareLine" class="line"></p>
 <div id="fttShareControlArea"></div>
-<p class="small">To stop, click <strong>Stop Sharing</strong> here or in your other tab. Stopping closes this tab. If you refresh this tab, sharing stops: click <strong>Resume sharing</strong> and choose Entire Screen again.</p>
 </main>
 <script>
-/* If sharing could not start (not signed in, sharing turned off), say so instead of waiting forever. */
-setTimeout(function(){var h=document.getElementById('fttShareHeadline');if(h&&h.textContent==='Getting ready…')h.textContent='Sharing is not available right now. Close this tab and try again from your other tab.'},15000);
+/* The page always shows one big button, from the first instant. The sharing code in activity-share.js replaces it with
+   the real control as soon as it has signed the student in and found the lesson. If that does not happen (no
+   connection, signed out) the button becomes "Try again" instead of the page being left empty or with a long message. */
+(function(){
+  var area=document.getElementById('fttShareControlArea');if(!area)return;
+  var again=false;try{again=!!sessionStorage.getItem('fttShareTabWasSharing')}catch(e){}
+  var b=document.createElement('button');b.id='fttShareShell';b.type='button';
+  b.textContent=again?'\u25B6 Resume sharing':'\uD83D\uDDA5 Share My Screen';
+  b.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:18px;padding:26px 34px;width:100%;cursor:pointer;font:800 30px system-ui,sans-serif';
+  var retry=false;
+  b.onclick=function(){if(retry){location.reload();return}b.textContent='One moment\u2026'};
+  area.appendChild(b);
+  setTimeout(function(){var s=document.getElementById('fttShareShell');if(s){retry=true;s.textContent='\u21BB Try again'}},window.__fttShareShellRetryMs||12000);
+})();
 </script>
 </body>
 </html>

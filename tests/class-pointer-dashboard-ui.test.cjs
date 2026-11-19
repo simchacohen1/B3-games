@@ -33,9 +33,13 @@ test('persistent screen sharing asks for Entire Screen and contains no browser-t
   assert.doesNotMatch(boards,/Share a browser tab/);
   assert.doesNotMatch(boards,/startShare\('tab'\)/);
   assert.match(activity,/Please choose Entire Screen in the browser picker/);
-  assert.match(shareWindow,/You can visit any page in your other tab and the sharing keeps going/);
-  assert.match(activity,/Choose Entire Screen in the box that pops up/);
-  assert.match(activity,/You’re sharing your screen\. Go back to your other tab to keep working\./);
+  // Young students: the sharing tab says almost nothing. While sharing it is a title, one short line and Stop Sharing;
+  // otherwise one big button. No explanation paragraphs anywhere in the page.
+  assert.match(activity,/Sharing your screen ✅/);
+  assert.match(activity,/Keep this tab open/);
+  assert.doesNotMatch(shareWindow,/<p(?![^>]*\bclass="line")[^>]*>[^<]/);
+  assert.doesNotMatch(shareWindow,/Your teacher sees your screen|Getting ready|not available right now|You can visit any page/);
+  assert.match(shareWindow,/id="fttShareHeadline"/);assert.match(shareWindow,/id="fttShareControlArea"/);
   assert.match(activity,/displaySurface:'monitor'/);
   assert.match(activity,/displaySurface&&displaySurface!=='monitor'/);
 });

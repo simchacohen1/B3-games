@@ -30,9 +30,9 @@ async function studentFixture({persistent=false,openWindow=()=>({closed:false}),
   const sessionStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   const element=tag=>({tag,style:{cssText:''},dataset:{},children:[],listeners:{},textContent:'',hidden:false,disabled:false,
     setAttribute(){},addEventListener(type,fn){this.listeners[type]=fn},append(...args){this.children.push(...args)}});
-  const headline=element('p');
+  const headline=element('h1'),shareLine=element('p');
   const document={currentScript:{src:'https://funtorahtools.com/class-pointer-prototype/activity-share.js'},createElement:element,
-    getElementById:id=>id==='fttShareHeadline'?headline:null,
+    getElementById:id=>id==='fttShareHeadline'?headline:id==='fttShareLine'?shareLine:null,
     head:{appendChild(){}},body:{appendChild(node){if(node.id==='fttActivityScreenShare')holder=node}}};
   const db={ref:p=>({on:(_e,cb)=>{if(p.includes('/classPointerSessions'))listener=cb},off(){}})};
   const firebase={apps:[{}],database:()=>db};
@@ -72,7 +72,7 @@ async function studentFixture({persistent=false,openWindow=()=>({closed:false}),
   const [shareButton,label]=holder.children;
   let revision=1;
   const row=(extra={})=>({roomId:room,createdAt:Date.now(),studentScreenSharing:true,permissionRevision:revision,destinationRequest:{mode:'screens',at:revision},...extra});
-  return{control,holder,shareButton,label,headline,peerCalls,peers,opened,
+  return{control,holder,shareButton,label,headline,shareLine,peerCalls,peers,opened,
     // The page is leaving (refresh, another page, closed tab): the browser fires pagehide.
     unload(){for(const fn of windowListeners.pagehide||[])fn({})},
     // The teacher's lesson record changed (a new permissionRevision each time, like every teacher action).
@@ -188,7 +188,8 @@ test('teacher offline for less than the grace period: the sharing tab keeps capt
   assert.equal(s.stopCount,0,'the share is not ended by a short drop');
   assert.equal(s.peerCalls[0].closed,false);
   assert.equal(s.shareButton.textContent,'⏹ Stop Sharing');
-  assert.match(s.headline.textContent,/sharing your screen/);
+  assert.equal(s.headline.textContent,'Sharing your screen ✅','a short title while sharing');
+  assert.equal(s.shareLine.textContent,'Keep this tab open','and one short line');
   // The teacher is back: the stamp is cleared, nothing else happens.
   await s.same();await tick();
   assert.equal(s.stopCount,0);
@@ -205,7 +206,8 @@ test('teacher offline past the grace period: the sharing tab releases the captur
   assert.equal(s.stopCount,1,'capture is not left running for an absent teacher');
   assert.equal(s.peerCalls[0].closed,true);
   assert.equal(s.holder.style.display,'none');
-  assert.match(s.headline.textContent,/Screen sharing is off right now/);
+  assert.equal(s.headline.textContent,'','nothing but the button once sharing is over');
+  assert.equal(s.shareLine.textContent,'');
   s.peerCalls[0].emit('close');await tick(1300);
   assert.equal(s.peerCalls.length,1,'and it does not call the teacher again');
 });
@@ -222,7 +224,8 @@ test('End Class (the lesson record is removed) ends the capture in the sharing t
   assert.equal(page.shareButton.textContent,'⏹ Stop Sharing');
   await tab.gone();await page.gone();await tick(50);
   assert.equal(tab.stopCount,1,'no waiting: the lesson is over');
-  assert.match(tab.headline.textContent,/Screen sharing is off right now/);
+  assert.equal(tab.headline.textContent,'','nothing but the button once the class has ended');
+  assert.equal(tab.shareLine.textContent,'');
   assert.equal(page.shareButton.textContent,'🖥 Share My Screen','no stale Stop or Cancel button in the working tab');
   assert.equal(page.holder.style.display,'none','and no button at all while there is no lesson');
 });

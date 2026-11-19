@@ -238,9 +238,9 @@ test('a refreshed sharing tab shows a big Resume sharing button right away, and 
   const second=await activityFixture({persistent:true,validTicket:true,sessionStorageValues:storage,capture:()=>allowed?Promise.resolve(okStream()):needsClick()});
   assert.equal(second.shareButton.textContent,'▶ Resume sharing','the Resume button is there before the lesson has even loaded');
   assert.equal(second.holder.style.display,'flex');
-  assert.match(second.shareButton.style.cssText,/font:800 28px/,'and it is big');
+  assert.match(second.shareButton.style.cssText,/font:800 30px/,'and it is big');
   await second.shareButton.listeners.click();
-  assert.match(second.label.textContent,/Almost ready/);
+  assert.match(second.label.textContent,/One moment/);
   assert.equal(second.captureCount,0,'nothing is captured before the lesson is known');
   await second.emit('screens');await tick(50);
   assert.equal(second.shareButton.textContent,'▶ Resume sharing','a refused automatic start leaves the big button in place');

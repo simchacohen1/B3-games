@@ -48,12 +48,26 @@
     // game-gate owns Firebase startup on activity/presentation pages. Waiting
     // here prevents two app SDK loads from replacing each other's services.
     if(window.B3GameGateAuthReady)await window.B3GameGateAuthReady;
+    // The sharing tab has no game-gate.js, which is what signs the student in on the activity pages. Without that
+    // sign-in the database refuses to read the lesson and the student's class (the rules need a signed-in student),
+    // so the tab could never start. It loads Firebase's sign-in part itself and waits for the saved sign-in below.
+    let ownSignIn=false;
     if(!window.firebase?.database){
       if(!window.firebase)await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
       await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js');
+      if(persistentShareWindow&&!window.firebase.auth){await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js');ownSignIn=true}
     }
     if(!window.B3_FIREBASE_CONFIG)await load(new URL('firebase-config.js',root).href);
     if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    if(ownSignIn){
+      // The saved student sign-in is restored from the browser a moment after start. Do not read anything before it
+      // is back (but never wait forever).
+      const auth0=firebase.auth();
+      await Promise.race([
+        typeof auth0.authStateReady==='function'?auth0.authStateReady():new Promise(resolve=>{const off=auth0.onAuthStateChanged(()=>{off();resolve()})}),
+        new Promise(resolve=>setTimeout(resolve,8000))
+      ]);
+    }
     const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
     if(!auth.ok||!(await auth.json()).ok)return;
     // Use the same class resolver as the existing student dashboard.
@@ -88,7 +102,7 @@
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=hlshapes1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261120-sharetab2',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261120-sharetab3',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
@@ -101,13 +115,16 @@
     holder.id='fttActivityScreenShare';
     holder.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
-    const BTN_BASE='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
-    // After the sharing tab itself is refreshed the capture is gone (a browser ends it when its page reloads), so the
-    // student gets one big button to pick the screen again.
-    const BTN_RESUME='background:#1d4ed8;color:#fff;border:0;border-radius:16px;padding:26px 34px;width:100%;cursor:pointer;font:800 28px system-ui,sans-serif';
+    // The sharing tab is for young students: one big button, almost no words. After the sharing tab itself is refreshed
+    // the capture is gone (a browser ends it when its page reloads), so the button reads Resume sharing.
+    const BTN_BASE=persistentShareWindow
+      ?'background:#1d4ed8;color:#fff;border:0;border-radius:18px;padding:26px 34px;width:100%;cursor:pointer;font:800 30px system-ui,sans-serif'
+      :'background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
+    const BTN_RESUME=BTN_BASE;
     btn.style.cssText=BTN_BASE;
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:190px';
-    const IDLE_TEXT='Click to show your teacher your screen. Choose Entire Screen.';label.textContent=IDLE_TEXT;
+    const IDLE_TEXT=persistentShareWindow?'':'Click to show your teacher your screen. Choose Entire Screen.';label.textContent=IDLE_TEXT;
+    label.hidden=persistentShareWindow;   // the sharing tab only shows a short line when there is something to say
     // Screen-sharing errors must never send a student into the retired Pointer page.
     const fallback=document.createElement('button');fallback.type='button';
     fallback.textContent='Try again';fallback.hidden=true;
@@ -115,7 +132,12 @@
     fallback.addEventListener('click',()=>{if(persistentShareWindow)void beginShare();else openHolder()});
     holder.append(btn,label,fallback);
     const shareArea=persistentShareWindow&&typeof document.querySelector==='function'?document.querySelector('#fttShareControlArea'):null;
-    if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
+    if(shareArea){
+      // Plain and centred: the page itself is the control. The start-up placeholder button (see student-share-window.html)
+      // stays until this control is actually shown (setHolderDisplay), so there is never a moment with no button.
+      holder.style.cssText='position:static;display:none;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px;width:100%;padding:0;border:0;background:none;box-shadow:none;font:700 20px system-ui,sans-serif';
+      shareArea.appendChild(holder);
+    }
     else document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Remembered per tab (sessionStorage survives a refresh of the same tab): this student was sharing from this tab
@@ -124,6 +146,11 @@
     let resumeNeeded=false;
     if(persistentShareWindow){try{resumeNeeded=!!id&&sessionStorage.getItem(RESUME_KEY)===id}catch{}}
     const clearResume=()=>{try{sessionStorage.removeItem(RESUME_KEY)}catch{}};
+    // In the sharing tab the real control replaces the start-up placeholder button in the same step it is shown or hidden.
+    function setHolderDisplay(value){
+      holder.style.display=value;
+      if(persistentShareWindow){try{document.getElementById('fttShareShell')?.remove()}catch{}}
+    }
     const rememberSharing=()=>{try{sessionStorage.setItem(RESUME_KEY,id)}catch{}};
     function styleIdleButton(){
       btn.textContent=resumeNeeded?'▶ Resume sharing':'🖥 Share My Screen';
@@ -133,8 +160,8 @@
     function styleSharingButton(){
       btn.textContent='⏹ Stop Sharing';btn.style.cssText=BTN_BASE;btn.style.background='#a91f37';holder.style.flexWrap='nowrap';
     }
-    if(resumeNeeded){styleIdleButton();holder.style.display='flex'}   // right away, before the lesson record has loaded
-    const SHARING_TEXT='✅ Your teacher can see your screen. Click Stop Sharing when your teacher says.';
+    if(resumeNeeded){styleIdleButton();setHolderDisplay('flex')}   // right away, before the lesson record has loaded
+    const SHARING_TEXT='';   // the sharing tab's title says it ("Sharing your screen"); no extra sentence
     // Shown when the browser would not open the sharing tab and this page shares by itself (see openHolder).
     const PAGE_SHARING_TEXT='✅ Your teacher can see your screen. Stay on this page: leaving it stops sharing.';
     const sharingText=()=>persistentShareWindow?SHARING_TEXT:PAGE_SHARING_TEXT;
@@ -168,16 +195,15 @@
     let holderState=null,holderSeen=0,autoTried=false,settled=false;
     const tell=message=>{try{channel?.postMessage({...message,studentId:id})}catch{}};
     const headline=persistentShareWindow&&typeof document.getElementById==='function'?document.getElementById('fttShareHeadline'):null;
+    const shareLine=persistentShareWindow&&typeof document.getElementById==='function'?document.getElementById('fttShareLine'):null;
     function report(){
       if(!persistentShareWindow)return;
       // Once there is nothing to share to (lesson over, sharing turned off) this tab no longer counts as
       // open, so the student's own tab goes back to its ordinary button instead of showing Cancel.
       tell({type:'holder',open:!settled||!!stream||!!active||busy,sharing:!!stream});
-      const text=stream?'📺 You’re sharing your screen. Go back to your other tab to keep working.':
-        resumeNeeded&&(active||!settled)?'⏸ Sharing stopped because this page was refreshed. Click Resume sharing, then choose Entire Screen.':
-        active?'Choose Entire Screen in the box that pops up, then click Share.':
-        settled?'Screen sharing is off right now. You can close this tab.':'';
-      if(headline&&text)headline.textContent=text;
+      // While sharing: a title and one short line. Otherwise nothing but the big button.
+      if(headline)headline.textContent=stream?'Sharing your screen ✅':'';
+      if(shareLine)shareLine.textContent=stream?'Keep this tab open':'';
       try{document.title=stream?'📺 Sharing your screen':'Share My Screen'}catch{}
     }
     // The student ended it (Stop here, Stop in his other tab, or the browser's own Stop sharing bar).
@@ -976,7 +1002,8 @@
       // Until his own permission is confirmed the button is hidden, so a teacher's change hides it at once.
       // (A share already running is not interrupted while the check is in progress.)
       const keep=permission;permissionKey=key;permission={};permissionReady=false;const current=++permissionRequest;
-      if(!stream&&!holderState?.open)holder.style.display='none';else if(stream){permission=keep;permissionReady=true}
+      // (In the sharing tab the Resume button stays while this is checked, so it never blinks out on a refresh.)
+      if(!stream&&!holderState?.open){if(persistentShareWindow)setHolderDisplay(resumeNeeded?'flex':'none');else holder.style.display='none'}else if(stream){permission=keep;permissionReady=true}
       // unsure: no clear answer came back (no internet, time-out, busy or broken server).
       let unsure=false;
       try{
@@ -1017,13 +1044,13 @@
       prior?.getTracks().forEach(t=>t.stop());
       // The student's own tab shows what his sharing tab is doing.
       if(!persistentShareWindow){if(prior)tellTeacherStopped();showLinked();return}
-      clearResume();
+      if(!resumeNeeded)clearResume();   // still waiting to resume: keep it, so a second refresh also offers Resume
       styleIdleButton();
-      label.textContent=IDLE_TEXT;
+      status(IDLE_TEXT);
       fallback.hidden=true;
       if(prior)report();
     }
-    function status(text){label.textContent=text}
+    function status(text){label.textContent=text;if(persistentShareWindow)label.hidden=!text}
     function refreshSessionState(){
       const next=latestSession;
       settled=true;
@@ -1032,7 +1059,7 @@
         if(!persistentShareWindow){showLinked();return}
         // A lesson that is gone cannot be resumed; otherwise keep the Resume button while the permission is checked.
         if(!latestSession&&resumeNeeded){resumeNeeded=false;clearResume();styleIdleButton()}
-        holder.style.display=resumeNeeded?'flex':'none';
+        setHolderDisplay(resumeNeeded?'flex':'none');
         if(!was)report();
         return;
       }
@@ -1040,7 +1067,9 @@
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;
       if(!persistentShareWindow){showLinked();return}
-      holder.style.display=active||resumeNeeded?'flex':'none';
+      // Permission is known and there is nothing to share to (sharing turned off, a "no" for this student): nothing to resume.
+      if(resumeNeeded&&!active){resumeNeeded=false;clearResume();styleIdleButton()}
+      setHolderDisplay(active||resumeNeeded?'flex':'none');
       report();
       // The sharing tab asks for the screen by itself as soon as it knows sharing is allowed.
       if(active&&!autoTried&&!stream&&!busy){autoTried=true;void beginShare()}
@@ -1180,7 +1209,7 @@
       dropCall();
       scheduleRecall();
     }
-    function giveUp(text){stop();status(text||'Sharing stopped. Click Share My Screen to share again, or close this tab.')}
+    function giveUp(text){stop();status(text||(persistentShareWindow?'Sharing stopped.':'Sharing stopped. Click Share My Screen to share again, or close this tab.'))}
     function scheduleRecall(){
       if(recallTimer||!stream)return;
       if(!active||!stream.active||!sameStudent()||recallAttempts>=RECALL_DELAYS.length){giveUp();return}
@@ -1204,7 +1233,7 @@
     }
     async function beginShare(){
       if(stream){studentStop();return}
-      if(!active&&resumeNeeded&&!busy){status('Almost ready. Click Resume sharing again in a moment.');return}
+      if(!active&&resumeNeeded&&!busy){status('One moment…');return}
       if(busy||!active||!sameStudent())return;
       const lesson=active;
       busy=true;btn.disabled=true;
@@ -1233,7 +1262,9 @@
         stop();
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
         // InvalidStateError: this browser only opens its screen picker after a click in this tab.
-        status(error?.name==='NotAllowedError'?'Sharing canceled. Click Share My Screen to try again.':error?.name==='InvalidStateError'?'Click Share My Screen to choose your screen.':error.message||'Could not share.');
+        // In the sharing tab the big button is the whole instruction: no sentence for "needs a click" or "cancelled".
+        const justClick=persistentShareWindow&&(error?.name==='NotAllowedError'||error?.name==='InvalidStateError');
+        status(justClick?'':error?.name==='NotAllowedError'?'Sharing canceled. Click Share My Screen to try again.':error?.name==='InvalidStateError'?'Click Share My Screen to choose your screen.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
         // The teacher has turned this student off: hide the button until the teacher changes it.
         if(error?.code==='ACTIVITY_SHARE_DENIED'){permission={...permission,screenSharingDenied:true};refreshSessionState()}
