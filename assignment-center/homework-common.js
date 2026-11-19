@@ -11,7 +11,7 @@
   var isStagingRuntime = projectId === STAGING_PROJECT &&
     (host === STAGING_HOST || STAGING_PREVIEW_HOST.test(host) || localPreview);
   var LIVE_PROJECT = 'b3-games';
-  var LIVE_HOSTS = ['funtorahtools.com', 'www.funtorahtools.com', 'sols.tools', 'www.sols.tools', 'simchacohen1.github.io'];
+  var LIVE_HOSTS = ['sols.tools', 'www.sols.tools', 'simchacohen1.github.io'];
   var isLiveRuntime = projectId === LIVE_PROJECT && LIVE_HOSTS.indexOf(host) !== -1;
   var API = isStagingRuntime
     ? (localPreview && /^http:\/\/(localhost|127\.0\.0\.1):5001\//.test(root.B3_HOMEWORK_API_URL || '')

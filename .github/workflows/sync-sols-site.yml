@@ -2,8 +2,8 @@ name: Sync sols.tools site
 
 # Every release to main is copied straight away to simchacohen1/sols-school-site,
 # which GitHub Pages serves at https://sols.tools with Shluchim Online School
-# branding. funtorahtools.com is still served from this repository and is not
-# touched by this workflow. Both sites use the same live Firebase project.
+# branding. funtorahtools.com only redirects (301, Cloudflare) to sols.tools; its
+# old GitHub Pages copy in this repository is not touched by this workflow. Both sites use the same live Firebase project.
 #
 # Uses the SOLS_SITE_DEPLOY_KEY secret: the private half of a deploy key that
 # can write to sols-school-site only. The "Update from B3-games" workflow in

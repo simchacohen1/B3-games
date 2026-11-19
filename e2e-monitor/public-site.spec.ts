@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { STUDENT_TOOLS, TEACHER_PAGES, openHomeSignedOut, watchForProblems } from './helpers';
+import { SITE_NAME, SITE_TITLE, STUDENT_TOOLS, TEACHER_PAGES, openHomeSignedOut, watchForProblems } from './helpers';
 
 // Read-only checks a signed-out visitor can make. Nothing here signs in,
 // types a passcode, or writes anything to the database.
@@ -9,7 +9,7 @@ test.describe('Home page', () => {
     const problems = watchForProblems(page, new URL(baseURL!).origin);
     await openHomeSignedOut(page);
     await expect(page.locator('#studentPinInput, #classPinInput').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open Fun Torah Tools' })).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp('Open (' + SITE_NAME.source + ')', 'i') })).toBeVisible();
     await expect(page.getByRole('button', { name: /Teacher Tools/ })).toBeVisible();
     // Signed out: the tool map must stay hidden.
     await expect(page.locator('#gamesArea')).toBeHidden();
@@ -19,7 +19,7 @@ test.describe('Home page', () => {
   test('empty sign-in is stopped in the browser with a clear message', async ({ page }) => {
     // Checked before any server call, so this never touches sign-in limits.
     await openHomeSignedOut(page);
-    await page.getByRole('button', { name: 'Open Fun Torah Tools' }).click();
+    await page.getByRole('button', { name: new RegExp('Open (' + SITE_NAME.source + ')', 'i') }).click();
     await expect(page.locator('#loginMsg')).toHaveText(/Please type your name/);
     await expect(page.locator('#gamesArea')).toBeHidden();
   });
@@ -50,7 +50,7 @@ test.describe('Student tool pages open without errors', () => {
       await page.waitForTimeout(5_000);
       const path = new URL(page.url()).pathname;
       if (path === '/' || path === '/index.html') {
-        await expect(page).toHaveTitle(/Fun Torah Tools/i);
+        await expect(page).toHaveTitle(SITE_TITLE);
         await expect(page.locator('#studentNameInput')).toBeVisible();
         await expect(page.locator('#gamesArea')).toBeHidden();
       } else {
@@ -66,8 +66,15 @@ test.describe('Teacher pages show only a sign-in screen when signed out', () => 
     test(path, async ({ page, baseURL }) => {
       const problems = watchForProblems(page, new URL(baseURL!).origin);
       await page.goto(path);
-      await expect(page.locator('body')).toContainText(signInText);
+      // On sols.tools a signed-out visitor is sent back to the home page from any page outside
+      // the front door (home, teacher sign-in, Class Pointer). That is the page staying locked.
       await page.waitForTimeout(5_000);
+      const landed = new URL(page.url()).pathname;
+      if (landed === '/' || landed === '/index.html') {
+        await expect(page.locator('#gamesArea')).toBeHidden();
+        return;
+      }
+      await expect(page.locator('body')).toContainText(signInText);
       // No student list or passcode boxes for a visitor.
       await expect(page.locator('[data-student-passcode], [data-remove-student]')).toHaveCount(0);
       await expect(page.locator('body')).not.toContainText(/Delete class|Delete teacher/);

@@ -7,7 +7,7 @@ exports.safeQuestion=safeQuestion;
 exports.isActiveStudentAccess=isActiveStudentAccess;
 exports.canAcceptStudentBuzz=canAcceptStudentBuzz;
 
-exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
+exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'});
   try{
@@ -36,7 +36,7 @@ exports.gameShowStudentQuestions=onRequest({region:'us-central1',cors:['https://
   }
 });
 
-exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools'],maxInstances:30,memory:'256MiB'},async(req,res)=>{
+exports.gameShowStudentAction=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'],maxInstances:30,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
   try{

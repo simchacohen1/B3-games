@@ -2,21 +2,23 @@
 // Public, anonymous checks only. No accounts, capture, data reads/writes or deploys.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const crypto=require('node:crypto');
 const {chromium}=require('playwright');
-const root='https://funtorahtools.com/';
+const {expectedLiveFiles,sha:normalizedSha}=require('./sols-expected.cjs');
+// The live site is sols.tools; funtorahtools.com only redirects there.
+const root=(process.env.SITE_URL||'https://sols.tools').replace(/\/+$/,'')+'/';
 const overlay=process.env.POINTER_CANDIDATE_OVERLAY==='1';
 const paths=['class-pointer-prototype/dashboard.html','class-pointer-prototype/dashboard.js','class-pointer-prototype/dashboard-session.js','class-pointer-prototype/classroom.html','class-pointer-prototype/classroom.js','class-pointer-prototype/classroom.css','class-pointer-prototype/student-boards.js','class-pointer-prototype/student-boards.css','class-pointer-prototype/teacher-toolbar.js','class-pointer-prototype/activity-share.js'];
-const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 (async()=>{
+ // The same rebranding build that publishes sols.tools, so live pages are compared like for like.
+ const expected=expectedLiveFiles(paths);
  const pending=new Set(paths.filter(p=>!overlay||p!=='class-pointer-prototype/dashboard.html')),deadline=Date.now()+6*60*1000;
  while(pending.size&&Date.now()<deadline){
   for(const path of Array.from(pending)){
    try{
     const url=new URL(path,root);url.searchParams.set('release-check',process.env.GITHUB_SHA||'pointer');
     const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});
-    if(r.ok&&hash(await r.text())===hash(fs.readFileSync(path,'utf8'))){pending.delete(path);console.log('Published asset verified:',path)}
+    if(r.ok&&normalizedSha(await r.text())===normalizedSha(expected.get(path))){pending.delete(path);console.log('Published asset verified:',path)}
    }catch(error){console.log('Public fetch pending:',path,error.name)}
   }
   if(pending.size){console.log('Waiting for Pages/CDN:',pending.size,'assets');await pause(15000)}
@@ -28,7 +30,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   // Keep the check anonymous and prevent database/Storage/Functions access.
   await context.route(/(?:firebaseio\.com|firebasedatabase\.app|firebasestorage\.googleapis\.com|cloudfunctions\.net)/,route=>route.abort());
   await context.routeWebSocket(/(?:firebaseio\.com|firebasedatabase\.app)/,ws=>ws.close());
-  if(overlay)await context.route('**/class-pointer-prototype/dashboard.html?*',route=>route.fulfill({contentType:'text/html',body:fs.readFileSync('class-pointer-prototype/dashboard.html','utf8')}));
+  if(overlay)await context.route('**/class-pointer-prototype/dashboard.html?*',route=>route.fulfill({contentType:'text/html',body:expected.get('class-pointer-prototype/dashboard.html')}));
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   const response=await page.goto(root+'class-pointer-prototype/dashboard.html?teacher=1&release-check='+encodeURIComponent(process.env.GITHUB_SHA||'pointer'),{waitUntil:'domcontentloaded'});

@@ -20,6 +20,10 @@ export const STUDENT_TOOLS: { id: string; path: string; title: RegExp }[] = [
 ];
 
 /** Teacher/admin pages: a signed-out visitor must only see a sign-in screen. */
+/** sols.tools renames the site in tab titles and visible text; the old name is still accepted. */
+export const SITE_TITLE = /Fun Torah Tools|SOLS Tools/i;
+export const SITE_NAME = /Fun Torah Tools|Shluchim Online School/i;
+
 export const TEACHER_PAGES: { path: string; signInText: RegExp }[] = [
   { path: 'teacher-home.html', signInText: /Checking your teacher account|Sign in with Google|Teacher .* sign in/i },
   { path: 'owner-admin.html', signInText: /Owner access/i },
@@ -49,7 +53,7 @@ export function watchForProblems(page: Page, siteOrigin: string) {
 /** The home page shows the student sign-in form once its startup check finishes. */
 export async function openHomeSignedOut(page: Page) {
   await page.goto('./');
-  await expect(page).toHaveTitle(/Fun Torah Tools/);
+  await expect(page).toHaveTitle(SITE_TITLE);
   // The startup check can take 10-15 s when the server is waking up.
   await expect(page.locator('#studentNameInput')).toBeVisible({ timeout: 60_000 });
 }

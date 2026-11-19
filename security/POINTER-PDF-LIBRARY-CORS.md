@@ -7,7 +7,7 @@ Symptom: the library lists a saved file, but Open shows **Failed to fetch**. Thi
 ## One-time setup
 
 1. In the Google Cloud Console for project `b3-games`, open **Cloud Storage → Buckets → b3-games.firebasestorage.app → Configuration → Cross-origin resource sharing**.
-2. Check whether the bucket has existing CORS entries. **Preserve any additional origins/methods/response headers already in use**. Add GET for the actual webpage origin `https://funtorahtools.com`. The example in `security/pointer-pdf-library-cors.example.json` also covers the www and GitHub Pages origins.
+2. Check whether the bucket has existing CORS entries. **Preserve any additional origins/methods/response headers already in use**. Add GET for the actual webpage origin `https://sols.tools` (the only address the site runs on; funtorahtools.com only redirects to it). The example in `security/pointer-pdf-library-cors.example.json` also covers the www and GitHub Pages origins.
 3. To set the example from Cloud Shell (or local authenticated gcloud CLI), after checking that it safely includes existing CORS settings, run:
    `gcloud storage buckets update gs://b3-games.firebasestorage.app --cors-file=pointer-pdf-library-cors.example.json`
    For current Google Cloud Consoles supporting CORS editing, use the CORS editor instead; add the exact origins with method GET and relevant response headers.

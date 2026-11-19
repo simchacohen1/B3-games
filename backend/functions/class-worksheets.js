@@ -9,7 +9,7 @@ if(!admin.apps.length)admin.initializeApp();
 // Allowed to send: an active teacher assigned to the class, or a site admin (b3Games/admins/{uid}/active).
 const BUCKET='b3-games.firebasestorage.app';
 
-exports.classWorksheets=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:10,memory:'256MiB'},async(req,res)=>{
+exports.classWorksheets=onRequest({region:'us-central1',cors:['https://sols.tools','https://www.sols.tools','https://simchacohen1.github.io'],maxInstances:10,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
   try{

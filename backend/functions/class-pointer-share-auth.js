@@ -11,7 +11,7 @@ const validId=s=>key(s);
 const error=(code,message)=>{throw Object.assign(new Error(message),{code})};
 exports.classPointerShareAuth=onRequest({
  region:'us-central1',
- cors:['https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com','https://simchacohen1.github.io'],
+ cors:['https://sols.tools','https://www.sols.tools','https://simchacohen1.github.io'],
  maxInstances:10
 },async(req,res)=>{
  res.set('Cache-Control','no-store');

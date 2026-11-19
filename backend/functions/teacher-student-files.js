@@ -9,7 +9,7 @@ if(!admin.apps.length)admin.initializeApp();
 // special address here: the owner is let in through the same admin row the other teacher tools use.
 const BUCKET='b3-games.firebasestorage.app';
 
-exports.teacherStudentFiles=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:10,memory:'256MiB'},async(req,res)=>{
+exports.teacherStudentFiles=onRequest({region:'us-central1',cors:['https://sols.tools','https://www.sols.tools','https://simchacohen1.github.io'],maxInstances:10,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
   try{

@@ -1,5 +1,5 @@
 'use strict';
-// Anonymous, read-only check of the LIVE site at funtorahtools.com.
+// Anonymous, read-only check of the LIVE site at sols.tools (funtorahtools.com only redirects there).
 //
 // What this does NOT do: sign in, use any account, read or write any class or
 // student data, or deploy anything. It only looks at the public pages the way a
@@ -12,10 +12,11 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const crypto = require('node:crypto');
 const { chromium } = require('playwright');
+const { expectedLiveFiles, sha: normalizedSha, solsTitle } = require('./sols-expected.cjs');
 
-const ROOT = 'https://funtorahtools.com/';
+const ROOT = (process.env.SITE_URL || 'https://sols.tools').replace(/\/+$/, '') + '/';
+const ON_SOLS = new URL(ROOT).hostname.endsWith('sols.tools');
 
 // Files whose published copy must match this repository. If one of these is
 // stale, a merged change never reached the live site.
@@ -33,7 +34,8 @@ const PAGES = [
   {
     name: 'Home',
     path: 'index.html',
-    title: 'Fun Torah Tools'
+    title: 'Fun Torah Tools',
+    front: true
   },
   {
     name: 'Shorashim',
@@ -50,13 +52,13 @@ const PAGES = [
   {
     name: 'Class Pointer',
     path: 'class-pointer-prototype/dashboard.html?teacher=1',
+    front: true,
     heading: 'Classroom Sharing',
     // Nobody signed out may see a class to start.
     mustHaveNone: '#teacherClassButtons button'
   }
 ];
 
-const sha = text => crypto.createHash('sha256').update(text).digest('hex');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const stamp = process.env.GITHUB_SHA || 'site-smoke';
 
@@ -66,6 +68,7 @@ const warnings = [];
 async function verifyPublishedFiles() {
   // GitHub Pages and its CDN can take a few minutes after a merge, so keep
   // retrying before calling a file stale.
+  const expected = expectedLiveFiles(PUBLISHED);
   const pending = new Set(PUBLISHED);
   const deadline = Date.now() + 6 * 60 * 1000;
 
@@ -75,7 +78,7 @@ async function verifyPublishedFiles() {
         const url = new URL(path, ROOT);
         url.searchParams.set('release-check', stamp);
         const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-        if (response.ok && sha(await response.text()) === sha(fs.readFileSync(path, 'utf8'))) {
+        if (response.ok && normalizedSha(await response.text()) === normalizedSha(expected.get(path))) {
           pending.delete(path);
           console.log('Live copy matches the repository:', path);
         }
@@ -91,7 +94,7 @@ async function verifyPublishedFiles() {
 
   for (const path of pending) {
     problems.push('The live site is still serving an old copy of ' + path +
-      '. A merged change has not reached funtorahtools.com.');
+      '. A merged change has not reached sols.tools.');
   }
 }
 
@@ -127,11 +130,36 @@ async function checkPages() {
           continue;
         }
 
-        if (page.title) {
+        let expectedTitle = page.title;
+        if (ON_SOLS) {
+          if (expectedTitle) expectedTitle = solsTitle(expectedTitle);
+          if (!page.front) {
+            // On sols.tools a visitor who is not signed in is sent back to the home page from any page
+            // outside the front door (home, teacher sign-in, Class Pointer). That is the page staying
+            // locked, so it counts as a pass. If the page stays instead, its own checks run below.
+            const sentHome = await tab.waitForURL(u => u.pathname === '/' || u.pathname === '/index.html', { timeout: 20000 })
+              .then(() => true, () => false);
+            if (sentHome) {
+              const homeTitle = await tab.title();
+              if (homeTitle !== solsTitle('Fun Torah Tools')) {
+                problems.push(page.name + ' was sent home, but the home page title was "' + homeTitle + '".');
+              }
+              for (const area of ['#gamesArea', '#appShell']) {
+                if (await tab.locator(area).isVisible().catch(() => false)) {
+                  problems.push(page.name + ' sent a visitor home, but ' + area + ' is visible there.');
+                }
+              }
+              console.log('Checked:', page.name, '(sent back to the home page, as expected)');
+              continue;
+            }
+          }
+        }
+
+        if (expectedTitle) {
           const title = await tab.title();
-          if (title !== page.title) {
+          if (title !== expectedTitle) {
             problems.push(page.name + ' loaded but the page title was "' + title +
-              '" instead of "' + page.title + '".');
+              '" instead of "' + expectedTitle + '".');
           }
         }
 

@@ -60,9 +60,10 @@ test('new teacher access reads only the verified teacher invitation addressed to
  assert.match(settings,/String\(invite\.email \|\| ""\)\.trim\(\)\.toLowerCase\(\) !== email/);
 });
 
-test('custom Fun Torah Tools domains are allowed to call the teacher claim function',()=>{
- assert.match(claimEndpoint,/https:\/\/funtorahtools\.com/);
- assert.match(claimEndpoint,/https:\/\/www\.funtorahtools\.com/);
+test('the sols.tools domain is allowed (and the old funtorahtools.com is not) to call the teacher claim function',()=>{
+ assert.match(claimEndpoint,/https:\/\/sols\.tools/);
+ assert.match(claimEndpoint,/https:\/\/www\.sols\.tools/);
+ assert.doesNotMatch(claimEndpoint,/funtorahtools\.com/);
 });
 
 const vm=require('node:vm');

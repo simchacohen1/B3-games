@@ -4,7 +4,7 @@ A link that opens Fun Torah Tools already signed in as a **fictional test studen
 Put it in a `.bat` file and double-click to open the student window.
 
 ## How it works
-- Link: `https://funtorahtools.com/#ftt-test=<token>`. The token is the test student's
+- Link: `https://sols.tools/#ftt-test=<token>`. The token is the test student's
   name and passcode, encoded (not encrypted). Without it, nothing happens.
 - The part after `#` is never sent to any server. The home page removes it from the
   address bar as soon as it loads.

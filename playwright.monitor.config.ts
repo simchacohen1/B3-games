@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  *
  *   npx playwright test --config playwright.monitor.config.ts
  *
- * SITE_URL can point at another copy of the site (default: funtorahtools.com).
+ * SITE_URL can point at another copy of the site (default: sols.tools).
  */
 export default defineConfig({
   testDir: './e2e-monitor',
@@ -24,7 +24,7 @@ export default defineConfig({
     ['json', { outputFile: 'monitor-report/results.json' }],
   ],
   use: {
-    baseURL: (process.env.SITE_URL || 'https://funtorahtools.com').replace(/\/?$/, '/'),
+    baseURL: (process.env.SITE_URL || 'https://sols.tools').replace(/\/?$/, '/'),
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',

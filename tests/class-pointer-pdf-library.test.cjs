@@ -164,7 +164,7 @@ test('private PDF CORS example only allows known site origins and GET',()=>{
   const cors=JSON.parse(fs.readFileSync(path.join(base,'security/pointer-pdf-library-cors.example.json'),'utf8'));
   assert.equal(cors.length,1);
   assert.deepEqual(cors[0].method,['GET']);
-  assert.ok(cors[0].origin.includes('https://funtorahtools.com'));
+  assert.ok(cors[0].origin.includes('https://sols.tools'));
   assert.ok(!cors[0].origin.includes('*'));
   assert.ok(cors[0].maxAgeSeconds<=3600);
 });

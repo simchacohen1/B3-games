@@ -1,6 +1,6 @@
 # sols.tools (Shluchim Online School)
 
-The same website is served at two addresses from the same live Firebase project:
+**sols.tools is the only address the site runs on.** funtorahtools.com only redirects, permanently (301), to the same path on sols.tools (a Cloudflare redirect rule; `domain-redirect.js`, loaded first in every page, and `404.html` are the fallback for anything that still reaches the old GitHub Pages copy). The site is built from one source and published at two addresses:
 
 | Address | Repository | Branding |
 | --- | --- | --- |
@@ -41,9 +41,13 @@ its own checks apply. This is display only: accounts, data and rules are unchang
 Do not edit `sols-school-site` by hand: the next update overwrites it. Change
 this repository instead.
 
-When a new backend function or host allow-list is added, include
-`https://sols.tools` and `https://www.sols.tools` next to the
-funtorahtools.com entries, or that feature will fail on sols.tools.
+When a new backend function or host allow-list is added, list only
+`https://sols.tools` and `https://www.sols.tools` (plus the GitHub Pages origin where one is
+listed). funtorahtools.com is no longer in any backend CORS list or live-host check: it only redirects.
+
+The live-site monitor and smoke scripts run against sols.tools. A signed-out visitor is sent back to
+the home page from any page outside the front door, which counts as that page staying locked.
+`scripts/sols-expected.cjs` rebuilds the expected sols.tools files so "live matches the repository" compares like with like.
 
 ## Google sign-in domain
 

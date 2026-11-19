@@ -166,7 +166,7 @@ test('staging-only backend and frontend refuse production; shared model parity',
   assert.throws(() => createService({ projectId: 'b3-games' }), /staging only/);
   assert.equal(fs.readFileSync('kriah-assessment/core.js', 'utf8'), fs.readFileSync('backend/kriah-staging/core.js', 'utf8'));
   const source = fs.readFileSync('kriah-assessment/client.js', 'utf8');
-  const context = { window: { location: { hostname: 'funtorahtools.com', search: '' } }, URLSearchParams }; vm.runInNewContext(source, context);
+  const context = { window: { location: { hostname: 'sols.tools', search: '' } }, URLSearchParams }; vm.runInNewContext(source, context);
   await assert.rejects(context.window.KriahClient.init(() => {}), /isolated staging/);
   assert.equal(PROJECT, 'fun-torah-tools-staging');
 });
