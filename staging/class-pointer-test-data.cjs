@@ -5,6 +5,11 @@
 //   node staging/class-pointer-test-data.cjs            read-only: lists what is missing
 //   node staging/class-pointer-test-data.cjs --apply    adds ONLY what is missing; never overwrites a value
 //
+//   node staging/class-pointer-test-data.cjs --google-teacher=<your-google-email> [--apply]
+//       makes YOUR Google account a teacher of the fictional class TEST-ALEF on staging, so you can sign in with
+//       Google on the staging site and pick that class. Sign in with Google on staging once first (it will say
+//       you are not authorized; that is expected) so the account exists, then run this.
+//
 // STAGING ONLY: the project is fixed below and the script refuses anything else. It uses your own
 // `gcloud auth application-default` login, like staging/provision-fictional-accounts.ps1. It never reads or
 // prints passwords or passcodes (it only checks that a passcode exists), and it never touches production.
@@ -63,6 +68,37 @@ function diagnose({ workspaceId, role, uid, have }) {
   return { problems, patch };
 }
 
+// The invitation id the site looks up for a signed-in Google account (see site-settings.js).
+const inviteIdFor = email => String(email).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const EMAIL_RE = /^[^\s@<>"'`\\]+@[^\s@<>"'`\\]+\.[^\s@<>"'`\\]+$/;
+
+// Pure: refuses anything that is not an ordinary, verified Google account on the staging project.
+function checkGoogleTeacher(email, user) {
+  if (!EMAIL_RE.test(email || '') || email.length > 200) throw new Error('--google-teacher needs a full email address, for example --google-teacher=<your-google-email>');
+  if (/@funtorahtools-staging\.test$/i.test(email)) throw new Error('That is a fictional staging address, not a Google account. Use --teacher= for those.');
+  if (!user) throw new Error('No account for ' + email + ' on staging yet. Open the staging site, click "Sign in with Google" once with this account (it will say you are not authorized, that is expected), then run this again.');
+  if (user.emailVerified !== true) throw new Error('That staging account has an unverified email; refusing.');
+  if (!(user.providerUserInfo || []).some(p => p.providerId === 'google.com')) throw new Error('That staging account did not sign in with Google; refusing.');
+}
+
+// Pure: the records that make a Google account a teacher of the fictional class. Reuses diagnose() for the teacher
+// record, class, Class Pointer setting and fictional students, and adds the invitation the site also looks up.
+// Only fills blanks. The class is always the fictional one from fictional-accounts.json; admin rights are never granted.
+function diagnoseGoogleTeacher({ workspaceId, role, email, uid, displayName, have }) {
+  const mail = String(email).trim().toLowerCase();
+  const me = { ...role, email: mail, displayName: displayName || 'Staging Google tester' };
+  const r = diagnose({ workspaceId, role: me, uid, have });
+  const invitePath = 'b3Games/workspaces/' + workspaceId + '/teacherInvites/' + inviteIdFor(mail), inv = have.invite;
+  if (!inv) {
+    r.problems.push('No teacher invitation for ' + mail + ' (a fallback the site also checks).');
+    r.patch[invitePath] = { email: mail, name: me.displayName, active: true, classIds: { [role.classId]: true } };
+  } else {
+    if (inv.active === false) { r.problems.push('The teacher invitation for ' + mail + ' is switched off.'); r.patch[invitePath + '/active'] = true; }
+    if (!inv.classIds || inv.classIds[role.classId] !== true) { r.problems.push('The teacher invitation does not list ' + role.classId + '.'); r.patch[invitePath + '/classIds/' + role.classId] = true; }
+  }
+  return r;
+}
+
 // On Windows gcloud is gcloud.cmd, which Node cannot start without a shell (that is the "spawnSync gcloud ENOENT" error).
 // The arguments below are fixed strings, never user input, so using a shell there is safe.
 const spawnOptions = platform => ({ encoding: 'utf8', shell: platform === 'win32', windowsHide: true });
@@ -80,18 +116,27 @@ async function main() {
   const apply = process.argv.includes('--apply');
   const fixture = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
   const emailArg = process.argv.find(a => a.startsWith('--teacher='));
-  const email = emailArg ? emailArg.slice(10) : 'teacher.alef@funtorahtools-staging.test';
-  const role = fixture.roles.find(r => r.email === email);
+  const googleArg = process.argv.find(a => a.startsWith('--google-teacher='));
+  if (googleArg && emailArg) throw new Error('Use either --teacher= or --google-teacher=, not both.');
+  const googleEmail = googleArg ? googleArg.slice('--google-teacher='.length).trim().toLowerCase() : null;
+  // Check the address is well formed and not a fictional one before anything is contacted.
+  if (googleEmail !== null) checkGoogleTeacher(googleEmail, { emailVerified: true, providerUserInfo: [{ providerId: 'google.com' }] });
+  const email = googleEmail ? googleEmail : (emailArg ? emailArg.slice(10) : 'teacher.alef@funtorahtools-staging.test');
+  // Your Google account is attached to the fictional Alef class: the fixture teacher record supplies the class and students.
+  const role = fixture.roles.find(r => r.email === (googleEmail ? 'teacher.alef@funtorahtools-staging.test' : email));
   if (!role || role.role !== 'teacher') throw new Error('Not a fictional staging teacher: ' + email);
   const token = gcloudToken();
   const headers = { Authorization: 'Bearer ' + token, 'x-goog-user-project': PROJECT };
   const lookup = await (await fetch('https://identitytoolkit.googleapis.com/v1/projects/' + PROJECT + '/accounts:lookup', {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: [email] })
   })).json();
-  const user = (lookup.users || []).find(u => u.email === email);
-  if (!user) throw new Error('No Auth account for ' + email + ' on staging. Run staging/provision-fictional-accounts.ps1 first.');
-  let claims = null; try { claims = JSON.parse(user.customAttributes || 'null'); } catch { /* none */ }
-  if (!claims || claims.b3StagingAccount !== true) throw new Error('That account is not a staging fixture account; refusing.');
+  const user = (lookup.users || []).find(u => String(u.email || '').toLowerCase() === email.toLowerCase());
+  if (googleEmail) checkGoogleTeacher(googleEmail, user);
+  else {
+    if (!user) throw new Error('No Auth account for ' + email + ' on staging. Run staging/provision-fictional-accounts.ps1 first.');
+    let claims = null; try { claims = JSON.parse(user.customAttributes || 'null'); } catch { /* none */ }
+    if (!claims || claims.b3StagingAccount !== true) throw new Error('That account is not a staging fixture account; refusing.');
+  }
   const uid = user.localId;
   const get = async p => { const r = await fetch(DB + '/' + p + '.json', { headers }); if (!r.ok) throw new Error('Read ' + p + ' failed: HTTP ' + r.status); return r.json(); };
   const ws = fixture.workspaceId, students = role.students = fixture.students.filter(s => s.classId === role.classId);
@@ -101,8 +146,11 @@ async function main() {
     have.students[s.id] = { profile: rec && rec.profile, membership: rec && rec.memberships && rec.memberships[ws + '_' + role.classId] };
     have.passcodes[s.id] = (await get('b3Private/passcodes/' + s.id + '/updatedAt')) != null;
   }
-  const { problems, patch } = diagnose({ workspaceId: ws, role, uid, have });
-  console.log('Staging project: ' + PROJECT + '   Teacher: ' + email + '   Class: ' + role.classId);
+  if (googleEmail) have.invite = await get('b3Games/workspaces/' + ws + '/teacherInvites/' + inviteIdFor(googleEmail));
+  const { problems, patch } = googleEmail
+    ? diagnoseGoogleTeacher({ workspaceId: ws, role, email: googleEmail, uid, displayName: user.displayName, have })
+    : diagnose({ workspaceId: ws, role, uid, have });
+  console.log('Staging project: ' + PROJECT + '   Teacher: ' + email + (googleEmail ? ' (your Google account)' : '') + '   Class: ' + role.classId);
   if (!problems.length) { console.log('OK: everything the Class Pointer dashboard needs is present.'); return; }
   problems.forEach(p => console.log(' - ' + p));
   const paths = Object.keys(patch);
@@ -112,5 +160,5 @@ async function main() {
   console.log('\nAdded: ' + paths.join(', '));
 }
 
-module.exports = { diagnose, spawnOptions, PROJECT };
+module.exports = { diagnose, diagnoseGoogleTeacher, checkGoogleTeacher, inviteIdFor, spawnOptions, PROJECT };
 if (require.main === module) main().catch(e => { console.error('Error: ' + e.message); process.exit(1); });
