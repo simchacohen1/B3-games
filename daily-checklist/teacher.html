@@ -31,6 +31,9 @@ th.nm{background:#f3f7fa;z-index:2}
 td.y{color:#1a7f45;font-weight:900;font-size:18px}
 td.n{color:#c0392b;font-weight:900;font-size:18px}
 td.b{color:#9aa8b6}
+td.edit{cursor:pointer}
+td.edit:hover{background:#eef6ff}
+td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
 .star{color:#d92d20}
 .muted{color:#5d6b7a;font-size:13px}
 .erow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6}
@@ -77,8 +80,9 @@ td.b{color:#9aa8b6}
 
     <div class="panel">
       <p class="sum" id="summary"></p>
+      <p class="muted" id="markMsg" role="status" aria-live="polite" style="color:#b42318"></p>
       <div class="scroll"><table id="grid"></table></div>
-      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Column names are shown as they were on that day.</p>
+      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Click a cell to mark it for a student: blank → ✓ → ✗ → blank. It saves the way the student's own answer does. Column names are shown as they were on that day.</p>
     </div>
 
     <div class="panel">
@@ -92,19 +96,6 @@ td.b{color:#9aa8b6}
       </div>
       <p class="muted">Columns: Date, Student, then one column per item with Yes / No / blank. Opens correctly in Excel, including Hebrew. A range includes only days on which at least one student answered.</p>
     </div>
-
-    <div class="panel">
-      <h2>Edit checklist items <span class="muted">(for this class)</span></h2>
-      <p class="muted">Add, rename, reorder or remove items, and tick ⭐ to show the red star. Changes apply from the next time a student opens the checklist. Past answers and exports are not changed.</p>
-      <div id="editor"></div>
-      <div class="bar" style="border:0;padding:8px 0 0;margin:0">
-        <button class="alt" id="addItem" type="button">+ Add item</button>
-        <button id="saveItems" type="button">Save items</button>
-        <button class="alt" id="resetItems" type="button">Discard changes</button>
-        <span class="muted" id="editMsg"></span>
-      </div>
-      <div id="removed"></div>
-    </div>
   </div>
 </main>
 <script>
@@ -116,7 +107,6 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){retur
 var db=null,ws=(window.B3SiteSettings&&window.B3SiteSettings.workspaceId)||"b3-2026";
 var classes=[],classId="",roster=[];        // roster: [{id,name}]
 var configRaw=null;                           // stored config/items (or null = standard list)
-var editList=[];                              // working copy in the editor, includes removed
 var cache={};                                 // date -> answers object for the current class
 
 function base(){return C.basePath(ws,classId)}
@@ -126,8 +116,6 @@ function fail(msg){$("status").hidden=false;$("status").textContent=msg}
 async function loadConfig(){
   var snap=await db.ref(base()+"/config/items").once("value");
   configRaw=snap.val()||null;
-  editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});
-  drawEditor();
 }
 async function loadDay(d,force){
   if(!force&&cache[d])return cache[d];
@@ -161,11 +149,11 @@ function buildColumns(dayKeys){
   cfg.forEach(function(x){
     if(x.removed&&!seen[x.id])return;
     var s=seen[x.id];
-    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order});
+    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order,edit:!x.removed});   // only current items can be marked
   });
   Object.keys(seen).forEach(function(id){
     if(byId[id])return;                                    // answered items that are no longer in the config at all
-    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order});
+    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order,edit:false});
   });
   cols.sort(function(a,b){return a.order-b.order||(a.id<b.id?-1:1)});
   return cols;
@@ -177,21 +165,61 @@ function cellValue(day,sid,id){
 function sortedRoster(){return roster.slice().sort(function(a,b){return a.name.localeCompare(b.name)})}
 
 /* ---------- grid ---------- */
+var lastCols=[];
+function showSummary(d){
+  var day=cache[d]||{},people=sortedRoster();
+  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
+  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+}
 async function drawGrid(force){
   var d=$("day").value;if(!C.isDateKey(d))return;
   $("summary").textContent="Loading…";
   var day;
   try{day=await loadDay(d,force)}catch(e){console.error(e);$("summary").textContent="Could not load answers: "+(e.message||e);return}
   var cols=buildColumns([d]),people=sortedRoster();
-  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
-  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+  lastCols=cols;
+  showSummary(d);
   var h='<tr><th class="nm">Student</th>'+cols.map(function(c){return '<th dir="auto">'+esc(c.name)+(c.star?' <span class="star">⭐</span>':'')+'</th>'}).join("")+'</tr>';
   var rows=people.map(function(p){
     return '<tr><td class="nm">'+esc(p.name)+'</td>'+cols.map(function(c){var v=cellValue(day,p.id,c.id);
-      return v===1?'<td class="y" title="Yes">✓</td>':v===0?'<td class="n" title="No">✗</td>':'<td class="b"></td>'}).join("")+'</tr>';
+      var at=c.edit?' edit" tabindex="0" role="button" data-sid="'+esc(p.id)+'" data-iid="'+esc(c.id)+'" aria-label="'+esc(p.name+' — '+c.name)+'"':'"';
+      return v===1?'<td class="y'+at+' title="Yes">✓</td>':v===0?'<td class="n'+at+' title="No">✗</td>':'<td class="b'+at+'></td>'}).join("")+'</tr>';
   }).join("");
   $("grid").innerHTML=h+rows;
 }
+
+/* ---------- teacher marks a cell: blank -> ✓ -> ✗ -> blank, saved the way a student's answer is ---------- */
+var saving={};
+function paintCell(td,v){
+  td.className=(v===1?"y":v===0?"n":"b")+" edit";
+  td.textContent=v===1?"✓":v===0?"✗":"";
+  td.title=v===1?"Yes":v===0?"No":"";
+}
+async function markCell(td){
+  var d=$("day").value,sid=td.getAttribute("data-sid"),iid=td.getAttribute("data-iid");
+  var col=lastCols.filter(function(c){return c.id===iid})[0],person=roster.filter(function(r){return r.id===sid})[0];
+  if(!col||!col.edit||!person||!C.isDateKey(d)||saving[sid+"|"+iid])return;
+  saving[sid+"|"+iid]=1;
+  var day=cache[d]||(cache[d]={}),before=day[sid]?JSON.parse(JSON.stringify(day[sid])):null;
+  var prev=cellValue(day,sid,iid),v=C.nextMark(prev);
+  var rec=day[sid]||(day[sid]={name:person.name,items:{}});rec.items=rec.items||{};
+  if(v==null)delete rec.items[iid];else rec.items[iid]={v:v,n:col.name,s:col.star?1:0,o:col.order};
+  paintCell(td,v);showSummary(d);$("markMsg").textContent="";
+  try{
+    await db.ref(base()+"/answers/"+d+"/"+sid).update(C.markUpdate(col,v,person.name,firebase.database.ServerValue.TIMESTAMP));
+  }catch(e){
+    console.warn("Teacher mark failed",e);
+    if(before)day[sid]=before;else delete day[sid];
+    paintCell(td,prev);showSummary(d);
+    $("markMsg").textContent="Could not save that mark for "+person.name+". Check your internet and click it again.";
+  }
+  delete saving[sid+"|"+iid];
+}
+$("grid").addEventListener("click",function(e){var td=e.target.closest&&e.target.closest("td.edit");if(td)markCell(td)});
+$("grid").addEventListener("keydown",function(e){
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  var td=e.target.closest&&e.target.closest("td.edit");if(td){e.preventDefault();markCell(td)}
+});
 
 /* ---------- CSV ---------- */
 function csvCell(v){
@@ -234,67 +262,6 @@ $("exportRange").onclick=async function(){
   }catch(e){alert("Could not export: "+(e.message||e))}
 };
 
-/* ---------- item editor ---------- */
-function activeEdits(){return editList.filter(function(x){return !x.removed})}
-function drawEditor(){
-  var act=activeEdits();
-  $("editor").innerHTML=act.map(function(it,i){
-    return '<div class="erow" data-id="'+esc(it.id)+'"><input type="text" maxlength="80" dir="auto" value="'+esc(it.name)+'" aria-label="Item name">'+
-      '<label class="stars"><input type="checkbox" '+(it.star?'checked':'')+'> <span class="star">⭐</span> star</label>'+
-      '<span class="btns"><button class="alt" data-act="up" '+(i===0?'disabled':'')+' title="Move up">↑</button><button class="alt" data-act="down" '+(i===act.length-1?'disabled':'')+' title="Move down">↓</button></span>'+
-      '<button class="danger" data-act="remove">Remove</button></div>';
-  }).join("")||'<p class="muted">No items. Add one below.</p>';
-  var gone=editList.filter(function(x){return x.removed});
-  $("removed").innerHTML=gone.length?'<p class="muted" style="margin-top:12px">Removed items (still kept in past answers): '+gone.map(function(x){return '<span dir="auto">'+esc(x.name)+'</span> <button class="alt" data-restore="'+esc(x.id)+'">Restore</button>'}).join(" &nbsp; ")+'</p>':"";
-}
-function syncFromDom(){
-  document.querySelectorAll("#editor .erow").forEach(function(row){
-    var it=editList.find(function(x){return x.id===row.dataset.id});if(!it)return;
-    it.name=row.querySelector("input[type=text]").value;it.star=row.querySelector("input[type=checkbox]").checked;
-  });
-}
-$("editor").onclick=function(e){
-  var b=e.target.closest("button[data-act]");if(!b)return;
-  syncFromDom();
-  var id=b.closest(".erow").dataset.id,act=activeEdits(),i=act.findIndex(function(x){return x.id===id}),a=b.dataset.act;
-  if(a==="remove"){
-    if(!confirm('Remove "'+act[i].name+'"? Students will no longer see it. Past answers and exports are kept.'))return;
-    act[i].removed=true;
-  }else{
-    var j=a==="up"?i-1:i+1;if(j<0||j>=act.length)return;
-    var ia=editList.indexOf(act[i]),ib=editList.indexOf(act[j]);var t=editList[ia];editList[ia]=editList[ib];editList[ib]=t;
-  }
-  drawEditor();
-};
-$("removed").onclick=function(e){
-  var b=e.target.closest("button[data-restore]");if(!b)return;
-  syncFromDom();var it=editList.find(function(x){return x.id===b.dataset.restore});if(it){it.removed=false;editList.splice(editList.indexOf(it),1);editList.push(it)}drawEditor();
-};
-$("addItem").onclick=function(){syncFromDom();editList.push({id:C.newItemId(),name:"",star:false,order:editList.length,removed:false});drawEditor();
-  var ins=document.querySelectorAll("#editor .erow input[type=text]");if(ins.length)ins[ins.length-1].focus()};
-$("resetItems").onclick=function(){editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});drawEditor();$("editMsg").textContent=""};
-$("saveItems").onclick=async function(){
-  syncFromDom();
-  var names={},out={},n=0;
-  for(var i=0;i<editList.length;i++){
-    var it=editList[i];it.name=String(it.name||"").trim();
-    if(it.removed&&!it.name)continue;                              // blank, never saved: drop
-    if(!it.removed){
-      if(!it.name){alert("Every item needs a name. Fill in or remove the empty one.");return}
-      var k=it.name.toLowerCase();if(names[k]){alert('There are two items named "'+it.name+'". Please make them different.');return}names[k]=1;
-    }
-    out[it.id]={name:it.name,star:!!it.star,order:n++,removed:!!it.removed};
-  }
-  if(!Object.keys(out).some(function(id){return !out[id].removed})&&!confirm("There will be no active items, so students will see an empty checklist. Save anyway?"))return;
-  $("saveItems").disabled=true;$("editMsg").textContent="Saving…";
-  try{
-    await db.ref(base()+"/config/items").set(out);
-    configRaw=out;editList=C.itemsFromConfig(configRaw,true).map(function(x){return Object.assign({},x)});
-    drawEditor();$("editMsg").textContent="✓ Saved";drawGrid(false);
-  }catch(e){console.error(e);$("editMsg").textContent="Could not save: "+(e.message||e)}
-  $("saveItems").disabled=false;
-};
-
 /* ---------- Sync to Mashpia (runs on the teacher's own Mashpia tab; no password stored) ---------- */
 (function(){
   var M=window.B3MashpiaSync,Core=window.B3MashpiaCore;
@@ -304,6 +271,14 @@ $("saveItems").onclick=async function(){
   Promise.all([fetch("mashpia-core.js",{cache:"no-store"}).then(function(r){return r.text()}),fetch("mashpia-agent.js",{cache:"no-store"}).then(function(r){return r.text()})])
     .then(function(t){link.setAttribute("href",M.bookmarkletHref(t[0],t[1]))}).catch(function(){$("mashpiaSetup").hidden=true});
   var pre=null;
+  /* Mashpia is the source of this class's checklist items: every sync copies the grid's columns (names, order, red stars).
+     Past answers keep the names they had that day; classes that never synced keep their current items. */
+  async function applyMashpiaItems(cls,items){
+    var next=Core.mergeItems(configRaw,items,C.DEFAULT_ITEMS);
+    if(!next||cls!==classId)return false;
+    await db.ref(C.basePath(ws,cls)+"/config/items").set(next);
+    configRaw=next;await drawGrid(false);return true;
+  }
   var env={
     open:function(){return pre},
     listen:function(fn){window.addEventListener("message",fn);return function(){window.removeEventListener("message",fn)}},
@@ -321,10 +296,15 @@ $("saveItems").onclick=async function(){
     try{
       var d=$("day").value;
       var answers=await loadDay(d,true);
-      var students=Core.buildStudents(answers,roster);
-      if(!students.length){try{if(pre&&pre.location.href==="about:blank")pre.close()}catch(e){}}
+      var students=Core.buildStudents(answers,roster),cls=classId;
       var res=await M.run(env,d,students);
-      msg.textContent=res.message;
+      if(!res.ok){msg.textContent=res.message;btn.disabled=false;return}
+      var changed=false,itemsFailed=false;
+      try{changed=await applyMashpiaItems(cls,res.items)}catch(e){console.error(e);itemsFailed=true}
+      var stale=!res.items;   /* an older copy of the bookmark does not send the items: ask for the new one */
+      if(stale)$("mashpiaSetup").open=true;
+      var extra=stale?" To get Mashpia's checklist items, drag the new B3 Mashpia Sync button to your bookmarks bar again (setup below).":itemsFailed?" Could not update the checklist items.":changed?" Checklist items updated from Mashpia.":"";
+      msg.textContent=students.length?res.message+extra:(stale||itemsFailed?extra.trim():changed?"Checklist items updated from Mashpia. No answers to send yet.":"Checklist items already match Mashpia. No answers to send yet.");
     }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
     btn.disabled=false;
   };
