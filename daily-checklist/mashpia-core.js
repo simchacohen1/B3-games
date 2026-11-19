@@ -4,7 +4,9 @@
 
    Mashpia grid (captured from the real site): POST /api/missions/grid?action=get {type:"daily", date:<Julian day>}
    -> {data:{missions:[{grid_id,cat,disabled}], soldiers:[{user_id,name,registered,absent,marks:{grid_id:{done_qty}}}]}}.
-   Safety rules: only checked marks are ever sent (never unchecks); cells already checked are skipped; greyed-out soldiers
+   Three states per cell: check (Yes), X (No) and blank. Check is sent as a check. X replaces a check (sent as an uncheck, only for
+   cells Mashpia shows checked). Blank means no change: it never overrides anything, and a check already in Mashpia is pulled
+   into a blank cell on this side. Safety rules: cells already in the wanted state are skipped; greyed-out soldiers
    (not registered, or absent that day) are skipped; only missions Mashpia shows as available (disabled == 0) match;
    ambiguous names are never guessed. */
 (function (root) {
@@ -30,12 +32,14 @@
     return norm(text).split(' ').filter(Boolean).sort().join(' ');
   }
 
-  /* students: [{name, items:[names answered Yes]}] ->
-     {sends:{grid_id:[user_id]}, synced:[{name,userId}], notFound:[name], greyed:[name], missingItems:[name]} */
+  /* students: [{name, items:[names answered Yes], no:[names answered No]}] ->
+     {sends:{grid_id:[user_id]}, clears:{grid_id:[user_id]}, pulls:[{name,items:[names]}], synced:[{name,userId}],
+      notFound:[name], greyed:[name], missingItems:[name]}
+     sends = checks to add in Mashpia; clears = checks to remove (the student's X); pulls = checks Mashpia has where this side is blank. */
   function plan(grid, students) {
-    var missions = {}, byName = {}, out = { sends: {}, synced: [], notFound: [], greyed: [], missingItems: [] }, missing = {};
+    var missions = {}, byName = {}, out = { sends: {}, clears: {}, pulls: [], synced: [], notFound: [], greyed: [], missingItems: [] }, missing = {}, gidName = {};
     (grid.missions || []).forEach(function (m) {
-      if (m && !m.disabled && typeof m.grid_id === 'number' && !(norm(m.cat) in missions)) missions[norm(m.cat)] = m.grid_id;
+      if (m && !m.disabled && typeof m.grid_id === 'number' && !(norm(m.cat) in missions)) { missions[norm(m.cat)] = m.grid_id; gidName[m.grid_id] = String(m.cat); }
     });
     (grid.soldiers || []).forEach(function (s) {
       if (s && typeof s.user_id === 'number') (byName[nameKey(s.name)] = byName[nameKey(s.name)] || []).push(s);
@@ -45,30 +49,41 @@
       if (hit.length !== 1) { out.notFound.push(label); return; }
       var sol = hit[0];
       if (sol.registered === false || sol.absent) { out.greyed.push(label); return; }
-      var marks = sol.marks && typeof sol.marks === 'object' ? sol.marks : {};
+      var marks = sol.marks && typeof sol.marks === 'object' ? sol.marks : {}, known = {}, pull = [];
+      function isDone(gid) { var d = marks[String(gid)]; return !!(d && (d.done_qty || 0) >= 1); }
+      (st.no || []).forEach(function (item) {
+        var gid = missions[norm(item)];
+        if (gid === undefined) { missing[String(item)] = 1; return; }
+        known[gid] = 1;
+        if (isDone(gid)) (out.clears[gid] = out.clears[gid] || []).push(sol.user_id);
+      });
       (st.items || []).forEach(function (item) {
         var gid = missions[norm(item)];
         if (gid === undefined) { missing[String(item)] = 1; return; }
-        var done = marks[String(gid)];
-        if (done && (done.done_qty || 0) >= 1) return;
+        known[gid] = 1;
+        if (isDone(gid)) return;
         (out.sends[gid] = out.sends[gid] || []).push(sol.user_id);
       });
-      out.synced.push({ name: label, userId: sol.user_id });
+      Object.keys(marks).forEach(function (gid) { if (!known[gid] && gidName[gid] !== undefined && isDone(gid)) pull.push(gidName[gid]); });
+      if (pull.length) out.pulls.push({ name: label, items: pull });
+      if ((st.items || []).length || (st.no || []).length) out.synced.push({ name: label, userId: sol.user_id });
     });
     out.missingItems = Object.keys(missing).sort();
     return out;
   }
 
-  /* Yes answers of the students who answered that day -> [{name, items:[item names]}] */
+  /* Every roster student -> [{name, items:[Yes item names], no:[No item names]}]. Students with no answers are included (both
+     lists empty) so a check made in Mashpia can still be pulled into their blank cells. */
   function buildStudents(dayAnswers, roster) {
     var out = [];
     (roster || []).forEach(function (st) {
-      var a = dayAnswers && dayAnswers[st.id];
-      if (!a || !a.items || !Object.keys(a.items).length) return;
-      var yes = Object.keys(a.items).filter(function (id) { return a.items[id] && a.items[id].v === 1; })
-        .sort(function (x, y) { return (a.items[x].o || 0) - (a.items[y].o || 0); })
-        .map(function (id) { return String(a.items[id].n || id); });
-      out.push({ name: st.name, items: yes });
+      var a = dayAnswers && dayAnswers[st.id], its = (a && a.items) || {};
+      function pick(v) {
+        return Object.keys(its).filter(function (id) { return its[id] && its[id].v === v; })
+          .sort(function (x, y) { return (its[x].o || 0) - (its[y].o || 0); })
+          .map(function (id) { return String(its[id].n || id); });
+      }
+      out.push({ name: st.name, items: pick(1), no: pick(0) });
     });
     return out;
   }
@@ -123,6 +138,7 @@
     var nf = r.notFound || [], line = 'Synced ' + r.synced + (nf.length ? '' : r.synced === 1 ? ' student' : ' students');
     if (nf.length) line += ", couldn't find: " + nf.join(', ');
     if (r.greyed && r.greyed.length) line += ' (skipped greyed out: ' + r.greyed.join(', ') + ')';
+    if (r.cleared) line += ' (removed ' + r.cleared + ' check' + (r.cleared === 1 ? '' : 's') + ' for X)';
     if (r.missingItems && r.missingItems.length) line += ' (not in Mashpia: ' + r.missingItems.join(', ') + ')';
     return line;
   }

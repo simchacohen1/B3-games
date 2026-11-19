@@ -1,7 +1,7 @@
 /* Runs ON the Mashpia tab (inlined into the "B3 Mashpia Sync" bookmark, after mashpia-core.js).
    It waits for the Daily Checklist page (the tab that opened this one) to send the day's Yes answers, then checks the
    matching boxes in Mashpia with the teacher's own Mashpia session. No password is ever seen or stored.
-   Only B3 pages may talk to it. It only ever sends checked marks (mark "1"), never unchecks. Block comments only. */
+   Only B3 pages may talk to it. It sends a check (mark "1") for a Yes and removes a check (mark "0") only for an explicit No (X); blank never changes anything. Block comments only. */
 (function () {
   'use strict';
   var ALLOWED = ['https://fun-torah-tools-staging.web.app', 'https://funtorahtools.com', 'https://www.funtorahtools.com',
@@ -39,7 +39,8 @@
     if (!jdn) return Promise.reject({ code: 'bad', message: 'Invalid date.' });
     var students = Array.isArray(msg.students) ? msg.students.slice(0, 300).map(function (s) {
       return { name: String((s && s.name) || '').slice(0, 120),
-        items: (Array.isArray(s && s.items) ? s.items : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60) };
+        items: (Array.isArray(s && s.items) ? s.items : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60),
+        no: (Array.isArray(s && s.no) ? s.no : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60) };
     }) : [];
     return post('/api/missions/grid?action=get', { type: 'daily', date: jdn }).then(function (g) {
       var data = g.body && g.body.success === true ? g.body.data : null;
@@ -48,17 +49,21 @@
       }
       var items = Core.itemsFromMashpia(data.missions);   /* Mashpia is the source of the checklist items */
       var p = Core.plan(data, students), failed = {}, gids = Object.keys(p.sends);
-      return gids.reduce(function (chain, gid) {
+      var jobs = [];
+      gids.forEach(function (gid) { jobs.push({ gid: gid, ids: p.sends[gid], mark: '1' }); });
+      Object.keys(p.clears).forEach(function (gid) { jobs.push({ gid: gid, ids: p.clears[gid], mark: '0' }); });
+      var cleared = 0;
+      return jobs.reduce(function (chain, j) {
         return chain.then(function () {
-          return post('/api/missions/mark', { user_ids: p.sends[gid], grid_id: +gid, dates: [jdn], mark: '1' }).then(function (r) {
+          return post('/api/missions/mark', { user_ids: j.ids, grid_id: +j.gid, dates: [jdn], mark: j.mark }).then(function (r) {
             var ok = r.body && r.body.success === true && r.body.data && typeof r.body.data === 'object' ? r.body.data : {};
-            p.sends[gid].forEach(function (id) { if (!(String(id) in ok)) failed[id] = 1; });
+            j.ids.forEach(function (id) { if (!(String(id) in ok)) failed[id] = 1; else if (j.mark === '0') cleared++; });
           });
         });
       }, Promise.resolve()).then(function () {
         var good = [], bad = p.notFound.slice();
         p.synced.forEach(function (s) { (failed[s.userId] ? bad : good).push(s.name); });
-        return { synced: good.length, notFound: bad, greyed: p.greyed, missingItems: p.missingItems, items: items };
+        return { synced: good.length, notFound: bad, greyed: p.greyed, missingItems: p.missingItems, items: items, pulls: p.pulls, cleared: cleared };
       });
     });
   }
