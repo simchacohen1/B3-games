@@ -37,7 +37,7 @@ async function studentFixture({persistent=false,openWindow=()=>({closed:false}),
   const db={ref:p=>({on:(_e,cb)=>{if(p.includes('/classPointerSessions'))listener=cb},off(){}})};
   const firebase={apps:[{}],database:()=>db};
   const location={href:'https://funtorahtools.com/shorashim/index.html'+(persistent?'?pointerShare=1':''),pathname:'/shorashim/index.html'};
-  const peerCalls=[],peers=[],opened=[];
+  const peerCalls=[],peers=[],opened=[],windowListeners={};
   class FakePeer extends EventEmitter{
     constructor(id){super();this.id=id;this.destroyed=false;peers.push(this)}
     once(event,callback){if(event==='open')callback();else super.once(event,callback);return this}
@@ -49,7 +49,9 @@ async function studentFixture({persistent=false,openWindow=()=>({closed:false}),
   }
   const window={firebase,B3_FIREBASE_CONFIG:{},Peer:FakePeer,
     FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})},
-    open(...args){opened.push(args);return openWindow(...args)},close(){closed=true},addEventListener(){}};
+    open(...args){opened.push(args);return openWindow(...args)},close(){closed=true},
+    // Recorded so a test can unload the page (a refresh or a move to another page) and see what the page does then.
+    addEventListener(type,fn){(windowListeners[type]=windowListeners[type]||[]).push(fn)}};
   const track={stop(){stopCount++},addEventListener(){}};
   const navigator={mediaDevices:{getDisplayMedia(){captureCount++;return Promise.resolve({active:true,getTracks:()=>[track],getVideoTracks:()=>[track]})}}};
   async function fetch(url,options){
@@ -71,6 +73,8 @@ async function studentFixture({persistent=false,openWindow=()=>({closed:false}),
   let revision=1;
   const row=(extra={})=>({roomId:room,createdAt:Date.now(),studentScreenSharing:true,permissionRevision:revision,destinationRequest:{mode:'screens',at:revision},...extra});
   return{control,holder,shareButton,label,headline,peerCalls,peers,opened,
+    // The page is leaving (refresh, another page, closed tab): the browser fires pagehide.
+    unload(){for(const fn of windowListeners.pagehide||[])fn({})},
     // The teacher's lesson record changed (a new permissionRevision each time, like every teacher action).
     emit:async(extra={})=>{revision++;await listener({val:()=>({[room]:row(extra)})})},
     // The same record again, unchanged apart from the extra fields.
@@ -233,6 +237,30 @@ test('another student signing in on the same computer ends and closes the first 
   await tick(250);
   assert.equal(tab.stopCount,1,'his screen is never shown under the first student\'s name');
   assert.equal(tab.closed,true);
+});
+
+// A student's share lives in the sharing tab, so refreshing (or leaving) the page he is working in must not touch it.
+test('a refresh of the main site page leaves the share running in the sharing tab, and the new page shows it',async()=>{
+  const BroadcastChannel=fakeBus();
+  const tab=await studentFixture({persistent:true,BroadcastChannel});
+  await tab.emit();await tick(50);
+  assert.equal(tab.peerCalls.length,1,'the sharing tab is sharing');
+  const page=await studentFixture({BroadcastChannel});
+  await page.emit();await tick(80);
+  assert.equal(page.shareButton.textContent,'⏹ Stop Sharing','his working page knows he is sharing');
+  // He refreshes the page he is working in (and again, and moves to another page).
+  for(let i=0;i<3;i++){
+    page.unload();
+    const next=await studentFixture({BroadcastChannel});
+    await next.emit();await tick(120);
+    assert.equal(tab.stopCount,0,'refresh '+(i+1)+': the capture is never stopped');
+    assert.equal(tab.peerCalls[0].closed,false,'refresh '+(i+1)+': the call to the teacher stays up');
+    assert.equal(tab.closed,false,'refresh '+(i+1)+': the sharing tab stays open');
+    assert.equal(tab.peerCalls.length,1,'refresh '+(i+1)+': no new call is needed');
+    assert.equal(next.shareButton.textContent,'⏹ Stop Sharing','refresh '+(i+1)+': the new page shows that he is still sharing');
+    next.unload();
+  }
+  assert.equal(tab.captureCount,1,'he never had to choose his screen again');
 });
 
 // ---------- Teacher side (activity-screen-teacher.js) ----------
