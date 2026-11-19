@@ -16,7 +16,7 @@ function grid() {
   const cats = [[22001, 'Daily Tzedaka', 0], [22002, 'Shacharis', 0], [22004, 'Mincha', 0], [16006, "Rebbe's Kapitel", 0],
     [11014, 'Listen to Parents', 1], [13002, 'נעגל וואסער', 0]];
   return {
-    missions: cats.map(([grid_id, cat, disabled]) => ({ grid_id, cat, disabled })),
+    missions: cats.map(([grid_id, cat, disabled]) => ({ grid_id, cat, disabled, mandatory_qty: grid_id === 22002 ? 1 : 0 })),
     soldiers: [
       { user_id: 1, name: 'Arik Fake', registered: true, absent: false, marks: {} },
       { user_id: 2, name: 'Moshe Fake', registered: true, absent: false, marks: { 22002: { done_qty: 1 } } },
@@ -58,6 +58,36 @@ test('only Yes answers of students who answered', () => {
 test('one short line', () => {
   assert.equal(Core.summary({ synced: 10, notFound: [], greyed: [], missingItems: [] }), 'Synced 10 students');
   assert.equal(Core.summary({ synced: 9, notFound: ['Moshe Fake'], greyed: [], missingItems: [] }), "Synced 9, couldn't find: Moshe Fake");
+});
+
+/* ---------- Mashpia is the source of the checklist items ---------- */
+const DEFAULTS = [{ id: 'tzedaka', name: 'Daily Tzedaka', star: false }, { id: 'shacharis', name: 'Shacharis', star: true }, { id: 'mincha', name: 'Mincha', star: false }];
+
+test('items come from the grid: available missions only, grid order, red star = mandatory', () => {
+  assert.deepEqual(Core.itemsFromMashpia(grid().missions), [
+    { name: 'Daily Tzedaka', star: false, gridId: 22001 }, { name: 'Shacharis', star: true, gridId: 22002 },
+    { name: 'Mincha', star: false, gridId: 22004 }, { name: "Rebbe's Kapitel", star: false, gridId: 16006 },
+    { name: 'נעגל וואסער', star: false, gridId: 13002 }]);
+  assert.deepEqual(Core.itemsFromMashpia([{ grid_id: 1, cat: ' A ', disabled: 0 }, { grid_id: 2, cat: 'a', disabled: 0 }, { grid_id: 3, cat: '', disabled: 0 }]).map(i => i.name), ['A']);
+});
+
+test('merge: never-synced class (null config) keeps ids of matching defaults, so old answers stay joined', () => {
+  const next = Core.mergeItems(null, [{ name: 'Shacharis', star: true, gridId: 22002 }, { name: 'Daily Tzedaka', star: false, gridId: 22001 }, { name: 'New Thing', star: true, gridId: 77 }], DEFAULTS);
+  assert.deepEqual(next, {
+    shacharis: { name: 'Shacharis', star: true, order: 0, removed: false },
+    tzedaka: { name: 'Daily Tzedaka', star: false, order: 1, removed: false },
+    m77: { name: 'New Thing', star: true, order: 2, removed: false },
+    mincha: { name: 'Mincha', star: false, order: 2, removed: true }   /* no longer in Mashpia: kept (hidden) so past answers keep their name */
+  });
+});
+
+test('merge: identical to what is saved changes nothing; a star or order change does; removed items come back by name', () => {
+  const same = Core.mergeItems(null, [{ name: 'Daily Tzedaka', star: false, gridId: 1 }, { name: 'Shacharis', star: true, gridId: 2 }, { name: 'Mincha', star: false, gridId: 3 }], DEFAULTS);
+  assert.equal(same, null);
+  const saved = { a: { name: 'Mincha', star: false, order: 0, removed: false }, b: { name: 'Old', star: false, order: 1, removed: true } };
+  assert.equal(Core.mergeItems(saved, [{ name: 'mincha', star: false, gridId: 3 }, { name: 'Old', star: false, gridId: 9 }], DEFAULTS).b.removed, false);
+  assert.equal(Core.mergeItems(saved, [{ name: 'Mincha', star: true, gridId: 3 }], DEFAULTS).a.star, true);
+  assert.equal(Core.mergeItems(saved, [], DEFAULTS), null);   /* never wipes the list */
 });
 
 /* ---------- the script that runs on the Mashpia tab ---------- */
@@ -111,6 +141,15 @@ test('agent: accepts the live sols.tools sites', async () => {
   }
 });
 
+test('agent: every sync also sends the Mashpia items; with no students it only reads them and marks nothing', async () => {
+  const t = mashpiaTab();
+  await t.send({ b3: 'mashpia-sync', id: 'i1', date: '2026-11-18', students: [] });
+  const res = t.replies.find(([m]) => m.b3 === 'mashpia-result')[0];
+  assert.equal(res.ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(res.result.items.map(i => [i.name, i.star]))), [['Daily Tzedaka', false], ['Shacharis', true], ['Mincha', false], ["Rebbe's Kapitel", false], ['נעגל וואסער', false]]);
+  assert.equal(t.calls.filter(c => c.url.includes('/mark')).length, 0);
+});
+
 test('agent: ignores other websites', async () => {
   const t = mashpiaTab({ origin: 'https://evil.example.com' });
   await t.send({ b3: 'mashpia-sync', id: 'x', date: '2026-11-18', students: STUDENTS });
@@ -161,7 +200,7 @@ test('page: tab already set up -> one click, result line', async () => {
   const m = syncs(w)[0];
   assert.deepEqual([m[1], m[0].date, m[0].students.length], ['https://mashpia.com', '2026-11-18', 2]);
   e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 2, notFound: [], greyed: [], missingItems: [] } });
-  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students' });
+  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students', items: null });   /* null = an older bookmark that sends no items */
   assert.equal(e.setup, 0);
   assert.equal(w.location.href, 'about:blank');   /* an existing tab is never reloaded */
 });
@@ -201,7 +240,6 @@ test('page: ignores other sites and other runs; explains popup block; nothing to
   e.advance(90000);
   assert.match((await p).message, /did not answer/);
   assert.match((await Sync.run({ open: () => null }, 'd', STUDENTS)).message, /pop-ups/);
-  assert.match((await Sync.run(e, 'd', [])).message, /No student has answered/);
 });
 
 test('bookmark text is self-contained and parses', () => {
@@ -210,6 +248,22 @@ test('bookmark text is self-contained and parses', () => {
   assert.doesNotThrow(() => new Function(decodeURIComponent(href.slice('javascript:'.length))));
   assert.ok(href.length < 30000, 'bookmark is ' + href.length + ' chars');
   assert.doesNotMatch(coreText + agentText, /^\s*\/\/ /m);
+});
+
+test('page: an items-only sync (no answers yet) still runs and returns the items', async () => {
+  const w = fakeWin(), e = fakeEnv(w);
+  const p = Sync.run(e, '2026-11-18', []);
+  e.fire({ b3: 'mashpia-pong' });
+  assert.deepEqual(syncs(w)[0][0].students, []);
+  e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 0, notFound: [], greyed: [], missingItems: [], items: [{ name: 'Mincha', star: false, gridId: 1 }] } });
+  assert.deepEqual((await p).items, [{ name: 'Mincha', star: false, gridId: 1 }]);
+});
+
+test('teacher page: the item editor is gone and items come from Mashpia', () => {
+  const html = fs.readFileSync(path.join(dir, 'teacher.html'), 'utf8');
+  assert.doesNotMatch(html, /Edit checklist items|id="saveItems"|id="addItem"|drawEditor|editList/);
+  assert.match(html, /applyMashpiaItems/);
+  assert.match(html, /Core\.mergeItems\(configRaw,items,C\.DEFAULT_ITEMS\)/);
 });
 
 test('teacher page: one button, one-time setup panel, no password fields, no server', () => {

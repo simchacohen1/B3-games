@@ -32,5 +32,13 @@
   }
   function newItemId(){return "i"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
   function basePath(ws,classId){return "b3Games/workspaces/"+ws+"/classes/"+classId+"/resources/daily-checklist"}
-  window.B3DailyChecklist={DEFAULT_ITEMS:DEFAULT_ITEMS,schoolDate:schoolDate,isDateKey:isDateKey,itemsFromConfig:itemsFromConfig,newItemId:newItemId,basePath:basePath};
+  // Teacher marking a cell: blank -> yes (1) -> no (0) -> blank (null).
+  function nextMark(v){return v===1?0:(v===0?null:1)}
+  // The Firebase update for one cell. Same shape a student's own answer saves; null (blank) removes that item's answer.
+  function markUpdate(item,v,studentName,ts){
+    var u={name:studentName,t:ts};
+    u["items/"+item.id]=(v===1||v===0)?{v:v,n:item.name,s:item.star?1:0,o:item.order}:null;
+    return u;
+  }
+  window.B3DailyChecklist={DEFAULT_ITEMS:DEFAULT_ITEMS,schoolDate:schoolDate,isDateKey:isDateKey,itemsFromConfig:itemsFromConfig,newItemId:newItemId,basePath:basePath,nextMark:nextMark,markUpdate:markUpdate};
 })();
