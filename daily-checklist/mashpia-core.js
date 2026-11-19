@@ -32,22 +32,38 @@
     return norm(text).split(' ').filter(Boolean).sort().join(' ');
   }
 
+  /* Common spellings of the same first name count as equal when matching loosely. */
+  var SPELLINGS = { shalom: 'sholom', sholem: 'sholom', sholom: 'sholom', shulem: 'sholom', ber: 'berel', berel: 'berel', beryl: 'berel',
+    moshe: 'moshe', moishe: 'moshe', moische: 'moshe', mosheh: 'moshe', moisha: 'moshe' };
+  function looseKey(text) {
+    return norm(text).split(' ').filter(Boolean).map(function (w) { return SPELLINGS[w] || w; }).sort().join(' ');
+  }
+
   /* students: [{name, items:[names answered Yes], no:[names answered No]}] ->
      {sends:{grid_id:[user_id]}, clears:{grid_id:[user_id]}, pulls:[{name,items:[names]}], synced:[{name,userId}],
-      notFound:[name], greyed:[name], missingItems:[name]}
+      notFound:[name], unmatched:[{id,name}], candidates:[Mashpia names nobody was matched to], greyed:[name], missingItems:[name]}
+     A student is found by (1) the Mashpia name the teacher saved for them (st.mashpiaName), (2) the exact name, (3) a loose name
+     (same words in any order, common spellings equal). A name that fits more than one soldier is never guessed.
      sends = checks to add in Mashpia; clears = checks to remove (the student's X); pulls = checks Mashpia has where this side is blank. */
   function plan(grid, students) {
-    var missions = {}, byName = {}, out = { sends: {}, clears: {}, pulls: [], synced: [], notFound: [], greyed: [], missingItems: [] }, missing = {}, gidName = {};
+    var missions = {}, byName = {}, byLoose = {}, used = {}, out = { sends: {}, clears: {}, pulls: [], synced: [], notFound: [], unmatched: [], candidates: [], greyed: [], missingItems: [] }, missing = {}, gidName = {};
     (grid.missions || []).forEach(function (m) {
       if (m && !m.disabled && typeof m.grid_id === 'number' && !(norm(m.cat) in missions)) { missions[norm(m.cat)] = m.grid_id; gidName[m.grid_id] = String(m.cat); }
     });
     (grid.soldiers || []).forEach(function (s) {
-      if (s && typeof s.user_id === 'number') (byName[nameKey(s.name)] = byName[nameKey(s.name)] || []).push(s);
+      if (s && typeof s.user_id === 'number') {
+        (byName[nameKey(s.name)] = byName[nameKey(s.name)] || []).push(s);
+        (byLoose[looseKey(s.name)] = byLoose[looseKey(s.name)] || []).push(s);
+      }
     });
     (students || []).forEach(function (st) {
-      var label = String((st && st.name) || '').trim(), hit = byName[nameKey(label)] || [];
-      if (hit.length !== 1) { out.notFound.push(label); return; }
+      var label = String((st && st.name) || '').trim(), saved = String((st && st.mashpiaName) || '').trim(), hit = [];
+      if (saved) hit = byName[nameKey(saved)] || [];
+      if (hit.length !== 1) hit = byName[nameKey(label)] || [];
+      if (hit.length !== 1) hit = byLoose[looseKey(label)] || [];
+      if (hit.length !== 1) { out.notFound.push(label); out.unmatched.push({ id: String((st && st.id) || ''), name: label }); return; }
       var sol = hit[0];
+      used[sol.user_id] = 1;
       if (sol.registered === false || sol.absent) { out.greyed.push(label); return; }
       var marks = sol.marks && typeof sol.marks === 'object' ? sol.marks : {}, known = {}, pull = [];
       function isDone(gid) { var d = marks[String(gid)]; return !!(d && (d.done_qty || 0) >= 1); }
@@ -69,21 +85,27 @@
       if ((st.items || []).length || (st.no || []).length) out.synced.push({ name: label, userId: sol.user_id });
     });
     out.missingItems = Object.keys(missing).sort();
+    (grid.soldiers || []).forEach(function (s) {
+      if (s && typeof s.user_id === 'number' && !used[s.user_id] && String(s.name || '').trim()) out.candidates.push(String(s.name).trim());
+    });
+    out.candidates.sort(function (a, b) { return a.localeCompare(b); });
     return out;
   }
 
-  /* Every roster student -> [{name, items:[Yes item names], no:[No item names]}]. Students with no answers are included (both
-     lists empty) so a check made in Mashpia can still be pulled into their blank cells. */
-  function buildStudents(dayAnswers, roster) {
+  /* Every roster student -> [{id, name, mashpiaName, items:[Yes item names], no:[No item names]}]. Students with no answers are
+     included (both lists empty) so a check made in Mashpia can still be pulled into their blank cells. Demo/test students
+     (st.demo) are left out entirely. mapping = {studentId: Mashpia name} saved by the teacher. */
+  function buildStudents(dayAnswers, roster, mapping) {
     var out = [];
     (roster || []).forEach(function (st) {
+      if (st.demo || /^demo_/.test(String(st.id || ''))) return;
       var a = dayAnswers && dayAnswers[st.id], its = (a && a.items) || {};
       function pick(v) {
         return Object.keys(its).filter(function (id) { return its[id] && its[id].v === v; })
           .sort(function (x, y) { return (its[x].o || 0) - (its[y].o || 0); })
           .map(function (id) { return String(its[id].n || id); });
       }
-      out.push({ name: st.name, items: pick(1), no: pick(0) });
+      out.push({ id: String(st.id || ''), name: st.name, mashpiaName: String((mapping && mapping[st.id]) || ''), items: pick(1), no: pick(0) });
     });
     return out;
   }
@@ -143,7 +165,7 @@
     return line;
   }
 
-  var api = { julianDay: julianDay, norm: norm, nameKey: nameKey, plan: plan, buildStudents: buildStudents, summary: summary,
+  var api = { julianDay: julianDay, norm: norm, nameKey: nameKey, looseKey: looseKey, plan: plan, buildStudents: buildStudents, summary: summary,
     itemsFromMashpia: itemsFromMashpia, mergeItems: mergeItems };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.B3MashpiaCore = api;

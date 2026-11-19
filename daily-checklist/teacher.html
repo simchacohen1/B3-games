@@ -69,6 +69,7 @@ td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
       <button class="alt" id="refresh" type="button">Refresh</button>
       <button id="mashpiaSync" type="button">Sync to Mashpia</button>
       <span id="mashpiaMsg" class="muted" role="status" aria-live="polite"></span>
+      <div id="mashpiaMatch" class="panel" hidden style="flex-basis:100%"></div>
     </div>
     <details id="mashpiaSetup" class="panel">
       <summary><b>Sync to Mashpia: one-time setup</b> <span class="muted">(about 20 seconds, once per computer)</span></summary>
@@ -271,6 +272,36 @@ $("exportRange").onclick=async function(){
   Promise.all([fetch("mashpia-core.js",{cache:"no-store"}).then(function(r){return r.text()}),fetch("mashpia-agent.js",{cache:"no-store"}).then(function(r){return r.text()})])
     .then(function(t){link.setAttribute("href",M.bookmarkletHref(t[0],t[1]))}).catch(function(){$("mashpiaSetup").hidden=true});
   var pre=null;
+  /* Fun Torah student id -> the exact Mashpia name the teacher picked once. Saved per class; later syncs use it automatically. */
+  async function loadNameMap(){
+    try{return (await db.ref(base()+"/mashpiaNames").once("value")).val()||{}}catch(e){console.warn("Could not read saved Mashpia names",e);return {}}
+  }
+  /* Students Mashpia could not match: each gets a dropdown of the Mashpia names nobody was matched to. */
+  function showMatchUp(cls,unmatched,candidates){
+    var box=$("mashpiaMatch");
+    if(cls!==classId||!unmatched||!unmatched.length||!candidates){box.hidden=true;box.innerHTML="";return}
+    box.innerHTML="<b>Match these students to their Mashpia names</b> <span class=\"muted\">(pick once; it is remembered for next time)</span>"+
+      unmatched.map(function(u,i){return "<div style=\"margin:6px 0\"><span style=\"display:inline-block;min-width:180px\">"+esc(u.name)+"</span> <select data-i=\""+i+"\" data-sid=\""+esc(u.id)+"\"></select></div>"}).join("")+
+      "<button type=\"button\" id=\"mashpiaMatchSave\">Save and sync again</button>";
+    var sels=[].slice.call(box.querySelectorAll("select"));
+    function fill(){
+      var taken={};sels.forEach(function(s){if(s.value)taken[s.value]=1});
+      sels.forEach(function(s){
+        var cur=s.value;
+        s.innerHTML="<option value=\"\">Not matched</option>"+candidates.filter(function(n){return n===cur||!taken[n]}).map(function(n){return "<option value=\""+esc(n)+"\""+(n===cur?" selected":"")+">"+esc(n)+"</option>"}).join("");
+      });
+    }
+    sels.forEach(function(s){s.onchange=fill});fill();box.hidden=false;
+    $("mashpiaMatchSave").onclick=async function(){
+      var pick=sels.filter(function(s){return s.value&&s.getAttribute("data-sid")});
+      if(!pick.length){$("mashpiaMsg").textContent="Pick a Mashpia name for at least one student, or leave them for now.";return}
+      try{
+        var upd={};pick.forEach(function(s){upd[s.getAttribute("data-sid")]=s.value});
+        await db.ref(C.basePath(ws,cls)+"/mashpiaNames").update(upd);
+      }catch(e){console.error(e);$("mashpiaMsg").textContent="Could not save the matches. Try again.";return}
+      $("mashpiaSync").click();
+    };
+  }
   /* Mashpia is the source of this class's checklist items: every sync copies the grid's columns (names, order, red stars).
      Past answers keep the names they had that day; classes that never synced keep their current items. */
   async function applyMashpiaItems(cls,items){
@@ -317,7 +348,9 @@ $("exportRange").onclick=async function(){
     try{
       var d=$("day").value;
       var answers=await loadDay(d,true);
-      var students=Core.buildStudents(answers,roster),cls=classId;
+      var mapping=await loadNameMap(),cls=classId;
+      var students=Core.buildStudents(answers,roster,mapping);   /* demo/test students are left out */
+      $("mashpiaMatch").hidden=true;
       var res=await M.run(env,d,students);
       if(!res.ok){msg.textContent=res.message;btn.disabled=false;return}
       var changed=false,itemsFailed=false;
@@ -325,10 +358,11 @@ $("exportRange").onclick=async function(){
       var pulled=0;
       try{pulled=await applyPulls(cls,d,res.pulls)}catch(e){console.error(e);res.message+=" Could not copy Mashpia's checks into the checklist."}
       if(pulled)res.message+=" Added "+pulled+" check"+(pulled===1?"":"s")+" from Mashpia.";
-      var stale=!res.items;   /* an older copy of the bookmark does not send the items: ask for the new one */
+      var stale=!res.items||!res.candidates;   /* an older copy of the bookmark does not send the items: ask for the new one */
       if(stale)$("mashpiaSetup").open=true;
       var extra=stale?" To get Mashpia's checklist items, drag the new B3 Mashpia Sync button to your bookmarks bar again (setup below).":itemsFailed?" Could not update the checklist items.":changed?" Checklist items updated from Mashpia.":"";
       var anyAnswer=students.some(function(s){return s.items.length||s.no.length});
+      showMatchUp(cls,res.unmatched,res.candidates);
       msg.textContent=anyAnswer||pulled?res.message+extra:(stale||itemsFailed?extra.trim():changed?"Checklist items updated from Mashpia. No answers to send yet.":"Checklist items already match Mashpia. No answers to send yet.");
     }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
     btn.disabled=false;
@@ -346,7 +380,7 @@ $("refresh").onclick=function(){cache={};loadConfig().then(function(){drawGrid(t
 async function selectClass(id){
   classId=id;cache={};
   var c=classes.find(function(x){return x.id===id});
-  roster=((c&&c.studentIds)||[]).map(function(sid,i){return {id:sid,name:String((c.students&&c.students[i])||sid)}});
+  roster=((c&&c.studentIds)||[]).map(function(sid,i){return {id:sid,name:String((c.students&&c.students[i])||sid),demo:!!(c.demo&&c.demo[i])}});
   try{await loadConfig();await drawGrid(true)}catch(e){console.error(e);fail("Could not load this class: "+(e.message||e))}
 }
 $("classSel").onchange=function(){selectClass($("classSel").value)};
@@ -405,10 +439,10 @@ async function loadAllowedClasses(){
         if(session.access.role!=="admin")throw e;   // teachers keep the strict check; owner falls back to the class record
         profile=null;
       }
-      return {id:sid,name:String((profile&&profile.name)||member.name||"").trim()||sid};
+      return {id:sid,name:String((profile&&profile.name)||member.name||"").trim()||sid,demo:member.demo===true||(profile&&profile.demo===true)||/^demo_/.test(sid)};
     }));
     var active=checked.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)});
-    return {id:id,name:String(cls.name||id),students:active.map(function(r){return r.name}),studentIds:active.map(function(r){return r.id})};
+    return {id:id,name:String(cls.name||id),students:active.map(function(r){return r.name}),studentIds:active.map(function(r){return r.id}),demo:active.map(function(r){return r.demo})};
   }));
   var list=rows.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)||a.id.localeCompare(b.id)});
   if(!list.length)throw new Error("No active class could be loaded for this account.");

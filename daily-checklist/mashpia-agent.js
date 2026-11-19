@@ -38,7 +38,7 @@
     var jdn = Core.julianDay(msg.date);
     if (!jdn) return Promise.reject({ code: 'bad', message: 'Invalid date.' });
     var students = Array.isArray(msg.students) ? msg.students.slice(0, 300).map(function (s) {
-      return { name: String((s && s.name) || '').slice(0, 120),
+      return { id: String((s && s.id) || '').slice(0, 120), name: String((s && s.name) || '').slice(0, 120), mashpiaName: String((s && s.mashpiaName) || '').slice(0, 120),
         items: (Array.isArray(s && s.items) ? s.items : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60),
         no: (Array.isArray(s && s.no) ? s.no : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60) };
     }) : [];
@@ -63,7 +63,7 @@
       }, Promise.resolve()).then(function () {
         var good = [], bad = p.notFound.slice();
         p.synced.forEach(function (s) { (failed[s.userId] ? bad : good).push(s.name); });
-        return { synced: good.length, notFound: bad, greyed: p.greyed, missingItems: p.missingItems, items: items, pulls: p.pulls, cleared: cleared };
+        return { synced: good.length, notFound: bad, unmatched: p.unmatched, candidates: p.candidates, greyed: p.greyed, missingItems: p.missingItems, items: items, pulls: p.pulls, cleared: cleared };
       });
     });
   }

@@ -52,8 +52,10 @@ test('roster students with Yes list, No list; blanks are left out of both', () =
     s2: { items: { a: { v: 0, n: 'Shacharis', o: 1 } } }, s4: { items: {} }
   };
   const roster = [{ id: 's1', name: 'Arik Fake' }, { id: 's2', name: 'Levi Fake' }, { id: 's3', name: 'Silent' }, { id: 's4', name: 'Ghost' }];
-  assert.deepEqual(Core.buildStudents(answers, roster), [{ name: 'Arik Fake', items: ['Daily Tzedaka', 'Shacharis'], no: ['Mincha'] }, { name: 'Levi Fake', items: [], no: ['Shacharis'] },
-    { name: 'Silent', items: [], no: [] }, { name: 'Ghost', items: [], no: [] }]);
+  const E = { mashpiaName: '' };
+  assert.deepEqual(Core.buildStudents(answers, roster), [{ id: 's1', name: 'Arik Fake', ...E, items: ['Daily Tzedaka', 'Shacharis'], no: ['Mincha'] },
+    { id: 's2', name: 'Levi Fake', ...E, items: [], no: ['Shacharis'] },
+    { id: 's3', name: 'Silent', ...E, items: [], no: [] }, { id: 's4', name: 'Ghost', ...E, items: [], no: [] }]);
 });
 
 test('one short line', () => {
@@ -226,7 +228,7 @@ test('page: tab already set up -> one click, result line', async () => {
   const m = syncs(w)[0];
   assert.deepEqual([m[1], m[0].date, m[0].students.length], ['https://mashpia.com', '2026-11-18', 2]);
   e.fire({ b3: 'mashpia-result', id: 'id1', ok: true, result: { synced: 2, notFound: [], greyed: [], missingItems: [] } });
-  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students', items: null, pulls: [] });   /* null = an older bookmark that sends no items */
+  assert.deepEqual(await p, { ok: true, message: 'Synced 2 students', items: null, pulls: [], unmatched: [], candidates: null });   /* null = an older bookmark that sends no items */
   assert.equal(e.setup, 0);
   assert.equal(w.location.href, 'about:blank');   /* an existing tab is never reloaded */
 });
@@ -300,4 +302,39 @@ test('teacher page: one button, one-time setup panel, no password fields, no ser
   assert.doesNotMatch(html, /type="password"|nigri-auth|onrender\.com/);
   const inline = html.match(/<script>([\s\S]*?)<\/script>/g).map(s => s.replace(/<\/?script>/g, '')).join('\n');
   assert.doesNotThrow(() => new Function(inline));
+});
+
+/* ---------- loose names, saved matches, demo students ---------- */
+test('loose matching: spellings, case and spaces; ambiguous names are still never guessed', () => {
+  const g = grid();
+  g.soldiers.push({ user_id: 7, name: 'Sholom  HUEBNER', registered: true, absent: false, marks: {} },
+    { user_id: 8, name: 'Ber Raichik', registered: true, absent: false, marks: {} },
+    { user_id: 9, name: 'Moishe Raichman', registered: true, absent: false, marks: {} });
+  const p = Core.plan(g, [
+    { id: 'a', name: 'Shalom Huebner', items: ['Mincha'] },
+    { id: 'b', name: 'Berel Raichik', items: ['Mincha'] },
+    { id: 'c', name: 'Moshe Raichman', items: ['Mincha'] },
+    { id: 'd', name: 'Sam Twin', items: ['Mincha'] }
+  ]);
+  assert.deepEqual(p.synced.map(s => s.userId).sort(), [7, 8, 9]);
+  assert.deepEqual(p.notFound, ['Sam Twin']);
+});
+
+test('unmatched students get a candidate list of unclaimed Mashpia names; a saved match is used next time', () => {
+  const g = grid();
+  g.soldiers.push({ user_id: 10, name: 'Berel Raichick', registered: true, absent: false, marks: {} });
+  let p = Core.plan(g, [{ id: 's1', name: 'Berel Raichik', items: ['Mincha'] }, { id: 's2', name: 'Arik Fake', items: [] }]);
+  assert.deepEqual(p.unmatched, [{ id: 's1', name: 'Berel Raichik' }]);
+  assert.ok(p.candidates.includes('Berel Raichick'));
+  assert.ok(!p.candidates.includes('Arik Fake'), 'a matched soldier is not offered');
+  p = Core.plan(g, [{ id: 's1', name: 'Berel Raichik', mashpiaName: 'Berel Raichick', items: ['Mincha'] }]);
+  assert.deepEqual(p.notFound, []);
+  assert.deepEqual(p.sends[22004], [10]);
+});
+
+test('demo/test students are skipped entirely', () => {
+  const roster = [{ id: 'x1', name: 'Real Kid' }, { id: 'demo_t', name: 'Teacher Demo' }, { id: 'x2', name: 'Fake Test', demo: true }];
+  const s = Core.buildStudents({}, roster, { x1: 'Real K' });
+  assert.deepEqual(s.map(x => x.name), ['Real Kid']);
+  assert.equal(s[0].mashpiaName, 'Real K');
 });
