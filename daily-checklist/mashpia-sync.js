@@ -16,7 +16,6 @@
 
   /* env: {open(url,name), listen(fn)->stop, timer(fn,ms)->cancel, repeat(fn,ms)->cancel, status(text), needSetup(), newId()} */
   function run(env, date, students) {
-    if (!students.length) return Promise.resolve({ ok: false, message: 'No student has answered on this day yet.' });
     if (current) current();
     var w = env.open('', TAB);       /* empty address: reuses a Mashpia tab we opened before without reloading it */
     if (!w) return Promise.resolve({ ok: false, message: 'Your browser blocked the Mashpia tab. Allow pop-ups for this site, then press again.' });
@@ -38,7 +37,7 @@
         var d = ev.data;
         if (d.b3 === 'mashpia-pong' || d.b3 === 'mashpia-ready') { send(); return; }
         if (d.b3 !== 'mashpia-result' || d.id !== id) return;
-        if (d.ok) return done({ ok: true, message: Core.summary(d.result || { synced: 0 }) });
+        if (d.ok) return done({ ok: true, message: Core.summary(d.result || { synced: 0 }), items: (d.result && d.result.items) || null });
         if (d.code === 'login') { sent = false; env.status(d.message); env.needSetup(); return; }   /* wait for the bookmark to be clicked again */
         done({ ok: false, message: d.message || 'Could not sync right now.' });
       }));

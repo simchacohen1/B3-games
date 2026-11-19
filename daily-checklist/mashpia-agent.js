@@ -41,12 +41,12 @@
       return { name: String((s && s.name) || '').slice(0, 120),
         items: (Array.isArray(s && s.items) ? s.items : []).filter(function (i) { return typeof i === 'string'; }).slice(0, 60) };
     }) : [];
-    if (!students.length) return Promise.reject({ code: 'bad', message: 'Nothing to sync.' });
     return post('/api/missions/grid?action=get', { type: 'daily', date: jdn }).then(function (g) {
       var data = g.body && g.body.success === true ? g.body.data : null;
       if (!data || !Array.isArray(data.missions) || !Array.isArray(data.soldiers)) {
         throw { code: 'login', message: 'Log in to Mashpia on this tab, then click the bookmark again.' };
       }
+      var items = Core.itemsFromMashpia(data.missions);   /* Mashpia is the source of the checklist items */
       var p = Core.plan(data, students), failed = {}, gids = Object.keys(p.sends);
       return gids.reduce(function (chain, gid) {
         return chain.then(function () {
@@ -58,7 +58,7 @@
       }, Promise.resolve()).then(function () {
         var good = [], bad = p.notFound.slice();
         p.synced.forEach(function (s) { (failed[s.userId] ? bad : good).push(s.name); });
-        return { synced: good.length, notFound: bad, greyed: p.greyed, missingItems: p.missingItems };
+        return { synced: good.length, notFound: bad, greyed: p.greyed, missingItems: p.missingItems, items: items };
       });
     });
   }
@@ -71,7 +71,7 @@
     var id = ev.data.id;
     toast('Syncing the Daily Checklist to Mashpia…');
     run(ev.data).then(function (res) {
-      toast(Core.summary(res) + ' (refresh the grid to see it)');
+      toast((ev.data.students && ev.data.students.length ? Core.summary(res) : 'Checklist items read from Mashpia') + ' (refresh the grid to see it)');
       reply({ b3: 'mashpia-result', id: id, ok: true, result: res });
     }, function (err) {
       var message = (err && err.message) || 'Could not reach Mashpia right now.';
