@@ -31,6 +31,9 @@ th.nm{background:#f3f7fa;z-index:2}
 td.y{color:#1a7f45;font-weight:900;font-size:18px}
 td.n{color:#c0392b;font-weight:900;font-size:18px}
 td.b{color:#9aa8b6}
+td.edit{cursor:pointer}
+td.edit:hover{background:#eef6ff}
+td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
 .star{color:#d92d20}
 .muted{color:#5d6b7a;font-size:13px}
 .erow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6}
@@ -77,8 +80,9 @@ td.b{color:#9aa8b6}
 
     <div class="panel">
       <p class="sum" id="summary"></p>
+      <p class="muted" id="markMsg" role="status" aria-live="polite" style="color:#b42318"></p>
       <div class="scroll"><table id="grid"></table></div>
-      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Column names are shown as they were on that day.</p>
+      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Click a cell to mark it for a student: blank → ✓ → ✗ → blank. It saves the way the student's own answer does. Column names are shown as they were on that day.</p>
     </div>
 
     <div class="panel">
@@ -145,11 +149,11 @@ function buildColumns(dayKeys){
   cfg.forEach(function(x){
     if(x.removed&&!seen[x.id])return;
     var s=seen[x.id];
-    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order});
+    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order,edit:!x.removed});   // only current items can be marked
   });
   Object.keys(seen).forEach(function(id){
     if(byId[id])return;                                    // answered items that are no longer in the config at all
-    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order});
+    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order,edit:false});
   });
   cols.sort(function(a,b){return a.order-b.order||(a.id<b.id?-1:1)});
   return cols;
@@ -161,21 +165,61 @@ function cellValue(day,sid,id){
 function sortedRoster(){return roster.slice().sort(function(a,b){return a.name.localeCompare(b.name)})}
 
 /* ---------- grid ---------- */
+var lastCols=[];
+function showSummary(d){
+  var day=cache[d]||{},people=sortedRoster();
+  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
+  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+}
 async function drawGrid(force){
   var d=$("day").value;if(!C.isDateKey(d))return;
   $("summary").textContent="Loading…";
   var day;
   try{day=await loadDay(d,force)}catch(e){console.error(e);$("summary").textContent="Could not load answers: "+(e.message||e);return}
   var cols=buildColumns([d]),people=sortedRoster();
-  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
-  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+  lastCols=cols;
+  showSummary(d);
   var h='<tr><th class="nm">Student</th>'+cols.map(function(c){return '<th dir="auto">'+esc(c.name)+(c.star?' <span class="star">⭐</span>':'')+'</th>'}).join("")+'</tr>';
   var rows=people.map(function(p){
     return '<tr><td class="nm">'+esc(p.name)+'</td>'+cols.map(function(c){var v=cellValue(day,p.id,c.id);
-      return v===1?'<td class="y" title="Yes">✓</td>':v===0?'<td class="n" title="No">✗</td>':'<td class="b"></td>'}).join("")+'</tr>';
+      var at=c.edit?' edit" tabindex="0" role="button" data-sid="'+esc(p.id)+'" data-iid="'+esc(c.id)+'" aria-label="'+esc(p.name+' — '+c.name)+'"':'"';
+      return v===1?'<td class="y'+at+' title="Yes">✓</td>':v===0?'<td class="n'+at+' title="No">✗</td>':'<td class="b'+at+'></td>'}).join("")+'</tr>';
   }).join("");
   $("grid").innerHTML=h+rows;
 }
+
+/* ---------- teacher marks a cell: blank -> ✓ -> ✗ -> blank, saved the way a student's answer is ---------- */
+var saving={};
+function paintCell(td,v){
+  td.className=(v===1?"y":v===0?"n":"b")+" edit";
+  td.textContent=v===1?"✓":v===0?"✗":"";
+  td.title=v===1?"Yes":v===0?"No":"";
+}
+async function markCell(td){
+  var d=$("day").value,sid=td.getAttribute("data-sid"),iid=td.getAttribute("data-iid");
+  var col=lastCols.filter(function(c){return c.id===iid})[0],person=roster.filter(function(r){return r.id===sid})[0];
+  if(!col||!col.edit||!person||!C.isDateKey(d)||saving[sid+"|"+iid])return;
+  saving[sid+"|"+iid]=1;
+  var day=cache[d]||(cache[d]={}),before=day[sid]?JSON.parse(JSON.stringify(day[sid])):null;
+  var prev=cellValue(day,sid,iid),v=C.nextMark(prev);
+  var rec=day[sid]||(day[sid]={name:person.name,items:{}});rec.items=rec.items||{};
+  if(v==null)delete rec.items[iid];else rec.items[iid]={v:v,n:col.name,s:col.star?1:0,o:col.order};
+  paintCell(td,v);showSummary(d);$("markMsg").textContent="";
+  try{
+    await db.ref(base()+"/answers/"+d+"/"+sid).update(C.markUpdate(col,v,person.name,firebase.database.ServerValue.TIMESTAMP));
+  }catch(e){
+    console.warn("Teacher mark failed",e);
+    if(before)day[sid]=before;else delete day[sid];
+    paintCell(td,prev);showSummary(d);
+    $("markMsg").textContent="Could not save that mark for "+person.name+". Check your internet and click it again.";
+  }
+  delete saving[sid+"|"+iid];
+}
+$("grid").addEventListener("click",function(e){var td=e.target.closest&&e.target.closest("td.edit");if(td)markCell(td)});
+$("grid").addEventListener("keydown",function(e){
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  var td=e.target.closest&&e.target.closest("td.edit");if(td){e.preventDefault();markCell(td)}
+});
 
 /* ---------- CSV ---------- */
 function csvCell(v){
