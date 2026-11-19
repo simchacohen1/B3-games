@@ -1633,7 +1633,7 @@ function scoreShows(scoreType, column){
 }
 function gradeLabel(review){
   if(!review) return '';
-  const mistakes = '';
+  const m = Number(review.mistakes) || 0, mistakes = m ? ' · ' + m + ' mistake' + (m === 1 ? '' : 's') : '';
   if(review.status === 'gold') return '🏅 Gold' + mistakes + (Number(review.bonus) ? ' · +' + review.bonus + ' bonus' : '');
   if(review.status === 'pending') return '⏳ Waiting for grade';
   if(review.status === 'retry') return '🔁 Not gold yet' + mistakes;
@@ -4561,7 +4561,7 @@ async function loadGradeTab(){
   graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
   document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
   let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
-    'Gold standard: click 10, 8, 6, 4, 2 or 0 points (plus any bonus) and the posuk locks the posuk for a month. Not gold lets the student try again, with no points. The student already paid 5 points to send it.</p>';
+    'Gold standard: click 10, 8, 6, 4, 2 or 0 points (plus any bonus) and the posuk is locked for a month. Not gold lets the student try again, with no points. The student already paid 5 points to send it.</p>';
   if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
   html += pending.map((s, i) => `<div class="grade-card" id="gradeCard_${i}">
       <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
