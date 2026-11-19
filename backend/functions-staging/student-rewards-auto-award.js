@@ -132,7 +132,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade'];
+    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
@@ -149,7 +149,7 @@ async function authorizeChazaraAction(teacher,body){
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
- if(action==='posuk-grade')return; // posuk-review-core checks the student against this scope
+ if(action==='posuk-grade'||action==='posuk-delete')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
    return;
@@ -1561,7 +1561,12 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="posuk-grade"){
           const result=await posukReview.grade({teacherEmail:teacher.email,scope:teacher.scope,
             studentId:String(body.studentId||''),submissionId:String(body.submissionId||''),
-            gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note});
+            points:body.points,gold:body.gold===true,mistakes:body.mistakes,bonus:body.bonus,note:body.note});
+          return res.status(200).json(result);
+        }
+        if(action==="posuk-delete"){
+          const result=await posukReview.discard({teacherEmail:teacher.email,scope:teacher.scope,
+            studentId:String(body.studentId||''),submissionId:String(body.submissionId||'')});
           return res.status(200).json(result);
         }
         await authorizeChazaraAction(teacher,body);
