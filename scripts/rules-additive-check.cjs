@@ -28,6 +28,9 @@ const ALLOWED_NEW = [
   // reads as posukPractice/attempts.
   ['posukPractice', 'submissions'],
   ['posukPractice', 'reviews'],
+  // Teacher Add-ons step 1 (PENDING OWNER REVIEW): records only (who owns an add-on, its name/icon/classes, the owner's off switch).
+  // New private top-level node; no student access, no uploads, nothing existing changes.
+  ['teacherAddons'],
 ];
 
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.

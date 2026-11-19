@@ -960,6 +960,36 @@
       "path": "/shorashimLibraries/$uid",
       "permission": ".write",
       "expression": "auth != null && (($uid == auth.uid && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true) || (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false))"
+    },
+    {
+      "path": "/teacherAddons/admin/$addonId",
+      "permission": ".read",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('teacherAddons/owners/' + $addonId).val() == auth.uid)"
+    },
+    {
+      "path": "/teacherAddons/admin/$addonId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+    },
+    {
+      "path": "/teacherAddons/owners/$addonId",
+      "permission": ".read",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && data.val() == auth.uid)"
+    },
+    {
+      "path": "/teacherAddons/owners/$addonId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && !newData.exists())))"
+    },
+    {
+      "path": "/teacherAddons/profile/$addonId",
+      "permission": ".read",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('teacherAddons/owners/' + $addonId).val() == auth.uid)"
+    },
+    {
+      "path": "/teacherAddons/profile/$addonId",
+      "permission": ".write",
+      "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('teacherAddons/owners/' + $addonId).val() == auth.uid)"
     }
   ]
 }
