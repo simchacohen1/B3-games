@@ -66,6 +66,8 @@
       const [a,b]=out.points;
       if(tool!=='rect'||typeof s.image!=='string'||s.image.length>MAX_IMAGE||!IMAGE_DATA.test(s.image)||b.x-a.x<.02||b.y-a.y<.02)return null;
       out.image=s.image;
+      // The teacher can lock a picture so a student cannot move or resize it (a worksheet background).
+      if(s.locked===true)out.locked=true;
     }
     return out;
   }
@@ -148,10 +150,22 @@
     }
     // Move or resize one of my own marks without sending it again (a picture stays where it is in the pile).
     if(op.type==='board-move'){
-      const old=board.strokes.find(item=>item.by===by&&item.id===op.id);if(!old)return false;
+      let old=board.strokes.find(item=>item.by===by&&item.id===op.id);
+      // A student may move or resize a picture the teacher put on the board, unless the teacher locked it. The picture stays the
+      // teacher's, keeps its name and can never be handed over or removed by the student.
+      const theirs=!old&&by==='student'&&typeof op.newId!=='string'?board.strokes.find(item=>item.by==='teacher'&&item.image&&!item.locked&&item.id===op.id):null;
+      old=old||theirs;if(!old)return false;
+      const owner=theirs?'teacher':by;
       const s=cleanStroke({...old,id:typeof op.newId==='string'?op.newId:old.id,points:op.points});
-      if(!s||s.id[0]!==by[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
-      s.by=by;board.strokes[board.strokes.indexOf(old)]=s;return true;
+      if(!s||s.id[0]!==owner[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
+      s.by=owner;board.strokes[board.strokes.indexOf(old)]=s;return true;
+    }
+    // Teacher only: lock or unlock one of the teacher's pictures. A locked picture cannot be moved or resized by the student.
+    if(op.type==='board-lock'){
+      if(by!=='teacher'||typeof op.id!=='string')return false;
+      const at=board.strokes.findIndex(item=>item.by==='teacher'&&item.image&&item.id===op.id);if(at<0)return false;
+      const s=cleanStroke({...board.strokes[at],locked:op.locked===true});if(!s)return false;
+      s.by='teacher';board.strokes[at]=s;return true;
     }
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
@@ -490,12 +504,18 @@
       if(o.by==='student'&&state?.mode==='open'&&state.surface==='board'){FA.select('select');say('Drag the picture to move it.');return}
       o.tools.setTool(o.tools.tool==='move'?'pen':'move');update();
     });
+    // Teacher only: lock the picture so the student cannot move or resize it (good for a worksheet background).
+    const lock=o.by==='teacher'?button('🔒 Lock','Lock this picture so the student cannot move or resize it',()=>{const s=mine();if(s)o.act({type:'board-lock',id:s.id,locked:s.locked!==true});update()}):null;
     pictureGroup.append(move,button('➖ Smaller','Make the picture smaller',()=>resize(.8)),button('➕ Bigger','Make the picture bigger',()=>resize(1.25)),
+      ...(lock?[lock]:[]),
       button('✕ Remove picture','Take the picture off the board',()=>{const s=mine();if(s)o.act({type:'board-remove',ids:[s.id]});update()},'danger'));
     root.append(button('📋 Paste','Put the picture or words you copied on this board. You can also press Ctrl+V.',()=>{if(Clip)void Clip.pasteInto(target)}),
       button('📄 Copy board','Copy a picture of this board, so you can paste it somewhere else',()=>{if(Clip)void Clip.copyFrom(target)}),pictureGroup,note);
     bar.append(root);
-    function update(){pictureGroup.hidden=!mine();move.setAttribute('aria-pressed',String(o.tools.tool==='move'))}
+    function update(){
+      const s=mine();pictureGroup.hidden=!s;move.setAttribute('aria-pressed',String(o.tools.tool==='move'));
+      if(lock){lock.textContent=s?.locked?'🔓 Unlock':'🔒 Lock';lock.setAttribute('aria-pressed',String(!!s?.locked))}
+    }
     clipReady.then(clip=>{if(clip)clip.register(target);else root.hidden=true});
     update();
     return{root,update,say};
@@ -576,8 +596,29 @@
     const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-      getItems:()=>board.strokes.filter(item=>item.by==='student'),
-      setItems(list){syncBoardItems(board,'student',list,act)},
+      // My own marks, and (while my board is open to me, i.e. I am not paused) the teacher's pictures that are not locked.
+      getItems:()=>board.strokes.filter(item=>item.by==='student'||(boardOpen()&&item.by==='teacher'&&item.image&&!item.locked)),
+      setItems(list){
+        // A teacher's picture (its name starts with "t") can only be moved or resized, never removed: Delete, Eraser and Clear
+        // leave it where it is. The drawing toolbar gives a moved or resized picture a NEW name (it is the student's "copy"):
+        // that is turned back into a move of the teacher's own picture, so there is never a second picture.
+        const movable=board.strokes.filter(s=>s.by==='teacher'&&s.image&&!s.locked);
+        const missing=movable.filter(s=>!list.some(item=>item.id===s.id));      // teacher pictures that are no longer in the list
+        const own=[],moves=[];
+        for(const item of list){
+          if(item.id[0]==='t'){
+            const old=movable.find(s=>s.id===item.id);
+            if(old&&JSON.stringify(old.points)!==JSON.stringify(item.points))moves.push({id:item.id,points:item.points});
+            continue;
+          }
+          const fresh=item.image&&!board.strokes.some(s=>s.id===item.id);
+          const from=fresh?missing.find(s=>s.image===item.image):null;
+          if(from){missing.splice(missing.indexOf(from),1);moves.push({id:from.id,points:item.points});continue}
+          own.push(item);
+        }
+        syncBoardItems(board,'student',own,act);
+        for(const move of moves)act({type:'board-move',id:move.id,points:move.points});
+      },
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
@@ -897,22 +938,61 @@
       const img=el('img');img.src=URL.createObjectURL(value.file);img.alt='Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
       img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
       previewBody.append(img);
+      // How the picture goes out: a movable picture on every board (default), or the common background (a worksheet).
+      const choice=(value,label,hint,checked)=>{
+        const row=el('label',null),radio=el('input');radio.type='radio';radio.name='boardsPasteHow';radio.value=value;radio.checked=checked;
+        row.style.cssText='display:flex;align-items:flex-start;gap:8px;margin:8px 0;font-weight:700;cursor:pointer';
+        const text=el('span',null,label);text.append(el('br'),Object.assign(el('span',null,hint),{style:'font-weight:400;font-size:13px;color:#4a5b77'}));
+        row.append(radio,text);return {row,radio};
+      };
+      const movable=choice('movable','📌 Movable picture on every board','Every student can move and resize it, but never delete it. Their drawings stay.',true);
+      const lockRow=el('label',null),lockBox=el('input');lockBox.type='checkbox';lockBox.id='boardsLockAll';
+      lockRow.style.cssText='display:flex;align-items:center;gap:8px;margin:0 0 8px 28px;font-weight:700';
+      lockRow.append(lockBox,el('span',null,'🔒 Lock for everyone (students cannot move it)'));
+      const background=choice('background','🖼 Set as background (worksheet)','Replaces the common background on every board and clears their current drawings.',false);
       // Each student's copy is saved in their My files; if ticked it arrives already starred (they can unstar it).
       const tick=el('label',null),box=el('input');box.type='checkbox';box.id='boardsImportant';
-      tick.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700';
+      tick.style.cssText='display:flex;align-items:center;gap:8px;margin:0 0 8px 28px;font-weight:700';
       tick.append(box,el('span',null,'⭐ Mark as important (every student\'s copy arrives starred)'));
-      previewBody.append(tick);
+      const sync=()=>{const how=movable.radio.checked;lockRow.style.display=how?'flex':'none';tick.style.display=how?'none':'flex'};
+      movable.radio.addEventListener('change',sync);background.radio.addEventListener('change',sync);sync();
+      previewBody.append(movable.row,lockRow,background.row,tick);
     }
     if(value.note)previewBody.append(el('p',null,value.note));
     pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
     // Nothing goes to the students until the teacher presses the green button, so the status line says so.
     B.status('Not sent yet. Press ✓ Send to all boards to send this to every student.');
   }
+  // A picture the teacher puts on EVERY student's board as an ordinary teacher picture (same as pasting on one board): each
+  // student can move and resize it but never delete it, and the teacher may lock it for everyone. Students whose board is
+  // paused or off, or already full, are skipped and named. Boards are not stored online, so a student who joins later does not get it.
+  async function sendMovablePicture(file,opts={}){
+    if(!on||mode!=='boards'){B.status('Open Student whiteboards before pasting.');return}
+    if(!Clip){B.fail('Pictures cannot be prepared in this browser.');return}
+    try{
+      const picture=await Clip.encodeImage(file,{maxChars:MAX_IMAGE});
+      const stroke={id:newId('t'),tool:'rect',color:COLORS[0],size:SIZE_VALUES[0],points:Clip.placeImage(picture.width,picture.height,{aspect:ASPECT}),image:picture.data};
+      if(opts.lock)stroke.locked=true;
+      const op={type:'board-add',stroke},here=admitted(),skipped=[],full=[];let got=0;
+      for(const m of here){
+        if(excluded(m,'boards')||isBlocked(m)){skipped.push(m);continue}
+        if(applyOp(boardFor(m),JSON.parse(JSON.stringify(op)),'teacher')){B.send(m.connection,op);dirty(m.id);got++}else full.push(m);
+      }
+      const names=list=>list.slice(0,5).map(m=>m.name).join(', ')+(list.length>5?' and more':'');
+      B.status('Picture sent to '+got+' of '+here.length+' board'+(here.length===1?'':'s')+(opts.lock?' (locked)':'. Students can move and resize it, never delete it')+'.'+
+        (skipped.length?' Not sent to '+names(skipped)+' (whiteboard paused or off).':'')+(full.length?' Board full for '+names(full)+'.':''));
+    }catch(error){B.fail(error?.message||'Could not prepare that picture.')}
+  }
   async function commitPaste(){
     const item=pendingPaste;if(!item)return;
     const important=!!previewBody.querySelector('#boardsImportant')?.checked;
+    const how=previewBody.querySelector('input[name="boardsPasteHow"]:checked')?.value||'movable';
+    const lock=!!previewBody.querySelector('#boardsLockAll')?.checked;
     closePreview();
-    if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important});
+    if(item.kind==='image'){
+      if(how==='background')await sendImageFile(item.file,{subject:item.subject,important});
+      else await sendMovablePicture(item.file,{lock});
+    }
     else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
   }
   // The gallery of all boards: Ctrl+V and the 📋 Paste to All Boards button both end in the same preview, and
