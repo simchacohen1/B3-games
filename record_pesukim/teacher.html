@@ -1633,7 +1633,7 @@ function scoreShows(scoreType, column){
 }
 function gradeLabel(review){
   if(!review) return '';
-  const m = Number(review.mistakes) || 0, mistakes = m ? ' · ' + m + ' mistake' + (m === 1 ? '' : 's') : '';
+  const mistakes = '';
   if(review.status === 'gold') return '🏅 Gold' + mistakes + (Number(review.bonus) ? ' · +' + review.bonus + ' bonus' : '');
   if(review.status === 'pending') return '⏳ Waiting for grade';
   if(review.status === 'retry') return '🔁 Not gold yet' + mistakes;
@@ -4516,6 +4516,10 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .grade-choice button{ border:2px solid #cfc3a6; background:#fff; border-radius:999px; padding:6px 14px; font-weight:800; cursor:pointer; }
   .grade-choice button.on.gold{ background:#fff3c4; border-color:#d4a514; }
   .grade-choice button.on.retry{ background:#ffe4dc; border-color:#d47a5e; }
+  .grade-pts{ display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap; font-weight:700; }
+  .grade-pts button{ border:2px solid #cfc3a6; background:#fff; border-radius:10px; min-width:44px; padding:6px 10px; font-weight:800; cursor:pointer; }
+  .grade-pts button:disabled{ opacity:.45; cursor:not-allowed; }
+  .grade-pts button.on{ background:#fff3c4; border-color:#d4a514; }
   .grade-points{ font-weight:800; }
   .grade-msg{ font-size:.85rem; margin-top:6px; min-height:1.1em; }
   .graded-row{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:8px 0; border-bottom:1px solid #eee; font-size:.9rem; }
@@ -4523,23 +4527,23 @@ function renderClassPosukDetail(posukKey, bodyEl){
 <script>
 /* ---------- To Grade (Issue #694) ----------
    Students send ONE recording (reading + translation). The teacher listens
-   and grades it: gold standard (+10 points minus 1 per mistake, plus any
-   bonus; the posuk is locked for a month) or not gold (the student may try
-   again). Grades and points are saved by the server only. */
+   and grades it: gold standard (the teacher picks 10, 8, 6, 4, 2 or 0
+   points, plus any bonus; the posuk is locked for a month) or not gold (the
+   student may try again). Grades and points are saved by the server only. */
 const POSUK_GOLD_POINTS = 10;
 function gradeRefLabel(s){
   const perek = Number(s.perek), a = Number(s.startPosuk), b = Number(s.endPosuk || a);
   return (s.sefer ? s.sefer + ' · ' : '') + 'Perek ' + perek + ' · Posuk ' + a + (b > a ? '–' + b : '');
 }
-function gradePointsFor(gold, mistakes, bonus){
+const POSUK_POINT_CHOICES = [10, 8, 6, 4, 2, 0];
+function gradePointsFor(gold, base, bonus){
   if(!gold) return 0;
-  return Math.max(0, POSUK_GOLD_POINTS - (Number(mistakes) || 0)) + (Number(bonus) || 0);
+  return (Number(base) || 0) + (Number(bonus) || 0);
 }
 function gradeStatusText(s){
   if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' pts' +
-    (Number(s.mistakes) ? ' · ' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') : '') +
     (Number(s.bonus) ? ' · ' + s.bonus + ' bonus' : '');
-  if(s.status === 'retry') return '🔁 Not gold — student may retry' + (Number(s.mistakes) ? ' · ' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') : '');
+  if(s.status === 'retry') return '🔁 Not gold — student may retry';
   return '⏳ Waiting';
 }
 async function loadGradeTab(){
@@ -4557,7 +4561,7 @@ async function loadGradeTab(){
   graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
   document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
   let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
-    'Gold standard gives +10 points minus 1 per mistake (plus any bonus) and locks the posuk for a month. Not gold lets the student try again. The student already paid 5 points to send it.</p>';
+    'Gold standard: click 10, 8, 6, 4, 2 or 0 points (plus any bonus) and the posuk locks the posuk for a month. Not gold lets the student try again, with no points. The student already paid 5 points to send it.</p>';
   if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
   html += pending.map((s, i) => `<div class="grade-card" id="gradeCard_${i}">
       <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
@@ -4566,7 +4570,7 @@ async function loadGradeTab(){
       ${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}
       <div class="grade-form">
         <span class="grade-choice"><button type="button" class="gold" data-choice="gold">🏅 Gold standard</button><button type="button" class="retry" data-choice="retry">🔁 Not gold — try again</button></span>
-        <label>Mistakes <input type="number" min="0" max="100" step="1" value="0" data-field="mistakes"></label>
+        <span class="grade-pts">Points ${POSUK_POINT_CHOICES.map(n => `<button type="button" data-pts="${n}">${n}</button>`).join('')}</span>
         <label>Bonus points <input type="number" min="0" step="1" value="0" data-field="bonus"></label>
         <input type="text" maxlength="500" placeholder="Note for the student (optional)" data-field="note">
         <span class="grade-points" data-field="points"></span>
@@ -4583,25 +4587,30 @@ async function loadGradeTab(){
 }
 function wireGradeCard(card, s){
   if(!card) return;
-  let choice = '';
+  let choice = '', base = null;
   const field = n => card.querySelector('[data-field="' + n + '"]');
   const saveBtn = card.querySelector('[data-save]');
   const refresh = () => {
     card.querySelectorAll('[data-choice]').forEach(b => b.classList.toggle('on', b.dataset.choice === choice));
     const gold = choice === 'gold';
+    if(!gold) base = null;
     field('bonus').disabled = !gold;
     if(!gold) field('bonus').value = '0';
-    const mistakes = Math.max(0, Math.floor(Number(field('mistakes').value) || 0));
+    card.querySelectorAll('[data-pts]').forEach(b => { b.disabled = !gold; b.classList.toggle('on', gold && base === Number(b.dataset.pts)); });
     const bonus = Math.max(0, Math.floor(Number(field('bonus').value) || 0));
-    field('points').textContent = choice ? ('= ' + gradePointsFor(gold, mistakes, bonus) + ' points') : '';
-    saveBtn.disabled = !choice;
+    field('points').textContent = choice === 'retry' ? '= 0 points' : (gold && base !== null ? '= ' + gradePointsFor(gold, base, bonus) + ' points' : (gold ? 'Pick the points' : ''));
+    saveBtn.disabled = !choice || (gold && base === null);
   };
   card.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => { choice = b.dataset.choice; refresh(); });
-  field('mistakes').oninput = refresh; field('bonus').oninput = refresh;
+  card.querySelectorAll('[data-pts]').forEach(b => b.onclick = () => { base = Number(b.dataset.pts); refresh(); });
+  field('bonus').oninput = refresh;
   refresh();
   saveBtn.onclick = async () => {
-    const mistakes = Number(field('mistakes').value || 0), bonus = Number(field('bonus').value || 0);
-    if(!Number.isInteger(mistakes) || mistakes < 0 || mistakes > 100) return field('msg').textContent = 'Mistakes must be a whole number from 0 to 100.';
+    const bonus = Number(field('bonus').value || 0);
+    if(choice === 'gold' && !POSUK_POINT_CHOICES.includes(base)) return field('msg').textContent = 'Pick 10, 8, 6, 4, 2 or 0 points.';
+    // The server still scores a gold grade as 10 minus mistakes, so send the
+    // chosen points as (10 - points) mistakes; no server change is needed.
+    const mistakes = choice === 'gold' ? POSUK_GOLD_POINTS - base : 0;
     if(!Number.isInteger(bonus) || bonus < 0) return field('msg').textContent = 'Bonus must be a whole number of 0 or more.';
     saveBtn.disabled = true; field('msg').textContent = 'Saving…';
     try{
