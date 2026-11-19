@@ -2738,6 +2738,7 @@ exports.yiddishApi = require("./yiddish").yiddishApi;
 
 exports.funTorahTeacherClaim = require("./teacher-claim").funTorahTeacherClaim;
 exports.funTorahClassAccess = require("./class-access").funTorahClassAccess;
+exports.studentLocks = require("./student-locks").studentLocks;
 exports.funTorahManageStudents = require("./student-management").funTorahManageStudents;
 // Server-side student sign-in (passcodes never reach the browser).
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;

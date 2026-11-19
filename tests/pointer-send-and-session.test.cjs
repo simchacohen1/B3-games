@@ -59,7 +59,7 @@ test('versions: the changed scripts have new cache versions', () => {
   for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=' + v), f);
   assert.match(html, /teacher-dashboard\.css\?v=20261118-onebar/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261120-sharetab3/, page);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261120-locks1/, page);
 });
 
 // ---------- black / blue screen and the connection signs ----------
