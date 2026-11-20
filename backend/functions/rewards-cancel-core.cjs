@@ -25,8 +25,15 @@ async function cancelRedemption(store,studentId,requestId,nowMs=Date.now()){
  const item=claim.snapshot.val()||{},cost=Math.max(0,Number(item.cost||0));
  let balance=0;
  if(cost){
-  const r=await store.tx(`${SR}/students/${studentId}/rewardBalance`,cur=>Number(cur||0)+cost);
-  balance=Number(r?.snapshot?.val?.()??0);
+  try{
+   const r=await store.tx(`${SR}/students/${studentId}/rewardBalance`,cur=>Number(cur||0)+cost);
+   if(!r?.committed)throw new Error('Could not return the points.');
+   balance=Number(r?.snapshot?.val?.()??0);
+  }catch(err){
+   // Never leave a canceled request with no refund: put it back to pending so it can be retried.
+   await store.tx(path,cur=>cur&&cur.status==='canceled'?{...cur,status:'pending',canceledAt:null,reviewedAt:null,reviewedBy:null}:undefined).catch(()=>{});
+   throw err;
+  }
  }
  // Give back the reserved stock and clear the cooldown this purchase started.
  const rewardPath=`${SR}/rewards/${item.rewardId}`;
