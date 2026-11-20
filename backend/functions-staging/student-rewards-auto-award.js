@@ -11,6 +11,7 @@ const posukReviewCore=require('./posuk-review-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
+const chazaraCap=require('./chazara-cap-core.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = typeof process !== "undefined" && process.env.B3_STAGING_DEPLOYMENT === "true"
   ? "owner@funtorahtools-staging.test"
@@ -99,6 +100,17 @@ function evidenceCovers(evidenceKey, awardKey){
   return !!(e && a && e.prefix===a.prefix && e.perek===a.perek && a.start===a.end && a.start>=e.start && a.start<=e.end);
 }
 function safeKey(v){ return String(v || "").replace(/[^A-Za-z0-9_-]/g, "-").slice(0,220); }
+// Storage adapter for the server-side Chazara daily cap (chazara-cap-core.cjs).
+const chazaraCapStore={
+  get:async path=>(await rtdb.ref(path).get()).val(),
+  tx:(path,fn)=>rtdb.ref(path).transaction(fn),
+  range:async prefix=>(await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByKey().startAt(prefix).endAt(prefix+"\uf8ff").get()).val()||{}
+};
+// Marks an event whose points were refused by the daily cap, so the page stops
+// counting it and stops retrying it.
+function markChazaraEventOverLimit(eventRef){
+  return eventRef.update({pointRequestStatus:"rejected",pointRequestRejectReason:"daily-limit",pointRequestCreatedAt:Date.now()}).catch(()=>{});
+}
 function reasonFor(source,perek,posuk){
   const ref=(perek&&posuk)?`Perek ${perek} · Posuk ${posuk}`:"Posuk Practice";
   if(source==="reading100") return `Reading reached 100% — ${ref}`;
@@ -848,13 +860,23 @@ async function repairMissingChazaraPointRequests(scope){
       }
 
       const amount=POINTS[source];
+      const eventMs=Number(e.createdAt)||Date.now();
       const record={
         eventId,
         perek:e.perek||null,
         posuk:e.posuk||null,
         workspaceClassId:e.workspaceClassId||scope.selected||null,
-        recorded:e.recorded===true
+        recorded:e.recorded===true,
+        chazaraDay:chazaraCap.nyDay(eventMs)
       };
+      // Same daily cap as a student-created request, counted on the day of the event.
+      if(e.teacherEntered!==true){
+        const gate=await chazaraCap.guard({store:chazaraCapStore,studentId,perek:record.perek,posuk:record.posuk,requestId,keyOf:safeKey,dayMs:eventMs,lock:false});
+        if(!gate.ok){
+          await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).update({pointRequestStatus:"rejected",pointRequestRejectReason:"daily-limit",pointRequestRepairError:gate.error,pointRequestRepairAt:Date.now()}).catch(()=>{});
+          continue;
+        }
+      }
       const result=await createPendingRequest({
         requestId,
         rewardStudentId,
@@ -1695,10 +1717,21 @@ exports.studentRewardsAutoAward = onRequest(
 
         requestId=safeKey(`chazara_${studentId}_${eventId}`);
         reason=reasonFor(source,e.perek,e.posuk);
-        record={eventId,perek:e.perek||null,posuk:e.posuk||null,workspaceClassId:e.workspaceClassId||null,recorded:e.recorded===true};
+        record={eventId,perek:e.perek||null,posuk:e.posuk||null,workspaceClassId:e.workspaceClassId||null,recorded:e.recorded===true,chazaraDay:chazaraCap.nyDay(Date.now())};
       }
 
-      const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});
+      // Daily cap per posuk, enforced here so a second tab or a script cannot get around the page.
+      let capGate=null;
+      if(chazaraVerification){
+        capGate=await chazaraCap.guard({store:chazaraCapStore,studentId,perek:record.perek,posuk:record.posuk,requestId,keyOf:safeKey});
+        if(!capGate.ok){
+          if(capGate.limit)await markChazaraEventOverLimit(chazaraVerification.eventRef);
+          return res.status(capGate.code).json({error:capGate.error});
+        }
+      }
+      let result;
+      try{result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});}
+      finally{if(capGate)await capGate.release();}
       // Posuk Practice 100% milestones are verified above from the student's
       // saved attempt, so they are paid immediately with no teacher approval.
       // approvePendingRequest is idempotent: a request that is already

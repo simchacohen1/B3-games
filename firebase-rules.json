@@ -215,9 +215,14 @@
       },
       "chazara": {
         ".read": true,
-        "$section": {
+        "students": {
           "$studentId": {
-            ".write": true
+            ".write": "auth != null && auth.token.b3StudentId == $studentId"
+          }
+        },
+        "events": {
+          "$studentId": {
+            ".write": "auth != null && auth.token.b3StudentId == $studentId"
           }
         }
       },
