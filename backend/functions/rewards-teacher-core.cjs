@@ -312,12 +312,26 @@ async function undoBatch(store,scope,email,classId,batchId,nowMs,now){
  if(!undone.length&&!skipped.length)fail(404,'Nothing in that save can be undone.');
  return {ok:true,undone:undone.length,skipped};
 }
+// A whole quick award: every student's entry in it that has not been undone yet (each entry can be undone only once).
+async function undoAwardBatch(store,scope,email,classId,batchId,nowMs,now){
+ requireClass(scope,classId);if(!key(String(batchId||'')))fail(400,'Invalid batch.');
+ const batch=await store.get(SR+'/pointAdjustmentBatches/'+batchId);
+ if(!batch||batch.classId!==classId)fail(404,'That award no longer exists.');
+ const undone=[],skipped=[];
+ for(const [sid,adjId] of Object.entries(batch.entries||{})){
+  try{await undoAmount(store,scope,email,'adjust',String(adjId),nowMs,now);undone.push(sid)}
+  catch(error){if(!/already undone/i.test(String(error?.message||'')))skipped.push({studentId:sid,reason:String(error?.message||error)})}
+ }
+ if(!undone.length&&!skipped.length)fail(409,'This whole award was already undone.');
+ return {ok:true,undone:undone.length,skipped};
+}
 async function undoAction(store,scope,email,body,nowMs,now,owner){
  const kind=String(body.kind||'');
  if(kind==='adjust'||kind==='request')return undoAmount(store,scope,email,kind,String(body.id||''),nowMs,now);
  if(kind==='purchase')return undoPurchase(store,scope,email,String(body.studentId||''),String(body.key||''),now,owner);
  if(kind==='daily')return undoDaily(store,scope,email,String(body.classId||''),String(body.studentId||''),String(body.date||''),nowMs,now);
  if(kind==='batch')return undoBatch(store,scope,email,String(body.classId||''),String(body.batchId||''),nowMs,now);
+ if(kind==='awardbatch')return undoAwardBatch(store,scope,email,String(body.classId||''),String(body.batchId||''),nowMs,now);
  fail(400,'This kind of entry cannot be undone here.');
 }
 
@@ -370,6 +384,28 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   const id='adj_'+nowMs+'_'+sha(sid+nowMs+Math.random()).slice(0,8);
   await store.update({[SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now}});
   return {ok:true,applied,balance};
+ }
+ if(action==='awardBatch'){
+  // Quick award: the same points to several students (or the whole class) in one step. Every student gets their
+  // own history entry sharing one batch id, so the whole award can be undone in one click (once per entry).
+  const classId=String(body.classId||'');requireClass(scope,classId);
+  const amount=Number(body.amount);if(!Number.isInteger(amount)||amount===0||Math.abs(amount)>1000)fail(400,'Enter a whole number between -1000 and 1000.');
+  const reason=String(body.reason||'Teacher award').trim().slice(0,200)||'Teacher award';
+  const whole=body.wholeClass===true;
+  let ids=whole?Object.keys(scope.enrollments[classId]||{}).filter(id=>scope.enrollments[classId][id]===true):(Array.isArray(body.studentIds)?body.studentIds.map(String):[]);
+  ids=[...new Set(ids)];if(!ids.length)fail(400,'Choose at least one student.');if(ids.length>200)fail(400,'Too many students at once (200 at most).');
+  for(const sid of ids)requireStudent(scope,classId,sid);
+  const batchId='ab_'+nowMs+'_'+sha(email+nowMs+Math.random()).slice(0,8),entries={},failed=[];
+  for(const sid of ids){
+   try{
+    const {applied,balance}=await addToBalance(store,sid,amount);
+    const id='adj_'+nowMs+'_'+sha(sid+nowMs+Math.random()).slice(0,8);
+    await store.update({[SR+'/pointAdjustments/'+id]:{id,studentId:sid,classId,amount:applied,action:'teacher',reason,teacherEmail:email,createdAt:now,balanceAfter:balance,batchId}});
+    entries[sid]=id;
+   }catch(error){failed.push({studentId:sid,reason:String(error?.message||error)})}
+  }
+  if(Object.keys(entries).length)await store.update({[SR+'/pointAdjustmentBatches/'+batchId]:{id:batchId,classId,amount,reason,teacherEmail:email,createdAt:now,wholeClass:whole,entries}});
+  return {ok:true,batchId,awarded:Object.keys(entries).length,failed};
  }
  if(action==='undo')return undoAction(store,scope,email,body,nowMs,now,access.owner);
  if(action==='comment'){

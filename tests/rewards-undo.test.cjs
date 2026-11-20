@@ -223,7 +223,8 @@ test('page: each row shows who did it, offers the right Undo, marks undone entri
   assert.ok(dailyUndo, 'a daily undo is shown in the history'); assert.equal(dailyUndo.counts, false, 'it does not change the running balance a second time'); assert.equal(dailyUndo.amount, -2);
 });
 test('page: Undo needs a confirmation, goes through the checked server action, and reloads the history', () => {
-  assert.match(pageSource, /if\(!confirm\(whole\?"Undo this whole Daily Points save/);
+  assert.match(pageSource, /if\(!confirm\(question\)\)return;/);
+  assert.match(pageSource, /"Undo this whole Daily Points save for the class\?/);
   assert.match(pageSource, /await teacherApi\("undo",spec\)/);
   assert.match(pageSource, /await loadRoot\(\);render\(\);\s*\}\s*document\.addEventListener\("click"/);
   assert.match(pageSource, /"classRewardRounds","dailyAwardLog"\]/, 'the owner view loads the daily save log too');
@@ -254,4 +255,63 @@ test('an undo claim left behind by a crash can be taken again after 2 minutes, b
   item().undoneBy = 'processing:' + (clock - 200000);            // it crashed a few minutes ago
   await call(d, T, { action: 'undo', kind: 'adjust', id });
   assert.equal(bal(moshe), 0); assert.match(item().undoneBy, /^undo_/);
+});
+
+// ---- Quick award (several students or the whole class) and undoing the whole award ----
+const award = (d, who, body) => call(d, who, { action: 'awardBatch', classId: 'b3_sc', ...body });
+test('quick award gives each chosen student the points with their own history entry, sharing one batch id', async () => {
+  const { d, moshe, yoi, bal } = await ready();
+  const r = await award(d, T, { studentIds: [moshe, yoi], amount: 5, reason: 'Great davening' });
+  assert.equal(r.awarded, 2); assert.deepEqual(r.failed, []);
+  assert.equal(bal(moshe), 5); assert.equal(bal(yoi), 5);
+  const rows = Object.values(d.tree.studentRewards.pointAdjustments);
+  assert.equal(rows.length, 2); assert.ok(rows.every(x => x.batchId === r.batchId && x.amount === 5 && x.reason === 'Great davening' && x.teacherEmail === 'teacher@school.test'));
+  assert.equal(d.tree.studentRewards.pointAdjustmentBatches[r.batchId].amount, 5);
+});
+test('whole class award reaches every enrolled student; a teacher cannot award outside their class', async () => {
+  const { d, moshe, yoi, bal } = await ready();
+  const r = await award(d, T, { wholeClass: true, amount: 10 }); assert.equal(r.awarded, 2); assert.equal(bal(moshe), 10); assert.equal(bal(yoi), 10);
+  await assert.rejects(call(d, OTHER, { action: 'awardBatch', classId: 'b3_sc', studentIds: [moshe], amount: 5 }), { code: 403 });
+  await assert.rejects(award(d, T, { studentIds: [], amount: 5 }), { code: 400 });
+  await assert.rejects(award(d, T, { studentIds: [moshe], amount: 0 }), { code: 400 });
+  await assert.rejects(award(d, T, { studentIds: [moshe], amount: 1001 }), { code: 400 });
+});
+test('one click undoes the whole award, once; nothing is deleted and the undo entries are logged', async () => {
+  const { d, moshe, yoi, bal } = await ready();
+  const r = await award(d, T, { wholeClass: true, amount: 5, reason: 'Pizza party' });
+  const u = await call(d, T, { action: 'undo', kind: 'awardbatch', classId: 'b3_sc', batchId: r.batchId });
+  assert.equal(u.undone, 2); assert.deepEqual(u.skipped, []); assert.equal(bal(moshe), 0); assert.equal(bal(yoi), 0);
+  const all = Object.values(d.tree.studentRewards.pointAdjustments);
+  assert.equal(all.length, 4, 'the two awards are kept and two undo entries were added'); assert.equal(all.filter(x => x.action === 'undo').length, 2);
+  await assert.rejects(call(d, T, { action: 'undo', kind: 'awardbatch', classId: 'b3_sc', batchId: r.batchId }), { code: 409 });
+  assert.equal(bal(moshe), 0, 'a second click never takes points twice');
+});
+test('whole-award undo skips a student who already spent the points, and names them; the others are undone', async () => {
+  const { d, moshe, yoi, bal } = await ready();
+  const r = await award(d, T, { studentIds: [moshe, yoi], amount: 5 });
+  d.tree.studentRewards.students[moshe].rewardBalance = 2; // moshe spent 3
+  const u = await call(d, T, { action: 'undo', kind: 'awardbatch', classId: 'b3_sc', batchId: r.batchId });
+  assert.equal(u.undone, 1); assert.equal(u.skipped.length, 1); assert.equal(u.skipped[0].studentId, moshe);
+  assert.equal(bal(moshe), 2); assert.equal(bal(yoi), 0);
+});
+test('a single entry of a quick award can still be undone on its own, and then the whole-award undo leaves it alone', async () => {
+  const { d, moshe, yoi, bal } = await ready();
+  const r = await award(d, T, { studentIds: [moshe, yoi], amount: 5 });
+  const mosheAdj = d.tree.studentRewards.pointAdjustmentBatches[r.batchId].entries[moshe];
+  await call(d, T, { action: 'undo', kind: 'adjust', id: mosheAdj }); assert.equal(bal(moshe), 0);
+  const u = await call(d, T, { action: 'undo', kind: 'awardbatch', classId: 'b3_sc', batchId: r.batchId });
+  assert.equal(u.undone, 1); assert.equal(bal(moshe), 0); assert.equal(bal(yoi), 0);
+});
+
+test('page: quick award bar, whole-award undo and the Refund button on purchases', () => {
+  assert.match(pageSource, /function quickAwardPanel\(\)/);
+  assert.match(pageSource, /QUICK_PRESETS=\[1,5,10\]/, 'presets +1, +5, +10');
+  assert.match(pageSource, /id="qaCustom"[\s\S]*id="qaReason"/, 'custom amount and reason');
+  assert.match(pageSource, /data-qa-student=/, 'pick several students');
+  assert.match(pageSource, /id="qaWhole">Whole class/, 'whole class');
+  assert.match(pageSource, /teacherApi\("awardBatch"/, 'goes through the checked server action');
+  assert.match(pageSource, /if\(!confirm\(`Give /, 'asks before giving points');
+  assert.match(pageSource, /kind:"awardbatch"[\s\S]*Undo whole award/, 'one click undoes the whole award');
+  assert.match(pageSource, /class="points-undo refund"[\s\S]*↩ Refund/, 'purchases get a Refund button');
+  assert.match(pageSource, /\$\{quickAwardPanel\(\)\}/, 'the bar is on the Points page');
 });

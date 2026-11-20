@@ -463,7 +463,10 @@ function decorateLedger(rows){
       row.by=item.teacherEmail||"";
       if(item.action==="undo"){row.sourceLabel="Undo";row.status="undo";row.sourceGroup="teacher"}
       else if(item.undoneBy){row.status="undone"}
-      else if(Number(item.amount)) row.undo={kind:"adjust",id:key};
+      else if(Number(item.amount)){
+        row.undo={kind:"adjust",id:key};
+        if(item.batchId){const n=Object.values(root.pointAdjustments||{}).filter(x=>x&&x.batchId===item.batchId&&!x.undoneBy&&x.action!=="undo").length;if(n>1)row.batch={kind:"awardbatch",classId:item.classId,batchId:item.batchId,count:n}}
+      }
     }else if(id.startsWith("request:")){
       const key=id.slice(8),item=root.pointRequests?.[key]||{};
       row.by=item.reviewedBy?(/^Automatic/i.test(item.reviewedBy)?"Automatic":item.reviewedBy):(item.status==="approved"?"Automatic":"");
@@ -505,18 +508,24 @@ function whoLabel(row){return row.isGap?"—":row.by||"—"}
 function undoCell(row){
   if(row.status==="undone")return `<small class="points-undone">Undone</small>`;
   const out=[];
-  if(row.undo)out.push(`<button type="button" class="points-undo" data-undo="${esc(JSON.stringify(row.undo))}" title="Reverse exactly this entry. The undo is added to the history.">↩ Undo</button>`);
-  if(row.batch)out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"batch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole Daily Points save for ${row.batch.count} students">↩ Undo whole save (${row.batch.count})</button>`);
+  if(row.undo&&row.undo.kind==="purchase")out.push(`<button type="button" class="points-undo refund" data-undo="${esc(JSON.stringify(row.undo))}" title="Give the points back for this purchase (and the stock). The refund is added to the history.">↩ Refund</button>`);
+  else if(row.undo)out.push(`<button type="button" class="points-undo" data-undo="${esc(JSON.stringify(row.undo))}" title="Reverse exactly this entry. The undo is added to the history.">↩ Undo</button>`);
+  if(row.batch&&row.batch.kind==="awardbatch")out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"awardbatch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole award for ${row.batch.count} students">↩ Undo whole award (${row.batch.count})</button>`);
+  else if(row.batch)out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"batch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole Daily Points save for ${row.batch.count} students">↩ Undo whole save (${row.batch.count})</button>`);
   if(!out.length&&row.undoHint)out.push(`<small class="points-undone">${esc(row.undoHint)}</small>`);
   return out.join(" ");
 }
 async function runUndo(spec){
-  const whole=spec.kind==="batch";
-  if(!confirm(whole?"Undo this whole Daily Points save for the class? Each student's day goes back to how it was before. The undo is added to the history; nothing is deleted.":"Undo this entry? It is reversed exactly, and the undo is added to the history. Nothing is deleted."))return;
+  const whole=spec.kind==="batch"||spec.kind==="awardbatch",refund=spec.kind==="purchase";
+  const question=spec.kind==="awardbatch"?"Undo this whole award? Every student in it who still has the points gets them taken back (anyone who already spent them is skipped and named). The undo is added to the history; nothing is deleted."
+    :spec.kind==="batch"?"Undo this whole Daily Points save for the class? Each student's day goes back to how it was before. The undo is added to the history; nothing is deleted."
+    :refund?"Refund this purchase? The points go back to the student, and the refund is added to the history. Nothing is deleted."
+    :"Undo this entry? It is reversed exactly, and the undo is added to the history. Nothing is deleted.";
+  if(!confirm(question))return;
   try{
     const result=await teacherApi("undo",spec);
     const skipped=(result.skipped||[]).map(x=>{const s=(state.root?.students||{})[x.studentId];return `${s?.name||x.studentId}: ${x.reason}`});
-    toast(whole?`Undone for ${result.undone} student${result.undone===1?"":"s"}${skipped.length?` · skipped ${skipped.length}: ${skipped.join("; ")}`:""}`:"Undone. The history shows the undo.");
+    toast(whole?`Undone for ${result.undone} student${result.undone===1?"":"s"}${skipped.length?` · skipped ${skipped.length}: ${skipped.join("; ")}`:""}`:refund?"Refunded. The history shows the refund.":"Undone. The history shows the undo.");
   }catch(err){toast(err.message,"error")}
   await loadRoot();render();
 }
@@ -555,6 +564,50 @@ function redeemedPointsForStudent(studentId){
     if(cost>0&&status!=="declined"&&status!=="canceled"&&status!=="refunded")redeemed+=cost;
   }
   return redeemed;
+}
+// ---------- Quick award: the same points to several students (or the whole class) at once; the whole award can be undone in one click ----------
+const QUICK_PRESETS=[1,5,10];
+function quickState(){return state.quick||(state.quick={ids:new Set(),amount:5,custom:"",reason:"",whole:false})}
+function quickInfo(){
+  const q=quickState(),roster=pointsRoster(),c=String(q.custom||"").trim(),amount=c!==""?Number(c):q.amount;
+  const count=q.whole?roster.length:roster.filter(s=>q.ids.has(s.id)).length;
+  return {amount,count,roster,ok:state.pointClassId!=="all"&&Number.isInteger(amount)&&amount!==0&&Math.abs(amount)<=1000&&count>0};
+}
+function quickGoLabel(info){const q=quickState();return info.ok?`Give ${info.amount>0?"+":""}${info.amount} ★ to ${q.whole?"the whole class":info.count+" student"+(info.count===1?"":"s")}`:"Choose points and students"}
+function quickAwardPanel(){
+  if(state.pointClassId==="all")return `<section class="points-section quick-award"><div class="points-section-head"><div><h2>Quick award</h2><p>Choose a class above to give points to several students at once.</p></div></div></section>`;
+  const q=quickState(),info=quickInfo();
+  return `<section class="points-section quick-award"><div class="points-section-head"><div><h2>Quick award</h2><p>Give points to several students at once. It shows in the history below, and one click undoes the whole award.</p></div></div>
+    <div class="qa-row"><span class="qa-label">Points</span>${QUICK_PRESETS.map(n=>`<button type="button" class="qa-preset ${!String(q.custom||"").trim()&&q.amount===n?"active":""}" data-qa-amount="${n}">+${n} ★</button>`).join("")}<input id="qaCustom" class="qa-input" type="number" step="1" placeholder="Other" value="${esc(q.custom)}" aria-label="Custom points"><input id="qaReason" class="qa-input qa-reason" type="text" maxlength="200" placeholder="Reason (e.g. Great davening)" value="${esc(q.reason)}" aria-label="Reason"></div>
+    <div class="qa-row"><span class="qa-label">Who</span><button type="button" class="qa-preset ${q.whole?"active":""}" id="qaWhole">Whole class (${info.roster.length})</button><button type="button" class="qa-link" id="qaAll">Select all</button><button type="button" class="qa-link" id="qaNone">Clear</button></div>
+    <div class="qa-students">${info.roster.map(s=>`<label class="qa-chip ${q.whole||q.ids.has(s.id)?"on":""}"><input type="checkbox" data-qa-student="${esc(s.id)}" ${q.whole||q.ids.has(s.id)?"checked":""} ${q.whole?"disabled":""}>${esc(s.name)}</label>`).join("")}</div>
+    <div class="qa-row"><button type="button" class="primary" id="qaGo" ${info.ok?"":"disabled"}>${esc(quickGoLabel(info))}</button></div></section>`;
+}
+function refreshQuickAward(){
+  const info=quickInfo(),go=document.querySelector("#qaGo");if(!go)return;
+  go.disabled=!info.ok;go.textContent=quickGoLabel(info);
+}
+async function runQuickAward(){
+  const q=quickState(),info=quickInfo();if(!info.ok)return;
+  const who=q.whole?"the whole class":`${info.count} student${info.count===1?"":"s"}`,reason=q.reason.trim()||"Teacher award";
+  if(!confirm(`Give ${info.amount>0?"+":""}${info.amount} ★ to ${who} for “${reason}”?\n\nYou can undo the whole award in one click from the history.`))return;
+  try{
+    const r=await teacherApi("awardBatch",{classId:state.pointClassId,amount:info.amount,reason,wholeClass:q.whole,studentIds:[...q.ids]});
+    toast(`Gave ${info.amount>0?"+":""}${info.amount} ★ to ${r.awarded} student${r.awarded===1?"":"s"}${r.failed?.length?` · ${r.failed.length} could not be updated`:""}. Undo is in the history below.`);
+    q.ids=new Set();q.whole=false;q.custom="";q.reason="";
+  }catch(err){toast(err.message,"error")}
+  await loadRoot();render();
+}
+function bindQuickAward(){
+  const q=quickState(),$=s=>document.querySelector(s);
+  document.querySelectorAll("[data-qa-amount]").forEach(b=>b.onclick=()=>{q.amount=Number(b.dataset.qaAmount);q.custom="";render()});
+  if($("#qaCustom"))$("#qaCustom").oninput=e=>{q.custom=e.target.value;refreshQuickAward()};
+  if($("#qaReason"))$("#qaReason").oninput=e=>{q.reason=e.target.value};
+  if($("#qaWhole"))$("#qaWhole").onclick=()=>{q.whole=!q.whole;render()};
+  if($("#qaAll"))$("#qaAll").onclick=()=>{q.whole=false;q.ids=new Set(pointsRoster().map(s=>s.id));render()};
+  if($("#qaNone"))$("#qaNone").onclick=()=>{q.whole=false;q.ids=new Set();render()};
+  document.querySelectorAll("[data-qa-student]").forEach(b=>b.onchange=()=>{b.checked?q.ids.add(b.dataset.qaStudent):q.ids.delete(b.dataset.qaStudent);b.closest(".qa-chip").classList.toggle("on",b.checked);refreshQuickAward()});
+  if($("#qaGo"))$("#qaGo").onclick=runQuickAward;
 }
 function pointsDashboard(){
   if(state.pointClassId!=="all"&&!state.root?.classes?.[state.pointClassId]?.active)state.pointClassId="all";
@@ -616,6 +669,8 @@ function pointsDashboard(){
     <div class="points-summary single">
       <article><span>${allClasses?"Current all-classes balance":"Current class balance"}</span><strong>${totalBalance} ★</strong><small>Total points currently available for ${r.length} student${r.length===1?"":"s"}${allClasses?" across all classes":` in ${esc(classLabel)}`}</small></article>
     </div>
+
+    ${quickAwardPanel()}
 
     <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Click a student to see an overview of where that student's points came from.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
       <div class="points-student-grid">${byStudent.map(x=>`<button class="points-student-card ${state.pointStudent===x.s.id?"selected":""}" data-points-student="${esc(x.s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(x.s))}">${esc(x.s.initials||initials(x.s.name))}</em><span><b>${esc(x.s.name)}</b><small>${allClasses&&x.classLabel?`${esc(x.classLabel)} · `:""}${x.recent?`Latest: ${esc(x.recent.reason)}`:"No saved activity yet"}</small></span></span><strong>${x.currentBalance} ★</strong></button>`).join("")}</div>
@@ -1012,6 +1067,7 @@ function bindPage(){
       render();
       requestAnimationFrame(()=>document.querySelector(".points-ledger")?.scrollIntoView({behavior:"smooth",block:"start"}));
     });
+    bindQuickAward();
     if($("#pointsReset"))$("#pointsReset").onclick=()=>{state.pointStudent="all";state.pointRange="30";state.pointType="all";state.pointStatus="all";state.pointSearch="";render()};
     if($("#pointsCsv"))$("#pointsCsv").onclick=exportPointsCSV;
   }
