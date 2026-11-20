@@ -59,7 +59,7 @@ test('every student page on the site checks the lock, and every page is classifi
 });
 
 test('every tile on the student home page is a lockable feature', () => {
-  const html = realRead('index.html');
+  const html = require('./render-home-html.cjs')();
   const ids = [...html.matchAll(/class="game-card"[^>]*\bdata-game-id="([^"]+)"/g)].map(m => m[1]);
   assert.ok(ids.length >= 15, 'found the tiles: ' + ids.length);
   for (const id of ids) assert.ok(FEATURES.has(TILE_ALIAS[id] || id), `home tile "${id}" has no lock feature in student-lock-core.js`);

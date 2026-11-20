@@ -43,7 +43,7 @@ function fixture(initial='boards'){
 }
 
 test('one homepage Pointer tile opens the class-and-mode chooser',()=>{
-  const index=read('index.html'),html=read('class-pointer-prototype/dashboard.html');
+  const index=require('./render-home-html.cjs')(),html=read('class-pointer-prototype/dashboard.html');
   for(const mode of ['lesson','screens','boards'])assert.match(html,new RegExp('data-classroom-mode="'+mode+'"'));
   assert.match(index,/<span class="card-title">Classroom Pointer<\/span>/);
   assert.match(index,/class-pointer-prototype\/dashboard\.html\?teacher=1/);

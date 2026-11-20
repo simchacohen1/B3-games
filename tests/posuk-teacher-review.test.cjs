@@ -159,7 +159,7 @@ test('pages: Posuk Practice has no AI grading calls on its path; Chumash חיד�
   assert.doesNotMatch(html, /\n\s*loadOrGenerateTranslationChunks\(\);\n\}/);
   assert.doesNotMatch(html, /\n  wakeScorer\(\);/);
   assert.match(html, /action:'posuk-submit'/);
-  const index = fs.readFileSync('index.html', 'utf8');
+  const index = require('./render-home-html.cjs')();
   assert.match(index, /href="record_pesukim\/student\.html\?mode=quiz"[^>]*>.*Chumash חידון/);
   assert.doesNotMatch(index, /Chumash Test Me/);
 });

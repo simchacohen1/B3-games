@@ -43,7 +43,7 @@ test('Weekly Quiz "Send to Nigri" starts hidden and appears only when the check 
 });
 
 test('home page Sync to Nigri card is hidden by default with a class the card filter cannot undo', () => {
-  const html = read('index.html');
+  const html = require('./render-home-html.cjs')();
   assert.match(html, /<a class="teacher-tool-card nigri-hidden" href="sync-to-nigri\/index\.html" id="nigriSyncCard">/);
   assert.match(html, /\.teacher-tool-card\.nigri-hidden\{display:none!important\}/);
   assert.match(html, /B3SchoolScope\.checkNigri/);

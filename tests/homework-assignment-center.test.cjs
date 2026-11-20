@@ -173,7 +173,7 @@ test('staging guard accepts only the staging host/project and provides local act
 
 test('preview Firebase config and bootstrap stay isolated from production', () => {
   const configSource = fs.readFileSync(__dirname + '/../firebase-config.js', 'utf8');
-  const homeSource = fs.readFileSync(__dirname + '/../index.html', 'utf8');
+  const homeSource = require('./render-home-html.cjs')();
   assert.match(homeSource, /id="homeworkCenterCard" href="assignment-center\/teacher\.html"[^>]*>[\s\S]*?Homework &amp; Assignments/,
     'the main Teacher Tools panel links directly to the Homework Center');
   assert.match(homeSource, /homework-406-preview\|pr-597-homework-notes/,

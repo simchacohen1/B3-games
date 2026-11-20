@@ -70,7 +70,7 @@ test('Teacher Tools whiteboards action targets only chosen class',async()=>{
   assert.match(c.navigated,/sendEveryoneBoards=1/);
 });
 test('Teacher Tools and classroom wire whiteboard launch without automatic all-classes action',()=>{
-  const index=read('index.html'),classroom=read('class-pointer-prototype/classroom.js'),boards=read('class-pointer-prototype/student-boards.js');
+  const index=require('./render-home-html.cjs')(),classroom=read('class-pointer-prototype/classroom.js'),boards=read('class-pointer-prototype/student-boards.js');
   // Teacher Tools now deliberately has one Pointer tile; the modes live in its chooser.
   assert.match(index,/class-pointer-prototype\/dashboard\.html\?teacher=1/);
   assert.match(index,/Classroom Pointer/);
