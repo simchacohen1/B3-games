@@ -35,6 +35,12 @@
   const WRAP_BIG='position:relative;display:flex;flex-direction:column;flex:1;min-height:0';
   const BUTTON='min-height:40px;padding:0 14px;border-radius:10px;border:1px solid #ffffff55;background:#1d4ed8;color:#fff;font:700 15px system-ui;cursor:pointer';
   let focused=null; // student id shown large
+  // A screen whose connection dropped by itself (network trouble) is kept for this long, because the student's
+  // computer quietly calls again: the tile and the large view stay open instead of jumping back to the gallery.
+  const GRACE=20000;
+  const dismissed=new Set();  // students whose screen the teacher closed with Stop viewing
+  const quiet=reason=>Object.assign(Error(reason),{quiet:true});
+  const cancelWait=entry=>{if(entry.waitTimer&&typeof clearTimeout==='function')clearTimeout(entry.waitTimer);entry.waitTimer=null};
 
   function reportFailure(message){
     let notice=document.getElementById('activityScreenFailure');
@@ -75,9 +81,15 @@
   // A tab that was just closed can take a while to report its call closed over the real PeerJS service; its video
   // stops first. Prefer the newest call whose video is still arriving, so the tile never goes blank.
   const liveVideo=stream=>!!stream?.getVideoTracks?.().some(track=>track.readyState==='live'&&!track.muted);
+  // A call that has just arrived has no picture yet. It must never blank a tile that is showing a picture:
+  // keep the last picture until the new one arrives.
+  function pick(entry){
+    const newestFirst=[...entry.calls].reverse();
+    return (newestFirst.find(item=>liveVideo(item.stream))||newestFirst.find(item=>item.stream))?.stream||entry.lastStream||null;
+  }
   function showLatest(entry){
-    const latest=[...entry.calls].reverse().find(item=>liveVideo(item.stream))||entry.calls[entry.calls.length-1];
-    const stream=latest?.stream||null;
+    const stream=pick(entry);
+    if(stream)entry.lastStream=stream;
     if(entry.video.srcObject!==stream){entry.video.srcObject=stream;if(stream)entry.video.play?.().catch?.(()=>{})}
     notify();
   }
@@ -97,16 +109,26 @@
     const dismiss=document.createElement('button');dismiss.textContent='Stop viewing';dismiss.type='button';
     dismiss.title='Close this student’s screen (they can share again)';
     dismiss.style.cssText='align-self:flex-start;min-height:34px;padding:0 12px;border-radius:9px;border:1px solid #ffffff44;background:transparent;color:#fff;cursor:pointer';
-    dismiss.onclick=()=>closeStudent(studentId);
+    dismiss.onclick=()=>stopViewing(studentId);
     // Enlarged, the teacher can point or draw on this screen; the student sees it on his own screen.
-    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video);
+    // Shown over the tile while this student's share has stopped (for example he refreshed his sharing tab), so the
+    // teacher never mistakes the last picture for a live one.
+    const notice=document.createElement('div');notice.hidden=true;notice.dataset.stageUi='true';notice.setAttribute?.('role','status');
+    notice.style.cssText='position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;background:#0b1730f2;color:#fff;font:700 15px system-ui,sans-serif;pointer-events:none';
+    const wrap=document.createElement('div');wrap.style.cssText=WRAP_SMALL;wrap.append(video,notice);
     card.append(top,wrap,dismiss);tray.appendChild(card);
-    entry={card,video,wrap,heading,enlarge,name,calls:[]};students.set(studentId,entry);
+    entry={card,video,wrap,heading,enlarge,notice,name,calls:[]};students.set(studentId,entry);
     entry.ink=window.ClassPointerScreenMarks?.attach?.(wrap,video,()=>focused===studentId&&students.get(studentId)===entry?{id:studentId,name:entry.name}:null)||null;
     setFocus(focused);
     return entry;
   }
-  function clear(call){
+  function removeEntry(studentId,entry){
+    cancelWait(entry);
+    entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null;window.ClassPointerScreenMarks?.clearFor(studentId);
+  }
+  // deliberate: the teacher closed it, the student stopped, or sharing was turned off. Otherwise the connection
+  // ended by itself, and the tile waits a short while for the student's computer to call again.
+  function clear(call,deliberate){
     const studentId=screens.get(call);if(studentId===undefined)return;
     screens.delete(call);
     const entry=students.get(studentId);
@@ -114,14 +136,38 @@
       entry.calls=entry.calls.filter(item=>item.call!==call);
       // Another tab of the same boy is still sharing: keep his tile and show that screen.
       if(entry.calls.length)showLatest(entry);
-      else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null;window.ClassPointerScreenMarks?.clearFor(studentId)}
+      else if(deliberate===true||!entry.lastStream||typeof setTimeout!=='function')removeEntry(studentId,entry);
+      else{
+        // The connection ended by itself: say so now. The tile stays a short while for the student to resume.
+        entry.stopped=true;
+        entry.heading.textContent=entry.name+' · Sharing stopped';
+        entry.notice.textContent='⏸ '+entry.name+' stopped sharing. Waiting for them to resume…';entry.notice.hidden=false;
+        if(entry.video.srcObject){try{entry.video.pause?.()}catch{}entry.video.srcObject=null}
+        cancelWait(entry);
+        entry.waitTimer=setTimeout(()=>{
+          if(students.get(studentId)!==entry||entry.calls.length)return;
+          removeEntry(studentId,entry);setFocus(focused);notify();
+        },GRACE);
+        entry.waitTimer?.unref?.();
+      }
     }
     setFocus(focused);
     notify();
   }
   function closeStudent(studentId){
     const entry=students.get(studentId);if(!entry)return;
-    for(const item of entry.calls.slice()){close(item.call);clear(item.call)}
+    for(const item of entry.calls.slice()){close(item.call);clear(item.call,true)}
+    // A tile that was only waiting for its student to reconnect goes too.
+    if(students.get(studentId)===entry){removeEntry(studentId,entry);setFocus(focused);notify()}
+  }
+  // "Stop viewing": the teacher ends this student's share. His computer is told to stop, so it does not call back.
+  function stopViewing(studentId){
+    dismissed.add(studentId);
+    try{
+      const bridge=window.ClassPointerBridge;
+      for(const person of bridge?.presence?.().values()||[])if(person.admitted&&person.studentId===studentId)bridge.send(person.connection,{type:'share-stop'});
+    }catch{}
+    closeStudent(studentId);
   }
   async function incomingCall(call){
     if(call.metadata?.kind!=='activity-screen')return false;
@@ -140,12 +186,17 @@
       if(document.getElementById('endClass').disabled)throw Error('Lesson ended');
       if(typeof verified.studentId!=='string'||!verified.studentId)throw Error('The server did not confirm which student this is.');
       // A student the teacher removed from this class session is not shown.
-      if((window.ClassPointerRoster?.removedIds?.()||[]).includes(verified.studentId))throw Error(verified.studentName+' was removed from this class.');
+      // resume: the student's computer is calling again by itself after its connection dropped.
+      const resume=call.metadata?.resume===true;
+      if((window.ClassPointerRoster?.removedIds?.()||[]).includes(verified.studentId))throw (resume?quiet:Error)(verified.studentName+' was removed from this class.');
+      if(resume&&dismissed.has(verified.studentId))throw quiet('The teacher stopped viewing this screen.');
+      if(!resume)dismissed.delete(verified.studentId);
       const priorFailure=document.getElementById('activityScreenFailure');if(priorFailure)priorFailure.hidden=true;
       const entry=tileFor(verified.studentId,String(verified.studentName||'Student'));
       const item={call,stream:null};entry.calls.push(item);screens.set(call,verified.studentId);
+      cancelWait(entry);
       call.on('stream',stream=>{
-        if(!screens.has(call))return;item.stream=stream;showLatest(entry);
+        if(!screens.has(call))return;item.stream=stream;entry.stopped=false;entry.notice.hidden=true;entry.heading.textContent=entry.name+' · Live screen';showLatest(entry);
         // Re-pick the picture whenever this screen's video stops or starts again.
         for(const track of stream.getVideoTracks?.()||[])for(const type of ['mute','unmute','ended'])track.addEventListener?.(type,()=>{if(screens.has(call))showLatest(entry)});
       });
@@ -154,7 +205,7 @@
       call.on('close',later);call.on('error',later);
       call.answer();
       tray.hidden=!!(document.getElementById('boardsView')&&!document.getElementById('boardsView').hidden);
-    }catch(e){console.warn('Class Pointer activity screen rejected:',e?.message||e);reportFailure(e?.message||'Unknown connection error');close(call)}
+    }catch(e){console.warn('Class Pointer activity screen rejected:',e?.message||e);if(e?.quiet!==true)reportFailure(e?.message||'Unknown connection error');close(call)}
     return true;
   }
   window.ClassPointerActivityShares={incomingCall,
@@ -163,10 +214,15 @@
     count:()=>students.size,
     // The newest live MediaStream this verified student is sharing (null when none). The large Student Screens
     // viewer in student-boards.js uses this, because these students are not joined to Pointer.
+    // True while this student's share has ended by itself (for example he refreshed his sharing tab) and the tile is
+    // waiting for him to resume. The large viewer labels its last picture with this instead of passing it off as live.
+    stopped:studentId=>!!(typeof studentId==='string'&&students.get(studentId)?.stopped),
     streamFor:studentId=>{
       const entry=typeof studentId==='string'?students.get(studentId):null;
-      return entry?.calls[entry.calls.length-1]?.stream||null;
+      return entry?pick(entry):null;
     },
+    // The student's own page says he stopped sharing: take his tile away now instead of waiting for the connection to time out.
+    studentStopped(studentId){if(typeof studentId==='string')closeStudent(studentId)},
     revokeStudents(studentIds){
       const denied=new Set(Array.isArray(studentIds)?studentIds:[]);
       for(const id of Array.from(students.keys()))if(denied.has(id))closeStudent(id);

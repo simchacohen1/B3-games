@@ -97,7 +97,7 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
       const functionName=path.basename(url.pathname);
       if(functionName in syntheticFunctions)return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(syntheticFunctions[functionName]),headers:{'access-control-allow-origin':origin(),'access-control-allow-headers':'authorization,content-type'}});
       try{
-        const response=await route.fetch({url:`http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/us-central1/${path.basename(url.pathname)}`,headers:{...req.headers(),origin:'https://funtorahtools.com'}});
+        const response=await route.fetch({url:`http://127.0.0.1:${FUNCTIONS_PORT}/${PROJECT}/us-central1/${path.basename(url.pathname)}`,headers:{...req.headers(),origin:'https://sols.tools'}});
         if(!response.ok())failed.push(`${response.status()} ${url.pathname}`);
         return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin(),vary:'Origin'}});
       }catch(error){

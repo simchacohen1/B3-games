@@ -37,6 +37,8 @@ const pointerIcons={
   sparkle:'<path d="M16 1L19.5 12.5L31 16L19.5 19.5L16 31L12.5 19.5L1 16L12.5 12.5Z" fill="currentColor"/><path d="M26 1L27.5 5.5L32 7L27.5 8.5L26 13L24.5 8.5L20 7L24.5 5.5Z" fill="currentColor"/>'
 };
 function status(text){$('connectionStatus').textContent=text}
+// A student who is in the class but sees nothing yet is told so plainly (the teacher never sees this text).
+if(!isTeacher){const waiting=$('placeholder');if(waiting)waiting.textContent='Waiting for your teacher… What your teacher shows will appear here by itself. You do not need to do anything.'}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
 // A student on an activity page draws on a picture of the part of the teacher's screen that shows, but the teacher
@@ -64,18 +66,25 @@ function markOwner(id){return highlightStore.strokes.find(mark=>mark.id===id)?.o
 // student's marks or the teacher's. Each change is converted like a new mark. Returns true when something changed.
 function replaceStudentMarks(member,changes){
   if(!Array.isArray(changes))return false;
+  const editable=id=>highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark));
   let changed=false;
-  for(const change of changes.slice(0,60)){
-    if(!change||typeof change.id!=='string'||!change.stroke||!C.cleanStroke(change.stroke))continue;
-    const converted=studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke;
-    if(highlightStore.replace(member.id,change.id,converted))changed=true;
-  }
+  // A move of several marks is one step for the student's Undo.
+  highlightStore.group(member.id,()=>{
+    for(const change of changes.slice(0,60)){
+      if(!change||typeof change.id!=='string'||!editable(change.id)||!change.stroke||!C.cleanStroke(change.stroke))continue;
+      const converted=member.presence?studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke:change.stroke;
+      if(highlightStore.replace(member.id,change.id,converted))changed=true;
+    }
+  });
   return changed;
 }
+function canEditStudentMark(member,mark){return C.isHighlightShape(mark.tool)?writingAllowed(mark.tool,member):member.presence&&toolAllowed('pen',member)}
 function eraseStudentMarks(member,ids){
   if(!Array.isArray(ids))return false;
   let changed=false;
-  for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id)){highlightStore.edit(member.id,'erase',id);changed=true}
+  highlightStore.group(member.id,()=>{
+    for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark))){highlightStore.edit(member.id,'erase',id);changed=true}
+  });
   return changed;
 }
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
@@ -87,7 +96,10 @@ function selected(member){return !!member?.admitted&&member.allowed===true&&stat
 function memberTools(member){return member?.tools||state.tools}
 function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)&&memberTools(member)?.[tool]===true}
 function allowed(){return toolAllowed('pointer')}
-function writingAllowed(tool){return toolAllowed(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(tool)?'pen':'highlight')}
+function writingAllowed(tool,member=ownMember()){
+  if(C.isHighlightShape(tool)||tool==='select')return toolAllowed('highlight',member)||toolAllowed('pen',member);
+  return toolAllowed(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(tool)?'pen':'highlight',member);
+}
 function pointerPermission(){
   const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
   if(!mayPoint)cancelHover();if(!mayWrite)highlighter?.cancel()
@@ -95,7 +107,7 @@ function pointerPermission(){
     // The same permission decides the drawing toolbar on the student's own shared screen (none by default).
     const own=ownMember(),level=!selected(own)?'none':memberTools(own)?.pen?'pen':memberTools(own)?.highlight?'highlight':memberTools(own)?.pointer?'point':'none';
     window.FTTAnnotate?.setStudentLevel?.(level);
-    const tool=$('studentTool');if(tool){for(const option of tool.options){if(C.highlightTools.includes(option.value))option.disabled=!writingAllowed(option.value);else option.disabled=!mayPoint;option.hidden=option.disabled}if(tool.selectedOptions[0]?.disabled){const first=Array.from(tool.options).find(o=>!o.disabled);if(first){tool.value=first.value;tool.dispatchEvent(new Event('change',{bubbles:true}))}}}
+    const tool=$('studentTool');if(tool){for(const option of tool.options){if(C.highlightTools.includes(option.value)||option.value==='select')option.disabled=!writingAllowed(option.value);else option.disabled=!mayPoint;option.hidden=option.disabled}if(tool.selectedOptions[0]?.disabled){const first=Array.from(tool.options).find(o=>!o.disabled);if(first){tool.value=first.value;tool.dispatchEvent(new Event('change',{bubbles:true}))}}}
     $('permissionText').textContent=!admitted?'Connecting to your class.':!mayPoint?'Watch the lesson. Your teacher has not enabled your pointer.':mayWrite?'Use the tools your teacher enabled.':'Pointer only. Your teacher has not enabled writing tools.';
   }
 }
@@ -257,6 +269,14 @@ function receiveStudent(connection){
   let joinPending=false;
   connection.on('data',message=>{
     if(!message||typeof message!=='object')return;
+    // A student's heartbeat: answer it, and remember when it came and how slow the link is (shown as a dot by their name).
+    if(message.type==='ping'){
+      if(member&&(member.presence?presence.get(member.id):members.get(member.id))===member){
+        member.lastPing=Date.now();member.rtt=Number.isFinite(message.rtt)?Math.min(60000,Math.max(0,message.rtt)):0;member.weak=message.weak===true;
+        try{connection.send({type:'pong',t:message.t})}catch{}
+      }
+      return;
+    }
     if(member?.presence){
       if(presence.get(member.id)!==member)return;
       if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}
@@ -291,11 +311,11 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(message.type==='poll-vote'){window.ClassPointerPoll?.fromStudent(member,message);return}
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&writingAllowed(message.stroke?.tool,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
       if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
-      // Select on an activity page: only with pen permission, and only the sender's own marks.
-      else if(member.presence&&selected(member)&&memberTools(member)?.pen===true){
+      // Select edits only the sender's own marks. Highlight permission covers highlight shapes.
+      else if(live()&&writingAllowed('select',member)){
         if(message.action==='replace'&&replaceStudentMarks(member,message.changes))publishHighlights();
         else if(message.action==='erase'&&eraseStudentMarks(member,message.ids))publishHighlights();
       }
@@ -650,7 +670,7 @@ function joinClass(event){
     if(call.peer!==room||!teacherConnection?.open){call.close();return}
     mediaCall?.close();mediaCall=call;call.answer();
     call.on('stream',incoming=>{if(mediaCall!==call)return;$('lesson').srcObject=incoming;$('placeholder').hidden=true;$('lesson').play().catch(error=>{if(mediaCall===call&&error.name!=='AbortError')fail('Click the lesson to resume video playback.')});send(teacherConnection,{type:'video-ready'});status('Live teaching screen received.');drawPointers()});
-    call.on('close',()=>{if(mediaCall===call){mediaCall=null;$('lesson').srcObject=null;$('placeholder').hidden=false;status('Teaching screen paused.');drawPointers()}});
+    call.on('close',()=>{if(mediaCall===call){mediaCall=null;$('lesson').srcObject=null;$('placeholder').hidden=false;status('Waiting for your teacher…');drawPointers()}});
     call.on('error',()=>fail('Could not receive the teaching screen. Leave and rejoin, or try another network.'));
   });
   peer.on('connection',connection=>connection.close());
@@ -699,8 +719,8 @@ function applyLevel(member,level){
 if(isTeacher)window.ClassPointerRoster={
   levels:LEVELS.slice(),
   everyone:()=>defaultLevel,
-  list:()=>[...Array.from(members.values()).map(m=>({id:m.id,name:m.name,studentId:m.studentId||null,admitted:!!m.admitted,color:m.color,level:levelOf(m)})),
-    ...Array.from(presence.values()).filter((p,i,all)=>!Array.from(members.values()).some(m=>m.studentId&&m.studentId===p.studentId)&&all.findIndex(o=>o.studentId===p.studentId)===i).map(p=>({id:p.id,name:p.name,studentId:p.studentId,admitted:true,presence:true,activity:p.activity,level:savedLevel(p.name)}))],
+  list:()=>[...Array.from(members.values()).map(m=>({id:m.id,name:m.name,studentId:m.studentId||null,admitted:!!m.admitted,color:m.color,level:levelOf(m),lastPing:m.lastPing||0,rtt:m.rtt||0,weak:m.weak===true})),
+    ...Array.from(presence.values()).filter((p,i,all)=>!Array.from(members.values()).some(m=>m.studentId&&m.studentId===p.studentId)&&all.findIndex(o=>o.studentId===p.studentId)===i).map(p=>({id:p.id,name:p.name,studentId:p.studentId,admitted:true,presence:true,activity:p.activity,level:savedLevel(p.name),lastPing:p.lastPing||0,rtt:p.rtt||0,weak:p.weak===true}))],
   levelForName(name){const key=String(name).toLocaleLowerCase();const m=Array.from(members.values()).find(x=>x.admitted&&x.name.toLocaleLowerCase()===key);return m?levelOf(m):savedLevel(name)},
   setLevelForName(name,level){
     if(!LEVELS.includes(level))return;const key=String(name).toLocaleLowerCase();nameLevels.set(key,level);
@@ -761,9 +781,14 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
-  edit(action,id){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action,id);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
+  edit(action,id){if(isTeacher){if(action==='all')highlightStore.clearAll('teacher');else highlightStore.group('teacher',()=>highlightStore.edit('teacher',action,id));publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
+function editOwnHighlightShape(id,stroke){
+  if(!window.ClassPointerPdf?.active()||!live()||!writingAllowed('select')||!teacherConnection?.open)return false;
+  send(teacherConnection,stroke?{type:'edit-highlights',action:'replace',changes:[{id,stroke}]}:{type:'edit-highlights',action:'erase',ids:[id]});
+  return true;
+}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
 window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   // What the lesson shows now: 'screen', 'pdf', 'webpage', 'whiteboard' or null (used by classroom-annotate.js).
@@ -775,16 +800,16 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   navigating:()=>navigating,
   refreshActivityMarks(){for(const entry of presence.values())if(entry.admitted)send(entry.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})},
   highlights:()=>highlightStore.strokes,
-  // Teacher only: erase one of the teacher's own marks, or change it in place (Select: move, resize, recolor).
+  // The teacher can edit any mark. A student can request an edit to their own highlight shape.
   // The whole mark list is sent again, exactly as after a new mark, so student pages need nothing new.
-  eraseMark(id){if(!isTeacher)return false;const before=highlightStore.strokes.length;highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMark(id){if(!isTeacher)return editOwnHighlightShape(id);const before=highlightStore.strokes.length;highlightStore.group('teacher',()=>highlightStore.edit(markOwner(id),'erase',id));if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Erase several of the teacher's own marks (every line of one block of words). Sent to the class once.
-  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;for(const id of ids)highlightStore.edit(markOwner(id),'erase',id);if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
+  eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;highlightStore.group('teacher',()=>{for(const id of ids)highlightStore.edit(markOwner(id),'erase',id)});if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
-  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.swap(owner,ids,strokes);if(made)publishHighlights();return made},
-  replaceMark(id,stroke){if(!isTeacher||!highlightStore.replace(markOwner(id),id,stroke))return false;publishHighlights();return true},
+  swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.group('teacher',()=>highlightStore.swap(owner,ids,strokes));if(made)publishHighlights();return made},
+  replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.group('teacher',()=>highlightStore.replace(markOwner(id),id,stroke)))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
-  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed;if(changed)publishHighlights();return changed},
+  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},

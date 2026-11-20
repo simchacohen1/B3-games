@@ -207,7 +207,7 @@ test.describe('teacher: Class Access, Follow and Class Pointer buttons work on e
         }).catch(() => 'not shown');
       } else {
         row.bar = gate ? 'shown (after the page\'s own class screen)' : 'shown';
-        row.lock = await tryPanel(page, BUTTONS.lock, 'Class Access', 'admin.html');
+        row.lock = await tryPanel(page, BUTTONS.lock, 'Class Access', 'class-locks/index.html');
         row.follow = await tryPanel(page, BUTTONS.follow, 'Follow the Teacher controls', 'follow-teacher/teacher.html');
         row.pointer = await tryPointer(page, BUTTONS.pointer);
       }

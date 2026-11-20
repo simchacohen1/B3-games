@@ -250,6 +250,13 @@ function init(){
   return out;
  }
  let renderQueued=false;
+ // lost: no heartbeat for 20 seconds. weak: the student reports a bad link, or answers take over 1.5 seconds.
+ function linkState(m){
+  if(!m?.lastPing)return '';
+  if(Date.now()-m.lastPing>20000)return 'lost';
+  return m.weak||m.rtt>1500?'weak':'';
+ }
+ setInterval(()=>{if((R()?.list()||[]).some(m=>m.lastPing))queueRender()},6000);
  function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;renderTable()})}
  function renderTable(){
   const list=rows();
@@ -267,6 +274,11 @@ function init(){
    dot.setAttribute('role','img');dot.setAttribute('aria-label',m?.admitted?'Joined':m?'Waiting':'Not joined');
    const name=el('span','cp-name-text',row.name);name.title=row.name;
    nameCell.append(dot,name);
+   // A weak or lost connection: an orange or red dot beside the name (only for students whose page sends a heartbeat).
+   const link=m?.admitted?linkState(m):'';
+   if(link){const weak=el('span','cp-weak cp-weak-'+link);weak.setAttribute('role','img');
+    weak.setAttribute('aria-label',link==='lost'?row.name+': no signal, probably reconnecting':row.name+': weak connection');
+    weak.title=link==='lost'?'No signal from '+row.name+' for a while. Their connection may have dropped.':row.name+' has a weak connection. Their picture may be slow.';nameCell.append(weak)}
    // Connected from another Fun Torah Tools page: joined, working in that activity.
    if(m?.presence){const where=el('span','cp-where',m.activity?'in '+m.activity:'in an activity');where.style.cssText=WHERE;where.title=row.name+' is connected from '+(m.activity||'another activity');nameCell.append(where);dot.setAttribute('aria-label','Joined from '+(m.activity||'another activity'))}
    const wasRemoved=!m&&!!row.id&&(R()?.removedIds?.()||[]).includes(row.id);
@@ -303,7 +315,9 @@ function init(){
   const live=R()?.list()||[];
   const inClass=live.filter(m=>m.admitted).length,waiting=live.length-inClass;
   const total=(S()?.loaded?.()?list.length:0);
-  joined.textContent=(total?inClass+' of '+total+' joined':inClass?inClass+' joined':'No students yet')+(waiting?' · '+waiting+' waiting':'');
+  // "Joined" only counts who is connected. Say so when nothing is being shown, because then they see no lesson.
+  let idle=false;try{idle=!!stage&&!docOpen()&&!sharingScreen()&&!document.body.classList.contains('boards-on')}catch{}
+  joined.textContent=(total?inClass+' of '+total+' joined':inClass?inClass+' joined':'No students yet')+(waiting?' · '+waiting+' waiting':'')+(idle&&inClass?' · nothing shown':'');
   joined.classList.toggle('cp-joined-alert',waiting>0);
  }
  document.addEventListener('classpointer:roster',queueRender);
@@ -424,8 +438,13 @@ function init(){
   else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
  });
 
+ let wasLive=false;
  function syncLive(){
   const isLive=docOpen()||sharingScreen();
+  // Leaving the whiteboard (or a PDF, webpage or screen share): the old "Whiteboard open for everyone…" line must go.
+  if(wasLive&&!isLive){const line=$('connectionStatus');if(line)line.textContent='Nothing is shown to students right now. Pick what to teach from.'}
+  const changed=wasLive!==isLive;wasLive=isLive;
+  if(changed){try{syncJoined()}catch{}}
   const boards=document.body.classList.contains('boards-on');
   document.body.classList.toggle('cp-is-live',isLive);
   pickerCard.hidden=isLive||boards||panel.hidden;

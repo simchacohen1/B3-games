@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="/domain-redirect.js"></script>
 
 <script>document.documentElement.classList.add("b3-home-auth-pending");</script>
 
@@ -146,6 +146,7 @@
   .approval-center-x{border:0;background:#eef2f7;color:#334155;border-radius:999px;width:36px;height:36px;font-size:22px;font-weight:900;cursor:pointer;flex:0 0 auto}
   .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
   .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
+  .approval-center-item-with-classes{position:relative}.approval-center-primary{color:inherit;text-decoration:none}.approval-center-primary::after{content:"";position:absolute;inset:0}.approval-center-class-link{position:relative;color:inherit}
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
   .home-class-bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 6px 5px 14px;box-shadow:0 6px 16px rgba(0,0,0,.16);font-weight:900;color:#1f2937}
   .home-class-bar.hidden{display:none}
@@ -434,8 +435,12 @@ document.addEventListener("DOMContentLoaded",function(){
   });
 });
 </script>
+<script src="shared/home-tool-registry.js?v=20261120-shared-tiles"></script>
 <script src="approval-queue.js?v=20261021-approvals" defer></script>
+<script src="student-roster-csv.js?v=20261118-roster1" defer></script>
+<script src="record_pesukim/grading-queue.js" defer></script>
 <script defer src="audio-mode.js?v=20261116-no-audio-button"></script>
+<script defer src="student-lock.js?v=20261120-locks1" data-feature="home"></script>
 </head>
 <body>
   <h1>Fun Torah Tools</h1>
@@ -477,74 +482,16 @@ document.addEventListener("DOMContentLoaded",function(){
   <div id="gamesArea" class="hidden">
     <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while Fun Torah Tools is locked, only the activity or activities shown below are available to you.</div>
     <div class="island-intro"><div><h2>Welcome to Learning Island!</h2><p>Choose a place to explore.</p></div></div>
-    <div class="game-container island-map" aria-label="Learning Island destinations">
-            <section class="game-group island-place island-main" data-game-group="learn">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true"><svg viewBox="0 0 64 64" width="52" height="52" role="img" aria-label="Rebbe"><path d="M9 64c0-13 10-20 23-20s23 7 23 20z" fill="#1f2937"/><path d="M26 44l6 13 6-13z" fill="#fff"/><ellipse cx="32" cy="29" rx="11" ry="12" fill="#f3c79d"/><path d="M20.5 28c0 15 5 25 11.5 25s11.5-10 11.5-25c-2 6-6 9-11.5 9s-9.5-3-11.5-9z" fill="#4a3426"/><path d="M27 36.5c2-1.6 3.5-1.6 5-.6 1.5-1 3-1 5 .6-2 .8-3.5 1-5 .4-1.5.6-3 .4-5-.4z" fill="#4a3426"/><circle cx="28" cy="28" r="1.5" fill="#1f2937"/><circle cx="36" cy="28" r="1.5" fill="#1f2937"/><path d="M25.5 24.5q2.5-1.5 5 0M33.5 24.5q2.5-1.5 5 0" stroke="#4a3426" stroke-width="1.3" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="19" rx="18" ry="3.6" fill="#111827"/><path d="M21.5 19c0-8 3-12.5 10.5-12.5S42.5 11 42.5 19z" fill="#111827"/><path d="M21.8 15.5h20.4v3H21.8z" fill="#374151"/><path d="M32 7.5v4" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg></span><div><div class="game-group-title">Chumash Cheder</div><div class="game-group-subtitle">Learn your posuk, then review it</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
-<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record_pesukim/student.html?mode=quiz"><span class="card-icon">🧠</span><span class="card-title">Chumash חידון</span></a>
-<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record-mishnayos/student.html"><span class="card-icon">📖</span><span class="card-title">Mishnayos Practice</span></a>
-<a class="game-card" data-game-id="posuk-practice-scroll" data-companion-of="posuk-practice-scroll" href="record-mishnayos/student.html?mode=quiz"><span class="card-icon">🧠</span><span class="card-title">Mishnayos חידון</span></a>
-<a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a></div>
-      </section>
-            <section class="game-group island-place island-main island-roots" data-game-group="roots">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🌳</span><div><div class="game-group-title">Shorashim Grove</div><div class="game-group-subtitle">Grow your Hebrew word skills</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a></div>
-      </section>
-            <section class="game-group island-place " data-game-group="skills">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" loading="lazy" decoding="async" width="74" height="74" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
-<a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
-      </section>
-            <section class="game-group island-place " data-game-group="more-learning">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🕍</span><div><div class="game-group-title">Learning Beis Midrash</div><div class="game-group-subtitle">Halacha and Sefer HaMitzvos</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
-<a class="game-card" data-game-id="sefer-hamitzvos" href="sefer-hamitzvos/index.html"><span class="card-icon">📖</span><span class="card-title">Sefer HaMitzvos</span></a></div>
-      </section>
-            <section class="game-group island-place " data-game-group="class">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏡</span><div><div class="game-group-title">Class Village</div><div class="game-group-subtitle">Your gallery and rewards</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
-<a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a></div>
-      </section>
-            <section class="game-group island-place " data-game-group="challenge">
-        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏆</span><div><div class="game-group-title">Challenge Playground</div><div class="game-group-subtitle">Quiz yourself or play a game</div></div></div>
-        <div class="game-group-grid"><a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
-<a class="game-card" data-game-id="multiplayer-center" href="multiplayer/index.html"><span class="card-icon">🎲</span><span class="card-title">Multiplayer Center</span></a></div>
-      </section>
-    </div>
+    <div class="game-container island-map" id="islandMap" aria-label="Learning Island destinations"></div>
+    <script>document.getElementById("islandMap").innerHTML=B3HomeToolRegistry.renderMap({audience:"student"});</script>
     <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
   </div>
 
   <div id="teacherToolsSection" class="teacher-tools-section hidden">
     <h2>👨‍🏫 Teacher Tools</h2>
     <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
-    <div class="teacher-tools-container">
-      <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
-      <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
-      <a class="teacher-tool-card" id="homeworkCenterCard" href="assignment-center/teacher.html"><span class="card-icon">📚</span><span class="card-title">Homework &amp; Assignments</span></a>
-      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
-      <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
-      <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
-      <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
-      <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="record-mishnayos/teacher.html" ><span class="card-icon">📖</span><span class="card-title">Mishnayos Practice — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="chazara/teacher.html" ><span class="card-icon">🔁</span><span class="card-title">Chazara — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="rashi-letters/teacher.html" ><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="gematria/teacher.html" ><span class="card-icon">🔢</span><span class="card-title">Gematria — Teacher Dashboard</span></a>
-      <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">🏅</span><span class="card-title">Student Rewards — Teacher</span></a>
-      <a class="teacher-tool-card" href="weekly-quiz/teacher.html" ><span class="card-icon">📝</span><span class="card-title">Weekly Quiz — Teacher</span></a>
-      <a class="teacher-tool-card" href="halacha/index.html?teacher=1&v=20261007-teacher-sync" ><span class="card-icon">📔</span><span class="card-title">Halacha — Teacher Lesson</span></a>
-      <a class="teacher-tool-card" href="halacha/teacher.html" ><span class="card-icon">🗂️</span><span class="card-title">Halacha — Student Work</span></a>
-      <a class="teacher-tool-card" href="chavrusa/index.html" ><span class="card-icon">👥</span><span class="card-title">Chavrusa of the Day</span></a>
-      <a class="teacher-tool-card" href="name-picker/index.html" ><span class="card-icon">🎡</span><span class="card-title">Name Picker</span></a>
-      <a class="teacher-tool-card" href="class-dashboard/index.html" ><span class="card-icon">📊</span><span class="card-title">Class Dashboard</span></a>
-      <a class="teacher-tool-card" href="student-report/index.html" ><span class="card-icon">📈</span><span class="card-title">Student Report — All Tools</span></a>
-      <a class="teacher-tool-card nigri-hidden" href="sync-to-nigri/index.html" id="nigriSyncCard"><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
-      <a class="teacher-tool-card" href="davening_student_app_et/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — ET</span></a>
-      <a class="teacher-tool-card" href="davening_student_app_wt/index.html" ><span class="card-icon" role="img" aria-label="Siddur">📖</span><span class="card-title">Davening Player — WT</span></a>
-    </div>
+    <div class="teacher-tools-container" id="teacherToolsContainer"></div>
+    <script>document.getElementById("teacherToolsContainer").innerHTML=B3HomeToolRegistry.renderTeacherTools({audience:"admin"});</script>
   </div>
 
   <div id="versionModal" class="version-modal hidden" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle">
@@ -613,6 +560,10 @@ document.addEventListener("DOMContentLoaded",function(){
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
           <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
           <button id="showAddStudentButton" class="admin-action" type="button" style="margin:0">+ Add Student</button>
+          <div style="display:flex;gap:6px;align-items:end;flex-wrap:wrap">
+            <select id="rosterCsvScope" class="override-student-select" aria-label="Which students to download" style="min-width:140px"><option value="class">This class</option></select>
+            <button id="downloadRosterButton" class="admin-action secondary" type="button" style="margin:0">⬇ Download roster (CSV)</button>
+          </div>
 
         </div>
         <details id="classToolsArea" class="hidden"><summary>Passcode privacy</summary><button id="securePasscodesButton" class="admin-action secondary" type="button">Make all passcodes private</button></details>
@@ -793,6 +744,7 @@ document.addEventListener("DOMContentLoaded",function(){
     "posuk-practice-scroll":"record_pesukim/teacher.html",
     "rashi-letters":"rashi-letters/teacher.html",
     "gematria":"gematria/teacher.html",
+    "daily-checklist":"daily-checklist/teacher.html",
     "shorashim":"shorashim/teacher.html?v=20260917-correct-dashboard",
     "chazara":"chazara/teacher.html",
     "game-show":"game-show/teacher.html",
@@ -859,7 +811,14 @@ document.addEventListener("DOMContentLoaded",function(){
     // The owner can still manage the complete B3 student directory.
     let studentIds=[];
     if(isOwner){
-      studentIds=await ownerStudentIds();
+      try{studentIds=await ownerStudentIds();}
+      catch(error){
+        // The whole student directory is not readable by this account. Use the students in the classes instead (as a teacher does).
+        console.warn("Student directory not readable; listing the students in the classes.",error);
+        const ids=new Set();
+        Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
+        studentIds=[...ids];
+      }
     }else{
       const ids=new Set();
       Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
@@ -881,6 +840,13 @@ document.addEventListener("DOMContentLoaded",function(){
     studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+escHtml(id)+'">'+escHtml(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
 
+    rosterContext={classes,students,classLabel,isOwner};
+    const scopeSel=el("rosterCsvScope");
+    if(scopeSel){
+      const wantAll=isOwner&&classIds.length>1;
+      if(wantAll&&!scopeSel.querySelector('option[value="all"]'))scopeSel.insertAdjacentHTML("beforeend",'<option value="all">All classes</option>');
+      if(!wantAll){const a=scopeSel.querySelector('option[value="all"]');if(a)a.remove();}
+    }
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
       const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
@@ -899,6 +865,36 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   // Why the last student request was refused (for example a possible duplicate).
   let lastStudentActionError=null;
+  // What the Students list last loaded, for the roster download.
+  let rosterContext=null;
+  // Download the roster as a CSV. Passcodes come from the same server request the list uses (it checks that the signed-in
+  // teacher owns the class); "All classes" is owner-only and asks for each class in turn.
+  async function downloadRoster(){
+    const status=el("classManagementStatus"),button=el("downloadRosterButton"),csv=window.B3RosterCsv,ctx=rosterContext;
+    if(!csv||!ctx){status.textContent="The student list is not loaded yet. Try again in a moment.";return;}
+    const all=el("rosterCsvScope").value==="all"&&ctx.isOwner;
+    const classIds=all?Object.keys(ctx.classes).sort((a,b)=>String(ctx.classLabel(a)).localeCompare(String(ctx.classLabel(b)))):[el("manageClassSelect").value].filter(id=>ctx.classes[id]);
+    if(!classIds.length){status.textContent="Choose a class first.";return;}
+    button.disabled=true;status.textContent="Preparing the roster…";
+    try{
+      const rows=[];
+      for(const classId of classIds){
+        const listed=await trustedStudentAction("list",{classId});
+        if(!listed)return;   // the page already shows why
+        const members=(ctx.classes[classId]&&ctx.classes[classId].members)||{};
+        Object.keys(members).sort((a,b)=>String(members[a]?.name||ctx.students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||ctx.students[b]?.profile?.name||b))).forEach(id=>{
+          const profile=ctx.students[id]?.profile||{};
+          rows.push({className:String(ctx.classLabel(classId)),name:members[id]?.name||profile.name||id,passcode:(listed.passcodes||{})[id]||"",status:csv.accessStatus(members[id],profile)});
+        });
+      }
+      const label=all?"all-classes":String(ctx.classLabel(classIds[0]));
+      const blob=new Blob([csv.rosterCsv(rows)],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download=csv.fileName(label);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      status.textContent="Roster downloaded ("+rows.length+" student"+(rows.length===1?"":"s")+"). It has passcodes: keep the file private.";
+    }catch(error){
+      status.textContent="The roster could not be prepared. Nothing was changed. ("+((error&&error.message)||"unknown error")+")";
+    }finally{button.disabled=false;}
+  }
   async function trustedStudentAction(action,data={}){
     lastStudentActionError=null;
     try{
@@ -1014,6 +1010,7 @@ document.addEventListener("DOMContentLoaded",function(){
   let approvalCenterLoading=false;
   let approvalCounts={};
   let approvalClassCounts={};
+  let approvalPosukRecordings=null;
   let approvalClassNames={};
   let approvalSweepAt=0;
   const APPROVAL_POLL_MS=60000,APPROVAL_SWEEP_MIN_MS=5*60000;
@@ -1048,8 +1045,9 @@ document.addEventListener("DOMContentLoaded",function(){
   };
 
   const approvalDefinitions=[
-    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
+    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student disputes about a Read and Translate grade or a result waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"posukRecordings",render:()=>window.B3PosukGradingQueue.approvalCard(approvalPosukRecordings)},
     {key:"rashiRecordings",icon:"🎤",title:"Rashi Letters Recordings",detail:"Rashi Letters readings waiting for you to listen and approve (+2 points).",href:"rashi-letters/teacher.html?tab=recordings"},
     {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
     {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
@@ -1110,6 +1108,7 @@ document.addEventListener("DOMContentLoaded",function(){
       return 0;
     }
     list.innerHTML=active.map(function(item){
+      if(item.render)return item.render().outerHTML;
       const count=Number(approvalCounts[item.key]||0);
       const split=approvalClassSplitText(approvalClassCounts[item.key]);
       return '<a class="approval-center-item" href="'+item.href+'" ><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+(split?' '+split:'')+'</small></span><span class="approval-center-count">'+count+'</span></a>';
@@ -1150,6 +1149,7 @@ document.addEventListener("DOMContentLoaded",function(){
   // the changes. (posukPractice/attempts alone is large.)
   const APPROVAL_SOURCES=[
     ["attempts","posukPractice/attempts"],
+    ["posukRecordings",(onValue,onError)=>window.B3PosukGradingQueue.watchClassCounts(db,workspaceId,onValue,onError)],
     ["pointRequests","studentRewards/pointRequests"],
     ["shorashimRecordings","posukPractice/shorashimLearning/recordingEvents"],
     ["shorashimWords","posukPractice/shorashimLearning/catalog/shorashim"],
@@ -1162,9 +1162,12 @@ document.addEventListener("DOMContentLoaded",function(){
     if(approvalUnwatchers.length)return;
     approvalData={};approvalFailed={};
     APPROVAL_SOURCES.forEach(function(source){
-      const key=source[0],ref=db.ref(source[1]);
-      const onValue=function(snap){approvalData[key]=snap.val()||{};delete approvalFailed[key];scheduleApprovalRecompute();};
+      const [key,watch]=source;
+      const onData=function(data,error){approvalData[key]=data;if(error)approvalFailed[key]=true;else delete approvalFailed[key];scheduleApprovalRecompute();};
       const onError=function(err){console.warn("Approval source unavailable: "+key,err);delete approvalData[key];approvalFailed[key]=true;scheduleApprovalRecompute();};
+      if(typeof watch==="function"){approvalUnwatchers.push(watch(onData,onError));return;}
+      const ref=db.ref(watch);
+      const onValue=function(snap){onData(snap.val()||{});};
       ref.on("value",onValue,onError);
       approvalUnwatchers.push(function(){ref.off("value",onValue);});
     });
@@ -1186,6 +1189,7 @@ document.addEventListener("DOMContentLoaded",function(){
     approvalCenterLoading=APPROVAL_SOURCES.some(function(source){return approvalData[source[0]]===undefined&&!approvalFailed[source[0]];});
     if(approvalCenterLoading){renderApprovalCenter();return;}
     const data=approvalData;
+    approvalPosukRecordings=data.posukRecordings;
     const failed=Object.keys(approvalFailed);
     // Gallery posts live in one shared list but the gallery page shows one class at a time,
     // so link straight to the class that has the waiting projects (most pending first).
@@ -1210,6 +1214,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(data.pointRequests)sweepAutomaticPosukPoints(data.pointRequests);
     approvalCounts={
       posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
+      posukRecordings:data.posukRecordings?.total||0,
       chazara:chazaraPending.length,
       rashiRecordings:rashiPending.length,
       shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
@@ -1247,6 +1252,7 @@ document.addEventListener("DOMContentLoaded",function(){
     closeApprovalCenter();
     approvalCounts={};
     approvalClassCounts={};
+    approvalPosukRecordings=null;
     unwatchApprovalSources();
     approvalCenterAutoShown=false;
   }
@@ -1494,6 +1500,7 @@ document.addEventListener("DOMContentLoaded",function(){
     "chazara/teacher.html":"Teachers see each student's chazara chart.",
     "rashi-letters/teacher.html":"Teachers see each student's Rashi letters progress.",
     "gematria/teacher.html":"Teachers see each student's gematria practice.",
+    "daily-checklist/teacher.html":"Teachers see each student's daily checklist answers and can edit the items.",
     "weekly-quiz/teacher.html":"Teachers build and release the weekly quiz.",
     "halacha/index.html":"Teachers teach a Halacha lesson together with the class.",
     "halacha/teacher.html":"Teachers review the Halacha work students handed in.",
@@ -2529,6 +2536,7 @@ document.addEventListener("DOMContentLoaded",function(){
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
 
   el("showAddStudentButton").addEventListener("click",()=>el("addStudentArea").classList.toggle("hidden"));
+  el("downloadRosterButton").addEventListener("click",downloadRoster);
 
   el("classMemberList").addEventListener("click",async e=>{
     const save=e.target.closest("[data-save-student]");
@@ -2703,7 +2711,7 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 },{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261116-live2"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261120-locks1"></script>
 </body>
 </html>
 

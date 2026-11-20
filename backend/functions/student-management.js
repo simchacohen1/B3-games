@@ -3,7 +3,7 @@ const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {manageStudents}=require('./student-management-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.funTorahManageStudents=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com'],maxInstances:5,timeoutSeconds:300,memory:'1GiB'},async(req,res)=>{
+exports.funTorahManageStudents=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'],maxInstances:5,timeoutSeconds:300,memory:'1GiB'},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  // Owner bulk import/rollback requests carry a whole roster (Issue #706).

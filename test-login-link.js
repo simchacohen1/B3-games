@@ -1,6 +1,6 @@
 // Quick sign-in links for FICTIONAL TEST STUDENTS only (issue #619).
 //
-// A link looks like  https://funtorahtools.com/#ftt-test=<token>
+// A link looks like  https://sols.tools/#ftt-test=<token>
 // The token is the test student's name and passcode, encoded. It sits after
 // the "#", so the browser never sends it to any server or hosting log, and the
 // home page removes it from the address bar straight away. Sign-in still goes
@@ -58,7 +58,7 @@
   }
 
   function link(siteUrl,name,passcode){
-    var base=String(siteUrl||"https://funtorahtools.com/").replace(/#.*$/,"");
+    var base=String(siteUrl||"https://sols.tools/").replace(/#.*$/,"");
     if(!/\/$/.test(base)&&!/\.html$/.test(base))base+="/";
     return base+"#"+PREFIX+encode(name,passcode);
   }

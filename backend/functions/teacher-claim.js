@@ -3,7 +3,7 @@ const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {claimTeacher}=require('./teacher-claim-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
-exports.funTorahTeacherClaim=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com'],maxInstances:5},async(req,res)=>{
+exports.funTorahTeacherClaim=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'],maxInstances:5},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
  try{

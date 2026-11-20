@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '..');
-const SITE = 'https://funtorahtools.com';
+const SITE = 'https://sols.tools'; // the only address the site runs on (funtorahtools.com redirects to it)
 const TYPES: Record<string, string> = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.cjs': 'text/javascript',
   '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',

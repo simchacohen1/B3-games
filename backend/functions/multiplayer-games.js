@@ -6,6 +6,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const core = require('./multiplayer-games-core.cjs');
 const matchmaking = require('./multiplayer-matchmaking-core.cjs');
 const { allowsMultiplayer } = require('./multiplayer-lock-policy.cjs');
+const { featureLockedForClass } = require('./student-locks-core.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -645,6 +646,12 @@ exports.multiplayerGameAction = onCall(OPTIONS, async request => {
       settings: actor.lockSettings, classRow: actor.classRow,
     })) {
       throw new HttpsError('permission-denied', 'Multiplayer Arcade is locked for your class. Ask your teacher to unlock it.');
+    }
+    // The class locks from the teacher's Locks panel (the Arcade switch, schedules of all his teachers, temporary overrides).
+    // Everything a student does here is refused while it is locked, except leaving a room.
+    if (actor.actorRole === 'student' && !['leave', 'cleanup'].includes(data.action)) {
+      const lock = await featureLockedForClass({ get: async path => (await db.ref(path).get()).val() }, actor.classId, 'multiplayer-center', Date.now(), actor.workspaceId);
+      if (lock.locked) throw new HttpsError('permission-denied', 'Multiplayer Arcade is locked by your teacher.');
     }
     if (data.action === 'cleanup') return await cleanupStaleRooms(db, actor);
     if (data.action === 'list-rooms') return await listPublicRooms(db, actor);

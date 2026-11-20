@@ -5,7 +5,7 @@ const {studentAuth}=require('./student-auth-core.cjs');
 const crypto=require('node:crypto');
 const studentTools=require('./student-tool-policy.js');
 if(!admin.apps.length)admin.initializeApp();
-const authOrigins=['https://simchacohen1.github.io','https://funtorahtools.com','https://sols.tools','https://www.sols.tools','https://www.funtorahtools.com'];
+const authOrigins=['https://simchacohen1.github.io','https://sols.tools','https://www.sols.tools'];
 if((process.env.GCLOUD_PROJECT||admin.app().options.projectId)==='fun-torah-tools-staging')authOrigins.push('https://fun-torah-tools-staging.web.app');
 exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:authOrigins,maxInstances:10},async(req,res)=>{
  res.set('Cache-Control','no-store');

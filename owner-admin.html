@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<html lang="en"><head><script src="/domain-redirect.js"></script><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
 <meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -14,6 +14,7 @@
 <script src="school-scope.js?v=20261107"></script>
 <script src="owner-teacher-view.js?v=20261109-726"></script>
 <script src="student-scope.js?v=20261108"></script>
+<script src="owner-classes.js?v=20261118"></script>
 <script src="bulk-roster.js?v=20261109-706"></script>
 <script src="owner-export.js?v=20261109-724"></script>
 <style>
@@ -81,6 +82,33 @@ small.warn{display:block;color:#b45309;margin-top:4px}
 .hidden{display:none!important}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
 .schoolpick{flex:0 1 260px!important;width:auto!important;padding:8px 10px!important;font-size:15px!important}.entry .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.syncs{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}.card .syncs input{width:22px;height:22px;padding:0;accent-color:#16a34a}.noschool{color:#b45309!important;font-weight:700}.studentrow .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.classtick{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-weight:600;cursor:pointer}.card .classtick input{width:20px;height:20px;padding:0;accent-color:#16a34a}.studentrow small.warn{display:block;color:#b45309;margin-top:4px}
+main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
+.access-overview-scroll{max-height:60vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px}
+.access-overview-table{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
+.access-overview-table th,.access-overview-table td{padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
+.access-overview-table thead th{position:sticky;top:0;background:#f1f5f9;white-space:nowrap;z-index:1}
+.access-overview-table tbody th,.access-overview-table tbody td:nth-child(2),.access-overview-table tbody td:nth-child(3){min-width:130px}
+.access-overview-table td:nth-child(n+4){text-align:center;color:#166534;font-weight:800}
+.access-overview-table tbody tr:nth-child(even){background:#f8fafc}
+/* The Name column stays in view when the table is scrolled sideways. Its cells need their own background so the columns under them do not show through. */
+.access-overview-table thead th:first-child,.access-overview-table tbody th{position:sticky;left:0;box-shadow:1px 0 0 #cbd5e1}
+.access-overview-table thead th:first-child{z-index:3}
+.access-overview-table tbody th{z-index:2;background:#fff;text-align:left}
+.access-overview-table tbody tr:nth-child(even) th{background:#f8fafc}
+/* Editing: a checkbox at the start of the name, a bulk bar, clickable tool cells and an Undo bar. */
+.access-overview-table tbody th label{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700}
+.access-overview-table tbody th input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
+.access-overview-table .tool-cell{width:100%;min-width:34px;min-height:30px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.access-overview-table .tool-cell:hover{background:#dbeafe}
+.access-overview-table .tool-cell:focus-visible{outline:3px solid #2563eb;outline-offset:-2px}
+.access-overview-table tbody tr.selected td,.access-overview-table tbody tr.selected th{background:#eff6ff}
+.access-overview-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc}
+.access-overview-bulk button,.access-overview-undo button{padding:8px 12px;border-radius:9px;border:1px solid #94a3b8;background:#fff;font:inherit;font-weight:700;cursor:pointer}
+.access-overview-bulk button.give{background:#166534;border-color:#166534;color:#fff}
+.access-overview-bulk button.take{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.access-overview-bulk button:disabled{opacity:.45;cursor:not-allowed}
+.access-overview-undo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #86efac;color:#14532d;font-weight:700}
+.access-overview-undo[hidden],.access-overview-bulk[hidden]{display:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head><body>
@@ -198,6 +226,33 @@ small.warn{display:block;color:#b45309;margin-top:4px}
 <div id="bmAuditArea" style="margin-top:10px"></div>
 </section>
 
+<section class="card hidden" data-view="tool-access-overview" aria-labelledby="toolAccessHeading">
+<div class="card-head"><h2 id="toolAccessHeading">Tool access overview</h2></div>
+<p class="hint" id="toolAccessHelp">A checkmark shows that a tool is granted in at least one of the teacher’s active classes. Click a cell, or tick teachers and use the bar above, to give or remove a tool: tools are granted per class, so a change applies to ALL of that teacher’s active classes (and to anyone who shares those classes). You confirm first and can undo right after. Download CSV exports the rows shown here.</p>
+<div class="formrow">
+  <input type="search" id="toolAccessSearch" aria-label="Search teachers" placeholder="Search teachers">
+  <select id="toolAccessSchool" aria-label="Filter by school"><option value="">All schools</option></select>
+  <select id="toolAccessClass" aria-label="Filter by class"><option value="">All classes</option></select>
+  <button id="toolAccessDownload" type="button" disabled>Download CSV</button>
+</div>
+<div class="access-overview-bulk" id="toolAccessBulk">
+  <button type="button" id="toolAccessSelectAll">Select all shown</button>
+  <button type="button" id="toolAccessClearSel">Clear selection</button>
+  <span id="toolAccessSelCount" role="status">0 selected</span>
+  <select id="toolAccessTool" aria-label="Tool to change"><option value="">Choose a tool…</option></select>
+  <button type="button" id="toolAccessGive" class="give" disabled>Give to selected</button>
+  <button type="button" id="toolAccessRemove" class="take" disabled>Remove from selected</button>
+</div>
+<div class="access-overview-undo" id="toolAccessUndoBar" role="status" hidden><span id="toolAccessUndoText"></span><button type="button" id="toolAccessUndo">Undo</button></div>
+<p class="hint" id="toolAccessCount" role="status"></p>
+<div class="access-overview-scroll" tabindex="0" role="region" aria-labelledby="toolAccessHeading">
+  <table class="access-overview-table" aria-labelledby="toolAccessHeading" aria-describedby="toolAccessHelp">
+    <thead><tr id="toolAccessHeaders"></tr></thead>
+    <tbody id="toolAccessRows"></tbody>
+  </table>
+</div>
+</section>
+
 <!-- Whole site, not one school, so it sits on the Schools page. -->
 <section class="card" id="exportEverythingCard" data-view="schools"><div class="card-head"><h2>&#x1F4E5; Export Everything</h2></div>
 <p class="hint">Downloads two files with the same information: an Excel spreadsheet (.xlsx) and a CSV. One row for each student, with their name, passcode, school, classes, those classes&rsquo; teachers and the school&rsquo;s principal. Schools, classes, teachers and principals with no students are listed at the bottom, so nothing is missing. <b>The files contain every student&rsquo;s passcode, so keep them private.</b></p>
@@ -225,6 +280,7 @@ const PLATFORM_TOOLS=[
  ["posuk-practice-scroll","Posuk Practice","dual"],
  ["rashi-letters","Rashi Letters","dual"],
  ["gematria","Gematria","dual"],
+ ["daily-checklist","Daily Checklist","dual"],
  ["shorashim","Shorashim","dual"],
  ["chazara","Chazara","dual"],
  ["game-show","Game Show","dual"],
@@ -284,11 +340,22 @@ function renderPrincipalAssignments(){
    }catch(error){console.error(error);box.checked=!box.checked;box.disabled=false;q("status").textContent="Could not update principal. Try again.";}
  });
 }
+async function readClasses(ids){const r=await B3OwnerClasses.readClasses(db,WS,ids);if(r.unreadable.length)console.warn("Some classes could not be read and are skipped:",r.unreadable);return r.classes}
+const freshClasses=()=>readClasses(Object.keys(classData));   // re-read the known classes one by one (never the whole classes node)
 // Reads everything once, then draws only the view that is open (see render()).
 async function load(){
- const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};schoolData=B3SchoolScope.normalizeSchools((await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val());
- await reconcilePrincipals(teacherData,classData);
- await loadStudentData();
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value");teacherData=ts.val()||{};
+ // Classes are read one at a time (the rules do not allow reading the whole classes node): classes assigned to teachers, plus
+ // classes this browser has seen. A class with no teacher and never seen here appears once a teacher is assigned.
+ classData=await readClasses(B3OwnerClasses.idsFromInvites(teacherData).concat(B3OwnerClasses.remembered(WS),nav.classId?[nav.classId]:[]));
+ B3OwnerClasses.remember(WS,Object.keys(classData));
+ // Teachers and classes are what every view needs. Schools, principal links and the student directory are extras: if this account
+ // cannot read one of them (the staging owner account), show the page with what is readable instead of an empty page.
+ let schoolsRaw=null;
+ try{schoolsRaw=(await db.ref("b3Games/workspaces/"+WS+"/schools").once("value")).val();}catch(error){console.warn("Schools are not readable by this account.",error);}
+ schoolData=B3SchoolScope.normalizeSchools(schoolsRaw);
+ try{await reconcilePrincipals(teacherData,classData);}catch(error){console.warn("Principal links could not be checked.",error);}
+ try{await loadStudentData();}catch(error){console.warn("The student directory is not readable by this account.",error);studentRecords={};rosterData=B3StudentScope.rosterStudents(classData);}
  applyNav();
 }
 // Owner as a teacher (#726): the owner's own classes come from an ordinary teacher
@@ -327,7 +394,7 @@ async function deletePrincipal(id){
  }
  await db.ref().update(updates);q("status").textContent="Principal removed.";await load();
 }
-q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=nav.school;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});q("className").value="";q("status").textContent="Class added ✓";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim(),school=nav.school;if(!name)return;if(!schoolData[school]){q("status").textContent="Choose the class's school.";return}let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true,schoolId:school});B3OwnerClasses.remember(WS,id);q("className").value="";q("status").textContent="Class added ✓";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=nav.classId;if(!t||!classData[c]){q("status").textContent="Choose a teacher.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Schools (owner only). One school per teacher, stored on the invitation. See school-scope.js. ----
 const SCHOOLS_PATH=()=>"b3Games/workspaces/"+WS+"/schools";
@@ -374,7 +441,7 @@ async function deleteSchool(id){
  const sc=schoolData[id];if(!sc)return;
  const n=B3SchoolScope.countBySchool((await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value")).val()||{})[id]||0;
  if(n){alert(sc.name+" still has "+n+" "+(n===1?"person":"people")+". Move them to another school first.");return}
- const use=B3StudentScope.countSchoolUse(id,(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{},await B3StudentScope.loadRecords(db,WS));
+ const use=B3StudentScope.countSchoolUse(id,await freshClasses(),await B3StudentScope.loadRecords(db,WS));
  if(use.classes||use.students){alert(sc.name+" still has "+use.classes+" "+(use.classes===1?"class":"classes")+" and "+use.students+" "+(use.students===1?"student":"students")+". Move them to another school first.");return}
  if(!confirm("Delete the school "+sc.name+"?"))return;
  await db.ref(SCHOOLS_PATH()+"/"+id).remove();q("status").textContent="School deleted.";await load();
@@ -877,7 +944,7 @@ function renderClassSchoolMove(){
 // Re-reads the classes first so a school chosen meanwhile is never overwritten.
 async function moveClassesWithoutSchool(){
  const to=q("classSchoolMoveTo").value;if(!schoolData[to]){q("status").textContent="Choose a school first.";return}
- const ids=B3StudentScope.classesWithoutSchool((await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{});
+ const ids=B3StudentScope.classesWithoutSchool(await freshClasses());
  if(!ids.length){await load();return}
  if(!confirm("Put "+ids.length+" "+(ids.length===1?"class":"classes")+" in "+schoolData[to].name+"?"))return;
  const updates={};ids.forEach(id=>{updates["b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId"]=to});
@@ -941,7 +1008,7 @@ function filterStudents(){const t=q("studentSearch").value.trim().toLowerCase();
 q("studentSearch").addEventListener("input",filterStudents);
 // Re-reads records first so the import never overwrites a record saved meanwhile. Writes only the new path, and only for students in the open school's classes.
 async function importStudents(){
- const school=nav.school,records=await B3StudentScope.loadRecords(db,WS),classes=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
+ const school=nav.school,records=await B3StudentScope.loadRecords(db,WS),classes=await freshClasses();
  const roster=B3StudentScope.rosterStudents(classes),plan=B3StudentScope.planImport(roster,records,classes,firebase.database.ServerValue.TIMESTAMP);
  const mine=plan.created.filter(sid=>Object.keys(roster[sid].classIds).some(c=>classes[c]&&classes[c].schoolId===school));
  if(!mine.length){await load();return}
@@ -987,13 +1054,142 @@ async function onStudentChange(e){
 q("studentList").addEventListener("change",onStudentChange);
 q("studentOrphans").addEventListener("change",onStudentChange);
 
+// ---- Tool access overview -------------------------------------------------
+const TOOL_ACCESS_PATH="tool-access-overview/";
+const toolAccessHeaders=["Name","School","Classes",...PLATFORM_TOOLS.map(([,name])=>name)];
+let toolAccessRows=[];
+let toolAccessIds=[];                  // the teacher id of each row above (same order)
+const toolAccessSelected=new Set();    // teachers ticked in the table
+let toolAccessLastChange=null;         // {text, items:[{classId,tool,prev}]} for Undo
+q("toolAccessHeaders").innerHTML=toolAccessHeaders.map(name=>'<th scope="col">'+safe(name)+'</th>').join("");
+
+function setOverviewOptions(select,label,options){
+ const selected=select.value;
+ select.replaceChildren(new Option(label,""),...options.sort((a,b)=>byName(a[1],b[1])).map(([id,name])=>new Option(name,id)));
+ if(options.some(([id])=>id===selected))select.value=selected;
+}
+function renderToolAccessOverview(){
+ if(!isOwner(auth.currentUser))return;
+ setOverviewOptions(q("toolAccessSchool"),"All schools",Object.entries(schoolData).map(([id,school])=>[id,school.name]));
+ const schoolFilter=q("toolAccessSchool").value,search=q("toolAccessSearch").value.trim().toLowerCase();
+ const teachers=Object.values(teacherData).filter(t=>t&&!B3PrincipalScope.principal(t)&&(!schoolFilter||t.schoolId===schoolFilter));
+ const assignedClasses=teacher=>Object.keys(teacher.classIds||{}).filter(id=>teacher.classIds[id]===true&&Object.hasOwn(classData,id)&&classData[id]);
+ const classOptions=new Set(teachers.flatMap(assignedClasses));
+ setOverviewOptions(q("toolAccessClass"),"All classes",[...classOptions].map(id=>[id,bulkClassName(id)]));
+ const classFilter=q("toolAccessClass").value;
+ const idOf=new Map(Object.entries(teacherData).map(([id,t])=>[t,id]));
+ const entries=teachers.flatMap(teacher=>{
+  const name=teacher.name||teacher.email||"Teacher",school=schoolData[teacher.schoolId]?.name||"No school";
+  const ids=assignedClasses(teacher),classes=ids.map(bulkClassName).sort(byName);
+  if(classFilter&&!ids.includes(classFilter))return [];
+  if(search&&![name,teacher.email||"",school,...classes].some(value=>String(value).toLowerCase().includes(search)))return [];
+  const activeClasses=teacher.active===false?[]:ids.map(id=>classData[id]).filter(cls=>cls.active!==false);
+  const tools=PLATFORM_TOOLS.map(([id])=>activeClasses.some(cls=>cls.toolGrants?.[id]===true)?"✓":"");
+  return [{id:idOf.get(teacher),row:[name,school,classes.join(", "),...tools]}];
+ }).sort((a,b)=>byName(a.row[0],b.row[0])||byName(a.row[1],b.row[1]));
+ toolAccessRows=entries.map(e=>e.row);toolAccessIds=entries.map(e=>e.id);
+ // Only teachers that are still shown stay ticked.
+ for(const id of [...toolAccessSelected])if(!toolAccessIds.includes(id))toolAccessSelected.delete(id);
+ q("toolAccessRows").innerHTML=toolAccessRows.map(([name,school,classes,...tools],i)=>{
+  const id=toolAccessIds[i];
+  return '<tr'+(toolAccessSelected.has(id)?' class="selected"':'')+'><th scope="row"><label><input type="checkbox" data-pick="'+safe(id)+'" aria-label="Select '+safe(name)+'"'+(toolAccessSelected.has(id)?' checked':'')+'>'+safe(name)+'</label></th><td>'+safe(school)+'</td><td>'+safe(classes||"—")+'</td>'+
+   tools.map((mark,t)=>'<td><button type="button" class="tool-cell" data-teacher="'+safe(id)+'" data-tool="'+safe(PLATFORM_TOOLS[t][0])+'" aria-pressed="'+(mark?"true":"false")+'" aria-label="'+(mark?"Remove ":"Give ")+safe(PLATFORM_TOOLS[t][1])+(mark?" from ":" to ")+safe(name)+'">'+mark+'</button></td>').join("")+'</tr>';
+ }).join("");
+ updateToolAccessBulk();
+ const count=toolAccessRows.length;
+ q("toolAccessCount").textContent=count?count+(count===1?" teacher":" teachers"):"No teachers match.";
+ q("toolAccessDownload").disabled=!count;
+}
+// ---- Editing the overview (owner only) ----
+// A tool is granted per class (classes/<id>/toolGrants/<tool>). Giving it to a teacher grants it in ALL of that teacher's active
+// classes; removing it takes it from all of them. A class shared with other teachers changes for them too, so the confirm says so.
+(function(){
+ const toolName=id=>(PLATFORM_TOOLS.find(t=>t[0]===id)||[id,id])[1];
+ const teacherName=id=>{const t=teacherData[id]||{};return t.name||t.email||"Teacher"};
+ const activeClassIds=id=>{const t=teacherData[id];if(!t||t.active===false)return [];return Object.keys(t.classIds||{}).filter(c=>t.classIds[c]===true&&classData[c]&&classData[c].active!==false)};
+ // What would change for these teachers: only the classes whose value is not already the wanted one.
+ function plan(teacherIds,tool,give){
+  const items=[],seen=new Set(),sharedWith=new Set(),teachersChanged=new Set();
+  for(const id of teacherIds)for(const c of activeClassIds(id)){
+   if(seen.has(c))continue;seen.add(c);
+   const now=classData[c].toolGrants?.[tool]===true;
+   if(now===give)continue;
+   items.push({classId:c,tool,prev:classData[c].toolGrants&&Object.hasOwn(classData[c].toolGrants,tool)?classData[c].toolGrants[tool]:null,next:give});
+   teachersChanged.add(id);
+   for(const [other,t] of Object.entries(teacherData))if(!teacherIds.includes(other)&&t&&t.active!==false&&t.classIds?.[c]===true&&!B3PrincipalScope.principal(t))sharedWith.add(other);
+  }
+  return {items,sharedWith:[...sharedWith],teachersChanged:[...teachersChanged]};
+ }
+ function describe(p,tool,give,teacherIds){
+  const word=give?"Give":"Remove",prep=give?"to":"from";
+  if(!p.items.length)return null;
+  const who=teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teacher"+(p.teachersChanged.length===1?"":"s");
+  let text=word+" "+toolName(tool)+" "+prep+" "+who+"?\n\nThis changes "+p.items.length+" class"+(p.items.length===1?"":"es")+": "+p.items.map(i=>bulkClassName(i.classId)).join(", ")+".";
+  if(p.sharedWith.length)text+="\n\nThose classes are also used by "+p.sharedWith.length+" other teacher"+(p.sharedWith.length===1?"":"s")+" ("+p.sharedWith.map(teacherName).join(", ")+"), who "+(give?"get":"lose")+" it too.";
+  return text;
+ }
+ async function apply(teacherIds,tool,give){
+  if(!isOwner(auth.currentUser)){q("status").textContent="Only the owner can change tool access.";return}
+  const p=plan(teacherIds,tool,give),message=describe(p,tool,give,teacherIds);
+  if(!message){q("status").textContent=toolName(tool)+" is already "+(give?"given":"removed")+" for "+(teacherIds.length===1?teacherName(teacherIds[0]):"the selected teachers")+".";return}
+  if(!confirm(message))return;
+  const updates={};
+  for(const i of p.items)updates["b3Games/workspaces/"+WS+"/classes/"+i.classId+"/toolGrants/"+i.tool]=i.next;
+  try{await db.ref().update(updates)}catch(error){console.error(error);q("status").textContent="Could not save. Nothing was changed.";return}
+  for(const i of p.items){classData[i.classId].toolGrants=Object.assign({},classData[i.classId].toolGrants,{[i.tool]:i.next})}
+  toolAccessLastChange={text:(give?"Gave ":"Removed ")+toolName(tool)+(give?" to ":" from ")+(teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teachers")+" ("+p.items.length+" class"+(p.items.length===1?"":"es")+").",items:p.items};
+  q("status").textContent="Saved ✓";
+  renderToolAccessOverview();
+ }
+ async function undo(){
+  const last=toolAccessLastChange;if(!last||!isOwner(auth.currentUser))return;
+  const updates={};
+  for(const i of last.items)updates["b3Games/workspaces/"+WS+"/classes/"+i.classId+"/toolGrants/"+i.tool]=i.prev;   // null removes a value that did not exist before
+  try{await db.ref().update(updates)}catch(error){console.error(error);q("status").textContent="Could not undo. Nothing was changed.";return}
+  for(const i of last.items){const g=Object.assign({},classData[i.classId].toolGrants);if(i.prev===null)delete g[i.tool];else g[i.tool]=i.prev;classData[i.classId].toolGrants=g}
+  toolAccessLastChange=null;q("status").textContent="Undone ✓";
+  renderToolAccessOverview();
+ }
+ window.updateToolAccessBulk=function(){
+  const n=toolAccessSelected.size,tool=q("toolAccessTool").value,sel=q("toolAccessTool");
+  if(sel.options.length<2)PLATFORM_TOOLS.forEach(([id,name])=>sel.add(new Option(name,id)));
+  q("toolAccessSelCount").textContent=n+(n===1?" teacher selected":" teachers selected");
+  q("toolAccessGive").disabled=!(n&&tool);q("toolAccessRemove").disabled=!(n&&tool);
+  q("toolAccessClearSel").disabled=!n;
+  const bar=q("toolAccessUndoBar");bar.hidden=!toolAccessLastChange;if(toolAccessLastChange)q("toolAccessUndoText").textContent=toolAccessLastChange.text;
+ };
+ q("toolAccessSelectAll").onclick=()=>{toolAccessIds.forEach(id=>toolAccessSelected.add(id));renderToolAccessOverview()};
+ q("toolAccessClearSel").onclick=()=>{toolAccessSelected.clear();renderToolAccessOverview()};
+ q("toolAccessTool").onchange=updateToolAccessBulk;
+ q("toolAccessGive").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,true);
+ q("toolAccessRemove").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,false);
+ q("toolAccessUndo").onclick=undo;
+ q("toolAccessRows").addEventListener("change",e=>{
+  const box=e.target.closest("[data-pick]");if(!box)return;
+  if(box.checked)toolAccessSelected.add(box.dataset.pick);else toolAccessSelected.delete(box.dataset.pick);
+  renderToolAccessOverview();
+ });
+ q("toolAccessRows").addEventListener("click",e=>{
+  const cell=e.target.closest(".tool-cell");if(!cell)return;
+  apply([cell.dataset.teacher],cell.dataset.tool,cell.getAttribute("aria-pressed")!=="true");
+ });
+})();
+q("toolAccessSearch").addEventListener("input",renderToolAccessOverview);
+q("toolAccessSchool").addEventListener("change",renderToolAccessOverview);
+q("toolAccessClass").addEventListener("change",renderToolAccessOverview);
+q("toolAccessDownload").onclick=()=>{
+ if(!isOwner(auth.currentUser)||!toolAccessRows.length)return;
+ // Keep spreadsheet apps from evaluating a roster value as a formula.
+ const rows=toolAccessRows.map(row=>row.map(cell=>/^(?:\s*[=+@-]|[\t\r\n])/.test(cell)?"'"+cell:cell));
+ downloadFile("tool-access-overview.csv",FTTOwnerExport.toCsv([toolAccessHeaders,...rows]));
+};
+
 // ---- Drill-down navigation ---------------------------------------------
 // Schools -> one school -> one of its sections -> (in Classes) one class.
 // The position lives in the address after "#" (school/section/class), so the
 // browser's Back button and reloading both work. Every card stays in the page;
 // render() shows only the cards of the open view and fills them with the open
-// school's data. Nothing outside the open school is listed anywhere except the
-// "no school yet" leftovers on the Schools page.
+// school's data or the platform-wide tool access overview.
 const SECTIONS=[["principals","🎓","Principals"],["teachers","👤","Teachers"],["classes","📚","Classes"],["students","👥","Students"],["bulk","📋","Bulk Upload"],["undo","↩️","Undo Import"],["manage","🧹","Bulk Manage"]];
 const navPath=(...parts)=>parts.filter(Boolean).map(encodeURIComponent).join("/");
 const byName=(a,b)=>String(a||"").localeCompare(String(b||""));
@@ -1001,7 +1197,7 @@ const inSchool=o=>!!o&&!!nav.school&&o.schoolId===nav.school;
 function schoolTeachers(){return Object.entries(teacherData).filter(([,t])=>!B3PrincipalScope.principal(t)&&inSchool(t)).sort((a,b)=>byName(a[1].name||a[1].email,b[1].name||b[1].email))}
 function schoolClassIds(){return Object.keys(classData).filter(id=>inSchool(classData[id])).sort((a,b)=>byName(classData[a].name||a,classData[b].name||b))}
 function classStudentIds(cid){return Object.keys(rosterData).filter(id=>rosterData[id].classIds[cid]).sort((a,b)=>byName(studentName(a),studentName(b)))}
-function currentView(){return !nav.school?"schools":!nav.section?"home":nav.section==="classes"&&nav.classId?"class":nav.section}
+function currentView(){return location.hash==="#"+TOOL_ACCESS_PATH?"tool-access-overview":!nav.school?"schools":!nav.section?"home":nav.section==="classes"&&nav.classId?"class":nav.section}
 function go(path){if("#"+path===location.hash||(!path&&!location.hash))applyNav();else location.hash=path;}
 let shownView="";
 // Reads the address, drops anything that no longer exists, and draws the view.
@@ -1013,7 +1209,7 @@ function applyNav(){
  if(n.section!=="classes"||!classData[n.classId]||classData[n.classId].schoolId!==n.school)n.classId="";
  nav=n;
  if(before!==nav.school)resetSchoolTools();
- const key=navPath(nav.school,nav.section,nav.classId);
+ const key=currentView()==="tool-access-overview"?TOOL_ACCESS_PATH:navPath(nav.school,nav.section,nav.classId);
  render();
  if(key!==shownView){shownView=key;window.scrollTo(0,0);}
 }
@@ -1030,6 +1226,7 @@ function render(){
  document.querySelectorAll("[data-view]").forEach(el=>el.classList.toggle("hidden",el.dataset.view!==view));
  renderNav(view);
  renderTeacherViewBar();
+ if(view==="tool-access-overview"){renderToolAccessOverview();return;}
  renderSchools();renderClassSchoolMove();renderOrphanStudents();
  if(!nav.school)return;
  renderSchoolHome();renderPrincipalAssignments();renderTeachers();renderClasses();renderStudentSection();
@@ -1038,8 +1235,10 @@ function render(){
 function renderNav(view){
  const sc=schoolData[nav.school],section=SECTIONS.find(s=>s[0]===nav.section),cls=classData[nav.classId];
  q("oaNav").innerHTML='<button type="button" class="oa-nav-btn'+(view==="schools"?' oa-active':'')+'" data-go="">🏫 Schools</button>'+
+  '<button type="button" class="oa-nav-btn'+(view==="tool-access-overview"?' oa-active':'')+'" data-go="'+TOOL_ACCESS_PATH+'">Tool access overview</button>'+
   (sc?'<button type="button" class="oa-nav-label" data-go="'+safe(navPath(nav.school))+'">'+safe(sc.name)+'</button>'+SECTIONS.map(([id,icon,label])=>'<button type="button" class="oa-nav-btn oa-sub'+(nav.section===id?' oa-active':'')+'" data-go="'+safe(navPath(nav.school,id))+'">'+icon+' '+label+'</button>').join(""):'');
  const crumbs=[];
+ if(view==="tool-access-overview")crumbs.push(["Tool access overview",TOOL_ACCESS_PATH]);
  if(sc){
   crumbs.push(["Schools",""],[sc.name,navPath(nav.school)]);
   if(section)crumbs.push([section[2],navPath(nav.school,section[0])]);
@@ -1122,7 +1321,25 @@ async function adoptImport(school,{classIds,inviteIds,studentIds}){
 }
 
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
+function isOwner(user){return user?.emailVerified===true&&String(user.email||"").toLowerCase()===OWNER;}
+auth.onAuthStateChanged(async user=>{
+ if(isOwner(user)){
+  q("gate").classList.add("hidden");
+  q("ownerArea").classList.remove("hidden");
+  await load();
+  return;
+ }
+ q("ownerArea").classList.add("hidden");
+ toolAccessRows=[];
+ q("toolAccessRows").replaceChildren();
+ q("toolAccessSchool").options.length=1;
+ q("toolAccessClass").options.length=1;
+ q("toolAccessCount").textContent="";
+ q("toolAccessDownload").disabled=true;
+ q("gate").classList.remove("hidden");
+ q("signIn").classList.remove("hidden");
+ q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account.";
+});
 })();
 </script>
 <script>

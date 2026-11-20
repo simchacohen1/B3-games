@@ -38,13 +38,14 @@ test('Gallery assigned teacher response includes its class submissions only',()=
   assert.deepEqual(visibleGalleryPosts(rows,'et','teacher',true),{etApproved:rows.etApproved,etPending:rows.etPending});
 });
 
-test('Class Gallery read and private media CORS permit both live branded hosts',()=>{
+test('Class Gallery read and private media CORS permit the live site (sols.tools) and no longer the old funtorahtools.com address',()=>{
   const fs=require('node:fs');
   for(const file of ['class-gallery-read.js','private-media-url.js']){
     const source=fs.readFileSync(require('node:path').join(__dirname,'../backend/functions',file),'utf8');
-    for(const domain of ['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io']){
+    for(const domain of ['https://sols.tools','https://www.sols.tools','https://simchacohen1.github.io']){
       assert.ok(source.includes(domain),file+' must support '+domain);
     }
+    assert.ok(!source.includes('funtorahtools.com'),file+' must not allow the old funtorahtools.com address');
     assert.match(source,/verifyIdToken\(/,'All gallery reads and media access still require a Firebase token.');
   }
 });

@@ -34,6 +34,7 @@ function fixture(){
     if(name==='firebase-functions/v2/https')return{onRequest:(_options,fn)=>{handler=fn;return fn}};
     if(name==='firebase-admin')return admin;
     if(name==='node:crypto')return require('node:crypto');
+    if(name==='./student-locks-core.cjs')return require('../backend/functions/student-locks-core.cjs');
     if(name==='./student-passcodes.cjs')return{readPasscode:async()=>({passcode:'123456'}),key:s=>typeof s==='string'&&/^[a-z0-9_-]+$/i.test(s),equal:(a,b)=>a===b};
     throw Error(name);
   },Buffer,Date,console};

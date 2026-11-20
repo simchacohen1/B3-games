@@ -23,13 +23,14 @@ test('toolbar only initializes for verified teachers and never in embedded stude
   assert.match(s, /all\[id\]\.active !== false/);
 });
 
-test('class selection and lock reuse existing controls, no new lock database writes', () => {
+test('class selection reuses existing controls; the lock button opens Class Locks; no lock writes from the bar itself', () => {
   const s = read('teacher-global-controls.js');
   assert.match(s, /b3ControlClass/);
   assert.match(s, /homeClassBar/);
-  assert.match(s, /admin\.html/);
-  assert.match(s, /tab:'access',embed:'1'/);
-  assert.doesNotMatch(s, /updateClassMode|\.ref\(\)\.update\(/);
+  assert.match(s, /class-locks\/index\.html/, 'the lock button opens the Class Locks panel');
+  assert.doesNotMatch(s, /updateClassMode|\.ref\(\)\.update\(/, 'every lock change goes through the studentLocks function');
+  // The older Class Access (class hours and modes) stays reachable from the panel.
+  assert.match(read('class-locks/index.html'), /admin\.html\?tab=access/);
 });
 
 test('Follow can be opened and closed without removing its iframe, and standalone window is available', () => {
@@ -73,7 +74,7 @@ test('a button press is never silent: with no class chosen it asks which class (
 });
 
 test('pages fetch the fixed toolbar, not a cached older copy', () => {
-  const version = /teacher-global-controls\.js\?v=20261116-shapes2/;
+  const version = /teacher-global-controls\.js\?v=combo2/;
   assert.match(read('gallery-share.js'), version);
   assert.match(read('teacher-global-bootstrap.js'), version);
   assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);

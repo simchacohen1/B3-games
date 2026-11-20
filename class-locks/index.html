@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><script src="/domain-redirect.js"></script>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Class Locks | Fun Torah Tools</title>
+<style>
+:root{--ink:#0f172a;--soft:#475569;--line:#dbe3ee;--blue:#1d4ed8;--red:#b91c1c;--green:#15803d;--bg:#f4f7fb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,Segoe UI,Arial,sans-serif}
+main{max-width:980px;margin:0 auto;padding:14px 14px 90px}
+h1{font-size:1.5rem;margin:6px 0 2px}h2{font-size:1.15rem;margin:0 0 8px}
+.sub{color:var(--soft);margin:0 0 12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit}
+button{border:2px solid var(--blue);background:#fff;color:var(--blue);border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer}
+button.fill{background:var(--blue);color:#fff}
+button.danger{border-color:var(--red);color:var(--red)}button.danger.fill{background:var(--red);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.holder{border-left:6px solid var(--blue);background:#eff6ff}
+.holder.other{border-left-color:#b45309;background:#fffbeb}
+.holder.none{border-left-color:#64748b;background:#f1f5f9}
+.group{margin:12px 0 4px;font-weight:800;color:#334155}
+.feature{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 6px;border-top:1px solid #eef2f7}
+.feature .name{font-weight:700}.feature .why{color:var(--soft);font-size:.92rem}
+.chip{display:inline-block;border-radius:999px;padding:2px 10px;font-weight:800;font-size:.85rem}
+.chip.locked{background:#fee2e2;color:var(--red)}.chip.open{background:#dcfce7;color:var(--green)}.chip.temp{background:#fef3c7;color:#92400e}
+.switch{position:relative;display:inline-block;width:56px;height:32px}
+.switch input{opacity:0;width:100%;height:100%;margin:0;position:absolute;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;border-radius:999px;background:#cbd5e1;transition:.15s}
+.switch span::after{content:'';position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:.15s}
+.switch input:checked+span{background:var(--red)}.switch input:checked+span::after{left:27px}
+.switch input:focus-visible+span{outline:3px solid #93c5fd;outline-offset:2px}
+.days{display:flex;gap:4px;flex-wrap:wrap}
+.days label{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:6px 8px;border:2px solid var(--line);border-radius:8px;font-weight:800;cursor:pointer}
+.days input{position:absolute;opacity:0}
+.days label:has(input:checked){background:var(--blue);border-color:var(--blue);color:#fff}
+.days label:has(input:focus-visible){outline:3px solid #93c5fd}
+.line{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0;display:grid;gap:8px}
+.targets{display:flex;flex-wrap:wrap;gap:6px 14px}
+.targets label{display:inline-flex;gap:5px;align-items:center}
+.ov{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fffbeb}
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f172a;color:#fff;border-radius:12px;padding:10px 16px;font-weight:700;max-width:92vw;z-index:9}
+#toast.err{background:#991b1b}
+.muted{color:var(--soft)}
+@media(max-width:560px){.feature{grid-template-columns:1fr auto}.feature .icon{display:none}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
+<script src="../student-lock-core.js?v=20261120-locks1"></script>
+<script defer src="locks.js?v=20261120-locks1"></script>
+</head>
+<body>
+<main id="app" aria-live="polite">
+  <h1>🔒 Class Locks <span id="className"></span></h1>
+  <p class="sub">Lock or unlock what your students can use. It takes effect within a few seconds, even for students already inside a page.</p>
+  <div id="signin" class="card" hidden><p>Sign in with your teacher account to change locks.</p><button class="fill" id="signinBtn" type="button">Sign in with Google</button></div>
+  <div id="panel" hidden>
+    <section id="holder" class="card holder" aria-label="Who has this class"></section>
+    <section class="card" aria-label="Lock or unlock everything">
+      <h2>Everything at once</h2>
+      <div class="row"><button class="danger fill" id="lockAll" type="button">🔒 Lock all</button><button class="fill" id="unlockAll" type="button">🔓 Unlock all</button>
+        <span class="muted">These switches stay until you change them. Weekly schedules and timed unlocks are below.</span></div>
+    </section>
+    <section class="card" aria-label="Timed unlock or lock">
+      <h2>Unlock (or lock) for a set time</h2>
+      <p class="muted" id="ovHelp"></p>
+      <div class="row">
+        <label>What: <select id="ovTarget"></select></label>
+        <label><input type="radio" name="ovState" value="open" checked> Unlock</label>
+        <label><input type="radio" name="ovState" value="locked"> Lock</label>
+      </div>
+      <div class="row" style="margin-top:8px" id="ovButtons"></div>
+      <div id="ovList"></div>
+    </section>
+    <section class="card" aria-label="Every feature"><h2>Every feature</h2><div id="features"></div></section>
+    <section class="card" aria-label="Weekly schedule"><h2>My weekly schedule for this class</h2>
+      <p class="muted">A student follows the schedules of ALL his teachers: if any of them has a feature locked right now, it is locked. Times are New York time.</p>
+      <div id="myLines"></div>
+      <div class="row"><button type="button" id="addLine">+ Add a line</button><button type="button" id="presetGames">+ Games locked Mon–Thu 9:00–3:00</button><button class="fill" type="button" id="saveSchedule">Save my schedule</button></div>
+      <div id="otherSchedules" style="margin-top:12px"></div>
+    </section>
+    <p class="muted"><a id="oldAccess" href="../admin.html?tab=access" target="_blank" rel="noopener">Class hours and modes (the older Class Access page)</a></p>
+  </div>
+</main>
+<div id="toast" role="status" hidden></div>
+</body></html>

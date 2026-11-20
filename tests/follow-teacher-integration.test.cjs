@@ -114,7 +114,7 @@ test('activity can veto a redirect to finish saving work',async()=>{
   assert.equal(h.navigations.length,0);
 });
 test('homepage, activity gate and teacher interfaces include Follow Teacher',()=>{
-  const homepage=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  const homepage=require('./render-home-html.cjs')();
   const gate=fs.readFileSync(path.join(ROOT,'game-gate.js'),'utf8');
   const teacherHome=fs.readFileSync(path.join(ROOT,'teacher-home.html'),'utf8');
   const teacher=fs.readFileSync(path.join(ROOT,'follow-teacher/teacher.js'),'utf8');
@@ -122,7 +122,9 @@ test('homepage, activity gate and teacher interfaces include Follow Teacher',()=
   assert.match(homepage,/FTTFollowStudent\?\.start/);
   assert.match(homepage,/Follow the Teacher/);
   assert.match(gate,/startFollowTeacherListener\(studentClassId, studentId\)/);
-  assert.match(teacherHome,/follow-teacher\/teacher\.html\?class=/);
+  require('../shared/home-tool-registry.js');
+  assert.match(teacherHome,/shared\/home-tool-registry\.js/);
+  assert.match(globalThis.B3HomeToolRegistry.renderTeacherTools({audience:'teacher',classId:'c1',isOn:()=>false}),/follow-teacher\/teacher\.html\?class=c1/);
   assert.match(teacher,/access\/followTeacher/);
   assert.match(teacher,/teacher\.user\.uid/);
   assert.match(teacher,/C\.propose/);

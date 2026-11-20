@@ -18,8 +18,9 @@ test('every standalone Nigri page loads the school gate before its own scripts r
     const gate = html.search(/<script src="[^"]*sync-to-nigri\/nigri-school-gate\.js[^"]*"( data-owner-only="1")?><\/script>/);
     assert.ok(gate > 0, page + ' is missing the school gate');
     assert.ok(!/nigri-school-gate\.js[^"]*" data-mode="panel"/.test(html), page + ' must use full-page mode');
-    const firstOther = html.slice(0, gate).match(/<script(?![^>]*guest-mode\.js)[^>]*>/);
-    assert.equal(firstOther, null, page + ': only guest-mode.js may run before the gate');
+    const firstOther = html.slice(0, gate).match(/<script(?![^>]*(?:guest-mode|domain-redirect)\.js)[^>]*>/);
+    // domain-redirect.js only acts on the old funtorahtools.com address (it sends the visitor to sols.tools).
+    assert.equal(firstOther, null, page + ': only guest-mode.js and domain-redirect.js may run before the gate');
   }
 });
 
@@ -42,7 +43,7 @@ test('Weekly Quiz "Send to Nigri" starts hidden and appears only when the check 
 });
 
 test('home page Sync to Nigri card is hidden by default with a class the card filter cannot undo', () => {
-  const html = read('index.html');
+  const html = require('./render-home-html.cjs')();
   assert.match(html, /<a class="teacher-tool-card nigri-hidden" href="sync-to-nigri\/index\.html" id="nigriSyncCard">/);
   assert.match(html, /\.teacher-tool-card\.nigri-hidden\{display:none!important\}/);
   assert.match(html, /B3SchoolScope\.checkNigri/);

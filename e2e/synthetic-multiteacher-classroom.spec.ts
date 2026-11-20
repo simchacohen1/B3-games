@@ -318,13 +318,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(gradeCard.locator('audio')).toHaveCount(1);
   await expect(posukTeacherPage.locator('#gradeTabCount')).toHaveText('1');
   await gradeCard.locator('[data-choice="gold"]').click();
-  await gradeCard.locator('[data-field="mistakes"]').fill('1');
+  await gradeCard.locator('[data-pts="8"]').click();
   await gradeCard.locator('[data-field="bonus"]').fill('2');
   await gradeCard.locator('[data-field="note"]').fill('Beautiful reading');
-  await expect(gradeCard.locator('[data-field="points"]')).toHaveText('= 11 points');
+  await expect(gradeCard.locator('[data-field="points"]')).toHaveText('= 10 points');
   await gradeCard.locator('[data-save]').click();
   await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 20000}).toBe('gold');
-  expect(await readFixture(rewardBalancePath)).toBe(9); // −2 + (10 − 1 mistake + 2 bonus)
+  expect(await readFixture(rewardBalancePath)).toBe(8); // −2 + (8 chosen points + 2 bonus)
   await expect(posukTeacherPage.locator('.graded-row').filter({hasText:'Ari Example'})).toContainText('Gold standard',{timeout:15000});
   await expect(posukTeacherPage.locator('.grade-card')).toHaveCount(0);
   expect(posukTeacherReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);

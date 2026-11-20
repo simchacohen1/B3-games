@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><script src="/domain-redirect.js"></script>
 
 <meta charset="utf-8">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -20,6 +20,7 @@
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="chazara" data-back-href="../index.html"></script>
+<script defer src="../student-lock.js?v=20261120-locks1" data-feature="chazara"></script>
 </head>
 <body>
 <div class="wrap">
@@ -29,7 +30,7 @@
     <div class="stats"><div class="stat"><b id="total">0</b><span>Total Chazaras</span></div><div class="stat"><b id="learned">0</b><span>Pesukim Unlocked</span></div><div class="stat"><b id="goalDone">0</b><span>At 10+ Chazaras</span></div><div class="stat"><b id="streak">0</b><span>Day Streak 🔥</span></div></div>
     <div class="record-help"><b>🎙️ Recorded Chazara = 2 points.</b> A normal Chazara = 1 point. Points are sent to Rabbi Cohen for approval before they are added.</div>
     <div class="panel"><h2>⏰ Time for Chazara</h2><p class="note">An unlocked Posuk appears here if it has never been reviewed or has not been reviewed for 14 days.</p><div id="due" class="due"></div></div>
-    <div class="panel"><div class="controls"><h2>My Chazara Grid</h2><span class="note">A Posuk unlocks when your teacher marks your Posuk Practice recording gold standard.</span></div><p class="note">You may do each open Posuk once, then a second time only after doing all the other open pesukim. Maximum 2 per Posuk per day. The square gets brighter as you approach 10 Chazaras. At 10, you need 100% Understand before continuing beyond 10.</p><div id="grid" class="grid"></div></div>
+    <div class="panel"><div class="controls"><h2>My Chazara Grid</h2><span class="note">A Posuk unlocks when your teacher marks your Posuk Practice recording gold standard.</span></div><p class="note">You may do each open Posuk once, then a second time only after doing all the other open pesukim. Maximum 2 per Posuk per day. The square gets brighter as you approach 10 Chazaras. At 10, you need 100% in Chumash חידון (comprehension) before continuing beyond 10.</p><div id="grid" class="grid"></div></div>
     <div class="panel"><div class="controls"><h2>🎧 My Chazara Recordings</h2><span class="note">Approved and rejected recordings are separated clearly below.</span></div><p class="note">A green <b>2 points</b> badge means the recording was approved. Rejected recordings stay in your history, but do not count as a Chazara and may be recorded again.</p><div id="recordingsList" class="recordings-list"><div class="recording-empty">Loading recordings…</div></div></div>
   </div>
 </div>
@@ -80,7 +81,7 @@ function dailyRotationPool(){return activeChazaraKeys().filter(baseCanReview)}
 function dailyLimitReached(key){return Number(todayCounts()[key]||0)>=MAX_DAILY_CHazaras}
 function rotationAllows(key){const pool=dailyRotationPool();if(pool.length<=1)return true;if(!pool.includes(key))return false;const counts=todayCounts(),min=Math.min(...pool.map(k=>Number(counts[k]||0)));return Number(counts[key]||0)===min}
 function canReview(key){return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
-function reviewLockReason(key){if(!baseCanReview(key))return '100% Understand needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
+function reviewLockReason(key){if(!baseCanReview(key))return '100% in Chumash חידון needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
 async function askNormalReview(key){return new Promise(resolve=>{const box=$('confirmBox');$('confirmQuestion').textContent='Did you read and translate '+R(key)+' correctly?';box.classList.remove('hidden');let done=false;const finish=v=>{if(done)return;done=true;box.classList.add('hidden');$('confirmYes').onclick=null;$('confirmNo').onclick=null;resolve(v)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false)})}
 async function requestPoints(source,eventId){if(teacherPreview)return null;try{const user=firebase.auth().currentUser;if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');const idToken=await user.getIdToken();const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:sid,source,eventId}),signal:AbortSignal.timeout(15000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
 async function requestRemovalPoints(eventId){if(teacherPreview)return null;try{const user=firebase.auth().currentUser;if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');const idToken=await user.getIdToken();const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:sid,source:'chazara-remove',eventId})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));await db.ref(EVENTS+sid+'/'+eventId).update({removalPointSynced:true,removalPointRequestId:data.requestId||null,removalPointRequestStatus:data.status||data.action||'none',removalPointSyncedAt:firebase.database.ServerValue.TIMESTAMP});return data}catch(e){console.warn('Point removal will be retried later',e);return null}}
@@ -417,7 +418,7 @@ const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once
   render();
 })();
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261116-live2"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261120-locks1"></script>
 </body>
 </html>
 

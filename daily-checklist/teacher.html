@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en"><head><script src="/domain-redirect.js"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Checklist — Teacher</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}
+header{background:#173b62;color:#fff;padding:16px 22px}header h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#c9d8e8;font-size:13px}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.bar[hidden]{display:none}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid #d5e0ea;border-radius:12px;padding:12px;margin-bottom:14px}
+.bar label{font-weight:700;font-size:13px;color:#4a5b6c}
+input,select,button{font:inherit}
+input[type=date],select,input[type=text]{border:1px solid #b9c8d6;border-radius:8px;padding:7px 9px;background:#fff}
+button{border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;background:#173b62;color:#fff}
+button.alt{background:#fff;color:#173b62;border:1px solid #b9c8d6}
+button.danger{background:#fff;color:#b42318;border:1px solid #e5b4ae}
+button[disabled]{opacity:.45;cursor:default}
+.panel{background:#fff;border:1px solid #d5e0ea;border-radius:12px;padding:14px;margin-bottom:14px}
+.panel h2{margin:0 0 8px;font-size:18px}
+.scroll{overflow:auto;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid #dbe5ee;padding:7px 8px;text-align:center}
+th{background:#f3f7fa;position:sticky;top:0;z-index:1}
+th.nm,td.nm{text-align:left;position:sticky;left:0;background:#fff;font-weight:700;min-width:140px}
+th.nm{background:#f3f7fa;z-index:2}
+td.y{color:#1a7f45;font-weight:900;font-size:18px}
+td.n{color:#c0392b;font-weight:900;font-size:18px}
+td.b{color:#9aa8b6}
+td.edit{cursor:pointer}
+td.edit:hover{background:#eef6ff}
+td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
+.star{color:#d92d20}
+.muted{color:#5d6b7a;font-size:13px}
+.erow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f6}
+.erow input[type=text]{width:100%}
+.erow .btns{display:flex;gap:4px}
+.erow .btns button{padding:6px 10px}
+.stars{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap}
+#status{padding:12px;color:#5d6b7a}
+.sum{margin:0 0 8px;font-weight:700}
+@media(max-width:600px){.erow{grid-template-columns:1fr auto}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../class-confirm-gate.js"></script>
+<script src="../owner-classes.js?v=20261118"></script>
+<script src="common.js"></script>
+<script src="mashpia-core.js"></script>
+<script src="mashpia-sync.js"></script>
+</head><body>
+<header><h1>☑️ Daily Checklist — Teacher View</h1><p>Yes / No answers from students, one response per student per day. No points or stars are given.</p></header>
+<main>
+  <div id="status">Checking teacher access…</div>
+  <div id="app" hidden>
+    <div class="bar">
+      <label>Class <select id="classSel"></select></label>
+      <label>Day <input type="date" id="day"></label>
+      <button class="alt" id="prev" type="button">← Previous</button>
+      <button class="alt" id="next" type="button">Next →</button>
+      <button class="alt" id="today" type="button">Today</button>
+      <button class="alt" id="refresh" type="button">Refresh</button>
+      <button id="mashpiaSync" type="button">Sync to Mashpia</button>
+      <span id="mashpiaMsg" class="muted" role="status" aria-live="polite"></span>
+      <div id="mashpiaMatch" class="panel" hidden style="flex-basis:100%"></div>
+    </div>
+    <details id="mashpiaSetup" class="panel">
+      <summary><b>Sync to Mashpia: one-time setup</b> <span class="muted">(about 20 seconds, once per computer)</span></summary>
+      <p>1. Show your bookmarks bar (Chrome: press <b>Ctrl+Shift+B</b>).<br>
+         2. <b>Drag this button</b> up to your bookmarks bar: <a id="mashpiaBookmark" draggable="true" href="#" style="display:inline-block;padding:6px 12px;border-radius:8px;background:#2d6ea3;color:#fff;font-weight:700;text-decoration:none">B3 Mashpia Sync</a><br>
+         3. Press <b>Sync to Mashpia</b> above. Mashpia opens in a new tab. Log in to Mashpia there if it asks, then click the <b>B3 Mashpia Sync</b> bookmark once on that tab. The sync runs by itself.</p>
+      <p class="muted">After that, just press <b>Sync to Mashpia</b> here each time. Keep that Mashpia tab open; if you close it, repeat step 3. Your Mashpia password is never stored or sent to us.</p>
+    </details>
+
+    <div class="panel">
+      <p class="sum" id="summary"></p>
+      <p class="muted" id="markMsg" role="status" aria-live="polite" style="color:#b42318"></p>
+      <div class="scroll"><table id="grid"></table></div>
+      <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Click a cell to mark it for a student: blank → ✓ → ✗ → blank. It saves the way the student's own answer does. Column names are shown as they were on that day.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Export CSV</h2>
+      <div class="bar" style="border:0;padding:0;margin:0">
+        <button id="exportDay" type="button">Export selected day</button>
+        <span class="muted">or a date range:</span>
+        <label>From <input type="date" id="from"></label>
+        <label>To <input type="date" id="to"></label>
+        <button id="exportRange" type="button">Export range</button>
+      </div>
+      <p class="muted">Columns: Date, Student, then one column per item with Yes / No / blank. Opens correctly in Excel, including Hebrew. A range includes only days on which at least one student answered.</p>
+    </div>
+  </div>
+</main>
+<script>
+(function(){
+"use strict";
+var C=window.B3DailyChecklist;
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
+var db=null,ws=(window.B3SiteSettings&&window.B3SiteSettings.workspaceId)||"b3-2026";
+var classes=[],classId="",roster=[];        // roster: [{id,name}]
+var configRaw=null;                           // stored config/items (or null = standard list)
+var cache={};                                 // date -> answers object for the current class
+
+function base(){return C.basePath(ws,classId)}
+function fail(msg){$("status").hidden=false;$("status").textContent=msg}
+
+/* ---------- reading ---------- */
+async function loadConfig(){
+  var snap=await db.ref(base()+"/config/items").once("value");
+  configRaw=snap.val()||null;
+}
+async function loadDay(d,force){
+  if(!force&&cache[d])return cache[d];
+  var snap=await db.ref(base()+"/answers/"+d).once("value");
+  cache[d]=snap.val()||{};return cache[d];
+}
+async function loadRange(from,to){
+  var snap=await db.ref(base()+"/answers").orderByKey().startAt(from).endAt(to).once("value");
+  var v=snap.val()||{};Object.keys(v).forEach(function(k){cache[k]=v[k]});
+  return v;
+}
+
+/* ---------- table model (used by both the grid and the CSV) ----------
+   Columns are item ids. The header is the name given in the most recent answer snapshot in range,
+   falling back to the current configured name. Removed items only appear if someone answered them. */
+function buildColumns(dayKeys){
+  var cfg=C.itemsFromConfig(configRaw,true),byId={};
+  cfg.forEach(function(x){byId[x.id]=x});
+  var seen={};   // id -> {name, order, date}
+  dayKeys.slice().sort().forEach(function(d){
+    var day=cache[d]||{};
+    Object.keys(day).forEach(function(sid){
+      var its=(day[sid]&&day[sid].items)||{};
+      Object.keys(its).forEach(function(id){
+        var a=its[id];if(!a||(a.v!==1&&a.v!==0))return;
+        seen[id]={name:String(a.n||id),order:Number(a.o)||0,star:!!a.s};   // later days overwrite earlier ones
+      });
+    });
+  });
+  var cols=[];
+  cfg.forEach(function(x){
+    if(x.removed&&!seen[x.id])return;
+    var s=seen[x.id];
+    cols.push({id:x.id,name:s?s.name:x.name,star:s?s.star:x.star,order:x.order,edit:!x.removed});   // only current items can be marked
+  });
+  Object.keys(seen).forEach(function(id){
+    if(byId[id])return;                                    // answered items that are no longer in the config at all
+    cols.push({id:id,name:seen[id].name,star:seen[id].star,order:seen[id].order,edit:false});
+  });
+  cols.sort(function(a,b){return a.order-b.order||(a.id<b.id?-1:1)});
+  return cols;
+}
+function cellValue(day,sid,id){
+  var a=day&&day[sid]&&day[sid].items&&day[sid].items[id];
+  return a&&a.v===1?1:(a&&a.v===0?0:null);
+}
+function sortedRoster(){return roster.slice().sort(function(a,b){return a.name.localeCompare(b.name)})}
+
+/* ---------- grid ---------- */
+var lastCols=[];
+function showSummary(d){
+  var day=cache[d]||{},people=sortedRoster();
+  var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
+  $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
+}
+async function drawGrid(force){
+  var d=$("day").value;if(!C.isDateKey(d))return;
+  $("summary").textContent="Loading…";
+  var day;
+  try{day=await loadDay(d,force)}catch(e){console.error(e);$("summary").textContent="Could not load answers: "+(e.message||e);return}
+  var cols=buildColumns([d]),people=sortedRoster();
+  lastCols=cols;
+  showSummary(d);
+  var h='<tr><th class="nm">Student</th>'+cols.map(function(c){return '<th dir="auto">'+esc(c.name)+(c.star?' <span class="star">⭐</span>':'')+'</th>'}).join("")+'</tr>';
+  var rows=people.map(function(p){
+    return '<tr><td class="nm">'+esc(p.name)+'</td>'+cols.map(function(c){var v=cellValue(day,p.id,c.id);
+      var at=c.edit?' edit" tabindex="0" role="button" data-sid="'+esc(p.id)+'" data-iid="'+esc(c.id)+'" aria-label="'+esc(p.name+' — '+c.name)+'"':'"';
+      return v===1?'<td class="y'+at+' title="Yes">✓</td>':v===0?'<td class="n'+at+' title="No">✗</td>':'<td class="b'+at+'></td>'}).join("")+'</tr>';
+  }).join("");
+  $("grid").innerHTML=h+rows;
+}
+
+/* ---------- teacher marks a cell: blank -> ✓ -> ✗ -> blank, saved the way a student's answer is ---------- */
+var saving={};
+function paintCell(td,v){
+  td.className=(v===1?"y":v===0?"n":"b")+" edit";
+  td.textContent=v===1?"✓":v===0?"✗":"";
+  td.title=v===1?"Yes":v===0?"No":"";
+}
+async function markCell(td){
+  var d=$("day").value,sid=td.getAttribute("data-sid"),iid=td.getAttribute("data-iid");
+  var col=lastCols.filter(function(c){return c.id===iid})[0],person=roster.filter(function(r){return r.id===sid})[0];
+  if(!col||!col.edit||!person||!C.isDateKey(d)||saving[sid+"|"+iid])return;
+  saving[sid+"|"+iid]=1;
+  var day=cache[d]||(cache[d]={}),before=day[sid]?JSON.parse(JSON.stringify(day[sid])):null;
+  var prev=cellValue(day,sid,iid),v=C.nextMark(prev);
+  var rec=day[sid]||(day[sid]={name:person.name,items:{}});rec.items=rec.items||{};
+  if(v==null)delete rec.items[iid];else rec.items[iid]={v:v,n:col.name,s:col.star?1:0,o:col.order};
+  paintCell(td,v);showSummary(d);$("markMsg").textContent="";
+  try{
+    await db.ref(base()+"/answers/"+d+"/"+sid).update(C.markUpdate(col,v,person.name,firebase.database.ServerValue.TIMESTAMP));
+  }catch(e){
+    console.warn("Teacher mark failed",e);
+    if(before)day[sid]=before;else delete day[sid];
+    paintCell(td,prev);showSummary(d);
+    $("markMsg").textContent="Could not save that mark for "+person.name+". Check your internet and click it again.";
+  }
+  delete saving[sid+"|"+iid];
+}
+$("grid").addEventListener("click",function(e){var td=e.target.closest&&e.target.closest("td.edit");if(td)markCell(td)});
+$("grid").addEventListener("keydown",function(e){
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  var td=e.target.closest&&e.target.closest("td.edit");if(td){e.preventDefault();markCell(td)}
+});
+
+/* ---------- CSV ---------- */
+function csvCell(v){
+  var s=String(v==null?"":v).replace(/[\r\n]+/g," ");
+  if(/^[=+\-@\t]/.test(s))s="'"+s;                          // stop spreadsheet formula injection
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+function downloadCsv(rows,name){
+  var text="﻿"+rows.map(function(r){return r.map(csvCell).join(",")}).join("\r\n");   // UTF-8 BOM so Excel shows Hebrew
+  var blob=new Blob([text],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function className(){var c=classes.find(function(x){return x.id===classId});return (c&&c.name)||classId}
+async function exportDates(dates,label){
+  var cols=buildColumns(dates),people=sortedRoster();
+  var rows=[["Date","Student"].concat(cols.map(function(c){return c.name}))];
+  dates.forEach(function(d){
+    var day=cache[d]||{};
+    people.forEach(function(p){
+      rows.push([d,p.name].concat(cols.map(function(c){var v=cellValue(day,p.id,c.id);return v===1?"Yes":v===0?"No":""})));
+    });
+  });
+  var safe=String(className()).replace(/[^\w֐-׿-]+/g,"_");
+  downloadCsv(rows,"daily-checklist-"+safe+"-"+label+".csv");
+}
+$("exportDay").onclick=async function(){
+  var d=$("day").value;if(!C.isDateKey(d)){alert("Pick a day first.");return}
+  try{await loadDay(d,true);await exportDates([d],d)}catch(e){alert("Could not export: "+(e.message||e))}
+};
+$("exportRange").onclick=async function(){
+  var f=$("from").value,t=$("to").value;
+  if(!C.isDateKey(f)||!C.isDateKey(t)){alert("Choose both a From and a To date.");return}
+  if(f>t){var x=f;f=t;t=x}
+  try{
+    var v=await loadRange(f,t);
+    var dates=Object.keys(v).filter(function(k){return C.isDateKey(k)&&v[k]&&Object.keys(v[k]).length}).sort();
+    if(!dates.length){alert("No answers were found between "+f+" and "+t+".");return}
+    await exportDates(dates,f+"_to_"+t);
+  }catch(e){alert("Could not export: "+(e.message||e))}
+};
+
+/* ---------- Sync to Mashpia (runs on the teacher's own Mashpia tab; no password stored) ---------- */
+(function(){
+  var M=window.B3MashpiaSync,Core=window.B3MashpiaCore;
+  if(!M||!Core){$("mashpiaSync").hidden=true;$("mashpiaSetup").hidden=true;return}
+  var link=$("mashpiaBookmark");
+  link.onclick=function(e){e.preventDefault();alert("Don't click it here: drag it up to your bookmarks bar.")};
+  Promise.all([fetch("mashpia-core.js",{cache:"no-store"}).then(function(r){return r.text()}),fetch("mashpia-agent.js",{cache:"no-store"}).then(function(r){return r.text()})])
+    .then(function(t){link.setAttribute("href",M.bookmarkletHref(t[0],t[1]))}).catch(function(){$("mashpiaSetup").hidden=true});
+  var pre=null;
+  /* Fun Torah student id -> the exact Mashpia name the teacher picked once. Saved per class; later syncs use it automatically. */
+  async function loadNameMap(){
+    try{return (await db.ref(base()+"/mashpiaNames").once("value")).val()||{}}catch(e){console.warn("Could not read saved Mashpia names",e);return {}}
+  }
+  /* Students Mashpia could not match: each gets a dropdown of the Mashpia names nobody was matched to. */
+  function showMatchUp(cls,unmatched,candidates){
+    var box=$("mashpiaMatch");
+    if(cls!==classId||!unmatched||!unmatched.length||!candidates){box.hidden=true;box.innerHTML="";return}
+    box.innerHTML="<b>Match these students to their Mashpia names</b> <span class=\"muted\">(pick once; it is remembered for next time)</span>"+
+      unmatched.map(function(u,i){return "<div style=\"margin:6px 0\"><span style=\"display:inline-block;min-width:180px\">"+esc(u.name)+"</span> <select data-i=\""+i+"\" data-sid=\""+esc(u.id)+"\"></select></div>"}).join("")+
+      "<button type=\"button\" id=\"mashpiaMatchSave\">Save and sync again</button>";
+    var sels=[].slice.call(box.querySelectorAll("select"));
+    function fill(){
+      var taken={};sels.forEach(function(s){if(s.value)taken[s.value]=1});
+      sels.forEach(function(s){
+        var cur=s.value;
+        s.innerHTML="<option value=\"\">Not matched</option>"+candidates.filter(function(n){return n===cur||!taken[n]}).map(function(n){return "<option value=\""+esc(n)+"\""+(n===cur?" selected":"")+">"+esc(n)+"</option>"}).join("");
+      });
+    }
+    sels.forEach(function(s){s.onchange=fill});fill();box.hidden=false;
+    $("mashpiaMatchSave").onclick=async function(){
+      var pick=sels.filter(function(s){return s.value&&s.getAttribute("data-sid")});
+      if(!pick.length){$("mashpiaMsg").textContent="Pick a Mashpia name for at least one student, or leave them for now.";return}
+      try{
+        var upd={};pick.forEach(function(s){upd[s.getAttribute("data-sid")]=s.value});
+        await db.ref(C.basePath(ws,cls)+"/mashpiaNames").update(upd);
+      }catch(e){console.error(e);$("mashpiaMsg").textContent="Could not save the matches. Try again.";return}
+      $("mashpiaSync").click();
+    };
+  }
+  /* Mashpia is the source of this class's checklist items: every sync copies the grid's columns (names, order, red stars).
+     Past answers keep the names they had that day; classes that never synced keep their current items. */
+  async function applyMashpiaItems(cls,items){
+    var next=Core.mergeItems(configRaw,items,C.DEFAULT_ITEMS);
+    if(!next||cls!==classId)return false;
+    await db.ref(C.basePath(ws,cls)+"/config/items").set(next);
+    configRaw=next;await drawGrid(false);return true;
+  }
+  /* Checks Mashpia has where this side is blank become ✓ here (saved like a teacher's mark). Cells that already hold a ✓ or ✗ are never touched. */
+  async function applyPulls(cls,d,pulls){
+    if(!pulls||!pulls.length||cls!==classId)return 0;
+    var cols=C.itemsFromConfig(configRaw,false),byName={};
+    cols.forEach(function(c){byName[Core.norm(c.name)]=c});
+    var day=await loadDay(d,true),n=0;
+    for(var i=0;i<pulls.length;i++){
+      var key=Core.nameKey(pulls[i].name),person=roster.filter(function(r){return Core.nameKey(r.name)===key})[0];
+      if(!person)continue;
+      var upd={name:person.name,t:firebase.database.ServerValue.TIMESTAMP},count=0;
+      pulls[i].items.forEach(function(nm){
+        var col=byName[Core.norm(nm)];
+        if(!col||cellValue(day,person.id,col.id)!==null)return;
+        var u=C.markUpdate(col,1,person.name,0);upd["items/"+col.id]=u["items/"+col.id];count++;
+      });
+      if(!count)continue;
+      await db.ref(base()+"/answers/"+d+"/"+person.id).update(upd);n+=count;
+    }
+    if(n){await loadDay(d,true);if($("day").value===d)await drawGrid(false)}
+    return n;
+  }
+  var env={
+    open:function(){return pre},
+    listen:function(fn){window.addEventListener("message",fn);return function(){window.removeEventListener("message",fn)}},
+    timer:function(fn,ms){var t=setTimeout(fn,ms);return function(){clearTimeout(t)}},
+    repeat:function(fn,ms){var t=setInterval(fn,ms);return function(){clearInterval(t)}},
+    status:function(text){$("mashpiaMsg").textContent=text},
+    needSetup:function(){$("mashpiaSetup").open=true},
+    newId:function(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+  };
+  $("mashpiaSync").onclick=async function(){
+    var btn=$("mashpiaSync"),msg=$("mashpiaMsg");
+    if(!classId)return;
+    btn.disabled=true;msg.textContent="Opening Mashpia…";
+    pre=window.open("","b3-mashpia");     /* opened right at the click so the browser allows it; an existing Mashpia tab is reused as is */
+    try{
+      var d=$("day").value;
+      var answers=await loadDay(d,true);
+      var mapping=await loadNameMap(),cls=classId;
+      var students=Core.buildStudents(answers,roster,mapping);   /* demo/test students are left out */
+      $("mashpiaMatch").hidden=true;
+      var res=await M.run(env,d,students);
+      if(!res.ok){msg.textContent=res.message;btn.disabled=false;return}
+      var changed=false,itemsFailed=false;
+      try{changed=await applyMashpiaItems(cls,res.items)}catch(e){console.error(e);itemsFailed=true}
+      var pulled=0;
+      try{pulled=await applyPulls(cls,d,res.pulls)}catch(e){console.error(e);res.message+=" Could not copy Mashpia's checks into the checklist."}
+      if(pulled)res.message+=" Added "+pulled+" check"+(pulled===1?"":"s")+" from Mashpia.";
+      var stale=!res.items||!res.candidates;   /* an older copy of the bookmark does not send the items: ask for the new one */
+      if(stale)$("mashpiaSetup").open=true;
+      var extra=stale?" To get Mashpia's checklist items, drag the new B3 Mashpia Sync button to your bookmarks bar again (setup below).":itemsFailed?" Could not update the checklist items.":changed?" Checklist items updated from Mashpia.":"";
+      var anyAnswer=students.some(function(s){return s.items.length||s.no.length});
+      showMatchUp(cls,res.unmatched,res.candidates);
+      msg.textContent=anyAnswer||pulled?res.message+extra:(stale||itemsFailed?extra.trim():changed?"Checklist items updated from Mashpia. No answers to send yet.":"Checklist items already match Mashpia. No answers to send yet.");
+    }catch(e){console.error(e);msg.textContent="Could not sync right now. Try again in a minute."}
+    btn.disabled=false;
+  };
+  $("day").addEventListener("change",function(){$("mashpiaMsg").textContent=""});
+})();
+
+/* ---------- navigation ---------- */
+function shift(n){var p=$("day").value.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]+n);
+  $("day").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");drawGrid(false)}
+$("prev").onclick=function(){shift(-1)};$("next").onclick=function(){shift(1)};
+$("today").onclick=function(){$("day").value=C.schoolDate();drawGrid(false)};
+$("day").onchange=function(){drawGrid(false)};
+$("refresh").onclick=function(){cache={};loadConfig().then(function(){drawGrid(true)})};
+async function selectClass(id){
+  classId=id;cache={};
+  var c=classes.find(function(x){return x.id===id});
+  roster=((c&&c.studentIds)||[]).map(function(sid,i){return {id:sid,name:String((c.students&&c.students[i])||sid),demo:!!(c.demo&&c.demo[i])}});
+  try{await loadConfig();await drawGrid(true)}catch(e){console.error(e);fail("Could not load this class: "+(e.message||e))}
+}
+$("classSel").onchange=function(){selectClass($("classSel").value)};
+
+/* Loads only classes this account may read. Never reads the whole `classes` node: the database rules allow
+   a read of one class at a time (assigned teacher, active admin, owner) but not of the list of all classes. */
+var SAFE_ID=/^[A-Za-z0-9_-]{1,100}$/;
+async function loadAllowedClasses(){
+  var api=window.B3SiteSettings;
+  if(!api||typeof api.onAuthStateChanged!=="function")throw new Error("Teacher sign-in is unavailable. Open this tool from your Teacher Center.");
+  var session=await new Promise(function(resolve,reject){
+    var done=false;
+    api.onAuthStateChanged(function(user,authorized,access){
+      if(done)return;done=true;
+      if(!user||!authorized||!access||!access.authorized||["teacher","admin"].indexOf(access.role)<0)reject(new Error("Sign in to your authorized teacher account in Teacher Center to view your class."));
+      else resolve({user:user,access:access});
+    });
+  });
+  var requested=(new URLSearchParams(location.search).get("class")||"").trim();
+  if(requested&&!SAFE_ID.test(requested))throw new Error("Invalid class selection.");
+  var ids=[];
+  if(session.access.role==="admin"){
+    // Owner/admin. A class in the link is all that is needed, so nothing else is read (no teacher-assignment lookup, no warning).
+    // Without one, look for classes in teacher invitations and in classes this browser has opened before.
+    var OC=window.B3OwnerClasses;
+    if(requested){ids=[requested];if(OC)OC.remember(ws,requested)}
+    else{
+      var found=OC?OC.remembered(ws):[];
+      try{
+        var inv=(await db.ref("b3Games/workspaces/"+ws+"/teacherInvites").once("value")).val()||{};
+        found=found.concat(OC?OC.idsFromInvites(inv):[]);
+      }catch(e){console.info("Teacher assignments are not readable by this account, so only classes opened before are listed.",e&&e.code||"")}
+      ids=OC?OC.unique(found):found;
+    }
+  }else{
+    ids=(session.access.classIds||[]).filter(function(id){return SAFE_ID.test(id)});
+    if(requested&&ids.indexOf(requested)<0)throw new Error("This class is not assigned to your teacher account.");
+    if(requested)ids=[requested];
+  }
+  ids=ids.filter(function(id){return SAFE_ID.test(id)});
+  if(!ids.length)throw new Error(session.access.role==="admin"
+    ?"No class to show yet. Open this page with a class in the link, for example daily-checklist/teacher.html?class=YOUR-CLASS-ID. Classes you open this way are remembered on this browser."
+    :"No class selected. Open this tool from Teacher Home so a class is chosen.");
+  var rows=await Promise.all(ids.map(async function(id){
+    var cls;
+    try{cls=(await db.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value")).val()}catch(e){console.warn("Class not readable",id,e);return null}
+    if(!cls||cls.active===false)return null;
+    var entries=Object.entries(cls.members||{}).filter(function(en){return SAFE_ID.test(en[0])&&en[1]&&en[1].active!==false});
+    var checked=await Promise.all(entries.map(async function(en){
+      var sid=en[0],member=en[1],profile=null;
+      try{
+        var res=await Promise.all([db.ref("b3Games/students/"+sid+"/profile").once("value"),db.ref("b3Games/students/"+sid+"/memberships/"+ws+"_"+id).once("value")]);
+        profile=res[0].val();var m=res[1].val();
+        if(!profile||profile.active===false||!m||m.active===false||m.workspaceId!==ws||m.classId!==id)return null;
+      }catch(e){
+        if(session.access.role!=="admin")throw e;   // teachers keep the strict check; owner falls back to the class record
+        profile=null;
+      }
+      return {id:sid,name:String((profile&&profile.name)||member.name||"").trim()||sid,demo:member.demo===true||(profile&&profile.demo===true)||/^demo_/.test(sid)};
+    }));
+    var active=checked.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)});
+    return {id:id,name:String(cls.name||id),students:active.map(function(r){return r.name}),studentIds:active.map(function(r){return r.id}),demo:active.map(function(r){return r.demo})};
+  }));
+  var list=rows.filter(Boolean).sort(function(a,b){return a.name.localeCompare(b.name)||a.id.localeCompare(b.id)});
+  if(!list.length)throw new Error("No active class could be loaded for this account.");
+  var names={};list.forEach(function(c){names[c.id]=c.name});
+  var selectedId=window.B3ClassGate?await window.B3ClassGate.choose({ids:list.map(function(c){return c.id}),names:names,requested:requested||"-"}):(requested||list[0].id);
+  return {classes:list,selectedId:selectedId};
+}
+
+(async function(){
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    db=firebase.database();
+    var session=await loadAllowedClasses();
+    classes=session.classes||[];
+    if(!classes.length){fail("No classes are assigned to this teacher.");return}
+    $("classSel").innerHTML=classes.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name||c.id)+'</option>'}).join("");
+    var first=session.selectedId&&classes.some(function(c){return c.id===session.selectedId})?session.selectedId:classes[0].id;
+    $("classSel").value=first;
+    $("day").value=C.schoolDate();
+    var t=C.schoolDate();$("from").value=t;$("to").value=t;
+    $("status").hidden=true;$("app").hidden=false;
+    await selectClass(first);
+  }catch(e){console.error(e);fail((e.message||"Could not load your class.")+" Open Teacher Center to sign in or choose an assigned class.")}
+})();
+})();
+</script>
+<script src="../back-nav.js" data-mode="inline" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body></html>

@@ -44,7 +44,9 @@ test('student capture requires Entire Screen and offers a persistent share windo
  assert.match(s,/displaySurface:'monitor'/);
  assert.match(s,/surfaceSwitching:'exclude'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
- assert.match(s,/window\.open\(url\.href,'classPointerStudentShare'/);
+ // The window is looked up by name and only navigated when it is new, so an open sharing window is never reloaded.
+ assert.match(s,/openShareWindowOnce\(window,url\.href,'classPointerStudentShare'\)/);
+ assert.match(s,/win\.open\('',name\)/);
  assert.doesNotMatch(s,/Share a browser tab/);
 });
 
@@ -73,7 +75,7 @@ test('teacher can send a single class to student screen sharing while the browse
   assert.match(session,/requestScreenSharing/);
   assert.match(session,/shareRequest:\{at:firebase\.database\.ServerValue\.TIMESTAMP\}/);
   assert.match(activity,/shareRequest\?\.at/);
-  assert.match(activity,/btn\.addEventListener\('click',beginShare\)/);
+  assert.match(activity,/btn\.addEventListener\('click',shareClick\)/);
   assert.doesNotMatch(activity,/fttShareRequestOverlay|Open Sharing Window/);
   assert.doesNotMatch(activity,/location\.assign\(new URL\(/);
   assert.match(activity,/ClassPointerBoards\?\.fromTeacher\(message\)/);

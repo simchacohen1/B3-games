@@ -52,6 +52,8 @@ function fixture() {
     if (name === 'firebase-functions/v2/https') return { onRequest: (_o, fn) => { handler = fn; return fn; } };
     if (name === 'firebase-admin') return admin;
     if (name === 'node:crypto') return require('node:crypto');
+    // The real lock rules (Class Pointer is not locked in these fixtures: no locks are stored).
+    if (name === './student-locks-core.cjs') return require('../backend/functions/student-locks-core.cjs');
     if (name === './student-passcodes.cjs') return {
       // like the real one: the shared default 5770 is only returned when the caller allows it
       readPasscode: async (_get, id, opts) => ({ passcode: passcodes[id] || (id === 'legacy' && opts && opts.allowLegacyDefault ? '5770' : '') }),
@@ -276,4 +278,36 @@ test('compatibility: a denial recorded on the public session record (website cur
   const ticket = (await share(g, 'avi', '1111', '3.3.3.3')).body.token;
   g.rows.set(key, { ...g.rows.get(key), screenSharingDenied: { avi: true } });
   assert.equal((await g.post({ action: 'verify', classId: 'et', room: ROOM, token: ticket }, 'teacher-et')).statusCode, 403);
+});
+
+// ---- Class locks (the teacher's Locks panel): while Class Pointer is locked for a class, no join or sharing ticket ----
+test('Class Pointer locked by the teacher: no join ticket for the class; other classes and other features are not affected', async () => {
+  const f = fixture();
+  const ok = await f.issue('avi', '1111');
+  assert.equal(ok.statusCode, 200, 'unlocked: a ticket is issued');
+  const lock = (locks) => f.rows.set('b3Games/workspaces/b3-2026/classes/et/locks', locks);
+  // the Class Pointer switch
+  lock({ features: { 'class-pointer': { locked: true } } });
+  const locked = await f.issue('avi', '1111');
+  assert.equal(locked.statusCode, 403); assert.match(locked.body.error, /locked by your teacher/i);
+  // another feature's lock does not touch it, and another class is not affected
+  lock({ features: { gematria: { locked: true } } });
+  assert.equal((await f.issue('avi', '1111')).statusCode, 200, 'locking Gematria does not lock Class Pointer');
+  lock({ features: { 'class-pointer': { locked: true } } });
+  assert.equal((await f.issue('wes', '3333', 'wt', ROOM_WT)).statusCode, 200, 'WT has its own locks');
+  // a temporary unlock opens it again for a while
+  lock({ features: { 'class-pointer': { locked: true } }, overrides: { 'class-pointer': { state: 'open', until: Date.now() + 60000, byName: 'T' } } });
+  assert.equal((await f.issue('avi', '1111')).statusCode, 200);
+  // a schedule of any of his teachers, "all features"
+  const now = Date.now(), core = require('../student-lock-core.js'), p = core.nyParts(now);
+  const hhmm = m => String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0') + ':' + String(((m % 1440) + 1440) % 1440 % 60).padStart(2, '0');
+  lock({ schedules: { t1: { name: 'T', rules: { r1: { days: [p.day], start: hhmm(p.minutes - 2), end: hhmm(p.minutes + 20), targets: ['*'] } } } } });
+  assert.equal((await f.issue('avi', '1111')).statusCode, 403);
+});
+
+test('the Class Pointer function carries the lock check on permissions, sharing tickets and join tickets', () => {
+  assert.equal((source.match(/pointerLocked\(\)/g) || []).length, 3);
+  assert.match(source, /action==='permissions'[\s\S]{0,600}pointerLocked\(\)/);
+  assert.match(source, /action==='issue'[\s\S]{0,600}pointerLocked\(\)/);
+  assert.match(source, /action==='joinIssue'[\s\S]{0,200}pointerLocked\(\)/);
 });

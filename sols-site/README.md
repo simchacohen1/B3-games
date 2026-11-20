@@ -1,6 +1,6 @@
 # sols.tools (Shluchim Online School)
 
-The same website is served at two addresses from the same live Firebase project:
+**sols.tools is the only address the site runs on.** funtorahtools.com only redirects, permanently (301), to the same path on sols.tools (a Cloudflare redirect rule; `domain-redirect.js`, loaded first in every page, and `404.html` are the fallback for anything that still reaches the old GitHub Pages copy). The site is built from one source and published at two addresses:
 
 | Address | Repository | Branding |
 | --- | --- | --- |
@@ -24,26 +24,30 @@ Nothing in this folder is loaded by funtorahtools.com. `brand.js` only changes
 the visible site name and the browser-tab icon on the sols.tools copy; accounts,
 saved work and Firebase paths are identical on both addresses.
 
-## Only Class Pointer for teachers and students
+## Front door: Class Pointer for visitors, the whole site once signed in
 
-`pointer-only.js` (issue #832) is put at the start of `/sols-brand.js` on the sols.tools copy.
-For everyone except a site administrator it:
+`pointer-only.js` (issue #832, widened) is put at the start of `/sols-brand.js` on the sols.tools copy.
 
-- sends any page other than the home page, the teacher home page and the Class Pointer
-  pages (`/class-pointer-prototype/`) back to the home page;
-- hides the other tools on the student home page and the teacher home page.
+- **Not signed in:** any page other than the home page, the teacher sign-in page and the Class Pointer
+  pages (`/class-pointer-prototype/`) sends the visitor back to the home page, and the home pages show
+  Class Pointer only. Clean links work too (`/teacher-home`, `/index`, `/class-pointer-prototype`).
+- **Signed in (teacher, student or administrator):** the whole site, the same as funtorahtools.com.
+  The script never grants access: every page and the server still run their own checks (class
+  permissions, teacher assignment, owner-only pages).
 
-A site administrator who has signed in on sols.tools keeps the whole site in that browser.
-This is display only: accounts, data and rules are unchanged, and the same account still
-sees its class's tools on funtorahtools.com. To show another tool on sols.tools, add its
-folder to the allowed list in `pointer-only.js`.
+A page waits (hidden) until the site's sign-in has answered; if it never does, the page is shown and
+its own checks apply. This is display only: accounts, data and rules are unchanged.
 
 Do not edit `sols-school-site` by hand: the next update overwrites it. Change
 this repository instead.
 
-When a new backend function or host allow-list is added, include
-`https://sols.tools` and `https://www.sols.tools` next to the
-funtorahtools.com entries, or that feature will fail on sols.tools.
+When a new backend function or host allow-list is added, list only
+`https://sols.tools` and `https://www.sols.tools` (plus the GitHub Pages origin where one is
+listed). funtorahtools.com is no longer in any backend CORS list or live-host check: it only redirects.
+
+The live-site monitor and smoke scripts run against sols.tools. A signed-out visitor is sent back to
+the home page from any page outside the front door, which counts as that page staying locked.
+`scripts/sols-expected.cjs` rebuilds the expected sols.tools files so "live matches the repository" compares like with like.
 
 ## Google sign-in domain
 

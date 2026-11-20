@@ -9,3 +9,4 @@ exports.privateMediaUrl = require('./private-media-url').privateMediaUrl;
 exports.teacherStudentFiles = require('./teacher-student-files').teacherStudentFiles;
 exports.classWorksheets = require('./class-worksheets').classWorksheets;
 exports.studentRewardsTeacher = require('./rewards-teacher').studentRewardsTeacher;
+exports.studentLocks = require('./student-locks').studentLocks;

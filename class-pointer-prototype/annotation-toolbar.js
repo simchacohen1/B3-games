@@ -472,6 +472,7 @@
   document.addEventListener('pointerdown',e=>{if(flyOpen&&!bar.contains(e.target)&&!fly.contains(e.target))closeFly()},true);
 
   // ---------- Toolbar state ----------
+  const colorKey=(s,tool)=>s.variantColor?.(tool,variantOf(tool))?.key||tool;
   function chooseTool(tool,fromClick){
     const s=surface();if(!supports(s,tool))return;
     // Clicking the chosen tool again shows its kinds (pointer shapes, highlight box, shapes).
@@ -480,7 +481,8 @@
     if(st.tool!==tool){selected=tool==='select'?selected:null;laser=null;try{s.live?.(null,null)}catch{}}
     st.tool=tool;closeFly();
     // Each drawing tool keeps its own color (the highlighter starts yellow).
-    if(toolColors[tool]&&colorsOf(s).some(c=>c[0]===toolColors[tool]))st.color=toolColors[tool];
+    const color=toolColors[colorKey(s,tool)]||s.variantColor?.(tool,variantOf(tool))?.defaultColor;
+    if(color&&colorsOf(s).some(c=>c[0]===color))st.color=color;
     applyDelegate();
     // Shapes show their kinds straight away.
     if(tool==='shape'&&fromClick)openVariants(tool);
@@ -492,7 +494,7 @@
     if(st.tool==='select'&&(isDelegate(now)?now.delegate.recolor?.(c):recolorSelected(now,c))){st.color=c;sync();return}
     // Picking a color while no drawing tool is chosen starts the pen. A lesson's pointer has a color of its own.
     if(['pointer','hand','select','eraser'].includes(st.tool)&&supports(now,'pen')&&!(st.tool==='pointer'&&isDelegate(now)))st.tool='pen';
-    st.color=c;if(toolColors[st.tool])toolColors[st.tool]=c;applyDelegate();sync();
+    st.color=c;const key=colorKey(now,st.tool);if(toolColors[key]||key!==st.tool)toolColors[key]=c;applyDelegate();sync();
   }
   function applyDelegate(){
     const s=surface();if(!isDelegate(s))return;
@@ -518,7 +520,11 @@
       const kinds=variantsOf(s,tool);
       if(kinds&&!kinds.some(k=>k[0]===variantOf(tool))){setVariant(tool,kinds[0][0]);if(tool===st.tool)changed=true}
     }
-    if(changed||fresh)applyDelegate();
+    if(changed||fresh){
+      const fallback=s.variantColor?.(st.tool,variantOf(st.tool))?.defaultColor;
+      if(fallback)st.color=toolColors[colorKey(s,st.tool)]||fallback;
+      applyDelegate();
+    }
     const open=mode==='open';
     bar.hidden=!open||!!s.bare;pencil.hidden=open||!!s.bare;if(!open||s.bare){closeFly();tip.hidden=true}
     for(const [tool,b] of toolButtons){
