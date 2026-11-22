@@ -75,7 +75,7 @@
   async function preview() {
     const out = $('wpnOut'), cls = $('wpnClass').value, dateVal = $('wpnDate').value, range = C.weekRange(dateVal);
     if (!range) { out.innerHTML = '<p class="wpn-err">Choose a date.</p>'; return; }
-    if (range.to > Date.now() + 1000 && C.nyDateIso(Date.now()) <= range.end && !confirm('This week is not over yet. Preview it anyway?')) return;
+    if (range.to > Date.now() + 1000 && C.nyDateIso(Date.now()) <= range.end && !confirm('This week is not over yet. Preview it anyway?')) { out.textContent = ''; state = null; return; }
     out.textContent = 'Loading…';
     try {
       if (!Object.keys(studentsMap || {}).length && typeof loadStudents === 'function') await loadStudents();
@@ -162,7 +162,7 @@
   async function preview() {
     const out = $('wpnOut'), cls = $('wpnClass').value, dateVal = $('wpnDate').value, range = C.weekRange(dateVal);
     if (!range) { out.innerHTML = '<p class="wpn-err">Choose a date.</p>'; return; }
-    if (range.to > Date.now() + 1000 && C.nyDateIso(Date.now()) <= range.end && !confirm('This week is not over yet. Preview it anyway?')) return;
+    if (range.to > Date.now() + 1000 && C.nyDateIso(Date.now()) <= range.end && !confirm('This week is not over yet. Preview it anyway?')) { out.textContent = ''; state = null; return; }
     out.textContent = 'Loading…';
     try {
       if (!Object.keys(studentsMap || {}).length && typeof loadStudents === 'function') await loadStudents();
