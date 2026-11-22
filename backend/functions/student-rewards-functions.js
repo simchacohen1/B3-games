@@ -17,10 +17,16 @@ const {resolveStudent}=require("./student-login-core.cjs");
 const studentTools=require('./student-tool-policy.js');
 const rewardsStore=require('./rewards-store.cjs');
 const {cancelRedemption}=require("./rewards-cancel-core.cjs");
+const purchase=require("./rewards-purchase-core.cjs");
 if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 const SR_ROOT = "studentRewards";
 const DAY_MS = 24*60*60*1000;
+// Store adapter for the purchase core (rewards-purchase-core.cjs).
+const purchaseStore={
+  get:async path=>(await rtdb.ref(path).get()).val(),
+  tx:(path,fn)=>rtdb.ref(path).transaction(fn)
+};
 function timeMs(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const n=Number(value); if (Number.isFinite(n) && n>0) return n;
@@ -130,6 +136,8 @@ exports.studentRewardsLogin = onRequest(
           await rtdb.ref(`${SR_ROOT}/enrollments/${rewardClassId}/${rewardId}`).set(true);
         }
         await rtdb.ref(`${SR_ROOT}/students/${match.studentId}/b3StudentId`).set(b3StudentId);
+        // Give back points from any purchase that was interrupted before its request was saved.
+        await purchase.repair(purchaseStore,match.studentId).catch(err=>console.warn("purchase repair",err));
         const uid=`sr_${sha256(match.studentId).slice(0,28)}`;
         const customToken=await admin.auth().createCustomToken(uid,{
           studentRewardsStudentId:match.studentId,
@@ -194,61 +202,77 @@ exports.studentRewardsRedeem = onRequest(
       const qty = Number(reward.quantity ?? -1);
       if (qty === 0) return res.status(409).json({error:"That reward is unavailable right now."});
 
-      const balanceRef = rtdb.ref(`${SR_ROOT}/students/${studentId}/rewardBalance`);
-      let insufficient = false;
-      const balanceTx = await balanceRef.transaction(current => {
-        const balance = Number(current || 0);
-        if (balance < cost) { insufficient = true; return; }
-        return balance - cost;
-      });
-      if (!balanceTx.committed) {
-        return res.status(409).json({error: insufficient ? "You do not have enough points yet." : "Could not update your point balance."});
-      }
+      // Finish or undo any purchase this student left half-done earlier.
+      await purchase.repair(purchaseStore,studentId).catch(err=>console.warn("purchase repair",err));
 
-      if (qty > 0) {
-        let soldOut = false;
-        const qtyTx = await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}/quantity`).transaction(current => {
-          const n = Number(current || 0);
-          if (n <= 0) { soldOut = true; return; }
-          return n - 1;
-        });
-        if (!qtyTx.committed) {
-          await balanceRef.transaction(current => Number(current || 0) + cost);
-          return res.status(409).json({error: soldOut ? "That reward just became unavailable." : "Could not reserve that reward."});
-        }
-      }
-
-      const cooldownDays=Math.max(0,Number(reward.cooldownDays||0)),rewardRef=rtdb.ref(`${SR_ROOT}/rewards/${rewardId}`);
-      let purchaseMs=Date.now(),blockedUntil=0;
-      if(cooldownDays>0){
-        const cdTx=await rewardRef.transaction(current=>{
-          if(!current || current.active===false || current.available===false) return;
-          const existingUntil=timeMs(current.cooldownUntil);
-          if(existingUntil>Date.now()){blockedUntil=existingUntil;return;}
-          purchaseMs=Date.now();
-          return {...current,lastRedeemedAt:purchaseMs,cooldownUntil:purchaseMs+cooldownDays*DAY_MS};
-        });
-        if(!cdTx.committed){
-          if(qty>0)await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}/quantity`).transaction(current=>Number(current||0)+1).catch(()=>{});
-          await balanceRef.transaction(current => Number(current || 0) + cost);
-          return res.status(409).json({error:blockedUntil?`That reward will be available again in ${cooldownText(blockedUntil)}.`:"That reward is unavailable right now."});
-        }
-      }else{
-        await rewardRef.update({lastRedeemedAt:purchaseMs,cooldownUntil:null});
-      }
-
+      // 1) Charge atomically with a durable marker, 2) reserve stock and cooldown,
+      // 3) save the purchase request, 4) clear the marker. If anything fails or the
+      // function dies, the points are returned (now, or by repair on the next visit).
       const requestRef = rtdb.ref(`${SR_ROOT}/redemptionsByStudent/${studentId}`).push();
-      const requestedAt = new Date(purchaseMs).toISOString();
-      await requestRef.set({
-        id: requestRef.key,
-        studentId,
-        rewardId,
-        cost,
-        status: "pending",
-        quantityReserved: qty > 0,
-        requestedAt
-      });
-      return res.status(200).json({ok:true,balance:Number(balanceTx.snapshot.val()||0),requestId:requestRef.key});
+      const purchaseId = requestRef.key;
+      const charged = await purchase.charge(purchaseStore, studentId, purchaseId, {rewardId, cost, quantityReserved: qty > 0});
+      if (!charged.ok) {
+        return res.status(409).json({error: charged.insufficient ? "You do not have enough points yet." : "Could not update your point balance."});
+      }
+      const undo = async (stockReserved) => {
+        if (stockReserved) await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}/quantity`).transaction(current=>Number(current||0)+1).catch(()=>{});
+        await purchase.refund(purchaseStore, studentId, purchaseId);
+      };
+
+      let stockReserved = false;
+      try {
+        if (qty > 0) {
+          let soldOut = false;
+          const qtyTx = await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}/quantity`).transaction(current => {
+            // A first pass can see no stored value yet (nothing cached): return a guess so the server rechecks and retries with the real stock.
+            if (current === null) return 0;
+            const n = Number(current || 0);
+            if (n <= 0) { soldOut = true; return; }
+            return n - 1;
+          });
+          if (!qtyTx.committed) {
+            await undo(false);
+            return res.status(409).json({error: soldOut ? "That reward just became unavailable." : "Could not reserve that reward."});
+          }
+          stockReserved = true;
+        }
+
+        const cooldownDays=Math.max(0,Number(reward.cooldownDays||0)),rewardRef=rtdb.ref(`${SR_ROOT}/rewards/${rewardId}`);
+        let purchaseMs=Date.now(),blockedUntil=0;
+        if(cooldownDays>0){
+          const cdTx=await rewardRef.transaction(current=>{
+            if(!current || current.active===false || current.available===false) return;
+            const existingUntil=timeMs(current.cooldownUntil);
+            if(existingUntil>Date.now()){blockedUntil=existingUntil;return;}
+            purchaseMs=Date.now();
+            return {...current,lastRedeemedAt:purchaseMs,cooldownUntil:purchaseMs+cooldownDays*DAY_MS};
+          });
+          if(!cdTx.committed){
+            await undo(stockReserved);
+            return res.status(409).json({error:blockedUntil?`That reward will be available again in ${cooldownText(blockedUntil)}.`:"That reward is unavailable right now."});
+          }
+        }else{
+          await rewardRef.update({lastRedeemedAt:purchaseMs,cooldownUntil:null});
+        }
+
+        const requestedAt = new Date(purchaseMs).toISOString();
+        await requestRef.set({
+          id: purchaseId,
+          studentId,
+          rewardId,
+          cost,
+          status: "pending",
+          quantityReserved: qty > 0,
+          requestedAt
+        });
+      } catch (err) {
+        // The request was not saved: put everything back before reporting the error.
+        const saved = await rtdb.ref(`${SR_ROOT}/redemptionsByStudent/${studentId}/${purchaseId}`).get().then(x=>x.exists()).catch(()=>false);
+        if (!saved) await undo(stockReserved).catch(e2=>console.error("purchase undo failed; repair will retry", e2));
+        throw err;
+      }
+      await purchase.confirm(purchaseStore, studentId, purchaseId).catch(err=>console.warn("purchase confirm; repair will clear", err));
+      return res.status(200).json({ok:true,balance:charged.balance,requestId:purchaseId});
     } catch (err) {
       console.error("studentRewardsRedeem", err);
       return res.status(Number.isInteger(err.code)?err.code:500).json({error:"Could not request that reward right now."});
