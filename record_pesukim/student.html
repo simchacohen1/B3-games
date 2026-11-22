@@ -6882,12 +6882,17 @@ function combinedSelectionState(reviews, keys, now){
   return { kind:'open' };
 }
 
+function combinedScoreOf(s){
+  if(Number.isFinite(Number(s.score)) && s.score != null) return Number(s.score);
+  return s.status === 'gold' ? Math.max(0, 10 - (Number(s.mistakes) || 0)) : 0;
+}
 function combinedStatusLabel(s){
   if(s.status === 'pending') return '⏳ Waiting for your teacher';
-  if(s.status === 'gold') return '🏅 Gold standard · +' + (Number(s.pointsAwarded) || 0) + ' points' +
-    (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') +
+  const pts = Number(s.pointsAwarded) || 0;
+  if(s.status === 'gold') return '🏅 Gold standard ' + combinedScoreOf(s) + '/10 · +' + pts + ' points' +
     (Number(s.bonus) ? ' · 🎉 ' + s.bonus + ' bonus' : '');
-  if(s.status === 'retry') return '🔁 Not gold standard yet' + (Number(s.mistakes) ? ' (' + s.mistakes + ' mistake' + (Number(s.mistakes) === 1 ? '' : 's') + ')' : '') + ' — try again';
+  if(s.status === 'scored') return '⭐ ' + combinedScoreOf(s) + '/10 · +' + pts + ' points — try again for gold';
+  if(s.status === 'retry') return '🔁 0/10 — try again';
   return '';
 }
 
@@ -6926,9 +6931,12 @@ async function loadCombinedState(keepMessage){
     setCombinedLocked(true);
   }else if(mine[0] && mine[0].status === 'retry' && mine[0].selectionKey === key){
     box.className = 'combined-state retry';
-    box.textContent = '🔁 Your teacher graded your last try: not gold standard yet' +
-      (Number(mine[0].mistakes) ? ' (' + mine[0].mistakes + ' mistake' + (Number(mine[0].mistakes) === 1 ? '' : 's') + ')' : '') +
+    box.textContent = '🔁 Your teacher gave your last try 0/10' +
       (mine[0].teacherNote ? ' — “' + mine[0].teacherNote + '”' : '') + '. Practice and try again!';
+  }else if(mine[0] && mine[0].status === 'scored' && mine[0].selectionKey === key){
+    box.className = 'combined-state retry';
+    box.textContent = '⭐ Your teacher gave your last try ' + combinedScoreOf(mine[0]) + '/10 (+' + (Number(mine[0].pointsAwarded) || 0) +
+      ' points)' + (mine[0].teacherNote ? ' — “' + mine[0].teacherNote + '”' : '') + '. Record it again to try for 10/10 gold standard!';
   }else if(mine[0] && mine[0].status === 'gold'){
     box.className = 'combined-state gold';
     box.textContent = '🏅 You got gold standard on this on ' + combinedDate(mine[0].gradedAt) + '. You may practice it again.';

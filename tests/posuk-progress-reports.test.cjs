@@ -76,8 +76,8 @@ test('teacher report: the teacher\'s grade shows for the posuk, gold and not gol
   const gold = rows.find(r => r.posukNum === 1), retry = rows.find(r => r.posukNum === 3);
   assert.equal(gold.review.status, 'gold');
   assert.equal(gold.timestamp, 7000, 'the date is the grade date');
-  assert.match(api.gradePlain(gold.review), /Gold · 2 mistakes · \+3 bonus/);
-  assert.match(api.gradePlain(retry.review), /Not gold yet · 1 mistake$/);
+  assert.match(api.gradePlain(gold.review), /^🏅 8\/10$|8\/10$/);
+  assert.match(api.gradePlain(retry.review), /0\/10$/);
   assert.match(api.gradeBadge(gold.review), /grade-gold/);
 });
 
