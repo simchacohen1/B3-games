@@ -158,7 +158,7 @@ test('refreshing the sharing tab twice without clicking still offers Resume shar
 test('the start-up placeholder button is removed in exactly one place: in the same step the real control is shown or hidden',()=>{
   const src=fs.readFileSync(path.join(ROOT,'class-pointer-prototype/activity-share.js'),'utf8');
   assert.equal((src.match(/fttShareShell/g)||[]).length,1,'only one place touches the placeholder');
-  assert.match(src,/function setHolderDisplay\(value\)\{\s*holder\.style\.display=value;\s*if\(persistentShareWindow\)\{try\{document\.getElementById\('fttShareShell'\)\?\.remove\(\)\}catch\{\}\}\s*\}/);
+  assert.match(src,/function setHolderDisplay\(value\)\{\s*holder\.style\.display=sharePaused\?'none':value;\s*if\(persistentShareWindow\)\{try\{document\.getElementById\('fttShareShell'\)\?\.remove\(\)\}catch\{\}\}\s*\}/);
   // and the sharing tab's own visibility changes go through it
   assert.match(src,/setHolderDisplay\(active\|\|resumeNeeded\?'flex':'none'\)/);
   assert.match(src,/setHolderDisplay\(resumeNeeded\?'flex':'none'\)/);

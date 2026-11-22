@@ -506,7 +506,13 @@
   // The teacher may pause ("block") one student; then that student sees a short message instead.
   // =====================================================================
   if(!isTeacher){
-    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null;
+    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null,teacherPresenting=false;
+    // Whatever the teacher presents comes first: no Share My Screen button meanwhile, and a share from this page is paused until the teacher stops.
+    document.addEventListener('classpointer:teacher-presenting',event=>{
+      teacherPresenting=event.detail?.on===true;
+      try{stream?.getVideoTracks().forEach(t=>{t.enabled=!teacherPresenting})}catch{}
+      try{redraw()}catch{}
+    });
     const view=el('div','boards-view student-board');view.id='myBoard';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','My whiteboard');
     const bar=el('div','boards-bar'),title=el('strong','boards-title'),drawGroup=el('span','boards-group');
     const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');
@@ -555,6 +561,7 @@
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
+      shareBtn.hidden=teacherPresenting;
       shareBtn.textContent=stream?'⏹ Stop Sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share My Screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
@@ -578,6 +585,7 @@
     }
     /* share-window-open:end */
     function openShareWindow(){
+      if(teacherPresenting)return;
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
       // After this page is refreshed it no longer holds the window it opened, so it asks the browser for the window by
