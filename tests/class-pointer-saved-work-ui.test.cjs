@@ -24,7 +24,8 @@ class El{
   setAttribute(name,value){this.attrs[name]=value}
   querySelector(){return this.found||null}
   querySelectorAll(){return[]}
-  showModal(){this.open=true}
+  // The page's own "Please confirm" question answers itself with its first (yes) button, like the old confirm:()=>true.
+  showModal(){this.open=true;if(this.attrs['aria-label']==='Please confirm')queueMicrotask(()=>walk(this).find(item=>item.tag==='button')?.click())}
   close(){this.open=false;this.listeners.close?.()}
   remove(){}
   focus(){}
