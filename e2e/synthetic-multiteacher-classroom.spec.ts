@@ -317,16 +317,24 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await expect(gradeCard.locator('.grade-hebrew')).toContainText('אֵלָיו');
   await expect(gradeCard.locator('audio')).toHaveCount(1);
   await expect(posukTeacherPage.locator('#gradeTabCount')).toHaveText('1');
-  await gradeCard.locator('[data-choice="gold"]').click();
-  await gradeCard.locator('[data-pts="8"]').click();
-  await gradeCard.locator('[data-field="bonus"]').fill('2');
-  await gradeCard.locator('[data-field="note"]').fill('Beautiful reading');
-  await expect(gradeCard.locator('[data-field="points"]')).toHaveText('= 10 points');
-  await gradeCard.locator('[data-save]').click();
-  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 20000}).toBe('gold');
-  expect(await readFixture(rewardBalancePath)).toBe(8); // −2 + (8 chosen points + 2 bonus)
-  await expect(posukTeacherPage.locator('.graded-row').filter({hasText:'Ari Example'})).toContainText('Gold standard',{timeout:15000});
-  await expect(posukTeacherPage.locator('.grade-card')).toHaveCount(0);
+  // One row of grades 0-10, no Gold / Not gold buttons, no bonus box, no note, no Save button. 10 is gold.
+  await expect(gradeCard.locator('[data-choice], [data-field="bonus"], [data-field="note"], [data-save]')).toHaveCount(0);
+  await expect(gradeCard.locator('[data-pts]')).toHaveCount(11);
+  await expect(gradeCard.locator('[data-delete]')).toHaveCount(1);
+  // Tapping a number grades it a few seconds later; the last tap wins.
+  await gradeCard.locator('[data-pts="7"]').click();
+  await gradeCard.locator('[data-pts="10"]').click();
+  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 30000}).toBe('gold');
+  expect((await readFixture(reviewPath))?.score).toBe(10);
+  expect(await readFixture(rewardBalancePath)).toBe(8); // −2 + 10 points
+  await expect(gradeCard.locator('[data-field="msg"]')).toContainText('Saved 10/10',{timeout:15000});
+  // The teacher can change it again: 6 takes back 4 points and removes the one-month lock.
+  await gradeCard.locator('[data-pts="6"]').click();
+  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 30000}).toBe('scored');
+  expect(await readFixture(rewardBalancePath)).toBe(4);
+  await gradeCard.locator('[data-pts="10"]').click();
+  await expect.poll(async()=>(await readFixture(reviewPath))?.status, {timeout: 30000}).toBe('gold');
+  expect(await readFixture(rewardBalancePath)).toBe(8);
   expect(posukTeacherReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
   await posukTeacherContext.close();
 
@@ -334,7 +342,6 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.goto(`${origin}/record_pesukim/student.html?sefer=Bereishis&perek=18&posuk=1`);
   await expect(page.locator('#combinedStateBox')).toContainText('Gold standard');
   await expect(page.locator('#combinedRecordStage')).toBeHidden();
-  await expect(page.locator('#bonusNotices')).toContainText('2 bonus points');
   await page.goto(`${origin}/record_pesukim/progress.html`);
   await expect(page.locator('.review-group').filter({hasText: 'Gold standard'}).locator('.review-tile')).toContainText('18:1');
   await expect(page.locator('.review-group').filter({hasText: 'Waiting for your teacher'}).locator('.review-tile')).toHaveCount(0);
