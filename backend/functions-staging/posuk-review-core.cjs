@@ -23,6 +23,8 @@
 // them for grades or points. Submissions, per-posuk review status and all
 // point changes are written only by this server code (rules: write false).
 
+const wordMarks = require('./posuk-word-marks-core.cjs');
+
 const SUBMIT_COST = 5;
 const GOLD_POINTS = 10;
 const LOCK_MS = 30 * 24 * 60 * 60 * 1000;
@@ -296,7 +298,23 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     return { ok: true, refunded: refund.ok && sub.submitCharged === true ? SUBMIT_COST : 0, refundPosted: !!refund.ok };
   }
 
-  return { submit, grade, discard, postPoints };
+  // The teacher taps words of the posuk (read wrong / translated wrong). This only stores the marks and the SUGGESTED
+  // score worked out from them. It never touches status, score, points, the lock or the Student Rewards balance.
+  async function saveWordMarks({ teacherEmail, scope, studentId, submissionId, readWrong, translationWrong }){
+    const { ref, before } = await loadForTeacher({ scope, studentId, submissionId });
+    if(before.status === 'deleted') fail('This recording was deleted.', 409);
+    const record = wordMarks.build(before.hebrewText, readWrong, translationWrong);
+    const t = now();
+    const tx = await ref.transaction(cur => {
+      if(cur === null) return null;
+      if(cur.status === 'deleted') return;
+      return { ...cur, wordReview: { ...record, markedAt: t, markedBy: String(teacherEmail || '').slice(0, 200) } };
+    });
+    if(!tx.committed) fail('Could not save the word marks. Please try again.', 409);
+    return { ok: true, total: record.total, suggested: record.suggested, markedAt: t };
+  }
+
+  return { submit, grade, discard, postPoints, saveWordMarks };
 }
 
 module.exports = { createPosukReview, posukKeysForSelection, pointsForGrade, statusForScore, blockedReason, validSelectionKey,

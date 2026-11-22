@@ -203,7 +203,7 @@ test('rules: students and the browser can never write submissions or reviews', (
 test('the rewards function routes the new actions with the right checks', () => {
   const src = fs.readFileSync('backend/functions/student-rewards-auto-award.js', 'utf8');
   assert.match(src, /action==="posuk-submit"[\s\S]{0,200}requirePracticeStudent/);
-  assert.match(src, /'posuk-grade','posuk-delete'\]/);
+  assert.match(src, /'posuk-grade','posuk-delete','posuk-word-marks'\]/);
   assert.match(src, /action==="posuk-delete"[\s\S]{0,200}posukReview\.discard/);
   assert.match(src, /act\.startsWith\('posuk-'\)\?'posuk-practice-scroll'/);
   assert.equal(require('../backend/functions/student-practice-auth.cjs').toolForSource('posuk-submit'), 'posuk-practice-scroll');
@@ -229,7 +229,7 @@ test('staging functions carry the same Posuk review actions and never use the pr
   const staging = norm('backend/functions-staging/student-rewards-auto-award.js');
   assert.match(staging, /action==="posuk-submit"/);
   assert.match(staging, /action==="posuk-grade"/);
-  assert.match(staging, /'teacher-set-recording-full-review','posuk-grade','posuk-delete'\]/);
+  assert.match(staging, /'teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'\]/);
   assert.match(staging, /action==="posuk-delete"/);
   assert.match(staging, /act\.startsWith\('posuk-'\)\?'posuk-practice-scroll'/);
   assert.doesNotMatch(staging, /b3-games\.firebasestorage\.app/);

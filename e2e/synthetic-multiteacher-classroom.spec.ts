@@ -314,7 +314,9 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   const gradeCard=posukTeacherPage.locator('.grade-card').filter({hasText:'Ari Example'});
   await expect(gradeCard).toBeVisible({timeout:20000});
   await expect(gradeCard).toContainText('Posuk 1');
-  await expect(gradeCard.locator('.grade-hebrew')).toContainText('אֵלָיו');
+  // The posuk is shown as tappable words (one button per word), each with a small T for "translated wrong".
+  await expect(gradeCard.locator('.grade-words .gw-word').filter({hasText:'אֵלָיו'})).toHaveCount(1);
+  await expect(gradeCard.locator('.grade-words .gw-t').first()).toBeVisible();
   await expect(gradeCard.locator('audio')).toHaveCount(1);
   await expect(posukTeacherPage.locator('#gradeTabCount')).toHaveText('1');
   // One row of grades 0-10, no Gold / Not gold buttons, no bonus box, no note, no Save button. 10 is gold.
