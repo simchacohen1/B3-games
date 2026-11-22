@@ -64,10 +64,10 @@ test('Student Rewards owner view keeps its collections live instead of re-downlo
     prepareDraft(){},renderClassSelect(){},setHeader(){},buildNav(){},sweepAutomaticPosukPoints(){},activeClasses:()=>[],requestedClassId:()=>'',B3ClassGate:{choose:async()=>'c1'}};
   const loadRoot=vm.runInNewContext(source.slice(source.indexOf('const OWNER_ROOT_PATHS='),source.indexOf('async function ensureRewardModelV2('))+';loadRoot',ctx);
   await loadRoot();await loadRoot();await loadRoot();
-  assert.equal(listeners.length,18,'each collection is held open once, however many refreshes run');
-  assert.equal(reads.length,54,'every refresh still reads all 18 collections, so the screen shows the same data');
+  assert.equal(listeners.length,19,'each collection is held open once, however many refreshes run');
+  assert.equal(reads.length,57,'every refresh still reads all 19 collections, so the screen shows the same data');
   assert.deepEqual([...new Set(reads)].sort(),[...listeners].sort(),'the held paths are exactly the paths that are read');
-  assert.equal(Object.keys(ctx.state.root).length,18);
+  assert.equal(Object.keys(ctx.state.root).length,19);
 });
 
 test('Parent Dashboard API reads only the quiz data it summarizes',()=>{
