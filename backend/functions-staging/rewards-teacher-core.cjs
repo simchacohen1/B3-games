@@ -215,7 +215,12 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
  if(!claim?.committed)fail(409,'This request was already handled.');
  await store.update({[path+'/reviewedBy']:email,[path+'/reviewedAt']:now});
  if(decision==='decline'){
-  await addToBalance(store,studentId,Number(item.cost||0));
+  try{await addToBalance(store,studentId,Number(item.cost||0))}
+  catch(error){
+   // Never leave a declined request with no refund: put it back to pending so the teacher can retry.
+   await store.tx(path+'/status',cur=>cur==='declined'?'pending':undefined).catch(()=>{});
+   throw error;
+  }
   const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
   if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
   await returnStock(store,item,reward);
