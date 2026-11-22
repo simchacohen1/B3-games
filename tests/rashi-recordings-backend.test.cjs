@@ -453,3 +453,10 @@ test('deleting a re-sent attempt keeps the points earned before it',async()=>{
   assert.equal(b.db.getAt('rashiLetters/recordings/kid1/shin').priorPoints,3,'the 3 earned on the first send are still remembered');
   assert.equal((await marks(b,'teacherEt',third,[])).body.paidTotal,2);
 });
+test('Delete gives back the reading slot of the day (3 per day), so a bad recording does not use one up',async()=>{
+  const b=makeBackend(seed());
+  for(const sec of ['zayin','bet','alef'])await sendText(b,'kid1',sec);
+  assert.equal((await sendText(b,'kid1','tsadi')).code,429,'the 4th reading today is refused');
+  const id=requestsFor(b,'bet')[0];await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:id});
+  const ok=await sendText(b,'kid1','tsadi');assert.equal(ok.code,200,JSON.stringify(ok.body));
+});

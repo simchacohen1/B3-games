@@ -177,7 +177,8 @@ async function authorizeChazaraAction(teacher,body){
 const RASHI_BUCKET='b3-games.firebasestorage.app';
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 const RASHI_DAILY_LIMIT=3;
-const rashiDate=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const row=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${row.year}-${row.month}-${row.day}`;};
+const rashiDateOf=ms=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms));const row=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${row.year}-${row.month}-${row.day}`;};
+const rashiDate=()=>rashiDateOf(Date.now());
 const rashiDailyRef=(studentId,date)=>rtdb.ref(`rashiLetters/dailySubmissions/${studentId}/${date}`);
 async function rashiDailyCount(studentId,date){return Number((await rashiDailyRef(studentId,date).get()).val()?.count)||0;}
 async function rashiReserveDaily(studentId,date){
@@ -453,6 +454,8 @@ async function rashiDelete(teacher,body){
   await rtdb.ref(`rashiLetters/recordingAudit/${requestId}`).update({
     requestId,studentId:item.practiceStudentId,sectionId:item.sectionId,attemptId:item.attemptId,classId:item.workspaceClassId||null,
     result:'deleted',points:0,reviewedBy:teacher.email,reviewedAt:t}).catch(()=>{});
+  // A deleted bad recording does not use up one of his 3 readings for the day.
+  if(Number(record.createdAt)>0)await rashiReleaseDaily(item.practiceStudentId,rashiDateOf(Number(record.createdAt))).catch(()=>{});
   const refunded=record.submitCharged===true&&refund.ok?rashiCore.SUBMIT_COST:0;
   return {ok:true,refunded,refundPosted:!!refund.ok,takenBack};
 }
