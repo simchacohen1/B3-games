@@ -598,7 +598,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
-<script src="grading-queue.js"></script>
+<script src="grading-queue.js"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -4516,6 +4516,16 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .grade-card h3{ margin:0 0 4px; font-size:1.05rem; }
   .grade-meta{ color:var(--ink-soft); font-size:.85rem; margin-bottom:8px; }
   .grade-hebrew{ direction:rtl; text-align:right; font-family:'Frank Ruhl Libre','David',serif; font-size:1.35rem; line-height:1.7; background:#fbf7ee; border-radius:10px; padding:8px 12px; margin:8px 0; }
+  .grade-words{ direction:rtl; display:flex; flex-wrap:wrap; gap:14px 16px; background:#fbf7ee; border-radius:12px; padding:14px 16px; margin:8px 0; }
+  .gw{ display:inline-flex; flex-direction:column; align-items:center; gap:4px; }
+  .gw-word{ font-family:'Frank Ruhl Libre','David',serif; font-size:2.6rem; line-height:1.35; padding:2px 10px; border:2px solid transparent; border-radius:10px; background:transparent; color:inherit; cursor:pointer; }
+  .gw-word:hover{ border-color:#d9cba6; }
+  .gw-word.bad{ background:#fde0e0; border-color:#c0392b; color:#8e1b10; text-decoration:line-through; text-decoration-thickness:2px; }
+  .gw-t{ font:800 .75rem system-ui,sans-serif; min-width:26px; padding:1px 7px; border:1.5px solid #cfc3a6; border-radius:8px; background:#fff; color:#6b6254; cursor:pointer; }
+  .gw-t.on{ background:#ffe2b0; border-color:#d9822b; color:#8a4b00; }
+  .grade-words-help{ font-size:.8rem; color:var(--ink-soft); margin:2px 0 0; }
+  .grade-suggested{ font-size:.82rem; color:var(--ink-soft); }
+  .grade-suggested b{ color:#555; font-weight:700; }
   .grade-form{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-top:10px; }
   .grade-pts{ display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap; font-weight:700; }
   .grade-pts button{ border:2px solid #cfc3a6; background:#fff; border-radius:10px; min-width:42px; padding:6px 8px; font-weight:800; cursor:pointer; }
@@ -4553,15 +4563,27 @@ function gradeOutcomeText(score){
     : score === 0 ? 'No points — the student may try again'
     : score + ' points — the student may re-record for gold';
 }
+const POSUK_MARKS_DELAY_MS = 1500;
+/* The posuk, one tappable word at a time. Tap a word = read wrong. The small T under it = translated wrong. Tap again to undo.
+   All words count as correct until marked. The marks only feed the small "Suggested" line; they never change the 0-10 grade. */
+function gradeWordsHtml(s){
+  const words = B3PosukWordMarks.splitWords(s.hebrewText);
+  if(!words.length) return s.hebrewText ? '<div class="grade-hebrew">' + escapeHtml(s.hebrewText) + '</div>' : '';
+  return '<div class="grade-words" data-words="1">' + words.map((w, n) =>
+    `<span class="gw"><button type="button" class="gw-word" data-w="${n}" aria-pressed="false" title="Tap if read wrong">${escapeHtml(w)}</button>` +
+    `<button type="button" class="gw-t" data-t="${n}" aria-pressed="false" title="Translated wrong" aria-label="Translated wrong: ${escapeHtml(w)}">T</button></span>`).join('') +
+    '</div><div class="grade-words-help" data-field="marksMsg">Tap a word if it was read wrong. Tap the small T if it was translated wrong. Tap again to undo.</div>';
+}
 function gradeCardHtml(s, id, graded){
   const saved = gradeScoreOf(s);
   return `<div class="grade-card${graded ? ' is-graded' : ''}" id="${id}">
       <h3>${escapeHtml(studentsMap[s.sid] || s.sid)} · ${escapeHtml(gradeRefLabel(s))}</h3>
       <div class="grade-meta">Sent ${escapeHtml(new Date(Number(s.submittedAt)).toLocaleString())}${s.durationMs ? ' · ' + formatDuration(Number(s.durationMs) / 1000) : ''}${graded && s.gradedAt ? ' · Graded ' + escapeHtml(new Date(Number(s.gradedAt)).toLocaleDateString()) : ''}</div>
-      ${s.hebrewText ? '<div class="grade-hebrew">' + escapeHtml(s.hebrewText) + '</div>' : ''}
+      ${gradeWordsHtml(s)}
       ${B3PrivateMedia.audioMarkup(s.audioStoragePath, '')}
       <div class="grade-form">
         <span class="grade-pts">${POSUK_GRADES.map(n => `<button type="button" data-pts="${n}"${n === POSUK_GOLD_POINTS ? ' class="gold-btn" title="Gold standard"' : ''}>${n === POSUK_GOLD_POINTS ? '🏅 10' : n}</button>`).join('')}</span>
+        ${B3PosukWordMarks.splitWords(s.hebrewText).length ? '<span class="grade-suggested" data-field="suggested" title="Only a suggestion, worked out from the word marks. It never changes the 0-10 grade or the points."></span>' : ''}
       </div>
       <div class="grade-msg" data-field="msg">${saved === null ? '' : 'Saved: ' + saved + '/10. You can still change it.'}</div>
       ${graded ? '' : '<div class="grade-card-foot"><button type="button" class="btn-delete-sub" data-delete="1" title="Remove without grading and refund the 5 points">Delete</button></div>'}
@@ -4614,8 +4636,48 @@ async function postGradeAction(body){
   if(!res.ok || !data.ok) throw new Error(data.error || ('The service returned ' + res.status));
   return data;
 }
+/* Word marks: saved by the server a moment after the last tap, as one record per recording (every word with read/translation
+   correct or not, plus the suggested scores). They are separate from the 0-10 grade and never change it or the points. */
+function wireWordMarks(card, s){
+  const box = card.querySelector('[data-words]');
+  if(!box) return;
+  const WM = B3PosukWordMarks, words = WM.splitWords(s.hebrewText);
+  const saved = s.wordMarks && s.wordMarks.total === words.length && (s.wordMarks.words || []).every((w, n) => w && w.w === words[n]) ? WM.wrongSets(s.wordMarks) : { read:new Set(), translation:new Set() };
+  const readWrong = new Set(saved.read), translationWrong = new Set(saved.translation);
+  const msg = card.querySelector('[data-field="marksMsg"]'), suggested = card.querySelector('[data-field="suggested"]');
+  const help = msg.textContent;
+  let timer = null, busy = null, dirty = false;
+  const paint = () => {
+    box.querySelectorAll('[data-w]').forEach(b => { const on = readWrong.has(Number(b.dataset.w)); b.classList.toggle('bad', on); b.setAttribute('aria-pressed', String(on)); });
+    box.querySelectorAll('[data-t]').forEach(b => { const on = translationWrong.has(Number(b.dataset.t)); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    if(suggested) suggested.innerHTML = '<b>Suggested:</b> ' + escapeHtml(WM.label(WM.scores(words.length, readWrong.size, translationWrong.size)));
+  };
+  paint();
+  const send = async () => {
+    clearTimeout(timer); timer = null;
+    if(busy) return busy;
+    if(!dirty){ gradeSavers.delete(send); return; }
+    dirty = false;
+    const body = { action:'posuk-word-marks', studentId:s.sid, submissionId:s.id, readWrong:[...readWrong].sort((a, b) => a - b), translationWrong:[...translationWrong].sort((a, b) => a - b) };
+    busy = (async () => {
+      msg.textContent = 'Saving word marks…';
+      try{ await postGradeAction(body); msg.textContent = '✔️ Word marks saved.'; }
+      catch(err){ console.error(err); dirty = true; msg.textContent = '⚠️ Could not save the word marks: ' + (err.message || 'try again') + ' Tap a word to try again.'; }
+    })();
+    await busy; busy = null;
+    if(dirty && !/Could not save/.test(msg.textContent)) return send();
+    if(!dirty) gradeSavers.delete(send);
+  };
+  const changed = () => { paint(); dirty = true; msg.textContent = 'Word marks will save in a moment…'; gradeSavers.add(send); clearTimeout(timer); timer = setTimeout(send, POSUK_MARKS_DELAY_MS); };
+  const flip = (set, n) => { if(set.has(n)) set.delete(n); else set.add(n); changed(); };
+  box.addEventListener('click', e => {
+    const w = e.target.closest('[data-w]'), t = e.target.closest('[data-t]');
+    if(w) flip(readWrong, Number(w.dataset.w)); else if(t) flip(translationWrong, Number(t.dataset.t));
+  });
+}
 function wireGradeCard(card, s){
   if(!card) return;
+  wireWordMarks(card, s);
   let shown = gradeScoreOf(s);      // the number highlighted on screen
   let saved = shown;                // the number the server has
   let timer = null, busy = null;
