@@ -382,6 +382,9 @@ function peerError(error){
     if(peer&&!peer.destroyed&&peer.disconnected){try{peer.reconnect()}catch{}}
     return;
   }
+  // The teacher's own class is open: "peer-unavailable" only means one student's tab or sharing window is already gone
+  // (for example when they stop sharing). That is not a closed class, so the join-link message must not be shown.
+  if(isTeacher&&started&&kind==='peer-unavailable'){status('A student has just left.');return}
   fail(message);if(!started&&!admitted){if(isTeacher){endClass();fail(message)}else{leaveClass();fail(message)}}
 }
 function makePeer(id){
