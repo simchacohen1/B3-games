@@ -334,39 +334,19 @@ function init(){
  const liveWrap=el('div','cp-live-wrap');
  const live=el('span','cp-live-chip','Live');
  const tabControls=$('tabControls');
- const switchWrap=el('div','cp-switch-wrap');
- const switchBtn=el('button','cp-switch-btn','Switch lesson');switchBtn.type='button';
- switchBtn.setAttribute('aria-haspopup','true');switchBtn.setAttribute('aria-expanded','false');switchBtn.setAttribute('aria-controls','cpSwitchMenu');
- const switchMenu=el('div','cp-switch-menu');switchMenu.id='cpSwitchMenu';switchMenu.hidden=true;
- switchMenu.append(el('small',null,'Switch to'));
- const short={shareScreen:['screen','Share my screen'],openWhiteboard:['board','Whiteboard'],openPdf:['pdf','PDF'],openWebpage:['web','Webpage'],openBrowserTab:['camera','Still picture of a tab']};
- for(const id of ['shareScreen','openWhiteboard','openPdf','openWebpage','openBrowserTab','pdfFile','stopScreen']){
-  const node=$(id);if(!node)continue;
-  if(short[id]){node.dataset.longLabel=node.textContent;node.replaceChildren(icon(short[id][0]),el('span',null,short[id][1]))}
-  switchMenu.append(node);
- }
+ // Presentation source controls stay in the hidden session controls; the side toolbar clicks them.
  /* The one red Stop button, above the lesson. In full screen this row is hidden; the drawing toolbar shows its own red Stop that clicks this one. */
  const stopBtn=iconButton('cp-stop-btn','stop','Stop presenting');stopBtn.id='cpStopBtn';
  stopBtn.title='Stop what students are watching (PDF, whiteboard, webpage or shared screen)';
- switchWrap.append(switchBtn,switchMenu);
  const fullBtn=$('fullScreenLesson');
  if(fullBtn){fullBtn.replaceChildren(icon('full'));fullBtn.setAttribute('aria-label','Full screen');fullBtn.title='Full screen';fullBtn.classList.add('cp-icon-btn')}
  liveWrap.append(live);
  if(tabControls)liveWrap.append(tabControls);
- liveWrap.append(switchWrap,stopBtn);
+ liveWrap.append(stopBtn);
  if(fullBtn)liveWrap.append(fullBtn);
  tabsRow.append(liveWrap);
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
  const emptyActions=document.querySelector('.lesson-actions');if(emptyActions&&!emptyActions.children.length)emptyActions.hidden=true;
-
- function openSwitch(open){
-  switchMenu.hidden=!open;switchBtn.setAttribute('aria-expanded',String(open));
-  if(open)switchMenu.querySelector('button:not(:disabled)')?.focus();
- }
- switchBtn.addEventListener('click',()=>openSwitch(switchMenu.hidden));
- switchMenu.addEventListener('click',e=>{if(e.target.closest('button'))openSwitch(false)});
- document.addEventListener('click',e=>{if(!switchMenu.hidden&&!switchWrap.contains(e.target))openSwitch(false)});
- switchWrap.addEventListener('keydown',e=>{if(e.key==='Escape'&&!switchMenu.hidden){openSwitch(false);switchBtn.focus()}});
 
  /* ---------- What is live right now ---------- */
  const stage=$('stage'),stopScreen=$('stopScreen');
@@ -405,7 +385,7 @@ function init(){
   grid.append(b);tileButtons.push([b,original]);
  }
  pickerCard.append(grid);
- // The still picture of a tab or window is not a start-screen choice any more: it is in the Lesson menu, right under Share my screen.
+ // The still picture of a tab or window is not a start-screen choice any more: it is in Switch presentation, right under Share my screen.
  pickerCard.append(el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
  stage?.append(pickerCard);
  for(const [b,original] of tileButtons){
@@ -453,7 +433,6 @@ function init(){
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   syncHint();
   syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
-  if(!isLive)openSwitch(false);
  }
  if(stage)new MutationObserver(syncLive).observe(stage,{attributes:true,attributeFilter:['class']});
  if(stopScreen)new MutationObserver(syncLive).observe(stopScreen,{attributes:true,attributeFilter:['disabled']});

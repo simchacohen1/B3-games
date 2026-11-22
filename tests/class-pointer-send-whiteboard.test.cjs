@@ -97,8 +97,8 @@ test('student-boards sends only after the teacher confirms, through the existing
   assert.match(boardsSource,/if\(hasWork&&!confirm\('This will erase the students\\' current marks and start a new activity\. Continue\?'\)\)return;/);
 });
 
-test('More menu offers Send whiteboard to students beside Save and My files; the classroom loads the new scripts',()=>{
-  assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}\);/);
+test('the toolbar Send menu offers This whiteboard (and a PDF); More no longer carries Send; the classroom loads the new scripts',()=>{
+  assert.match(annotate,/\{icon:'📝',label:'This whiteboard',disabled:!window\.FTTSavedWork\?\.sendCurrent,onClick:\(\)=>window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}/);
   assert.match(html,/student-boards[.]js[?]v=20261120-sharetab3/);
   assert.match(html,/classroom-annotate[.]js[?]v=combo2/);
   assert.match(html,/saved-work[.]js[?]v=20261117-send1/);

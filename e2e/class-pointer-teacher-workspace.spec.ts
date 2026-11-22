@@ -137,7 +137,7 @@ test('full-screen Students panel is a compact popover that can be dragged by its
   await context.close();
 });
 
-test('full screen: the drawing toolbar is the only toolbar and its Lesson menu opens clear choices', async ({ browser }) => {
+test('full screen: the drawing toolbar is the only toolbar and its Switch presentation menu opens clear choices', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await enterFullScreen(page);
@@ -150,7 +150,7 @@ test('full screen: the drawing toolbar is the only toolbar and its Lesson menu o
   const barBox = (await bar.boundingBox())!;
   await expect.poll(async () => (await page.locator('#stage').boundingBox())!.x).toBeGreaterThanOrEqual(barBox.x + barBox.width);
   const lesson = bar.locator('[data-action="lesson"]');
-  await expect(lesson).toContainText('Lesson');
+  await expect(lesson).toContainText('Switch presentation');
   await lesson.click();
   const menu = page.locator('#fttAnnotate .fa-fly.fa-list');
   await expect(menu).toBeVisible();

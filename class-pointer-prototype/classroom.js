@@ -36,7 +36,17 @@ const pointerIcons={
   paw:'<circle cx="16" cy="21" r="7" fill="currentColor"/><ellipse cx="7" cy="11" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="15" cy="7" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="23" cy="9" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="28" cy="15" rx="2.8" ry="3.8" fill="currentColor"/>',
   sparkle:'<path d="M16 1L19.5 12.5L31 16L19.5 19.5L16 31L12.5 19.5L1 16L12.5 12.5Z" fill="currentColor"/><path d="M26 1L27.5 5.5L32 7L27.5 8.5L26 13L24.5 8.5L20 7L24.5 5.5Z" fill="currentColor"/>'
 };
-function status(text){$('connectionStatus').textContent=text}
+let statusTimer=null;
+function status(text){
+  const line=$('connectionStatus');
+  clearTimeout(statusTimer);
+  // This line is for brief feedback, not tool instructions.
+  const message=String(text||'').split(/(?<=[.!?])\s+/)[0];
+  line.textContent=/^(?:Use|Press|Click|Pick|Choose|Drag|Move|Type|Enter|Select)\b/.test(message)?'':message;
+  line.classList.toggle('status-faded',false);
+  statusTimer=setTimeout(()=>line.classList.toggle('status-faded',true),4000);
+}
+status($('connectionStatus').textContent);
 // A student who is in the class but sees nothing yet is told so plainly (the teacher never sees this text).
 if(!isTeacher){const waiting=$('placeholder');if(waiting)waiting.textContent='Waiting for your teacher… What your teacher shows will appear here by itself. You do not need to do anything.'}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
@@ -378,7 +388,7 @@ function peerError(error){
   }
   // Temporary PeerJS signalling interruptions should not end a functioning lesson.
   if(['network','socket-error','socket-closed','server-error'].includes(kind)&&(started||admitted)){
-    status('Classroom connection interrupted. Trying to reconnect; your current lesson may still work.');
+    status('Classroom connection interrupted; reconnecting…');
     if(peer&&!peer.destroyed&&peer.disconnected){try{peer.reconnect()}catch{}}
     return;
   }
