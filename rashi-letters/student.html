@@ -829,7 +829,7 @@ function renderLetterGrid(){
   if(window.RashiRecordings){
     const mic=document.createElement('button');
     mic.className='letter-pick-btn mic-tile';
-    mic.innerHTML='<span>🎤</span><small>Reading with Mic — earn 2 points per reading</small>';
+    mic.innerHTML='<span>🎤</span><small>Reading with Mic — costs 2, earn up to 5</small>';
     mic.setAttribute('aria-label','Reading with Mic: record yourself reading Rashi words');
     mic.onclick=()=>window.RashiRecordings.openHub(allRecSections());
     grid.appendChild(mic);

@@ -5,7 +5,7 @@
      posuk  - Posuk Practice Scroll: average of the teacher's grades (0-10, x10 = %) for psukim graded that week.
               Reading + translation is ONE combined grade. Topic "Chumash".
      chidon - Chumash chidon: average of that week's comprehension scores. Topic "Chumash Comprehension".
-     rashi  - Rashi reading: average of that week's graded Rashi readings (0-100). Topic "Chumash-Rashi".
+     rashi  - Rashi reading: average over all the letters he read that week (0-100): letters read correctly out of letters read. Topic "Chumash-Rashi".
    A tool the student did not use that week gives no mark for that tool. Every mark is type "homework".
 
    A week is Sunday 00:00 to Saturday 23:59:59, New York time. The mark is dated the Friday of that week. */
@@ -107,15 +107,21 @@
         if (typeof s === 'number' && Number.isFinite(s) && inWeek(chidonTime(a), range)) chidon.push(clamp(Math.round(s), 0, 100));
       });
     });
+    // Rashi reading: each graded reading is the percent of its letters read correctly, weighted by how many letters it had
+    // (so the mark is the average over all the letters he read that week). Older readings have a grade and no weight.
     const rashi = [];
+    let rashiWeightSum = 0, rashiWeighted = 0;
     ((input && input.rashi) || []).forEach(r => {
-      if (r && typeof r.grade === 'number' && Number.isFinite(r.grade) && inWeek(r.gradedAt, range)) rashi.push(clamp(Math.round(r.grade), 0, 100));
+      if (r && typeof r.grade === 'number' && Number.isFinite(r.grade) && inWeek(r.gradedAt, range)) {
+        const g = clamp(Math.round(r.grade), 0, 100), w = Number(r.weight) > 0 ? Number(r.weight) : 1;
+        rashi.push(g); rashiWeightSum += w; rashiWeighted += g * w;
+      }
     });
     ungraded += Number(input && input.rashiPending) || 0;
     return {
       posuk: { n: posuk.length, mark: avg(posuk) },
       chidon: { n: chidon.length, mark: avg(chidon) },
-      rashi: { n: rashi.length, mark: avg(rashi) },
+      rashi: { n: rashi.length, mark: rashiWeightSum ? Math.round(rashiWeighted / rashiWeightSum) : null },
       ungraded
     };
   }

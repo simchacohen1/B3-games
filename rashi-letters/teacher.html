@@ -85,6 +85,34 @@
   .btn.green{ background:#2e7d4f; box-shadow:0 3px 0 #1f5736; }
   .btn:disabled{ opacity:.55; cursor:default; }
   .rec-msg{ min-height:1.2em; font-size:0.85rem; }
+  .rec-section-title{ margin:22px 0 4px; font-size:1.1rem; color:var(--rimon-dark); }
+  .rec-text{ direction:rtl; display:flex; flex-wrap:wrap; gap:6px 26px; background:#fbf7ee; border-radius:12px; padding:14px 16px; margin:4px 0; line-height:1.3; }
+  .rec-text .lw{ display:inline-flex; white-space:nowrap; }
+  .rec-text .lp{ font-family:'Mekorot Rashi', serif; font-size:3.4rem; }
+  .rec-text .lt{ font-family:'Mekorot Rashi', serif; font-size:3.4rem; line-height:1.25; padding:0 3px; margin:0; border:2px solid transparent; border-radius:10px; background:transparent; color:inherit; cursor:pointer; }
+  .rec-text .lt.part-odd{ background:#f3ecd7; }
+  .rec-text .lt:hover{ border-color:#d9cba6; }
+  .rec-text .lt.bad{ background:#fde0e0; border-color:#c0392b; color:#8e1b10; }
+  .rec-words-help{ font-size:.8rem; color:var(--ink-soft); }
+  .rec-form{ display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:4px; }
+  .rec-score{ font-weight:700; }
+  .rec-parts{ display:inline-flex; gap:5px; vertical-align:middle; }
+  .rec-parts i{ display:inline-block; width:22px; height:22px; border-radius:50%; border:2px solid #cfc3a6; background:#fff; }
+  .rec-parts i.ok{ background:#2e7d4f; border-color:#1f5736; }
+  .rec-parts i.no{ background:#fde0e0; border-color:#c0392b; }
+  .rec-item.is-graded{ background:#f7fcf4; }
+  .btn-delete-rec{ margin-left:auto; background:#fff; color:#b3261e; border:1.5px solid #e0a29d; border-radius:8px; padding:3px 10px; font-size:.75rem; font-weight:700; cursor:pointer; }
+  .btn-delete-rec:hover{ background:#fdecea; border-color:#b3261e; }
+  .btn-delete-rec:disabled{ opacity:.5; cursor:not-allowed; }
+  #letterPanel{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:14px 18px; margin-bottom:18px; }
+  #letterPanel h2{ margin:0 0 4px; font-size:1.25rem; color:var(--rimon-dark); }
+  #letterPanel .rec-sub{ margin:0 0 10px; color:var(--ink-soft); font-size:0.9rem; }
+  #letterHolder{ overflow-x:auto; }
+  #letterHolder table{ font-size:.85rem; }
+  #letterHolder th, #letterHolder td{ padding:6px 8px!important; text-align:center; white-space:nowrap; font-size:.85rem!important; }
+  #letterHolder th:first-child, #letterHolder td:first-child{ text-align:left; position:sticky; left:0; background:#fff; }
+  #letterHolder th.lh{ font-family:'Mekorot Rashi', serif; font-size:1.5rem!important; }
+  .ls-good{ background:#dcefd9; } .ls-mid{ background:#fff3c4; } .ls-low{ background:#fde0e0; } .ls-none{ color:#9aa3b5; }
 
 :root{--parchment:#fff;--parchment-dark:#e5eafa;--ink:#172547;--ink-soft:#475675;--rimon:#6553d6;--rimon-dark:#3f3099;--gold:#b8c4e7;--gold-light:#ede9ff;--shadow:#283f7520}
 body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial-gradient(ellipse at 95% 60%,#ccf5ed,transparent 45%),#f3f6ff;font-family:'Quicksand',Arial,sans-serif}
@@ -116,9 +144,15 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
   <section id="recPanel" aria-live="polite">
     <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
-    <p class="rec-sub">Listen, then approve (+2 points) or ask the student to try again.</p>
+    <p class="rec-sub">Listen and follow along. All letters count as correct: tap a letter that was <b>not recognized</b> (tap again to undo). The text is split into 5 equal parts and each part with no missed letter earns <b>1 point</b> (perfect = 5). The student paid 2 points to send it; if it earned less than 5 he can record it again (and pay 2 again), and you will see the new one here. <b>Delete</b> removes a bad recording and refunds the 2 points. There is no Save button: it saves a few seconds after your last tap, and you can change it again at any time (points are adjusted for you, never paid twice). If every letter was right, press <b>Done</b>.</p>
     <div class="rec-bulk"><button class="btn green hidden" id="approveLegacyAllBtn" type="button">✅ Approve All Legacy Readings</button><span id="approveLegacyAllMsg" aria-live="polite"></span></div>
     <div id="recList"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section id="letterPanel">
+    <h2>🔤 Letter scores</h2>
+    <p class="rec-sub">For each boy: how often each letter was read correctly, over all his graded readings. Hover a number to see how many times the letter came up. The weekly Nigri Rashi mark is the average over all the letters he read that week.</p>
+    <div id="letterHolder"><div class="empty">Loading…</div></div>
   </section>
 
   <div id="tableHolder">
@@ -132,6 +166,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../teacher-class-scope.js"></script>
+<script src="./rashi-letter-marks-core.js?v=20261122"></script>
 <script>
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db = firebase.database();
@@ -244,59 +279,156 @@ async function rashiApi(action, extra){
   return data;
 }
 let pendingLegacyIds=[];
-function renderRecordings(rows){
-  const list = document.getElementById('recList');
-  document.getElementById('recCount').textContent = rows.length ? '(' + rows.length + ')' : '';
-  // Vayeira entries require an individual numeric reading grade, so bulk approve only legacy word missions.
-  pendingLegacyIds=rows.filter(r=>!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
+const RASHI_SAVE_DELAY_MS=3000;
+const gradeSavers=new Set();          // one entry per card with a tap that is not saved yet
+let recRows={};                       // id -> row, so a card can find its own recording
+const LM=B3RashiLetterMarks;
+function rashiTextOf(r){ return (r.words||[]).join(' '); }
+function rashiPartOf(total,i){ const b=LM.partBounds(total); for(let k=0;k<b.length;k++) if(i>=b[k][0]&&i<b[k][1]) return k; return b.length-1; }
+function rashiTextHtml(r){
+  const tk=LM.tokenize(rashiTextOf(r));
+  if(!tk.total) return '';
+  return '<div class="rec-text" data-letters="1" lang="he">'+tk.words.map(word=>'<span class="lw">'+word.map(p=>p.letter
+    ? '<button type="button" class="lt'+(rashiPartOf(tk.total,p.i)%2?' part-odd':'')+'" data-l="'+p.i+'" aria-pressed="false" title="Tap if this letter was not recognized">'+escapeHtml(p.text)+'</button>'
+    : '<span class="lp">'+escapeHtml(p.text)+'</span>').join('')+'</span>').join('')+'</div>'+
+    '<div class="rec-words-help">Tap a letter that was not recognized. Tap again to undo. Every other letter counts as correct.</div>';
+}
+function rashiCardHtml(r,graded){
+  return '<div class="rec-item'+(graded?' is-graded':'')+'" data-id="'+escapeHtml(r.id)+'">'+
+    '<div class="rec-head"><span>'+escapeHtml(r.studentName)+'</span>'+
+      (r.className?'<span class="rec-class">'+escapeHtml(r.className)+'</span>':'')+
+      '<span>'+escapeHtml(r.sectionLabel)+(r.attempt>1?' · try #'+Number(r.attempt):'')+'</span></div>'+
+    rashiTextHtml(r)+
+    '<div class="rec-meta">'+escapeHtml(fmtTime(r.createdAt))+(r.durationMs?' · '+Math.round(r.durationMs/1000)+' sec':'')+(graded&&r.gradedAt?' · Graded '+escapeHtml(new Date(Number(r.gradedAt)).toLocaleDateString()):'')+'</div>'+
+    (r.audioUrl?'<audio controls preload="none" src="'+escapeHtml(r.audioUrl)+'"></audio>':'<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>')+
+    '<div class="rec-form"><span class="rec-score" data-field="score"></span>'+
+      '<button type="button" class="btn green" data-done="1"'+(graded?' hidden':'')+'>✅ Done — save</button>'+
+      '<button type="button" class="btn-delete-rec" data-delete="1" title="Remove this bad recording and refund the 2 points">Delete</button></div>'+
+    '<div class="rec-msg" data-field="msg"></div></div>';
+}
+function renderRecordings(rows,recent){
+  const list=document.getElementById('recList');
+  recent=recent||[];
+  recRows={};rows.concat(recent).forEach(r=>{recRows[r.id]=r;});
+  document.getElementById('recCount').textContent=rows.length?'('+rows.length+')':'';
+  // Older recordings (sent before letter marking) can be approved all at once: +2 points, no letter data.
+  pendingLegacyIds=rows.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
   const bulk=document.getElementById('approveLegacyAllBtn');
   bulk.classList.toggle('hidden',!pendingLegacyIds.length);
   bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
-  if(!rows.length){ list.innerHTML = '<div class="empty">✅ No Rashi recordings are waiting.</div>'; return; }
-  list.innerHTML = rows.map(r =>
-    '<div class="rec-item" data-id="' + escapeHtml(r.id) + '">' +
-      '<div class="rec-head"><span>' + escapeHtml(r.studentName) + '</span>' +
-        (r.className ? '<span class="rec-class">' + escapeHtml(r.className) + '</span>' : '') +
-        '<span>' + escapeHtml(r.sectionLabel) + (r.attempt > 1 ? ' · try #' + Number(r.attempt) : '') + '</span></div>' +
-      (r.words && r.words.length ? '<div class="rec-words" lang="he">' + r.words.map(escapeHtml).join(' &nbsp; ') + '</div>' : '') +
-      (String(r.sectionId||'').startsWith('vayeira-')
-        ? '<div class="rec-meta">Reading score (0–100): <input type="number" class="rashi-grade" min="0" max="100" step="1" required aria-label="Rashi reading score" style="width:90px;padding:6px"></div><label class="rec-meta">Feedback <input type="text" class="rashi-feedback" maxlength="500" placeholder="Optional student feedback" style="max-width:380px;width:90%;padding:6px"></label>'
-        : '') +
-      '<div class="rec-meta">' + escapeHtml(fmtTime(r.createdAt)) + (r.durationMs ? ' · ' + Math.round(r.durationMs/1000) + ' sec' : '') + '</div>' +
-      (r.audioUrl ? '<audio controls preload="none" src="' + escapeHtml(r.audioUrl) + '"></audio>' : '<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>') +
-      '<div class="rec-actions"><button class="btn green" data-act="approve">✅ Approve (+2 Points)</button><button class="btn gold" data-act="reject">🔄 Try Again</button></div>' +
-      '<div class="rec-msg"></div></div>').join('');
+  let html=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="empty">✅ No Rashi recordings are waiting.</div>';
+  if(recent.length) html+='<h3 class="rec-section-title">✔️ Recently graded</h3><p class="rec-sub">Tap letters to change the marks. The points are adjusted for you (a student is never paid twice).</p>'+recent.map(r=>rashiCardHtml(r,true)).join('');
+  list.innerHTML=html;
+  list.querySelectorAll('.rec-item').forEach(card=>wireRashiCard(card,recRows[card.dataset.id]));
 }
+async function flushGradeSaves(){ await Promise.all([...gradeSavers].map(fn=>fn())); }
+window.addEventListener('beforeunload',e=>{ if(gradeSavers.size){ e.preventDefault(); e.returnValue=''; } });
 async function loadRecordings(){
-  const list = document.getElementById('recList');
-  if(!teacherScope){ list.innerHTML = '<div class="empty">Sign in to see recordings.</div>'; return; }
-  try{ renderRecordings((await rashiApi('rashi-list-pending')).requests || []); }
-  catch(error){ list.innerHTML = '<div class="empty">' + escapeHtml(error.message || 'Could not load recordings.') + '</div>'; }
+  const list=document.getElementById('recList');
+  if(!teacherScope){ list.innerHTML='<div class="empty">Sign in to see recordings.</div>'; return; }
+  await flushGradeSaves();   // never lose a tap when the list is refreshed
+  try{ const out=await rashiApi('rashi-list-pending'); renderRecordings(out.requests||[],out.recent||[]); }
+  catch(error){ list.innerHTML='<div class="empty">'+escapeHtml(error.message||'Could not load recordings.')+'</div>'; }
 }
-document.getElementById('recList').addEventListener('click', async e => {
-  const btn = e.target.closest('button[data-act]'); if(!btn || btn.disabled) return;
-  const item = btn.closest('.rec-item'), msg = item.querySelector('.rec-msg');
-  item.querySelectorAll('button').forEach(b => b.disabled = true);   // one click only
-  try{
-    const scoreInput=item.querySelector('.rashi-grade'),feedbackInput=item.querySelector('.rashi-feedback');
-    const action=btn.dataset.act === 'approve' ? 'rashi-approve' : 'rashi-reject';
-    const grade=scoreInput?.value;
-    if(scoreInput&&action==='rashi-approve'&&(grade===''||!Number.isInteger(Number(grade))||Number(grade)<0||Number(grade)>100)){
-      throw new Error('Enter a reading grade from 0 to 100.');
+function wireRashiCard(card,r){
+  if(!card||!r) return;
+  const box=card.querySelector('[data-letters]');
+  const msg=card.querySelector('[data-field="msg"]'),scoreEl=card.querySelector('[data-field="score"]'),doneBtn=card.querySelector('[data-done]');
+  const total=LM.tokenize(rashiTextOf(r)).total;
+  if(!box||!total){ scoreEl.textContent='This recording has no letters to mark.'; if(doneBtn) doneBtn.hidden=true; return; }
+  const review=r.letterReview;
+  const missed=new Set(review&&review.total===total?review.missed:[]);
+  let graded=!!review, savedKey=graded?JSON.stringify([...missed].sort((a,b)=>a-b)):null;
+  let timer=null,busy=null,dirty=false;
+  const paint=()=>{
+    box.querySelectorAll('[data-l]').forEach(b=>{ const on=missed.has(Number(b.dataset.l)); b.classList.toggle('bad',on); b.setAttribute('aria-pressed',String(on)); });
+    const s=LM.score(rashiTextOf(r),[...missed]);
+    scoreEl.innerHTML='<b>'+s.points+'/5 points</b> &nbsp; <span class="rec-parts" aria-label="Parts with no missed letter">'+s.partsClean.map(ok=>'<i class="'+(ok?'ok':'no')+'"></i>').join('')+'</span> &nbsp; '+
+      (total-missed.size)+'/'+total+' letters correct ('+s.pct+'%)'+(graded?'':' · not graded yet');
+  };
+  paint();
+  if(graded) msg.textContent='Saved. You can still change it.';
+  const send=async()=>{
+    clearTimeout(timer);timer=null;
+    if(busy) return busy;
+    const key=JSON.stringify([...missed].sort((a,b)=>a-b));
+    if(!dirty&&graded&&key===savedKey){ gradeSavers.delete(send); return; }
+    if(!dirty&&!graded){ gradeSavers.delete(send); return; }
+    dirty=false;
+    busy=(async()=>{
+      msg.textContent='Saving…';
+      try{
+        const out=await rashiApi('rashi-letter-marks',{requestId:r.id,missed:[...missed].sort((a,b)=>a-b)});
+        graded=true;savedKey=key;
+        const moved=Number(out.points)||0;
+        msg.textContent='✔️ Saved. '+out.parts+' of 5 parts perfect'+(out.priorPoints?' (he already earned '+out.priorPoints+' before, so this send adds '+out.paidTotal+')':'')+(moved>0?' · +'+moved+' points now':moved<0?' · '+Math.abs(moved)+' points taken back':'')+'.'+(out.canRerecord?' He can record it again.':'');
+        card.classList.add('is-graded');paint();
+        if(doneBtn) doneBtn.hidden=true;
+        scheduleLetterScores();
+      }catch(err){
+        console.error(err);dirty=true;
+        msg.textContent='⚠️ Could not save: '+(err.message||'try again')+' Tap a letter or press Done to try again.';
+      }
+    })();
+    await busy;busy=null;
+    if(dirty&&!/Could not save/.test(msg.textContent)) return send();
+    if(!dirty) gradeSavers.delete(send);
+  };
+  const changed=()=>{ paint();dirty=true;msg.textContent='Saving in a few seconds… (tap again to change)';gradeSavers.add(send);clearTimeout(timer);timer=setTimeout(send,RASHI_SAVE_DELAY_MS); };
+  box.addEventListener('click',e=>{
+    const b=e.target.closest('[data-l]'); if(!b) return;
+    const n=Number(b.dataset.l); if(missed.has(n)) missed.delete(n); else missed.add(n);
+    changed();
+  });
+  if(doneBtn) doneBtn.onclick=()=>{ dirty=true; send(); };
+  const deleteBtn=card.querySelector('[data-delete]');
+  if(deleteBtn) deleteBtn.onclick=async()=>{
+    if(!confirm('Delete this recording from '+r.studentName+' ('+r.sectionLabel+')?\n\nHe gets his 2 points back (and any points it earned are taken back), it does not count anywhere, and he can send it again.')) return;
+    clearTimeout(timer);timer=null;gradeSavers.delete(send);dirty=false;
+    card.querySelectorAll('button').forEach(b=>b.disabled=true);msg.textContent='Deleting…';
+    try{
+      const out=await rashiApi('rashi-delete',{requestId:r.id});
+      msg.textContent='🗑️ Deleted. '+(out.refunded?out.refunded+' points refunded.':'Nothing had been charged, so nothing to refund.')+(out.takenBack?' '+out.takenBack+' earned points taken back.':'')+' He can send it again.';
+      setTimeout(()=>{ loadRecordings(); loadLetterScores(); },900);
+    }catch(err){
+      console.error(err);msg.textContent='⚠️ '+(err.message||'Could not delete the recording.');
+      card.querySelectorAll('button').forEach(b=>b.disabled=false);
     }
-    const out = await rashiApi(action, { requestId: item.dataset.id,...(scoreInput&&action==='rashi-approve'?{grade:Number(grade)}:{}),...(feedbackInput?{feedback:feedbackInput.value}:{}) });
-    msg.textContent = out.alreadyHandled ? 'Already handled earlier — nothing more was changed.'
-      : btn.dataset.act === 'approve' ? '✅ Approved. +' + (out.actualAmount ?? 2) + ' points.' : '🔄 Sent back to try again.';
-    setTimeout(loadRecordings, 1200);
-  }catch(error){ msg.textContent = error.message || 'Could not save.'; item.querySelectorAll('button').forEach(b => b.disabled = false); }
-});
+  };
+}
 
+// ---- Each boy's running letter scores ----
+let letterTimer=null;
+function scheduleLetterScores(){ clearTimeout(letterTimer); letterTimer=setTimeout(loadLetterScores,1500); }
+async function loadLetterScores(){
+  const holder=document.getElementById('letterHolder');
+  if(!teacherScope){ holder.innerHTML=''; return; }
+  const ids=Object.keys(teacherScope.students||{});
+  if(!ids.length){ holder.innerHTML='<div class="empty">No students in this class.</div>'; return; }
+  try{
+    const out=await rashiApi('rashi-letter-stats',{studentIds:ids});
+    const names=id=>(teacherScope.students[id]&&teacherScope.students[id].name)||id;
+    const boys=ids.filter(id=>out.students&&out.students[id]&&out.students[id].readings>0).sort((a,b)=>names(a).localeCompare(names(b)));
+    if(!boys.length){ holder.innerHTML='<div class="empty">No graded readings yet.</div>'; return; }
+    let html='<table><thead><tr><th>Boy</th>'+LM.LETTER_KEYS.map(k=>'<th class="lh">'+k+'</th>').join('')+'<th>Readings</th></tr></thead><tbody>';
+    boys.forEach(id=>{
+      const st=out.students[id];
+      html+='<tr><td>'+escapeHtml(names(id))+'</td>'+LM.LETTER_KEYS.map(k=>{
+        const row=st.letters[k],pct=LM.letterPct(row);
+        if(pct===null) return '<td class="ls-none">–</td>';
+        return '<td class="'+(pct>=90?'ls-good':pct>=70?'ls-mid':'ls-low')+'" title="'+k+': '+(row.seen-row.missed)+' of '+row.seen+' read correctly">'+pct+'%</td>';
+      }).join('')+'<td>'+st.readings+'</td></tr>';
+    });
+    holder.innerHTML=html+'</tbody></table>';
+  }catch(error){ holder.innerHTML='<div class="empty">'+escapeHtml(error.message||'Could not load letter scores.')+'</div>'; }
+}
 
 document.getElementById('approveLegacyAllBtn').addEventListener('click',async e=>{
   const btn=e.currentTarget,msg=document.getElementById('approveLegacyAllMsg'),ids=pendingLegacyIds.slice();
   if(btn.disabled||!ids.length)return;
-  if(!confirm('Approve '+ids.length+' legacy Rashi word recording(s)? Vayeira Rashis must each receive their own grade.'))return;
+  if(!confirm('Approve '+ids.length+' legacy Rashi word recording(s)? Each gets +2 points and no letter marks. Recordings sent with the new 2-point cost are graded by marking letters.'))return;
   btn.disabled=true;
+  await flushGradeSaves();
   document.querySelectorAll('#recList button').forEach(x=>x.disabled=true);
   let done=0,failed=0;
   for(const requestId of ids){
@@ -314,7 +446,7 @@ async function loadLockState(){
 document.getElementById('lockToggle').addEventListener('change', async (e) => {
   await db.ref('rashiLetters/settings/accessLocked').set(e.target.checked);
 });
-document.getElementById('refreshBtn').addEventListener('click', () => { loadDashboard(); loadRecordings(); });
+document.getElementById('refreshBtn').addEventListener('click', () => { loadDashboard(); loadRecordings(); loadLetterScores(); });
 
 async function loadTeacher(user, access){
   const gate = document.getElementById('teacherGate'), app = document.getElementById('teacherApp');
@@ -340,6 +472,7 @@ async function loadTeacher(user, access){
     if(isOwner) loadLockState();
     loadDashboard();
     loadRecordings();
+    loadLetterScores();
     if(new URLSearchParams(location.search).get('tab') === 'recordings') document.getElementById('recPanel').scrollIntoView();
   }catch(error){
     app.style.display = 'none'; gate.style.display = '';

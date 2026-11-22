@@ -85,7 +85,7 @@ test('a signed-in student sends a recording: one pending 2-point request, audio 
   const [id,item]=reqs[0];
   assert.equal(item.amount,2);assert.equal(item.status,'pending');assert.equal(item.practiceStudentId,'kid1');assert.equal(item.workspaceClassId,'et');assert.equal(item.sectionId,'zayin');
   assert.deepEqual(Object.keys(b.files).map(p=>p.split('/').slice(0,4).join('/')),['rashi-recordings/et/kid1/zayin']);
-  assert.equal(balance(b,'rs1'),10,'submitting gives no points');
+  assert.equal(balance(b,'rs1'),8,'sending costs 2 points');
   assert.equal(b.db.getAt('rashiLetters/recordings/kid1/zayin').status,'pending');
   assert.ok(id.startsWith('rashi_kid1_zayin_'));
 });
@@ -121,20 +121,20 @@ test('approval gives exactly 2 points; repeated and parallel approvals add nothi
   const id=pendingRequests(b)[0][0];
   const [x,y]=await Promise.all([b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id}),b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id})]);
   assert.ok(x.body.ok&&y.body.ok);
-  assert.equal(balance(b,'rs1'),12);
-  const third=await b.teacher('owner','rashi-approve',{requestId:id});assert.equal(third.body.alreadyHandled,true);assert.equal(balance(b,'rs1'),12);
+  assert.equal(balance(b,'rs1'),10);
+  const third=await b.teacher('owner','rashi-approve',{requestId:id});assert.equal(third.body.alreadyHandled,true);assert.equal(balance(b,'rs1'),10);
   const item=b.db.getAt('studentRewards/pointRequests/'+id);assert.equal(item.status,'approved');assert.equal(item.actualAmount,2);assert.equal(item.reviewedBy,'et.teacher@test.example');
   assert.equal(b.db.getAt('rashiLetters/recordings/kid1/zayin').status,'approved');
   const audit=b.db.getAt('rashiLetters/recordingAudit/'+id);
-  assert.equal(audit.result,'approved');assert.equal(audit.points,2);assert.equal(audit.balanceAfter,12);assert.equal(audit.reviewedBy,'et.teacher@test.example');
+  assert.equal(audit.result,'approved');assert.equal(audit.points,2);assert.equal(audit.balanceAfter,10);assert.equal(audit.reviewedBy,'et.teacher@test.example');
   const st=(await b.status('kid1')).body.sections;assert.equal(st.zayin.status,'approved');assert.equal(st.zayin.points,2);
-  const re=await b.submit('kid1','zayin');assert.equal(re.body.status,'approved');assert.equal(pendingRequests(b).length,1,'no new request after approval');assert.equal(balance(b,'rs1'),12);
+  const re=await b.submit('kid1','zayin');assert.equal(re.body.status,'approved');assert.equal(pendingRequests(b).length,1,'no new request after approval');assert.equal(balance(b,'rs1'),10);
 });
 test('rejection gives 0 points and lets the student record again; the new one can earn 2',async()=>{
   const b=makeBackend(seed());await b.submit('kid1','shin');
   const first=pendingRequests(b)[0][0];
   const rej=await b.teacher('teacherEt','rashi-reject',{classId:'et',requestId:first});assert.equal(rej.body.status,'rejected');
-  assert.equal(balance(b,'rs1'),10);
+  assert.equal(balance(b,'rs1'),8);
   assert.equal((await b.status('kid1')).body.sections.shin.status,'rejected');
   assert.equal(b.db.getAt('rashiLetters/recordingAudit/'+first).points,0);
   const again=await b.submit('kid1','shin');assert.equal(again.body.status,'pending');assert.equal(again.body.attempt,2);
@@ -142,15 +142,15 @@ test('rejection gives 0 points and lets the student record again; the new one ca
   assert.ok(b.db.getAt('rashiLetters/recordingHistory/kid1/shin/'+Object.keys(b.db.getAt('rashiLetters/recordingHistory/kid1/shin'))[0]),'old attempt kept for audit');
   const second=pendingRequests(b).find(([id,r])=>r.status==='pending')[0];
   await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:second});
-  assert.equal(balance(b,'rs1'),12);
+  assert.equal(balance(b,'rs1'),8);
   // the rejected request can never be approved later
-  const late=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:first});assert.equal(late.body.alreadyHandled,true);assert.equal(balance(b,'rs1'),12);
+  const late=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:first});assert.equal(late.body.alreadyHandled,true);assert.equal(balance(b,'rs1'),8);
 });
 test('each section pays on its own',async()=>{
   const b=makeBackend(seed());
   for(const s of ['zayin','bet','words3'])await b.submit('kid1',s);
   for(const [id] of pendingRequests(b))await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id});
-  assert.equal(balance(b,'rs1'),16);
+  assert.equal(balance(b,'rs1'),10);
 });
 test('students cannot approve, reject or list; teachers cannot touch other classes',async()=>{
   const b=makeBackend(seed());await b.submit('kid1','zayin');
@@ -160,13 +160,13 @@ test('students cannot approve, reject or list; teachers cannot touch other class
   assert.equal((await b.teacher('kid1','rashi-list-pending')).code,401);
   assert.equal((await b.teacher('teacherWt','rashi-approve',{classId:'wt',requestId:id})).code,403,'WT teacher cannot approve an ET recording');
   assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:'../x'})).code,403);
-  assert.equal(balance(b,'rs1'),10);assert.equal(b.db.getAt('studentRewards/pointRequests/'+id).status,'pending');
+  assert.equal(balance(b,'rs1'),8);assert.equal(b.db.getAt('studentRewards/pointRequests/'+id).status,'pending');
 });
 test('a request with a changed point value is refused',async()=>{
   const b=makeBackend(seed());await b.submit('kid1','zayin');
   const id=pendingRequests(b)[0][0];b.db.ref('studentRewards/pointRequests/'+id+'/amount').set(500);
   const r=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id});
-  assert.equal(r.code,409);assert.equal(balance(b,'rs1'),10);
+  assert.equal(r.code,409);assert.equal(balance(b,'rs1'),8);
 });
 test('ET and WT stay separate in status and storage',async()=>{
   const b=makeBackend(seed());await b.submit('kid1','zayin');await b.submit('kid2','zayin');
@@ -215,11 +215,11 @@ test('Vayeira passage uses full canonical Hebrew and allows only its assigned te
   assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:'',feedback:'Good'})).code,400);
   const yes=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:95,feedback:'Well read!'});
   assert.equal(yes.code,200,JSON.stringify(yes.body));
-  assert.equal(balance(b,'rs1'),12);
+  assert.equal(balance(b,'rs1'),10);
   const state=(await b.status('kid1')).body.sections[passage.id];
   assert.equal(state.status,'approved');assert.equal(state.grade,95);assert.equal(state.feedback,'Well read!');
   assert.equal((await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:id,grade:95})).body.alreadyHandled,true);
-  assert.equal(balance(b,'rs1'),12);
+  assert.equal(balance(b,'rs1'),10);
 });
 test('daily quota is shared across all legacy and Vayeira readings, including rejected attempts',async()=>{
   const b=makeBackend(seed()),p=require('../backend/functions/vayeira-rashi.json').passages;
@@ -243,4 +243,220 @@ test('four simultaneous Rashi section submissions accept at most three',async()=
   assert.equal(out.filter(r=>r.code===429).length,1);
   assert.equal(Object.keys(b.files).length,3);
   assert.equal(pendingRequests(b).length,3);
+});
+
+// ---------- Letter marks (2026-11-22): sending costs 2, 5 parts x 1 point, per-letter scores ----------
+const LM=require('../backend/functions/rashi-letter-marks-core.cjs');
+const marks=(b,token,id,missed,extra={})=>b.teacher(token,'rashi-letter-marks',{classId:token==='teacherWt'?'wt':'et',requestId:id,missed,...extra});
+// 20 letters: 4 per part. Letters are numbered 0-19 in reading order.
+const TEXT20='אבגד הוזח טיכל מנסע עפצק';
+const sendText=(b,token,section,text=TEXT20)=>b.submit(token,section,{query:{words:text.split(' ').join('|')}});
+
+test('core: letters keep their vowels, finals count as their own letters, 5 equal parts, 27 letter keys',()=>{
+  assert.equal(LM.LETTER_KEYS.length,27);assert.equal(new Set(LM.LETTER_KEYS).size,27);
+  const tk=LM.tokenize('שָׁלוֹם: בְּרֵאשִׁית');
+  assert.equal(tk.total,10);assert.equal(tk.words[0][0].text,'שָׁ');assert.equal(tk.words[0][3].key,'ם');assert.equal(tk.words[0][4].letter,false);
+  assert.equal(tk.words[1][0].key,'ב');
+  assert.equal(JSON.stringify(LM.partBounds(20)),'[[0,4],[4,8],[8,12],[12,16],[16,20]]');
+  assert.equal(JSON.stringify(LM.partBounds(18)),'[[0,3],[3,7],[7,10],[10,14],[14,18]]');
+  const perfect=LM.score(TEXT20,[]);assert.equal(perfect.points,5);assert.equal(perfect.pct,100);
+  const two=LM.score(TEXT20,[0,19]);assert.equal(two.points,3);assert.equal(JSON.stringify(two.partsClean),'[false,true,true,true,false]');
+  assert.equal(LM.score(TEXT20,[0,1,2,3]).points,4,'many misses in one part still cost one point');
+  assert.equal(LM.score(TEXT20,Array.from({length:20},(_,i)=>i)).points,0);
+  assert.equal(LM.score('אב',[]).points,5,'a very short text can still be perfect');
+  assert.equal(LM.score('אב',[1]).points,1,'empty parts earn nothing when something was missed');
+  assert.throws(()=>LM.score(TEXT20,[20]),/not in this reading/);assert.throws(()=>LM.score(TEXT20,[1.5]));assert.throws(()=>LM.score('123',[]),/no Hebrew letters/);
+  assert.equal(LM.score(TEXT20,[0]).letters['א'].missed,1);assert.equal(LM.score(TEXT20,[0]).letters['א'].seen,1);
+});
+test('client and both server copies of the letter core are identical',()=>{
+  const fs=require('node:fs'),a=fs.readFileSync('rashi-letters/rashi-letter-marks-core.js','utf8');
+  assert.equal(fs.readFileSync('backend/functions/rashi-letter-marks-core.cjs','utf8'),a);
+  assert.equal(fs.readFileSync('backend/functions-staging/rashi-letter-marks-core.cjs','utf8'),a);
+});
+test('sending a recording costs 2 points once; a double send never charges twice',async()=>{
+  const b=makeBackend(seed());
+  const [x,y]=await Promise.all([sendText(b,'kid1','zayin'),sendText(b,'kid1','zayin')]);
+  assert.ok([x,y].every(r=>r.code===200));
+  assert.equal(balance(b,'rs1'),8);
+  await sendText(b,'kid1','zayin');assert.equal(balance(b,'rs1'),8);
+  const rec=b.db.getAt('rashiLetters/recordings/kid1/zayin');assert.equal(rec.v2,true);assert.equal(rec.submitCharged,true);
+  const charge=Object.values(b.db.getAt('studentRewards/pointRequests')).find(r=>r.source==='rashi-letters-submit');
+  assert.equal(charge.amount,-2);assert.equal(charge.status,'approved');
+  await sendText(b,'kid2','zayin');assert.equal(balance(b,'rs2'),-2,'like Posuk Practice, the charge may go below zero');
+});
+test('marking letters: each clean part earns 1 point (5 = perfect), net of the 2 paid to send',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');
+  const id=pendingRequests(b)[0][0];
+  const r=await marks(b,'teacherEt',id,[0,19]);
+  assert.equal(r.code,200,JSON.stringify(r.body));assert.equal(r.body.paidTotal,3);assert.equal(r.body.points,3);assert.equal(balance(b,'rs1'),11);
+  const rec=b.db.getAt('rashiLetters/recordings/kid1/zayin');
+  assert.equal(rec.status,'approved');assert.equal(rec.pointsPaid,3);assert.equal(rec.letterReview.total,20);assert.equal(JSON.stringify(rec.letterReview.missed),'[0,19]');
+  const st=(await b.status('kid1')).body.sections.zayin;assert.equal(st.status,'approved');assert.equal(st.points,3);assert.equal(st.letterMode,true);
+  const item=b.db.getAt('studentRewards/pointRequests/'+id);assert.equal(item.status,'approved');assert.equal(item.pointsPaid,3);
+});
+test('a perfect reading needs no taps: saving with nothing marked pays 5',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','bet');
+  const id=pendingRequests(b)[0][0];
+  const r=await marks(b,'teacherEt',id,[]);assert.equal(r.body.paidTotal,5);assert.equal(balance(b,'rs1'),13);
+});
+test('changing the marks adjusts the points and never pays twice',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','alef');
+  const id=pendingRequests(b)[0][0];
+  await marks(b,'teacherEt',id,[]);assert.equal(balance(b,'rs1'),13);
+  const down=await marks(b,'teacherEt',id,[0,5,10]);assert.equal(down.body.points,-3);assert.equal(balance(b,'rs1'),10);
+  const same=await marks(b,'teacherEt',id,[0,5,10]);assert.equal(same.body.points,0);assert.equal(balance(b,'rs1'),10);
+  const back=await marks(b,'teacherEt',id,[]);assert.equal(back.body.points,3);assert.equal(balance(b,'rs1'),13);
+  const par=await Promise.all([marks(b,'teacherEt',id,[0]),marks(b,'teacherEt',id,[0,5,10,15])]);
+  assert.ok(par.every(x=>[200,409].includes(x.code)));
+  const paid=b.db.getAt('rashiLetters/recordings/kid1/alef').pointsPaid;
+  assert.equal(balance(b,'rs1'),8+paid,'balance always equals the saved points');
+  assert.equal(b.db.getAt('studentRewards/pointRequests/'+id).pointsPaid,paid);
+});
+test('marks are checked: whole letter numbers inside the text, own class only, teachers only',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','bet');
+  const id=pendingRequests(b)[0][0];
+  for(const bad of [[20],[-1],[1.5],['a'],'0',{}])assert.equal((await marks(b,'teacherEt',id,bad)).code,400,JSON.stringify(bad));
+  assert.equal((await marks(b,'teacherWt',id,[])).code,403);
+  assert.equal((await b.teacher('kid1','rashi-letter-marks',{requestId:id,missed:[]})).code,401);
+  assert.equal(balance(b,'rs1'),8);assert.equal(b.db.getAt('rashiLetters/recordings/kid1/bet').status,'pending');
+});
+test('an old recording cannot be marked once a newer one exists (rejected then re-sent)',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','samech');
+  const first=pendingRequests(b)[0][0];
+  await b.teacher('teacherEt','rashi-reject',{classId:'et',requestId:first});
+  await sendText(b,'kid1','samech');
+  const stale=await marks(b,'teacherEt',first,[]);assert.equal(stale.code,409);
+  const second=pendingRequests(b).find(([id])=>id!==first)[0];
+  assert.equal((await marks(b,'teacherEt',second,[])).body.paidTotal,5);
+});
+test('recent list keeps graded readings with their marks; legacy bulk approve still works and gives +2 with no letter data',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');await sendText(b,'kid1','bet');
+  const [[a],[c]]=[pendingRequests(b)[0],pendingRequests(b)[1]];
+  await marks(b,'teacherEt',a,[3]);
+  const listed=await b.teacher('teacherEt','rashi-list-pending',{classId:'et'});
+  assert.equal(listed.body.requests.length,1);assert.equal(listed.body.requests[0].id,c);assert.equal(listed.body.requests[0].v2,true);
+  assert.equal(listed.body.recent.length,1);assert.equal(listed.body.recent[0].id,a);assert.equal(JSON.stringify(listed.body.recent[0].letterReview.missed),'[3]');
+  const before=balance(b,'rs1');
+  const legacy=await b.teacher('teacherEt','rashi-approve',{classId:'et',requestId:c});assert.equal(legacy.body.status,'approved');assert.equal(balance(b,'rs1'),before+2);
+  assert.equal((await b.teacher('teacherEt','rashi-list-pending',{classId:'et'})).body.recent.length,1,'no letter data, so not in the recent list');
+});
+test('each boy gets running letter scores over all his graded readings, per class scope',async()=>{
+  const b=makeBackend(seed());
+  await sendText(b,'kid1','zayin');await sendText(b,'kid1','bet','אבגד הוזח טיכל מנסע');
+  const ids=pendingRequests(b).map(([id])=>id);
+  await marks(b,'teacherEt',ids[0],[0,1]);await marks(b,'teacherEt',ids[1],[0]);   // alef missed twice out of two, bet missed once of two
+  const out=await b.teacher('teacherEt','rashi-letter-stats',{classId:'et',studentIds:['kid1','kid2']});
+  assert.equal(out.code,200,JSON.stringify(out.body));
+  const k1=out.body.students.kid1;assert.equal(k1.readings,2);
+  assert.equal(k1.letters['א'].seen,2);assert.equal(k1.letters['א'].missed,2);assert.equal(k1.letters['ב'].seen,2);assert.equal(k1.letters['ב'].missed,1);assert.equal(k1.letters['ג'].missed,0);
+  assert.equal(out.body.students.kid2,undefined,'another class is not shown');
+  await marks(b,'teacherEt',ids[0],[]);   // changing the marks changes the totals (no double counting)
+  const again=(await b.teacher('teacherEt','rashi-letter-stats',{classId:'et',studentIds:['kid1']})).body.students.kid1;
+  assert.equal(again.letters['א'].missed,1);assert.equal(again.letters['ב'].missed,0);
+  assert.equal((await b.teacher('kid1','rashi-letter-stats',{studentIds:['kid1']})).code,401);
+});
+test('weekly Nigri Rashi mark = letters read correctly out of all letters read that week; older grades still count',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');await sendText(b,'kid1','bet','אבגד הוזח');   // 20 letters and 8 letters
+  const ids=pendingRequests(b).map(([id])=>id);
+  await marks(b,'teacherEt',ids[0],[0,1,2,3,4]);   // 15/20 correct = 75
+  await marks(b,'teacherEt',ids[1],[]);           // 8/8 = 100
+  const out=await b.teacher('teacherEt','rashi-week-grades',{classId:'et',studentIds:['kid1'],from:Date.now()-3*864e5,to:Date.now()+864e5});
+  assert.equal(out.code,200,JSON.stringify(out.body));
+  const g=out.body.students.kid1.graded.map(x=>[x.grade,x.weight]).sort((x,y)=>x[1]-y[1]);
+  assert.equal(JSON.stringify(g),'[[100,8],[75,20]]');
+  const weekly=require('../shared/weekly-practice-marks-core.js');
+  const range=weekly.weekRange(weekly.nyDateIso(Date.now()));
+  const mark=weekly.collectStudent({rashi:out.body.students.kid1.graded.map(x=>({...x,gradedAt:range.from+1}))},range).rashi;
+  assert.equal(mark.mark,Math.round((15+8)/28*100),'pooled over letters, not an average of two readings');assert.equal(mark.n,2);
+  // an older reading graded 0-100 with no weight counts as one reading
+  const old=weekly.collectStudent({rashi:[{grade:80,gradedAt:range.from+1}]},range).rashi;assert.equal(old.mark,80);
+});
+test('grading later never moves a reading into another Nigri week',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');
+  const id=pendingRequests(b)[0][0];await marks(b,'teacherEt',id,[]);
+  const first=b.db.getAt('rashiLetters/recordings/kid1/zayin').gradedAt;
+  await new Promise(r=>setTimeout(r,5));await marks(b,'teacherEt',id,[1]);
+  assert.equal(b.db.getAt('rashiLetters/recordings/kid1/zayin').gradedAt,first);
+});
+
+// ---------- Record again below 5, and teacher Delete (2026-11-22) ----------
+const requestsFor=(b,section)=>pendingRequests(b).filter(([,r])=>r.sectionId===section).map(([id])=>id);
+test('a reading that earned less than 5 can be recorded again (costs 2 again); earned points are never paid twice',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');
+  const first=requestsFor(b,'zayin')[0];
+  await marks(b,'teacherEt',first,[0,19]);                         // 3 of 5
+  assert.equal(balance(b,'rs1'),8+3);
+  let st=(await b.status('kid1')).body.sections.zayin;assert.equal(st.status,'approved');assert.equal(st.points,3);assert.equal(st.canRerecord,true);
+  const again=await sendText(b,'kid1','zayin');
+  assert.equal(again.code,200,JSON.stringify(again.body));assert.equal(again.body.status,'pending');assert.equal(again.body.attempt,2);
+  assert.equal(balance(b,'rs1'),9,'sending again costs 2 again');
+  assert.equal(b.db.getAt('rashiLetters/recordings/kid1/zayin').priorPoints,3);
+  assert.ok(b.db.getAt('rashiLetters/recordingHistory/kid1/zayin'),'the first attempt is kept for the record');
+  const second=requestsFor(b,'zayin').find(id=>id!==first);
+  assert.equal((await marks(b,'teacherEt',first,[])).code,409,'the first attempt can no longer be changed');
+  const r2=await marks(b,'teacherEt',second,[0]);                  // 4 parts clean now, already had 3: pays 1 more
+  assert.equal(r2.body.parts,4);assert.equal(r2.body.paidTotal,1);assert.equal(balance(b,'rs1'),10);
+  st=(await b.status('kid1')).body.sections.zayin;assert.equal(st.points,4);assert.equal(st.canRerecord,true);
+  await sendText(b,'kid1','zayin');
+  const third=requestsFor(b,'zayin').find(id=>id!==first&&id!==second);
+  assert.equal((await marks(b,'teacherEt',third,[])).body.paidTotal,1,'a perfect third send adds only the missing point');
+  assert.equal(balance(b,'rs1'),10-2+1);
+  st=(await b.status('kid1')).body.sections.zayin;assert.equal(st.points,5);assert.equal(st.canRerecord,false);
+  const blocked=await sendText(b,'kid1','zayin');assert.equal(blocked.body.alreadySubmitted,true);assert.equal(balance(b,'rs1'),9,'a perfect 5 is final');
+});
+test('a worse second send never takes points away from the best one', async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','bet');
+  const first=requestsFor(b,'bet')[0];await marks(b,'teacherEt',first,[0,5,10,15]);   // 1 of 5
+  await sendText(b,'kid1','bet');const second=requestsFor(b,'bet').find(id=>id!==first);
+  const r=await marks(b,'teacherEt',second,[0,5,10,15,19]);assert.equal(r.body.paidTotal,0);
+  assert.equal(b.db.getAt('rashiLetters/recordings/kid1/bet').bestPoints,1);
+  assert.equal(balance(b,'rs1'),10-2-2+1);
+});
+test('Delete refunds the 2 points, takes back earned points, removes it from letter scores and lets him send again',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','alef');
+  const id=requestsFor(b,'alef')[0];
+  await marks(b,'teacherEt',id,[0,19]);assert.equal(balance(b,'rs1'),11);
+  const del=await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:id});
+  assert.equal(del.code,200,JSON.stringify(del.body));assert.equal(del.body.refunded,2);assert.equal(del.body.takenBack,3);
+  assert.equal(balance(b,'rs1'),10,'back to where he started');
+  const rec=b.db.getAt('rashiLetters/recordings/kid1/alef');assert.equal(rec.status,'deleted');assert.ok(!rec.letterReview);
+  const refund=Object.values(b.db.getAt('studentRewards/pointRequests')).find(r=>r.source==='rashi-letters-submit'&&r.amount===2);assert.ok(refund);
+  const again=await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:id});assert.equal(again.body.alreadyDeleted,true);assert.equal(balance(b,'rs1'),10,'pressing Delete twice refunds once');
+  const listed=(await b.teacher('teacherEt','rashi-list-pending',{classId:'et'})).body;assert.equal(listed.requests.length,0);assert.equal(listed.recent.length,0);
+  assert.equal(Object.keys((await b.teacher('teacherEt','rashi-letter-stats',{classId:'et',studentIds:['kid1']})).body.students.kid1.letters).length,0);
+  const week=(await b.teacher('teacherEt','rashi-week-grades',{classId:'et',studentIds:['kid1'],from:Date.now()-3*864e5,to:Date.now()+864e5})).body.students.kid1;
+  assert.equal(week.graded.length,0);assert.equal(week.pending,0);
+  assert.equal((await b.status('kid1')).body.sections.alef.status,'none');
+  const resend=await sendText(b,'kid1','alef');assert.equal(resend.code,200,JSON.stringify(resend.body));assert.equal(resend.body.status,'pending');
+  assert.equal(balance(b,'rs1'),8);
+});
+test('Delete of a waiting recording refunds 2; delete is for teachers of that class only; an old attempt cannot be deleted',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','samech');await sendText(b,'kid2','samech');
+  const kid1Id=pendingRequests(b).find(([,r])=>r.practiceStudentId==='kid1')[0];
+  assert.equal((await b.teacher('teacherWt','rashi-delete',{classId:'wt',requestId:kid1Id})).code,403);
+  assert.equal((await b.teacher('kid1','rashi-delete',{requestId:kid1Id})).code,401);
+  assert.equal(balance(b,'rs1'),8);
+  const del=await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:kid1Id});assert.equal(del.body.refunded,2);assert.equal(balance(b,'rs1'),10);
+  assert.equal(b.db.getAt('studentRewards/pointRequests/'+kid1Id).status,'rejected');
+  await sendText(b,'kid1','samech');                                    // a new attempt exists
+  assert.equal((await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:kid1Id})).code,409,'an old attempt can no longer be deleted once a newer one exists');
+  assert.equal(balance(b,'rs1'),8);
+});
+test('deleting a re-sent attempt keeps the points earned before it',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','shin');
+  const first=requestsFor(b,'shin')[0];await marks(b,'teacherEt',first,[0,19]);      // earned 3
+  await sendText(b,'kid1','shin');const second=requestsFor(b,'shin').find(id=>id!==first);
+  const bal=balance(b,'rs1');                                                       // 10 - 2 + 3 - 2 = 9
+  await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:second});
+  assert.equal(balance(b,'rs1'),bal+2,'only the second 2-point charge is refunded');
+  await sendText(b,'kid1','shin');const third=requestsFor(b,'shin').find(id=>id!==first&&id!==second);
+  assert.equal(b.db.getAt('rashiLetters/recordings/kid1/shin').priorPoints,3,'the 3 earned on the first send are still remembered');
+  assert.equal((await marks(b,'teacherEt',third,[])).body.paidTotal,2);
+});
+test('Delete gives back the reading slot of the day (3 per day), so a bad recording does not use one up',async()=>{
+  const b=makeBackend(seed());
+  for(const sec of ['zayin','bet','alef'])await sendText(b,'kid1',sec);
+  assert.equal((await sendText(b,'kid1','tsadi')).code,429,'the 4th reading today is refused');
+  const id=requestsFor(b,'bet')[0];await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:id});
+  const ok=await sendText(b,'kid1','tsadi');assert.equal(ok.code,200,JSON.stringify(ok.body));
 });

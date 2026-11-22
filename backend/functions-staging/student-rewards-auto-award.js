@@ -8,6 +8,7 @@ const rtdb = admin.database();
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
 const posukReviewCore=require('./posuk-review-core.cjs');
+const letterMarks=require('./rashi-letter-marks-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
@@ -144,7 +145,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
+    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
@@ -186,7 +187,8 @@ async function authorizeChazaraAction(teacher,body){
 const rashiBucket=()=>admin.storage().bucket();
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
 const RASHI_DAILY_LIMIT=3;
-const rashiDate=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const row=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${row.year}-${row.month}-${row.day}`;};
+const rashiDateOf=ms=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms));const row=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${row.year}-${row.month}-${row.day}`;};
+const rashiDate=()=>rashiDateOf(Date.now());
 const rashiDailyRef=(studentId,date)=>rtdb.ref(`rashiLetters/dailySubmissions/${studentId}/${date}`);
 async function rashiDailyCount(studentId,date){return Number((await rashiDailyRef(studentId,date).get()).val()?.count)||0;}
 async function rashiReserveDaily(studentId,date){
@@ -220,10 +222,10 @@ async function rashiStudentSubmit(req,res){
   const label=rashiCore.sectionLabel(sectionId);
   const makeRequest=record=>createPendingRequest({requestId:record.requestId,rewardStudentId,studentId,source:rashiCore.RASHI_SOURCE,
     amount:rashiCore.RASHI_POINTS,reason:`Rashi Letters reading — ${label}`,
-    record:{sectionId,attemptId:record.attemptId,recordingPath:record.storagePath,workspaceClassId:classId,words:record.words||[]}});
+    record:{sectionId,attemptId:record.attemptId,recordingPath:record.storagePath,workspaceClassId:classId,words:record.words||[],v2:!!record.v2}});
   // 1. Already waiting or approved: never upload or create anything new.
   const existing=(await rashiRecordRef(studentId,sectionId).get()).val();
-  if(existing&&existing.status!=='rejected'){
+  if(existing&&!rashiCore.canSendAgain(existing)){
     let status=String(existing.status||'pending');
     if(status==='pending'){
       const made=await makeRequest(existing); // repairs a request that never got saved
@@ -252,7 +254,7 @@ async function rashiStudentSubmit(req,res){
   try{await file.save(audio,{resumable:false,contentType:type,metadata:{cacheControl:'private, max-age=0'}});}
   catch(err){await rashiReleaseDaily(studentId,dailyDate);throw err;}
   const requestId=rashiCore.requestIdFor(studentId,sectionId,attemptId);
-  const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now()};
+  const seed={sectionId,attemptId,requestId,storagePath,studentId,classId,words,durationMs,sizeBytes:audio.length,contentType:type,status:'pending',attempt:1,createdAt:Date.now(),v2:true,submitCost:rashiCore.SUBMIT_COST};
   // 3. Claim the one slot for this student+section (only if nothing is
   //    pending/approved). A double-click loses here and its upload is removed.
   let claimed=null,blockedBy=null;
@@ -277,7 +279,11 @@ async function rashiStudentSubmit(req,res){
   if(claimed.previousAttemptId&&existing)await rtdb.ref(`rashiLetters/recordingHistory/${studentId}/${sectionId}/${existing.attemptId}`).set(existing).catch(()=>{});
   // 4. The points request (deterministic id, so a retry never doubles it).
   await makeRequest(claimed);
-  return res.status(200).json({ok:true,status:'pending',sectionId,attempt:claimed.attempt,dailyCount:await rashiDailyCount(studentId,dailyDate),dailyLimit:RASHI_DAILY_LIMIT});
+  // 5. The 2-point cost of sending, taken once (deterministic id, so a retry never charges twice).
+  const charge=await rashiPostPoints({requestId:`rashisubmit_${studentId}_${attemptId}`.slice(0,220),rewardStudentId,studentId,amount:-rashiCore.SUBMIT_COST,
+    reason:`Rashi Letters reading sent — ${label}`,record:{sectionId,attemptId}}).catch(err=>{console.warn('Rashi submit charge failed',err);return {ok:false};});
+  await rashiRecordRef(studentId,sectionId).transaction(cur=>cur&&cur.attemptId===attemptId?{...cur,submitCharged:!!charge.ok,rewardStudentId}:cur).catch(()=>{});
+  return res.status(200).json({ok:true,status:'pending',pointsCharged:charge.ok?rashiCore.SUBMIT_COST:0,sectionId,attempt:claimed.attempt,dailyCount:await rashiDailyCount(studentId,dailyDate),dailyLimit:RASHI_DAILY_LIMIT});
 }
 // Student asks for the status of every section (one call, no polling).
 async function rashiStudentStatus(req,res){
@@ -299,21 +305,32 @@ async function rashiStudentStatus(req,res){
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
   const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
-  const bucket=rashiBucket(),rows=[];
+  const bucket=rashiBucket(),pending=[],decided=[];
   for(const [id,item] of Object.entries(all)){
-    if(!isRashiRequest(item)||item.status!=='pending')continue;
+    if(!isRashiRequest(item))continue;
     if(scope&&!teacherClassScope.recordAllowed(scope,item.practiceStudentId,item))continue;
+    if(item.status==='pending')pending.push([id,item]);
+    else if(item.status==='approved'||item.status==='rejected')decided.push([id,item]);
+  }
+  const rowFor=async(id,item,wantGraded)=>{
     const record=(await rashiRecordRef(item.practiceStudentId,item.sectionId).get()).val();
-    if(!record||record.attemptId!==item.attemptId||!record.storagePath)continue;
+    if(!record||record.attemptId!==item.attemptId||!record.storagePath)return null;
+    if(wantGraded&&!record.letterReview)return null;
     let audioUrl=null;
     try{[audioUrl]=await bucket.file(record.storagePath).getSignedUrl({action:'read',expires:Date.now()+60*60*1000});}catch(err){console.warn('Rashi recording URL failed',err);}
     const info=scope?.students?.[item.practiceStudentId];
-    rows.push({id,studentId:item.practiceStudentId,studentName:item.studentName||info?.name||item.practiceStudentId,
+    return {id,studentId:item.practiceStudentId,studentName:item.studentName||info?.name||item.practiceStudentId,
       classId:item.workspaceClassId||info?.classId||'',className:info?.className||item.workspaceClassId||'',sectionId:item.sectionId,
       sectionLabel:rashiCore.sectionLabel(item.sectionId),words:record.words||[],attempt:record.attempt||1,createdAt:item.createdAt||record.createdAt||0,
-      durationMs:record.durationMs||0,amount:item.amount,audioUrl});
-  }
-  return rows.sort((a,b)=>Number(b.createdAt)-Number(a.createdAt));
+      durationMs:record.durationMs||0,amount:item.amount,audioUrl,
+      v2:!!record.v2,letterReview:record.letterReview||null,gradedAt:record.gradedAt||null};
+  };
+  const rows=(await Promise.all(pending.map(([id,item])=>rowFor(id,item,false)))).filter(Boolean);
+  // The newest graded readings stay on screen so the teacher can change a grade.
+  decided.sort((a,b)=>Number(b[1].reviewedAt||0)-Number(a[1].reviewedAt||0));
+  const recent=(await Promise.all(decided.slice(0,60).map(([id,item])=>rowFor(id,item,true)))).filter(Boolean)
+    .sort((a,b)=>Number(b.gradedAt||0)-Number(a.gradedAt||0)).slice(0,30);
+  return {requests:rows.sort((a,b)=>Number(b.createdAt)-Number(a.createdAt)),recent};
 }
 // Teachers may only act on a Rashi recording from a class they manage.
 async function rashiAuthorizeRequest(teacher,requestId){
@@ -322,6 +339,152 @@ async function rashiAuthorizeRequest(teacher,requestId){
   if(!isRashiRequest(item))throw Object.assign(new Error('This is not a Rashi recording.'),{code:403});
   if(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,item.practiceStudentId,item))throw Object.assign(new Error('This recording does not belong to your selected class.'),{code:403});
   return item;
+}
+
+// ---------- Rashi letter marks (2026-11-22) ----------
+// Sending a recording costs 2 points. The teacher taps the letters that were not recognized; the text is split into 5
+// equal parts and each part with no missed letter earns 1 point (perfect = 5). The teacher can change the marks any
+// number of times: the server pays or takes back only the difference, so nothing is ever paid twice.
+// Same unclamped posting as Posuk Practice: the submit charge may take a balance below zero.
+async function rashiPostPoints({requestId,rewardStudentId,studentId,amount,reason,record}){
+  const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
+  const info=await studentInfo(rewardStudentId);
+  const claimId=`${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const seed={id:requestId,status:'processing',automatic:true,amount,source:'rashi-letters-submit',reason,practiceStudentId:studentId,studentId,
+    rewardStudentId,studentName:info.name,classId:info.classId,createdAt:Date.now(),claimId,...record};
+  const tx=await ref.transaction(cur=>cur?undefined:seed);
+  if(!tx.committed||tx.snapshot.val()?.claimId!==claimId){
+    const existing=(await ref.get()).val()||{};
+    return {ok:true,newlyPosted:false,status:existing.status||'approved'};
+  }
+  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+amount);
+  if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return {ok:false,error:'Could not update the point balance.'};}
+  const balanceAfter=Number(bal.snapshot.val()||0);
+  await ref.update({status:'approved',actualAmount:amount,balanceAfter,approvedAutomatically:true,reviewedBy:'Rashi Letters',reviewedAt:Date.now()});
+  return {ok:true,newlyPosted:true,balanceAfter};
+}
+// The weekly Nigri mark input for one graded reading: percent of its letters read correctly, weighted by letter count.
+// Readings graded before letter marks existed keep their old 0-100 grade (no weight).
+function rashiMarkOf(record){
+  const review=record&&record.letterReview;
+  if(review&&Number(review.total)>0)return {grade:Math.round((Number(review.total)-Number(review.missedCount||0))/Number(review.total)*100),weight:Number(review.total)};
+  if(record&&typeof record.grade==='number'&&Number.isFinite(record.grade))return {grade:record.grade};
+  return null;
+}
+async function rashiLetterMarks(teacher,body){
+  const item=await rashiAuthorizeRequest(teacher,body.requestId);
+  const requestId=String(body.requestId);
+  const recRef=rashiRecordRef(item.practiceStudentId,item.sectionId);
+  const record=(await recRef.get()).val();
+  if(!record||record.requestId!==requestId||record.attemptId!==item.attemptId)
+    throw Object.assign(new Error('The student has already sent a newer recording, so this one cannot be graded any more. Press Refresh.'),{code:409});
+  const scored=letterMarks.score((Array.isArray(record.words)?record.words:[]).join(' '),body.missed);   // 400 if a marked letter is not in the text
+  // Points earned on earlier sends of this section are not paid again: this send pays only what it adds.
+  const prior=Math.max(0,Number(record.priorPoints)||0);
+  const target=Math.max(0,scored.points-prior);
+  const reqRef=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
+  let before=null;
+  const lock=await reqRef.transaction(cur=>{
+    if(cur===null)return null;
+    if(!isRashiRequest(cur)||cur.status==='processing'||!['pending','approved','rejected'].includes(cur.status))return;
+    const paid=typeof cur.pointsPaid==='number'?cur.pointsPaid:(cur.status==='approved'?(Number(cur.actualAmount??cur.amount)||0):0);
+    before={status:cur.status,paid};
+    return {...cur,status:'processing',reviewedBy:teacher.email,reviewStartedAt:Date.now(),gradeFromStatus:cur.status};
+  });
+  if(!lock.committed||!before)throw Object.assign(new Error('The marks are being saved right now. Please try again in a moment.'),{code:409});
+  const rewardStudentId=String((lock.snapshot.val()||{}).rewardStudentId||'');
+  const restore=async msg=>{await reqRef.update({status:before.status,reviewStartedAt:null,gradeFromStatus:null,lastError:msg});};
+  const delta=target-before.paid;
+  let balanceAfter=null;
+  if(delta!==0){
+    if(!rewardStudentId){await restore('Missing reward student ID');throw Object.assign(new Error('Could not find this student in Student Rewards.'),{code:409});}
+    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+delta);
+    if(!bal.committed){await restore('Balance update did not commit');throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
+    balanceAfter=Number(bal.snapshot.val()||0);
+  }
+  const t=Date.now();
+  const update={status:'approved',pointsPaid:target,actualAmount:target,reviewedBy:teacher.email,reviewedAt:t,reviewStartedAt:null,gradeFromStatus:null,lastError:null};
+  if(balanceAfter!==null)update.balanceAfter=balanceAfter;
+  await reqRef.update(update);
+  const {letters,...rest}=scored;
+  const tx=await recRef.transaction(cur=>{
+    if(cur===null)return null;
+    if(cur.attemptId!==item.attemptId)return;
+    // gradedAt stays the time of the first grading, so a later change never moves the reading into another Nigri week.
+    return {...cur,status:'approved',pointsPaid:target,priorPoints:prior,bestPoints:Math.max(prior,scored.points),gradedAt:cur.gradedAt||t,gradedBy:String(teacher.email||'').slice(0,200),reviewedAt:t,
+      letterReview:{...rest,letters,markedAt:t,markedBy:String(teacher.email||'').slice(0,200)}};
+  });
+  await rtdb.ref(`rashiLetters/recordingAudit/${requestId}`).update({
+    requestId,studentId:item.practiceStudentId,sectionId:item.sectionId,attemptId:item.attemptId,classId:item.workspaceClassId||null,
+    result:'graded',missedLetters:scored.missedCount,totalLetters:scored.total,points:target,balanceAfter,reviewedBy:teacher.email,reviewedAt:t
+  }).catch(()=>{});
+  return {ok:true,points:delta,paidTotal:target,parts:scored.points,priorPoints:prior,canRerecord:Math.max(prior,scored.points)<5,priorPaid:before.paid,partsClean:scored.partsClean,missedCount:scored.missedCount,total:scored.total,pct:scored.pct,
+    balanceAfter,saved:!!(tx&&tx.committed)};
+}
+// Teacher Delete for a bad recording: the 2 points it cost are refunded, any points it earned are taken back, nothing counts
+// toward letter scores or Nigri, and the student can send that section again. Safe to press twice.
+async function rashiDelete(teacher,body){
+  const item=await rashiAuthorizeRequest(teacher,body.requestId);
+  const requestId=String(body.requestId);
+  const recRef=rashiRecordRef(item.practiceStudentId,item.sectionId);
+  const record=(await recRef.get()).val();
+  if(!record||record.requestId!==requestId||record.attemptId!==item.attemptId)
+    throw Object.assign(new Error('The student has already sent a newer recording, so this one cannot be deleted. Press Refresh.'),{code:409});
+  if(record.status==='deleted')return {ok:true,alreadyDeleted:true,refunded:0,takenBack:0};
+  const reqRef=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
+  let before=null;
+  const lock=await reqRef.transaction(cur=>{
+    if(cur===null)return null;
+    if(!isRashiRequest(cur)||cur.status==='processing'||!['pending','approved','rejected'].includes(cur.status))return;
+    const paid=typeof cur.pointsPaid==='number'?cur.pointsPaid:(cur.status==='approved'?(Number(cur.actualAmount??cur.amount)||0):0);
+    before={status:cur.status,paid};
+    return {...cur,status:'processing',reviewedBy:teacher.email,reviewStartedAt:Date.now(),gradeFromStatus:cur.status};
+  });
+  if(!lock.committed||!before)throw Object.assign(new Error('This recording is being saved right now. Please try again in a moment.'),{code:409});
+  const rewardStudentId=String((lock.snapshot.val()||{}).rewardStudentId||'');
+  let takenBack=0;
+  if(before.paid>0&&rewardStudentId){
+    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)-before.paid);
+    if(!bal.committed){await reqRef.update({status:before.status,reviewStartedAt:null,gradeFromStatus:null,lastError:'Balance update did not commit'});throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
+    takenBack=before.paid;
+  }
+  const t=Date.now();
+  await reqRef.update({status:'rejected',deleted:true,pointsPaid:0,actualAmount:null,reviewedBy:teacher.email,reviewedAt:t,reviewStartedAt:null,gradeFromStatus:null,lastError:null});
+  let refund={ok:true};
+  if(record.submitCharged===true&&rewardStudentId){
+    refund=await rashiPostPoints({requestId:`rashirefund_${item.practiceStudentId}_${item.attemptId}`.slice(0,220),rewardStudentId,studentId:item.practiceStudentId,amount:rashiCore.SUBMIT_COST,
+      reason:`Rashi Letters recording deleted by teacher, ${rashiCore.SUBMIT_COST} points refunded — ${rashiCore.sectionLabel(item.sectionId)}`,record:{sectionId:item.sectionId,attemptId:item.attemptId}})
+      .catch(err=>{console.warn('Rashi refund failed',err);return {ok:false};});
+  }
+  await recRef.transaction(cur=>{
+    if(cur===null)return null;
+    if(cur.attemptId!==item.attemptId)return;
+    return {...cur,status:'deleted',letterReview:null,pointsPaid:0,bestPoints:null,gradedAt:null,deletedAt:t,deletedBy:String(teacher.email||'').slice(0,200),refundPosted:!!refund.ok};
+  });
+  await rtdb.ref(`rashiLetters/recordingAudit/${requestId}`).update({
+    requestId,studentId:item.practiceStudentId,sectionId:item.sectionId,attemptId:item.attemptId,classId:item.workspaceClassId||null,
+    result:'deleted',points:0,reviewedBy:teacher.email,reviewedAt:t}).catch(()=>{});
+  // A deleted bad recording does not use up one of his 3 readings for the day.
+  if(Number(record.createdAt)>0)await rashiReleaseDaily(item.practiceStudentId,rashiDateOf(Number(record.createdAt))).catch(()=>{});
+  const refunded=record.submitCharged===true&&refund.ok?rashiCore.SUBMIT_COST:0;
+  return {ok:true,refunded,refundPosted:!!refund.ok,takenBack};
+}
+// Each boy's running letter scores: every graded reading adds its letters (seen / missed) to the boy's total for that letter.
+// Worked out from the saved readings each time, so it can never drift from the marks.
+async function rashiLetterStats(teacher,body){
+  const ids=Array.isArray(body.studentIds)?body.studentIds.slice(0,120):[];
+  const out={};
+  for(const id of ids){
+    if(!teacherClassScope.validKey(id)||(teacher.scope&&!teacher.scope.students?.[id]))continue;
+    const rows=(await rtdb.ref(`rashiLetters/recordings/${id}`).get()).val()||{};
+    const letters={};let readings=0;
+    for(const record of Object.values(rows)){
+      if(!record||!record.letterReview||(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,id,record)))continue;
+      letterMarks.addLetters(letters,record.letterReview.letters);readings++;
+    }
+    out[id]={letters,readings};
+  }
+  return {ok:true,students:out};
 }
 
 async function requireStudent(req){
@@ -1633,16 +1796,19 @@ exports.studentRewardsAutoAward = onRequest(
             for(const record of Object.values(rows)){
               if(!record||(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,id,record)))continue;
               if(record.status==='pending'&&Number(record.createdAt)>=from&&Number(record.createdAt)<to)pending++;
-              else if(typeof record.grade==='number'&&Number(record.gradedAt)>=from&&Number(record.gradedAt)<to)graded.push({grade:record.grade,gradedAt:Number(record.gradedAt)});
+              else if(Number(record.gradedAt)>=from&&Number(record.gradedAt)<to){const m=rashiMarkOf(record);if(m)graded.push({...m,gradedAt:Number(record.gradedAt)});}
             }
             out[id]={graded,pending};
           }
           return res.status(200).json({ok:true,students:out});
         }
         if(action==="rashi-list-pending"){
-          const requests=await rashiTeacherList(teacher);
-          return res.status(200).json({ok:true,requests});
+          const listed=await rashiTeacherList(teacher);
+          return res.status(200).json({ok:true,requests:listed.requests,recent:listed.recent});
         }
+        if(action==="rashi-letter-marks")return res.status(200).json(await rashiLetterMarks(teacher,body));
+        if(action==="rashi-delete")return res.status(200).json(await rashiDelete(teacher,body));
+        if(action==="rashi-letter-stats")return res.status(200).json(await rashiLetterStats(teacher,body));
         if(action==="rashi-approve"||action==="rashi-reject"){
           const request=await rashiAuthorizeRequest(teacher,body.requestId);
           const isPassage=!!rashiCore.sectionText(request.sectionId);
