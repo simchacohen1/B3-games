@@ -224,6 +224,8 @@ exports.studentRewardsRedeem = onRequest(
         if (qty > 0) {
           let soldOut = false;
           const qtyTx = await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}/quantity`).transaction(current => {
+            // A first pass can see no stored value yet (nothing cached): return a guess so the server rechecks and retries with the real stock.
+            if (current === null) return 0;
             const n = Number(current || 0);
             if (n <= 0) { soldOut = true; return; }
             return n - 1;

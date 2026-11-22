@@ -71,3 +71,10 @@ test('the teacher decline path puts the request back if the refund fails',()=>{
  const s=fs.readFileSync('backend/functions/rewards-teacher-core.cjs','utf8');
  assert.ok(/try\{await addToBalance[\s\S]*cur==='declined'\?'pending'/.test(s));
 });
+
+test('the stock transaction does not read a cold first pass as sold out',()=>{
+ const src=require('node:fs').readFileSync('backend/functions/student-rewards-functions.js','utf8');
+ const tx=src.slice(src.indexOf('/quantity`).transaction(current => {'),src.indexOf('stockReserved = true;'));
+ assert.match(tx,/if \(current === null\) return 0;/);
+ assert.ok(tx.indexOf('current === null')<tx.indexOf('soldOut = true'));
+});
