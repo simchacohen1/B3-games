@@ -39,3 +39,20 @@ test('poll: timer select (default 1 minute), countdown, shrink once answered, cl
   assert.match(p,/addEventListener\('pagehide'/);
   assert.match(p,/if\(n<=0\)\{clearInterval\(stuTick\)/);
 });
+test('teacher: opening Student screens sets the presentation aside; Resume presenting brings back the same one',()=>{
+  const d=read('teacher-dashboard.js'),p=read('pdf-mode.js');
+  // the dashboard reacts to the Student screens / whiteboards workspaces and stops what is on
+  assert.match(d,/w==='screens'\|\|w==='boards'\)void setPresentationAside\(\)/);
+  assert.match(d,/window\.ClassPointerPdf\?\.suspend\?\.\(\)/);
+  assert.match(d,/stopScreen\.click\(\);heldPresentation=\{label:'Shared screen',screen:true\}/);
+  // one Resume button on My screen; doing something else by hand forgets the held one
+  assert.match(d,/'▶ Resume presenting: '/);
+  assert.match(d,/window\.ClassPointerPdf\?\.resumeHeld\?\.\(\)/);
+  assert.match(d,/if\(isLive&&heldPresentation\)\{heldPresentation=null;window\.ClassPointerPdf\?\.discardHeld/);
+  // pdf-mode keeps exactly what was open: whiteboard (pictures + marks), PDF file + page, webpage, tab picture
+  assert.match(p,/snap=\{kind:'board',saved\}/);
+  assert.match(p,/lastOpen=\{kind:'pdf',file\}/);
+  assert.match(p,/lastOpen=\{kind:'web',source,file\}/);
+  assert.match(p,/if\(s\.kind==='pdf'\)\{const ok=await openFile\(s\.file\);[^}]*goToPage\(s\.page\)/);
+  assert.match(p,/suspend:suspendDoc,resumeHeld,hasHeld/);
+});

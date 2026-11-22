@@ -12,6 +12,8 @@
   const pdfjs=window.pdfjsLib;
   const Web=window.ClassPointerWebpageCore;
   let webMode=false,opening=0,docLabel='webpage';
+  // How the teacher's current PDF / webpage / tab picture was opened, and what was set aside when the teacher left My screen (suspend / resumeHeld).
+  let lastOpen=null,held=null;
   // A whiteboard is shown whole: at 100% all of it fits in the lesson area, with nothing to scroll. A PDF or a
   // webpage fits the width, as before. Students are told which with every view the teacher sends (whole).
   let fitWhole=false,navWatched=false;
@@ -1016,7 +1018,7 @@
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       docLabel='webpage';fitWhole=false;syncFit();await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
-      showNote('');B.resetMarks();B.setPdf(true,'webpage');
+      showNote('');B.resetMarks();B.setPdf(true,'webpage');lastOpen={kind:'web',source,file};
       B.status('Webpage open. The ↖ arrow is your mouse: scroll, drag the page, click a link to open it for the class. Students follow you. Pick another tool on the left to point or draw.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
     }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
@@ -1043,6 +1045,7 @@
       fitWhole=!!board;updateControls();syncFit();relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
       if(board){startBoardPresentation(dataUrl);const opened=docId;setTimeout(()=>settleBoardShape(opened),900)}
+      if(!board)lastOpen={kind:'snap',args:[dataUrl,width,height,opts]};
       B.status(board?'Whiteboard open.':'Static tab snapshot open.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
@@ -1077,6 +1080,7 @@
       for(const member of B.members().values())if(member.admitted)deliver(member);
       startPdfPresentation();
       if(big)scheduleViewSend(true);
+      lastOpen={kind:'pdf',file};
       window.PointerPdfLibrary?.onOpened(file);
       return true;
     }catch(error){
@@ -1589,7 +1593,27 @@
     $('chooseWebpageFile')?.addEventListener('click',()=>webFile.click());
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
+  // Teacher leaves My screen (Student screens): stop showing the document to the class but remember exactly what it was,
+  // so Resume presenting can bring back the same whiteboard (pictures and marks), PDF page or webpage.
+  async function suspendDoc(){
+    if(!isTeacher||!lay||scroller.hidden)return false;
+    let snap=null;
+    if(isBoardOpen()){const saved=await exportWhiteboard();if(saved)snap={kind:'board',saved}}
+    else if(lastOpen)snap={...lastOpen,page:webMode?0:currentPage(),top:scroller.scrollTop,left:scroller.scrollLeft};
+    if(!snap)return false;
+    held=snap;closePdf(true);return true;
+  }
+  async function resumeHeld(){
+    const s=held;held=null;
+    if(!s||!isTeacher)return false;
+    if(s.kind==='board')return importWhiteboard(s.saved);
+    if(s.kind==='pdf'){const ok=await openFile(s.file);if(ok===false||!lay)return false;if(s.page)goToPage(s.page);return true}
+    if(s.kind==='web'){await openWebpage(s.source,s.file);if(!lay)return false;scroller.scrollTop=s.top;scroller.scrollLeft=s.left;return true}
+    if(s.kind==='snap')return !!(await openSnapshot(...s.args));
+    return false;
+  }
   window.ClassPointerPdf={
+    suspend:suspendDoc,resumeHeld,hasHeld:()=>!!held,discardHeld:()=>{held=null},
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityTextScale,activityBoardBox,activityMarks,recolorSelected,resizeSelected,setFill,fillSelected,pickedShape,
     openFile,currentPage,goToPage,
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
