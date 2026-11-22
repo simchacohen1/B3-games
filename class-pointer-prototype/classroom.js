@@ -835,7 +835,7 @@ window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass(
 // A student whose tab or computer vanished without saying goodbye stops pinging (every 4 seconds). The browser can take
 // a long time to notice the dead link, so the teacher drops anyone silent for a minute (a student still there reconnects by himself).
 const SILENT_MS=60000;
-if(isTeacher)setInterval(()=>{
+if(isTeacher&&typeof setInterval==='function')setInterval(()=>{
   const now=Date.now();
   for(const m of Array.from(presence.values()))if(m.lastPing&&now-m.lastPing>SILENT_MS){try{m.connection.close()}catch{}dropPresence(m)}
   for(const m of Array.from(members.values()))if(m.lastPing&&now-m.lastPing>SILENT_MS){try{m.connection.close()}catch{}removeMember(m)}
