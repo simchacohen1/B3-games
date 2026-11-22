@@ -222,6 +222,7 @@ async function decideRefund(sid,key,decision){
       if(!t.committed)throw new Error("This purchase was already returned.");
       marked=true;
       await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}`).update({refundedAt:stamp,refundedBy:state.user.email,statusBeforeRefund:String(info.record.status||"pending")});
+      await returnStock(info.record);
     }
     let balanceAfter=null;
     const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const next=Math.max(0,Number(cur||0)+amount);balanceAfter=next;return next});
@@ -1015,6 +1016,12 @@ async function toggleRewardStore(){const open=classStoreOpen(),next=!open;
   if(state.teacherMode){try{await teacherApi("setStore",{classId:state.classId,open:next})}catch(err){toast(err.message,"error");return}await loadRoot();render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
   if(isTeacherStore(state.classId)){await db.ref(`${ROOT}/settings/classStoreEnabled/${state.classId}`).set(next);state.root.settings=state.root.settings||{};(state.root.settings.classStoreEnabled??={})[state.classId]=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
   await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
+// Puts the stock a purchase reserved back (the same rule as a student cancelling and the server's Decline/Refund).
+async function returnStock(item){
+  const q=state.root.rewards?.[item.rewardId]?.quantity;
+  const reserved=item.quantityReserved===true||(item.quantityReserved===undefined&&q!=null&&Number.isFinite(Number(q))&&Number(q)>=0);
+  if(reserved)await sdb().ref(`${ROOT}/rewards/${item.rewardId}/quantity`).transaction(cur=>{const n=Number(cur);return Number.isFinite(n)&&n>=0?n+1:undefined}).catch(()=>{});
+}
 async function review(sid,key,decision){
   if(state.teacherMode){try{const r=await teacherApi("review",{studentId:sid,key,decision});toast(`Request ${r.status}`)}catch(err){toast(err.message,"error")}await loadRoot();render();return}
   const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
@@ -1026,6 +1033,7 @@ async function review(sid,key,decision){
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;
   if(decision==="decline"){
     await sdb().ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>Number(cur||0)+Number(item.cost||0));
+    await returnStock(item);
     const r=state.root.rewards?.[item.rewardId],requestMs=timeMs(item.requestedAt),lastMs=timeMs(r?.lastRedeemedAt);
     if(r&&requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000){
       updates[`${ROOT}/rewards/${item.rewardId}/lastRedeemedAt`]=null;
