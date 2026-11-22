@@ -1194,8 +1194,7 @@ function renderShorashimRecordings(){
 async function teacherRewardsToken(){
   let user=firebase.auth().currentUser;
   if(!user){
-    const provider=new firebase.auth.GoogleAuthProvider();
-    const result=await firebase.auth().signInWithPopup(provider); user=result.user;
+    user=(await window.B3SiteSettings.signInWithGoogle())||firebase.auth().currentUser;
   }
   if(String(user?.email||"").toLowerCase()!=="simcha5770@gmail.com")throw new Error("Please sign in with simcha5770@gmail.com.");
   return user.getIdToken(true);

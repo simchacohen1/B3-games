@@ -326,7 +326,7 @@ button.link:hover{background:none;color:var(--navy)}
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="../firebase-config.js"></script>
+<script src="../firebase-config.js"></script><script src="../teacher-signin.js?v=20261122-one-signin"></script>
 <script src="staging-guard.js" data-b3-homework-guard></script>
 <script src="../class-confirm-gate.js"></script><script src="../owner-teacher-view.js?v=20261109-726"></script>
 <script src="homework-common.js?v=a0c7c0a6"></script>
@@ -413,7 +413,7 @@ var HI=window.HomeworkItems,itemsBox=HI.builder($('itemsBuilder'),{onChange:func
 // Items are optional. The only check left is at Save: an item that is half filled in is never dropped silently.
 function itemsProblem(){return itemsBox.isEditing()?'Finish the item you are adding first: press Add to homework, or Cancel.':''}
 
-$('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){say($('signinMsg'),e.message)})};
+$('go').onclick=function(){B3TeacherSignIn().catch(function(e){say($('signinMsg'),e.message)})};
 $('signout').onclick=function(){auth.signOut()};
 auth.onAuthStateChanged(async function(u){
   if(!u){$('signin').style.display='';$('app').style.display='none';$('signout').style.display='none';$('who').textContent='';return}

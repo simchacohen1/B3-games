@@ -12,6 +12,7 @@
 <script src="principal-scope.js?v=20261025"></script>
 <script src="shorashim/units.js?v=20261106-units-1"></script>
 <script src="school-scope.js?v=20261107"></script>
+<script src="teacher-signin.js?v=20261122-one-signin"></script>
 <script src="owner-teacher-view.js?v=20261109-726"></script>
 <script src="student-scope.js?v=20261108"></script>
 <script src="owner-classes.js?v=20261118"></script>
@@ -1320,7 +1321,7 @@ async function adoptImport(school,{classIds,inviteIds,studentIds}){
  if(Object.keys(updates).length)await db.ref().update(updates);
 }
 
-q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+q("signIn").onclick=()=>B3TeacherSignIn().catch(error=>{q("gateMsg").textContent=(error&&error.message)||"Google sign-in did not complete."});
 function isOwner(user){return user?.emailVerified===true&&String(user.email||"").toLowerCase()===OWNER;}
 auth.onAuthStateChanged(async user=>{
  if(isOwner(user)){

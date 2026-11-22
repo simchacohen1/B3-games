@@ -241,7 +241,7 @@ async function rejectPointRequest(id,quiet=false){
 $("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject,oldText=b.textContent;b.disabled=true;b.textContent=a?"Approving…":"Rejecting…";try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false;b.textContent=oldText}};
 $("approveAllBtn").onclick=async()=>{const ids=Object.keys(pendingPointRequests||{});if(!ids.length)return;if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;$("approveAllBtn").disabled=true;let done=0;for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id});done++}catch(err){console.error(err)}}$("approveAllBtn").disabled=false;setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved.`);await loadApprovals()};
 $("recordingsApproveAllBtn").onclick=()=>{if(!$("approveAllBtn").disabled)$("approveAllBtn").click()};
-$("approvalSignInBtn").onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(provider)}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
+$("approvalSignInBtn").onclick=async()=>{try{await window.B3SiteSettings.signInWithGoogle()}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
 
 setInterval(()=>{if(!document.hidden&&auth.currentUser&&teacherScope)loadApprovals()},60000);
 

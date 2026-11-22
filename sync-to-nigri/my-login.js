@@ -50,7 +50,7 @@
     busy(true); var r = await C.remove(env); render(r); if (r.ok) msg.textContent = 'Removed.'; busy(false);
   });
   $('signin').addEventListener('click', async function () {
-    try { await auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (e) { /* refresh shows the state */ }
+    try { await B3TeacherSignIn(); } catch (e) { /* refresh shows the state */ }
     refresh();
   });
   refresh();

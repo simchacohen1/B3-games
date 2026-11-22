@@ -141,8 +141,8 @@ function makeSection(d,id){
 function moveRange(start,count,target){let n=start;for(let i=0;i<count&&n;i++){const next=n.nextElementSibling;target.appendChild(n);n=next}}
 function isOwnerNow(){try{return (frame.contentWindow?.B3SiteSettings?.getCurrentAccess?.()||{}).role==="admin"}catch(e){return false}}
 let teacherAccessClass="";
-let teacherAuthWait=null;
 function taEsc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
+let teacherAuthWait=null;
 function waitForTeacherAuth(w){
  if(teacherAuthWait)return teacherAuthWait;
  teacherAuthWait=new Promise(resolve=>{
@@ -153,14 +153,31 @@ function waitForTeacherAuth(w){
  });
  return teacherAuthWait;
 }
+// If an authorized user is reported later (a slow restore, or sign-in finished in another
+// tab), swap the sign-in panel for the class controls without asking again.
+let teacherAuthWatching=false;
+function watchTeacherAuth(w){
+ if(teacherAuthWatching)return;
+ teacherAuthWatching=true;
+ w.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
+   if(!(access?.authorized||authorized))return;
+   try{applyRoleView()}catch(e){}
+   if(currentTab==="access")showTab(currentTab);
+ });
+}
 async function renderTeacherAccess(msg){
   const panel=document.getElementById("teacherAccessPanel");
   const w=frame.contentWindow,db=w?.firebase?.database?.(),access=w?.B3SiteSettings?.getCurrentAccess?.()||{},ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
   if(!db||!w?.B3SiteSettings){panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Loading teacher sign-in…</div></div>';setTimeout(()=>{if(currentTab==="access"&&!isOwnerNow())renderTeacherAccess()},900);return}
   if(!access.authorized){
     const auth=typeof w.firebase?.auth==="function"?w.firebase.auth():null;
+    // Do not offer Google sign-in yet. This tab's own login may be empty while the
+    // remembered teacher login is still being restored; B3SiteSettings reports back
+    // only once that restore has either worked or failed (or the wait times out).
+    panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Checking your sign-in…</div></div>';
     if(auth?.authStateReady)await auth.authStateReady();
-    if(auth?.currentUser)await waitForTeacherAuth(w);
+    await waitForTeacherAuth(w);
+    watchTeacherAuth(w);
     const refreshed=w.B3SiteSettings.getCurrentAccess?.()||{};
     if(refreshed.authorized){showTab(currentTab);return}
     if(auth?.currentUser){panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Class access unavailable</h2><p class="ta-hint">This signed-in account is not assigned to an active class.</p><p role="status" id="taSignInStatus"></p></div></div>';return}

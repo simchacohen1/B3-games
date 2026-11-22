@@ -1095,7 +1095,7 @@ function bindPage(){
 }
 function shiftDate(n){const d=new Date(`${state.date}T12:00:00`);d.setDate(d.getDate()+n);state.date=d.toISOString().slice(0,10);prepareDraft();render()}
 $("#prevDate").onclick=()=>shiftDate(-1);$("#nextDate").onclick=()=>shiftDate(1);$("#topDate").onchange=e=>{state.date=e.target.value;prepareDraft();render()};
-$("#googleBtn").onclick=async()=>{try{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});await auth.signInWithPopup(p)}catch(err){$("#loginError").textContent=err.message||String(err)}};
+$("#googleBtn").onclick=async()=>{try{await B3TeacherSignIn()}catch(err){$("#loginError").textContent=err.message||String(err)}};
 $("#signOutBtn").onclick=()=>auth.signOut();
 auth.onAuthStateChanged(async user=>{
   if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
