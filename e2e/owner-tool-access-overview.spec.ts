@@ -45,6 +45,8 @@ async function openAdministration(page: Page, email: string, emailVerified: bool
             }
           }) })
         };
+        // Owner Admin signs in through the shared B3SiteSettings.signInWithGoogle() (via teacher-signin.js).
+        window.B3SiteSettings = { signInWithGoogle: async () => { await auth.signInWithPopup(); return user; } };
       ` });
     }
     if (path === '/owner-admin.html') {
