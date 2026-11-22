@@ -985,6 +985,8 @@
       if(role==='teacher')return;
       if(!visible())return hideAll();
       if(before==='none'&&reasons.has('sharing')){mount();st.tool=viewport.defaultTool;lastSurface=null;openBar(true);return}
+      // A higher grant picks that tool for the student, so allowing Pen does not leave them on Pointer.
+      if((level==='highlight'||level==='pen')&&LEVEL_TOOLS[level].includes(level))st.tool=level;
       sync();
     },
     // name: 'sharing' | 'whiteboard'. Turning a reason on opens the toolbar.

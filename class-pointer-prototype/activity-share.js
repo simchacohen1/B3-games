@@ -913,7 +913,7 @@
             if(admitted){const before=lessonStatus.textContent;lessonStatus.textContent='That mark could not be added. Try a shorter one, or ask your teacher.';setTimeout(()=>{if(lessonStatus.textContent.startsWith('That mark could not'))lessonStatus.textContent=before},4000)}
             return;
           }
-          if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
+          if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){const raised=message.level!==lessonLevel&&(message.level==='highlight'||message.level==='pen');lessonLevel=message.level;if(raised)lessonTool=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
           if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){if(!selDrag)selPreview=new Map();lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[],marksInVideo:message.marksInVideo===true,boardBox:Number.isFinite(message.boardBox?.w)&&Number.isFinite(message.boardBox?.h)?{w:message.boardBox.w,h:message.boardBox.h}:null};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           // The teacher pressed Stop viewing on this student's screen: end the share in his sharing tab.
