@@ -315,3 +315,13 @@ test('page: quick award bar, whole-award undo and the Refund button on purchases
   assert.match(pageSource, /class="points-undo refund"[\s\S]*↩ Refund/, 'purchases get a Refund button');
   assert.match(pageSource, /\$\{quickAwardPanel\(\)\}/, 'the bar is on the Points page');
 });
+
+test('refunding a purchase that reserved stock puts the stock back', async () => {
+  const { d, moshe, bal } = await ready();
+  d.tree.studentRewards.rewards = { w1: { id: 'w1', name: 'Pencil', cost: 15, quantity: 2, ownerClassId: 'b3_sc' } };
+  d.tree.studentRewards.redemptionsByStudent = { [moshe]: { p1: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: true }, p3: { rewardId: 'w1', cost: 15, status: 'pending' } } };
+  await call(d, T, { action: 'undo', kind: 'purchase', studentId: moshe, key: 'p1' });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3);
+  await call(d, T, { action: 'undo', kind: 'purchase', studentId: moshe, key: 'p3' });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3, 'no stock was reserved, so none is returned');
+});
