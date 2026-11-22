@@ -15,7 +15,10 @@ exports.studentRewardsTeacher=onRequest({region:'us-central1',cors:STAGING_ORIGI
  try{
   const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
   if(!token)return res.status(401).json({error:'Teacher sign-in required.'});
-  const identity=await admin.auth().verifyIdToken(token,true),db=admin.database();
+  let identity=await admin.auth().verifyIdToken(token,true);const db=admin.database();
+  // Staging only: the fictional staging accounts (b3StagingAccount claim, password or the one-click owner sign-in) cannot sign in with Google,
+  // so they are treated as a verified Google teacher here. The shared core is unchanged and still applies every other check.
+  if(process.env.GCLOUD_PROJECT==='fun-torah-tools-staging'&&identity.b3StagingAccount===true&&['password','custom'].includes(identity.firebase?.sign_in_provider))identity={...identity,email_verified:true,firebase:{...identity.firebase,sign_in_provider:'google.com'}};
   const store={
    get:async path=>(await db.ref(path).once('value')).val(),
    update:updates=>db.ref().update(updates),
