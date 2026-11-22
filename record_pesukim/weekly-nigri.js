@@ -125,13 +125,38 @@
     out.querySelectorAll('button[data-kind]').forEach(b => { b.onclick = () => send(b.dataset.kind); });
   }
 
+
+  // The owner always sends as the owner, whatever the Nigri helper thinks the role is.
+  function isOwnerNow() {
+    try {
+      if (window.NigriConnect && window.NigriConnect.state && window.NigriConnect.state.role === 'owner') return true;
+      if (window.B3NigriGate && window.B3NigriGate.result && window.B3NigriGate.result.reason === 'owner') return true;
+      const u = firebase.auth().currentUser, ownerEmail = window.B3SchoolScope && window.B3SchoolScope.OWNER_EMAIL;
+      return !!(u && u.emailVerified === true && ownerEmail && String(u.email || '').trim().toLowerCase() === String(ownerEmail).toLowerCase());
+    } catch (e) { return false; }
+  }
+  const VIA = { signin: 'signed in', key: 'old key', teacher: 'teacher login', owner: 'old key' };
+  const OWNER_URL = 'https://nigrisync.onrender.com/sync-marks';
+
+  // Returns { response, via }. Owner: Google sign-in first, the old shared key only when there is no sign-in or the server
+  // answers 401 (same as the Weekly Quiz). Teacher: only his own saved Nigri login, never the key.
+  async function sendToNigri(b) {
+    const hdr = { 'Content-Type': 'application/json' }, init = { method: 'POST', headers: hdr, body: JSON.stringify(b) };
+    if (isOwnerNow()) {
+      if (window.NigriAuth) return window.NigriAuth.request('/sync-marks', init, ROSTER && ROSTER.syncKey);
+      if (ROSTER && ROSTER.syncKey) return { response: await fetch(OWNER_URL, { method: 'POST', headers: Object.assign({ 'X-Sync-Key': ROSTER.syncKey }, hdr), body: init.body }), via: 'key' };
+      throw Object.assign(new Error('The Nigri sync helper did not load. Refresh the page.'), { preSend: true });
+    }
+    if (window.NigriConnect) return window.NigriConnect.sendMarks(b);
+    throw Object.assign(new Error('The Nigri sync helper did not load. Refresh the page.'), { preSend: true });
+  }
+
   async function send(kind) {
     const s = state, status = $('wpnS_' + kind), btn = document.querySelector('button[data-kind="' + kind + '"]');
     if (STAGING_OFF) { status.textContent = 'Nigri sending is off on staging.'; return; }
     const item = C.nigriBodies(s.rows, s.range, ROSTER.classSections[s.cls], s.nigriNames).find(b => b.kind === kind);
     if (!item) { status.textContent = 'Nothing to send.'; return; }
-    const blocked = window.NigriConnect ? await window.NigriConnect.cannotSync()
-      : (window.B3NigriGate && (window.B3NigriGate.result || {}).reason !== 'owner' ? 'The Nigri sync helper did not load. Refresh the page.' : null);
+    const blocked = isOwnerNow() ? null : (window.NigriConnect ? await window.NigriConnect.cannotSync() : 'The Nigri sync helper did not load. Refresh the page.');
     if (blocked) { status.className = 'wpn-err'; status.textContent = blocked; return; }
     const b = item.body;
     if (!confirm('Save "' + b.test_name + '" to Nigri as ' + b.topic + ' (' + b.class_section + ', ' + b.date + ') for ' + b.students.length + ' boys?\n\nIt cannot be sent again for this week.')) return;
@@ -146,114 +171,30 @@
       status.className = 'wpn-sent'; status.textContent = cur.state === 'sending' ? 'Already being sent right now.' : 'Already sent.'; btn.textContent = 'Already sent: ' + C.KINDS[kind].label; return;
     }
     status.textContent = 'Saving to Nigri… this can take under a minute, please wait.';
+    let via = '';
     try {
-      const hdr = { 'Content-Type': 'application/json' };
-      let res;
-      if (window.NigriConnect && (await window.NigriConnect.ready).role !== 'owner') res = (await window.NigriConnect.sendMarks(b)).response; // the teacher's own Nigri login
-      else if (window.NigriAuth) res = (await window.NigriAuth.request('/sync-marks', { method: 'POST', headers: hdr, body: JSON.stringify(b) }, ROSTER && ROSTER.syncKey)).response; // owner: Google sign-in first, the old key only if the server answers 401 (same as the Weekly Quiz)
-      else throw Object.assign(new Error('The Nigri sync helper did not load. Refresh the page.'), { preSend: true });
-      if (!res) throw Object.assign(new Error('Please sign in with your Google account first.'), { preSend: true });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not load the Rashi grades.');
-      return { byStudent: data.students || {}, error: '' };
-    } catch (e) { return { byStudent: {}, error: e.message || String(e) }; }
-  }
-
-  async function preview() {
-    const out = $('wpnOut'), cls = $('wpnClass').value, dateVal = $('wpnDate').value, range = C.weekRange(dateVal);
-    if (!range) { out.innerHTML = '<p class="wpn-err">Choose a date.</p>'; return; }
-    if (range.to > Date.now() + 1000 && C.nyDateIso(Date.now()) <= range.end && !confirm('This week is not over yet. Preview it anyway?')) { out.textContent = ''; state = null; return; }
-    out.textContent = 'Loading…';
-    try {
-      if (!Object.keys(studentsMap || {}).length && typeof loadStudents === 'function') await loadStudents();
-      // Which practice students belong to the chosen class, and their Nigri names.
-      const nigriNames = ROSTER ? ROSTER.names : Object.assign({}, studentsMap);
-      const people = []; const unmatched = [];
-      Object.entries(studentsMap || {}).forEach(([id, name]) => {
-        if (!ROSTER) { people.push({ id, sid: id }); return; }
-        const sid = C.matchRosterId(id, name, ROSTER.rosters[cls], ROSTER.names);
-        if (sid) people.push({ id, sid }); else if (!Object.values(ROSTER.rosters).some(r => r.includes(id))) unmatched.push(name || id);
-      });
-      const ids = people.map(p => p.id);
-      const [subs, atts, rashi, sent] = await Promise.all([
-        scopedStudentData('posukPractice/submissions', ids), scopedStudentData('posukPractice/attempts', ids),
-        rashiForWeek(ids, range, cls), db.ref(MARKS_ROOT + '/' + cls + '/' + range.start).once('value').catch(() => null)]);
-      const subVal = subs.val() || {}, attVal = atts.val() || {};
-      const rows = people.map(p => ({ sid: p.sid, id: p.id, name: nigriNames[p.sid] || studentsMap[p.id] || p.id,
-        result: C.collectStudent({ submissions: subVal[p.id], attempts: attVal[p.id], rashi: (rashi.byStudent[p.id] || {}).graded,
-          rashiPending: (rashi.byStudent[p.id] || {}).pending }, range,
-          typeof effComprehensionScore === 'function' ? { chidonScore: effComprehensionScore } : {}) }));
-      state = { cls, range, rows, nigriNames, sent: (sent && sent.val()) || {}, rashiError: rashi.error };
-      render(unmatched);
-    } catch (e) { out.innerHTML = '<p class="wpn-err">Could not build the preview: ' + esc(e.message || e) + '</p>'; }
-  }
-
-  function cell(r) { return r.mark === null ? '<span class="wpn-none">–</span>' : r.mark + '% <span class="wpn-none">(' + r.n + ')</span>'; }
-
-  function render(unmatched) {
-    const out = $('wpnOut'), s = state, ungraded = s.rows.reduce((n, r) => n + r.result.ungraded, 0);
-    let html = '<h3>' + esc(classLabel(s.cls)) + ' · week ' + esc(C.weekLabel(s.range)) + ' · dated ' + esc(s.range.friday) + '</h3>';
-    if (ungraded) html += '<div class="wpn-warn">⚠️ ' + ungraded + ' recording' + (ungraded === 1 ? ' is' : 's are') + ' still waiting to be graded this week. Ungraded work is left out of the averages. Grade it first if you want it counted.</div>';
-    if (s.rashiError) html += '<div class="wpn-warn">⚠️ Rashi grades could not be loaded (' + esc(s.rashiError) + '). Rashi marks cannot be sent until this works.</div>';
-    if (unmatched && unmatched.length) html += '<div class="wpn-warn">Not in the ' + esc(classLabel(s.cls)) + ' roster and skipped: ' + esc(unmatched.join(', ')) + '</div>';
-    html += '<table><thead><tr><th>Boy</th><th>Posuk Practice</th><th>Chidon</th><th>Rashi reading</th></tr></thead><tbody>' +
-      (s.rows.length ? s.rows.map(r => '<tr><td>' + esc(r.name) + '</td><td>' + cell(r.result.posuk) + '</td><td>' + cell(r.result.chidon) + '</td><td>' + cell(r.result.rashi) + '</td></tr>').join('') : '<tr><td colspan="4">No students found for this class on this page.</td></tr>') +
-      '</tbody></table><p class="small">Percent shown, with how many results were averaged in brackets.</p><div id="wpnSend">';
-    C.KIND_ORDER.forEach(k => {
-      const count = s.rows.filter(r => r.result[k].mark !== null).length, done = s.sent[k];
-      const disabled = STAGING_OFF || !count || !!done || (k === 'rashi' && s.rashiError);
-      html += '<div><button type="button" data-kind="' + k + '" ' + (disabled ? 'disabled' : '') + '>' +
-        (done ? 'Already sent: ' : 'Send ') + esc(C.KINDS[k].label) + ' (' + count + ' boy' + (count === 1 ? '' : 's') + ')</button>' +
-        '<span id="wpnS_' + k + '" class="' + (done ? 'wpn-sent' : 'small') + '">' +
-        (done ? 'Already sent ' + (done.at ? new Date(Number(done.at)).toLocaleDateString() : '') + (done.testId ? ' (mark #' + esc(done.testId) + ')' : '') : (!count ? 'Nothing to send this week.' : '')) + '</span></div>';
-    });
-    html += '</div>';
-    out.innerHTML = html;
-    out.querySelectorAll('button[data-kind]').forEach(b => { b.onclick = () => send(b.dataset.kind); });
-  }
-
-  async function send(kind) {
-    const s = state, status = $('wpnS_' + kind), btn = document.querySelector('button[data-kind="' + kind + '"]');
-    if (STAGING_OFF) { status.textContent = 'Nigri sending is off on staging.'; return; }
-    const item = C.nigriBodies(s.rows, s.range, ROSTER.classSections[s.cls], s.nigriNames).find(b => b.kind === kind);
-    if (!item) { status.textContent = 'Nothing to send.'; return; }
-    const blocked = window.NigriConnect ? await window.NigriConnect.cannotSync()
-      : (window.B3NigriGate && (window.B3NigriGate.result || {}).reason !== 'owner' ? 'The Nigri sync helper did not load. Refresh the page.' : null);
-    if (blocked) { status.className = 'wpn-err'; status.textContent = blocked; return; }
-    const b = item.body;
-    if (!confirm('Save "' + b.test_name + '" to Nigri as ' + b.topic + ' (' + b.class_section + ', ' + b.date + ') for ' + b.students.length + ' boys?\n\nIt cannot be sent again for this week.')) return;
-    btn.disabled = true; status.className = 'small'; status.textContent = 'Checking this week was not already sent…';
-    const ref = db.ref(MARKS_ROOT + '/' + s.cls + '/' + s.range.start + '/' + kind);
-    // Claim the week first (only one tab / teacher can), so a double click or two teachers cannot send twice.
-    let claim;
-    try { claim = await ref.transaction(cur => (cur === null ? { state: 'sending', at: firebase.database.ServerValue.TIMESTAMP } : undefined)); }
-    catch (e) { status.className = 'wpn-err'; status.textContent = 'Could not check or reserve this week: ' + e.message; btn.disabled = false; return; }
-    if (!claim.committed) {
-      const cur = claim.snapshot.val() || {};
-      status.className = 'wpn-sent'; status.textContent = cur.state === 'sending' ? 'Already being sent right now.' : 'Already sent.'; btn.textContent = 'Already sent: ' + C.KINDS[kind].label; return;
-    }
-    status.textContent = 'Saving to Nigri… this can take under a minute, please wait.';
-    try {
-      const res = (await window.NigriConnect.sendMarks(b, async () => fetch('https://nigrisync.onrender.com/sync-marks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sync-Key': window.WEEKLY_NIGRI_OWNER_KEY || '' }, body: JSON.stringify(b) }))).response;
+      const sent = await sendToNigri(b);
+      if (!sent || !sent.response) throw Object.assign(new Error('Please sign in with your Google account first.'), { preSend: true });
+      const res = sent.response; via = ' · sent via: ' + (VIA[sent.via] || sent.via);
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.status === 'success') {
         const failed = (data.results || []).filter(r => String(r).includes('FAILED'));
-        await ref.set({ state: 'sent', at: firebase.database.ServerValue.TIMESTAMP, testId: String(data.test_id || ''), name: b.test_name, boys: b.students.length });
+        await ref.set({ state: 'sent', at: firebase.database.ServerValue.TIMESTAMP, testId: String(data.test_id || ''), name: b.test_name, boys: b.students.length, via: sent.via });
         s.sent[kind] = { at: Date.now(), testId: data.test_id };
-        status.className = 'wpn-sent'; status.textContent = 'Saved to Nigri! (mark #' + data.test_id + ')' + (failed.length ? ' — but check these: ' + failed.join('; ') : '');
+        status.className = 'wpn-sent'; status.textContent = 'Saved to Nigri! (mark #' + data.test_id + ')' + via + (failed.length ? ' — but check these: ' + failed.join('; ') : '');
         btn.textContent = 'Already sent: ' + C.KINDS[kind].label;
       } else {
         await ref.remove().catch(() => {});
-        status.className = 'wpn-err'; status.textContent = 'Nigri did not save this: ' + (data.detail || data.error || 'Unknown error (' + res.status + ').');
+        status.className = 'wpn-err'; status.textContent = 'Nigri did not save this: ' + (data.detail || data.error || 'Unknown error (' + res.status + ').') + via;
         btn.disabled = false;
       }
     } catch (e) {
       if (e.preSend) { await ref.remove().catch(() => {}); status.className = 'wpn-err'; status.textContent = e.message; btn.disabled = false; return; }
       // The request may or may not have reached Nigri: keep the week locked and tell the teacher to check Nigri.
-      status.className = 'wpn-err'; status.textContent = 'Could not confirm the save (' + e.message + '). The week stays locked. Check Nigri before asking the owner to unlock it.';
+      status.className = 'wpn-err'; status.textContent = 'Could not confirm the save (' + e.message + ').' + via + ' The week stays locked. Check Nigri before asking the owner to unlock it.';
     }
   }
 
+  if (window.__WEEKLY_NIGRI_TEST__) window.__WEEKLY_NIGRI_TEST__ = { sendToNigri, isOwnerNow }; // lets tests check which route a send takes
   injectUi();
 })();
