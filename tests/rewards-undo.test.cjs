@@ -319,9 +319,39 @@ test('page: quick award bar, whole-award undo and the Refund button on purchases
 test('refunding a purchase that reserved stock puts the stock back', async () => {
   const { d, moshe, bal } = await ready();
   d.tree.studentRewards.rewards = { w1: { id: 'w1', name: 'Pencil', cost: 15, quantity: 2, ownerClassId: 'b3_sc' } };
-  d.tree.studentRewards.redemptionsByStudent = { [moshe]: { p1: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: true }, p3: { rewardId: 'w1', cost: 15, status: 'pending' } } };
+  d.tree.studentRewards.redemptionsByStudent = { [moshe]: { p1: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: true }, p3: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: false } } };
   await call(d, T, { action: 'undo', kind: 'purchase', studentId: moshe, key: 'p1' });
   assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3);
   await call(d, T, { action: 'undo', kind: 'purchase', studentId: moshe, key: 'p3' });
   assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3, 'no stock was reserved, so none is returned');
+});
+
+test('a teacher Decline puts the reserved stock back, once, and never for unlimited prizes', async () => {
+  const { d, moshe, bal } = await ready();
+  d.tree.studentRewards.rewards = { w1: { id: 'w1', name: 'Pencil', cost: 15, quantity: 2, ownerClassId: 'b3_sc' }, w2: { id: 'w2', name: 'Sticker', cost: 5, quantity: -1, ownerClassId: 'b3_sc' } };
+  d.tree.studentRewards.redemptionsByStudent = { [moshe]: {
+    p1: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: true },
+    p2: { rewardId: 'w1', cost: 15, status: 'pending', quantityReserved: false },
+    p3: { rewardId: 'w1', cost: 15, status: 'pending' },
+    p4: { rewardId: 'w2', cost: 5, status: 'pending' } } };
+  const before = bal(moshe);
+  await call(d, T, { action: 'review', studentId: moshe, key: 'p1', decision: 'decline' });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3); assert.equal(bal(moshe), before + 15);
+  await assert.rejects(call(d, T, { action: 'review', studentId: moshe, key: 'p1', decision: 'decline' }), { code: 409 });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3, 'a second decline changes nothing');
+  await call(d, T, { action: 'review', studentId: moshe, key: 'p2', decision: 'decline' });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 3, 'no stock was reserved');
+  await call(d, T, { action: 'review', studentId: moshe, key: 'p3', decision: 'decline' });
+  assert.equal(d.tree.studentRewards.rewards.w1.quantity, 4, 'older request with no marker follows the cancel rule');
+  await call(d, T, { action: 'review', studentId: moshe, key: 'p4', decision: 'decline' });
+  assert.equal(d.tree.studentRewards.rewards.w2.quantity, -1, 'unlimited stays unlimited');
+});
+
+test('page: the owner Decline and approved refund requests also put the reserved stock back', () => {
+  const js = fs.readFileSync('student-rewards/teacher.js', 'utf8');
+  assert.match(js, /async function returnStock\(item\)/);
+  const decline = js.slice(js.indexOf('async function review('), js.indexOf('function reportRows'));
+  assert.match(decline, /await returnStock\(item\);/);
+  const refund = js.slice(js.indexOf('async function decideRefund'), js.indexOf('let balanceAfter=null'));
+  assert.match(refund, /await returnStock\(info\.record\);/);
 });

@@ -195,6 +195,12 @@ async function storeWrite(store,scope,classId,updates){
  await store.update(out);
  return {ok:true};
 }
+// Puts the stock a purchase reserved back (same rule as a student cancelling): used by decline and Refund.
+async function returnStock(store,item,reward){
+ const q=reward&&reward.quantity,reserved=item.quantityReserved===true||(item.quantityReserved===undefined&&q!=null&&Number.isFinite(Number(q))&&Number(q)>=0);
+ if(reserved)await store.tx(SR+'/rewards/'+item.rewardId+'/quantity',cur=>{const n=Number(cur);return Number.isFinite(n)&&n>=0?n+1:undefined}).catch(()=>{});
+}
+
 async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
  if(!scope.studentIds.includes(studentId)||!key(keyId))fail(403,'This request is not for a student in your class.');
  const path=SR+'/redemptionsByStudent/'+studentId+'/'+keyId,item=await store.get(path);
@@ -217,6 +223,7 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
   }
   const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
   if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
+  await returnStock(store,item,reward);
  }
  return {ok:true,status};
 }
@@ -274,8 +281,7 @@ async function undoPurchase(store,scope,email,studentId,keyId,now,owner){
   const cost=Number(item.cost||0);
   if(cost>0)await addToBalance(store,studentId,cost);
   await store.update({[path+'/refundedAt']:now,[path+'/refundedBy']:email,[path+'/statusBeforeRefund']:before});
-  // A refunded purchase also puts its reserved stock back (the same as a student cancelling).
-  if(item.quantityReserved===true)await store.tx(SR+'/rewards/'+item.rewardId+'/quantity',cur=>{const n=Number(cur);return Number.isFinite(n)&&n>=0?n+1:undefined}).catch(()=>{});
+  await returnStock(store,item,reward);
   const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
   if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
   return {ok:true,undone:1,applied:cost};
