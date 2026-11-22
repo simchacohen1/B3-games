@@ -14,5 +14,7 @@ window.WEEKLY_NIGRI_ROSTER = {
     levi_schtroks: 'Schtroks Levi', yisroel_aryeh_simmonds: 'Simmonds Yisroel Aryeh', leibel_vogel: 'Vogel Leibel',
     leib_wolf: 'Wolf Yisroel Arye Leib'
   },
-  classSections: { et: 'B3 ET', wt: 'B3 WT' }
+  classSections: { et: 'B3 ET', wt: 'B3 WT' },
+  // Same old shared key as weekly-quiz/nigri-sync.js: used only if the server refuses the owner's Google sign-in (401), exactly like the quiz.
+  syncKey: '1qaz2wsx'
 };
