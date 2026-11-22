@@ -522,9 +522,14 @@
       "expression": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
     },
     {
-      "path": "/posukPractice/chazara/$section/$studentId",
+      "path": "/posukPractice/chazara/students/$studentId",
       "permission": ".write",
-      "expression": true
+      "expression": "auth != null && auth.token.b3StudentId == $studentId"
+    },
+    {
+      "path": "/posukPractice/chazara/events/$studentId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.b3StudentId == $studentId"
     },
     {
       "path": "/posukPractice/chazara",

@@ -114,7 +114,7 @@ test('backend sweep leaves existing approvals, rejections and Chazara untouched'
 });
 
 test('backend milestone route returns approved points to the student page',()=>{
-  const route=slice('const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});','if(shorashimVerification?.eventRef)');
+  const route=slice('try{result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});}','if(shorashimVerification?.eventRef)');
   assert.match(route,/isMilestoneRequest\(\{source\}\)&&result\.status==="pending"/);
   assert.match(route,/approveAutomaticMilestone\(requestId\)/);
   assert.match(route,/status:"approved"/);

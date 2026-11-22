@@ -35,6 +35,7 @@ const ALLOWED_NEW = [
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'locks'],
 ];
 
+const CHAZARA_STUDENT_WRITE = 'auth != null && auth.token.b3StudentId == $studentId';
 // Owner-approved privacy tightenings, accepted only at this exact path with this exact value.
 // 2026-10-24: Posuk Practice recording links stop being public (student, active teacher, admin, owner).
 const APPROVED_CHANGES = [
@@ -51,10 +52,15 @@ const APPROVED_CHANGES = [
     "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"],
   [['b3Games', 'students', '$studentId', '.read'],
     "auth != null && (auth.token.b3StudentId == $studentId || (root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid).exists() && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false))"],
+  // #889 (PENDING OWNER REVIEW): Chazara event writes. The open "$section" write rule (anyone could write any student's
+  // Chazara data) is replaced by two explicit nodes that only the signed-in student can write for their own id.
+  ...['students', 'events'].map(k => [['posukPractice', 'chazara', k], { $studentId: { '.write': CHAZARA_STUDENT_WRITE } }]),
 ];
 // Approved removals, each allowed only while its replacement is present in the candidate.
 const APPROVED_REMOVALS = [
   [['b3Games', '.read'], candidate => candidate.b3Games?.$other?.['.read'] === true],
+  [['posukPractice', 'chazara', '$section'], candidate => ['students', 'events'].every(k =>
+    JSON.stringify(candidate.posukPractice?.chazara?.[k]) === JSON.stringify({ $studentId: { '.write': CHAZARA_STUDENT_WRITE } }))],
 ];
 
 function stripComments(text) { // the console allows // and /* */ comments; remove them outside strings
