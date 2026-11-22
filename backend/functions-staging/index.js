@@ -10,3 +10,6 @@ exports.teacherStudentFiles = require('./teacher-student-files').teacherStudentF
 exports.classWorksheets = require('./class-worksheets').classWorksheets;
 exports.studentRewardsTeacher = require('./rewards-teacher').studentRewardsTeacher;
 exports.studentLocks = require('./student-locks').studentLocks;
+// Staging-only functions that were deployed from other branches. Kept here so a staging deploy of this codebase does not delete them.
+exports.classGalleryRead = require('./class-gallery-read').classGalleryRead;
+exports.stagingOwnerSignIn = require('./staging-owner-signin').stagingOwnerSignIn;
