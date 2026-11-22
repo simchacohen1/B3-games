@@ -4642,7 +4642,7 @@ function wireWordMarks(card, s){
   const box = card.querySelector('[data-words]');
   if(!box) return;
   const WM = B3PosukWordMarks, words = WM.splitWords(s.hebrewText);
-  const saved = s.wordMarks && s.wordMarks.total === words.length && (s.wordMarks.words || []).every((w, n) => w && w.w === words[n]) ? WM.wrongSets(s.wordMarks) : { read:new Set(), translation:new Set() };
+  const saved = s.wordReview && s.wordReview.total === words.length && (s.wordReview.words || []).every((w, n) => w && w.w === words[n]) ? WM.wrongSets(s.wordReview) : { read:new Set(), translation:new Set() };
   const readWrong = new Set(saved.read), translationWrong = new Set(saved.translation);
   const msg = card.querySelector('[data-field="marksMsg"]'), suggested = card.querySelector('[data-field="suggested"]');
   const help = msg.textContent;

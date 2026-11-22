@@ -8,7 +8,7 @@
 //   Combined    = both together, as a percentage
 // The suggestion is for the teacher to look at. It NEVER sets the 0-10 grade, the points or the lock.
 //
-// The record saved on the submission (submissions/<studentId>/<submissionId>/wordMarks) has one entry per word so a
+// The record saved on the submission (submissions/<studentId>/<submissionId>/wordReview) has one entry per word so a
 // report of every graded word can be added later without changing the data:
 //   { version, total, words:[{i, w, readOk, translationOk}], suggested:{...}, markedAt, markedBy }
 //

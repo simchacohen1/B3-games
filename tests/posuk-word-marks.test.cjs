@@ -78,7 +78,7 @@ test('saving word marks stores one entry per word plus the suggested scores on t
   const { db, rev } = setup();
   const out = await rev.saveWordMarks({ teacherEmail: 't@example.test', scope, studentId: SID, submissionId: SUB, readWrong: [0], translationWrong: [3, 4] });
   assert.equal(out.ok, true);
-  const saved = db.store.posukPractice.submissions[SID][SUB].wordMarks;
+  const saved = db.store.posukPractice.submissions[SID][SUB].wordReview;
   assert.equal(saved.total, 7); assert.equal(saved.words.length, 7);
   assert.deepEqual(saved.words[0], { i: 0, w: 'בְּרֵאשִׁית', readOk: false, translationOk: true });
   assert.equal(saved.words[3].translationOk, false);
@@ -92,7 +92,7 @@ test('word marks never change the official grade, points, status or lock', async
   await rev.saveWordMarks({ teacherEmail: 't@example.test', scope, studentId: SID, submissionId: SUB, readWrong: [0, 1, 2, 3, 4, 5, 6], translationWrong: [0, 1, 2, 3, 4, 5, 6] });
   const after = db.store.posukPractice.submissions[SID][SUB];
   for (const k of Object.keys(before)) assert.deepEqual(after[k], before[k], k);
-  assert.deepEqual(Object.keys(after).sort(), [...Object.keys(before), 'wordMarks'].sort());
+  assert.deepEqual(Object.keys(after).sort(), [...Object.keys(before), 'wordReview'].sort());
   assert.equal(after.score, 7); assert.equal(after.pointsPaid, 7); assert.equal(after.status, 'scored');
 });
 
@@ -100,21 +100,21 @@ test('saving again replaces the marks; a student outside the teacher\'s class an
   const { db, rev } = setup();
   await rev.saveWordMarks({ teacherEmail: 'a', scope, studentId: SID, submissionId: SUB, readWrong: [1], translationWrong: [] });
   await rev.saveWordMarks({ teacherEmail: 'a', scope, studentId: SID, submissionId: SUB, readWrong: [], translationWrong: [] });
-  assert.equal(db.store.posukPractice.submissions[SID][SUB].wordMarks.suggested.readingPct, 100);
+  assert.equal(db.store.posukPractice.submissions[SID][SUB].wordReview.suggested.readingPct, 100);
   await assert.rejects(rev.saveWordMarks({ teacherEmail: 'a', scope: { students: {}, selected: 'et' }, studentId: SID, submissionId: SUB, readWrong: [], translationWrong: [] }), /does not belong/);
   const gone = setup({ status: 'deleted' });
   await assert.rejects(gone.rev.saveWordMarks({ teacherEmail: 'a', scope, studentId: SID, submissionId: SUB, readWrong: [], translationWrong: [] }), /deleted/);
-  assert.equal(gone.db.store.posukPractice.submissions[SID][SUB].wordMarks, undefined);
+  assert.equal(gone.db.store.posukPractice.submissions[SID][SUB].wordReview, undefined);
 });
 
 test('a later grade change keeps the word marks', async () => {
   const { db, rev } = setup({ status: 'pending', score: undefined, pointsAwarded: undefined, pointsPaid: undefined, priorPoints: 0, selectionKey: 'Bereishis_1_1', posukKeys: ['Bereishis_1_1'] });
   await rev.saveWordMarks({ teacherEmail: 'a', scope, studentId: SID, submissionId: SUB, readWrong: [2], translationWrong: [] });
-  db.store.posukPractice.submissions[SID][SUB].wordMarks.keep = true;
+  db.store.posukPractice.submissions[SID][SUB].wordReview.keep = true;
   try { await rev.grade({ teacherEmail: 'a', scope, studentId: SID, submissionId: SUB, points: 9 }); } catch (e) { /* points posting needs the rewards fake; the grade write itself is what matters */ }
   const after = db.store.posukPractice.submissions[SID][SUB];
-  assert.equal(after.wordMarks.keep, true);
-  assert.equal(after.wordMarks.total, 7);
+  assert.equal(after.wordReview.keep, true);
+  assert.equal(after.wordReview.total, 7);
 });
 
 test('the function routes posuk-word-marks for teachers (production and staging copies) and the page uses it', () => {

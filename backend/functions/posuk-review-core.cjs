@@ -308,7 +308,7 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
     const tx = await ref.transaction(cur => {
       if(cur === null) return null;
       if(cur.status === 'deleted') return;
-      return { ...cur, wordMarks: { ...record, markedAt: t, markedBy: String(teacherEmail || '').slice(0, 200) } };
+      return { ...cur, wordReview: { ...record, markedAt: t, markedBy: String(teacherEmail || '').slice(0, 200) } };
     });
     if(!tx.committed) fail('Could not save the word marks. Please try again.', 409);
     return { ok: true, total: record.total, suggested: record.suggested, markedAt: t };
