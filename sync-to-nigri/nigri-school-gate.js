@@ -38,7 +38,7 @@
       const p = document.createElement('p'); p.textContent = text; box.appendChild(p);
       if (withSignIn) {
         const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Sign in with Google';
-        b.onclick = () => window.firebase.auth().signInWithPopup(new window.firebase.auth.GoogleAuthProvider()).catch(() => {});
+        b.onclick = () => window.B3TeacherSignIn().catch(() => {});
         box.appendChild(b);
       } else {
         const a = document.createElement('a'); a.href = new URL('index.html', base).href; a.textContent = 'Back to Fun Torah Tools'; box.appendChild(a);

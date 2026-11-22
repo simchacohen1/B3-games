@@ -55,7 +55,7 @@
     $('login').hidden = Boolean(current); $('load').disabled = !current || loading;
     status(current ? 'Signed in. Load the session to review its grades and PDFs.' : 'Sign in with your Fun Torah Tools owner account.');
   });
-  $('login').addEventListener('click', () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(error => status(error.message, true)));
+  $('login').addEventListener('click', () => B3TeacherSignIn().catch(error => status(error.message, true)));
   $('load').addEventListener('click', async () => {
     const code = $('session').value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(code)) { status('Enter a six-character Classtime session code.', true); return; }
