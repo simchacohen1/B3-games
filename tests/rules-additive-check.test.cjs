@@ -58,3 +58,9 @@ test('console-style comments in a saved live rules file are tolerated', () => {
   assert.deepEqual(parse(text), { rules: { '.read': false, a: { b: 'has // inside' } } });
   assert.equal(stripComments('"//keep"'), '"//keep"');
 });
+test('the approved Chazara write lock (#889) must match exactly; a weaker write is caught', () => {
+  assert.deepEqual(compare(live(), additiveView()), []);
+  const c = candidate(); c.rules.posukPractice.chazara.events.$studentId['.write'] = 'auth != null';
+  assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/posukPractice/chazara/events')));
+  assert.ok(compare(live(), c).some(p => p.startsWith('REMOVED') && p.includes('/posukPractice/chazara/$section')));
+});
