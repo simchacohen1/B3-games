@@ -155,18 +155,18 @@ test('a picked shape: a clear Outline / Filled choice with the same two icons, h
   assert.match(pdf,/function fillSelected\(on\)\{/);
 });
 
-test('Save, My files and Send to class are right on the toolbar, and still under More',()=>{
+test('Save, My files and Send to class are right on the toolbar, with a Send chooser and no duplicates under More',()=>{
   const actions=annotate.slice(annotate.indexOf('function actions(){'),annotate.indexOf('FA.setActions?.(actions)'));
   for(const id of ['quick-save','quick-files','quick-send'])assert.match(actions,new RegExp("id:'"+id+"'"),id);
   assert.match(actions,/id:'quick-save'[^\n]*window\.FTTSavedWork\?\.saveCurrent\?\.\(\)/);
   assert.match(actions,/id:'quick-files'[^\n]*window\.FTTSavedWork\?\.open\?\.\(\)/);
   assert.match(actions,/id:'quick-send'[^\n]*Every student gets their own copy|id:'quick-send'[^\n]*every student gets their own copy/i);
-  assert.match(actions,/id:'quick-send'[^\n]*window\.FTTSavedWork\?\.sendCurrent\?\.\(\)/);
+  assert.match(actions,/id:'quick-send'[^\n]*items:sendItems/);
   // The order: Students, Stop, Save, My files, Send, Poll, Lesson, More.
   const order=[...actions.matchAll(/\{id:'([a-z-]+)'/g)].map(m=>m[1]);
   assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-send','poll','lesson','more']);
-  // Still under More.
-  assert.match(annotate,/\{id:'save',icon:'💾',label:'Save'/);assert.match(annotate,/\{id:'files',icon:'📂',label:'My files'/);assert.match(annotate,/\{id:'send',icon:'📤',label:'Send whiteboard to students'/);
+  const more=annotate.slice(annotate.indexOf('function moreItems(){'),annotate.indexOf('function sendItems(){'));
+  assert.doesNotMatch(more,/FTTSavedWork|Send|My files|Save/);
 });
 
 test('nothing on the students\' own boards or the other tools changed',()=>{

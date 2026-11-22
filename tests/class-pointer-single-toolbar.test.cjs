@@ -269,7 +269,7 @@ test('teacher: Clear offers the four choices of the old Clear menu',()=>{
   }
 });
 
-test('teacher: Students, Stop, Lesson and More carry the lesson-level actions',()=>{
+test('teacher: Students, Stop, Switch presentation and More carry the lesson-level actions',()=>{
   const c=classroom();
   // Students: same yellow button as the top bar, opens the same panel.
   const students=c.action('students');
@@ -282,19 +282,22 @@ test('teacher: Students, Stop, Lesson and More carry the lesson-level actions',(
   assert.ok(c.action('stop').classList.contains('fa-danger'));
   assert.equal(c.action('stop').title,'Stop PDF');
   c.action('stop').click();assert.equal(c.clicks.at(-1),'cpStopBtn');
-  // Lesson: switch what students see.
+  // One presentation menu retains the native PDF upload and the library.
+  assert.match(c.action('lesson').textContent,/Switch presentation/);
   c.action('lesson').click();
-  assert.deepEqual(c.flyRows().map(b=>b.textContent),['🖥Share my screen','📷Share a still picture instead','📝Whiteboard','🌐Webpage','⏹Stop PDF']);
+  assert.deepEqual(c.flyRows().map(b=>b.textContent),['🖥Share my screen','📷Share a still picture instead','📝Whiteboard','📄PDF','🌐Webpage','⏹Stop PDF']);
   c.flyRow('Whiteboard').click();assert.equal(c.clicks.at(-1),'openWhiteboard');
   // The PDF library and the share-view buttons appear once those scripts have added their buttons.
   c.add('button','pointerPdfLibrary').addEventListener('click',()=>c.clicks.push('library'));
   for(const id of ['viewChooseArea','viewShareFull','viewZoomIn','viewZoomOut','viewMove'])c.add('button',id).addEventListener('click',()=>c.clicks.push(id));
   c.action('lesson').click();
-  c.flyRow('PDF (my library, or upload)').click();assert.equal(c.clicks.at(-1),'library');
+  c.flyRow('My library').click();assert.equal(c.clicks.at(-1),'library');
   c.action('lesson').click();
   c.flyRow('Zoom in').click();assert.equal(c.clicks.at(-1),'viewZoomIn');
   assert.equal(c.fly.hidden,false,'zooming keeps the menu open');
   c.flyRow('Choose the part to share').click();assert.equal(c.clicks.at(-1),'viewChooseArea');
+  c.action('lesson').click();
+  c.flyRow('PDF').click();assert.equal(c.clicks.at(-1),'openPdf');
   // More: leave full screen, spotlight.
   c.action('more').click();
   assert.deepEqual(c.flyRows().map(b=>b.textContent),['⤢Exit full screen','🔦Spotlight']);
@@ -307,18 +310,22 @@ test('teacher: Students, Stop, Lesson and More carry the lesson-level actions',(
   c.flyRow('Full screen').click();assert.equal(c.clicks.at(-1),'fullScreenLesson');
 });
 
-test('teacher: Save and My files show only when saved work is loaded, and call it',()=>{
+test('teacher: saved work stays on the toolbar, Send chooses whiteboard or library PDF, More has no duplicates',()=>{
   const c=classroom(),calls=[];
+  assert.equal(c.action('quick-save'),null);
+  c.win.FTTSavedWork={saveCurrent:()=>calls.push('save'),open:()=>calls.push('open'),sendCurrent:()=>calls.push('whiteboard')};
+  c.win.PointerPdfLibrary={openForSend:()=>calls.push('pdf')};
+  c.tick();
+  c.action('quick-save').click();
+  c.action('quick-files').click();
+  c.action('quick-send').click();
+  assert.deepEqual(c.flyRows().map(b=>b.textContent),['📝This whiteboard','📄A PDF from my library']);
+  assert.deepEqual(calls,['save','open'],'opening Send does not send anything');
+  c.flyRow('This whiteboard').click();
+  c.action('quick-send').click();c.flyRow('A PDF from my library').click();
+  assert.deepEqual(calls,['save','open','whiteboard','pdf']);
   c.action('more').click();
-  assert.equal(c.flyRow('Save'),undefined);assert.equal(c.flyRow('My files'),undefined);
-  c.action('more').click();
-  // The saved-work script loads later.
-  c.win.FTTSavedWork={saveCurrent:()=>calls.push('save'),open:()=>calls.push('open')};
-  c.action('more').click();
-  c.flyRow('Save').click();
-  c.action('more').click();
-  c.flyRow('My files').click();
-  assert.deepEqual(calls,['save','open']);
+  assert.deepEqual(c.flyRows().map(b=>b.textContent),['⛶Full screen','🔦Spotlight']);
 });
 
 test('teacher: the toolbar has its own strip, so the lesson is never covered; it shrinks to the pencil when the lesson ends',()=>{

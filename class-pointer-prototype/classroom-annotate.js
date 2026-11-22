@@ -7,8 +7,8 @@
    Teacher: the toolbar opens by itself whenever a lesson is live. Besides the drawing tools it has
    • kinds of a tool: pointer shapes, highlight box, triangle (click the chosen tool again);
    • Clear: my drawings, my pointer, everyone's drawings, all pointers;
-   • Students (who can point and draw), a red Stop in full screen, Lesson (switch what students see, zoom
-     the shared screen) and More (full screen, spotlight, save);
+   • Students (who can point and draw), a red Stop in full screen, Switch presentation (what students see, zoom
+     the shared screen) and More (full screen, spotlight);
    • keys: P pointer, H highlight, B highlight box, D pen, E eraser, U undo.
    It sits in its own strip on the left, so it never covers the lesson.
 
@@ -160,7 +160,7 @@
   FA.setRole('teacher');
   const live=()=>hasClass('cp-is-live');
   const stopLabel=()=>$('cpStopBtn')?.textContent.trim()||'Stop';
-  const SOURCES=[['shareScreen','🖥','Share my screen'],['openBrowserTab','📷','Share a still picture instead'],['openWhiteboard','📝','Whiteboard'],['pointerPdfLibrary','📄','PDF (my library, or upload)'],['openWebpage','🌐','Webpage']];
+  const SOURCES=[['shareScreen','🖥','Share my screen'],['openBrowserTab','📷','Share a still picture instead'],['openWhiteboard','📝','Whiteboard'],['openPdf','📄','PDF'],['pointerPdfLibrary','📚','My library'],['openWebpage','🌐','Webpage']];
   // While a screen is shared, viewport.js adds these buttons (kept hidden in #tbViewSlot).
   const VIEW=[['viewChooseArea','✂️','Choose the part to share'],['viewShareFull','🖥','Share the whole screen'],['viewZoomIn','➕','Zoom in',true],['viewZoomOut','➖','Zoom out',true],['viewMove','✋','Move the zoomed view',true]];
   function lessonItems(){
@@ -174,16 +174,17 @@
     return out;
   }
   function moreItems(){
-    const full=expanded(),spot=$('spotlight'),saved=window.FTTSavedWork;
+    const full=expanded(),spot=$('spotlight');
     const out=[{icon:full?'⤢':'⛶',label:full?'Exit full screen':'Full screen',onClick:()=>$(full?'exitFullScreenLesson':'fullScreenLesson')?.click()}];
     if(spot)out.push({icon:'🔦',label:spot.checked?'Spotlight: on':'Spotlight',title:'Dim the lesson around your pointer',pressed:spot.checked,
       onClick(){spot.checked=!spot.checked;spot.dispatchEvent(new Event('change',{bubbles:true}))}});
-    // Saved work is another script that may load later: look for it each time the menu opens.
-    if(saved)out.push({heading:'Saved work'},
-      {id:'save',icon:'💾',label:'Save',onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
-      {id:'files',icon:'📂',label:'My files',onClick:()=>window.FTTSavedWork?.open?.()},
-      {id:'send',icon:'📤',label:'Send whiteboard to students',title:'Every student gets their own copy of this whiteboard to draw on',hidden:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()});
     return out;
+  }
+  function sendItems(){
+    return [
+      {icon:'📝',label:'This whiteboard',disabled:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()},
+      {icon:'📄',label:'A PDF from my library',disabled:!window.PointerPdfLibrary?.openForSend,onClick:()=>window.PointerPdfLibrary?.openForSend?.()}
+    ];
   }
   function actions(){
     const panel=window.ClassPointerStudentsPanel,waiting=panel?.waiting?.()||0;
@@ -192,21 +193,21 @@
         title:'Students: choose who can point and draw'+(waiting?' ('+waiting+' waiting to join)':''),onClick:()=>panel.toggle()},
       // Outside full screen the red Stop button is right above the lesson.
       {id:'stop',icon:'⏹',label:'Stop',danger:true,hidden:!(expanded()&&live()),title:stopLabel(),onClick:()=>click('cpStopBtn')},
-      // Saved work, right on the toolbar (also under More): Save this whiteboard, open My files, send the whiteboard to the class
+      // Saved work, right on the toolbar: Save this whiteboard, open My files, or choose what to send
       // (every student gets their own editable copy).
       {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
       {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
-      {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy of this whiteboard to draw on',hidden:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()},
+      {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy',hidden:!window.FTTSavedWork?.sendCurrent&&!window.PointerPdfLibrary?.openForSend,items:sendItems},
       {id:'poll',icon:'📊',label:'Poll',title:'Ask the class a poll',onClick:()=>window.ClassPointerPoll?.open()},
-      {id:'lesson',icon:'🖥',label:'Lesson',title:'Lesson: change what students see',items:lessonItems},
-      {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight'+(window.FTTSavedWork?', save':''),items:moreItems}
+      {id:'lesson',icon:'🖥',label:'Switch presentation',title:'Switch presentation: change what students see',items:lessonItems},
+      {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight',items:moreItems}
     ];
   }
   FA.setActions?.(actions);
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,
+    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.PointerPdfLibrary?.openForSend,
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 

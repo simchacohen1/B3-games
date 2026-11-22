@@ -12,6 +12,8 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
     after(value){this.afterElement=value;}
+    focus(){}
+    remove(){this.removed=true;}
     append(...xs){this.children.push(...xs)}
     replaceChildren(...xs){this.children=[...xs]}
     addEventListener(type,handler){this.listeners??={};this.listeners[type]=handler}
@@ -51,7 +53,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
       // Like the real viewer: a layout change keeps the place (page 1 on a fresh open) and reports it.
       setLayout(next){layout={...layout,...next};layouts.push(next);w.PointerPdfLibrary.onPageChanged(1);w.PointerPdfLibrary.onLayoutChanged()}}};
   const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:id==='teacherDock'&&dockAvailable?dock:null,
-    createElement:(tag)=>new E(tag),body,head};
+    createElement:(tag)=>new E(tag),createTextNode:text=>({textContent:text}),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
     URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>promptName,confirm:()=>true,clearTimeout,setTimeout,
     fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>{if(blobFails)throw TypeError('Failed to fetch');return new Blob(['%PDF-1.7\n'])}}}};
@@ -250,4 +252,34 @@ test('one click on the PDF view saves the open PDF; the library window only uplo
   const dash=fs.readFileSync(path.join(base,'class-pointer-prototype/teacher-dashboard.js'),'utf8');
   assert.doesNotMatch(dash,/syncLibrary|Open my PDF library|Capture a still picture/,'the start screen has one PDF card and no leftover calls');
   assert.match(dash,/id==='openPdf'&&\$\('pointerPdfLibrary'\)/,'the PDF card opens the library');
+});
+
+
+test('Send opens a library picker and sends a saved PDF without presenting or downloading it',async()=>{
+  const h=harness(),sent=[];
+  h.w.FTTSavedWork={worksheets:{list:async()=>[],send:async(...args)=>{sent.push(args);return {name:'Private worksheet'}}}};
+  h.w.PointerPdfLibrary.openForSend();
+  await new Promise(setImmediate);
+  assert.equal(h.elements.h2.textContent,'Send a PDF from my library');
+  assert.equal(h.elements['#pointerLibrarySave'].hidden,true);
+  const row=h.elements['#pointerLibraryItems'].children[0];
+  assert.deepEqual(row.children.map(e=>e.textContent),['Private worksheet','📤 Send to class']);
+  const pending=row.children[1].onclick();
+  await new Promise(setImmediate);
+  assert.equal(sent.length,0,'selecting a PDF still requires the existing send confirmation');
+  const confirmBox=h.doc.body.children.at(-1);
+  const subject=confirmBox.children[3];subject.value='Chumash';
+  const important=confirmBox.children[5].children[0];important.checked=true;
+  confirmBox.children.at(-1).children[0].onclick();
+  await pending;
+  assert.equal(sent.length,1);
+  assert.equal(sent[0][0],'abc.pdf');
+  assert.equal(sent[0][1],'Private worksheet');
+  assert.equal(sent[0][2].subject,'Chumash');assert.equal(sent[0][2].important,true);
+  assert.deepEqual(h.loaded,[]);assert.deepEqual(h.fetches,[]);
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  assert.equal(h.elements.h2.textContent,'My PDF Library');
+  assert.equal(h.elements['#pointerLibrarySave'].hidden,false);
+  assert.equal(h.elements['#pointerLibraryItems'].children[0].children[1].textContent,'Open');
 });
