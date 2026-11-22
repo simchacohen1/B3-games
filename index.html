@@ -772,8 +772,15 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!isAuthorizedTeacher)return;
     const isOwner=currentAccess.role==="admin";
     const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
-    const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
-    const allClasses=classesSnap.val()||{};
+    // An owner reads the whole list. A teacher may only read the classes they are assigned to (the database rules allow
+    // each class on its own, not the list), so reading the list gave "permission_denied" and an empty class picker.
+    let allClasses={};
+    if(isOwner){
+      allClasses=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value")).val()||{};
+    }else{
+      const rows=await Promise.all([...allowedClassIds].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)).map(async id=>[id,(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value")).val()]));
+      rows.forEach(([id,row])=>{if(row)allClasses[id]=row});
+    }
     const classes={};
     Object.entries(allClasses).forEach(([id,row])=>{
       // The owner can manage students in every active platform class.
