@@ -134,7 +134,7 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade'];
+    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
@@ -1594,6 +1594,24 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});
+        }
+        if(action==="rashi-week-grades"){
+          // Read only: the teacher's graded Rashi readings (and how many still wait) in a time window, for the weekly Nigri marks.
+          const from=Number(body.from),to=Number(body.to),ids=Array.isArray(body.studentIds)?body.studentIds.slice(0,80):[];
+          if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from||to-from>8*24*60*60*1000)return res.status(400).json({error:'Choose a one-week window.'});
+          const out={};
+          for(const id of ids){
+            if(!teacherClassScope.validKey(id)||(teacher.scope&&!teacher.scope.students?.[id]))continue;
+            const rows=(await rtdb.ref(`rashiLetters/recordings/${id}`).get()).val()||{};
+            const graded=[];let pending=0;
+            for(const record of Object.values(rows)){
+              if(!record||(teacher.scope&&!teacherClassScope.recordAllowed(teacher.scope,id,record)))continue;
+              if(record.status==='pending'&&Number(record.createdAt)>=from&&Number(record.createdAt)<to)pending++;
+              else if(typeof record.grade==='number'&&Number(record.gradedAt)>=from&&Number(record.gradedAt)<to)graded.push({grade:record.grade,gradedAt:Number(record.gradedAt)});
+            }
+            out[id]={graded,pending};
+          }
+          return res.status(200).json({ok:true,students:out});
         }
         if(action==="rashi-list-pending"){
           const requests=await rashiTeacherList(teacher);

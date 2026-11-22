@@ -124,6 +124,10 @@ function stageSource(siteRoot, env = process.env) {
       content = "window.B3_STAGING_DISABLED_INTEGRATIONS = window.B3_STAGING_DISABLED_INTEGRATIONS || [];\n" +
         "window.B3_STAGING_DISABLED_INTEGRATIONS.push('nigri-sync');\n";
     }
+    if (relative === 'record_pesukim/weekly-nigri-roster.js') {
+      // Real rosters never go to staging: the weekly marks screen then runs on the fictional class and cannot send.
+      content = "window.WEEKLY_NIGRI_ROSTER = null;\n";
+    }
     if (relative === 'paid-api.js') {
       // The allowlist is a regex, so its host is written with escaped dots and
       // the plain-text host replacement above never reaches it. Point the
