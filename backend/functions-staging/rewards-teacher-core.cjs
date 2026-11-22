@@ -274,6 +274,8 @@ async function undoPurchase(store,scope,email,studentId,keyId,now,owner){
   const cost=Number(item.cost||0);
   if(cost>0)await addToBalance(store,studentId,cost);
   await store.update({[path+'/refundedAt']:now,[path+'/refundedBy']:email,[path+'/statusBeforeRefund']:before});
+  // A refunded purchase also puts its reserved stock back (the same as a student cancelling).
+  if(item.quantityReserved===true)await store.tx(SR+'/rewards/'+item.rewardId+'/quantity',cur=>{const n=Number(cur);return Number.isFinite(n)&&n>=0?n+1:undefined}).catch(()=>{});
   const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
   if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
   return {ok:true,undone:1,applied:cost};
