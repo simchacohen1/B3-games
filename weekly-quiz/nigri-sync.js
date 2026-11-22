@@ -22,12 +22,12 @@
   const NIGRI_TOPICS = ['Shoroshim', 'Chumash Comprehension', 'Chumash Translation', 'Chumash Havana', 'Chumash',
     'Chumash-Rashi', 'Chumash-HW', 'Halacha-Yahadus', 'Parsha'];
   const NIGRI_ROSTERS = {
-    et: ['chaim_chaikin', 'yossi_gourarie', 'sholom_huebner', 'moshe_lapine', 'kehos_notik', 'yisroel_oirechman', 'moshe_raichman', 'avrohom_rosenfeld', 'levi_rozmarin', 'arik_traxler'],
+    et: ['chaim_chaikin', 'yossi_gourarie', 'sholom_huebner', 'moshe_lapine', 'kehos_notik', 'yisroel_oirechman', 'berel_raichik', 'moshe_raichman', 'avrohom_rosenfeld', 'levi_rozmarin', 'arik_traxler'],
     wt: ['ari_greenberg', 'zev_rosenfeld', 'levi_schtroks', 'yisroel_aryeh_simmonds', 'leibel_vogel', 'leib_wolf']
   };
   const NIGRI_NAMES = {
     chaim_chaikin: 'Chaikin Mayer Chaim', yossi_gourarie: 'Gourarie Yossi', sholom_huebner: 'Huebner Sholom DovBer',
-    moshe_lapine: 'Lapine Moshe', kehos_notik: 'Notik Kehos', yisroel_oirechman: 'Oirechman Yisroel',
+    moshe_lapine: 'Lapine Moshe', kehos_notik: 'Notik Kehos', yisroel_oirechman: 'Oirechman Yisroel', berel_raichik: 'Raichik Berel',
     moshe_raichman: 'Raichman Moshe Tuvia', avrohom_rosenfeld: 'Rosenfeld Avrohom', levi_rozmarin: 'Rozmarin Levi',
     arik_traxler: 'Traxler Arik', ari_greenberg: 'Greenberg Ari', zev_rosenfeld: 'Rosenfeld Zev',
     levi_schtroks: 'Schtroks Levi', yisroel_aryeh_simmonds: 'Simmonds Yisroel Aryeh', leibel_vogel: 'Vogel Leibel',

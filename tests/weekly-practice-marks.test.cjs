@@ -75,3 +75,15 @@ test('wiring: page loads the helpers; staging gets no real roster; rules block a
     assert.match(r['.write'], /!data\.exists\(\)/);
   }
 });
+
+test('both roster copies (weekly quiz sync and weekly practice marks) list the same boys and Nigri names', () => {
+  const quiz = fs.readFileSync(__dirname + '/../weekly-quiz/nigri-sync.js', 'utf8');
+  const grab = re => { const m = re.exec(quiz); return m && m[1]; };
+  const rosters = new Function('return ' + grab(/const NIGRI_ROSTERS = (\{[\s\S]*?\});\s*const NIGRI_NAMES/))();
+  const names = new Function('return ' + grab(/const NIGRI_NAMES = (\{[\s\S]*?\});/))();
+  global.window = {}; eval(fs.readFileSync(__dirname + '/../record_pesukim/weekly-nigri-roster.js', 'utf8'));
+  const R = global.window.WEEKLY_NIGRI_ROSTER; delete global.window;
+  assert.deepEqual(R.rosters, rosters);
+  assert.deepEqual(R.names, names);
+  assert.ok(R.rosters.et.includes('berel_raichik') && R.names.berel_raichik === 'Raichik Berel');
+});
