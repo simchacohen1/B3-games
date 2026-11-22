@@ -69,7 +69,9 @@ test('wiring: page loads the helpers; staging gets no real roster; rules block a
   ['nigri-connect.js', 'weekly-practice-marks-core.js', 'weekly-nigri-roster.js', 'weekly-nigri.js'].forEach(f => assert.ok(page.includes(f), f));
   assert.ok(fs.readFileSync(__dirname + '/../staging/prepare-site.cjs', 'utf8').includes("record_pesukim/weekly-nigri-roster.js"));
   const ui = fs.readFileSync(__dirname + '/../record_pesukim/weekly-nigri.js', 'utf8');
-  assert.ok(!/1qaz/.test(ui), 'no shared key in the page');
+  assert.ok(!/1qaz/.test(ui), 'the key lives only in the roster file, which staging replaces with a stub');
+  assert.match(ui, /NigriAuth\.request\('\/sync-marks'[\s\S]*?ROSTER && ROSTER\.syncKey\)/);
+  assert.ok(!/1qaz/.test('window.WEEKLY_NIGRI_ROSTER = null;'));
   for (const f of ['firebase-rules.json', 'firebase-rules.hardened.json']) {
     const r = JSON.parse(fs.readFileSync(__dirname + '/../' + f, 'utf8')).rules.b3Quiz.weeklyPracticeNigri.$classId.$week.$kind;
     assert.match(r['.write'], /!data\.exists\(\)/);
@@ -86,4 +88,12 @@ test('both roster copies (weekly quiz sync and weekly practice marks) list the s
   assert.deepEqual(R.rosters, rosters);
   assert.deepEqual(R.names, names);
   assert.ok(R.rosters.et.includes('berel_raichik') && R.names.berel_raichik === 'Raichik Berel');
+});
+
+test('owner send: sign-in first, old key only as the 401 fallback, same key as the Weekly Quiz', () => {
+  const quiz = fs.readFileSync(__dirname + '/../weekly-quiz/nigri-sync.js', 'utf8');
+  const quizKey = /const SYNC_KEY = '([^']+)'/.exec(quiz)[1];
+  global.window = {}; eval(fs.readFileSync(__dirname + '/../record_pesukim/weekly-nigri-roster.js', 'utf8'));
+  const R = global.window.WEEKLY_NIGRI_ROSTER; delete global.window;
+  assert.equal(R.syncKey, quizKey);
 });

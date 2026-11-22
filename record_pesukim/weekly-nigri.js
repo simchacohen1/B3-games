@@ -150,7 +150,7 @@
       const hdr = { 'Content-Type': 'application/json' };
       let res;
       if (window.NigriConnect && (await window.NigriConnect.ready).role !== 'owner') res = (await window.NigriConnect.sendMarks(b)).response; // the teacher's own Nigri login
-      else if (window.NigriAuth) res = (await window.NigriAuth.request('/sync-marks', { method: 'POST', headers: hdr, body: JSON.stringify(b) })).response; // owner Google sign-in, never the old shared key
+      else if (window.NigriAuth) res = (await window.NigriAuth.request('/sync-marks', { method: 'POST', headers: hdr, body: JSON.stringify(b) }, ROSTER && ROSTER.syncKey)).response; // owner: Google sign-in first, the old key only if the server answers 401 (same as the Weekly Quiz)
       else throw Object.assign(new Error('The Nigri sync helper did not load. Refresh the page.'), { preSend: true });
       if (!res) throw Object.assign(new Error('Please sign in with your Google account first.'), { preSend: true });
       const data = await res.json().catch(() => ({}));
