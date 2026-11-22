@@ -1063,6 +1063,23 @@ async function resolveRewardStudentId(posukStudentId){
   return match;
 }
 
+// Chumash Chidon: a saved attempt can cover a range of posukim, but only a posuk that had at least one
+// question answered, and every answered question of it correct, may be paid for "understand100".
+// Older saves with no per-question rows are only trusted for the single posuk they were saved for.
+function understandCoversPosuk(attemptMap, evidenceKey, awardKey){
+  const e=parsePracticeKey(evidenceKey), a=parsePracticeKey(awardKey);
+  if(!e||!a) return false;
+  return Object.values(attemptMap||{}).some(att=>{
+    if(!att) return false;
+    const rows=entries(att.questionResults).map(([,q])=>q).filter(q=>q&&typeof q==="object");
+    if(!rows.length) return e.start===e.end&&e.start===a.start&&understandScore(att)>=100;
+    const mine=rows.filter(q=>Number(q.posukNum)===a.start);
+    if(!mine.length) return false;
+    if(!(understandScore(att)>=100)) return false;
+    return mine.every(q=>(q.finalVerdict||q.verdict)==="correct");
+  });
+}
+
 async function verifyMilestone(studentId, source, awardPosukKey, evidencePosukKey){
   if(!evidenceCovers(evidencePosukKey, awardPosukKey)) return {ok:false,error:"That saved attempt does not cover this posuk."};
   const snap = await rtdb.ref(`posukPractice/attempts/${studentId}/${evidencePosukKey}`).get();
@@ -1071,6 +1088,8 @@ async function verifyMilestone(studentId, source, awardPosukKey, evidencePosukKe
   const reader = source === "reading100" ? readingScore : source === "translation100" ? translationScore : understandScore;
   const score=bestScore(attemptMap,reader);
   if(!(score >= 100)) return {ok:false,error:"The verified saved score has not reached 100%."};
+  if(source==="understand100"&&!understandCoversPosuk(attemptMap,evidencePosukKey,awardPosukKey))
+    return {ok:false,error:"No question was answered correctly for this posuk."};
   return {ok:true,score};
 }
 
