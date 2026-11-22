@@ -50,10 +50,12 @@ test('student tile, passage browser and teacher scoring are wired',()=>{
   assert.match(mic,/fetch\('data\/vayeira-rashi\.json'\)/);
   assert.match(mic,/sectionId\.startsWith\('vayeira-'\)/);
   assert.match(mic,/dailyFull\(\)/);
-  assert.match(teacher,/class="rashi-grade"/);
-  assert.match(teacher,/class="rashi-feedback"/);
+  assert.match(teacher,/data-l="/);
+  assert.match(teacher,/rashi-letter-marks/);
+  assert.match(teacher,/rashi-letter-stats/);
+  assert.doesNotMatch(teacher,/class="rashi-grade"|class="rashi-feedback"|data-pts=/);
   assert.match(teacher,/approveLegacyAllBtn/);
-  assert.match(teacher,/pendingLegacyIds=rows\.filter\(r=>!String\(r\.sectionId/);
+  assert.match(teacher,/pendingLegacyIds=rows\.filter\(r=>!r\.v2&&!String\(r\.sectionId/);
   assert.match(backend,/rashiCore\.readingWords\(sectionId,req\.query\.words\)/);
   assert.match(backend,/rashiReserveDaily\(studentId,dailyDate\)/);
   assert.match(backend,/rashiReleaseDaily\(studentId,dailyDate\)/);

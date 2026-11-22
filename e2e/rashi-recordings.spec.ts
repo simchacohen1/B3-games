@@ -230,20 +230,33 @@ test('existing lessons still run: letter question renders and answers', async ({
 });
 
 // ---------- Teacher: Rashi Letters Recordings panel ----------
-test('teacher panel shows student, class, section, audio, and approve / try again send one call each', async ({ page }) => {
+test('teacher taps letters that were not recognized: auto-saves, points by 5 parts, legacy bulk approve and letter scores', async ({ page }) => {
   const calls: any[] = [];
   await serveRepo(page);
-  let pending = [{ id: 'rashi_kid1_zayin_a1', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'zayin',
-    sectionLabel: 'Mission 1 (ז) words', words: ['זֶה', 'זָר'], attempt: 1, createdAt: 1790000000000, durationMs: 9000, amount: 2, audioUrl: 'https://signed.example/a.webm' },
-    { id: 'rashi_kid1_bet_a2', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'bet',
-      sectionLabel: 'Mission 2 (בּ / ב) words', words: ['בַּיִת'], attempt: 2, createdAt: 1790000100000, durationMs: 7000, amount: 2, audioUrl: 'https://signed.example/b.webm' }];
+  const text = ['אבגד', 'הוזח', 'טיכל', 'מנסע', 'עפצק'];   // 20 letters = 5 parts of 4
+  let pending: any[] = [
+    { id: 'rashi_kid1_zayin_a1', v2: true, studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'zayin',
+      sectionLabel: 'Mission 1 (ז) words', words: text, attempt: 1, createdAt: 1790000000000, durationMs: 9000, amount: 2, audioUrl: 'https://signed.example/a.webm', letterReview: null },
+    { id: 'rashi_kid1_bet_a2', v2: true, studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'bet',
+      sectionLabel: 'Mission 2 (בּ / ב) words', words: text, attempt: 1, createdAt: 1790000100000, durationMs: 7000, amount: 2, audioUrl: 'https://signed.example/b.webm', letterReview: null },
+    { id: 'rashi_kid1_samech_a1', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'samech',
+      sectionLabel: 'Mission 8 (ס) words', words: ['סֵפֶר'], attempt: 1, createdAt: 1789000000000, durationMs: 5000, amount: 2, audioUrl: 'https://signed.example/s.webm', letterReview: null }];
+  const recent: any[] = [{ id: 'rashi_kid1_alef_a1', v2: true, studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'alef',
+    sectionLabel: 'Mission 4 (א) words', words: text, attempt: 1, createdAt: 1789000000000, gradedAt: 1789000500000, durationMs: 5000, amount: 2, audioUrl: 'https://signed.example/c.webm',
+    letterReview: { total: 20, missed: [0, 1], missedCount: 2, partsClean: [false, true, true, true, true], points: 4 } }];
   await page.route(API, async route => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     const body = JSON.parse(req.postData() || '{}'); calls.push(body);
-    if (body.action === 'rashi-list-pending') return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, requests: pending }) });
-    pending = pending.filter(r => r.id !== body.requestId);
-    return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, status: body.action === 'rashi-approve' ? 'approved' : 'rejected', actualAmount: 2 }) });
+    const ok = (extra: any) => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, ...extra }) });
+    if (body.action === 'rashi-list-pending') return ok({ requests: pending, recent });
+    if (body.action === 'rashi-letter-marks') return ok({ points: 3, paidTotal: 3, parts: 3, priorPoints: 0, canRerecord: true, partsClean: [false, true, true, true, false], missedCount: body.missed.length, total: 20, pct: 90 });
+    if (body.action === 'rashi-letter-stats') {
+      const letters: any = { 'א': { seen: 4, missed: 1 }, 'ב': { seen: 4, missed: 0 }, 'ג': { seen: 2, missed: 2 } };
+      return ok({ students: { kid1: { letters, readings: 2 } } });
+    }
+    if (body.action === 'rashi-approve') { pending = pending.filter(r => r.id !== body.requestId); return ok({ status: 'approved', actualAmount: 2 }); }
+    return ok({});
   });
   await page.route(/gstatic\.com|googleapis\.com\/css|fonts\.g/, r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   await page.route('**/site-settings.js*', r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
@@ -259,24 +272,66 @@ test('teacher panel shows student, class, section, audio, and approve / try agai
     w.B3SiteSettings = { onAuthStateChanged: (cb: any) => setTimeout(() => cb({ uid: 'o' }, true, { authorized: true, role: 'admin' }), 0), signInWithGoogle() {} };
   });
   await page.goto(SITE + '/rashi-letters/teacher.html?class=et&tab=recordings');
-  const items = page.locator('.rec-item');
-  await expect(items).toHaveCount(2);
+  const items = page.locator('#recList .rec-item');
+  await expect(items).toHaveCount(4);                                   // 3 waiting + 1 recently graded
   const first = items.first();
   await expect(first).toContainText('Test Kid One');
   await expect(first).toContainText('B3 ET');
-  await expect(first).toContainText('Mission 1 (ז) words');
-  await expect(first.locator('audio')).toHaveAttribute('src', 'https://signed.example/a.webm');
-  await expect(first.getByRole('button', { name: '✅ Approve (+2 Points)' })).toBeVisible();
-  await expect(first.getByRole('button', { name: '🔄 Try Again' })).toBeVisible();
-  await expect(page.locator('#recCount')).toHaveText('(2)');
-  await first.getByRole('button', { name: /Approve/ }).dblclick();                   // double click = one approval
-  await expect(items).toHaveCount(1, { timeout: 5000 });
-  expect(calls.filter(c => c.action === 'rashi-approve')).toHaveLength(1);
-  expect(calls.find(c => c.action === 'rashi-approve').requestId).toBe('rashi_kid1_zayin_a1');
-  await items.first().getByRole('button', { name: /Try Again/ }).click();
-  await expect(page.locator('.rec-item')).toHaveCount(0, { timeout: 5000 });
-  expect(calls.filter(c => c.action === 'rashi-reject')).toHaveLength(1);
-  await expect(page.locator('#recList')).toContainText('No Rashi recordings are waiting');
+  const card = page.locator('.rec-item[data-id="rashi_kid1_zayin_a1"]');
+  await expect(card.locator('audio')).toHaveAttribute('src', 'https://signed.example/a.webm');
+  // No grade boxes, no number row, no word taps, no Approve / Try Again buttons.
+  await expect(page.locator('.rashi-grade, .rashi-feedback, [data-pts], .gw-word')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: /Try Again/ })).toHaveCount(0);
+  await expect(page.locator('#recCount')).toHaveText('(3)');
+  // The text is large with every LETTER tappable (20 letters), all correct by default.
+  await expect(card.locator('.lt')).toHaveCount(20);
+  await expect(card.locator('.lt.bad')).toHaveCount(0);
+  await expect(card.locator('[data-field="score"]')).toContainText('5/5 points');
+  await expect(card.locator('[data-field="score"]')).toContainText('20/20 letters correct');
+  // Tapping marks a letter as not recognized, tapping again undoes it. Nothing is sent yet and no popup appears.
+  let dialogs = 0; page.on('dialog', () => { dialogs++; });
+  await card.locator('.lt').nth(0).click();
+  await card.locator('.lt').nth(19).click();
+  await card.locator('.lt').nth(5).click();
+  await card.locator('.lt').nth(5).click();                              // undone
+  await expect(card.locator('.lt.bad')).toHaveCount(2);
+  await expect(card.locator('[data-field="score"]')).toContainText('3/5 points');
+  await expect(card.locator('[data-field="score"]')).toContainText('18/20 letters correct');
+  expect(calls.filter(c => c.action === 'rashi-letter-marks')).toHaveLength(0);
+  // Saved ONCE a few seconds after the last tap, with the missed letter numbers.
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-letter-marks').length, { timeout: 9000 }).toBe(1);
+  expect(calls.find(c => c.action === 'rashi-letter-marks')).toMatchObject({ requestId: 'rashi_kid1_zayin_a1', missed: [0, 19] });
+  await expect(card.locator('[data-field="msg"]')).toContainText('3 of 5 parts perfect');
+  await expect(card.locator('[data-done]')).toBeHidden();
+  // A perfect reading: no taps, press Done.
+  const perfect = page.locator('.rec-item[data-id="rashi_kid1_bet_a2"]');
+  await perfect.locator('[data-done]').click();
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-letter-marks').length, { timeout: 5000 }).toBe(2);
+  expect(calls.filter(c => c.action === 'rashi-letter-marks')[1]).toMatchObject({ requestId: 'rashi_kid1_bet_a2', missed: [] });
+  // A recently graded reading shows its saved marks and can be changed freely.
+  const old = page.locator('.rec-item[data-id="rashi_kid1_alef_a1"]');
+  await expect(old.locator('.lt.bad')).toHaveCount(2);
+  await expect(old.locator('[data-field="score"]')).toContainText('4/5 points');
+  await old.locator('.lt').nth(0).click();
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-letter-marks').length, { timeout: 9000 }).toBe(3);
+  expect(calls.filter(c => c.action === 'rashi-letter-marks')[2]).toMatchObject({ requestId: 'rashi_kid1_alef_a1', missed: [1] });
+  expect(dialogs).toBe(0);
+  // Delete removes a bad recording (after one confirmation) and calls the server once.
+  page.once('dialog', d => d.accept());
+  await perfect.locator('[data-delete]').click();
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-delete').length, { timeout: 5000 }).toBe(1);
+  expect(calls.find(c => c.action === 'rashi-delete')).toMatchObject({ requestId: 'rashi_kid1_bet_a2' });
+  // Each boy's letter scores are shown (27 letter columns).
+  await expect(page.locator('#letterHolder th.lh')).toHaveCount(27);
+  await expect(page.locator('#letterHolder tbody tr')).toHaveCount(1);
+  await expect(page.locator('#letterHolder tbody tr').first()).toContainText('Test Kid One');
+  await expect(page.locator('#letterHolder td[title^="א"]')).toHaveText('75%');
+  await expect(page.locator('#letterHolder td[title^="ג"]')).toHaveText('0%');
+  // Approve All Legacy Readings still approves only the older recording (no letter data).
+  page.removeAllListeners('dialog'); page.once('dialog', d => d.accept());
+  await page.getByRole('button', { name: /Approve All Legacy Readings \(1\)/ }).click();
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-approve').length, { timeout: 6000 }).toBe(1);
+  expect(calls.find(c => c.action === 'rashi-approve').requestId).toBe('rashi_kid1_samech_a1');
 });
 
 

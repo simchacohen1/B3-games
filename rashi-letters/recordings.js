@@ -24,8 +24,12 @@
     rejected:{icon:'🔄',text:'Your teacher asked you to try again. Record a new reading!',cls:'rr-rejected'}
   };
   // A student may record when nothing is waiting or approved yet.
-  const canRecord=status=>status==='none'||status==='rejected'||!status;
-  const bannerFor=status=>BANNERS[status]||BANNERS.none;
+  const canRecord=status=>status==='none'||status==='rejected'||status==='rerecord'||!status;
+  const bannerFor=(status,entry)=>{
+    if(status==='rerecord')return {icon:'🔁',text:'Graded: you earned '+(Number(entry&&entry.points)||0)+' of 5 points. You can record it again to earn more (sending costs '+POINTS+' points).',cls:'rr-approved'};
+    if(status==='approved'&&entry&&entry.letterMode)return {icon:'✅',text:'Graded! You earned '+(Number(entry.points)||0)+' of 5 points',cls:'rr-approved'};
+    return BANNERS[status]||BANNERS.none;
+  };
   const formatTime=ms=>{const s=Math.floor(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
   const pickMime=()=>MIMES.find(m=>root.MediaRecorder&&root.MediaRecorder.isTypeSupported&&root.MediaRecorder.isTypeSupported(m))||'';
 
@@ -62,6 +66,8 @@
     return statusPromise;
   }
   const statusOf=id=>(statusMap&&statusMap[id]&&statusMap[id].status)||'none';
+  // A reading graded below 5 points can be sent again: it counts as its own state, 'rerecord'.
+  const effStatus=id=>{const e=statusMap&&statusMap[id];return e&&e.canRerecord&&e.status==='approved'?'rerecord':statusOf(id);};
 
   async function sendRecording(sectionId,words,blob,durationMs){
     if(STAGING())throw new Error('Recording rewards are disabled on staging.');
@@ -94,7 +100,7 @@
     const card=el('div','card');card.id='recordScreen';card.style.display='none';
     ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),words:el('div','rr-words'),banner:el('div','rr-banner'),
       timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
-      note:el('p','rr-note','Worth '+POINTS+' points after your teacher listens and approves.'),footer:el('div','rr-row')};
+      note:el('p','rr-note','Sending costs '+POINTS+' points. After your teacher listens you earn up to 5 points: 1 for each fifth of the reading with every letter read right.'),footer:el('div','rr-row')};
     ui.words.setAttribute('dir','rtl');ui.words.setAttribute('lang','he');ui.msg.setAttribute('role','status');ui.msg.setAttribute('aria-live','polite');
     card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
     const anchor=document.getElementById('closedScreen');
@@ -105,11 +111,11 @@
   function stopTracks(){if(session&&session.stream){session.stream.getTracks().forEach(t=>t.stop());session.stream=null;}}
   function clearTimer(){if(session&&session.tick){clearInterval(session.tick);session.tick=null;}}
   function dropAudio(){if(session){if(session.player){session.player.pause();session.player=null;}if(session.url){URL.revokeObjectURL(session.url);session.url=null;}}}
-  function hasUnsent(){return !!(session&&session.blob&&canRecord(statusOf(session.id)));}
+  function hasUnsent(){return !!(session&&session.blob&&canRecord(effStatus(session.id)));}
 
   function render(){
     const u=ensureScreen(),s=session;if(!s)return;
-    const status=statusOf(s.id),b=bannerFor(status);
+    const status=effStatus(s.id),b=bannerFor(status,statusMap&&statusMap[s.id]);
     u.sub.textContent=s.label||'';
     u.title.textContent=s.id.startsWith('vayeira-')?'🎤 Read This Rashi!':'🎤 Read Your Words!';
     u.quota.textContent='Readings today: '+dailyCount+' / '+dailyLimit;
@@ -231,15 +237,15 @@
     cfg.hideOthers();
     if(!hub){hub=el('div','card');hub.id='recordHub';hub.style.textAlign='center';ui.card.parentNode.insertBefore(hub,ui.card);}
     hub.style.display='block';
-    hub.replaceChildren(el('h2',null,'🎤 Reading with Mic'),el('p','rr-sub','Pick a set of Rashi words, read them out loud, and send it to your teacher. Each approved reading earns '+POINTS+' points.'));
+    hub.replaceChildren(el('h2',null,'🎤 Reading with Mic'),el('p','rr-sub','Pick a set of Rashi words, read them out loud, and send it to your teacher. Sending a reading costs '+POINTS+' points, and you earn up to 5 back (1 for each fifth read perfectly).'));
     const list=el('div'),rows=sections.map(sec=>{
       const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record','',()=>open(sec,()=>openHub(sections),()=>openHub(sections)));
       row.append(name,chip,go);list.append(row);return {sec,chip,go};});
     hub.append(list,el('p','rr-note','Readings today: '+dailyCount+' / '+dailyLimit),button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
     const map=cfg.isPreview()?{}:await loadStatus(false);
-    rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const st=(map[r.sec.id]&&map[r.sec.id].status)||'none',b=bannerFor(st);
+    rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const e=map[r.sec.id],st=e&&e.canRerecord&&e.status==='approved'?'rerecord':(e&&e.status)||'none',b=bannerFor(st,e);
       r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
-      if(st==='pending'||st==='approved')r.go.textContent='View';});
+      if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';});
   }
   
   // A standalone passage browser. Each source Rashi has its own record ID and status.
