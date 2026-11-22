@@ -229,6 +229,8 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await expect(preview).toBeVisible();
     await expect(preview.getByAltText('Copied picture preview')).toBeVisible();
     expect(await teacher.evaluate(() => (window as any).__out.filter((m: any) => m.message?.activity?.kind === 'image').length)).toBe(0);
+    // A pasted picture now goes out as a movable picture by default; this test is about the worksheet background.
+    await preview.getByRole('radio', { name: /Set as background/ }).check();
     await teacher.getByRole('button', { name: '✓ Send to all boards' }).click();
     await expect.poll(() => teacher.evaluate(() => (window as any).__out.filter((m: any) =>
       m.message?.activity?.kind === 'image').length)).toBeGreaterThanOrEqual(2);

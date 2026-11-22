@@ -93,7 +93,7 @@ test('student-boards sends only after the teacher confirms, through the existing
   assert.doesNotMatch(body,/sendActivity\(|sendImageFile\(|commitPaste\(/,'sends nothing by itself');
   // The preview's own button is what sends, and it keeps the size and type checks and the erase confirmation.
   assert.match(boardsSource,/const confirmPaste=button\('✓ Send to all boards'[^\n]*commitPaste\(\)/);
-  assert.match(boardsSource,/if\(item\.kind==='image'\)await sendImageFile\(item\.file,\{subject:item\.subject,important\}\)/);
+  assert.match(boardsSource,/if\(how==='background'\)await sendImageFile\(item\.file,\{subject:item\.subject,important\}\);\s*else await sendMovablePicture\(item\.file,\{lock\}\)/);
   assert.match(boardsSource,/if\(hasWork&&!confirm\('This will erase the students\\' current marks and start a new activity\. Continue\?'\)\)return;/);
 });
 
