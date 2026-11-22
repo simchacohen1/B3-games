@@ -221,7 +221,7 @@
 
   <header class="top">
     <h1>📊 My Progress</h1>
-    <p>Your recordings: gold standard, waiting for your teacher, and ones to try again. Below: your earlier results.</p>
+    <p>Your recordings: your grades out of 10 (10 = gold standard), recordings waiting for your teacher, and ones to try again. Below: your earlier results.</p>
   </header>
 
   <!-- Shown if no student is signed in on this browser -->
@@ -497,8 +497,9 @@ async function loadReviewProgress(){
     const order = (a, b) => SEFER_ORDER.indexOf(a.ref.sefer) - SEFER_ORDER.indexOf(b.ref.sefer) || a.ref.perek - b.ref.perek || a.ref.posuk - b.ref.posuk;
     const groups = [
       { id:'gold', title:'🏅 Gold standard', empty:'No gold standard pesukim yet — keep practicing!', rows: rows.filter(r => r.status === 'gold') },
+      { id:'scored', title:'⭐ Graded — try again for gold', empty:'Nothing to improve right now.', rows: rows.filter(r => r.status === 'scored') },
       { id:'pending', title:'⏳ Waiting for your teacher', empty:'Nothing waiting for your teacher.', rows: rows.filter(r => r.status === 'pending') },
-      { id:'retry', title:'🔁 Graded — not gold standard yet', empty:'Nothing to try again right now.', rows: rows.filter(r => r.status === 'retry') }
+      { id:'retry', title:'🔁 Graded 0 — try again', empty:'Nothing to try again right now.', rows: rows.filter(r => r.status === 'retry') }
     ];
     const now = Date.now();
     wrap.innerHTML = groups.map(g => {
@@ -508,9 +509,10 @@ async function loadReviewProgress(){
         let detail = '';
         if(g.id === 'gold') detail = '+' + (Number(r.pointsAwarded) || 0) + ' pts' + (Number(r.bonus) ? ' · 🎉 ' + r.bonus + ' bonus' : '') +
           (Number(r.lockedUntil) > now ? ' · 🔒 until ' + reviewDate(r.lockedUntil) : '');
+        else if(g.id === 'scored') detail = (Number(r.score) || 0) + '/10 · +' + (Number(r.pointsAwarded) || 0) + ' pts';
         else if(g.id === 'pending') detail = 'Sent ' + reviewDate(r.submittedAt);
-        else detail = (Number(r.mistakes) ? r.mistakes + ' mistake' + (Number(r.mistakes) === 1 ? '' : 's') + ' · ' : '') + 'Try again';
-        return '<a class="posuk-tile review-tile tile-' + (g.id === 'gold' ? 'high' : g.id === 'pending' ? 'mid' : 'low') + '" href="' + href + '">' +
+        else detail = '0/10 · Try again';
+        return '<a class="posuk-tile review-tile tile-' + (g.id === 'gold' ? 'high' : g.id === 'pending' || g.id === 'scored' ? 'mid' : 'low') + '" href="' + href + '">' +
           '<span class="tile-num">' + reviewEscape(ref.sefer) + ' ' + ref.perek + ':' + ref.posuk + '</span><span class="tile-score">' + reviewEscape(detail) + '</span></a>';
       }).join('');
       return '<div class="perek-section expanded review-group"><div class="perek-header"><span>' + g.title + '</span><span class="summary">' + g.rows.length + '</span></div>' +
@@ -713,7 +715,7 @@ function readTranslateCell(attempts){
   return chips.length ? { read, translate, html: chips.join('') } : null;
 }
 // The teacher's grade for a posuk (the new one-recording way), as a small mark on its tile.
-function reviewFlag(row){ return !row ? '' : row.status === 'gold' ? '🏅' : row.status === 'pending' ? '⏳' : row.status === 'retry' ? '🔁' : ''; }
+function reviewFlag(row){ return !row ? '' : row.status === 'gold' ? '🏅' : row.status === 'scored' ? '⭐' : row.status === 'pending' ? '⏳' : row.status === 'retry' ? '🔁' : ''; }
 function slugKeyFor(sefer, perek, posuk){
   const slug = Object.keys(PARSHA_TO_SEFER).find(s => PARSHA_TO_SEFER[s] === sefer && reviewRows[s + '_' + perek + '_' + posuk]);
   return slug ? slug + '_' + perek + '_' + posuk : '';
