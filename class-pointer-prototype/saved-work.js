@@ -251,6 +251,22 @@
     document.body.append(dialog);dialog.showModal();
     return{dialog,body,say(text){status.textContent=text||''},fail(error){status.textContent=Core.errorText(error,teacherPage)}};
   }
+  // A yes/no question shown on the page (not the browser's grey box), above any open window. Resolves true or false.
+  // Where the page cannot show a dialog it falls back to the browser's own question.
+  function ask(question,yes,danger){
+    const probe=h('dialog');
+    if(typeof probe.showModal!=='function')return Promise.resolve(confirm(question));
+    return new Promise(resolve=>{
+      const dialog=h('dialog','ftt-saved ftt-saved-dialog'),actions=h('div','ftt-saved-actions');
+      dialog.setAttribute('aria-label','Please confirm');dialog.style.width='min(440px,92vw)';
+      let answer=false;
+      actions.append(button(yes||'Yes',()=>{answer=true;dialog.close()},danger?'danger':'main'),button('Cancel',()=>dialog.close()));
+      dialog.append(h('p','ftt-saved-note',question),actions);
+      dialog.addEventListener('close',()=>{dialog.remove();resolve(answer)});
+      ['keydown','keyup'].forEach(type=>dialog.addEventListener(type,event=>event.stopPropagation()));
+      document.body.append(dialog);dialog.showModal();
+    });
+  }
   // Drop-down of the class folders. Returns {node,value()}; node is null when the class has no folders.
   function folderPicker(state,chosen){
     const options=Core.folderOptions(state);
@@ -321,7 +337,7 @@
         try{await store.rename(file,next);await refresh()}catch(error){ui.fail(error)}
       }),
       button('Delete',async()=>{
-        if(!confirm('Delete "'+file.name+'"? You cannot get it back.'))return;
+        if(!await ask('Delete "'+file.name+'"? You cannot get it back.','Delete',true))return;
         try{await store.remove(file);if(current?.id===file.id)current=null;await refresh()}catch(error){ui.fail(error)}
       },'danger')
     ];
@@ -391,7 +407,7 @@
         try{
           const saved=await store.saveBoard({id,name:clean,folderId:picker.value(),subject:subject.value(),template:asTemplate.checked,data,picture:await api.picture()});
           current=asTemplate.checked?null:{id:saved,name:clean,folderId:picker.value(),subject:subject.value(),template:false};fromTemplate=null;
-          ui.say('Saved.');setTimeout(()=>ui.dialog.close(),900);
+          ui.say('Saved as "'+clean+'". Find it in My files.');setTimeout(()=>ui.dialog.close(),2200);
         }catch(error){ui.fail(error);actions.querySelectorAll('button').forEach(node=>{node.disabled=false})}
       };
       if(current&&!current.template)actions.append(button('Save over "'+current.name+'"',()=>run(current.id),'main'),button('Save as new',()=>run(null)));
@@ -406,7 +422,7 @@
   async function openBoard(file,ui){
     const api=board();
     if(!api.canOpen){ui.say('Open your whiteboard first, then open this file.');return}
-    if(!confirm(file.template?'Open a fresh copy of the template "'+file.name+'"? It will replace what is on the whiteboard now. The template itself never changes.':'Open "'+file.name+'"? It will replace what is on the whiteboard now.'))return;
+    if(!await ask(file.template?'Open a fresh copy of the template "'+file.name+'"? It will replace what is on the whiteboard now. The template itself never changes.':'Open "'+file.name+'"? It will replace what is on the whiteboard now.','Open'))return;
     ui.say('Opening…');
     try{
       if(!await api.write(await store.readBoard(file,api.kind)))throw Core.plain('This file could not be opened. Make sure your whiteboard is open.');
