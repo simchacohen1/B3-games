@@ -414,7 +414,7 @@
     {
       "path": "/b3Quiz/weeklyPracticeNigri/$classId/$week/$kind",
       "permission": ".write",
-      "expression": "(auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)) && (!data.exists() || !newData.exists() || data.child('state').val() == 'sending')"
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true) && (!data.exists() || !newData.exists() || data.child('state').val() == 'sending')"
     },
     {
       "path": "/b3Quiz/weeklyPracticeNigri/$classId",
