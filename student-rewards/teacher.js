@@ -222,6 +222,7 @@ async function decideRefund(sid,key,decision){
       if(!t.committed)throw new Error("This purchase was already returned.");
       marked=true;
       await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}`).update({refundedAt:stamp,refundedBy:state.user.email,statusBeforeRefund:String(info.record.status||"pending")});
+      await returnStock(info.record);
     }
     let balanceAfter=null;
     const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const next=Math.max(0,Number(cur||0)+amount);balanceAfter=next;return next});
@@ -255,7 +256,7 @@ function renderClassSelect(){
   el.innerHTML=rows.map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("");
   el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
 }
-const OWNER_ROOT_PATHS=["classes","students","categories","rewards","classRewardCatalog","settings","dailyRatings","dailyAwards","dailyAttendance","commentsByStudent","redemptionsByStudent","enrollments","pointAdjustments","audit","pointRequests","classRewardContributionsByStudent","refundRequests","classRewardRounds"];
+const OWNER_ROOT_PATHS=["classes","students","categories","rewards","classRewardCatalog","settings","dailyRatings","dailyAwards","dailyAttendance","commentsByStudent","redemptionsByStudent","enrollments","pointAdjustments","audit","pointRequests","classRewardContributionsByStudent","refundRequests","classRewardRounds","dailyAwardLog"];
 async function loadRoot(){
   if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
   else{
@@ -435,6 +436,7 @@ function allPointLedger(includeGaps=true){
       if(gap)add({id:`gap:${s.id}`,sid:s.id,amount:gap,when:0,source:"history-gap",sourceGroup:"gap",sourceLabel:"History gap",reason:"Balance not linked to a saved history record",detail:`Current balance ${current} ★ · saved ledger ${accounted} ★`,status:"needs-review",counts:true,isGap:true});
     }
   }
+  decorateLedger(rows);
   // Calculate a running balance for each student. History gaps are treated as the
   // older opening balance, so the newest calculated balance lands on the live total.
   for(const s of r){
@@ -443,6 +445,98 @@ function allPointLedger(includeGaps=true){
     for(const row of posted){running+=Number(row.amount||0);row.runningBalance=running}
   }
   return rows.sort((a,b)=>(b.when||0)-(a.when||0)||String(a.studentName).localeCompare(String(b.studentName)));
+}
+// ---------- Undo (the history shows who did each change; Undo reverses it exactly and adds its own entry; nothing is deleted) ----------
+// Adds "who", the undo choice and "undone" marks to the ledger rows, and one informational row for every Daily Points undo.
+function decorateLedger(rows){
+  const root=state.root||{};
+  const byDay=new Map();
+  for(const [sid,logs] of Object.entries(root.dailyAwardLog||{}))for(const log of Object.values(logs||{})){
+    if(!log||!log.classId||!log.date)continue;
+    const k=sid+"|"+log.classId+"|"+log.date;(byDay.get(k)||byDay.set(k,[]).get(k)).push(log);
+  }
+  for(const list of byDay.values())list.sort((a,b)=>String(a.savedAt).localeCompare(String(b.savedAt))||String(a.id).localeCompare(String(b.id)));
+  const batchSize=(batchId,classId)=>{let n=0;for(const [sid,logs] of Object.entries(root.dailyAwardLog||{}))if(Object.values(logs||{}).some(l=>l&&l.batchId===batchId&&l.classId===classId&&l.kind==="save"&&!l.undoneAt))n++;return n};
+  for(const row of rows){
+    const id=String(row.id||"");
+    if(id.startsWith("adjust:")){
+      const key=id.slice(7),item=root.pointAdjustments?.[key]||{};
+      row.by=item.teacherEmail||"";
+      if(item.action==="undo"){row.sourceLabel="Undo";row.status="undo";row.sourceGroup="teacher"}
+      else if(item.undoneBy){row.status="undone"}
+      else if(Number(item.amount)){
+        row.undo={kind:"adjust",id:key};
+        if(item.batchId){const n=Object.values(root.pointAdjustments||{}).filter(x=>x&&x.batchId===item.batchId&&!x.undoneBy&&x.action!=="undo").length;if(n>1)row.batch={kind:"awardbatch",classId:item.classId,batchId:item.batchId,count:n}}
+      }
+    }else if(id.startsWith("request:")){
+      const key=id.slice(8),item=root.pointRequests?.[key]||{};
+      row.by=item.reviewedBy?(/^Automatic/i.test(item.reviewedBy)?"Automatic":item.reviewedBy):(item.status==="approved"?"Automatic":"");
+      if(item.undoneBy)row.status="undone";
+      else if(item.status==="approved"&&Number(item.actualAmount??item.amount))row.undo={kind:"request",id:key};
+    }else if(id.startsWith("redeem:")){
+      const [,sid,key,part]=id.split(":"),item=root.redemptionsByStudent?.[sid]?.[key]||{};
+      if(part==="request"){
+        row.by="Student";
+        if(!["declined","canceled","refunded"].includes(String(item.status||"")))row.undo={kind:"purchase",studentId:sid,key};
+      }else row.by=item.refundedBy||item.reviewedBy||"Student";
+    }else if(id.startsWith("class-contribution:")){
+      row.undoHint="To give these back, use a refund request";
+    }else if(id.startsWith("daily:")){
+      const [,sid,cid,date]=id.split(":"),award=root.dailyAwards?.[sid]?.[cid]?.[date];
+      row.by=award?.teacherEmail||"";
+      const list=byDay.get(sid+"|"+cid+"|"+date)||[],latest=list[list.length-1];
+      if(latest&&latest.kind==="save"&&!latest.undoneAt&&Number(award?.points||0)===Number(latest.after?.points||0)){
+        row.undo={kind:"daily",classId:cid,studentId:sid,date};
+        const n=latest.batchId?batchSize(latest.batchId,cid):0;
+        if(n>1)row.batch={kind:"batch",classId:cid,batchId:latest.batchId,count:n};
+      }else if(!list.length)row.undoHint="Saved before Undo existed: edit the day instead";
+    }
+  }
+  // Every Daily Points undo is shown, so the history never hides that something was undone.
+  const known=new Set(rows.map(r=>r.sid));
+  for(const [sid,logs] of Object.entries(root.dailyAwardLog||{})){
+    if(!known.has(sid))continue;
+    for(const log of Object.values(logs||{})){
+      if(!log||log.kind!=="undo")continue;
+      const s=rows.find(r=>r.sid===sid);if(!s)continue;
+      rows.push({id:`dailyundo:${sid}:${log.id}`,sid,amount:Number(log.appliedDelta)||0,when:pointTime(log.savedAt),source:"undo",sourceGroup:"daily",sourceLabel:"Undo",
+        reason:`Undo — Daily Points ${C.formatDate(log.date)}`,detail:"The day was put back the way it was (already included in the Daily Points lines)",status:"logged",counts:false,classId:log.classId||"",by:log.teacherEmail||"",
+        studentName:s.studentName,studentInitials:s.studentInitials,studentColor:s.studentColor});
+    }
+  }
+}
+function whoLabel(row){return row.isGap?"—":row.by||"—"}
+function undoCell(row){
+  if(row.status==="undone")return `<small class="points-undone">Undone</small>`;
+  const out=[];
+  if(row.undo&&row.undo.kind==="purchase")out.push(`<button type="button" class="points-undo refund" data-undo="${esc(JSON.stringify(row.undo))}" title="Give the points back for this purchase (and the stock). The refund is added to the history.">↩ Refund</button>`);
+  else if(row.undo)out.push(`<button type="button" class="points-undo" data-undo="${esc(JSON.stringify(row.undo))}" title="Reverse exactly this entry. The undo is added to the history.">↩ Undo</button>`);
+  if(row.batch&&row.batch.kind==="awardbatch")out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"awardbatch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole award for ${row.batch.count} students">↩ Undo whole award (${row.batch.count})</button>`);
+  else if(row.batch)out.push(`<button type="button" class="points-undo batch" data-undo="${esc(JSON.stringify({kind:"batch",classId:row.batch.classId,batchId:row.batch.batchId}))}" title="Undo this whole Daily Points save for ${row.batch.count} students">↩ Undo whole save (${row.batch.count})</button>`);
+  if(!out.length&&row.undoHint)out.push(`<small class="points-undone">${esc(row.undoHint)}</small>`);
+  return out.join(" ");
+}
+async function runUndo(spec){
+  const whole=spec.kind==="batch"||spec.kind==="awardbatch",refund=spec.kind==="purchase";
+  const question=spec.kind==="awardbatch"?"Undo this whole award? Every student in it who still has the points gets them taken back (anyone who already spent them is skipped and named). The undo is added to the history; nothing is deleted."
+    :spec.kind==="batch"?"Undo this whole Daily Points save for the class? Each student's day goes back to how it was before. The undo is added to the history; nothing is deleted."
+    :refund?"Refund this purchase? The points go back to the student, and the refund is added to the history. Nothing is deleted."
+    :"Undo this entry? It is reversed exactly, and the undo is added to the history. Nothing is deleted.";
+  if(!confirm(question))return;
+  try{
+    const result=await teacherApi("undo",spec);
+    const skipped=(result.skipped||[]).map(x=>{const s=(state.root?.students||{})[x.studentId];return `${s?.name||x.studentId}: ${x.reason}`});
+    toast(whole?`Undone for ${result.undone} student${result.undone===1?"":"s"}${skipped.length?` · skipped ${skipped.length}: ${skipped.join("; ")}`:""}`:refund?"Refunded. The history shows the refund.":"Undone. The history shows the undo.");
+  }catch(err){toast(err.message,"error")}
+  await loadRoot();render();
+}
+document.addEventListener("click",event=>{const button=event.target.closest&&event.target.closest("[data-undo]");if(!button)return;event.preventDefault();let spec=null;try{spec=JSON.parse(button.dataset.undo)}catch{}if(spec)runUndo(spec)});
+// One student's own history, on the Students page.
+function studentPointsPanel(s){
+  const previous=state.pointClassId;state.pointClassId="all";
+  let rows=[];try{rows=allPointLedger(true).filter(row=>row.sid===s.id)}finally{state.pointClassId=previous}
+  const body=rows.length?rows.map(row=>`<tr><td class="points-date">${esc(formatPointWhen(row))}</td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b></td><td>${esc(whoLabel(row))}</td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td class="points-actions">${undoCell(row)}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty"><p>No saved point activity yet.</p></div></td></tr>`;
+  return `<section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Points history</h2><p>Every change to ${esc(s.name)}'s points: who did it, and Undo (nothing is ever deleted)</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Change</th><th>Reason</th><th>Who</th><th>Status</th><th></th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 function pointRangeStart(){
   if(state.pointRange==="all")return 0;
@@ -471,6 +565,50 @@ function redeemedPointsForStudent(studentId){
     if(cost>0&&status!=="declined"&&status!=="canceled"&&status!=="refunded")redeemed+=cost;
   }
   return redeemed;
+}
+// ---------- Quick award: the same points to several students (or the whole class) at once; the whole award can be undone in one click ----------
+const QUICK_PRESETS=[1,5,10];
+function quickState(){return state.quick||(state.quick={ids:new Set(),amount:5,custom:"",reason:"",whole:false})}
+function quickInfo(){
+  const q=quickState(),roster=pointsRoster(),c=String(q.custom||"").trim(),amount=c!==""?Number(c):q.amount;
+  const count=q.whole?roster.length:roster.filter(s=>q.ids.has(s.id)).length;
+  return {amount,count,roster,ok:state.pointClassId!=="all"&&Number.isInteger(amount)&&amount!==0&&Math.abs(amount)<=1000&&count>0};
+}
+function quickGoLabel(info){const q=quickState();return info.ok?`Give ${info.amount>0?"+":""}${info.amount} ★ to ${q.whole?"the whole class":info.count+" student"+(info.count===1?"":"s")}`:"Choose points and students"}
+function quickAwardPanel(){
+  if(state.pointClassId==="all")return `<section class="points-section quick-award"><div class="points-section-head"><div><h2>Quick award</h2><p>Choose a class above to give points to several students at once.</p></div></div></section>`;
+  const q=quickState(),info=quickInfo();
+  return `<section class="points-section quick-award"><div class="points-section-head"><div><h2>Quick award</h2><p>Give points to several students at once. It shows in the history below, and one click undoes the whole award.</p></div></div>
+    <div class="qa-row"><span class="qa-label">Points</span>${QUICK_PRESETS.map(n=>`<button type="button" class="qa-preset ${!String(q.custom||"").trim()&&q.amount===n?"active":""}" data-qa-amount="${n}">+${n} ★</button>`).join("")}<input id="qaCustom" class="qa-input" type="number" step="1" placeholder="Other" value="${esc(q.custom)}" aria-label="Custom points"><input id="qaReason" class="qa-input qa-reason" type="text" maxlength="200" placeholder="Reason (e.g. Great davening)" value="${esc(q.reason)}" aria-label="Reason"></div>
+    <div class="qa-row"><span class="qa-label">Who</span><button type="button" class="qa-preset ${q.whole?"active":""}" id="qaWhole">Whole class (${info.roster.length})</button><button type="button" class="qa-link" id="qaAll">Select all</button><button type="button" class="qa-link" id="qaNone">Clear</button></div>
+    <div class="qa-students">${info.roster.map(s=>`<label class="qa-chip ${q.whole||q.ids.has(s.id)?"on":""}"><input type="checkbox" data-qa-student="${esc(s.id)}" ${q.whole||q.ids.has(s.id)?"checked":""} ${q.whole?"disabled":""}>${esc(s.name)}</label>`).join("")}</div>
+    <div class="qa-row"><button type="button" class="primary" id="qaGo" ${info.ok?"":"disabled"}>${esc(quickGoLabel(info))}</button></div></section>`;
+}
+function refreshQuickAward(){
+  const info=quickInfo(),go=document.querySelector("#qaGo");if(!go)return;
+  go.disabled=!info.ok;go.textContent=quickGoLabel(info);
+}
+async function runQuickAward(){
+  const q=quickState(),info=quickInfo();if(!info.ok)return;
+  const who=q.whole?"the whole class":`${info.count} student${info.count===1?"":"s"}`,reason=q.reason.trim()||"Teacher award";
+  if(!confirm(`Give ${info.amount>0?"+":""}${info.amount} ★ to ${who} for “${reason}”?\n\nYou can undo the whole award in one click from the history.`))return;
+  try{
+    const r=await teacherApi("awardBatch",{classId:state.pointClassId,amount:info.amount,reason,wholeClass:q.whole,studentIds:[...q.ids]});
+    toast(`Gave ${info.amount>0?"+":""}${info.amount} ★ to ${r.awarded} student${r.awarded===1?"":"s"}${r.failed?.length?` · ${r.failed.length} could not be updated`:""}. Undo is in the history below.`);
+    q.ids=new Set();q.whole=false;q.custom="";q.reason="";
+  }catch(err){toast(err.message,"error")}
+  await loadRoot();render();
+}
+function bindQuickAward(){
+  const q=quickState(),$=s=>document.querySelector(s);
+  document.querySelectorAll("[data-qa-amount]").forEach(b=>b.onclick=()=>{q.amount=Number(b.dataset.qaAmount);q.custom="";render()});
+  if($("#qaCustom"))$("#qaCustom").oninput=e=>{q.custom=e.target.value;refreshQuickAward()};
+  if($("#qaReason"))$("#qaReason").oninput=e=>{q.reason=e.target.value};
+  if($("#qaWhole"))$("#qaWhole").onclick=()=>{q.whole=!q.whole;render()};
+  if($("#qaAll"))$("#qaAll").onclick=()=>{q.whole=false;q.ids=new Set(pointsRoster().map(s=>s.id));render()};
+  if($("#qaNone"))$("#qaNone").onclick=()=>{q.whole=false;q.ids=new Set();render()};
+  document.querySelectorAll("[data-qa-student]").forEach(b=>b.onchange=()=>{b.checked?q.ids.add(b.dataset.qaStudent):q.ids.delete(b.dataset.qaStudent);b.closest(".qa-chip").classList.toggle("on",b.checked);refreshQuickAward()});
+  if($("#qaGo"))$("#qaGo").onclick=runQuickAward;
 }
 function pointsDashboard(){
   if(state.pointClassId!=="all"&&!state.root?.classes?.[state.pointClassId]?.active)state.pointClassId="all";
@@ -533,6 +671,8 @@ function pointsDashboard(){
       <article><span>${allClasses?"Current all-classes balance":"Current class balance"}</span><strong>${totalBalance} ★</strong><small>Total points currently available for ${r.length} student${r.length===1?"":"s"}${allClasses?" across all classes":` in ${esc(classLabel)}`}</small></article>
     </div>
 
+    ${quickAwardPanel()}
+
     <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Click a student to see an overview of where that student's points came from.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
       <div class="points-student-grid">${byStudent.map(x=>`<button class="points-student-card ${state.pointStudent===x.s.id?"selected":""}" data-points-student="${esc(x.s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(x.s))}">${esc(x.s.initials||initials(x.s.name))}</em><span><b>${esc(x.s.name)}</b><small>${allClasses&&x.classLabel?`${esc(x.classLabel)} · `:""}${x.recent?`Latest: ${esc(x.recent.reason)}`:"No saved activity yet"}</small></span></span><strong>${x.currentBalance} ★</strong></button>`).join("")}</div>
     </section>
@@ -547,7 +687,7 @@ function pointsDashboard(){
         <label><span>Status</span><select id="pointsStatus">${statusOptions.map(([v,l])=>`<option value="${v}" ${state.pointStatus===v?"selected":""}>${l}</option>`).join("")}</select></label>
         <label class="points-search"><span>Search reason</span><input id="pointsSearch" value="${esc(state.pointSearch)}" placeholder="e.g. Chazara, Reading, Gimkit..."></label>
       </div>
-      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
+      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th><th>Who</th><th></th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td><td class="points-who">${esc(whoLabel(row))}</td><td class="points-actions">${undoCell(row)}</td></tr>`).join(""):`<tr><td colspan="9"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
     </section>
   </section>`;
 }
@@ -644,6 +784,7 @@ function students(){
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">STUDENT PROGRESS</p><h1>Students</h1><p>Review growth, balances, and daily history.</p></div><select id="studentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>
     <div class="studenthero"><em class="huge" style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><div><h2>${esc(s.name)}</h2><p>${scoreFor(s)}% overall progress</p></div><button class="balance" id="adjustPoints"><span>CURRENT POINT BALANCE</span><b>${Number(s.rewardBalance)||0} ★</b><small>Click to adjust points</small></button></div>
     <div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div>
+    ${studentPointsPanel(s)}
     <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Daily History</h2><p>Saved points and attendance</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${studentHistory(s).map(x=>`<tr><td>${esc(C.formatDate(x.date))}</td><td>${esc(x.status)}</td><td>${x.points} ★</td></tr>`).join("")||`<tr><td colspan="3">No saved days yet.</td></tr>`}</tbody></table></div></section>
   </section>`;
 }
@@ -875,6 +1016,12 @@ async function toggleRewardStore(){const open=classStoreOpen(),next=!open;
   if(state.teacherMode){try{await teacherApi("setStore",{classId:state.classId,open:next})}catch(err){toast(err.message,"error");return}await loadRoot();render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
   if(isTeacherStore(state.classId)){await db.ref(`${ROOT}/settings/classStoreEnabled/${state.classId}`).set(next);state.root.settings=state.root.settings||{};(state.root.settings.classStoreEnabled??={})[state.classId]=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
   await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
+// Puts the stock a purchase reserved back (the same rule as a student cancelling and the server's Decline/Refund).
+async function returnStock(item){
+  const q=state.root.rewards?.[item.rewardId]?.quantity;
+  const reserved=item.quantityReserved===true||(item.quantityReserved===undefined&&q!=null&&Number.isFinite(Number(q))&&Number(q)>=0);
+  if(reserved)await sdb().ref(`${ROOT}/rewards/${item.rewardId}/quantity`).transaction(cur=>{const n=Number(cur);return Number.isFinite(n)&&n>=0?n+1:undefined}).catch(()=>{});
+}
 async function review(sid,key,decision){
   if(state.teacherMode){try{const r=await teacherApi("review",{studentId:sid,key,decision});toast(`Request ${r.status}`)}catch(err){toast(err.message,"error")}await loadRoot();render();return}
   const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
@@ -886,6 +1033,7 @@ async function review(sid,key,decision){
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;
   if(decision==="decline"){
     await sdb().ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>Number(cur||0)+Number(item.cost||0));
+    await returnStock(item);
     const r=state.root.rewards?.[item.rewardId],requestMs=timeMs(item.requestedAt),lastMs=timeMs(r?.lastRedeemedAt);
     if(r&&requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000){
       updates[`${ROOT}/rewards/${item.rewardId}/lastRedeemedAt`]=null;
@@ -927,6 +1075,7 @@ function bindPage(){
       render();
       requestAnimationFrame(()=>document.querySelector(".points-ledger")?.scrollIntoView({behavior:"smooth",block:"start"}));
     });
+    bindQuickAward();
     if($("#pointsReset"))$("#pointsReset").onclick=()=>{state.pointStudent="all";state.pointRange="30";state.pointType="all";state.pointStatus="all";state.pointSearch="";render()};
     if($("#pointsCsv"))$("#pointsCsv").onclick=exportPointsCSV;
   }
