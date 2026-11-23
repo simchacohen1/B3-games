@@ -371,6 +371,8 @@
 
     <div class="panel">
       <h2>Look &amp; feel</h2>
+      <label for="spinDurationInput">Spin duration: <strong id="spinDurationValue">4.2 seconds</strong></label>
+      <input id="spinDurationInput" type="range" min="0" max="10" step="0.1" value="4.2" style="width:100%;accent-color:var(--accent);margin:8px 0 15px;">
       <div class="style-choice list-choice">
         <button data-style="wheel">Wheel</button>
         <button data-style="cards">Cards</button>
@@ -487,7 +489,7 @@ let state = {
   activePurposeId: 'p_chazzan',
   history: {},
   totalPicks: {}, // purposeId -> name -> count, kept forever
-  settings: { style: 'wheel', theme: 'gold', confetti: true, sound: true },
+  settings: { style: 'wheel', theme: 'gold', confetti: true, sound: true, spinDuration: 4.2 },
 };
 
 let rotationState = 0;
@@ -748,20 +750,20 @@ function drawWheel(canvas, names, pickedSet, theme) {
   });
 }
 
-function spinWheel(canvas, names, winnerIndex, onDone) {
+function spinWheel(canvas, names, winnerIndex, onDone, durationSeconds) {
   const n = names.length;
   const anglePer = 360 / n;
   const segCenterDeg = winnerIndex * anglePer + anglePer / 2;
   const jitter = (Math.random() - 0.5) * anglePer * 0.6;
   const targetMod = ((270 - segCenterDeg - jitter) % 360 + 360) % 360;
-  const spins = 5;
+  const spins = durationSeconds === 0 ? 0 : Math.max(1, Math.round(durationSeconds * 1.2));
   const prevMod = ((rotationState % 360) + 360) % 360;
   let delta = targetMod - prevMod;
   if (delta < 0) delta += 360;
   const totalRotation = rotationState + delta + spins * 360;
   rotationState = totalRotation;
 
-  canvas.style.transition = 'transform 4.2s cubic-bezier(0.12,0.67,0.1,1)';
+  canvas.style.transition = durationSeconds === 0 ? 'none' : `transform ${durationSeconds}s cubic-bezier(0.12,0.67,0.1,1)`;
   canvas.style.transform = `rotate(${totalRotation}deg)`;
 
   let ticking = true;
@@ -773,11 +775,9 @@ function spinWheel(canvas, names, winnerIndex, onDone) {
     setTimeout(tickLoop, tickDelay);
     if (tickDelay > 380) ticking = false;
   }
-  tickLoop();
-
-  setTimeout(() => {
-    onDone();
-  }, 4300);
+  if (durationSeconds > 0) tickLoop();
+  if (durationSeconds === 0) onDone();
+  else setTimeout(onDone, durationSeconds * 1000);
 }
 
 // ---------- Cards mode ----------
@@ -792,31 +792,26 @@ function renderCards(container, names, pickedSet) {
   });
 }
 
-function spinCards(container, names, winner, onDone) {
+function spinCards(container, names, winner, onDone, durationSeconds) {
   const cards = Array.from(container.children);
-  if (cards.length === 0) { onDone(); return; }
+  if (!cards.length) { onDone(); return; }
+  const winnerIdx = names.indexOf(winner);
+  const clearHighlight = () => cards.forEach(c => c.classList.remove('is-active'));
+  const finish = () => {
+    clearHighlight();
+    cards[winnerIdx].classList.add('is-winner');
+    onDone();
+  };
+  if (durationSeconds === 0) { finish(); return; }
+  const startTime = performance.now();
   let idx = 0;
-  let delay = 70;
-  const totalSteps = 22 + names.length;
-  let step = 0;
-  function clearHighlight() {
-    cards.forEach(c => c.classList.remove('is-active'));
-  }
   function loop() {
+    if (performance.now() - startTime >= durationSeconds * 1000) { finish(); return; }
     clearHighlight();
     cards[idx % cards.length].classList.add('is-active');
     playTick();
     idx++;
-    step++;
-    delay *= 1.06;
-    const winnerIdx = names.indexOf(winner);
-    if (step >= totalSteps && idx % cards.length === winnerIdx) {
-      clearHighlight();
-      cards[winnerIdx].classList.add('is-winner');
-      onDone();
-      return;
-    }
-    setTimeout(loop, Math.min(delay, 260));
+    setTimeout(loop, Math.min(180, Math.max(45, durationSeconds * 100)));
   }
   loop();
 }
@@ -859,6 +854,16 @@ const styleButtons = els('.style-choice button');
 const themeButtons = els('.theme-swatch');
 const confettiToggle = el('#confettiToggle');
 const soundToggle = el('#soundToggle');
+const spinDurationInput = el('#spinDurationInput');
+const spinDurationValue = el('#spinDurationValue');
+function spinDuration() {
+  const value = Number(state.settings.spinDuration);
+  return Number.isFinite(value) ? Math.max(0, Math.min(10, value)) : 4.2;
+}
+function syncSpinDuration() {
+  spinDurationInput.value = String(spinDuration());
+  spinDurationValue.textContent = `${spinDuration()} ${spinDuration() === 1 ? 'second' : 'seconds'}`;
+}
 
 const openDisplayBtn = el('#openDisplayBtn');
 const backToSetupBtn = el('#backToSetupBtn');
@@ -1172,6 +1177,7 @@ function refreshAllUi() {
   styleButtons.forEach(b => b.classList.toggle('is-active', b.dataset.style === state.settings.style));
   confettiToggle.checked = state.settings.confetti;
   soundToggle.checked = state.settings.sound;
+  syncSpinDuration();
   loadRosterEditor();
   renderExcludePicker();
   renderPurposeSelect();
@@ -1245,6 +1251,11 @@ confettiToggle.addEventListener('change', () => {
   state.settings.confetti = confettiToggle.checked;
   persist('settings');
 });
+spinDurationInput.addEventListener('input', () => {
+  state.settings.spinDuration = Number(spinDurationInput.value);
+  syncSpinDuration();
+  persist('settings');
+});
 soundToggle.addEventListener('change', () => {
   state.settings.sound = soundToggle.checked;
   persist('settings');
@@ -1308,9 +1319,9 @@ spinBtn.addEventListener('click', () => {
 
   if (state.settings.style === 'wheel') {
     const winnerIndex = names.indexOf(winner);
-    spinWheel(wheelCanvas, names, winnerIndex, () => finishSpin(purpose, entry, winner, names));
+    spinWheel(wheelCanvas, names, winnerIndex, () => finishSpin(purpose, entry, winner, names), spinDuration());
   } else {
-    spinCards(cardsWrap, names, winner, () => finishSpin(purpose, entry, winner, names));
+    spinCards(cardsWrap, names, winner, () => finishSpin(purpose, entry, winner, names), spinDuration());
   }
 });
 
@@ -1391,6 +1402,7 @@ async function init() {
   styleButtons.forEach(b => b.classList.toggle('is-active', b.dataset.style === state.settings.style));
   confettiToggle.checked = state.settings.confetti;
   soundToggle.checked = state.settings.sound;
+  syncSpinDuration();
   loadRosterEditor();
   renderExcludePicker();
   renderPurposeSelect();
