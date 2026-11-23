@@ -47,20 +47,21 @@ if (!existsSync(join(target, 'firebase-config.js')) || !existsSync(join(target, 
 const PREFIX = 'SOLS Tools';
 
 // Tab and share title. Students also use the real school site, so every sols.tools
-// tab starts with "SOLS Tools": "SOLS Tools | Shluchim Online School" on the home
-// page and "SOLS Tools | <page name>" on inner pages. sols-site/brand.js applies
-// the same rule to titles that a page sets while it runs.
+// tab says "SOLS Tools": "SOLS Tools | Shluchim Online School" on the home page and
+// "<page name> | SOLS Tools" on inner pages (page name first so narrow tabs stay
+// distinct). sols-site/brand.js applies the same rule to titles set while a page runs.
 export function solsTitle(raw) {
   const text = String(raw || '').replace(/\s+/g, ' ').trim();
-  if (/^SOLS Tools\b/i.test(text)) return text;
+  if (/^SOLS Tools\b/i.test(text) || /\|\s*SOLS Tools$/i.test(text)) return text;
   const rest = text
     .replace(/Fun Torah Tools/gi, ' ')
     .replace(/Shluchim Online School/gi, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-  // Page titles end in " · SOLS"; this site's own "SOLS Tools |" prefix replaces that. "Home" is the home page.
+  // Page titles end in " · SOLS"; on this site the page name comes first and "SOLS Tools" last, so a
+  // narrow tab still shows which page it is. The home page keeps "SOLS Tools | Shluchim Online School".
   const page = rest.replace(/\s*·\s*SOLS$/i, '').trim();
-  return PREFIX + ' | ' + (!page || page === 'Home' ? NAME : page);
+  return !page || page === 'Home' ? PREFIX + ' | ' + NAME : page + ' | ' + PREFIX;
 }
 
 const esc = text => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -69,12 +70,14 @@ const unesc = text => String(text).replace(/&lt;/g, '<').replace(/&gt;/g, '>').r
 // Link-preview crawlers (WhatsApp, iMessage, Facebook, Slack) read the raw HTML and
 // do not run scripts, so the icons and share tags are written into the page itself
 // instead of being added later by sols-brand.js.
-function headBlock(title, description, urlPath) {
+function headBlock(title, description, urlPath, keepOwnIcon = false) {
   const page = 'https://' + HOST + urlPath;
   return [
     TAG,
-    '<link rel="icon" type="image/png" sizes="32x32" href="/sols-favicon-32x32.png" data-sols="1">',
-    '<link rel="icon" type="image/png" sizes="16x16" href="/sols-favicon-16x16.png" data-sols="1">',
+    ...(keepOwnIcon ? [] : [
+      '<link rel="icon" type="image/png" sizes="32x32" href="/sols-favicon-32x32.png" data-sols="1">',
+      '<link rel="icon" type="image/png" sizes="16x16" href="/sols-favicon-16x16.png" data-sols="1">'
+    ]),
     '<link rel="apple-touch-icon" href="/sols-apple-touch-icon.png" data-sols="1">',
     '<meta property="og:type" content="website">',
     '<meta property="og:site_name" content="' + PREFIX + '">',
@@ -116,7 +119,9 @@ export function brandHtml(html, urlPath = '/') {
   const descContent = descTag ? descTag[0].match(/\bcontent=["']([^"']*)["']/i) : null;
   const description = descContent ? unesc(descContent[1]).replace(/Fun Torah Tools/g, NAME) : DESCRIPTION;
   if (descTag) out = out.replace(descTag[0], descTag[0].replace(/Fun Torah Tools/g, NAME));
-  // Drop the Fun Torah Tools icons and any share tags the page already has.
+  // Drop the Fun Torah Tools icons and any share tags the page already has. An inner page keeps its own
+  // section icon (/assets/favicons/*.svg); the home page and pages without one get the school emblem.
+  const ownIcon = urlPath !== '/' ? out.match(/<link\b[^>]*\brel=["']icon["'][^>]*\bhref=["']\/assets\/favicons\/[^"']+["'][^>]*>/i) : null;
   out = out
     .replace(/<link\b[^>]*\brel=["'](?:shortcut )?icon["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']apple-touch-icon(?:-precomposed)?["'][^>]*>\s*/gi, '')
@@ -124,7 +129,8 @@ export function brandHtml(html, urlPath = '/') {
     .replace(/<meta\b[^>]*\b(?:property|name)=["'](?:og|twitter):[^"']*["'][^>]*>\s*/gi, '');
   const anchor = findAnchor(out);
   const at = anchor.index + anchor[0].length;
-  return out.slice(0, at) + '\n' + headBlock(title, description, urlPath) + '\n' + out.slice(at);
+  const icon = ownIcon ? ownIcon[0] + '\n' : '';
+  return out.slice(0, at) + '\n' + icon + headBlock(title, description, urlPath, !!ownIcon) + '\n' + out.slice(at);
 }
 
 function* htmlFiles(dir) {

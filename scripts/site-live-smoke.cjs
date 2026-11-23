@@ -35,6 +35,8 @@ const PAGES = [
     name: 'Home',
     path: 'index.html',
     title: 'Fun Torah Tools',
+    // sols.tools shows the school emblem on the home page.
+    solsIcon: '/sols-favicon-32x32.png',
     front: true
   },
   {
@@ -52,6 +54,9 @@ const PAGES = [
   {
     name: 'Class Pointer',
     path: 'class-pointer-prototype/dashboard.html?teacher=1',
+    // An inner page: page name first on sols.tools, and its own section icon.
+    title: 'Class Pointer · SOLS',
+    icon: '/assets/favicons/pointer-teacher.svg',
     front: true,
     heading: 'Classroom Sharing',
     // Nobody signed out may see a class to start.
@@ -160,6 +165,15 @@ async function checkPages() {
           if (title !== expectedTitle) {
             problems.push(page.name + ' loaded but the page title was "' + title +
               '" instead of "' + expectedTitle + '".');
+          }
+        }
+
+        const iconWanted = page.icon || (ON_SOLS && page.solsIcon);
+        if (iconWanted) {
+          const hrefs = await tab.locator('link[rel~="icon"]').evaluateAll(links => links.map(l => l.getAttribute('href') || ''));
+          if (!hrefs.some(h => h.includes(iconWanted))) {
+            problems.push(page.name + ' loaded but its tab icon was ' + (hrefs.join(', ') || 'missing') +
+              ' instead of ' + iconWanted + '.');
           }
         }
 

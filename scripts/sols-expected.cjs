@@ -30,13 +30,15 @@ function expectedLiveFiles(files) {
   }
 }
 
-// What a tab title becomes on sols.tools (same rule as solsTitle() in sols-site/build.mjs).
+// What a tab title becomes on sols.tools (same rule as solsTitle() in sols-site/build.mjs):
+// "SOLS Tools | Shluchim Online School" for the home page, "<page name> | SOLS Tools" elsewhere.
 function solsTitle(raw) {
   const text = String(raw || '').replace(/\s+/g, ' ').trim();
-  if (/^SOLS Tools\b/i.test(text)) return text;
+  if (/^SOLS Tools\b/i.test(text) || /\|\s*SOLS Tools$/i.test(text)) return text;
   const rest = text.replace(/Fun Torah Tools/gi, ' ').replace(/Shluchim Online School/gi, ' ')
     .replace(/\s+/g, ' ').replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-  const page = rest.replace(/\s*·\s*SOLS$/i, '').trim(); return 'SOLS Tools | ' + (!page || page === 'Home' ? 'Shluchim Online School' : page);
+  const page = rest.replace(/\s*·\s*SOLS$/i, '').trim();
+  return !page || page === 'Home' ? 'SOLS Tools | Shluchim Online School' : page + ' | SOLS Tools';
 }
 
 module.exports = { expectedLiveFiles, sha, solsTitle };
