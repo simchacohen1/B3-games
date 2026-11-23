@@ -320,7 +320,7 @@ function renderOwnerControl(){
 function renderOwnerPlatformClass(panel){
  const id=cpClass,row=cpRecords[id],w=frame.contentWindow,teacherMode=w?.B3SiteSettings?.getCurrentAccess?.().role==="teacher";
  if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
- const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",isOpen=row.siteEnabled!==false&&mode!=="locked"&&cpSettings?.siteEnabled!==false;
+ const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",openUntil=Number(row.access?.openUntil)||0,isOpen=cpSettings?.siteEnabled!==false&&(openUntil>Date.now()||(row.siteEnabled!==false&&mode!=="locked"));
  const tools=cpGames().map(t=>({id:t.id==="class-gallery"?"gallery":t.id,name:t.name}));
  tools.push({id:"tag",name:"Tag Game"});
  const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
@@ -332,6 +332,7 @@ function renderOwnerPlatformClass(panel){
   +(cpSettings?.siteEnabled===false&&!teacherMode?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
   +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
   +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
+  +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock this class for'+(openUntil>Date.now()?' · open until '+new Date(openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):'')+'</span>'+[15,30,45].map(m=>'<button type="button" data-cp-new-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(openUntil>Date.now()?'<button type="button" data-cp-new-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
   +(distinct.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-grant-all="1"'+(cpBusy?" disabled":"")+'>✅ Enable ALL</button><button type="button" class="all-closed" data-cp-grant-all="0"'+(cpBusy?" disabled":"")+'>⛔ Disable ALL</button></div>':"")
   +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
@@ -341,9 +342,11 @@ function renderOwnerPlatformClass(panel){
  panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
    const mode=b.dataset.cpNewMode;
    if(teacherMode)return cpApi().manageClassAccessAction(id,"platform",{mode});
-   if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true});
-   return db.ref(base+"/access/mode").set("locked");
+   if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null});
+   return db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
  },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
+ panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
+   cpSave(()=>teacherMode?cpApi().manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null),m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
  const emergency=document.getElementById("cpEmergencyOffNew");
  if(emergency)emergency.onclick=()=>{
    if(confirm("Turn off the emergency lock for every class?"))

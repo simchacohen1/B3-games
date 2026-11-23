@@ -425,6 +425,32 @@
     }).catch(error=>console.warn("Follow Teacher not available",error));
   }
 
+  // Live push for the student's own class record (new classes keep their lock in classes/<id>/access and siteEnabled, which
+  // need a signed-in read). Re-opened with a fresh sign-in token when Firebase ends the stream (tokens last an hour).
+  var classWatch = { id: "", sources: [], timer: null };
+  function watchClassLive(classId, classPath) {
+    if (typeof EventSource !== "function" || isGuestPreview() || classId === "et" || classId === "wt") return;
+    if (classWatch.id === classId && classWatch.sources.length) return;
+    classWatch.id = classId;
+    classWatch.sources.forEach(function (s) { try { s.close(); } catch (e) {} });
+    classWatch.sources = [];
+    var auth = window.firebase && window.firebase.auth && window.firebase.auth();
+    var user = auth && auth.currentUser;
+    if (!user || typeof user.getIdToken !== "function") return;
+    user.getIdToken().then(function (token) {
+      if (classWatch.id !== classId) return;
+      ["access", "siteEnabled"].forEach(function (leaf) {
+        var first = true, url = classPath + "/" + leaf + ".json?auth=" + encodeURIComponent(token) + (databaseNamespace ? "&ns=" + encodeURIComponent(databaseNamespace) : "");
+        var src = new EventSource(url);
+        var changed = function () { if (first) { first = false; return; } clearTimeout(classWatch.timer); classWatch.timer = setTimeout(checkNow, 250); };
+        src.addEventListener("put", changed); src.addEventListener("patch", changed);
+        src.addEventListener("auth_revoked", function () { try { src.close(); } catch (e) {} classWatch.id = ""; });
+        src.addEventListener("cancel", function () { try { src.close(); } catch (e) {} classWatch.id = ""; });
+        classWatch.sources.push(src);
+      });
+    }).catch(function () { classWatch.id = ""; });
+  }
+
   async function resolveStudentClass() {
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
@@ -454,6 +480,7 @@
       fetchJson(classPath+"/toolGrants.json"),
       fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
     ]);
+    watchClassLive(studentClassId, classPath);
     var member=classFields[4];
     assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
@@ -608,7 +635,7 @@
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(!followActivityOpen&&!teacherOverrideOpen()&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      if(!followActivityOpen&&!teacherOverrideOpen()&&!(Number(assignedClass.access&&assignedClass.access.openUntil)>Date.now())&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 

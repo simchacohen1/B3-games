@@ -64,7 +64,12 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  }
  if(action==='platform'){
   if(!['open','locked'].includes(body.mode))fail(400,'Choose Open or Locked.');
-  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open'});
+  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open',[`${root}/access/openUntil`]:null});
+  return {ok:true};
+ }
+ if(action==='platformTimedOpen'){
+  if(!(Number.isInteger(body.minutes)&&body.minutes>=0&&body.minutes<=180))fail(400,'Choose 15, 30 or 45 minutes.');
+  await store.update({[`${root}/access/openUntil`]:body.minutes?now+body.minutes*60000:null});
   return {ok:true};
  }
  if(action==='grant'){
