@@ -194,35 +194,13 @@
     }
   }
 
-  // TEMPORARY staging-only debug box (never created on the live site).
-  var DBG = /staging/i.test(location.hostname) ? { listen: [], seen: null, resolved: "", lastUpdate: "", lastEvent: "", decision: "", note: "" } : null;
-  function dbgTime() { return new Date().toLocaleTimeString(); }
-  function dbgRender() {
-    if (!DBG) return;
-    var box = document.getElementById("b3GateDebug");
-    if (!box) {
-      if (!document.body) return;
-      box = document.createElement("pre"); box.id = "b3GateDebug";
-      box.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:2147483647;margin:0;padding:8px 10px;max-height:45vh;overflow:auto;background:rgba(0,0,0,.88);color:#8f8;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all;direction:ltr;text-align:left;pointer-events:none";
-      document.body.appendChild(box);
-    }
-    box.textContent = ["STAGING DEBUG (temporary) · gate: " + gameId,
-      "class resolved: " + (DBG.resolved || "(none)"),
-      "listening to: " + (DBG.listen.length ? DBG.listen.join("\n   ") : "(nothing yet)"),
-      "lock value seen: " + (DBG.seen ? JSON.stringify(DBG.seen) : "(not read yet)"),
-      "last full read: " + (DBG.lastUpdate || "-") + "   last live event: " + (DBG.lastEvent || "none yet"),
-      "decision: " + (DBG.decision || "-"), DBG.note].filter(Boolean).join("\n");
-  }
-  if (DBG) { document.addEventListener("DOMContentLoaded", dbgRender); setInterval(dbgRender, 2000); }
   function showOpen() {
-    if (DBG) { DBG.decision = "OPEN @ " + dbgTime(); dbgRender(); }
     markFirstDecision();
     reveal();
     removeOverlay();
   }
 
   function showClosed(title, message) {
-    if (DBG) { DBG.decision = "CLOSED (" + title + ") @ " + dbgTime(); dbgRender(); }
     // The independently authenticated Pointer lesson remains usable above a
     // locked activity. Closing that activity must not freeze the teacher video.
     document.querySelectorAll("audio,video").forEach(function(media){
@@ -458,22 +436,12 @@
     classWatch.sources = [];
     var auth = window.firebase && window.firebase.auth && window.firebase.auth();
     var user = auth && auth.currentUser;
-    if (!user || typeof user.getIdToken !== "function") { if (DBG) { DBG.note = "NO LIVE LISTENER: no signed-in Firebase user in this page (auth.currentUser is empty)"; dbgRender(); } return; }
+    if (!user || typeof user.getIdToken !== "function") return;
     user.getIdToken().then(function (token) {
       if (classWatch.id !== classId) return;
-      if (DBG) DBG.listen = [];
       ["access", "siteEnabled"].forEach(function (leaf) {
         var first = true, url = classPath + "/" + leaf + ".json?auth=" + encodeURIComponent(token) + (databaseNamespace ? "&ns=" + encodeURIComponent(databaseNamespace) : "");
         var src = new EventSource(url);
-        var dbgIdx = DBG ? DBG.listen.push(classPath.replace(/^https?:\/\//, "") + "/" + leaf + " [connecting]") - 1 : 0;
-        if (DBG) {
-          var dbgSet = function (s) { DBG.listen[dbgIdx] = classPath.replace(/^https?:\/\//, "") + "/" + leaf + " [" + s + "]"; dbgRender(); };
-          src.addEventListener("open", function () { dbgSet("open"); });
-          src.addEventListener("error", function () { dbgSet("error/reconnecting"); });
-          ["put", "patch"].forEach(function (t) { src.addEventListener(t, function (ev) { DBG.lastEvent = t + " " + leaf + " @ " + dbgTime() + " " + String(ev.data).slice(0, 120); dbgRender(); }); });
-          src.addEventListener("cancel", function () { dbgSet("CANCELLED by server (permission denied?)"); });
-          src.addEventListener("auth_revoked", function () { dbgSet("auth revoked"); });
-        }
         var changed = function () { if (first) { first = false; return; } clearTimeout(classWatch.timer); classWatch.timer = setTimeout(checkNow, 250); };
         src.addEventListener("put", changed); src.addEventListener("patch", changed);
         src.addEventListener("auth_revoked", function () { try { src.close(); } catch (e) {} classWatch.id = ""; });
@@ -513,7 +481,6 @@
       fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
     ]);
     watchClassLive(studentClassId, classPath);
-    if (DBG) { DBG.resolved = studentClassId; DBG.seen = { active: classFields[0], siteEnabled: classFields[1], access: classFields[2] }; DBG.lastUpdate = dbgTime(); dbgRender(); }
     var member=classFields[4];
     assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;

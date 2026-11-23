@@ -304,7 +304,6 @@ function renderOwnerControl(){
     +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(games.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-all="open"'+(cpBusy?" disabled":"")+'>✅ Open ALL</button><button type="button" class="all-closed" data-cp-all="closed"'+(cpBusy?" disabled":"")+'>⛔ Close ALL</button></div>':"")+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
   cpBindClassTabs(panel);
-  cpDbgAppend(panel,{classId:cls,role:"ET/WT settings",teacherMode:"n/a",workspace:"b3Games/siteSettings",database:"?",liveRecord:s.classAccess?.[cls]||null});
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
   panel.querySelectorAll("[data-cp-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpTimed);cpSave(()=>api.updateClassTimedOpen(cls,m),m?CL+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
@@ -340,17 +339,13 @@ function renderOwnerPlatformClass(panel){
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
  cpBindClassTabs(panel);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
- cpDbgAppend(panel,{classId:id,role:w?.B3SiteSettings?.getCurrentAccess?.().role||"?",teacherMode,workspace:ws,database:(()=>{try{return db.app.options.databaseURL}catch(e){return "?"}})(),liveRecord:{access:row.access||null,siteEnabled:row.siteEnabled===undefined?null:row.siteEnabled}});
- panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>{
+ panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
    const mode=b.dataset.cpNewMode;
-   cpDbgNote({click:mode==="locked"?"Lock this class":"Open this class",via:teacherMode?"function funTorahClassAccess (teacher path)":"direct database write",path:base+"/access/mode"+(mode==="open"?" and "+base+"/siteEnabled":""),value:mode,readBack:()=>db.ref(base).once("value").then(s=>({access:(s.val()||{}).access||null,siteEnabled:(s.val()||{}).siteEnabled}))});
-   cpSave(()=>{
    if(teacherMode)return cpApi().manageClassAccessAction(id,"platform",{mode});
    if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null});
    return db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
- },name+(mode==="locked"?" locked ✓":" opened ✓"))});
+ },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
  panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
-   cpDbgNote({click:m?"Unlock "+m+" min":"End timed unlock",via:teacherMode?"function funTorahClassAccess (teacher path)":"direct database write",path:base+"/access/openUntil",value:m?Date.now()+m*60000:null,readBack:()=>db.ref(base).once("value").then(s=>({access:(s.val()||{}).access||null,siteEnabled:(s.val()||{}).siteEnabled}))});
    cpSave(()=>teacherMode?cpApi().manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null),m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
  const emergency=document.getElementById("cpEmergencyOffNew");
  if(emergency)emergency.onclick=()=>{
@@ -373,26 +368,9 @@ function renderOwnerPlatformClass(panel){
      tool+(on?" disabled":" enabled")+" for "+name+" ✓");
  });
 }
-// TEMPORARY staging-only debug box (never shown on the live site).
-const CP_DBG=/staging/i.test(location.hostname);
-let cpDbg=null,cpDbgLast=null;
-function cpDbgNote(o){if(CP_DBG)cpDbg=Object.assign({time:new Date().toLocaleTimeString(),result:"saving…"},o)}
-function cpDbgAppend(panel,info){
-  if(!CP_DBG)return;
-  const d=cpDbgLast,box=document.createElement("pre");
-  box.id="cpDebugBox";box.style.cssText="margin:12px 0 0;padding:10px;background:#111;color:#8f8;font:12px/1.4 monospace;white-space:pre-wrap;word-break:break-all;border-radius:8px;text-align:left;direction:ltr";
-  const lines=["STAGING DEBUG (temporary)","class: "+info.classId+"   role: "+info.role+"   teacherMode: "+info.teacherMode,"database: "+info.database,"workspace: "+info.workspace,"record now: "+JSON.stringify(info.liveRecord)];
-  if(d){lines.push("--- last click @ "+d.time,"click: "+d.click,"via: "+d.via,"where: "+d.path,"saved value: "+JSON.stringify(d.value),"result: "+d.result,"read back after save: "+(d.after===undefined?"(none)":d.after))}
-  else lines.push("--- no click yet");
-  box.textContent=lines.join("\n");panel.querySelector(".cp-wrap").appendChild(box);
-}
 async function cpSave(fn,okMsg){
-  if(cpBusy)return;cpBusy=true;cpMsg="Saving…";
-  if(CP_DBG){if(!cpDbg)cpDbgNote({click:okMsg||"(unnamed action)",via:"api (ET/WT settings)",path:"b3Games/siteSettings/...",value:"?"});cpDbgLast=cpDbg;cpDbg=null;}
-  renderOwnerControl();
-  try{await fn();cpMsg=okMsg;if(cpDbgLast)cpDbgLast.result="OK (write accepted)";}
-  catch(e){console.error(e);cpMsg="Could not save. Please try again.";if(cpDbgLast)cpDbgLast.result="ERROR: "+(e&&e.code?e.code+" ":"")+(e&&e.message||e);}
-  if(cpDbgLast&&cpDbgLast.readBack){try{cpDbgLast.after=JSON.stringify(await cpDbgLast.readBack())}catch(e){cpDbgLast.after="read-back failed: "+(e.code||e.message)}}
+  if(cpBusy)return;cpBusy=true;cpMsg="Saving…";renderOwnerControl();
+  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save. Please try again.";}
   cpBusy=false;renderOwnerControl();
 }
 function applyRoleView(){
