@@ -30,7 +30,7 @@ test('assigned teacher can set schedule and stars only for assigned class',async
 test('owner admin retains access across classes while platform writes remain class-scoped',async()=>{
  const s=store({assigned:['et'],admin:{active:true}});
  await manageClassAccess(s,identity,{classId:'wt',action:'platform',mode:'locked'});
- assert.deepEqual(s.data.writes,[{'b3Games/workspaces/b3-2026/classes/wt/access/mode':'locked','b3Games/workspaces/b3-2026/classes/wt/siteEnabled':false}]);
+ assert.deepEqual(s.data.writes,[{'b3Games/workspaces/b3-2026/classes/wt/access/mode':'locked','b3Games/workspaces/b3-2026/classes/wt/siteEnabled':false,'b3Games/workspaces/b3-2026/classes/wt/access/openUntil':null}]);
 });
 test('teacher grant allowlist matches every classroom tool and excludes owner-only keys',async()=>{
  const expected=["sefer-hamitzvos","halacha","yiddish","posuk-practice-scroll","rashi-letters","gematria","shorashim","chazara","game-show","student-rewards","weekly-quiz","multiplayer-center","homework","gallery","tag","davening","chavrusa","name-picker","daily-checklist","class-pointer","sync-to-nigri"];
