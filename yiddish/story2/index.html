@@ -183,7 +183,7 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
     const t = audio.currentTime;
     if (t >= lesson.end - 0.08) {
       audio.pause();
-      audio.currentTime = lesson.end;
+      if (audio.currentTime > lesson.end - 0.09) audio.currentTime = lesson.end - 0.1;
       $('lessonEnd').textContent = 'Part complete! Choose Next part to continue.';
       return;
     }
