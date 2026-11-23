@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><script src="/domain-redirect.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Living Dream · Teacher Lessons</title>
+<style>
+body{font:16px Arial,sans-serif;margin:0;background:#f3efe5;color:#243141}header{background:#143e69;color:white;padding:18px 24px}header a{color:#fff4c5}
+main{max-width:960px;margin:auto;padding:18px}button,select,input,textarea{font:inherit;padding:9px;border-radius:6px;border:1px solid #aaa}button{cursor:pointer;background:#143e69;color:white}button:disabled{opacity:.5}
+section{padding:16px;margin:14px 0;background:white;border-radius:10px;box-shadow:0 1px 6px #0001}
+h2{margin-top:0}.part{border:1px solid #c1c8ce;padding:14px;margin:12px 0;border-radius:10px}
+textarea{width:100%;box-sizing:border-box;min-height:95px;line-height:1.5}
+small{color:#555}#notice{font-weight:bold;padding:8px}table{border-collapse:collapse;width:100%}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="../firebase-config.js"></script><script src="../site-settings.js"></script>
+<script src="../teacher-account.js"></script><script src="../api.js"></script>
+<header><a href="../teacher.html">← Yiddish Teacher</a><h1>Living Dream · Story 2</h1></header>
+<main><p id="notice" role="status">Sign in with your teacher account.</p><button id="login">Sign in with Google</button>
+<div id="panel" hidden><section><label>Parts students may open: <select id="unlock"></select></label>
+<p><small>All later parts are locked for students until you increase this number. Settings apply to the selected class.</small></p></section>
+<section><h2>Vocabulary by part</h2><p>Enter one Yiddish word and English meaning on each line, separated by a vertical bar: <b>ייִדיש | Yiddish</b>. Up to 15 per part. At least two words are needed for the practice quiz.</p><div id="parts"></div></section>
+<button id="save">Save Story 2 settings</button><section><h2>Student practice progress</h2><div id="progress"></div></section></div></main>
+<script>
+(()=>{'use strict';const $=id=>document.getElementById(id);let user=null,settings=null;
+const classId=new URLSearchParams(location.search).get('class')||'et';
+async function call(action,data={}){return YiddishAPI.call(action,{...data,classId,idToken:await user.getIdToken()})}
+function notice(s){$('notice').textContent=s}
+function render(r){settings=r.settings;$('panel').hidden=false;
+$('unlock').replaceChildren(...Array.from({length:9},(_,i)=>{const el=document.createElement('option');el.value=i;el.textContent=i===0?'0 — All locked':i+' '+(i===1?'part':'parts')+' open';return el}));
+$('unlock').value=settings.openParts;
+$('parts').replaceChildren(...settings.vocabulary.map((words,i)=>{const box=document.createElement('div');box.className='part';const h=document.createElement('h3');h.textContent='Part '+(i+1);const t=document.createElement('textarea');t.dataset.part=i;t.setAttribute('aria-label','Vocabulary for part '+(i+1));t.value=words.map(w=>w.yi+' | '+w.en).join('\n');box.append(h,t);return box}));
+const table=document.createElement('table'),head=document.createElement('tr');['Student','Completed vocabulary'].forEach(t=>{const e=document.createElement('th');e.textContent=t;head.append(e)});table.append(head);
+Object.values(r.students||{}).sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{const tr=document.createElement('tr');const n=document.createElement('td');n.textContent=s.name;const d=document.createElement('td');d.textContent=Object.values(s.progress.completed||{}).reduce((sum,x)=>sum+Object.keys(x||{}).length,0)+' correct words';tr.append(n,d);table.append(tr)});
+$('progress').replaceChildren(table)}
+async function load(){notice('Loading Story 2…');const r=await call('teacherStory2Load');render(r);notice('Story 2 settings ready.')}
+$('save').onclick=async()=>{if(!settings)return;const draft={version:settings.version,openParts:Number($('unlock').value),vocabulary:[]};try{
+for(const t of $('parts').querySelectorAll('textarea')){const words=t.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map(line=>{const at=line.indexOf('|');if(at===-1)throw Error('Part '+(Number(t.dataset.part)+1)+': use Yiddish | English on each line.');return {yi:line.slice(0,at).trim(),en:line.slice(at+1).trim()}});draft.vocabulary[Number(t.dataset.part)]=words;}
+$('save').disabled=true;notice('Saving…');const r=await call('teacherStory2Save',{settings:draft});settings=r.settings;notice('✓ Saved Story 2 lesson settings.')}catch(e){notice('Not saved: '+e.message)}finally{$('save').disabled=false}};
+$('login').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>notice(e.message));
+B3SiteSettings.onAuthStateChanged(async(u,ok)=>{user=ok?u:null;$('login').hidden=!!user;$('panel').hidden=!user;if(user)try{await load()}catch(e){notice(e.message)}else notice('Sign in with your teacher Google account.')});
+})();
+</script></html>
