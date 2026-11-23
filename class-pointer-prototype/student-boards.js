@@ -75,8 +75,11 @@
   // separate, editable text object on each boy's board.
   const MAX_ACTIVITY_IMAGE=420000;
   let activity=null,activityImage=null;
+  // Hebrew word tiles and word boxes (board-tiles-core.js). Without that file a tiles activity is simply not shown.
+  const Tiles=window.ClassPointerTiles||null;
   function cleanActivity(raw){
     if(!raw||raw.kind==='blank')return null;
+    if(raw.kind==='tiles')return Tiles?Tiles.cleanActivity(raw):null;
     if(raw.kind==='word'&&typeof raw.text==='string'){
       const text=raw.text.trim().slice(0,80),instruction=String(raw.instruction||'').trim().slice(0,120);
       if(text)return{kind:'word',text,instruction};
@@ -95,6 +98,7 @@
   }
   function chooseActivity(next,done){
     activity=cleanActivity(next);activityImage=null;
+    if(activity?.kind==='tiles')Tiles.loadFont(done);
     if(activity?.kind==='image'){
       const img=new Image();
       img.onload=()=>{if(activity?.data===img.src){activityImage=img;done()}};
@@ -115,6 +119,8 @@
   function paintActivity(ctx,w,h,board){
     if(activity?.kind==='image'){
       if(activityImage?.complete&&activityImage.naturalWidth)ctx.drawImage(activityImage,0,0,w,h);
+    }else if(activity?.kind==='tiles'){
+      Tiles.paint(ctx,w,h,activity,board.tiles);
     }else if(activity?.kind==='word'){
       const word=board.text||defaultWord();
       ctx.save();ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='middle';
@@ -132,7 +138,7 @@
       ctx.restore();
     }
   }
-  function emptyBoard(){return{strokes:[],drafts:{student:null,teacher:null},text:defaultWord()}}
+  function emptyBoard(){return{strokes:[],drafts:{student:null,teacher:null},text:defaultWord(),tiles:activity?.kind==='tiles'?Tiles.defaultState(activity):null}}
   // Student line ids start with "s", teacher line ids with "t". Each side may remove or clear only its own lines;
   // only the teacher may clear a whole board.
   function applyOp(board,op,by){
@@ -140,6 +146,13 @@
       if(activity?.kind!=='word'||!board.text)return false;
       const text=cleanWord(op.text);if(!text)return false;
       board.text=text;return true;
+    }
+    // A tile moved (by the student, or by the teacher on a student's board). Only the tile's place changes, never its words.
+    if(op.type==='board-tile'){
+      if(activity?.kind!=='tiles'||!board.tiles)return false;
+      const next=Tiles.move(activity,board.tiles,op.tile);
+      if(!next)return false;
+      board.tiles=next;return true;
     }
     if(op.type==='board-add'){
       const s=cleanStroke(op.stroke);
@@ -212,9 +225,10 @@
     syncBoardItems(board,'teacher',mine,act);
     for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
   }
-  function boardFromMessage(list,rawText){
+  function boardFromMessage(list,rawText,rawTiles){
     const board=emptyBoard();
     if(activity?.kind==='word')board.text=cleanWord(rawText)||defaultWord();
+    if(activity?.kind==='tiles')board.tiles=Tiles.cleanState(activity,rawTiles);
     if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s&&!(s.image&&pictureCount(board)>=MAX_IMAGES)){s.by=raw.by==='teacher'?'teacher':'student';board.strokes.push(s)}}
     return board;
   }
@@ -385,10 +399,14 @@
       lastTextMove=Date.now();
       o.apply({type:'board-text',text:{...t,x:p.x,y:p.y}});
     }
+    // Hebrew word tiles: picking one up works with any tool, so a student never has to switch tools to move a word.
+    const tileDrag=Tiles?Tiles.dragger({activity:()=>activity,state:()=>o.board().tiles,size:()=>({w:canvas.clientWidth,h:canvas.clientHeight}),
+      apply:op=>o.apply(op),redraw:()=>o.redraw()}):null;
     canvas.addEventListener('pointerdown',event=>{
       if(event.button!==0||pid!==null||!o.enabled())return;
       event.preventDefault();pid=event.pointerId;canvas.setPointerCapture(pid);
       const p=pos(event);
+      if(tileDrag&&activity?.kind==='tiles'&&tileDrag.down(p))return;
       if(o.tools.tool==='move'){
         const picture=pictureAt(p);
         grab=picture?{id:picture.id,dx:p.x-picture.points[0].x,dy:p.y-picture.points[0].y}:null;
@@ -400,6 +418,7 @@
     });
     canvas.addEventListener('pointermove',event=>{
       if(event.pointerId!==pid)return;
+      if(tileDrag?.active()){tileDrag.move(pos(event),false);return}
       const list=event.getCoalescedEvents?.();
       for(const item of list&&list.length?list:[event]){
         const p=pos(item);
@@ -416,16 +435,18 @@
     });
     const finish=event=>{
       if(event.pointerId!==pid)return;
+      if(tileDrag?.active()){tileDrag.up(pos(event));pid=null;return}
       if(grab){movePicture(pos(event),true);grab=null}
       else if(o.tools.tool==='move'&&o.board().text)moveWord(pos(event),true);
       pid=null;if(draft)commit();
     };
     canvas.addEventListener('pointerup',finish);canvas.addEventListener('lostpointercapture',finish);
-    canvas.addEventListener('pointercancel',event=>{if(event.pointerId!==pid)return;pid=null;grab=null;dropDraft()});
+    canvas.addEventListener('pointercancel',event=>{if(event.pointerId!==pid)return;pid=null;grab=null;tileDrag?.cancel();dropDraft()});
     return{
+      tiles:tileDrag,
       draft:()=>draft,
       point:()=>hover,
-      cancel(){if(pid!==null&&canvas.hasPointerCapture?.(pid))canvas.releasePointerCapture(pid);pid=null;grab=null;if(draft)dropDraft()}
+      cancel(){if(pid!==null&&canvas.hasPointerCapture?.(pid))canvas.releasePointerCapture(pid);pid=null;grab=null;tileDrag?.cancel();if(draft)dropDraft()}
     };
   }
 
@@ -507,6 +528,13 @@
   // =====================================================================
   if(!isTeacher){
     let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null,teacherPresenting=false;
+    // Tell the page when this student's whiteboard is actually on display (activity-share.js hides Share My Screen meanwhile).
+    let announced=null;
+    function announceBoard(){
+      const shown=on&&mode==='boards'&&!blocked&&!view.hidden&&(!B.embedded||stage.style.display!=='none');
+      if(shown===announced)return;announced=shown;
+      try{document.dispatchEvent(new CustomEvent('classpointer:student-board',{detail:{on:shown}}))}catch{}
+    }
     // Whatever the teacher presents comes first: no Share My Screen button meanwhile, and a share from this page is paused until the teacher stops.
     document.addEventListener('classpointer:teacher-presenting',event=>{
       teacherPresenting=event.detail?.on===true;
@@ -531,10 +559,10 @@
     if(!B.embedded)bar.append(full);
     else{
       const back=button('↩ Back to Activity','Hide the whiteboard without losing your drawing',()=>{
-        stage.style.display='none';returnBoard.hidden=false;
+        stage.style.display='none';returnBoard.hidden=false;announceBoard();
       });
       const returnBoard=button('📝 Show My Whiteboard','Return to your whiteboard',()=>{
-        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw()}
+        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw();announceBoard()}
       });
       returnBoard.id='fttReturnPointerBoard';
       returnBoard.hidden=true;
@@ -558,7 +586,7 @@
       // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
       const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
       drawGroup.hidden=!boardsOn||oneToolbar;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
-      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
+      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';announceBoard();
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
       shareBtn.hidden=teacherPresenting;
@@ -605,6 +633,8 @@
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
       getItems:()=>board.strokes.filter(item=>item.by==='student'),
       setItems(list){syncBoardItems(board,'student',list,act)},
+      // Hebrew word tiles can be picked up with any drawing tool.
+      grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
@@ -655,7 +685,7 @@
       view.hidden=!next;document.body.classList.toggle('boards-on',next);
       if(B.embedded){stage.style.display=next?'block':'none';stage.dispatchEvent(new Event('classpointer:board-state'))}
       if(next)stage.dispatchEvent(new PointerEvent('pointerleave'));
-      redraw();
+      redraw();announceBoard();
     }
     // ---------- The teacher's pointer and drawings on MY shared screen ----------
     // The teacher opens my screen large and points or draws on it (screen-annotate.js). Positions are 0..1 across
@@ -732,7 +762,7 @@
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
         if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,id:activity.id,subject:activity.subject,important:activity.important});
-        board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text):emptyBoard();
+        board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text,message.tiles):emptyBoard();
         // In embedded mode, screens are shared via the existing activity button;
         // never cover Shorashim with the old Pointer screen-sharing panel.
         show(on&&!(B.embedded&&mode==='screens'));
@@ -749,7 +779,9 @@
     function exportBoard(){
       if(!boardOpen())return null;
       return{version:1,kind:'student-board',strokes:board.strokes.map(s=>({...s,points:s.points.map(p=>({x:p.x,y:p.y}))})),
-        images:board.strokes.filter(s=>s.image).map(s=>s.id),text:board.text?{...board.text}:null,activity:activity?{...activity}:null};
+        images:board.strokes.filter(s=>s.image).map(s=>s.id),text:board.text?{...board.text}:null,activity:activity?{...activity}:null,
+        // Where every Hebrew tile is (the words themselves are in `activity`).
+        ...(activity?.kind==='tiles'&&board.tiles?{tiles:board.tiles.map(t=>({...t}))}:{})};
     }
     // Replaces my own marks with the saved ones. Saved data is checked like anything from the network, sent to the
     // teacher as normal board changes (so every limit holds), and the teacher's marks and activity are left alone.
@@ -767,6 +799,18 @@
       // locked background when the teacher has no picture of their own on this board now.
       const picture=cleanActivity(data.activity);
       if(picture?.kind==='image'&&!activity)chooseActivity(picture,redraw);
+      // Hebrew tiles: put each tile back where the student left it. If the teacher is not showing tiles now, the saved
+      // words and boxes come back too (on this student's board only).
+      const savedTiles=Tiles&&data.activity?.kind==='tiles'?Tiles.cleanActivity(data.activity):null;
+      if(savedTiles){
+        if(!activity){chooseActivity(savedTiles,redraw);board.tiles=Tiles.cleanState(activity,data.tiles)}
+        else if(activity.kind==='tiles'&&JSON.stringify(activity.tiles)===JSON.stringify(savedTiles.tiles)&&JSON.stringify(activity.boxes)===JSON.stringify(savedTiles.boxes)){
+          // A box can hold one tile, so tiles are put down one by one, free ones first.
+          const wanted=Tiles.cleanState(activity,data.tiles);
+          for(const tile of board.tiles)act({type:'board-tile',tile:{id:tile.id,x:tile.x,y:tile.y,box:''}});
+          for(const tile of wanted)act({type:'board-tile',tile});
+        }
+      }
       return true;
     }
     const exportPng=()=>boardOpen()?boardPng(board):Promise.reject(Error('Your whiteboard is not open.'));
@@ -954,7 +998,47 @@
     }};
   clipReady.then(clip=>{if(clip)clip.register(classTarget);else pasteAll.hidden=true});
   const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
+  // 🔤 Hebrew tiles: the teacher types or pastes Hebrew (nikud is kept). Each word becomes a tile that every student can
+  // drag into the word boxes on their own board. "Split into parts" lets the teacher cut words with | (ו|אמר|ו).
+  const sendTiles=button('🔤 Hebrew tiles','Type or paste Hebrew words. Each word becomes a tile students drag into word boxes',()=>openTilesDialog());
+  const tilesDialog=el('div','boards-tiles-dialog');tilesDialog.hidden=true;tilesDialog.setAttribute('role','dialog');tilesDialog.setAttribute('aria-label','Hebrew word tiles');
+  tilesDialog.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
+  function openTilesDialog(){
+    if(!Tiles)return;
+    const panel=el('div','boards-tiles-panel');
+    panel.style.cssText='background:white;color:#142642;border-radius:15px;padding:18px;width:min(640px,95vw);max-height:90vh;overflow:auto;box-shadow:0 16px 55px #0005;display:grid;gap:10px';
+    const field=(label,node)=>{const wrap=el('label');wrap.style.cssText='display:grid;gap:4px;font-weight:700';wrap.append(el('span',null,label),node);return wrap};
+    const text=el('textarea');text.rows=4;text.dir='rtl';text.lang='he';text.maxLength=Tiles.LIMITS.source;
+    text.style.cssText='font:400 26px "David Libre","Frank Ruehl CLM","Times New Roman",serif;padding:8px;border:2px solid #94a3b8;border-radius:10px;width:100%;box-sizing:border-box';
+    text.placeholder='Paste or type the Hebrew words here';text.setAttribute('aria-label','Hebrew words');
+    const whole=el('input'),parts=el('input');for(const r of [whole,parts]){r.type='radio';r.name='boardsTilesMode'}whole.checked=true;
+    const modeRow=el('div');modeRow.style.cssText='display:flex;gap:18px;flex-wrap:wrap;font-weight:700';
+    const wholeLabel=el('label',null),partsLabel=el('label',null);
+    wholeLabel.append(whole,' Whole words (students get each word as one tile)');
+    partsLabel.append(parts,' Already split into parts (write | between parts, like ו|אמר|ו)');
+    modeRow.append(wholeLabel,partsLabel);
+    const boxes=el('input');boxes.type='number';boxes.min='0';boxes.max=String(Tiles.LIMITS.boxes);boxes.placeholder='One box for each tile';boxes.style.cssText='padding:6px;border:2px solid #94a3b8;border-radius:8px;width:100%;box-sizing:border-box';
+    const labels=el('input');labels.type='text';labels.dir='auto';labels.maxLength=120;labels.placeholder='Box names (optional), separated by commas, for example: prefix, shoresh, suffix';labels.style.cssText=boxes.style.cssText;
+    const instruction=el('input');instruction.type='text';instruction.dir='auto';instruction.maxLength=Tiles.LIMITS.instruction;instruction.placeholder='Instructions (optional)';instruction.style.cssText=boxes.style.cssText;
+    const note=el('p');note.setAttribute('role','status');note.style.cssText='margin:0;min-height:1.3em;font-weight:700;color:#475569';
+    const close=()=>{tilesDialog.hidden=true;tilesDialog.style.display='none';tilesDialog.replaceChildren()};
+    const build=()=>Tiles.parse(text.value,{presplit:parts.checked,boxes:boxes.value,labels:labels.value,instruction:instruction.value});
+    const refresh=()=>{const r=text.value.trim()?build():null;note.style.color=r?.error?'#b91c1c':'#475569';note.textContent=!r?'':r.error||(r.activity.tiles.length+' tile'+(r.activity.tiles.length===1?'':'s')+' and '+r.activity.boxes.length+' box'+(r.activity.boxes.length===1?'':'es')+'.')};
+    for(const node of [text,whole,parts,boxes,labels,instruction])node.addEventListener('input',refresh);
+    for(const node of [whole,parts])node.addEventListener('change',refresh);
+    const send=button('✓ Send to all boards','Every student gets their own copy of these tiles and boxes',()=>{
+      const r=build();if(r.error){note.style.color='#b91c1c';note.textContent=r.error;return}
+      close();sendActivity(r.activity);
+    });
+    const cancel=button('Cancel','Close without sending',()=>{close();B.status('Nothing was sent.')});
+    const row=el('div');row.style.cssText='display:flex;gap:10px;flex-wrap:wrap';row.append(send,cancel);
+    panel.append(el('h3',null,'Hebrew word tiles'),field('Hebrew words',text),modeRow,field('Number of word boxes',boxes),field('Box names',labels),field('Instructions',instruction),note,row);
+    tilesDialog.replaceChildren(panel);tilesDialog.hidden=false;tilesDialog.style.display='flex';text.focus();
+  }
+  tilesDialog.addEventListener('keydown',e=>{if(e.key==='Escape')tilesDialog.querySelector('button:last-child')?.click()});
+  stage.appendChild(tilesDialog);shield(tilesDialog);
+  if(!Tiles)sendTiles.hidden=true;
+  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendTiles,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
@@ -1000,7 +1084,7 @@
     });
   }
   function updateActivityLabel(){
-    activityLabel.textContent=activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all students':'Boards are blank now';
+    activityLabel.textContent=activity?.kind==='tiles'?'Hebrew tiles sent: '+activity.tiles.length+' tile'+(activity.tiles.length===1?'':'s'):activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all students':'Boards are blank now';
   }
 
   // Focus bar: one student large.
@@ -1060,7 +1144,7 @@
     if(!on||suspended||excluded(m,mode)){if(!on||excluded(m,mode))closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
-    if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes;message.text=b.text}}
+    if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles}}
     B.send(m.connection,message);
   }
 
@@ -1194,7 +1278,7 @@
     if(!on||mode!=='boards')return;
     const item=cleanActivity(next);
     if(next&&!item){B.fail('Please enter a word or choose a valid picture.');return}
-    const hasWork=Array.from(boards.values()).some(b=>b.strokes.length||(activity?.kind==='word'&&b.text&&JSON.stringify(b.text)!==JSON.stringify(defaultWord())));
+    const hasWork=Array.from(boards.values()).some(b=>b.strokes.length||(activity?.kind==='word'&&b.text&&JSON.stringify(b.text)!==JSON.stringify(defaultWord()))||(activity?.kind==='tiles'&&b.tiles&&JSON.stringify(b.tiles)!==JSON.stringify(Tiles.defaultState(activity))));
     if(hasWork&&!confirm('This will erase the students\' current marks and start a new activity. Continue?'))return;
     boards.clear();chooseActivity(item,dirtyAll);
     for(const m of admitted())sendMode(m);
@@ -1203,7 +1287,7 @@
       // How many boards got it, and who did not (a paused or turned-off whiteboard gets nothing).
       const here=admitted(),skipped=here.filter(m=>excluded(m,'boards')||isBlocked(m)),got=here.length-skipped.length;
       B.status('Sent to '+got+' of '+here.length+' student'+(here.length===1?'':'s')+'. '+(skipped.length?'Not sent to '+skipped.slice(0,5).map(m=>m.name).join(', ')+(skipped.length>5?' and more':'')+' (their whiteboard is paused or off).':'Each student gets their own copy in My files.'));
-    }else B.status(item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':'All boards are blank.');
+    }else B.status(item?.kind==='tiles'?'The tiles and word boxes are on every student\'s board. Click a student\'s board to watch them move the words live.':item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':'All boards are blank.');
   }
   function setFocus(id){
     drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();
@@ -1328,6 +1412,8 @@
     // Every mark on the board: the student's too, so Select, move, resize, recolor, nudge and delete work on them.
     getItems:()=>focusBoard()?.strokes.slice()||[],
     setItems(list){if(boardOpen())syncTeacherBoardItems(focusBoard(),list,act)},
+    // The teacher can move a student's tiles too (for example to show where a word goes).
+    grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
     live(draft){
       const m=focusMember();if(!m||!boardOpen())return;
       const op={type:'board-draft',stroke:draft||null};

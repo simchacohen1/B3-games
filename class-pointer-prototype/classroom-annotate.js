@@ -45,10 +45,11 @@
   const canSelect=()=>allowed('select')&&(teacher?['whiteboard','pdf','webpage'].includes(B.lessonKind?.()):highlightShapes().length>0);
   // The arrow: where Select works it is also the mouse (scroll, drag the page, click a link), so there is one
   // button for both. A shared screen keeps the plain Mouse.
-  const arrow=tool=>tool==='hand'||tool==='select';
+  const arrow=tool=>tool==='pointer'||tool==='hand'||tool==='select';
   function tools(){
-    const out=[canSelect()?'select':'hand'];
-    if(kinds(POINTERS).length)out.push('pointer');
+    // One Pointer for the mouse and the dot (clicks, typing and scrolling work as usual), then Select for marks.
+    const out=['pointer'];
+    if(canSelect())out.push('select');
     if(kinds(HIGHLIGHTS).length)out.push('highlight');
     if(allowed('text'))out.push('text');
     if(kinds(lessonShapes()).length)out.push('shape');
@@ -81,9 +82,8 @@
     get defaultTool(){return teacher&&B.lessonKind?.()==='whiteboard'?'pen':'pointer'},
     get tools(){return tools()},
     get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(lessonShapes())}},
-    // On the lesson the Hand is the Mouse: no pointing, no drawing, the page is used as a page.
-    toolLabels:{hand:['🖱','Mouse',teacher?'Stop pointing and drawing, and move the shared screen.':'Stop pointing and drawing, and scroll the page.'],
-      // One button, a computer mouse, first on the toolbar.
+    // On the lesson the Pointer is also the mouse: click, type and scroll as usual while the class sees a dot where you point.
+    toolLabels:{pointer:['🔴','Pointer',teacher?'Use the page normally: click, type, scroll and move the shared screen. The class sees a dot where you point.':'Use the page normally: click, type and scroll. Your teacher sees a dot where you point.'],
       select:['🖱️','Select','Click one of your marks to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them. Everything else works like a normal mouse: scroll, drag the page, click a link to open it for the class.',-1]},
     // Only the tools this lesson has are shown; words have their own size control under the lesson.
     hideUnused:true,ownTextSize:true,
@@ -99,7 +99,7 @@
     delegate:{
       apply({tool,variant,color,size,open}){
         if(fromLesson)return;
-        B.setNavigation?.(arrow(tool)&&open);
+        B.setNavigation?.(arrow(tool)&&open,tool==='pointer');
         if(tool==='pointer'||tool==='highlight')set(toolSel,variant);
         else if(tool==='shape'){shapeVariant=variant;set(toolSel,valueOf(lessonShapes().find(kind=>kind[0]===variant)||[]))}
         else if(['text','eraser','pen','select'].includes(tool))set(toolSel,tool);
@@ -150,7 +150,7 @@
       const sig=on?tools().join()+'|'+[POINTERS,HIGHLIGHTS,lessonShapes()].map(list=>kinds(list).length).join():'';
       if(sig!==lastSig){lastSig=sig;FA.refresh()}
       const s=FA.state();
-      if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true);
+      if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true,s.tool==='pointer');
     };
     setInterval(check,400);check();
     return;
@@ -266,7 +266,7 @@
     placeGutter();
     // Hand = the lesson's mouse mode. A key press there turns it off, so keep it on while Hand is chosen.
     const s=FA.state();
-    if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true);
+    if(pushed&&s.surface==='classroom'&&s.mode==='open'&&arrow(s.tool)&&!B.navigating?.())B.setNavigation?.(true,s.tool==='pointer');
   }
   setInterval(check,400);check();
 })();

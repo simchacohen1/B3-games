@@ -99,8 +99,8 @@ test('student-boards sends only after the teacher confirms, through the existing
 
 test('the toolbar Send menu offers This whiteboard (and a PDF); More no longer carries Send; the classroom loads the new scripts',()=>{
   assert.match(annotate,/\{icon:'📝',label:'This whiteboard',disabled:!window\.FTTSavedWork\?\.sendCurrent,onClick:\(\)=>window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}/);
-  assert.match(html,/student-boards[.]js[?]v=20261122-presenting1/);
-  assert.match(html,/classroom-annotate[.]js[?]v=combo2/);
+  assert.match(html,/student-boards[.]js[?]v=20261123-tiles2/);
+  assert.match(html,/classroom-annotate[.]js[?]v=20261123-tiles2/);
   assert.match(html,/saved-work[.]js[?]v=20261117-send1/);
 });
 
